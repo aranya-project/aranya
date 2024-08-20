@@ -1,0 +1,165 @@
+[env]
+CARGO_MAKE_EXTEND_WORKSPACE_MAKEFILE = 1
+RUSTDOCFLAGS = { value = "", condition = { env_not_set = ["RUSTDOCFLAGS"] } }
+NIGHTLY = { script = ["cat rust-nightly.txt"], condition = { env_not_set = ["NIGHTLY"] } }
+
+RUSTFLAGS = { value = "-Dwarnings", condition = { env_true = ["CARGO_MAKE_CI"] } }
+
+[config]
+default_to_workspace = false
+skip_core_tasks = true
+skip_git_env_info = true
+skip_rust_env_info = true
+
+
+[tasks.default]
+description = "List tasks"
+script = "cargo make --quiet --list-all-steps --hide-uninteresting"
+
+
+# Build
+[tasks.build-code]
+category = "build"
+description = "Build Code"
+command = "cargo"
+args = ["build", "--verbose", "--release", "${@}"]
+
+
+# Test
+[tasks.unit-tests]
+category = "test"
+description = "Run Unit Tests"
+workspace = true
+command = "cargo"
+args = ["--verbose", "test-all-features", "${@}"]
+dependencies = ["install-cargo-all-features"]
+
+
+# Security
+[tasks.cargo-audit]
+category = "security"
+install_crate = { crate_name = "cargo-audit", version = "0.20.0", binary = "cargo-audit", test_arg = "-V" }
+command = "cargo"
+args = ["audit"]
+
+[tasks.cargo-deny]
+category = "security"
+install_crate = { crate_name = "cargo-deny", version = "0.16.1", binary = "cargo-deny", test_arg = "-V" }
+command = "cargo"
+args = ["deny", "check"]
+
+
+# Correctness
+[tasks.correctness]
+category = "correctness"
+description = "Run correctness checks"
+run_task = { name = [
+    "fmt",
+    "check-features",
+    "clippy",
+    "machete",
+] }
+
+[tasks.check-fmt]
+dependencies = ["check-fmt-rust", "check-fmt-toml"]
+description = "Check file formatting"
+
+[tasks.fmt]
+dependencies = ["fmt-rust", "fmt-toml"]
+description = "Format files"
+
+[tasks.check-fmt-rust]
+category = "correctness"
+description = "Check rust code formatting"
+toolchain = "${NIGHTLY}"
+command = "cargo"
+args = ["fmt", "--all", "--", "--check"]
+dependencies = ["install-nightly"]
+
+[tasks.fmt-rust]
+category = "correctness"
+description = "Format rust code"
+toolchain = "${NIGHTLY}"
+command = "cargo"
+args = ["fmt", "--all"]
+dependencies = ["install-nightly"]
+
+[tasks.check-fmt-toml]
+category = "correctness"
+description = "Check toml formatting"
+script = "git ls-files -z '*.toml' | xargs -0 -- taplo fmt --check --diff"
+dependencies = ["install-taplo"]
+
+[tasks.fmt-toml]
+category = "correctness"
+description = "Format toml"
+script = "git ls-files -z '*.toml' | xargs -0 taplo fmt"
+dependencies = ["install-taplo"]
+
+[tasks.install-taplo]
+private = true
+install_crate = { crate_name = "taplo-cli", version = "0.9.0", binary = "taplo", test_arg = ["-V"] }
+
+[tasks.check-features]
+category = "correctness"
+description = "Check features"
+workspace = true
+command = "cargo"
+args = ["--verbose", "check-all-features"]
+dependencies = ["install-cargo-all-features"]
+
+[tasks.clippy]
+category = "correctness"
+description = "Run clippy to lint code"
+workspace = true
+script = '''
+cargo clippy
+cargo clippy --all-targets
+cargo clippy --no-default-features
+cargo clippy --all-targets --all-features
+'''
+install_crate = { rustup_component_name = "clippy" }
+
+[tasks.machete]
+command = "cargo"
+args = ["machete"]
+install_crate = { crate_name = "cargo-machete", version = "0.6.2", binary = "cargo-machete", test_arg = "--version" }
+
+
+# Docs
+[tasks.gen-docs-nightly]
+category = "docs"
+description = "Generate docs with rust nightly"
+toolchain = "${NIGHTLY}"
+env = { RUSTDOCFLAGS = "--cfg docs ${RUSTDOCFLAGS}" }
+command = "cargo"
+args = ["doc", "--all-features"]
+dependencies = ["install-nightly"]
+
+[tasks.zip-docs]
+category = "docs"
+description = "Zip docs"
+script = "zip -qr docs.zip target/doc"
+
+
+# Misc
+[tasks.install-nightly]
+description = "Install nightly rust"
+# First check if the toolchain is installed, because that is much faster.
+# Don't do this if you want to keep a rolling channel up-to-date.
+script = "rustup run ${NIGHTLY} true 2>/dev/null || rustup toolchain install ${NIGHTLY}"
+
+[tasks.git-unchanged]
+description = "Verify files are unchanged"
+script = '''
+git diff
+status=$(git status -s)
+if [[ -n "$status" ]]; then
+    echo "$status"
+    exit 1
+fi
+'''
+
+[tasks.install-cargo-all-features]
+private = true
+install_crate = { crate_name = "cargo-all-features", version = "1.10.0", binary = "cargo-check-all-features", test_arg = ["-V"] }

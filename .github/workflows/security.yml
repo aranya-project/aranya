@@ -1,0 +1,49 @@
+name: "Security Checks"
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      workflow:
+        required: true
+        type: string
+    secrets:
+      CC_BUILD_TOKEN:
+        required: true
+      GH_DOTCOM_TOKEN:
+        required: true
+
+env:
+  REV: ${{ github.run_id }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  security-checks:
+    strategy:
+      matrix:
+        runner: ["self-hosted-linux-amd64"]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./.github/actions/setup
+        with:
+          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
+          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
+          runner: ${{ matrix.runner }}
+
+      - name: Run cargo audit
+        # TODO: https://github.com/rustsec/rustsec/issues/1217
+        run: |
+          rustup toolchain install 1.79
+          cargo +1.79 make cargo-audit
+
+      - name: Run cargo deny
+        run: cargo make cargo-deny

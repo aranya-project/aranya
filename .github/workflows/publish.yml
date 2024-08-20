@@ -1,0 +1,69 @@
+name: "Publish Release Artifacts On Tag Creation"
+
+on:
+  push:
+    tags:
+      - "*"
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      workflow:
+        required: true
+        type: string
+    secrets:
+      CC_BUILD_TOKEN:
+        required: true
+      GH_DOTCOM_TOKEN:
+        required: true
+
+jobs:
+  release:
+    strategy:
+      matrix:
+        runner: ["self-hosted-linux-amd64"]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Create Release
+        id: release
+        uses: spideroak-inc/release-action@v1.12.0
+        with:
+          allowUpdates: true
+          prerelease: false
+          makeLatest: legacy
+          token: ${{ secrets.CC_BUILD_TOKEN }}
+    outputs:
+      upload-url: ${{ steps.release.outputs.upload_url }}
+
+  build:
+    uses: ./.github/workflows/doc.yml
+    with:
+      workflow: doc
+    secrets:
+      CC_BUILD_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
+      GH_DOTCOM_TOKEN: ${{ secrets.GH_DOTCOM_TOKEN }}
+
+  publish-docs:
+    needs:
+      - release
+      - build
+    strategy:
+      matrix:
+        runner: ["self-hosted-linux-amd64"]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Download doc artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: docs
+          path: docs
+      - name: List files
+        run: ls -R -al
+      - name: Upload docs to tagged release
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
+        with:
+          upload_url: ${{ needs.release.outputs.upload-url }}
+          asset_path: docs/docs.zip
+          asset_name: docs/docs.zip
+          asset_content_type: application/zip
