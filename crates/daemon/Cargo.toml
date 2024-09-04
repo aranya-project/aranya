@@ -13,3 +13,8 @@ workspace = true
 
 
 [dependencies]
+anyhow = { version = "1.0.22" }
+clap = { version = "4", features = ["derive"] }
+deser-hjson = { version = "2" }
+pretty_assertions = { version = "1.4" }
+serde = { version = "1" }
