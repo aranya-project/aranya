@@ -97,6 +97,7 @@ version = 2
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
 allow = [
     "Apache-2.0",
+    "BSD-3-Clause",
     "MIT",
     "Unicode-DFS-2016",
 ]
@@ -205,7 +206,10 @@ deny = [
 #exact = true
 
 # Certain crates/versions that will be skipped when doing duplicate detection.
-skip = []
+skip = [
+    "generic-array@0.14.7",
+    "syn@1.0.109",
+]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive
 # dependencies starting at the specified crate, up to a certain depth, which is
