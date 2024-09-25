@@ -1,0 +1,41 @@
+[package]
+name = "transport"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[features]
+default = ["tcp"]
+quic = ["dep:quinn", "dep:rcgen", "dep:rustls", "dep:tokio-retry"]
+tcp = []
+udp = []
+
+[dependencies]
+anyhow = { workspace = true }
+postcard = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true, features = [
+    "rt-multi-thread",
+    "fs",
+    "net",
+    "macros",
+    "io-util",
+    "sync",
+    "time",
+] }
+tracing = { workspace = true }
+
+# quic deps
+quinn = { workspace = true, optional = true }
+rcgen = { workspace = true, features = ["x509-parser"], optional = true }
+rustls = { workspace = true, optional = true }
+tokio-retry = { workspace = true, optional = true }
+
+[dev-dependencies]
+test-log = { workspace = true }
+
+[lints]
+workspace = true

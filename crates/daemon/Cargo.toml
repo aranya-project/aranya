@@ -15,11 +15,11 @@ workspace = true
 [dependencies]
 policy-ifgen = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
 
-anyhow = { version = "1.0.22" }
+anyhow = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 deser-hjson = { version = "2" }
 pretty_assertions = { version = "1.4" }
-serde = { version = "1" }
+serde = { workspace = true }
 
 [build-dependencies]
 policy-ifgen-build = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
