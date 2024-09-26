@@ -101,7 +101,9 @@ allow = [
     "ISC",
     "MIT",
     "OpenSSL",
+    "Unicode-3.0",
     "Unicode-DFS-2016",
+    "Zlib",
 ]
 # The confidence threshold for detecting a license from license text.
 # The higher the value, the more closely the license text must be to the
@@ -216,6 +218,7 @@ skip = [
     "ring@0.16.20",
     "spin@0.5.2",
     "syn@1.0.109",
+    "synstructure@0.12.6",
     "untrusted@0.7.1",
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate

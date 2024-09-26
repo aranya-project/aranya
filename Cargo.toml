@@ -35,13 +35,35 @@ wildcard_imports = "warn"
 
 
 [workspace.dependencies]
+
 anyhow = { version = "1.0.86" }
+aps-util = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+aps = { git = "https://git.spideroak-inc.com/spideroak-inc/aps.git", branch = "main" }
+crypto = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main", features = ["alloc", "fs-keystore", "std"] }
+policy-ifgen-build = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+runtime = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main", features = ["std"] }
+
+daemon = { path = "crates/daemon" }
+keygen = { path = "crates/keygen" }
+transport = { path = "crates/transport" }
+
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 quinn = { version = "0.10.1" }
 rcgen = { version = "0.12" }
 rustls = { version = "0.21.11", default-features = false }
 serde = { version = "1" }
-tokio = { version = "1.36", default-features = false, features = ["rt", "io-util", "net"] }
+serial_test = { version = "3" }
+tempfile = { version = "3.8.1" }
+test-log = { version = "0.2.14", default-features = false, features = ["trace"] }
+tokio = { version = "1.36", default-features = false, features = ["rt", "rt-multi-thread", "fs", "net", "macros", "io-util", "sync"] }
 tokio-retry = { version = "0.3" }
 tracing = { version = "0.1.40" }
-test-log = { version = "0.2.14", default-features = false, features = ["trace"] }
+
+
+[profile.dev]
+opt-level = 1
+
+[profile.release]
+lto = true
+opt-level = "z"
+strip = true

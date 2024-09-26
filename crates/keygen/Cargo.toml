@@ -1,0 +1,16 @@
+[package]
+name = "keygen"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+crypto = { workspace = true, features = ["fs-keystore"] }
+serde = { workspace = true, features = ["derive"] }

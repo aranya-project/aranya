@@ -8,7 +8,8 @@ publish.workspace = true
 rust-version.workspace = true
 
 [features]
-default = ["tcp"]
+# TODO: rm quic from defaults on syncer PR.
+default = ["quic", "tcp"]
 quic = ["dep:quinn", "dep:rcgen", "dep:rustls", "dep:tokio-retry"]
 tcp = []
 udp = []

@@ -1,0 +1,32 @@
+[package]
+name = "test-util"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+crypto = { workspace = true, features = ["alloc", "fs-keystore", "std"] }
+daemon = { workspace = true }
+keygen = { workspace = true }
+rcgen = { workspace = true, features = ["x509-parser"] }
+runtime = { workspace = true, features = ["libc"] }
+rustls = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "fs", "net", "macros", "io-util"] }
+transport = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+
+[package.metadata.cargo-all-features]
+always_include_features = [
+    "test-internal",
+]
+
+denylist = [
+    "slice_first_last_chunk",
+]

@@ -13,13 +13,46 @@ workspace = true
 
 
 [dependencies]
+buggy = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+crypto = { workspace = true }
+crypto-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+device-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+envelope-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+idam-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+perspective-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+policy-compiler = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
 policy-ifgen = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+policy-lang = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+policy-vm = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+runtime = { workspace = true }
+
+aps = { workspace = true }
+aps-util = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { version = "4", features = ["derive"] }
 deser-hjson = { version = "2" }
-pretty_assertions = { version = "1.4" }
+keygen = { workspace = true }
+postcard = { workspace = true }
 serde = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+transport = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { version = "1.4" }
+serial_test = { workspace = true }
+test-log = { workspace = true }
+test-util = { path = "./test-util" }
 
 [build-dependencies]
-policy-ifgen-build = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
+policy-ifgen-build = { workspace = true }
+
+[[bin]]
+name = "daemon"
+path = "src/main.rs"
+test = false
+
+[[test]]
+name = "tests"
+path = "tests/tests.rs"

@@ -3,9 +3,7 @@
 use std::path::PathBuf;
 
 use clap::Parser;
-use config::Config;
-
-mod config;
+use daemon::config::Config;
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -15,8 +13,6 @@ struct Args {
 }
 
 fn main() {
-    println!("Hello, world!");
-
     let args = Args::parse();
     let _cfg = Config::load(args.cfg);
 }
