@@ -4,7 +4,6 @@ use std::{
     borrow::Cow,
     collections::BTreeSet,
     future::Future,
-    io,
     marker::PhantomData,
     net::SocketAddr,
     sync::{
@@ -24,12 +23,13 @@ use runtime::{
     StorageProvider, SyncRequester, SyncResponder, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
 };
 use serde::{Deserialize, Serialize};
-use tokio::{sync::Mutex, task::JoinSet};
-use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
-use transport::{
-    quic::{QuicClient, QuicServer},
-    Stream,
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpStream},
+    sync::Mutex,
+    task::JoinSet,
 };
+use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
 
 use crate::{
     addr::Addr,
@@ -50,8 +50,6 @@ pub enum SyncResponse {
 pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
-    /// Used to perform sync requests.
-    client: QuicClient,
     /// Used to disable the syncer.
     syncer_disabled: AtomicBool,
     /// A list of peers to skip syncing with.
@@ -61,10 +59,9 @@ pub struct Client<EN, SP, CE> {
 
 impl<EN, SP, CE> Client<EN, SP, CE> {
     /// Creates a new [`Client`].
-    pub const fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>, client: QuicClient) -> Self {
+    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Self {
         Client {
             aranya,
-            client,
             syncer_disabled: AtomicBool::new(false),
             syncer_skiplist: Mutex::const_new(BTreeSet::new()),
             _eng: PhantomData,
@@ -130,28 +127,41 @@ where
             }
         }
 
-        // connect the client to the server.
-        let stream = self
-            .client
-            .connect(&SocketAddr::V4(addr.lookup().await?))
-            .await?;
-
         // send the sync request.
         let mut syncer = SyncRequester::new(*id, &mut Rng);
-        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+        let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let (len, _) = {
             let mut client = self.aranya.lock().await;
             // TODO: save PeerCache somewhere.
             syncer
-                .poll(&mut buf, client.provider(), &mut PeerCache::new())
+                .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
                 .context("sync poll failed")?
         };
-        debug!(len = len, "sync poll finished");
-        buf.truncate(len);
+        debug!(?len, "sync poll finished");
+        send_buf.truncate(len);
+        let addr = SocketAddr::V4(addr.lookup().await?);
+        let mut stream = TcpStream::connect(addr).await?;
+
+        stream
+            .write_all(&send_buf)
+            .await
+            .context("failed to write sync request")?;
+        stream.shutdown().await?;
+        debug!(?addr, "sent sync request");
+
+        // get the sync response.
+        let mut recv = Vec::new();
+        stream
+            .read_to_end(&mut recv)
+            .await
+            .context("failed to read sync response")?;
+        debug!(?addr, n = recv.len(), "received sync response");
 
         // process the sync response.
-        let data = match stream.send(&buf).await? {
+        let resp =
+            postcard::from_bytes(&recv).context("postcard unable to deserialize sync response")?;
+        let data = match resp {
             SyncResponse::Ok(data) => data,
             SyncResponse::Err(msg) => bail!("sync error: {msg}"),
         };
@@ -293,27 +303,21 @@ where
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
-    /// Used to receive sync requests.
-    server: QuicServer,
+    /// Used to receive sync requests and send responses.
+    listener: TcpListener,
     /// Tracks running tasks.
-    set: JoinSet<Result<()>>,
+    set: JoinSet<()>,
 }
 
 impl<EN, SP> Server<EN, SP> {
     /// Creates a new `Server`.
     #[inline]
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>, server: QuicServer) -> Self {
+    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>, listener: TcpListener) -> Self {
         Self {
             aranya,
-            server,
+            listener,
             set: JoinSet::new(),
         }
-    }
-
-    /// Returns the address that the server is listening on.
-    #[inline]
-    pub fn local_addr(&self) -> io::Result<SocketAddr> {
-        self.server.local_addr()
     }
 }
 
@@ -325,56 +329,66 @@ where
     /// Begins accepting incoming requests.
     #[instrument(skip_all)]
     pub async fn serve(mut self) -> Result<()> {
-        while let Some(incoming) = self.server.accept().await {
-            let stream = match incoming {
-                Ok(stream) => stream,
+        // accept incoming connections to the server
+        loop {
+            let incoming = self.listener.accept().await;
+            let (mut stream, addr) = match incoming {
+                Ok(incoming) => incoming,
                 Err(err) => {
                     error!(err = %err, "stream failure");
                     continue;
                 }
             };
-            debug!(%stream.addr, stream = %stream.recv.id(), "received sync request");
+            debug!(?addr, "received sync request");
 
             let client = Arc::clone(&self.aranya);
-            let stream_id = stream.recv.id();
-            let addr = stream.addr;
             self.set.spawn(
                 async move {
-                    if let Err(err) = Self::sync(client, stream).await {
-                        error!(err = %err, "request failure");
+                    if let Err(err) = Self::sync(client, &mut stream, addr).await {
+                        error!(%err, "request failure");
                     }
-                    anyhow::Ok(())
                 }
-                .instrument(info_span!("sync", %addr, %stream_id)),
+                .instrument(info_span!("sync", %addr)),
             );
         }
-        info!("exiting");
-        Ok(())
     }
 
     /// Responds to a sync.
     #[instrument(skip_all)]
-    async fn sync(client: Arc<Mutex<ClientState<EN, SP>>>, mut stream: Stream) -> Result<()> {
-        let data = stream.recv.recv().await?;
-        debug!(len = data.len(), "read sync request");
+    async fn sync(
+        client: Arc<Mutex<ClientState<EN, SP>>>,
+        stream: &mut TcpStream,
+        addr: SocketAddr,
+    ) -> Result<()> {
+        let mut recv = Vec::new();
+        stream
+            .read_to_end(&mut recv)
+            .await
+            .context("failed to read sync request")?;
+        debug!(?addr, n = recv.len(), "received sync request");
 
-        let resp = match Self::sync_respond(client, &data).await {
+        // Generate a sync response for a sync request.
+        let resp = match Self::sync_respond(client, &recv).await {
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => SyncResponse::Err(err.to_string()),
         };
-        stream.send.send(&resp).await?;
+        // Serialize the sync response.
+        let data =
+            &postcard::to_allocvec(&resp).context("postcard unable to serialize sync response")?;
+
+        stream.write_all(data).await?;
+        stream.shutdown().await?;
+        debug!(?addr, n = data.len(), "sent sync response");
 
         Ok(())
     }
 
-    /// Returns the sync response to the sync request.
+    /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
         client: Arc<Mutex<ClientState<EN, SP>>>,
         request: &[u8],
     ) -> Result<Box<[u8]>> {
-        debug!(req_len = request.len());
-
         let mut resp = SyncResponder::new();
         resp.receive(request).context("sync recv failed")?;
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];

@@ -2,7 +2,6 @@
 
 use std::{
     fs,
-    net::{Ipv4Addr, SocketAddr, UdpSocket},
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -20,18 +19,16 @@ use daemon::{
     vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
 };
 use keygen::{KeyBundle, PublicKeys};
-use rcgen::{BasicConstraints, Certificate, CertificateParams, IsCa, KeyUsagePurpose};
 use runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, GraphId,
 };
-use rustls::RootCertStore;
 use tempfile::{tempdir, TempDir};
 use tokio::{
+    net::TcpListener,
     sync::Mutex,
     task::{self, AbortHandle},
 };
-use transport::{ClientConfig, QuicClient, QuicServer, ServerTlsConfig};
 
 pub type TestClient = aranya::Client<
     PolicyEngine<DefaultEngine, Store>,
@@ -54,7 +51,7 @@ pub struct TestDevice {
     /// The Aranya graph ID.
     pub graph_id: GraphId,
     /// The address that the server is listening on.
-    pub addr: Addr,
+    pub local_addr: Addr,
     /// Aborts the server task.
     handle: AbortHandle,
     /// Public keys
@@ -65,15 +62,15 @@ impl TestDevice {
     pub fn new(
         client: TestClient,
         server: TestServer,
+        local_addr: Addr,
         pk: PublicKeys<DefaultCipherSuite>,
         graph_id: GraphId,
     ) -> Result<Self> {
-        let addr = server.local_addr().context("unable to get local addr")?;
         let handle = task::spawn(async { server.serve().await }).abort_handle();
         Ok(Self {
             aranya: client,
             graph_id,
-            addr: addr.into(),
+            local_addr,
             handle,
             pk,
         })
@@ -83,9 +80,9 @@ impl TestDevice {
 impl TestDevice {
     pub async fn sync(&self, device: &TestDevice) -> Result<Vec<Effect>> {
         let mut sink = VecSink::new();
-        self.sync_peer(&self.graph_id, &mut sink, &device.addr)
+        self.sync_peer(&self.graph_id, &mut sink, &device.local_addr)
             .await
-            .with_context(|| format!("unable to sync with peer at {}", device.addr))?;
+            .with_context(|| format!("unable to sync with peer at {}", device.local_addr))?;
         Ok(sink.collect()?)
     }
 
@@ -102,7 +99,7 @@ impl TestDevice {
 
 impl Drop for TestDevice {
     fn drop(&mut self) {
-        self.handle.abort()
+        self.handle.abort();
     }
 }
 
@@ -144,11 +141,6 @@ impl<'a> TestTeam<'a> {
 pub struct TestCtx {
     /// The working directory for the test.
     dir: TempDir,
-    /// The root CA that signs the TLS certs used by each
-    /// `TestClient`.
-    ca: Certificate,
-    /// Contains `ca`.
-    roots: RootCertStore,
     // Per-client ID.
     // Incrementing counter is used to differentiate clients for test purposes.
     id: u64,
@@ -157,33 +149,20 @@ pub struct TestCtx {
 impl TestCtx {
     /// Creates a new test context.
     pub fn new() -> Result<Self> {
-        let ca = {
-            let mut params = CertificateParams::default();
-            params.is_ca = IsCa::Ca(BasicConstraints::Unconstrained);
-            params.key_usages = vec![KeyUsagePurpose::KeyCertSign, KeyUsagePurpose::CrlSign];
-            rcgen::Certificate::from_params(params)?
-        };
-        let roots = {
-            let mut roots = RootCertStore::empty();
-            roots.add(&rustls::Certificate(ca.serialize_der()?))?;
-            roots
-        };
         Ok(Self {
             dir: tempdir()?,
-            ca,
-            roots,
             id: 0,
         })
     }
 
     /// Creates a single client.
     pub async fn new_client(&mut self, name: &str, id: GraphId) -> Result<TestDevice> {
-        let addr = (Ipv4Addr::LOCALHOST, 0); // random port
+        let addr = Addr::new("localhost", 0)?; // random port
 
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
 
-        let (client, server, pk) = {
+        let (client, server, local_addr, pk) = {
             let mut store = {
                 let path = root.join("keystore");
                 fs::create_dir_all(&path)?;
@@ -193,16 +172,13 @@ impl TestCtx {
             let bundle = KeyBundle::generate(&mut eng, &mut store)
                 .context("unable to generate `KeyBundle`")?;
 
-            let server = {
-                let socket = UdpSocket::bind::<SocketAddr>(addr.into())?;
-                let cfg = ServerTlsConfig::generate(&self.ca, &socket.local_addr()?)?;
-                QuicServer::new(cfg.into_server_config()?, socket)
-                    .context("unable to create `QuicServer`")?
+            let (listener, local_addr) = {
+                let listener = TcpListener::bind(addr.lookup().await?)
+                    .await
+                    .context("unable to bind `TcpListener`")?;
+                let local_addr = listener.local_addr()?;
+                (listener, local_addr)
             };
-
-            let client = QuicClient::new(ClientConfig::with_root_certificates(self.roots.clone()))
-                .context("unable to create `QuicClient`")?;
-
             let storage_dir = root.join("storage");
             fs::create_dir_all(&storage_dir)?;
 
@@ -219,12 +195,12 @@ impl TestCtx {
             );
 
             let aranya = Arc::new(Mutex::new(graph));
-            let client = TestClient::new(Arc::clone(&aranya), client);
-            let server = TestServer::new(Arc::clone(&aranya), server);
-            (client, server, pk)
+            let client = TestClient::new(Arc::clone(&aranya));
+            let server = TestServer::new(Arc::clone(&aranya), listener);
+            (client, server, local_addr, pk)
         };
 
-        TestDevice::new(client, server, pk, id)
+        TestDevice::new(client, server, local_addr.into(), pk, id)
     }
 
     /// Creates `n` members.

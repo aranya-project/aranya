@@ -127,13 +127,14 @@ dependencies = [
  "const_format",
  "crypto",
  "heapless",
+ "libc",
  "serde",
 ]
 
 [[package]]
 name = "aps-util"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "aps",
  "crypto",
@@ -221,7 +222,7 @@ checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
 [[package]]
 name = "base58"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "buggy",
  "byteorder",
@@ -263,7 +264,7 @@ dependencies = [
 [[package]]
 name = "buggy"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "cfg-if",
 ]
@@ -466,7 +467,7 @@ checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 [[package]]
 name = "crypto"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "aes-gcm",
  "base58",
@@ -527,7 +528,7 @@ dependencies = [
 [[package]]
 name = "crypto-derive"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "prettyplease",
  "proc-macro2",
@@ -538,13 +539,12 @@ dependencies = [
 [[package]]
 name = "crypto-ffi"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "crypto",
  "policy-vm",
  "postcard",
  "tracing",
- "trouble",
 ]
 
 [[package]]
@@ -591,6 +591,7 @@ dependencies = [
  "aps",
  "aps-util",
  "buggy",
+ "ciborium",
  "clap",
  "crypto",
  "crypto-ffi",
@@ -610,11 +611,12 @@ dependencies = [
  "runtime",
  "serde",
  "serial_test",
+ "tempfile",
  "test-log",
  "test-util",
  "tokio",
  "tracing",
- "transport",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -668,7 +670,7 @@ dependencies = [
 [[package]]
 name = "device-ffi"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "crypto",
  "policy-vm",
@@ -776,7 +778,7 @@ checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 [[package]]
 name = "envelope-ffi"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "crypto",
  "policy-vm",
@@ -1031,13 +1033,12 @@ dependencies = [
 [[package]]
 name = "idam-ffi"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "crypto",
  "policy-vm",
  "postcard",
  "tracing",
- "trouble",
 ]
 
 [[package]]
@@ -1197,6 +1198,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "nu-ansi-term"
+version = "0.46.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77a8165726e8236064dbb45459242600304b42a5ea24ee2948e18e023bf7ba84"
+dependencies = [
+ "overload",
+ "winapi",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1268,6 +1279,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
+name = "overload"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
+
+[[package]]
 name = "p256"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1327,7 +1344,7 @@ dependencies = [
 [[package]]
 name = "perspective-ffi"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "crypto",
  "policy-vm",
@@ -1423,7 +1440,7 @@ dependencies = [
 [[package]]
 name = "policy-ast"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "serde",
 ]
@@ -1431,7 +1448,7 @@ dependencies = [
 [[package]]
 name = "policy-compiler"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "buggy",
  "ciborium",
@@ -1444,7 +1461,7 @@ dependencies = [
 [[package]]
 name = "policy-derive"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "policy-lang",
  "prettyplease",
@@ -1456,17 +1473,18 @@ dependencies = [
 [[package]]
 name = "policy-ifgen"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "policy-ifgen-macro",
  "policy-vm",
  "runtime",
+ "serde",
 ]
 
 [[package]]
 name = "policy-ifgen-build"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "anyhow",
  "policy-ast",
@@ -1480,7 +1498,7 @@ dependencies = [
 [[package]]
 name = "policy-ifgen-macro"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1490,7 +1508,7 @@ dependencies = [
 [[package]]
 name = "policy-lang"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "anyhow",
  "buggy",
@@ -1506,7 +1524,7 @@ dependencies = [
 [[package]]
 name = "policy-module"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "crypto",
  "policy-ast",
@@ -1516,7 +1534,7 @@ dependencies = [
 [[package]]
 name = "policy-vm"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "buggy",
  "crypto",
@@ -1838,7 +1856,7 @@ dependencies = [
 [[package]]
 name = "runtime"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 dependencies = [
  "buggy",
  "cfg-if",
@@ -2296,12 +2314,9 @@ dependencies = [
  "crypto",
  "daemon",
  "keygen",
- "rcgen",
  "runtime",
- "rustls",
  "tempfile",
  "tokio",
- "transport",
 ]
 
 [[package]]
@@ -2448,6 +2463,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06d3da6113f116aaee68e4d601191614c9053067f9ab7f6edbcb161237daa54"
 dependencies = [
  "once_cell",
+ "valuable",
+]
+
+[[package]]
+name = "tracing-log"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3"
+dependencies = [
+ "log",
+ "once_cell",
+ "tracing-core",
 ]
 
 [[package]]
@@ -2457,12 +2484,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ad0f048c97dbd9faa9b7df56362b8ebcaa52adb06b498c050d2f4e32f90a7a8b"
 dependencies = [
  "matchers",
+ "nu-ansi-term",
  "once_cell",
  "regex",
  "sharded-slab",
+ "smallvec",
  "thread_local",
  "tracing",
  "tracing-core",
+ "tracing-log",
 ]
 
 [[package]]
@@ -2484,7 +2514,7 @@ dependencies = [
 [[package]]
 name = "trouble"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1d640dd6314dad3bd77d05f368d3a7ceb4960294"
+source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 
 [[package]]
 name = "typenum"
@@ -2555,6 +2585,12 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
+
+[[package]]
+name = "valuable"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
 name = "vec1"

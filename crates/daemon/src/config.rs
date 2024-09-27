@@ -12,11 +12,17 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    /// Human-readable name for the daemon for tracing.
+    pub name: String,
+
     /// The daemon's working directory.
     pub work_dir: PathBuf,
 
     /// Used to receive API requests from the frontend client.
     pub uds_api_path: PathBuf,
+
+    /// Path where the daemon should write its PID file.
+    pub pid_file: PathBuf,
 }
 
 // TODO: remove allow dead_code once all methods are used.
@@ -27,7 +33,8 @@ impl Config {
     where
         P: AsRef<Path>,
     {
-        let cfg: Self = read_json(path.as_ref()).context("unable to parse config")?;
+        let cfg: Self = read_json(path.as_ref())
+            .context(format!("unable to parse config: {:?}", path.as_ref()))?;
 
         Ok(cfg)
     }
@@ -37,44 +44,19 @@ impl Config {
         self.work_dir.join("app_state.cbor")
     }
 
-    // TODO: key_wrap_key_path
+    /// Path to the [`DefaultEngine`]'s key wrapping key.
+    pub(crate) fn key_wrap_key_path(&self) -> PathBuf {
+        self.work_dir.join("key_wrap_key")
+    }
 
-    // TODO: key_bundle_path
+    /// Path to the [`KeyBundle`].
+    pub(crate) fn key_bundle_path(&self) -> PathBuf {
+        self.work_dir.join("key_bundle")
+    }
 
     /// Path to `Store`.
     pub(crate) fn keystore_path(&self) -> PathBuf {
         self.work_dir.join("keystore")
-    }
-
-    /// Path to the effect queue.
-    pub(crate) fn effect_queue_path(&self) -> PathBuf {
-        self.work_dir.join("effectq")
-    }
-
-    /// Path where TLS certificates are stored.
-    pub fn certs_path(&self) -> PathBuf {
-        self.work_dir.join("certs")
-    }
-
-    /// Path to where the audit log is stored.
-    pub fn audit_log_path(&self) -> PathBuf {
-        self.work_dir.join("audit.log")
-    }
-
-    /// Path to the TLS public cert.
-    pub(crate) fn tls_cert_path(&self) -> PathBuf {
-        self.certs_path().join("tls_cert.der")
-    }
-
-    /// Path to the TLS private key.
-    pub(crate) fn tls_key_path(&self) -> PathBuf {
-        self.certs_path().join("tls_key.der")
-    }
-
-    /// Path to the root certificate used to verify peer TLS
-    /// certificates.
-    pub(crate) fn tls_root_ca_path(&self) -> PathBuf {
-        self.certs_path().join("tls_root_ca_cert.der")
     }
 
     /// Path to the runtime's storage.
@@ -101,8 +83,10 @@ mod tests {
         let path = Path::new(DIR).join("example.json");
         let got = Config::load(path)?;
         let want = Config {
+            name: "name".to_string(),
             work_dir: "/var/lib/work_dir".parse()?,
             uds_api_path: "/var/run/uds_api.sock".parse()?,
+            pid_file: "/var/run/hub.pid".parse()?,
         };
         assert_eq!(got, want);
         Ok(())

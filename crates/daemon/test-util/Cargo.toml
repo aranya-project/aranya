@@ -7,26 +7,14 @@ license.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
+
 [dependencies]
-anyhow = { workspace = true }
 crypto = { workspace = true, features = ["alloc", "fs-keystore", "std"] }
+runtime = { workspace = true }
+
 daemon = { workspace = true }
 keygen = { workspace = true }
-rcgen = { workspace = true, features = ["x509-parser"] }
-runtime = { workspace = true, features = ["libc"] }
-rustls = { workspace = true }
+
+anyhow = { workspace = true }
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["rt-multi-thread", "fs", "net", "macros", "io-util"] }
-transport = { workspace = true }
-
-[package.metadata.docs.rs]
-all-features = true
-
-[package.metadata.cargo-all-features]
-always_include_features = [
-    "test-internal",
-]
-
-denylist = [
-    "slice_first_last_chunk",
-]
+tokio = { workspace = true }
