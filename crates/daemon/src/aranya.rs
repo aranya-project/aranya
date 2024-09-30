@@ -1,16 +1,6 @@
 //! Aranya.
 
-use std::{
-    borrow::Cow,
-    collections::BTreeSet,
-    future::Future,
-    marker::PhantomData,
-    net::SocketAddr,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
 
 use anyhow::{bail, Context, Result};
 use aps::Label;
@@ -50,10 +40,6 @@ pub enum SyncResponse {
 pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
-    /// Used to disable the syncer.
-    syncer_disabled: AtomicBool,
-    /// A list of peers to skip syncing with.
-    syncer_skiplist: Mutex<BTreeSet<Addr>>,
     _eng: PhantomData<CE>,
 }
 
@@ -62,8 +48,6 @@ impl<EN, SP, CE> Client<EN, SP, CE> {
     pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Self {
         Client {
             aranya,
-            syncer_disabled: AtomicBool::new(false),
-            syncer_skiplist: Mutex::const_new(BTreeSet::new()),
             _eng: PhantomData,
         }
     }
@@ -75,37 +59,6 @@ where
     SP: StorageProvider + Send + 'static,
     CE: crypto::Engine + Send + Sync + 'static,
 {
-    /// Disables syncer.
-    #[instrument(skip_all)]
-    pub fn disable_syncer(&self) {
-        info!("disabling syncer");
-        self.syncer_disabled.store(true, Ordering::Relaxed);
-    }
-
-    /// Enables syncer.
-    #[instrument(skip_all)]
-    pub fn enable_syncer(&self) {
-        info!("enabling syncer");
-        self.syncer_disabled.store(false, Ordering::Relaxed);
-    }
-
-    /// Disable a specific peer in the sync loop.
-    #[instrument(skip_all)]
-    pub async fn disable_peer_syncer(&self, addr: Addr) {
-        info!(addr = %addr, "disabling sync with peer");
-        let mut list = self.syncer_skiplist.lock().await;
-        list.insert(addr);
-    }
-
-    /// Enable a specific peer in the sync loop.
-    #[instrument(skip_all)]
-    pub async fn enable_peer_syncer(&self, addr: Addr) {
-        info!(addr = %addr, "enabling sync with peer");
-        let mut list = self.syncer_skiplist.lock().await;
-
-        list.remove(&addr);
-    }
-
     /// Syncs with the peer.
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
@@ -113,20 +66,6 @@ where
     where
         S: Sink<<EN as Engine>::Effect>,
     {
-        if self.syncer_disabled.load(Ordering::Relaxed) {
-            warn!("syncer disabled");
-            return Ok(());
-        }
-
-        {
-            let skiplist = self.syncer_skiplist.lock().await;
-            debug!(?skiplist, "checking disabled syncer for peer");
-            if skiplist.contains(addr) {
-                warn!("syncer disabled for peer");
-                return Ok(());
-            }
-        }
-
         // send the sync request.
         let mut syncer = SyncRequester::new(*id, &mut Rng);
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
@@ -529,6 +468,35 @@ where
         info!(%user_id, %label, "revoking APS label");
         self.with_actor(move |actor| {
             actor.revoke_label(user_id.into(), i64::from(label.to_u32()))?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Sets a network name.
+    #[instrument(skip(self), fields(user_id = %user_id, net_identifier = %net_identifier))]
+    fn set_network_name(
+        &self,
+        user_id: UserId,
+        net_identifier: String,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        info!(%user_id, %net_identifier, "setting network name");
+        self.with_actor(move |actor| {
+            actor.set_network_name(user_id.into(), net_identifier)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Sets a network name.
+    #[instrument(skip(self), fields(user_id = %user_id))]
+    fn unset_network_name(
+        &self,
+        user_id: UserId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        info!(%user_id, "unsetting network name");
+        self.with_actor(move |actor| {
+            actor.unset_network_name(user_id.into())?;
             Ok(())
         })
         .in_current_span()

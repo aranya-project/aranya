@@ -1,4 +1,4 @@
-use std::{iter::Cycle, sync::Arc};
+use std::{collections::HashSet, iter::Cycle, sync::Arc, vec::IntoIter};
 
 use anyhow::{Context, Result};
 use runtime::storage::GraphId;
@@ -11,45 +11,71 @@ use crate::{
 };
 
 /// Syncs with each peer in order.
-pub struct Syncer<I> {
+pub struct Syncer {
     client: Arc<Client>,
-    peers: Cycle<I>,
-    graph_id: GraphId,
+    peers: HashSet<Addr>,
+    graph_id: Option<GraphId>,
+    cycle: Cycle<IntoIter<Addr>>,
 }
 
-impl<I> Syncer<I>
-where
-    I: Clone + Iterator,
-{
+impl Syncer {
     /// Creates a new `Syncer`.
-    pub fn new<V>(client: Arc<Client>, graph_id: GraphId, peers: V) -> Self
-    where
-        V: IntoIterator<IntoIter = I>,
-    {
+    pub fn new(client: Arc<Client>) -> Self {
         Self {
             client,
-            graph_id,
-            peers: peers.into_iter().cycle(),
+            graph_id: None,
+            peers: HashSet::new(),
+            cycle: Vec::new().into_iter().cycle(),
         }
     }
 
-    // TODO: update peers.
+    /// Set the graph id.
+    pub fn set_graph_id(&mut self, graph_id: GraphId) -> Result<()> {
+        self.graph_id = Some(graph_id);
+        Ok(())
+    }
+
+    /// Add peer to sync rotation.
+    pub fn add_peer(&mut self, peer: Addr) -> Result<()> {
+        if self.peers.insert(peer) {
+            self.update_cycle();
+        }
+        Ok(())
+    }
+
+    /// Remove peer from sync rotation.
+    pub fn remove_peer(&mut self, peer: Addr) -> Result<()> {
+        if self.peers.remove(&peer) {
+            self.update_cycle();
+        }
+        Ok(())
+    }
+
+    /// Update the peer cycle.
+    fn update_cycle(&mut self) {
+        // TODO: better way to convert HashSet to cycle.
+        let mut v = Vec::new();
+        for p in &self.peers {
+            v.push(*p);
+        }
+        self.cycle = v.into_iter().cycle();
+    }
 }
 
-impl<I> Syncer<I>
-where
-    I: Clone + Iterator<Item = Addr>,
-{
+impl Syncer {
     /// Syncs with the next peer in the list.
     #[instrument(skip_all)]
     pub async fn next(&mut self) -> Result<()> {
-        let Some(peer) = self.peers.next() else {
-            // `Cycle` only returns `None` if the underlying
-            // iterator is empty.
-            warn!("no peers to debug with");
-            return Ok(());
-        };
-        self.sync(&self.graph_id.clone(), &peer).await
+        if let Some(graph_id) = self.graph_id {
+            let Some(peer) = self.cycle.next() else {
+                // `Cycle` only returns `None` if the underlying
+                // iterator is empty.
+                warn!("no peers to debug with");
+                return Ok(());
+            };
+            self.sync(&graph_id.clone(), &peer).await?
+        }
+        Ok(())
     }
 
     #[instrument(skip_all, fields(%peer, graph_id = %id))]

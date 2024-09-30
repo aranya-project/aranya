@@ -14,18 +14,16 @@ use crypto::{
 };
 use keygen::{KeyBundle, PublicKeys};
 use runtime::{
-    storage::{
-        linear::{libc::FileManager, LinearStorageProvider},
-        GraphId,
-    },
+    storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet, time};
-use tracing::{debug, error, info};
+use tracing::{error, info};
 
 use crate::{
     addr::Addr,
+    api::DaemonApiServer,
     aranya,
     config::Config,
     policy,
@@ -69,10 +67,8 @@ impl Daemon {
         // E.g. creating subdirectories.
         self.setup_env().await?;
 
-        // TODO: get values needed to initialize daemon from UDS API.
-        let external_sync_addr = Addr::new("localhost", 10298)?; // TODO: get this from UDS API.
-        let sync_interval = Duration::from_secs(1); // TODO: get this from UDS API.
-        let graph_id = GraphId::default(); // TODO: get graph_id from UDS API.
+        // TODO: get values needed to initialize daemon from tarpc API.
+        let sync_interval = Duration::from_millis(100); // TODO: get this from tarpc API.
 
         let mut set = JoinSet::new();
 
@@ -91,7 +87,7 @@ impl Daemon {
                     eng.clone(),
                     store.try_clone().context("unable to clone keystore")?,
                     &pk,
-                    external_sync_addr,
+                    self.cfg.sync_addr,
                 )
                 .await?;
             let client = Arc::new(client);
@@ -102,26 +98,30 @@ impl Daemon {
 
         // Sync in the background at some specified interval.
         // Effects are sent to `Api` via `mux`.
-        {
-            // TODO: add more sync peers from UDS API.
-            let mut syncer = Syncer::new(Arc::clone(&client), graph_id, Vec::new());
-            set.spawn(async move {
-                let mut timer = time::interval(sync_interval);
-                loop {
-                    timer.tick().await;
-                    if let Err(err) = syncer.next().await {
-                        error!(err = ?err, "unable to sync with peer");
-                    }
+        let arc = Arc::new(Mutex::new(Syncer::new(Arc::clone(&client))));
+        let syncer = arc.clone();
+        set.spawn(async move {
+            let mut timer = time::interval(sync_interval);
+            loop {
+                timer.tick().await;
+                if let Err(err) = syncer.lock().await.next().await {
+                    error!(err = ?err, "unable to sync with peer");
                 }
-            });
-        }
+            }
+        });
 
         // TODO: have Aranya write to shm.
-        let _aps = self.setup_aps()?;
+        let aps = self.setup_aps()?;
 
-        // TODO: setup UDS API.
-
-        debug!("daemon run completed");
+        // TODO: add context to error.
+        let api = DaemonApiServer::new(
+            client,
+            aps,
+            self.cfg.uds_api_path.clone(),
+            Arc::new(pk),
+            arc.clone(),
+        )?;
+        api.serve().await?;
 
         Ok(())
     }
@@ -272,21 +272,25 @@ mod tests {
 
     /// Tests running the daemon.
     #[test(tokio::test)]
-    async fn test_daemon_run() -> Result<()> {
+    async fn test_daemon_run() {
         let dir = tempdir().expect("should be able to create temp dir");
         let work_dir = dir.path().join("work");
 
+        let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
             name: "name".to_string(),
             work_dir: work_dir.clone(),
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
+            sync_addr: any,
         };
 
         let daemon = Daemon::load(cfg)
             .await
             .expect("should be able to load `Daemon`");
 
-        daemon.run().await
+        time::timeout(Duration::from_secs(1), daemon.run())
+            .await
+            .expect_err("`Timeout` should return Elapsed");
     }
 }

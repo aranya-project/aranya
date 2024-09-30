@@ -1,3 +1,5 @@
+//! Integration tests for the daemon.
+
 #![allow(
     clippy::expect_used,
     clippy::panic,

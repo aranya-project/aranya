@@ -7,9 +7,28 @@ license.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
-
 [lints]
 workspace = true
 
-
 [dependencies]
+daemon-api = { workspace = true }
+
+aps = { workspace = true, features = ["std", "posix"] }
+buggy = { workspace = true, features = ["std"] }
+
+anyhow = { workspace = true }
+tarpc = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+backon = "1.2.0"
+daemon = { workspace = true }
+serial_test = { workspace = true }
+tempfile = { workspace = true }
+test-log = { workspace = true }
+
+[[test]]
+name = "tests"
+path = "tests/tests.rs"

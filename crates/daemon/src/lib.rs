@@ -30,10 +30,11 @@ pub mod aranya;
 pub mod config;
 #[rustfmt::skip]
 pub mod policy;
-mod daemon;
 pub mod util;
 pub mod vm_policy;
 
+mod api;
+mod daemon;
 mod sync;
 
 pub use daemon::*;

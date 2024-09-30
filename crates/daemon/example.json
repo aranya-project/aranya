@@ -8,8 +8,11 @@
 	"work_dir": "/var/lib/work_dir",
 
 	// Used to receive API requests from the user library client.
-	"uds_api_path": "/var/run/uds_api.sock",
+	"uds_api_path": "/var/run/uds.sock",
 
 	// The path where the daemon should write its PID file.
-	"pid_file": "/var/run/hub.pid"
+	"pid_file": "/var/run/hub.pid",
+
+	// Aranya sync server address.
+	"sync_addr": "0.0.0.0:4321"
 }

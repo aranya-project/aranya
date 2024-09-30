@@ -13,30 +13,32 @@ workspace = true
 
 
 [dependencies]
+aps-util = { workspace = true }
+buggy = { workspace = true }
 crypto = { workspace = true }
+crypto-ffi = { workspace = true }
+device-ffi = { workspace = true }
+envelope-ffi = { workspace = true }
+idam-ffi = { workspace = true }
+perspective-ffi = { workspace = true }
+policy-compiler = { workspace = true }
+policy-ifgen = { workspace = true }
+policy-lang = { workspace = true }
+policy-vm = { workspace = true }
+postcard = { workspace = true }
 runtime = { workspace = true }
 
-buggy = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-crypto-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-device-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-envelope-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-idam-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-perspective-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-policy-compiler = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-policy-ifgen = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main", features = ["serde"] }
-policy-lang = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-policy-vm = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main", features = ["std"] }
-
 aps = { workspace = true }
-aps-util = { workspace = true }
 
 anyhow = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }
+daemon-api = { workspace = true }
 deser-hjson = { version = "2" }
+futures-util = { workspace = true }
 keygen = { workspace = true }
-postcard = { workspace = true }
 serde = { workspace = true }
+tarpc = { workspace = true }
 tokio = { workspace = true, features = [
     "rt-multi-thread",
     "io-util",
@@ -51,7 +53,7 @@ tracing-subscriber = { workspace = true }
 
 
 [dev-dependencies]
-pretty_assertions = { version = "1.4" }
+pretty_assertions = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }

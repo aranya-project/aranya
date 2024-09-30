@@ -8,6 +8,8 @@ use std::{
 use anyhow::{Context, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
+use crate::addr::Addr;
+
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -23,6 +25,9 @@ pub struct Config {
 
     /// Path where the daemon should write its PID file.
     pub pid_file: PathBuf,
+
+    /// Network address of Aranya sync server.
+    pub sync_addr: Addr,
 }
 
 // TODO: remove allow dead_code once all methods are used.
@@ -73,6 +78,8 @@ fn read_json<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::net::Ipv4Addr;
+
     use pretty_assertions::assert_eq;
 
     use super::*;
@@ -85,8 +92,9 @@ mod tests {
         let want = Config {
             name: "name".to_string(),
             work_dir: "/var/lib/work_dir".parse()?,
-            uds_api_path: "/var/run/uds_api.sock".parse()?,
+            uds_api_path: "/var/run/uds.sock".parse()?,
             pid_file: "/var/run/hub.pid".parse()?,
+            sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
         };
         assert_eq!(got, want);
         Ok(())

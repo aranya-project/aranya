@@ -213,6 +213,8 @@ deny = [
 skip = [
     "base64@0.21.7",
     "generic-array@0.14.7",
+    "hashbrown@0.12.3",
+    "indexmap@1.9.3",
     "regex-automata@0.1.10",
     "regex-syntax@0.6.29",
     "ring@0.16.20",
