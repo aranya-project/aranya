@@ -25,14 +25,13 @@ use tarpc::{
     server::{self, Channel},
     tokio_serde::formats::Json,
 };
-use tokio::sync::Mutex;
 use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
     addr::Addr,
     aranya::Actions,
     policy::{ChanOp, KeyBundle, Role},
-    sync::Syncer,
+    sync::SyncPeers,
     Client, CS,
 };
 
@@ -55,7 +54,7 @@ struct DaemonApiHandler<S> {
     #[allow(dead_code)] // TODO
     aps: S,
     pk: Arc<PublicKeys<CS>>,
-    syncer: Arc<Mutex<Syncer>>,
+    peers: SyncPeers,
 }
 
 impl<S: Clone + Send + 'static> DaemonApiServer<S> {
@@ -66,7 +65,7 @@ impl<S: Clone + Send + 'static> DaemonApiServer<S> {
         aps: S,
         daemon_sock: PathBuf,
         pk: Arc<PublicKeys<CS>>,
-        syncer: Arc<Mutex<Syncer>>,
+        peers: SyncPeers,
     ) -> Result<Self> {
         info!("uds path: {:?}", daemon_sock);
         Ok(Self {
@@ -75,7 +74,7 @@ impl<S: Clone + Send + 'static> DaemonApiServer<S> {
                 client,
                 aps,
                 pk,
-                syncer,
+                peers,
             },
         })
     }
@@ -154,11 +153,9 @@ impl<S: Clone + Send + 'static> DaemonApi for DaemonApiHandler<S> {
         interval: Duration,
     ) -> ApiResult<()> {
         let peer = Addr::from_str(addr.0.as_str()).map_err(|_| Error::Unknown)?;
-        // TODO: set sync interval for peer in syncer.
-        self.syncer
-            .lock()
+        self.peers
+            .add_peer(peer, interval, team.into_id().into())
             .await
-            .add_peer(peer)
             .map_err(|_| Error::Unknown)
     }
 
@@ -170,21 +167,15 @@ impl<S: Clone + Send + 'static> DaemonApi for DaemonApiHandler<S> {
         team: TeamId,
     ) -> ApiResult<()> {
         let peer = Addr::from_str(addr.0.as_str()).map_err(|_| Error::Unknown)?;
-        self.syncer
-            .lock()
+        self.peers
+            .remove_peer(peer, team.into_id().into())
             .await
-            .remove_peer(peer)
             .map_err(|_| Error::Unknown)
     }
 
     #[instrument(skip(self))]
     async fn add_team(self, _: context::Context, team: TeamId) -> ApiResult<()> {
-        // TODO: support multiple teams.
-        self.syncer
-            .lock()
-            .await
-            .set_graph_id(team.into_id().into())
-            .map_err(|_| Error::Unknown)
+        todo!()
     }
 
     #[instrument(skip(self))]
@@ -204,11 +195,6 @@ impl<S: Clone + Send + 'static> DaemonApi for DaemonApiHandler<S> {
             .await
             .map_err(|_| Error::Unknown)?;
         debug!(?graph_id);
-        self.syncer
-            .lock()
-            .await
-            .set_graph_id(graph_id)
-            .map_err(|_| Error::Unknown)?;
         Ok(graph_id.into_id().into())
     }
 

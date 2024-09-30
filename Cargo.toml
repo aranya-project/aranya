@@ -54,14 +54,13 @@ runtime = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", br
 aps = { git = "https://git.spideroak-inc.com/spideroak-inc/aps.git", branch = "main", features = ["posix", "std", "memory"] }
 
 daemon = { path = "crates/daemon" }
+daemon-api = { path = "crates/daemon-api" }
 keygen = { path = "crates/keygen" }
 transport = { path = "crates/transport" }
 
 anyhow = { version = "1.0.86" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
-daemon-api = { path = "crates/daemon-api" }
-futures = { version = "0.3.30" }
 futures-util = { version = "0.3.30" }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
@@ -75,6 +74,7 @@ tempfile = { version = "3.6.0" }
 test-log = { version = "0.2.14", default-features = false, features = ["trace"] }
 thiserror = { version = "1.0" }
 tokio = { version = "1.40" }
+tokio-util = { version = "0.7.12" }
 tokio-retry = { version = "0.3" }
 tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

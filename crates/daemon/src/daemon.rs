@@ -1,4 +1,4 @@
-use std::{io, net::SocketAddr, path::Path, sync::Arc, time::Duration};
+use std::{io, net::SocketAddr, path::Path, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use aps::memory::State as MemoryState;
@@ -18,7 +18,7 @@ use runtime::{
     ClientState,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet, time};
+use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
 use tracing::{error, info};
 
 use crate::{
@@ -67,9 +67,6 @@ impl Daemon {
         // E.g. creating subdirectories.
         self.setup_env().await?;
 
-        // TODO: get values needed to initialize daemon from tarpc API.
-        let sync_interval = Duration::from_millis(100); // TODO: get this from tarpc API.
-
         let mut set = JoinSet::new();
 
         // Load keys from the keystore or generate new ones if there are no existing keys.
@@ -98,13 +95,10 @@ impl Daemon {
 
         // Sync in the background at some specified interval.
         // Effects are sent to `Api` via `mux`.
-        let arc = Arc::new(Mutex::new(Syncer::new(Arc::clone(&client))));
-        let syncer = arc.clone();
+        let (mut syncer, peers) = Syncer::new(Arc::clone(&client));
         set.spawn(async move {
-            let mut timer = time::interval(sync_interval);
             loop {
-                timer.tick().await;
-                if let Err(err) = syncer.lock().await.next().await {
+                if let Err(err) = syncer.next().await {
                     error!(err = ?err, "unable to sync with peer");
                 }
             }
@@ -119,7 +113,7 @@ impl Daemon {
             aps,
             self.cfg.uds_api_path.clone(),
             Arc::new(pk),
-            arc.clone(),
+            peers,
         )?;
         api.serve().await?;
 
@@ -265,8 +259,11 @@ async fn write_cbor(path: impl AsRef<Path>, data: impl Serialize) -> Result<()> 
 mod tests {
     #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
+    use std::time::Duration;
+
     use tempfile::tempdir;
     use test_log::test;
+    use tokio::time;
 
     use super::*;
 

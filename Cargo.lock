@@ -670,6 +670,7 @@ dependencies = [
  "test-log",
  "test-util",
  "tokio",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
 ]

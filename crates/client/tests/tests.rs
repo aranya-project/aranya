@@ -125,9 +125,6 @@ async fn integration_test() -> Result<()> {
         .await
         .expect("expected to create team");
     info!(?team_id);
-    team.admin.client.add_team(team_id).await?;
-    team.operator.client.add_team(team_id).await?;
-    team.member.client.add_team(team_id).await?;
 
     // setup sync peers.
     let mut owner_team = team.owner.client.team(team_id);
