@@ -2,20 +2,24 @@
 policy-version: 1
 ---
 
-# Default Policy Template
+# Default Policy
 
-TODO:
-- Verify action signatures, effects and commands struct fields are all correct.
-- Are we going to continue referring to off-graph messaging as APS even though it means nothing?
-- Add all missing checks and remove/update existing checks.
-- Check and update all invariants.
-- Add recall blocks
+The default policy used by Aranya. It is the core component that our software is built on top 
+of, so any changes may affect the behavior of the system and could require updating other parts of 
+the code to get everything working together.
+
+This policy can also be used as a template for writing other custom policies.
+
+Note that the policy has been written for version beta of our product and includes several 
+limitations that will likely be changed for the MVP. 
 
 ## Roles & Permissions
 
 The MVP will likely support multiple role assignments per user, but we restrict to 1 role per user 
-for the beta. Hence, for the beta product, role assignment commands below can be thought of as 
-promoting the user's one role, while role revocation commands are a way to demote it. 
+for the beta. Hence, users can only be onboarded to the team under the `Member` role and the role 
+assignment commands can be thought of as a promotion of the user's single role. Similarly, only the 
+`Member` role can be removed from the team and so role revocation commands will simply demote any 
+higher role back down to `Member`.
 
 * Owner:
   * Initialize/terminate Team.
@@ -30,7 +34,8 @@ promoting the user's one role, while role revocation commands are a way to demot
 * Admin:
   * Assign/revoke Operator role.
   * Define/undefine APS label.
-  * Set/unset APS address&name.
+  * Revoke APS label.
+  * Unset APS network identifier.
 
 * Operator:
   * Add (new) / remove Member.
@@ -48,12 +53,11 @@ promoting the user's one role, while role revocation commands are a way to demot
 - If the `User` fact exists, then so will the `UserIdentKey`, `UserSignKey`, and `UserEncKey` 
   facts. Similarly, the latter three facts are predicated on the user fact.
 - A user can only have one of each user key type at a time.
-
-<!-- For MVP:
-- Entities permitted to assign a role can do so for any other entity in the hierarchy.
-- Entities permitted to revoke a role can do so only for another entity whose highest assigned role 
-  is lower than theirs.
-- We use "<role> device" to refer to an entity whose highest assigned role is the one specified. -->
+- Only the creator of the team is added as an `Owner`. All other users are onboarded as `Member`s.
+- Only onboarded users can be assigned to a higher role than `Member`.
+- Revoking a user's role will automatically set their role down to `Member`.
+- Only a `Member` can be removed from the team. All other roles must be revoked from a user before 
+  they can be removed from the team.
 
 
 ### Imports & Global Constants
@@ -123,7 +127,7 @@ fact TeamEnd[]=>{}
 fact Label[label int]=>{} 
 
 // Records that a user is allowed to use an APS label.
-fact AssignedLabel[user_id id, label int]=>{op enum ChanOp}
+fact AssignedLabel[label int, user_id id]=>{op enum ChanOp}
 
 // Stores a Member's associated network identifier for APS.
 fact MemberNetworkId[user_id id]=>{net_identifier string}
@@ -241,7 +245,7 @@ function is_valid_label(label int) bool {
 
 // Returns the channel operation for a particular label.
 function get_allowed_op(user_id id, label int) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedLabel[user_id: user_id, label: label]
+    let assigned_label = check_unwrap query AssignedLabel[label: label, user_id: user_id]
     return assigned_label.op
 }
 
@@ -885,6 +889,8 @@ command RevokeOperator{
 
 ## DefineLabel
 
+Establishes a whitelist of APS labels that can be assigned to Members.
+
 ```policy
 // Defines an APS label.
 action define_label(label int) {
@@ -910,11 +916,11 @@ command DefineLabel {
         let author = get_valid_user(envelope::author_id(envelope))
 
         // Owners, Admins and Operators can define APS labels.
-        check !is_member(author.role)
-        // It must be a valid APS label.
+        check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
+        // It must be a valid APS label that does not already exist.
         check is_valid_label(this.label)
+        check !exists Label[label: this.label]
 
-        // TODO: add check that label was not previously created
         finish {
             create Label[label: this.label]=>{}
 
@@ -934,12 +940,22 @@ command DefineLabel {
 
 ## UndefineLabel
 
+Removes an APS label from the whitelist. This operation will result in the APS label revocation across all Members that were assigned to it.
+
+
 ```policy
 // Undefines an APS label.
 action undefine_label(label int) {
+    // In a single transaction, publish the command to undefine the APS label as well as a 
+    // sequence of APS label revocation commands to revoke it from each Member role.
     publish UndefineLabel {
         label: label,
     }
+
+    // TODO: add back when transaction bug is resolved
+    // map AssignedLabel[label: label, user_id: ?] as member {
+    //     action revoke_label(member.user_id, label)
+    // }
 }
 
 effect LabelUndefined {
@@ -960,8 +976,7 @@ command UndefineLabel {
 
         // Only Owners and Admins can undefine APS labels.
         check is_owner(author.role) || is_admin(author.role)
-        // TODO: check that the label exists.
-        // TODO: handle users assigned to the undefine label (e.g., include checks elsewhere)
+        check exists Label[label: this.label]
 
         finish {
             delete Label[label: this.label]
@@ -1029,7 +1044,7 @@ command AssignLabel {
         check exists Label[label: this.label]
 
         finish {
-            create AssignedLabel[user_id: user.user_id, label: this.label]=>{op: this.op}
+            create AssignedLabel[label: this.label, user_id: user.user_id]=>{op: this.op}
 
             emit LabelAssigned {
                 user_id: user.user_id,
@@ -1049,6 +1064,9 @@ command AssignLabel {
 - Only labels that are defined are allowed to be assigned.
 
 ## RevokeLabel
+Revokes an APS label from a Member. Note that peers communicating with this Member over an APS 
+channel under the revoked label should delete their channel once the label revocation command is 
+received.
 
 ```policy
 // Revokes the user's access to the APS `label`.
@@ -1081,16 +1099,15 @@ command RevokeLabel {
         let author = get_valid_user(envelope::author_id(envelope))
         let user = check_unwrap find_existing_user(this.user_id)
 
-        // Only Owners and Operators are allowed to revoke a label from a Member.
-        // TODO: Allow Admins to also revoke labels?
-        check is_owner(author.role) || is_operator(author.role)
+        // Only Owners, Admins, and Operators are allowed to revoke a label from a Member.
+        check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
         check is_member(user.role)
 
-        // Verify that APS label has been assigned.
-        check exists AssignedLabel[user_id: user.user_id, label: this.label]
+        // Verify that APS label has been assigned to this Member
+        check exists AssignedLabel[label: this.label, user_id: user.user_id]
 
         finish {
-            delete AssignedLabel[user_id: user.user_id, label: this.label]
+            delete AssignedLabel[label: this.label, user_id: user.user_id]
 
             emit LabelRevoked {
                 user_id: user.user_id,
@@ -1137,22 +1154,34 @@ command SetNetworkName {
         let user = check_unwrap find_existing_user(this.user_id)
 
         // Only Owners and Operators can associate a network name.
-        // TODO: allow also Admins to associate a network name to a Member?
         check is_owner(author.role) || is_operator(author.role)
         // Only Members can be associated a network name.
         check is_member(user.role)
 
-        // TODO: Create APS FFI function for validating the network identifier.
-        // check aps::is_valid_network_identifier(this.net_identifier)
+        // TODO: check that the network identifier is valid.
+        let net_id_exists = query MemberNetworkId[user_id: this.user_id]
 
-        // TODO: Check if address already exists for the user and update the fact instead.
+        if net_id_exists is Some {
+            let net_id = unwrap net_id_exists
+            finish {
+                update MemberNetworkId[user_id: this.user_id]=>{net_identifier: net_id} to {
+                    net_identifier: this.net_identifier
+                }
 
-        finish {
-            create MemberNetworkId[user_id: this.user_id]=>{net_identifier: this.net_identifier}
-
-            emit NetworkNameSet {
-                user_id: user.user_id,
-                net_identifier: this.net_identifier,
+                emit NetworkNameSet {
+                    user_id: user.user_id,
+                    net_identifier: this.net_identifier,
+                }
+            }
+        } 
+        else {
+            finish {
+                create MemberNetworkId[user_id: this.user_id]=>{net_identifier: this.net_identifier}
+                
+                emit NetworkNameSet {
+                    user_id: user.user_id,
+                    net_identifier: this.net_identifier,
+                }
             }
         }
     }
@@ -1165,6 +1194,7 @@ command SetNetworkName {
 - Members can only be assigned to one network name.
 
 ## UnsetNetworkName
+Dissociates a network name and address from a Member. 
 
 ```policy
 action unset_network_name (user_id id) {}
@@ -1185,12 +1215,11 @@ command UnsetNetworkName {
         let author = get_valid_user(envelope::author_id(envelope))
         let user = check_unwrap find_existing_user(this.user_id)
 
-        // Only Owners and Operators can unset a Member's network name.
-        check is_owner(author.role) || is_operator(author.role)
+        // Only Owners, Admins, and Operators can unset a Member's network name.
+        check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
         check is_member(user.role)
 
-        // TODO: Update checks (e.g., other permitted users)
-
+        check exists MemberNetworkId[user_id: this.user_id]
         finish {
             delete MemberNetworkId[user_id: this.user_id]
 
@@ -1327,8 +1356,9 @@ command CreateBidiChannel {
 
 **Invariants**:
 
+- Only Members can create and communicate over APS channels.
 - Members can only create channels for the labels they've been assigned.
-- Members can only create bidi channels for their labels that have `ChanOp::ReadWrite` permission.
+- Members can only communicate over a bidi channel when they have `ChanOp::ReadWrite` permission.
 
 
 ### CreateUniChannel
@@ -1469,9 +1499,7 @@ command CreateUniChannel {
   either `ChanOp::ReadWrite` or `ChanOp::ReadOnly` permissions for the label.
 
 
-
-
-
+<!-- TODO: add delete channel commands? -->
 
 
 
