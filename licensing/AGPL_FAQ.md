@@ -14,18 +14,6 @@ A: No. Under the AGPL license, you cannot deny recipients access to source code.
 ## Q: What if I make updates to the Aranya policy code?
 A: Our policy language (policy compiler, policy parser, and policy VM) are all captured in our AGPL license. However, we understand that users may want to create their own custom policies to be compiled by our software. We do not consider policies to be a derived work of our software that is under AGPL. The relationship of our software to policies is a relationship of program to data, not program to program. AGPL only requires sharing for a program, not the data that the program processes.
 
-## Q: Under what conditions can AGPL-licensed software be mixed with proprietary software?
-A: Software licensed under the AGPL can be mixed with software released under other licenses in some circumstances.
-
-There are several ways to legally mix AGPL with proprietary software:
-- AGPL and other software can be transmitted together in source code form. However, binaries that combine AGPL and other software may not be compatible with AGPL.
-- AGPL and other software can run at the same time on the same computer or network, subject to the source code sharing requirements of AGPL. 
-
-Problems with mixing software occur when you distribute a product or make it available over a network.
-However, if your proprietary software requires our AGPL licensed software to run, then you may need to contact SpiderOak to discuss commercial license terms. 
-If a legal method for using the AGPL software for a particular application cannot be devised, and a different license cannot be negotiated, then you cannot use the software. Note that the proprietary terms applied by others to their own proprietary software may also prevent combination with AGPL code, even if the AGPL does not. 
-It is your responsibility to determine compatibility of the licenses for various software you use. This answer is offered in the hope that it is helpful, but it’s not legal advice for your specific situation.
-
 ## Q: Isn’t using open-source software (OSS) forbidden by DoD Information Assurance (IA) Policy?
 A: No. At a high-level, DoD policy requires commercial software (including OSS) to come with either a warranty or source code, so that the software can be maintained, when necessary, by the supplier or the government. Since OSS provides source code, there is no problem.
 Specifically, the federal government’s IA controls, as documented in NIST SP 800-53 revision 5 includes a control enhancement, CM-7(8). Control enhancement CM-7(8) states that an organization must prohibit “the use of binary or machine-executable code from sources with limited or no warranty or without the provision of source code”. This control enhancement is based on the need for some way to update software to fix problems after they are discovered. For commercial software, such needed fixes could be provided by a software vendor as part of a warranty, or in the case of OSS, by the government (or its contractors).
