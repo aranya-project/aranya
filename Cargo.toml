@@ -35,23 +35,23 @@ wildcard_imports = "warn"
 
 
 [workspace.dependencies]
-aps-util = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main", features = ["alloc"] }
-base58 = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-buggy = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-crypto = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
-crypto-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-device-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-envelope-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-idam-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-perspective-ffi = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-policy-compiler = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-policy-ifgen = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main", features = ["serde"] }
-policy-ifgen-build = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-policy-lang = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main" }
-policy-vm = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main", features = ["std"] }
-runtime = { git = "https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git", branch = "main", features = ["std", "libc"] }
+aranya-afc-util = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["alloc"] }
+aranya-base58 = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-buggy = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-crypto = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
+aranya-crypto-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-device-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-envelope-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-idam-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-perspective-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-policy-compiler = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-policy-ifgen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["serde"] }
+aranya-policy-ifgen-build = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-policy-lang = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-policy-vm = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["std"] }
+aranya-runtime = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["std", "libc"] }
 
-aps = { git = "https://git.spideroak-inc.com/spideroak-inc/aps.git", branch = "main", features = ["posix", "std", "memory"] }
+aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-fast-channels.git", branch = "main", features = ["posix", "std", "memory"] }
 
 daemon = { path = "crates/daemon" }
 daemon-api = { path = "crates/daemon-api" }

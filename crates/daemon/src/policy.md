@@ -4,21 +4,21 @@ policy-version: 1
 
 # Default Policy
 
-The default policy used by Aranya. It is the core component that our software is built on top 
-of, so any changes may affect the behavior of the system and could require updating other parts of 
+The default policy used by Aranya. It is the core component that our software is built on top
+of, so any changes may affect the behavior of the system and could require updating other parts of
 the code to get everything working together.
 
 This policy can also be used as a template for writing other custom policies.
 
-Note that the policy has been written for version beta of our product and includes several 
-limitations that will likely be changed for the MVP. 
+Note that the policy has been written for version beta of our product and includes several
+limitations that will likely be changed for the MVP.
 
 ## Roles & Permissions
 
-The MVP will likely support multiple role assignments per user, but we restrict to 1 role per user 
-for the beta. Hence, users can only be onboarded to the team under the `Member` role and the role 
-assignment commands can be thought of as a promotion of the user's single role. Similarly, only the 
-`Member` role can be removed from the team and so role revocation commands will simply demote any 
+The MVP will likely support multiple role assignments per user, but we restrict to 1 role per user
+for the beta. Hence, users can only be onboarded to the team under the `Member` role and the role
+assignment commands can be thought of as a promotion of the user's single role. Similarly, only the
+`Member` role can be removed from the team and so role revocation commands will simply demote any
 higher role back down to `Member`.
 
 * Owner:
@@ -27,43 +27,43 @@ higher role back down to `Member`.
   * Assign/revoke Owner role.
   * Assign/revoke Admin role.
   * Assign/revoke Operator role.
-  * Define/undefine APS label.
-  * Assign/revoke APS label.
-  * Set/unset APS address&name.
+  * Define/undefine AFC label.
+  * Assign/revoke AFC label.
+  * Set/unset AFC address&name.
 
 * Admin:
   * Assign/revoke Operator role.
-  * Define/undefine APS label.
-  * Revoke APS label.
-  * Unset APS network identifier.
+  * Define/undefine AFC label.
+  * Revoke AFC label.
+  * Unset AFC network identifier.
 
 * Operator:
   * Add (new) / remove Member.
-  * Define APS label.
-  * Assign/revoke APS label.
-  * Set/unset APS address&name.
+  * Define AFC label.
+  * Assign/revoke AFC label.
+  * Set/unset AFC address&name.
 
 * Member:
-  * Create/delete APS channel.
+  * Create/delete AFC channel.
 
 **Invariants**:
 
-- Owner is the "root user" (has all permissions except sending data on APS channel).
+- Owner is the "root user" (has all permissions except sending data on AFC channel).
 - A user can only have one role at a time.
-- If the `User` fact exists, then so will the `UserIdentKey`, `UserSignKey`, and `UserEncKey` 
+- If the `User` fact exists, then so will the `UserIdentKey`, `UserSignKey`, and `UserEncKey`
   facts. Similarly, the latter three facts are predicated on the user fact.
 - A user can only have one of each user key type at a time.
 - Only the creator of the team is added as an `Owner`. All other users are onboarded as `Member`s.
 - Only onboarded users can be assigned to a higher role than `Member`.
 - Revoking a user's role will automatically set their role down to `Member`.
-- Only a `Member` can be removed from the team. All other roles must be revoked from a user before 
+- Only a `Member` can be removed from the team. All other roles must be revoked from a user before
   they can be removed from the team.
 
 
 ### Imports & Global Constants
 
 ```policy
-use aps
+use afc
 use crypto
 use device
 use envelope
@@ -123,13 +123,13 @@ fact UserEncKey[user_id id]=>{key_id id, key bytes}
 // Indicates that the team has been terminated.
 fact TeamEnd[]=>{}
 
-// Records an APS label that has been defined for use.
-fact Label[label int]=>{} 
+// Records an AFC label that has been defined for use.
+fact Label[label int]=>{}
 
-// Records that a user is allowed to use an APS label.
+// Records that a user is allowed to use an AFC label.
 fact AssignedLabel[label int, user_id id]=>{op enum ChanOp}
 
-// Stores a Member's associated network identifier for APS.
+// Stores a Member's associated network identifier for AFC.
 fact MemberNetworkId[user_id id]=>{net_identifier string}
 ```
 
@@ -207,7 +207,7 @@ function seal_command(payload bytes) struct Envelope {
     let parent_id = perspective::head_id()
     let author_id = device::current_user_id()
     let author_sign_pk = check_unwrap query UserSignKey[user_id: author_id]
-    
+
     let signed = crypto::sign(author_sign_pk.key_id, payload)
     return envelope::new(
         parent_id,
@@ -218,7 +218,7 @@ function seal_command(payload bytes) struct Envelope {
     )
 }
 
-// Opens an envelope with the author's public SigningKey, and returns the contained serialized 
+// Opens an envelope with the author's public SigningKey, and returns the contained serialized
 // basic command once its been verified.
 function open_envelope(sealed_envelope struct Envelope) bytes {
     let author_id = envelope::author_id(sealed_envelope)
@@ -235,10 +235,10 @@ function open_envelope(sealed_envelope struct Envelope) bytes {
 }
 ```
 
-#### APS Functions
+#### AFC Functions
 
 ```policy
-// Reports whether `label` has the valid format for an APS label, which is an unsigned, 32-bit integer.
+// Reports whether `label` has the valid format for an AFC label, which is an unsigned, 32-bit integer.
 function is_valid_label(label int) bool {
     return label >= 0 && label <= 4294967295
 }
@@ -294,10 +294,10 @@ function can_create_uni_channel(writer_id id, reader_id id, label int) bool {
     check writer_id != reader_id
 
     // Writer must have permissions to encrypt data.
-    check writer_op == ChanOp::WriteOnly || 
+    check writer_op == ChanOp::WriteOnly ||
         writer_op == ChanOp::ReadWrite
     // Reader must have permission to decrypt data.
-    check reader_op == ChanOp::ReadOnly || 
+    check reader_op == ChanOp::ReadOnly ||
         reader_op == ChanOp::ReadWrite
 
     return true
@@ -305,7 +305,7 @@ function can_create_uni_channel(writer_id id, reader_id id, label int) bool {
 ```
 
 ## CreateTeam
-The `CreateTeam` command is the initial command in the graph. It creates the Team and establishes 
+The `CreateTeam` command is the initial command in the graph. It creates the Team and establishes
 the author as the sole Owner of the Team.
 
 ```policy
@@ -335,7 +335,7 @@ command CreateTeam {
         let author_id = device::current_user_id()
         let payload = serialize(this)
         let author_sign_key_id = idam::derive_sign_key_id(this.owner_keys.sign_key)
-        
+
         // Sign and enclose the serialized command into an Envelope with additional metadata.
         let signed = crypto::sign(author_sign_key_id, payload)
         return envelope::new(
@@ -344,9 +344,9 @@ command CreateTeam {
             signed.command_id,
             signed.signature,
             payload,
-        ) 
+        )
     }
-    
+
     open {
         let payload = envelope::payload(envelope)
         let author_sign_key = deserialize(payload).owner_keys.sign_key
@@ -384,18 +384,18 @@ command CreateTeam {
 // Adds the user to the Team.
 finish function add_new_user(key_bundle struct KeyBundle, key_ids struct KeyIds, role enum Role) {
     create User[user_id: key_ids.user_id]=>{
-        role: role, 
-        sign_key_id: key_ids.sign_key_id, 
+        role: role,
+        sign_key_id: key_ids.sign_key_id,
         enc_key_id: key_ids.enc_key_id,
     }
 
     create UserIdentKey[user_id: key_ids.user_id]=>{key: key_bundle.ident_key}
     create UserSignKey[user_id: key_ids.user_id]=>{
-        key_id: key_ids.sign_key_id, 
+        key_id: key_ids.sign_key_id,
         key: key_bundle.sign_key,
     }
     create UserEncKey[user_id: key_ids.user_id]=>{
-        key_id: key_ids.enc_key_id, 
+        key_id: key_ids.enc_key_id,
         key: key_bundle.enc_key,
     }
 }
@@ -531,7 +531,7 @@ command RemoveMember{
     policy {
         let author = get_valid_user(envelope::author_id(envelope))
         let user = check_unwrap find_existing_user(this.user_id)
-        
+
         // Only Operators and Owners can remove a Member
         check is_operator(author.role) || is_owner(author.role)
         // Check that the user is a Member
@@ -611,7 +611,7 @@ command AssignOwner{
     policy {
         let author = get_valid_user(envelope::author_id(envelope))
         let user = check_unwrap find_existing_user(this.user_id)
-        
+
         // Only an Owner can assign the Owner role.
         check is_owner(author.role)
         // The user must not already have the Owner role.
@@ -630,12 +630,12 @@ command AssignOwner{
 // Assigns the user to the specified role.
 finish function assign_role(user struct User, role enum Role) {
     update User[user_id: user.user_id]=>{
-        role: user.role, 
-        sign_key_id: user.sign_key_id, 
+        role: user.role,
+        sign_key_id: user.sign_key_id,
         enc_key_id: user.enc_key_id,
         } to {
-            role: role, 
-            sign_key_id: user.sign_key_id, 
+            role: role,
+            sign_key_id: user.sign_key_id,
             enc_key_id: user.enc_key_id,
         }
 }
@@ -661,7 +661,7 @@ command AssignAdmin{
     policy {
         let author = get_valid_user(envelope::author_id(envelope))
         let user = check_unwrap find_existing_user(this.user_id)
-        
+
         // Only an Owner can assign the Admin role.
         check is_owner(author.role)
         // The user must not already have the Admin role.
@@ -699,7 +699,7 @@ command AssignOperator{
     policy {
         let author = get_valid_user(envelope::author_id(envelope))
         let user = check_unwrap find_existing_user(this.user_id)
-        
+
         // Only Owners and Admins can assign the Operator role.
         check is_owner(author.role) || is_admin(author.role)
         // The user must not already have the Operator role.
@@ -774,7 +774,7 @@ command RevokeOwner{
     policy {
         let author = get_valid_user(envelope::author_id(envelope))
         let user = check_unwrap find_existing_user(this.user_id)
-        
+
         // Owner can only revoke the role from itself.
         check author.user_id == this.user_id
         // Check that the user is an Owner.
@@ -793,12 +793,12 @@ command RevokeOwner{
 // Revokes the specified role from the user. This automatically sets their role to Member instead.
 finish function revoke_role(user struct User) {
     update User[user_id: user.user_id]=>{
-        role: user.role, 
-        sign_key_id: user.sign_key_id, 
+        role: user.role,
+        sign_key_id: user.sign_key_id,
         enc_key_id: user.enc_key_id,
         } to {
-            role: Role::Member, 
-            sign_key_id: user.sign_key_id, 
+            role: Role::Member,
+            sign_key_id: user.sign_key_id,
             enc_key_id: user.enc_key_id,
             }
 }
@@ -824,7 +824,7 @@ command RevokeAdmin{
     policy {
         let author = get_valid_user(envelope::author_id(envelope))
         let user = check_unwrap find_existing_user(this.user_id)
-        
+
         // Only Owners can revoke the Admin role.
         check is_owner(author.role)
         // Check that the user is an Admin.
@@ -882,17 +882,17 @@ command RevokeOperator{
 
 - Revoking a role from a user will assign them with the Member role.
 - If all Owners revoke their own role, it is possible for the team to be left without any Owners.
-- As long as there is at least one Owner in the team, new users can continue to be added and 
+- As long as there is at least one Owner in the team, new users can continue to be added and
   assigned to the different roles.
 - Only Owners can revoke the Admin role.
 - Only Owners and Admins can revoke the Operator role.
 
 ## DefineLabel
 
-Establishes a whitelist of APS labels that can be assigned to Members.
+Establishes a whitelist of AFC labels that can be assigned to Members.
 
 ```policy
-// Defines an APS label.
+// Defines an AFC label.
 action define_label(label int) {
     publish DefineLabel {
         label: label,
@@ -915,9 +915,9 @@ command DefineLabel {
     policy {
         let author = get_valid_user(envelope::author_id(envelope))
 
-        // Owners, Admins and Operators can define APS labels.
+        // Owners, Admins and Operators can define AFC labels.
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
-        // It must be a valid APS label that does not already exist.
+        // It must be a valid AFC label that does not already exist.
         check is_valid_label(this.label)
         check !exists Label[label: this.label]
 
@@ -934,20 +934,20 @@ command DefineLabel {
 
 **Invariants**:
 
-- Only Members cannot define APS labels.
-- Owners, Admins and Operators are allowed to define APS labels.
-- APS labels must be unsigned, 32-bit integers.
+- Only Members cannot define AFC labels.
+- Owners, Admins and Operators are allowed to define AFC labels.
+- AFC labels must be unsigned, 32-bit integers.
 
 ## UndefineLabel
 
-Removes an APS label from the whitelist. This operation will result in the APS label revocation across all Members that were assigned to it.
+Removes an AFC label from the whitelist. This operation will result in the AFC label revocation across all Members that were assigned to it.
 
 
 ```policy
-// Undefines an APS label.
+// Undefines an AFC label.
 action undefine_label(label int) {
-    // In a single transaction, publish the command to undefine the APS label as well as a 
-    // sequence of APS label revocation commands to revoke it from each Member role.
+    // In a single transaction, publish the command to undefine the AFC label as well as a
+    // sequence of AFC label revocation commands to revoke it from each Member role.
     publish UndefineLabel {
         label: label,
     }
@@ -974,7 +974,7 @@ command UndefineLabel {
     policy {
         let author = get_valid_user(envelope::author_id(envelope))
 
-        // Only Owners and Admins can undefine APS labels.
+        // Only Owners and Admins can undefine AFC labels.
         check is_owner(author.role) || is_admin(author.role)
         check exists Label[label: this.label]
 
@@ -991,12 +991,12 @@ command UndefineLabel {
 
 **Invariants**:
 
-- Only Owners and Admins are allowed to undefine APS labels.
+- Only Owners and Admins are allowed to undefine AFC labels.
 
 
 ## AssignLabel
 
-Assigns an "APS" label to a Member. 
+Assigns an "AFC" label to a Member.
 
 ```policy
 // Assigns the user a `label` to .
@@ -1034,7 +1034,7 @@ command AssignLabel {
         let author = get_valid_user(envelope::author_id(envelope))
         let user = check_unwrap find_existing_user(this.user_id)
 
-        // Only Owners and Operators can assign APS labels to Members.
+        // Only Owners and Operators can assign AFC labels to Members.
         check is_owner(author.role) || is_operator(author.role)
         check is_member(user.role)
 
@@ -1060,16 +1060,16 @@ command AssignLabel {
 
 - Labels must be unsigned, 32-bit integers.
 - Only Owners and Operators are allowed to assign labels.
-- Only Members can be assigned APS labels.
+- Only Members can be assigned AFC labels.
 - Only labels that are defined are allowed to be assigned.
 
 ## RevokeLabel
-Revokes an APS label from a Member. Note that peers communicating with this Member over an APS 
-channel under the revoked label should delete their channel once the label revocation command is 
+Revokes an AFC label from a Member. Note that peers communicating with this Member over an AFC
+channel under the revoked label should delete their channel once the label revocation command is
 received.
 
 ```policy
-// Revokes the user's access to the APS `label`.
+// Revokes the user's access to the AFC `label`.
 action revoke_label(user_id id, label int) {
     publish RevokeLabel {
         user_id: user_id,
@@ -1103,7 +1103,7 @@ command RevokeLabel {
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
         check is_member(user.role)
 
-        // Verify that APS label has been assigned to this Member
+        // Verify that AFC label has been assigned to this Member
         check exists AssignedLabel[label: this.label, user_id: user.user_id]
 
         finish {
@@ -1125,7 +1125,7 @@ command RevokeLabel {
 
 
 ## SetNetworkName
-Associates a network name and address to a Member for use in APS. 
+Associates a network name and address to a Member for use in AFC.
 
 ```policy
 action set_network_name (user_id id, net_identifier string) {
@@ -1173,11 +1173,11 @@ command SetNetworkName {
                     net_identifier: this.net_identifier,
                 }
             }
-        } 
+        }
         else {
             finish {
                 create MemberNetworkId[user_id: this.user_id]=>{net_identifier: this.net_identifier}
-                
+
                 emit NetworkNameSet {
                     user_id: user.user_id,
                     net_identifier: this.net_identifier,
@@ -1194,7 +1194,7 @@ command SetNetworkName {
 - Members can only be assigned to one network name.
 
 ## UnsetNetworkName
-Dissociates a network name and address from a Member. 
+Dissociates a network name and address from a Member.
 
 ```policy
 action unset_network_name (user_id id) {}
@@ -1239,12 +1239,12 @@ command UnsetNetworkName {
 ## CreateChannel
 
 ### CreateBidChannel
-Creates a bidirectional "APS" channel for off-graph messaging. This is an ephemeral command, which 
-means that it can only be emitted within an ephemeral session so that it is not added to the graph 
+Creates a bidirectional "AFC" channel for off-graph messaging. This is an ephemeral command, which
+means that it can only be emitted within an ephemeral session so that it is not added to the graph
 of commands. Furthermore, it cannot persist any changes to the factDB.
 
-The `create_bidi_channel` action creates the `ChannelKeys`, encapsulates them for the peer and the 
-author, and sends the encapsulations through the `CreateBidiChannel` command. When processing the 
+The `create_bidi_channel` action creates the `ChannelKeys`, encapsulates them for the peer and the
+author, and sends the encapsulations through the `CreateBidiChannel` command. When processing the
 command, the user will decapsulate their keys and store them in the shared memory DB.
 
 ```policy
@@ -1254,7 +1254,7 @@ action create_bidi_channel(peer_id id, label int) {
     let author = get_valid_user(author_id)
     let peer_enc_pk = get_enc_pk(peer_id)
 
-    let channel = aps::create_bidi_channel(
+    let channel = afc::create_bidi_channel(
         parent_cmd_id,
         author.enc_key_id,
         author_id,
@@ -1306,7 +1306,7 @@ command CreateBidiChannel {
         let author = get_valid_user(envelope::author_id(envelope))
         let peer = check_unwrap find_existing_user(this.peer_id)
 
-        // Only Members can create APS channels with other peer Members
+        // Only Members can create AFC channels with other peer Members
         check is_member(author.role)
         check is_member(peer.role)
 
@@ -1356,18 +1356,18 @@ command CreateBidiChannel {
 
 **Invariants**:
 
-- Only Members can create and communicate over APS channels.
+- Only Members can create and communicate over AFC channels.
 - Members can only create channels for the labels they've been assigned.
 - Members can only communicate over a bidi channel when they have `ChanOp::ReadWrite` permission.
 
 
 ### CreateUniChannel
-Creates a unidirectional "APS" channel. This is an ephemeral command, which means that it can only 
-be emitted within an ephemeral session and is not added to the graph of commands. Furthermore, it 
+Creates a unidirectional "AFC" channel. This is an ephemeral command, which means that it can only
+be emitted within an ephemeral session and is not added to the graph of commands. Furthermore, it
 does not persist any changes to the factDB.
 
-The `create_uni_channel` action creates the `ChannelKey`, encapsulates it for the peer, and sends 
-the encapsulation through the `CreateUniChannel` command. When processing the command, the 
+The `create_uni_channel` action creates the `ChannelKey`, encapsulates it for the peer, and sends
+the encapsulation through the `CreateUniChannel` command. When processing the command, the
 corresponding recipient will decapsulate their key and store it in the shared memory DB.
 
 ```policy
@@ -1377,7 +1377,7 @@ action create_uni_channel(writer_id id, reader_id id, label int) {
     let peer_id = select_peer_id(author.user_id, writer_id, reader_id)
     let peer_enc_pk = get_enc_pk(peer_id)
 
-    let channel = aps::create_uni_channel(
+    let channel = afc::create_uni_channel(
         parent_cmd_id,
         author.enc_key_id,
         peer_enc_pk,
@@ -1427,7 +1427,7 @@ command CreateUniChannel {
         label int,
         // The encapsulated key for the recipient of the command.
         peer_encap bytes,
-        // The ID of the APS channel key.
+        // The ID of the AFC channel key.
         channel_key_id id,
     }
 
@@ -1441,7 +1441,7 @@ command CreateUniChannel {
         let peer_id = select_peer_id(author.user_id, this.writer_id, this.reader_id)
         let peer = check_unwrap find_existing_user(peer_id)
 
-        // Only Members can create APS channels with other peer Members
+        // Only Members can create AFC channels with other peer Members
         check is_member(author.role)
         check is_member(peer.role)
 
@@ -1494,8 +1494,8 @@ command CreateUniChannel {
 **Invariants**:
 
 - Members can only create channels for the labels they've been assigned.
-- Members can only create unidirectional channels when the writer side has either 
-  `ChanOp::ReadWrite` or `ChanOp::WriteOnly` permissions for the label and the reader side has 
+- Members can only create unidirectional channels when the writer side has either
+  `ChanOp::ReadWrite` or `ChanOp::WriteOnly` permissions for the label and the reader side has
   either `ChanOp::ReadWrite` or `ChanOp::ReadOnly` permissions for the label.
 
 
@@ -1508,7 +1508,7 @@ command CreateUniChannel {
 <!-- The commented out code below this line is not part of the beta, but could be needed for MVP -->
 
 <!-- ## AddUser
-The `add_owner`, `add_admin`, `add_operator`, and `add_user` actions add an Owner, Admin, Operator, 
+The `add_owner`, `add_admin`, `add_operator`, and `add_user` actions add an Owner, Admin, Operator,
 and Member to the team, respectively.
 
 ### AddOwner
@@ -1650,7 +1650,7 @@ command AddOperator{
         }
     }
 }
-``` 
+```
 
 **Invariants**:
 
@@ -1689,7 +1689,7 @@ command RemoveOwner{
 
     policy {
         let author = get_valid_user(envelope::author_id(envelope))
-        
+
         // Owner can only be remove by itself.
         check author.user_id == this.user_id
         // Check that the user is an Owner.
@@ -1733,7 +1733,7 @@ command RemoveAdmin{
     policy {
         let author = get_valid_user(envelope::author_id(envelope))
         let user = check_unwrap find_existing_user(this.user_id)
-        
+
         // Only Owner can remove an Admin.
         check is_owner(author.role)
         // Check that the user is an Admin.
@@ -1777,7 +1777,7 @@ command RemoveOperator{
     policy {
         let author = get_valid_user(envelope::author_id(envelope))
         let user = check_unwrap find_existing_user(this.user_id)
-        
+
         // Only Admin can remove a Operator
         check is_admin(author.role)
         // Check that the user is a Operator
@@ -1834,9 +1834,9 @@ command Message {
         check is_member(author.role)
         let author_sign_pk = check_unwrap query UserSignKey[user_id: author.user_id]
         let plaintext = idam::decrypt_message(
-            parent_id, 
-            this.ciphertext, 
-            this.wrapped_key, 
+            parent_id,
+            this.ciphertext,
+            this.wrapped_key,
             author_sign_pk.key,
         )
         finish {
@@ -1847,5 +1847,5 @@ command Message {
         }
     }
 }
-``` 
+```
 -->

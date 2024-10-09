@@ -3,17 +3,17 @@
 use std::{fmt, marker::PhantomData, str::FromStr};
 
 use anyhow::{anyhow, Context, Result};
-use aps_util::Ffi as ApsFfi;
-use crypto::{keystore::fs_keystore::Store, UserId};
-use crypto_ffi::Ffi as CryptoFfi;
-use device_ffi::FfiDevice as DeviceFfi;
-use envelope_ffi::Ffi as EnvelopeFfi;
-use idam_ffi::Ffi as IdamFfi;
-use perspective_ffi::FfiPerspective as PerspectiveFfi;
-use policy_compiler::Compiler;
-use policy_lang::lang::parse_policy_document;
-use policy_vm::{ffi::FfiModule, Machine};
-use runtime::{
+use aranya_afc_util::Ffi as AfcFfi;
+use aranya_crypto::{keystore::fs_keystore::Store, UserId};
+use aranya_crypto_ffi::Ffi as CryptoFfi;
+use aranya_device_ffi::FfiDevice as DeviceFfi;
+use aranya_envelope_ffi::Ffi as EnvelopeFfi;
+use aranya_idam_ffi::Ffi as IdamFfi;
+use aranya_perspective_ffi::FfiPerspective as PerspectiveFfi;
+use aranya_policy_compiler::Compiler;
+use aranya_policy_lang::lang::parse_policy_document;
+use aranya_policy_vm::{ffi::FfiModule, Machine};
+use aranya_runtime::{
     engine::{Engine, EngineError, PolicyId},
     FfiCallable, Sink, VmEffect, VmPolicy,
 };
@@ -55,7 +55,7 @@ pub struct PolicyEngine<E, KS> {
 
 impl<E> PolicyEngine<E, Store>
 where
-    E: crypto::Engine,
+    E: aranya_crypto::Engine,
 {
     /// Creates a `PolicyEngine` from a policy document.
     pub fn new(policy_doc: &str, eng: E, store: Store, user_id: UserId) -> Result<Self> {
@@ -63,7 +63,7 @@ where
         let ast = parse_policy_document(policy_doc).context("unable to parse policy document")?;
         let module = Compiler::new(&ast)
             .ffi_modules(&[
-                ApsFfi::<Store>::SCHEMA,
+                AfcFfi::<Store>::SCHEMA,
                 CryptoFfi::<Store>::SCHEMA,
                 DeviceFfi::SCHEMA,
                 EnvelopeFfi::SCHEMA,
@@ -76,7 +76,7 @@ where
 
         // select which FFI moddules to use.
         let ffis: Vec<Box<dyn FfiCallable<E> + Send + 'static>> = vec![
-            Box::from(ApsFfi::new(store.try_clone()?)),
+            Box::from(AfcFfi::new(store.try_clone()?)),
             Box::from(CryptoFfi::new(store.try_clone()?)),
             Box::from(DeviceFfi::new(user_id)),
             Box::from(EnvelopeFfi),
@@ -96,7 +96,7 @@ where
 
 impl<E, KS> Engine for PolicyEngine<E, KS>
 where
-    E: crypto::Engine,
+    E: aranya_crypto::Engine,
 {
     type Policy = VmPolicy<E>;
     type Effect = VmEffect;
@@ -108,7 +108,7 @@ where
         }
     }
 
-    fn get_policy<'a>(&'a self, _id: &PolicyId) -> Result<&'a Self::Policy, EngineError> {
+    fn get_policy(&self, _id: PolicyId) -> Result<&Self::Policy, EngineError> {
         Ok(&self.policy)
     }
 }

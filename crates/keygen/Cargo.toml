@@ -7,10 +7,13 @@ license.workspace = true
 publish.workspace = true
 rust-version.workspace = true
 
+
 [lints]
 workspace = true
 
+
 [dependencies]
+aranya-crypto = { workspace = true, features = ["fs-keystore"] }
+
 anyhow = { workspace = true }
-crypto = { workspace = true, features = ["fs-keystore"] }
 serde = { workspace = true, features = ["derive"] }

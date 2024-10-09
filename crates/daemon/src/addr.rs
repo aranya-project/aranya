@@ -20,7 +20,7 @@ use core::{
 use std::{error, net::SocketAddrV4};
 
 use anyhow::{bail, Context, Result};
-use buggy::Bug;
+use aranya_buggy::Bug;
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,

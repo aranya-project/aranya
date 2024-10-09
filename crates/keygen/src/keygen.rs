@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use crypto::{
+use aranya_crypto::{
     CipherSuite, EncryptionKey, EncryptionKeyId, EncryptionPublicKey, Engine, IdentityKey,
     IdentityVerifyingKey, KeyStore, KeyStoreExt, SigningKey, SigningKeyId, UserId, VerifyingKey,
 };
@@ -66,17 +66,17 @@ impl KeyBundle {
     {
         Ok(PublicKeys {
             ident_pk: store
-                .get_key::<_, IdentityKey<E::CS>>(eng, &self.user_id.into())
+                .get_key::<_, IdentityKey<E::CS>>(eng, self.user_id.into())
                 .context("unable to load `IdentityKey`")?
                 .context("unable to find `IdentityKey`")?
                 .public()?,
             enc_pk: store
-                .get_key::<_, EncryptionKey<E::CS>>(eng, &self.enc_id.into())
+                .get_key::<_, EncryptionKey<E::CS>>(eng, self.enc_id.into())
                 .context("unable to load `EncryptionKey`")?
                 .context("unable to find `EncryptionKey`")?
                 .public()?,
             sign_pk: store
-                .get_key::<_, SigningKey<E::CS>>(eng, &self.sign_id.into())
+                .get_key::<_, SigningKey<E::CS>>(eng, self.sign_id.into())
                 .context("unable to load `SigningKey`")?
                 .context("unable to find `SigningKey`")?
                 .public()?,

@@ -13,8 +13,8 @@ workspace = true
 [dependencies]
 daemon-api = { workspace = true }
 
-aps = { workspace = true, features = ["std", "posix"] }
-buggy = { workspace = true, features = ["std"] }
+aranya-buggy = { workspace = true, features = ["std"] }
+aranya-fast-channels = { workspace = true, features = ["std", "posix"] }
 
 anyhow = { workspace = true }
 tarpc = { workspace = true }

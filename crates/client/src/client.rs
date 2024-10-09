@@ -1,7 +1,7 @@
 use std::{path::Path, time::Duration};
 
 use daemon_api::{
-    Addr, ApsCtrl, ChannelId, DaemonApiClient, DeviceId, KeyBundle, Label, NetIdentifier, Role,
+    Addr, AfcCtrl, ChannelId, DaemonApiClient, DeviceId, KeyBundle, Label, NetIdentifier, Role,
     TeamId,
 };
 use tarpc::{context, tokio_serde::formats::Json};
@@ -11,7 +11,7 @@ use crate::{Error, Result};
 
 pub struct Client {
     daemon: DaemonApiClient,
-    // TODO: APS Router.
+    // TODO: AFC Router.
 }
 
 impl Client {
@@ -37,8 +37,8 @@ impl Client {
             .daemon
             .create_channel(context::current(), team, peer, label)
             .await??;
-        // TODO: APS Router.
-        //self.aps.send_ctrl(chan, ctrl).await;
+        // TODO: AFC Router.
+        //self.afc.send_ctrl(chan, ctrl).await;
         //Ok(chan)
         todo!()
     }
@@ -48,27 +48,27 @@ impl Client {
             .daemon
             .delete_channel(context::current(), chan)
             .await??;
-        // TODO: APS Router.
-        //self.aps.send_ctrl(chan, ctrl).await;
+        // TODO: AFC Router.
+        //self.afc.send_ctrl(chan, ctrl).await;
         todo!()
     }
 
-    pub async fn receive_aps_ctrl(&mut self, ctrl: ApsCtrl) -> Result<()> {
+    pub async fn receive_afc_ctrl(&mut self, ctrl: AfcCtrl) -> Result<()> {
         self.daemon
-            .receive_aps_ctrl(context::current(), ctrl)
+            .receive_afc_ctrl(context::current(), ctrl)
             .await??;
         todo!()
     }
 
     pub async fn send_data(&mut self, _chan: ChannelId, _data: Vec<u8>) {
-        // TODO: APS Router.
-        //self.aps.send_data(chan, data).await;
+        // TODO: AFC Router.
+        //self.afc.send_data(chan, data).await;
         todo!()
     }
 
     pub async fn recv_data(&mut self) -> Option<(ChannelId, Vec<u8>)> {
-        // TODO: APS Router.
-        //self.aps.recv_data().await
+        // TODO: AFC Router.
+        //self.afc.recv_data().await
         todo!()
     }
 }
@@ -181,7 +181,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// associate a network address to a device for use with APS.
+    /// associate a network address to a device for use with AFC.
     ///
     /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
@@ -231,7 +231,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// assign a label to a device so that it can be used for APS
+    /// assign a label to a device so that it can be used for AFC
     pub async fn assign_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
         Ok(self
             .client

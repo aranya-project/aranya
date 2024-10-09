@@ -13,11 +13,13 @@ workspace = true
 
 
 [dependencies]
-crypto = { workspace = true }
+aranya-crypto = { workspace = true }
+
 postcard = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
+
 
 [package.metadata.cargo-machete]
 ignored = ["postcard"]

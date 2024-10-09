@@ -3,7 +3,7 @@
 use core::time::Duration;
 use std::fmt;
 
-use crypto::custom_id;
+use aranya_crypto::custom_id;
 use serde::{Deserialize, Serialize};
 
 // TODO: support custom error types.
@@ -60,8 +60,8 @@ pub struct Label(pub u32);
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct ChannelId(pub [u8; 16]);
 
-// serialized command which must be passed over APS.
-pub type ApsCtrl = Vec<u8>;
+// serialized command which must be passed over AFC.
+pub type AfcCtrl = Vec<u8>;
 
 #[tarpc::service]
 pub trait DaemonApi {
@@ -108,7 +108,7 @@ pub trait DaemonApi {
         team: TeamId,
         peer: NetIdentifier,
         label: Label,
-    ) -> Result<(ChannelId, NodeId, ApsCtrl)>;
-    async fn delete_channel(chan: ChannelId) -> Result<ApsCtrl>;
-    async fn receive_aps_ctrl(ctrl: ApsCtrl) -> Result<()>;
+    ) -> Result<(ChannelId, NodeId, AfcCtrl)>;
+    async fn delete_channel(chan: ChannelId) -> Result<AfcCtrl>;
+    async fn receive_afc_ctrl(ctrl: AfcCtrl) -> Result<()>;
 }

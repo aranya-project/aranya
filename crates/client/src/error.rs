@@ -9,14 +9,14 @@ pub enum Error {
     #[error("daemon reported error: {0}")]
     Daemon(#[from] daemon_api::Error),
 
-    #[error("APS shared memory error: {0}")]
-    ApsShm(#[from] aps::shm::Error),
+    #[error("AFC shared memory error: {0}")]
+    AfcShm(#[from] aranya_fast_channels::shm::Error),
 
-    #[error("APS error: {0}")]
-    Aps(#[from] aps::Error),
+    #[error("AFC error: {0}")]
+    Afc(#[from] aranya_fast_channels::Error),
 
     #[error("Unexpected internal error: {0}")]
-    Bug(#[from] buggy::Bug),
+    Bug(#[from] aranya_buggy::Bug),
 }
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;

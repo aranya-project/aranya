@@ -13,30 +13,31 @@ workspace = true
 
 
 [dependencies]
-aps-util = { workspace = true }
-buggy = { workspace = true }
-crypto = { workspace = true }
-crypto-ffi = { workspace = true }
-device-ffi = { workspace = true }
-envelope-ffi = { workspace = true }
-idam-ffi = { workspace = true }
-perspective-ffi = { workspace = true }
-policy-compiler = { workspace = true }
-policy-ifgen = { workspace = true }
-policy-lang = { workspace = true }
-policy-vm = { workspace = true }
-postcard = { workspace = true }
-runtime = { workspace = true }
+daemon-api = { workspace = true }
+keygen = { workspace = true }
 
-aps = { workspace = true }
+aranya-afc-util = { workspace = true }
+aranya-buggy = { workspace = true }
+aranya-crypto = { workspace = true }
+aranya-crypto-ffi = { workspace = true }
+aranya-device-ffi = { workspace = true }
+aranya-envelope-ffi = { workspace = true }
+aranya-idam-ffi = { workspace = true }
+aranya-perspective-ffi = { workspace = true }
+aranya-policy-compiler = { workspace = true }
+aranya-policy-ifgen = { workspace = true }
+aranya-policy-lang = { workspace = true }
+aranya-policy-vm = { workspace = true }
+aranya-runtime = { workspace = true }
+
+aranya-fast-channels = { workspace = true }
 
 anyhow = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }
-daemon-api = { workspace = true }
 deser-hjson = { version = "2" }
 futures-util = { workspace = true }
-keygen = { workspace = true }
+postcard = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
 tokio = { workspace = true, features = [
@@ -62,7 +63,7 @@ test-util = { path = "./test-util" }
 
 
 [build-dependencies]
-policy-ifgen-build = { workspace = true }
+aranya-policy-ifgen-build = { workspace = true }
 
 
 [[bin]]

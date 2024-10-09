@@ -9,9 +9,9 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
-use buggy::BugExt;
+use aranya_buggy::BugExt;
+use aranya_runtime::storage::GraphId;
 use futures_util::StreamExt;
-use runtime::storage::GraphId;
 use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument};
@@ -139,7 +139,7 @@ impl Syncer {
                 let info = self.peers.get_mut(&peer).assume("peer must exist")?;
                 info.key = self.queue.insert(peer.clone(), info.interval);
                 // sync with peer.
-                self.sync(&peer.graph_id, &peer.addr).await?;
+                self.sync(peer.graph_id, &peer.addr).await?;
             }
         }
         Ok(())
@@ -166,7 +166,7 @@ impl Syncer {
     }
 
     #[instrument(skip_all, fields(%peer, graph_id = %id))]
-    async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
+    async fn sync(&mut self, id: GraphId, peer: &Addr) -> Result<()> {
         info!("syncing with peer");
 
         let effects: Vec<EF> = {

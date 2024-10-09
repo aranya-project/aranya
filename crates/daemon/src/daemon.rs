@@ -1,9 +1,7 @@
 use std::{io, net::SocketAddr, path::Path, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
-use aps::memory::State as MemoryState;
-use ciborium as cbor;
-use crypto::{
+use aranya_crypto::{
     aead::Aead,
     default::{DefaultCipherSuite, DefaultEngine},
     generic_array::GenericArray,
@@ -12,11 +10,13 @@ use crypto::{
     keystore::fs_keystore::Store,
     CipherSuite, Random, Rng,
 };
-use keygen::{KeyBundle, PublicKeys};
-use runtime::{
+use aranya_fast_channels::memory::State as MemoryState;
+use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState,
 };
+use ciborium as cbor;
+use keygen::{KeyBundle, PublicKeys};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
 use tracing::{error, info};
@@ -105,12 +105,12 @@ impl Daemon {
         });
 
         // TODO: have Aranya write to shm.
-        let aps = self.setup_aps()?;
+        let afc = self.setup_afc()?;
 
         // TODO: add context to error.
         let api = DaemonApiServer::new(
             client,
-            aps,
+            afc,
             self.cfg.uds_api_path.clone(),
             Arc::new(pk),
             peers,
@@ -170,10 +170,10 @@ impl Daemon {
         Ok((client, server))
     }
 
-    /// Creates APS shm.
-    fn setup_aps(&self) -> Result<MemoryState<CS>> {
+    /// Creates AFC shm.
+    fn setup_afc(&self) -> Result<MemoryState<CS>> {
         // TODO: issue stellar-tapestry#34
-        // add aps::shm{ReadState, WriteState} back in after linux/arm64 bugfix
+        // add aranya_fast_channels::shm::{ReadState, WriteState} back in after linux/arm64 bugfix
         let write = MemoryState::<CS>::new();
 
         Ok(write)

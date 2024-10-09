@@ -6,7 +6,7 @@
 #![allow(unused_imports)]
 extern crate alloc;
 use alloc::{string::String, vec::Vec};
-use policy_ifgen::{
+use aranya_policy_ifgen::{
     macros::{actions, effect, effects, value},
     ClientError, Id, Value,
 };

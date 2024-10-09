@@ -8,7 +8,7 @@
 )]
 
 use anyhow::{Context, Result};
-use aps::Label;
+use aranya_fast_channels::Label;
 use daemon::{
     aranya::Actions,
     policy::{ChanOp, Effect, Role},
@@ -176,7 +176,7 @@ async fn test_revoke_label() -> Result<()> {
         .context("unable to revoke label membera")?;
     if !contains_effect!(&effects, Effect::LabelRevoked(e) if e.user_id == team.membera.pk.ident_pk.id().expect("id").into())
     {
-        panic!("expected ApsLabelRevoked effect: {:?}", effects)
+        panic!("expected AfcLabelRevoked effect: {:?}", effects)
     }
     let effects = team
         .operator
@@ -186,7 +186,7 @@ async fn test_revoke_label() -> Result<()> {
         .context("unable to revoke label memberb")?;
     if !contains_effect!(&effects, Effect::LabelRevoked(e) if e.user_id ==  team.memberb.pk.ident_pk.id().expect("id").into())
     {
-        panic!("expected ApsLabelRevoked effect: {:?}", effects)
+        panic!("expected AfcLabelRevoked effect: {:?}", effects)
     }
 
     Ok(())

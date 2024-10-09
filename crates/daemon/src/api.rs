@@ -12,10 +12,10 @@ use std::{
 };
 
 use anyhow::Result;
-use aps::Label;
-use crypto::{Csprng, Rng};
+use aranya_crypto::{Csprng, Rng};
+use aranya_fast_channels::Label;
 use daemon_api::{
-    Addr as ApiAddr, ApsCtrl, ChannelId, DaemonApi, DeviceId, Error, KeyBundle as ApiKeyBundle,
+    Addr as ApiAddr, AfcCtrl, ChannelId, DaemonApi, DeviceId, Error, KeyBundle as ApiKeyBundle,
     Label as ApiLabel, NetIdentifier, NodeId, Result as ApiResult, Role as ApiRole, TeamId,
 };
 use futures_util::{StreamExt, TryStreamExt};
@@ -52,7 +52,7 @@ pub struct DaemonApiServer<S> {
 struct DaemonApiHandler<S> {
     client: Arc<Client>,
     #[allow(dead_code)] // TODO
-    aps: S,
+    afc: S,
     pk: Arc<PublicKeys<CS>>,
     peers: SyncPeers,
 }
@@ -62,7 +62,7 @@ impl<S: Clone + Send + 'static> DaemonApiServer<S> {
     #[instrument(skip_all)]
     pub fn new(
         client: Arc<Client>,
-        aps: S,
+        afc: S,
         daemon_sock: PathBuf,
         pk: Arc<PublicKeys<CS>>,
         peers: SyncPeers,
@@ -72,7 +72,7 @@ impl<S: Clone + Send + 'static> DaemonApiServer<S> {
             daemon_sock,
             handler: DaemonApiHandler {
                 client,
-                aps,
+                afc,
                 pk,
                 peers,
             },
@@ -381,19 +381,19 @@ impl<S: Clone + Send + 'static> DaemonApi for DaemonApiHandler<S> {
         team: TeamId,
         peer: NetIdentifier,
         label: ApiLabel,
-    ) -> ApiResult<(ChannelId, NodeId, ApsCtrl)> {
-        // TODO: self.aps.add()
+    ) -> ApiResult<(ChannelId, NodeId, AfcCtrl)> {
+        // TODO: self.afc.add()
         todo!();
     }
 
     #[instrument(skip(self))]
-    async fn delete_channel(self, _: context::Context, chan: ChannelId) -> ApiResult<ApsCtrl> {
-        // TODO: self.aps.remove()
+    async fn delete_channel(self, _: context::Context, chan: ChannelId) -> ApiResult<AfcCtrl> {
+        // TODO: self.afc.remove()
         todo!();
     }
 
     #[instrument(skip(self))]
-    async fn receive_aps_ctrl(self, _: context::Context, ctrl: ApsCtrl) -> ApiResult<()> {
+    async fn receive_afc_ctrl(self, _: context::Context, ctrl: AfcCtrl) -> ApiResult<()> {
         todo!();
     }
 }

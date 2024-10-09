@@ -3,15 +3,15 @@
 use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
 
 use anyhow::{bail, Context, Result};
-use aps::Label;
-use crypto::{Csprng, Rng, UserId};
-use keygen::PublicKeys;
-use policy_ifgen::{Actor, VmAction, VmEffect};
-use policy_vm::Value;
-use runtime::{
+use aranya_crypto::{Csprng, Rng, UserId};
+use aranya_fast_channels::Label;
+use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
+use aranya_policy_vm::Value;
+use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, PeerCache, Policy, Session, Sink,
     StorageProvider, SyncRequester, SyncResponder, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
 };
+use keygen::PublicKeys;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -57,17 +57,17 @@ impl<EN, SP, CE> Client<EN, SP, CE>
 where
     EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
     SP: StorageProvider + Send + 'static,
-    CE: crypto::Engine + Send + Sync + 'static,
+    CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
     /// Syncs with the peer.
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
-    pub async fn sync_peer<S>(&self, id: &GraphId, sink: &mut S, addr: &Addr) -> Result<()>
+    pub async fn sync_peer<S>(&self, id: GraphId, sink: &mut S, addr: &Addr) -> Result<()>
     where
         S: Sink<<EN as Engine>::Effect>,
     {
         // send the sync request.
-        let mut syncer = SyncRequester::new(*id, &mut Rng);
+        let mut syncer = SyncRequester::new(id, &mut Rng);
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let (len, _) = {
@@ -196,7 +196,7 @@ impl<EN, SP, CE> Actions<EN, SP, CE> for ActionsImpl<EN, SP, CE>
 where
     EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
     SP: StorageProvider + Send + 'static,
-    CE: crypto::Engine + Send + Sync + 'static,
+    CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
     #[instrument(skip_all)]
     async fn with_actor<F>(&self, f: F) -> Result<Vec<Effect>>
@@ -350,7 +350,7 @@ pub trait Actions<EN, SP, CE>
 where
     EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
     SP: StorageProvider + Send + 'static,
-    CE: crypto::Engine + Send + Sync + 'static,
+    CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
     /// Invokes `f` with an [`ActorImpl`].
     fn with_actor<F>(&self, f: F) -> impl Future<Output = Result<Vec<Effect>>> + Send
@@ -423,7 +423,7 @@ where
         .in_current_span()
     }
 
-    /// Defines an APS label.
+    /// Defines an AFC label.
     #[instrument(skip(self), fields(label = %label))]
     fn define_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
@@ -433,7 +433,7 @@ where
         .in_current_span()
     }
 
-    /// Undefines an APS label.
+    /// Undefines an AFC label.
     #[instrument(skip(self), fields(label = %label))]
     fn undefine_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
@@ -443,7 +443,7 @@ where
         .in_current_span()
     }
 
-    /// Grants an app permission to use an APS label.
+    /// Grants an app permission to use an AFC label.
     #[instrument(skip(self), fields(user_id = %user_id, label = %label, op = %op))]
     fn assign_label(
         &self,
@@ -458,14 +458,14 @@ where
         .in_current_span()
     }
 
-    /// Revokes an APS label.
+    /// Revokes an AFC label.
     #[instrument(skip(self), fields(user_id = %user_id, label = %label))]
     fn revoke_label(
         &self,
         user_id: UserId,
         label: Label,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%user_id, %label, "revoking APS label");
+        info!(%user_id, %label, "revoking AFC label");
         self.with_actor(move |actor| {
             actor.revoke_label(user_id.into(), i64::from(label.to_u32()))?;
             Ok(())
@@ -502,7 +502,7 @@ where
         .in_current_span()
     }
 
-    /// Creates a bidirectional APS channel.
+    /// Creates a bidirectional AFC channel.
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
     fn create_bidi_channel(
         &self,
@@ -516,7 +516,7 @@ where
         .in_current_span()
     }
 
-    /// Creates a bidirectional APS channel off graph.
+    /// Creates a bidirectional AFC channel off graph.
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
     fn create_bidi_channel_off_graph(
         &self,
@@ -533,7 +533,7 @@ where
         .in_current_span()
     }
 
-    /// Creates a unidirectional APS channel.
+    /// Creates a unidirectional AFC channel.
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
     fn create_uni_channel(
         &self,
@@ -548,7 +548,7 @@ where
         .in_current_span()
     }
 
-    /// Creates a unidirectional APS channel.
+    /// Creates a unidirectional AFC channel.
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
     fn create_uni_channel_off_graph(
         &self,
@@ -603,17 +603,17 @@ impl<EN, SP, CE, S> Actor for ActorImpl<'_, EN, SP, CE, S>
 where
     EN: Engine<Policy = VmPolicy<CE>> + Send + 'static,
     SP: StorageProvider + Send + 'static,
-    CE: crypto::Engine + Send + Sync,
+    CE: aranya_crypto::Engine + Send + Sync,
     S: Sink<<EN as Engine>::Effect>,
 {
     /// Calls action on Aranya graph.
     #[instrument(skip_all)]
     fn call_action(&mut self, action: VmAction<'_>) -> Result<(), ClientError> {
-        self.client.action(self.graph_id, self.sink, action)
+        self.client.action(*self.graph_id, self.sink, action)
     }
 }
 
-impl<CS: crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
+impl<CS: aranya_crypto::CipherSuite> TryFrom<&PublicKeys<CS>> for KeyBundle {
     type Error = postcard::Error;
     fn try_from(pk: &PublicKeys<CS>) -> Result<Self, Self::Error> {
         Ok(Self {

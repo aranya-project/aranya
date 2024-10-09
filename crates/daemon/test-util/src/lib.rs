@@ -7,10 +7,14 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use crypto::{
+use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
     Csprng, Rng,
+};
+use aranya_runtime::{
+    storage::linear::{libc::FileManager, LinearStorageProvider},
+    ClientState, GraphId,
 };
 use daemon::{
     addr::Addr,
@@ -19,10 +23,6 @@ use daemon::{
     vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
 };
 use keygen::{KeyBundle, PublicKeys};
-use runtime::{
-    storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState, GraphId,
-};
 use tempfile::{tempdir, TempDir};
 use tokio::{
     net::TcpListener,
@@ -80,7 +80,7 @@ impl TestDevice {
 impl TestDevice {
     pub async fn sync(&self, device: &TestDevice) -> Result<Vec<Effect>> {
         let mut sink = VecSink::new();
-        self.sync_peer(&self.graph_id, &mut sink, &device.local_addr)
+        self.sync_peer(self.graph_id, &mut sink, &device.local_addr)
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.local_addr))?;
         Ok(sink.collect()?)

@@ -117,32 +117,282 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86fdf8605db99b54d3cd748a44c6d04df638eb5dafb219b135d0149bd0db01f6"
 
 [[package]]
-name = "aps"
+name = "aranya-afc-util"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/aps.git?branch=main#89f4ff7385f8068fe0db2eef97f0c0d0ddbfca3d"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
 dependencies = [
- "buggy",
+ "aranya-crypto",
+ "aranya-fast-channels",
+ "aranya-policy-vm",
+ "postcard",
+ "serde",
+ "tracing",
+]
+
+[[package]]
+name = "aranya-base58"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aranya-buggy",
+ "byteorder",
+]
+
+[[package]]
+name = "aranya-buggy"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "cfg-if",
+]
+
+[[package]]
+name = "aranya-crypto"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aes-gcm",
+ "aranya-base58",
+ "aranya-buggy",
+ "aranya-crypto-derive",
+ "aranya-trouble",
+ "byteorder",
+ "cfg-if",
+ "ciborium",
+ "ciborium-io",
+ "crypto-common",
+ "der",
+ "ecdsa",
+ "ed25519-dalek",
+ "elliptic-curve",
+ "generic-array 1.1.0",
+ "getrandom",
+ "more-asserts",
+ "p256",
+ "p384",
+ "postcard",
+ "proptest",
+ "rand",
+ "rand_core",
+ "rustix",
+ "serde",
+ "serde_json",
+ "sha2",
+ "siphasher",
+ "spin 0.9.8",
+ "subtle",
+ "typenum",
+ "zeroize",
+]
+
+[[package]]
+name = "aranya-crypto-derive"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.77",
+]
+
+[[package]]
+name = "aranya-crypto-ffi"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aranya-crypto",
+ "aranya-policy-vm",
+ "postcard",
+ "tracing",
+]
+
+[[package]]
+name = "aranya-device-ffi"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aranya-crypto",
+ "aranya-policy-vm",
+]
+
+[[package]]
+name = "aranya-envelope-ffi"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aranya-crypto",
+ "aranya-policy-vm",
+ "tracing",
+]
+
+[[package]]
+name = "aranya-fast-channels"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-fast-channels.git?branch=main#f215ee7ab2fcac78676be62b91b666a67e421616"
+dependencies = [
+ "aranya-buggy",
+ "aranya-crypto",
  "byteorder",
  "cfg-if",
  "const_format",
- "crypto",
  "heapless",
  "libc",
  "serde",
 ]
 
 [[package]]
-name = "aps-util"
+name = "aranya-idam-ffi"
 version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
 dependencies = [
- "aps",
- "crypto",
- "policy-vm",
+ "aranya-crypto",
+ "aranya-policy-vm",
  "postcard",
- "serde",
  "tracing",
 ]
+
+[[package]]
+name = "aranya-perspective-ffi"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aranya-crypto",
+ "aranya-policy-vm",
+]
+
+[[package]]
+name = "aranya-policy-ast"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "aranya-policy-compiler"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aranya-buggy",
+ "aranya-policy-ast",
+ "aranya-policy-lang",
+ "aranya-policy-module",
+ "ciborium",
+ "clap",
+]
+
+[[package]]
+name = "aranya-policy-derive"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aranya-policy-lang",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.77",
+]
+
+[[package]]
+name = "aranya-policy-ifgen"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aranya-policy-ifgen-macro",
+ "aranya-policy-vm",
+ "aranya-runtime",
+ "serde",
+]
+
+[[package]]
+name = "aranya-policy-ifgen-build"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "anyhow",
+ "aranya-policy-ast",
+ "aranya-policy-lang",
+ "prettyplease",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.77",
+]
+
+[[package]]
+name = "aranya-policy-ifgen-macro"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.77",
+]
+
+[[package]]
+name = "aranya-policy-lang"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "anyhow",
+ "aranya-buggy",
+ "aranya-policy-ast",
+ "clap",
+ "markdown",
+ "pest",
+ "pest_derive",
+ "serde",
+ "serde_yaml",
+]
+
+[[package]]
+name = "aranya-policy-module"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aranya-crypto",
+ "aranya-policy-ast",
+ "serde",
+]
+
+[[package]]
+name = "aranya-policy-vm"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aranya-buggy",
+ "aranya-crypto",
+ "aranya-policy-ast",
+ "aranya-policy-derive",
+ "aranya-policy-module",
+ "heapless",
+ "postcard",
+]
+
+[[package]]
+name = "aranya-runtime"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
+dependencies = [
+ "aranya-buggy",
+ "aranya-crypto",
+ "aranya-policy-vm",
+ "cfg-if",
+ "heapless",
+ "libc",
+ "memchr",
+ "postcard",
+ "serde",
+ "spin 0.9.8",
+ "tracing",
+ "vec1",
+ "yoke",
+]
+
+[[package]]
+name = "aranya-trouble"
+version = "0.1.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=main#7595a545c2f5d3c6f971aff403069681e6362acf"
 
 [[package]]
 name = "asn1-rs"
@@ -242,15 +492,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
 
 [[package]]
-name = "base58"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "buggy",
- "byteorder",
-]
-
-[[package]]
 name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -281,14 +522,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
 dependencies = [
  "generic-array 0.14.7",
-]
-
-[[package]]
-name = "buggy"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "cfg-if",
 ]
 
 [[package]]
@@ -406,9 +639,9 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aps",
+ "aranya-buggy",
+ "aranya-fast-channels",
  "backon",
- "buggy",
  "daemon",
  "daemon-api",
  "serial_test",
@@ -517,45 +750,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7a81dae078cea95a014a339291cec439d2f232ebe854a9d672b796c6afafa9b7"
 
 [[package]]
-name = "crypto"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "aes-gcm",
- "base58",
- "buggy",
- "byteorder",
- "cfg-if",
- "ciborium",
- "ciborium-io",
- "crypto-common",
- "crypto-derive",
- "der",
- "ecdsa",
- "ed25519-dalek",
- "elliptic-curve",
- "generic-array 1.1.0",
- "getrandom",
- "more-asserts",
- "p256",
- "p384",
- "postcard",
- "proptest",
- "rand",
- "rand_core",
- "rustix",
- "serde",
- "serde_json",
- "sha2",
- "siphasher",
- "spin 0.9.8",
- "subtle",
- "trouble",
- "typenum",
- "zeroize",
-]
-
-[[package]]
 name = "crypto-bigint"
 version = "0.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -575,28 +769,6 @@ checksum = "1bfb12502f3fc46cca1bb51ac28df9d618d813cdc3d2f25b9fe775a34af26bb3"
 dependencies = [
  "generic-array 0.14.7",
  "typenum",
-]
-
-[[package]]
-name = "crypto-derive"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "prettyplease",
- "proc-macro2",
- "quote",
- "syn 2.0.77",
-]
-
-[[package]]
-name = "crypto-ffi"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "crypto",
- "policy-vm",
- "postcard",
- "tracing",
 ]
 
 [[package]]
@@ -640,29 +812,29 @@ name = "daemon"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aps",
- "aps-util",
- "buggy",
+ "aranya-afc-util",
+ "aranya-buggy",
+ "aranya-crypto",
+ "aranya-crypto-ffi",
+ "aranya-device-ffi",
+ "aranya-envelope-ffi",
+ "aranya-fast-channels",
+ "aranya-idam-ffi",
+ "aranya-perspective-ffi",
+ "aranya-policy-compiler",
+ "aranya-policy-ifgen",
+ "aranya-policy-ifgen-build",
+ "aranya-policy-lang",
+ "aranya-policy-vm",
+ "aranya-runtime",
  "ciborium",
  "clap",
- "crypto",
- "crypto-ffi",
  "daemon-api",
  "deser-hjson",
- "device-ffi",
- "envelope-ffi",
  "futures-util",
- "idam-ffi",
  "keygen",
- "perspective-ffi",
- "policy-compiler",
- "policy-ifgen",
- "policy-ifgen-build",
- "policy-lang",
- "policy-vm",
  "postcard",
  "pretty_assertions",
- "runtime",
  "serde",
  "serial_test",
  "tarpc",
@@ -679,7 +851,7 @@ dependencies = [
 name = "daemon-api"
 version = "0.1.0"
 dependencies = [
- "crypto",
+ "aranya-crypto",
  "postcard",
  "serde",
  "tarpc",
@@ -732,15 +904,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d94aac4095c08ded7e4b9ba7fc2b2929f11b94bb96897ca188b0f64e01688e1"
 dependencies = [
  "serde",
-]
-
-[[package]]
-name = "device-ffi"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "crypto",
- "policy-vm",
 ]
 
 [[package]]
@@ -865,16 +1028,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.77",
-]
-
-[[package]]
-name = "envelope-ffi"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "crypto",
- "policy-vm",
- "tracing",
 ]
 
 [[package]]
@@ -1165,17 +1318,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
-name = "idam-ffi"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "crypto",
- "policy-vm",
- "postcard",
- "tracing",
-]
-
-[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1230,7 +1372,7 @@ name = "keygen"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "crypto",
+ "aranya-crypto",
  "serde",
 ]
 
@@ -1535,15 +1677,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3148f5046208a5d56bcfc03053e3ca6334e51da8dfb19b6cdc8b306fae3283e"
 
 [[package]]
-name = "perspective-ffi"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "crypto",
- "policy-vm",
-]
-
-[[package]]
 name = "pest"
 version = "2.7.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1628,114 +1761,6 @@ checksum = "f950b2377845cebe5cf8b5165cb3cc1a5e0fa5cfa3e1f7f55707d8fd82e0a7b7"
 dependencies = [
  "der",
  "spki",
-]
-
-[[package]]
-name = "policy-ast"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "serde",
-]
-
-[[package]]
-name = "policy-compiler"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "buggy",
- "ciborium",
- "clap",
- "policy-ast",
- "policy-lang",
- "policy-module",
-]
-
-[[package]]
-name = "policy-derive"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "policy-lang",
- "prettyplease",
- "proc-macro2",
- "quote",
- "syn 2.0.77",
-]
-
-[[package]]
-name = "policy-ifgen"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "policy-ifgen-macro",
- "policy-vm",
- "runtime",
- "serde",
-]
-
-[[package]]
-name = "policy-ifgen-build"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "anyhow",
- "policy-ast",
- "policy-lang",
- "prettyplease",
- "proc-macro2",
- "quote",
- "syn 2.0.77",
-]
-
-[[package]]
-name = "policy-ifgen-macro"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.77",
-]
-
-[[package]]
-name = "policy-lang"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "anyhow",
- "buggy",
- "clap",
- "markdown",
- "pest",
- "pest_derive",
- "policy-ast",
- "serde",
- "serde_yaml",
-]
-
-[[package]]
-name = "policy-module"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "crypto",
- "policy-ast",
- "serde",
-]
-
-[[package]]
-name = "policy-vm"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "buggy",
- "crypto",
- "heapless",
- "policy-ast",
- "policy-derive",
- "policy-module",
- "postcard",
 ]
 
 [[package]]
@@ -2044,26 +2069,6 @@ dependencies = [
  "spin 0.9.8",
  "untrusted 0.9.0",
  "windows-sys 0.52.0",
-]
-
-[[package]]
-name = "runtime"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
-dependencies = [
- "buggy",
- "cfg-if",
- "crypto",
- "heapless",
- "libc",
- "memchr",
- "policy-vm",
- "postcard",
- "serde",
- "spin 0.9.8",
- "tracing",
- "vec1",
- "yoke",
 ]
 
 [[package]]
@@ -2545,10 +2550,10 @@ name = "test-util"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "crypto",
+ "aranya-crypto",
+ "aranya-runtime",
  "daemon",
  "keygen",
- "runtime",
  "tempfile",
  "tokio",
 ]
@@ -2786,11 +2791,6 @@ dependencies = [
  "tokio-retry",
  "tracing",
 ]
-
-[[package]]
-name = "trouble"
-version = "0.1.0"
-source = "git+https://git.spideroak-inc.com/spideroak-inc/flow3-rs.git?branch=main#1c39069902e2f59f29548d1834c7457cdc22ad1b"
 
 [[package]]
 name = "typenum"
