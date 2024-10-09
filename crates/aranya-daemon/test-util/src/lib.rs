@@ -12,17 +12,17 @@ use aranya_crypto::{
     keystore::fs_keystore::Store,
     Csprng, Rng,
 };
-use aranya_runtime::{
-    storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState, GraphId,
-};
-use daemon::{
+use aranya_daemon::{
     addr::Addr,
     aranya::{self, Actions},
     policy::{Effect, KeyBundle as UserKeyBundle, Role},
     vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
 };
-use keygen::{KeyBundle, PublicKeys};
+use aranya_keygen::{KeyBundle, PublicKeys};
+use aranya_runtime::{
+    storage::linear::{libc::FileManager, LinearStorageProvider},
+    ClientState, GraphId,
+};
 use tempfile::{tempdir, TempDir};
 use tokio::{
     net::TcpListener,

@@ -98,9 +98,7 @@ version = 2
 allow = [
     "Apache-2.0",
     "BSD-3-Clause",
-    "ISC",
     "MIT",
-    "OpenSSL",
     "Unicode-3.0",
     "Unicode-DFS-2016",
     "Zlib",
@@ -211,17 +209,12 @@ deny = [
 
 # Certain crates/versions that will be skipped when doing duplicate detection.
 skip = [
-    "base64@0.21.7",
     "generic-array@0.14.7",
     "hashbrown@0.12.3",
     "indexmap@1.9.3",
     "regex-automata@0.1.10",
     "regex-syntax@0.6.29",
-    "ring@0.16.20",
-    "spin@0.5.2",
     "syn@1.0.109",
-    "synstructure@0.12.6",
-    "untrusted@0.7.1",
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive

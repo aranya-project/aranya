@@ -1,5 +1,5 @@
 [package]
-name = "daemon"
+name = "aranya-daemon"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -13,8 +13,8 @@ workspace = true
 
 
 [dependencies]
-daemon-api = { workspace = true }
-keygen = { workspace = true }
+aranya-daemon-api = { workspace = true }
+aranya-keygen = { workspace = true }
 
 aranya-afc-util = { workspace = true }
 aranya-buggy = { workspace = true }

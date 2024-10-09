@@ -13,13 +13,13 @@ use std::{
 
 use anyhow::Result;
 use aranya_crypto::{Csprng, Rng};
-use aranya_fast_channels::Label;
-use daemon_api::{
+use aranya_daemon_api::{
     Addr as ApiAddr, AfcCtrl, ChannelId, DaemonApi, DeviceId, Error, KeyBundle as ApiKeyBundle,
     Label as ApiLabel, NetIdentifier, NodeId, Result as ApiResult, Role as ApiRole, TeamId,
 };
+use aranya_fast_channels::Label;
+use aranya_keygen::PublicKeys;
 use futures_util::{StreamExt, TryStreamExt};
-use keygen::PublicKeys;
 use tarpc::{
     context,
     server::{self, Channel},

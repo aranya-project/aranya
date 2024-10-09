@@ -7,7 +7,7 @@ pub enum Error {
     Rpc(#[from] tarpc::client::RpcError),
 
     #[error("daemon reported error: {0}")]
-    Daemon(#[from] daemon_api::Error),
+    Daemon(#[from] aranya_daemon_api::Error),
 
     #[error("AFC shared memory error: {0}")]
     AfcShm(#[from] aranya_fast_channels::shm::Error),

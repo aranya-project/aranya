@@ -1,6 +1,6 @@
 use std::{path::Path, time::Duration};
 
-use daemon_api::{
+use aranya_daemon_api::{
     Addr, AfcCtrl, ChannelId, DaemonApiClient, DeviceId, KeyBundle, Label, NetIdentifier, Role,
     TeamId,
 };

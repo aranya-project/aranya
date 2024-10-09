@@ -10,10 +10,10 @@
 use std::{path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
+use aranya_client::Client;
+use aranya_daemon::{addr::Addr, config::Config, Daemon};
+use aranya_daemon_api::{Addr as ApiAddr, DeviceId, KeyBundle, Role};
 use backon::{ExponentialBuilder, Retryable};
-use client::Client;
-use daemon::{addr::Addr, config::Config, Daemon};
-use daemon_api::{Addr as ApiAddr, DeviceId, KeyBundle, Role};
 use tempfile::tempdir;
 use test_log::test;
 use tokio::{fs, task, time::sleep};

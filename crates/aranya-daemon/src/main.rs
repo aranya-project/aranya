@@ -10,8 +10,8 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use aranya_daemon::{config::Config, Daemon};
 use clap::Parser;
-use daemon::{config::Config, Daemon};
 use tokio::runtime::Runtime;
 use tracing::{error, info};
 use tracing_subscriber::{prelude::*, EnvFilter};

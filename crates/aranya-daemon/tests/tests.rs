@@ -8,11 +8,11 @@
 )]
 
 use anyhow::{Context, Result};
-use aranya_fast_channels::Label;
-use daemon::{
+use aranya_daemon::{
     aranya::Actions,
     policy::{ChanOp, Effect, Role},
 };
+use aranya_fast_channels::Label;
 use serial_test::serial;
 use test_log::test;
 use test_util::{contains_effect, TestCtx, TestTeam};

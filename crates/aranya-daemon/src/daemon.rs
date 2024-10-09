@@ -11,12 +11,12 @@ use aranya_crypto::{
     CipherSuite, Random, Rng,
 };
 use aranya_fast_channels::memory::State as MemoryState;
+use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState,
 };
 use ciborium as cbor;
-use keygen::{KeyBundle, PublicKeys};
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
 use tracing::{error, info};

@@ -5,13 +5,13 @@ use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, syn
 use anyhow::{bail, Context, Result};
 use aranya_crypto::{Csprng, Rng, UserId};
 use aranya_fast_channels::Label;
+use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, PeerCache, Policy, Session, Sink,
     StorageProvider, SyncRequester, SyncResponder, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
 };
-use keygen::PublicKeys;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},

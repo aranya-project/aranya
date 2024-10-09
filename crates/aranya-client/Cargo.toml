@@ -1,5 +1,5 @@
 [package]
-name = "client"
+name = "aranya-client"
 version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
@@ -11,7 +11,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-daemon-api = { workspace = true }
+aranya-daemon-api = { workspace = true }
 
 aranya-buggy = { workspace = true, features = ["std"] }
 aranya-fast-channels = { workspace = true, features = ["std", "posix"] }
@@ -23,8 +23,9 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+aranya-daemon = { workspace = true }
+
 backon = "1.2.0"
-daemon = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }

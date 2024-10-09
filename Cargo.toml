@@ -53,10 +53,9 @@ aranya-runtime = { git = "https://github.com/aranya-project/aranya-core.git", br
 
 aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-fast-channels.git", branch = "main", features = ["posix", "std", "memory"] }
 
-daemon = { path = "crates/daemon" }
-daemon-api = { path = "crates/daemon-api" }
-keygen = { path = "crates/keygen" }
-transport = { path = "crates/transport" }
+aranya-daemon = { path = "crates/aranya-daemon" }
+aranya-daemon-api = { path = "crates/aranya-daemon-api" }
+aranya-keygen = { path = "crates/aranya-keygen" }
 
 anyhow = { version = "1.0.86" }
 ciborium = { version = "0.2" }
@@ -64,9 +63,6 @@ clap = { version = "4", features = ["derive"] }
 futures-util = { version = "0.3.30" }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
-quinn = { version = "0.10.1" }
-rcgen = { version = "0.12" }
-rustls = { version = "0.21.11", default-features = false }
 serde = "1"
 serial_test = { version = "3" }
 tarpc = { version = "0.34.0", features = ["unix", "serde-transport", "serde-transport-json"] }
@@ -75,7 +71,6 @@ test-log = { version = "0.2.14", default-features = false, features = ["trace"] 
 thiserror = { version = "1.0" }
 tokio = { version = "1.40" }
 tokio-util = { version = "0.7.12" }
-tokio-retry = { version = "0.3" }
 tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
