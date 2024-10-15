@@ -97,7 +97,3 @@ The [Aranya Core](https://github.com/aranya-project/aranya-core) repo has all th
 
 This repository is maintained by software engineers employed at [SpiderOak](https://spideroak.com/)
 
-## Contact Information
-
-For assistance with using this software or licensing inquiries please contact SpiderOak at:
-<info@spideroak.com>
