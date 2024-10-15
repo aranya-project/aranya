@@ -4,6 +4,14 @@ Aranya is a software development tool for governing access to data and services 
 
 Aranya has been designed with an emphasis on security, efficiency, and portability.
 
+The root cause of cyber insecurity is complexity; and yet when we attempt to protect our systems, our solution is to add more.
+
+Software developers must not expect customers to mitigate defects using external security tools and an endless cycle of patching. Software must become secure by design.
+
+Aranya is our contribution to this effort. It is a batteries-included tool which allows developers to produce software with built-in micro-segmentation. This complete solution covers access management with user onboarding, authentication and authorization, freeing the developer to focus on the problem they wish to solve.
+
+For users, software built on Aranya is less complex to operate securely, and is secure regardless of the network it is run on.
+
 More documentation on Aranya is provided here:
 [Aranya Documentation](https://github.com/aranya-project/docs)
 
@@ -88,8 +96,3 @@ The [Aranya Core](https://github.com/aranya-project/aranya-core) repo has all th
 ## Maintainers
 
 This repository is maintained by software engineers employed at [SpiderOak](https://spideroak.com/)
-
-## Contact Information
-
-For assistance with using this software or licensing inquiries please contact SpiderOak at:
-<info@spideroak.com>
