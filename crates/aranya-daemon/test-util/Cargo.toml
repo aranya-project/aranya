@@ -1,10 +1,11 @@
 [package]
 name = "test-util"
-version = "0.1.0"
+description = "Test utilities for the daemon"
+publish = false
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
-publish.workspace = true
+repository.workspace = true
 rust-version.workspace = true
 
 

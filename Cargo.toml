@@ -9,8 +9,8 @@ members = [
 [workspace.package]
 authors = ["SpiderOak, Inc."]
 edition = "2021"
-license = "UNLICENSED"
-publish = false
+license = "AGPL-3.0-only"
+repository = "https://github.com/aranya-project/aranya"
 rust-version = "1.80"
 
 
@@ -35,27 +35,26 @@ wildcard_imports = "warn"
 
 
 [workspace.dependencies]
-aranya-afc-util = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["alloc"] }
-aranya-base58 = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
-aranya-buggy = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
-aranya-crypto = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
-aranya-crypto-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
-aranya-device-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
-aranya-envelope-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
-aranya-idam-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
-aranya-perspective-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
-aranya-policy-compiler = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
-aranya-policy-ifgen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["serde"] }
-aranya-policy-ifgen-build = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
-aranya-policy-lang = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
-aranya-policy-vm = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["std"] }
-aranya-runtime = { git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["std", "libc"] }
+aranya-afc-util = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["alloc"] }
+aranya-base58 = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-buggy = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-crypto = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
+aranya-crypto-ffi = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-device-ffi = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-envelope-ffi = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-fast-channels = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["posix", "std", "memory"] }
+aranya-idam-ffi = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-perspective-ffi = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-policy-compiler = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-policy-ifgen = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["serde"] }
+aranya-policy-ifgen-build = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-policy-lang = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main" }
+aranya-policy-vm = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["std"] }
+aranya-runtime = { version = "0.1.0", git = "https://github.com/aranya-project/aranya-core.git", branch = "main", features = ["std", "libc"] }
 
-aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-fast-channels.git", branch = "main", features = ["posix", "std", "memory"] }
-
-aranya-daemon = { path = "crates/aranya-daemon" }
-aranya-daemon-api = { path = "crates/aranya-daemon-api" }
-aranya-keygen = { path = "crates/aranya-keygen" }
+aranya-daemon = { version = "0.1.0", path = "crates/aranya-daemon" }
+aranya-daemon-api = { version = "0.1.0", path = "crates/aranya-daemon-api" }
+aranya-keygen = { version = "0.1.0", path = "crates/aranya-keygen" }
 
 anyhow = { version = "1.0.86" }
 ciborium = { version = "0.2" }

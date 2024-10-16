@@ -113,7 +113,33 @@ confidence-threshold = 0.8
 exceptions = [
     # Each entry is the crate and version constraint, and its specific allow
     # list
-    #{ allow = ["Zlib"], crate = "adler32" },
+    { allow = ["AGPL-3.0"], crate = "aranya-afc-util" },
+    { allow = ["AGPL-3.0"], crate = "aranya-base58" },
+    { allow = ["AGPL-3.0"], crate = "aranya-buggy" },
+    { allow = ["AGPL-3.0"], crate = "aranya-crypto" },
+    { allow = ["AGPL-3.0"], crate = "aranya-crypto-derive" },
+    { allow = ["AGPL-3.0"], crate = "aranya-crypto-ffi" },
+    { allow = ["AGPL-3.0"], crate = "aranya-device-ffi" },
+    { allow = ["AGPL-3.0"], crate = "aranya-envelope-ffi" },
+    { allow = ["AGPL-3.0"], crate = "aranya-fast-channels" },
+    { allow = ["AGPL-3.0"], crate = "aranya-idam-ffi" },
+    { allow = ["AGPL-3.0"], crate = "aranya-perspective-ffi" },
+    { allow = ["AGPL-3.0"], crate = "aranya-policy-ast" },
+    { allow = ["AGPL-3.0"], crate = "aranya-policy-compiler" },
+    { allow = ["AGPL-3.0"], crate = "aranya-policy-derive" },
+    { allow = ["AGPL-3.0"], crate = "aranya-policy-ifgen" },
+    { allow = ["AGPL-3.0"], crate = "aranya-policy-ifgen-build" },
+    { allow = ["AGPL-3.0"], crate = "aranya-policy-ifgen-macro" },
+    { allow = ["AGPL-3.0"], crate = "aranya-policy-lang" },
+    { allow = ["AGPL-3.0"], crate = "aranya-policy-module" },
+    { allow = ["AGPL-3.0"], crate = "aranya-policy-vm" },
+    { allow = ["AGPL-3.0"], crate = "aranya-runtime" },
+    { allow = ["AGPL-3.0"], crate = "aranya-trouble" },
+
+    { allow = ["AGPL-3.0"], crate = "aranya-client" },
+    { allow = ["AGPL-3.0"], crate = "aranya-daemon" },
+    { allow = ["AGPL-3.0"], crate = "aranya-daemon-api" },
+    { allow = ["AGPL-3.0"], crate = "aranya-keygen" },
 ]
 
 # Some crates don't have (easily) machine readable licensing information,
