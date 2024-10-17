@@ -28,7 +28,7 @@ Download the source code from this repository or from [crates.io](https://crates
 - [daemon](https://crates.io/crates/aranya-daemon)
 
 Integrate the [client](crates/aranya-client) library into your application. Refer to the integration test here for an example:
-[test](crates/daemon/tests/tests.rs)
+[test](crates/aranya-daemon/tests/tests.rs)
 
 Create a config file for the daemon before running it. Refer to this documentation on the JSON config file parameters:
 [config](crates/aranya-daemon/src/config.rs)
@@ -38,7 +38,7 @@ Example daemon [config.json](crates/aranya-daemon/example.json) file:
 {
 	// The daemon's name.
 	"name": "name",
-	
+
 	// The daemon's working directory.
 	//
 	// Must already exist.
@@ -84,7 +84,7 @@ The daemon's responsibilities include:
 
 ### Aranya Policy
 
-The [Aranya Policy](crates/daemon/src/policy.md) is a security control policy written in Aranya's domain-specific policy language and executed by the Aranya runtime.
+The [Aranya Policy](crates/aranya-daemon/src/policy.md) is a security control policy written in Aranya's domain-specific policy language and executed by the Aranya runtime.
 
 ## Dependencies
 
@@ -94,7 +94,7 @@ The [Aranya Core](https://github.com/aranya-project/aranya-core) repo has all th
 
 ### Aranya Fast Channels
 
-[Aranya Fast Channels](https://github.com/aranya-project/aranya-fast-channels) are encrypted channels between 2 peers that could be either bidirectional or unidirectional.
+[Aranya Fast Channels](https://github.com/aranya-project/aranya-core/tree/main/crates/aranya-fast-channels) are encrypted channels between 2 peers that could be either bidirectional or unidirectional.
 
 ## Maintainers
 
