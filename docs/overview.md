@@ -41,7 +41,7 @@ A key discriminating attribute of Aranya is the decentralized, zero trust archit
 
 -   **Clear Accountability Structures:** Align access permissions with authenticated entities identities, ensuring individuals are accountable for actions within their scope.
 
--   **Adherence to Industry Regulations and Compliance:** Meet Zero Trust and other data acccess policy requirements, such as the DoD Zero Trust Strategy.
+-   **Adherence to Industry Regulations and Compliance:** Meet Zero Trust and other data access policy requirements, such as the DoD Zero Trust Strategy.
 
 -   **Streamlined Access Management:** Automate and streamline access management processes, decreasing the burden on IT and ensuring efficient onboarding and offboarding processes.
 
@@ -169,7 +169,7 @@ If the off-graph data exchange API is called, then Aranya will use the appropria
 
 -   **Graph**: Data structure of stored commands, where each command is connected by a line to the command that occurred immediately before it, as seen from the client\'s local state.
 
--   **IDAM**: (as defined by DOD): The combination of technical systems, policies and processes that create, define, and govern the utilization, and safeguarding of identity information.
+-   **IdAM**: (as defined by DOD): The combination of technical systems, policies and processes that create, define, and govern the utilization, and safeguarding of identity information.
 
 -   **Instance:** Individual deployment of the Aranya library. A single endpoint can have one or many instances.
 
