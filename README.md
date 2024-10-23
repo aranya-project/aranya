@@ -98,4 +98,4 @@ The [Aranya Core](https://github.com/aranya-project/aranya-core) repo has all th
 
 ## Maintainers
 
-This repository is maintained by software engineers employed at [SpiderOak](https://spideroak.com/)
+This repository is maintained by software engineers employed at [SpiderOak](https://spideroak.com/)  h
