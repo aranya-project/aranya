@@ -20,7 +20,7 @@ jobs:
   release:
     strategy:
       matrix:
-        runner: ["dc2-hosted-linux-arm-5"]
+        runner: ["dc2-hosted-linux-arm"]
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Create Release
@@ -48,7 +48,7 @@ jobs:
       - build
     strategy:
       matrix:
-        runner: ["dc2-hosted-linux-arm-5"]
+        runner: ["dc2-hosted-linux-arm"]
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Download doc artifacts
