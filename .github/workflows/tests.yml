@@ -28,12 +28,7 @@ jobs:
   unit-tests:
     strategy:
       matrix:
-        runner:
-          # TODO(eric): re-enable after we get macOS runners.
-          # - "macos-latest"
-          - "self-hosted-linux-arm"
-          - "self-hosted-linux-arm64"
-          - "self-hosted-linux-amd64"
+        runner: ["ubuntu-latest"]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
