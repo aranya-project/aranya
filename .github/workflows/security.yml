@@ -28,7 +28,7 @@ jobs:
   security-checks:
     strategy:
       matrix:
-        runner: ["ubuntu2202-arm64-4core"]
+        runner: ["dc2-hosted-linux-arm-5"]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
