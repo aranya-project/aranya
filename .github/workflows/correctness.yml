@@ -28,7 +28,7 @@ jobs:
   fmt:
     strategy:
       matrix:
-        runner: ["dc2-hosted-linux-arm"]
+        runner: ["self-hosted-linux-arm"]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
@@ -45,7 +45,7 @@ jobs:
   clippy:
     strategy:
       matrix:
-        runner: ["dc2-hosted-linux-arm"]
+        runner: ["self-hosted-linux-arm"]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
@@ -62,7 +62,7 @@ jobs:
   machete:
     strategy:
       matrix:
-        runner: ["dc2-hosted-linux-arm"]
+        runner: ["self-hosted-linux-arm"]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
@@ -79,7 +79,7 @@ jobs:
   check:
     strategy:
       matrix:
-        runner: ["dc2-hosted-linux-arm"]
+        runner: ["self-hosted-linux-arm"]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
