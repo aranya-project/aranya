@@ -28,7 +28,7 @@ jobs:
   unit-tests:
     strategy:
       matrix:
-        runner: ["ubuntu-latest"]
+        runner: ["dc2-hosted-linux-arm-5"]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
