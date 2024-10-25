@@ -28,7 +28,7 @@ jobs:
   build-release:
     strategy:
       matrix:
-        runner: ["self-hosted-linux-arm"]
+        runner: ["ubuntu2204-amd64-4core"]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
