@@ -28,7 +28,7 @@ jobs:
   build-release:
     strategy:
       matrix:
-        runner: ["dc2-hosted-linux-arm"]
+        runner: ["self-hosted-linux-arm"]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
