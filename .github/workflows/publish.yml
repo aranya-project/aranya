@@ -20,7 +20,7 @@ jobs:
   release:
     strategy:
       matrix:
-        runner: ["ubuntu2404-arm64-4core"]
+        runner: ["dc2-hosted-linux-arm-5"]
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Create Release
@@ -48,7 +48,7 @@ jobs:
       - build
     strategy:
       matrix:
-        runner: ["ubuntu2404-arm64-4core"]
+        runner: ["dc2-hosted-linux-arm-5"]
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Download doc artifacts
