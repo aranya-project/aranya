@@ -28,7 +28,7 @@ jobs:
   security-checks:
     strategy:
       matrix:
-        runner: ["self-hosted-linux-amd64"]
+        runner: ["ubuntu-latest"]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
