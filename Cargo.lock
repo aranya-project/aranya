@@ -158,7 +158,10 @@ dependencies = [
  "aranya-daemon",
  "aranya-daemon-api",
  "aranya-fast-channels",
+ "aranya-util",
  "backon",
+ "postcard",
+ "serde",
  "serial_test",
  "tarpc",
  "tempfile",
@@ -254,6 +257,7 @@ dependencies = [
  "aranya-policy-lang",
  "aranya-policy-vm",
  "aranya-runtime",
+ "aranya-util",
  "ciborium",
  "clap",
  "deser-hjson",
@@ -277,6 +281,8 @@ name = "aranya-daemon-api"
 version = "0.1.0"
 dependencies = [
  "aranya-crypto",
+ "aranya-fast-channels",
+ "aranya-util",
  "postcard",
  "serde",
  "tarpc",
@@ -494,6 +500,18 @@ name = "aranya-trouble"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c292729db9cbe6ad3c699bae15416c2e0596a9815046b49e27ad5d30ad54732d"
+
+[[package]]
+name = "aranya-util"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aranya-buggy",
+ "aranya-fast-channels",
+ "serde",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "async-trait"
@@ -2193,6 +2211,7 @@ dependencies = [
  "aranya-daemon",
  "aranya-keygen",
  "aranya-runtime",
+ "aranya-util",
  "tempfile",
  "tokio",
 ]

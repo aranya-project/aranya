@@ -6,9 +6,8 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use aranya_util::Addr;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-
-use crate::addr::Addr;
 
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -28,6 +27,9 @@ pub struct Config {
 
     /// Network address of Aranya sync server.
     pub sync_addr: Addr,
+
+    /// AFC configuration.
+    pub afc: AfcConfig,
 }
 
 // TODO: remove allow dead_code once all methods are used.
@@ -76,6 +78,31 @@ fn read_json<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T> {
     Ok(deser_hjson::from_slice(&buf)?)
 }
 
+/// AFC configuration.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AfcConfig {
+    /// Shared memory path.
+    pub shm_path: String,
+
+    /// Unlink `shm_path` before creating the shared memory?
+    ///
+    /// Ignored if `create` is false.
+    pub unlink_on_startup: bool,
+
+    /// Unlink `shm_path` before on exit?
+    ///
+    /// If false, the shared memory will persist across daemon
+    /// restarts.
+    pub unlink_at_exit: bool,
+
+    /// Create the shared memory?
+    pub create: bool,
+
+    /// Maximum number of channels AFC should support.
+    pub max_chans: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use std::net::Ipv4Addr;
@@ -95,6 +122,13 @@ mod tests {
             uds_api_path: "/var/run/uds.sock".parse()?,
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
+            afc: AfcConfig {
+                shm_path: "/hub".to_owned(),
+                unlink_on_startup: false,
+                unlink_at_exit: false,
+                create: true,
+                max_chans: 100,
+            },
         };
         assert_eq!(got, want);
         Ok(())

@@ -12,6 +12,7 @@ rust-version.workspace = true
 [dependencies]
 aranya-crypto = { workspace = true, features = ["alloc", "fs-keystore", "std"] }
 aranya-runtime = { workspace = true }
+aranya-util = { workspace = true }
 
 aranya-daemon = { workspace = true }
 aranya-keygen = { workspace = true }

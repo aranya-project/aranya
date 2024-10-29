@@ -25,12 +25,10 @@
     unused_qualifications
 )]
 
-pub mod addr;
 pub mod aranya;
 pub mod config;
 #[rustfmt::skip]
 pub mod policy;
-pub mod util;
 pub mod vm_policy;
 
 mod api;

@@ -30,6 +30,7 @@ aranya-policy-ifgen = { workspace = true }
 aranya-policy-lang = { workspace = true }
 aranya-policy-vm = { workspace = true }
 aranya-runtime = { workspace = true }
+aranya-util = { workspace = true }
 
 aranya-fast-channels = { workspace = true }
 

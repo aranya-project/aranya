@@ -16,11 +16,14 @@ aranya-daemon-api = { workspace = true }
 
 aranya-buggy = { workspace = true, features = ["std"] }
 aranya-fast-channels = { workspace = true, features = ["std", "posix"] }
+aranya-util = { workspace = true }
 
 anyhow = { workspace = true }
+postcard = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
 tracing = { workspace = true }
 
 [dev-dependencies]

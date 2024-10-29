@@ -1,10 +1,20 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
 use core::time::Duration;
-use std::fmt;
+use std::{fmt, net::SocketAddr};
 
-use aranya_crypto::custom_id;
+use aranya_crypto::{
+    afc::{BidiChannelId, UniChannelId},
+    custom_id,
+    default::DefaultCipherSuite,
+    Id,
+};
+use aranya_fast_channels::{Label, NodeId};
+use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
+
+/// CS = Cipher Suite
+pub type CS = DefaultCipherSuite;
 
 // TODO: support custom error types.
 #[derive(Serialize, Deserialize, Debug, thiserror::Error)]
@@ -37,9 +47,6 @@ pub struct KeyBundle {
     pub encoding: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Hash)]
-pub struct Addr(pub String);
-
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Role {
     Owner,
@@ -48,24 +55,61 @@ pub enum Role {
     Member,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
 pub struct NetIdentifier(pub String);
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub struct NodeId(pub u32);
+/// Number of bytes in the [`AfcId`]
+const AFC_ID_LEN: usize = 16;
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub struct Label(pub u32);
+/// [`AfcId`] is a [`BidiChannelId`] or [`UniChannelId`]
+/// truncated from 512 bits down to 128 bits.
+/// It uniquely identifies an Aranya fast channel.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+pub struct AfcId {
+    id: [u8; AFC_ID_LEN],
+}
 
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub struct ChannelId(pub [u8; 16]);
+fn truncate<const BIG: usize, const SMALL: usize>(arr: &[u8; BIG]) -> &[u8; SMALL] {
+    const { assert!(BIG >= SMALL) };
+    arr[..SMALL].try_into().expect("array must fit")
+}
+
+/// Convert from [`BidiChannelId`] to [`AfcId`]
+impl From<BidiChannelId> for AfcId {
+    fn from(value: BidiChannelId) -> Self {
+        Self {
+            id: *truncate(value.as_array()),
+        }
+    }
+}
+
+/// Convert from [`UniChannelId`] to [`AfcId`]
+impl From<UniChannelId> for AfcId {
+    fn from(value: UniChannelId) -> Self {
+        Self {
+            id: *truncate(value.as_array()),
+        }
+    }
+}
+
+/// Convert from [`Id`] to [`AfcId`]
+impl From<Id> for AfcId {
+    fn from(value: Id) -> Self {
+        Self {
+            id: *truncate(value.as_array()),
+        }
+    }
+}
 
 // serialized command which must be passed over AFC.
-pub type AfcCtrl = Vec<u8>;
+pub type AfcCtrl = Vec<Box<[u8]>>;
 
 #[tarpc::service]
 pub trait DaemonApi {
     async fn initialize() -> Result<()>;
+
+    /// Gets local address the Aranya sync server is bound to.
+    async fn aranya_local_addr() -> Result<SocketAddr>;
 
     /// Gets the public key bundle for this device
     async fn get_key_bundle() -> Result<KeyBundle>;
@@ -107,8 +151,13 @@ pub trait DaemonApi {
     async fn create_channel(
         team: TeamId,
         peer: NetIdentifier,
+        node_id: NodeId,
         label: Label,
-    ) -> Result<(ChannelId, NodeId, AfcCtrl)>;
-    async fn delete_channel(chan: ChannelId) -> Result<AfcCtrl>;
-    async fn receive_afc_ctrl(ctrl: AfcCtrl) -> Result<()>;
+    ) -> Result<(AfcId, AfcCtrl)>;
+    async fn delete_channel(chan: AfcId) -> Result<AfcCtrl>;
+    async fn receive_afc_ctrl(
+        team: TeamId,
+        node_id: NodeId,
+        ctrl: AfcCtrl,
+    ) -> Result<(AfcId, Label)>;
 }

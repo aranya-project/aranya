@@ -1,75 +1,163 @@
-use std::{path::Path, time::Duration};
+use std::{collections::BTreeMap, net::SocketAddr, path::Path, str::FromStr, time::Duration};
 
 use aranya_daemon_api::{
-    Addr, AfcCtrl, ChannelId, DaemonApiClient, DeviceId, KeyBundle, Label, NetIdentifier, Role,
-    TeamId,
+    AfcId, DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, CS,
 };
+use aranya_fast_channels::{shm::ReadState, ChannelId, Label};
+use aranya_util::addr::Addr;
 use tarpc::{context, tokio_serde::formats::Json};
 use tracing::{debug, info, instrument};
 
-use crate::{Error, Result};
+use crate::{
+    afc::{setup_afc_shm, App, PollData, Router},
+    Error, Result,
+};
 
 pub struct Client {
     daemon: DaemonApiClient,
-    // TODO: AFC Router.
+    /// AFC data router.
+    afc: Router<ReadState<CS>>,
+    /// Application abstraction for sending/receiving data between application and the AFC router.
+    app: App,
+    /// AFC channels.
+    chans: BTreeMap<AfcId, (TeamId, NetIdentifier, Label)>,
 }
 
 impl Client {
     /// Creates a client connected to the daemon.
     #[instrument(skip_all)]
-    pub async fn connect(daemon_sock: &Path) -> Result<Self> {
+    pub async fn connect(
+        daemon_sock: &Path,
+        afc_shm_path: &Path,
+        max_chans: usize,
+        afc_addr: Addr,
+    ) -> Result<Self> {
         info!("uds path: {:?}", daemon_sock);
         let transport = tarpc::serde_transport::unix::connect(daemon_sock, Json::default)
             .await
             .map_err(Error::Connecting)?;
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
         debug!("connected to: {:?}", daemon_sock);
-        Ok(Self { daemon })
+        let read = setup_afc_shm(afc_shm_path, max_chans)?;
+        let afc = aranya_fast_channels::Client::new(read);
+        let (afc, app) = Router::new(afc, afc_addr).await.map_err(Error::AfcRouter)?;
+        debug!(
+            "afc router bound to: {:?}",
+            afc.local_addr().map_err(Error::AfcRouter)?
+        );
+        Ok(Self {
+            daemon,
+            afc,
+            app,
+            chans: BTreeMap::new(),
+        })
     }
 
+    /// Returns address Aranya sync server bound to.
+    pub async fn aranya_local_addr(&self) -> Result<SocketAddr> {
+        Ok(self.daemon.aranya_local_addr(context::current()).await??)
+    }
+
+    /// Returns address AFC server bound to.
+    pub async fn afc_local_addr(&self) -> Result<SocketAddr> {
+        self.afc.local_addr().map_err(Error::AfcRouter)
+    }
+
+    /// Creates a bidirectional AFC channel.
     pub async fn create_channel(
         &mut self,
         team: TeamId,
         peer: NetIdentifier,
         label: Label,
-    ) -> Result<ChannelId> {
-        let (_chan, _node, _ctrl) = self
+    ) -> Result<AfcId> {
+        debug!("creating AFC channel in Aranya");
+        let node_id = self.afc.get_next_node_id().await?;
+        let (afc_id, ctrl) = self
             .daemon
-            .create_channel(context::current(), team, peer, label)
+            .create_channel(context::current(), team, peer.clone(), node_id, label)
             .await??;
-        // TODO: AFC Router.
-        //self.afc.send_ctrl(chan, ctrl).await;
-        //Ok(chan)
-        todo!()
+        debug!("creating AFC channel in AFC");
+        // TODO: use existing mapping from `assign_net_name`
+        let addr = Addr::from_str(&peer.0)
+            .map_err(|_| Error::AfcRouter(crate::afc::AfcRouterError::AppWrite))?;
+        let addr = addr
+            .lookup()
+            .await
+            .map_err(|_| Error::AfcRouter(crate::afc::AfcRouterError::AppWrite))?;
+        debug!(?label, ?team, ?addr, "sending ctrl msg");
+        let channel_id = ChannelId::new(node_id, label);
+        self.afc.insert_channel_id(afc_id, channel_id).await?;
+        self.app.send_ctrl(SocketAddr::V4(addr), team, ctrl).await?;
+        self.chans.insert(afc_id, (team, peer, label));
+        debug!(?team, ?addr, ?label, "AFC channel created");
+        Ok(afc_id)
     }
 
-    pub async fn delete_channel(&mut self, chan: ChannelId) -> Result<()> {
+    pub async fn delete_channel(&mut self, chan: AfcId) -> Result<()> {
         let _ctrl = self
             .daemon
             .delete_channel(context::current(), chan)
             .await??;
-        // TODO: AFC Router.
-        //self.afc.send_ctrl(chan, ctrl).await;
+        self.chans.remove(&chan);
+        // TODO: delete AFC channel from AFC router.
         todo!()
     }
 
-    pub async fn receive_afc_ctrl(&mut self, ctrl: AfcCtrl) -> Result<()> {
-        self.daemon
-            .receive_afc_ctrl(context::current(), ctrl)
-            .await??;
-        todo!()
+    /// Poll for new data and handle it.
+    pub async fn poll(&mut self) -> Result<()> {
+        let data = self.poll_data().await?;
+        self.handle_data(data).await
     }
 
-    pub async fn send_data(&mut self, _chan: ChannelId, _data: Vec<u8>) {
-        // TODO: AFC Router.
-        //self.afc.send_data(chan, data).await;
-        todo!()
+    /// Poll for new data.
+    pub async fn poll_data(&mut self) -> Result<PollData> {
+        #![allow(clippy::disallowed_macros)]
+        let data = tokio::select! {
+            result = self.app.recv_ctrl() => result?,
+            result = self.afc.poll() => result?,
+        };
+        Ok(data)
     }
 
-    pub async fn recv_data(&mut self) -> Option<(ChannelId, Vec<u8>)> {
-        // TODO: AFC Router.
-        //self.afc.recv_data().await
-        todo!()
+    /// Handle any received data.
+    pub async fn handle_data(&mut self, data: PollData) -> Result<()> {
+        match data {
+            PollData::Ctrl(ctrl) => {
+                debug!("client lib received AFC ctrl msg");
+                let node_id = ctrl.node_id;
+                let (afc_id, label) = self
+                    .daemon
+                    .receive_afc_ctrl(context::current(), ctrl.team_id, node_id, ctrl.afc_ctrl)
+                    .await??;
+                let channel_id = ChannelId::new(node_id, label);
+                self.afc.insert_channel_id(afc_id, channel_id).await?;
+            }
+            _ => {
+                self.afc.handle_data(data).await?;
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn send_data(&mut self, chan: AfcId, data: Vec<u8>) -> Result<()> {
+        if let Some((_team_id, peer, label)) = self.chans.get(&chan) {
+            let addr = Addr::from_str(&peer.0).map_err(|_| crate::afc::AfcRouterError::AppWrite)?;
+            let addr = addr
+                .lookup()
+                .await
+                .map_err(|_| crate::afc::AfcRouterError::AppWrite)?;
+            self.app
+                .send_data(SocketAddr::V4(addr), *label, chan, data)
+                .await?;
+        }
+        Ok(())
+    }
+
+    // TODO: return [`NetIdentifier`] instead of [`SocketAddr`].
+    pub async fn recv_data(&mut self) -> Result<(Vec<u8>, SocketAddr, AfcId, Label)> {
+        let (plaintext, addr, afc_id, label) = self.app.recv().await.map_err(Error::AfcRouter)?;
+        debug!(n = plaintext.len(), "received AFC data message");
+        Ok((plaintext, addr, afc_id, label))
     }
 }
 

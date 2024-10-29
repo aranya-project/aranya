@@ -11,13 +11,13 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 use anyhow::{Context, Result};
 use aranya_buggy::BugExt;
 use aranya_runtime::storage::GraphId;
+use aranya_util::Addr;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument};
 
 use crate::{
-    addr::Addr,
     daemon::{Client, EF},
     vm_policy::VecSink,
 };
@@ -94,6 +94,8 @@ pub struct Syncer {
     recv: mpsc::Receiver<Msg>,
     /// Delay queue for getting the next peer to sync with.
     queue: DelayQueue<SyncPeer>,
+    /// Used to send effects to the API to be processed.
+    send_effects: mpsc::Sender<Vec<EF>>,
 }
 
 struct PeerInfo {
@@ -105,7 +107,7 @@ struct PeerInfo {
 
 impl Syncer {
     /// Creates a new `Syncer`.
-    pub fn new(client: Arc<Client>) -> (Self, SyncPeers) {
+    pub fn new(client: Arc<Client>, send_effects: mpsc::Sender<Vec<EF>>) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -114,6 +116,7 @@ impl Syncer {
                 peers: HashMap::new(),
                 recv,
                 queue: DelayQueue::new(),
+                send_effects,
             },
             peers,
         )
@@ -139,7 +142,7 @@ impl Syncer {
                 let info = self.peers.get_mut(&peer).assume("peer must exist")?;
                 info.key = self.queue.insert(peer.clone(), info.interval);
                 // sync with peer.
-                self.sync(peer.graph_id, &peer.addr).await?;
+                self.sync(&peer.graph_id, &peer.addr).await?;
             }
         }
         Ok(())
@@ -166,19 +169,24 @@ impl Syncer {
     }
 
     #[instrument(skip_all, fields(%peer, graph_id = %id))]
-    async fn sync(&mut self, id: GraphId, peer: &Addr) -> Result<()> {
+    async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
         info!("syncing with peer");
 
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
             self.client
-                .sync_peer(id, &mut sink, peer)
+                .sync_peer(*id, &mut sink, peer)
                 .await
                 .inspect_err(|err| error!(?err, ?peer, "unable to sync with peer"))
                 .context("unable to sync with peer")?;
             sink.collect()?
         };
-        info!(num = effects.len(), "completed sync");
+        let n = effects.len();
+        self.send_effects
+            .send(effects)
+            .await
+            .context("unable to send effects")?;
+        info!(?n, "completed sync");
         Ok(())
     }
 }

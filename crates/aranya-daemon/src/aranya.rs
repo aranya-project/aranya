@@ -12,6 +12,7 @@ use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, PeerCache, Policy, Session, Sink,
     StorageProvider, SyncRequester, SyncResponder, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
 };
+use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -22,7 +23,6 @@ use tokio::{
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
 
 use crate::{
-    addr::Addr,
     policy::{ActorExt, ChanOp, Effect, KeyBundle, Role},
     vm_policy::{MsgSink, VecSink},
 };
@@ -257,6 +257,11 @@ impl<EN, SP> Server<EN, SP> {
             listener,
             set: JoinSet::new(),
         }
+    }
+
+    /// Returns the local address the sync server bound to.
+    pub fn local_addr(&self) -> Result<SocketAddr> {
+        Ok(self.listener.local_addr()?)
     }
 }
 

@@ -3,6 +3,12 @@ pub enum Error {
     #[error("could not connect to daemon: {0}")]
     Connecting(#[source] std::io::Error),
 
+    #[error("buffer not large enough")]
+    BuffSize,
+
+    #[error("afc router error: {0}")]
+    AfcRouter(#[from] crate::afc::AfcRouterError),
+
     #[error("could not send request to daemon: {0}")]
     Rpc(#[from] tarpc::client::RpcError),
 

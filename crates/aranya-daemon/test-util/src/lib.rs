@@ -13,7 +13,6 @@ use aranya_crypto::{
     Csprng, Rng,
 };
 use aranya_daemon::{
-    addr::Addr,
     aranya::{self, Actions},
     policy::{Effect, KeyBundle as UserKeyBundle, Role},
     vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
@@ -23,6 +22,7 @@ use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, GraphId,
 };
+use aranya_util::Addr;
 use tempfile::{tempdir, TempDir};
 use tokio::{
     net::TcpListener,

@@ -55,6 +55,7 @@ aranya-runtime = { version = "0.1.0", features = ["std", "libc"] }
 aranya-daemon = { version = "0.1.0", path = "crates/aranya-daemon" }
 aranya-daemon-api = { version = "0.1.0", path = "crates/aranya-daemon-api" }
 aranya-keygen = { version = "0.1.0", path = "crates/aranya-keygen" }
+aranya-util = { version = "0.1.0", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
 ciborium = { version = "0.2" }

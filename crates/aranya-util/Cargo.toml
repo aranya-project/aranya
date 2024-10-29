@@ -1,0 +1,28 @@
+[package]
+name = "aranya-util"
+description = "Utilities needed by other Aranya crates"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+
+[lints]
+workspace = true
+
+
+[dependencies]
+aranya-buggy = { workspace = true }
+aranya-fast-channels = { workspace = true }
+
+anyhow = { workspace = true }
+serde = { workspace = true }
+tokio = { workspace = true, features = [
+    "rt-multi-thread",
+    "macros",
+    "fs",
+    "net",
+] }
+tracing = { workspace = true }

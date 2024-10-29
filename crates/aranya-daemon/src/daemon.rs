@@ -1,48 +1,42 @@
-use std::{io, net::SocketAddr, path::Path, sync::Arc};
+use std::{io, net::SocketAddr, path::Path, str::FromStr, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use aranya_crypto::{
-    aead::Aead,
-    default::{DefaultCipherSuite, DefaultEngine},
-    generic_array::GenericArray,
-    import::Import,
-    keys::SecretKeyBytes,
-    keystore::fs_keystore::Store,
-    CipherSuite, Random, Rng,
+    aead::Aead, default::DefaultEngine, generic_array::GenericArray, import::Import,
+    keys::SecretKeyBytes, keystore::fs_keystore::Store, CipherSuite, Random, Rng,
 };
-use aranya_fast_channels::memory::State as MemoryState;
+use aranya_daemon_api::CS;
+use aranya_fast_channels::shm::{self, Flag, Mode, WriteState};
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState,
 };
+use aranya_util::{util, Addr};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 use crate::{
-    addr::Addr,
     api::DaemonApiServer,
     aranya,
     config::Config,
     policy,
     sync::Syncer,
-    util,
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
 // Use short names so that we can more easily add generics.
-// CE = Crypto Engine
-// CS = Cipher Suite
-// KS = Key Store
-// EN = Engine (Policy)
-// SP = Storage Providers
+/// CE = Crypto Engine
 pub(crate) type CE = DefaultEngine;
-pub(crate) type CS = DefaultCipherSuite;
+/// KS = Key Store
 pub(crate) type KS = Store;
+/// EN = Engine (Policy)
 pub(crate) type EN = PolicyEngine<CE, KS>;
+/// SP = Storage Provider
 pub(crate) type SP = LinearStorageProvider<FileManager>;
+/// EF = Policy Effect
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP, CE>;
@@ -78,7 +72,7 @@ impl Daemon {
         let pk = self.load_or_gen_public_keys(&mut eng, &mut store).await?;
 
         // Initialize Aranya client.
-        let client = {
+        let (client, local_addr) = {
             let (client, server) = self
                 .setup_aranya(
                     eng.clone(),
@@ -87,15 +81,17 @@ impl Daemon {
                     self.cfg.sync_addr,
                 )
                 .await?;
+            let local_addr = server.local_addr()?;
             let client = Arc::new(client);
             set.spawn(async move { server.serve().await });
 
-            client
+            (client, local_addr)
         };
 
         // Sync in the background at some specified interval.
         // Effects are sent to `Api` via `mux`.
-        let (mut syncer, peers) = Syncer::new(Arc::clone(&client));
+        let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
+        let (mut syncer, peers) = Syncer::new(Arc::clone(&client), send_effects);
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
@@ -103,18 +99,19 @@ impl Daemon {
                 }
             }
         });
-
-        // TODO: have Aranya write to shm.
         let afc = self.setup_afc()?;
-
-        // TODO: add context to error.
         let api = DaemonApiServer::new(
             client,
-            afc,
+            local_addr,
+            Arc::new(Mutex::new(afc)),
+            eng,
+            store,
             self.cfg.uds_api_path.clone(),
             Arc::new(pk),
             peers,
-        )?;
+            recv_effects,
+        )
+        .context("unable to start daemon API")?;
         api.serve().await?;
 
         Ok(())
@@ -127,7 +124,7 @@ impl Daemon {
             ("keystore", self.cfg.keystore_path()),
             ("storage", self.cfg.storage_path()),
         ] {
-            util::create_dir_all(&path)
+            aranya_util::create_dir_all(&path)
                 .await
                 .with_context(|| format!("unable to create '{name}' directory"))?;
         }
@@ -171,10 +168,28 @@ impl Daemon {
     }
 
     /// Creates AFC shm.
-    fn setup_afc(&self) -> Result<MemoryState<CS>> {
+    fn setup_afc(&self) -> Result<WriteState<CS, Rng>> {
         // TODO: issue stellar-tapestry#34
-        // add aranya_fast_channels::shm::{ReadState, WriteState} back in after linux/arm64 bugfix
-        let write = MemoryState::<CS>::new();
+        // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
+        debug!(
+            shm_path = self.cfg.afc.shm_path,
+            "setting up afc shm write side"
+        );
+        let write = {
+            let path = aranya_util::ShmPathBuf::from_str(&self.cfg.afc.shm_path)
+                .context("unable to parse AFC shared memory path")?;
+            if self.cfg.afc.unlink_on_startup && self.cfg.afc.create {
+                let _ = shm::unlink(&path);
+            }
+            WriteState::open(
+                &path,
+                Flag::Create,
+                Mode::ReadWrite,
+                self.cfg.afc.max_chans,
+                Rng,
+            )
+            .context("unable to open `WriteState`")?
+        };
 
         Ok(write)
     }
@@ -224,7 +239,7 @@ impl Daemon {
         // Import before writing in case importing fails.
         let key = Import::import(bytes.as_bytes()).context("unable to import new key wrap key")?;
         if !loaded {
-            util::write_file(&path, bytes.as_bytes())
+            aranya_util::write_file(&path, bytes.as_bytes())
                 .await
                 .context("unable to write key wrap key")?;
         }
@@ -234,7 +249,11 @@ impl Daemon {
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        // TODO: issue stellar-tapestry#34 shm unlink
+        if self.cfg.afc.unlink_at_exit {
+            if let Ok(path) = util::ShmPathBuf::from_str(&self.cfg.afc.shm_path) {
+                let _ = shm::unlink(path);
+            }
+        }
         let _ = std::fs::remove_file(&self.cfg.uds_api_path);
     }
 }
@@ -252,7 +271,7 @@ async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<Op
 async fn write_cbor(path: impl AsRef<Path>, data: impl Serialize) -> Result<()> {
     let mut buf = Vec::new();
     cbor::into_writer(&data, &mut buf)?;
-    Ok(util::write_file(path, &buf).await?)
+    Ok(aranya_util::write_file(path, &buf).await?)
 }
 
 #[cfg(test)]
@@ -266,6 +285,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
+    use crate::config::AfcConfig;
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -280,6 +300,13 @@ mod tests {
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
+            afc: AfcConfig {
+                shm_path: "/test_daemon".to_owned(),
+                unlink_on_startup: true,
+                unlink_at_exit: true,
+                create: true,
+                max_chans: 100,
+            },
         };
 
         let daemon = Daemon::load(cfg)
