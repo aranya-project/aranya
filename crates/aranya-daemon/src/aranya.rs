@@ -357,6 +357,7 @@ where
     where
         F: FnOnce(&mut ActorImpl<'_, EN, SP, CE, VecSink<EN::Effect>>) -> Result<()> + Send;
 
+    #[allow(clippy::type_complexity)]
     /// Performs a session action.
     fn session_action<'a, F>(
         &self,
@@ -517,6 +518,7 @@ where
     }
 
     /// Creates a bidirectional AFC channel off graph.
+    #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
     fn create_bidi_channel_off_graph(
         &self,
@@ -549,6 +551,7 @@ where
     }
 
     /// Creates a unidirectional AFC channel.
+    #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
     fn create_uni_channel_off_graph(
         &self,

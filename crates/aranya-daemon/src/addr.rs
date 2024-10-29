@@ -146,7 +146,7 @@ impl<'de> Deserialize<'de> for Addr {
         D: Deserializer<'de>,
     {
         struct AddrVisitor;
-        impl<'de> Visitor<'de> for AddrVisitor {
+        impl Visitor<'_> for AddrVisitor {
             type Value = Addr;
 
             fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
