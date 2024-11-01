@@ -27,35 +27,12 @@ Download the source code from this repository or from [crates.io](https://crates
 - [client](https://crates.io/crates/aranya-client)
 - [daemon](https://crates.io/crates/aranya-daemon)
 
-Integrate the [client](crates/aranya-client) library into your application. Refer to the integration test here for an example:
-[test](crates/aranya-daemon/tests/tests.rs)
+Integrate the [client](crates/aranya-client) library into your application. The
+[client's README](crates/aranya-client/README.md) has more information on using
+the Rust client.
 
-Create a config file for the daemon before running it. Refer to this documentation on the JSON config file parameters:
-[config](crates/aranya-daemon/src/config.rs)
-
-Example daemon [config.json](crates/aranya-daemon/example.json) file:
-```
-{
-	// The daemon's name.
-	"name": "name",
-
-	// The daemon's working directory.
-	//
-	// Must already exist.
-	"work_dir": "/var/lib/work_dir",
-
-	// Used to receive API requests from the user library client.
-	"uds_api_path": "/var/run/uds.sock",
-
-	// The path where the daemon should write its PID file.
-	"pid_file": "/var/run/hub.pid",
-
-	// Aranya sync server address.
-	"sync_addr": "0.0.0.0:4321"
-}
-```
-
-Build the [daemon](crates/aranya-daemon) crate and run it in the background.
+The [daemon's README](crates/aranya-daemon/README.md) contains instructions for
+configuring and running the daemon.
 
 After the daemon has started up, start the application.
 
@@ -68,19 +45,22 @@ This repository contains the following components:
 
 ### Rust Client Library
 
-The [Rust Client Library](crates/aranya-client) is the library that your application will interface with.
-By integrating the library into an application, IDAM/RBAC and secure data transmission can be easily added without needing to develop complex security architectures, protocols, and cryptography.
+The [Rust Client Library](crates/aranya-client/) provides an interface for your
+application to interface with the
+[Aranya Daemon](crates/aranya-daemon-api/src/service.rs) in order to invoke
+actions on and process affects from the Aranya graph. The library also provides
+an interface to [Aranya Core](https://github.com/aranya-project/aranya-core)
+for Aranya Fast Channels functionality. Refer to the
+[client's README](crates/aranya-client/README.md) for more details on this
+component.
 
 ### Daemon Process
 
-The [Daemon Process](crates/aranya-daemon) is a long-running executable that can interface with the [Aranya Core](https://github.com/aranya-project/aranya-core) library directly.
-
-The daemon handles Aranya DAG maintenance for the application.
-
-The daemon's responsibilities include:
-- Periodically syncing state between networked Aranya peers to ensure they all have a consistent DAG.
-- Interfacing with the [Aranya Core](https://github.com/aranya-project/aranya-core) library
-- Receiving requests from the [Rust Client Library](crates/aranya-client) via the [Unix Domain Socket `tarpc` API](crates/aranya-daemon-api)
+The [daemon](crates/aranya-daemon/) is a long-running process that forwards
+requests from the [client](crates/aranya-client) to the
+[Aranya Core](https://github.com/aranya-project/aranya-core). Refer to the
+[daemon's README](crates/aranya-daemon/README.md) for more information on
+this component.
 
 ### Aranya Policy
 
