@@ -1,5 +1,16 @@
 # Rust Client
 
+[![Crates.io][crates-badge]][crates-url]
+[![Docs.rs][docs-badge]][docs-url]
+[![License][license-badge]][license-url]
+
+[crates-badge]: https://img.shields.io/crates/v/aranya-client.svg
+[crates-url]: https://crates.io/crates/aranya-client
+[docs-badge]: https://docs.rs/aranya-client/badge.svg
+[docs-url]: https://docs.rs/aranya-client/latest/aranya_client/
+[license-badge]: https://img.shields.io/crates/l/aranya-client.svg
+[license-url]: ../../LICENSE.md
+
 ## Overview
 
 Aranya's Rust Client is the library that your application will interface with.

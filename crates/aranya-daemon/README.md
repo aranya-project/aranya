@@ -1,5 +1,13 @@
 # Aranya Daemon
 
+[![Crates.io][crates-badge]][crates-url]
+[![License][license-badge]][license-url]
+
+[crates-badge]: https://img.shields.io/crates/v/aranya-daemon.svg
+[crates-url]: https://crates.io/crates/aranya-daemon
+[license-badge]: https://img.shields.io/crates/l/aranya-daemon.svg
+[license-url]: ../../LICENSE.md
+
 ## Overview
 
 The Aranya Daemon is a long-running executable that is used to maintain
