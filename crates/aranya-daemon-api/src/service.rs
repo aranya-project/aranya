@@ -1,7 +1,6 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-use core::time::Duration;
-use std::{fmt, net::SocketAddr};
+use core::{fmt, net::SocketAddr, time::Duration};
 
 use aranya_crypto::{
     afc::{BidiChannelId, UniChannelId},
@@ -12,23 +11,36 @@ use aranya_crypto::{
 use aranya_fast_channels::{Label, NodeId};
 use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 /// CS = Cipher Suite
 pub type CS = DefaultCipherSuite;
 
-// TODO: support custom error types.
-#[derive(Serialize, Deserialize, Debug, thiserror::Error)]
-pub enum Error {
-    Unknown,
+// TODO: enum?
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Error(String);
+
+impl From<anyhow::Error> for Error {
+    fn from(err: anyhow::Error) -> Self {
+        error!(?err);
+        Self(format!("{err:?}"))
+    }
+}
+
+impl From<aranya_crypto::id::IdError> for Error {
+    fn from(err: aranya_crypto::id::IdError) -> Self {
+        error!(%err);
+        Self(err.to_string())
+    }
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Unknown => write!(f, "Unknown"),
-        }
+        self.0.fmt(f)
     }
 }
+
+impl core::error::Error for Error {}
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 

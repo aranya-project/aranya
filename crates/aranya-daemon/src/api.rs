@@ -12,12 +12,12 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler};
 use aranya_buggy::BugExt;
 use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, Rng, UserId};
 use aranya_daemon_api::{
-    AfcCtrl, AfcId, DaemonApi, DeviceId, Error, KeyBundle as ApiKeyBundle, NetIdentifier,
+    AfcCtrl, AfcId, DaemonApi, DeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
     Result as ApiResult, Role as ApiRole, TeamId, CS,
 };
 use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed, Label, NodeId};
@@ -167,7 +167,7 @@ struct DaemonApiHandler {
 
 impl DaemonApiHandler {
     fn get_pk(&self) -> ApiResult<KeyBundle> {
-        KeyBundle::try_from(&*self.pk).map_err(|_| Error::Unknown)
+        Ok(KeyBundle::try_from(&*self.pk).context("bad key bundle")?)
     }
 
     /// Handles effects resulting from invoking an Aranya action.
@@ -305,13 +305,7 @@ impl DaemonApi for DaemonApiHandler {
 
     #[instrument(skip(self))]
     async fn get_device_id(self, _: context::Context) -> ApiResult<DeviceId> {
-        Ok(self
-            .pk
-            .ident_pk
-            .id()
-            .map_err(|_| Error::Unknown)?
-            .into_id()
-            .into())
+        Ok(self.pk.ident_pk.id()?.into_id().into())
     }
 
     #[instrument(skip(self))]
@@ -324,8 +318,8 @@ impl DaemonApi for DaemonApiHandler {
     ) -> ApiResult<()> {
         self.peers
             .add_peer(peer, interval, team.into_id().into())
-            .await
-            .map_err(|_| Error::Unknown)
+            .await?;
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -335,10 +329,8 @@ impl DaemonApi for DaemonApiHandler {
         peer: Addr,
         team: TeamId,
     ) -> ApiResult<()> {
-        self.peers
-            .remove_peer(peer, team.into_id().into())
-            .await
-            .map_err(|_| Error::Unknown)
+        self.peers.remove_peer(peer, team.into_id().into()).await?;
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -357,11 +349,7 @@ impl DaemonApi for DaemonApiHandler {
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
         let pk = self.get_pk()?;
-        let (graph_id, _) = self
-            .client
-            .create_team(pk, Some(nonce))
-            .await
-            .map_err(|_| Error::Unknown)?;
+        let (graph_id, _) = self.client.create_team(pk, Some(nonce)).await?;
         debug!(?graph_id);
         Ok(graph_id.into_id().into())
     }
@@ -378,15 +366,10 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         keys: ApiKeyBundle,
     ) -> ApiResult<()> {
-        if let Err(e) = self
-            .client
+        self.client
             .actions(&team.into_id().into())
             .add_member(keys.into())
-            .await
-        {
-            error!(?e);
-            return Err(e).map_err(|_| Error::Unknown);
-        }
+            .await?;
         Ok(())
     }
 
@@ -397,15 +380,10 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         device: DeviceId,
     ) -> ApiResult<()> {
-        if let Err(e) = self
-            .client
+        self.client
             .actions(&team.into_id().into())
             .remove_member(device.into_id().into())
-            .await
-        {
-            error!(?e);
-            return Err(e).map_err(|_| Error::Unknown);
-        }
+            .await?;
         Ok(())
     }
 
@@ -417,15 +395,10 @@ impl DaemonApi for DaemonApiHandler {
         device: DeviceId,
         role: ApiRole,
     ) -> ApiResult<()> {
-        if let Err(e) = self
-            .client
+        self.client
             .actions(&team.into_id().into())
             .assign_role(device.into_id().into(), role.into())
-            .await
-        {
-            error!(?e);
-            return Err(e).map_err(|_| Error::Unknown);
-        }
+            .await?;
         Ok(())
     }
 
@@ -440,8 +413,7 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .revoke_role(device.into_id().into(), role.into())
-            .await
-            .map_err(|_| Error::Unknown)?;
+            .await?;
         Ok(())
     }
 
@@ -457,11 +429,8 @@ impl DaemonApi for DaemonApiHandler {
             .client
             .actions(&team.into_id().into())
             .set_network_name(device.into_id().into(), name.0)
-            .await
-            .map_err(|_| Error::Unknown)?;
-        self.handle_effects(&effects, None)
-            .await
-            .map_err(|_| Error::Unknown)?;
+            .await?;
+        self.handle_effects(&effects, None).await?;
         Ok(())
     }
 
@@ -476,8 +445,7 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .unset_network_name(device.into_id().into())
-            .await
-            .map_err(|_| Error::Unknown)?;
+            .await?;
         Ok(())
     }
 
@@ -486,8 +454,7 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .define_label(label)
-            .await
-            .map_err(|_| Error::Unknown)?;
+            .await?;
         Ok(())
     }
 
@@ -496,8 +463,7 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .undefine_label(label)
-            .await
-            .map_err(|_| Error::Unknown)?;
+            .await?;
         Ok(())
     }
 
@@ -513,8 +479,7 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .assign_label(device.into_id().into(), label, ChanOp::ReadWrite)
-            .await
-            .map_err(|_| Error::Unknown)?;
+            .await?;
         Ok(())
     }
 
@@ -526,12 +491,11 @@ impl DaemonApi for DaemonApiHandler {
         device: DeviceId,
         label: Label,
     ) -> ApiResult<()> {
-        let id = self.pk.ident_pk.id().map_err(|_| Error::Unknown)?;
+        let id = self.pk.ident_pk.id()?;
         self.client
             .actions(&team.into_id().into())
             .revoke_label(id, label)
-            .await
-            .map_err(|_| Error::Unknown)?;
+            .await?;
         Ok(())
     }
 
@@ -545,34 +509,32 @@ impl DaemonApi for DaemonApiHandler {
         label: Label,
     ) -> ApiResult<(AfcId, AfcCtrl)> {
         info!("create_channel");
-        if let Some(peer_id) = self.afc_peers.lock().await.get(&peer) {
-            let (cmds, effects) = self
-                .client
-                .actions(&team.into_id().into())
-                .create_bidi_channel_off_graph(*peer_id, label)
-                .await
-                .map_err(|_| Error::Unknown)?;
-            let id = self.pk.ident_pk.id().map_err(|_| Error::Unknown)?;
-            let (afc_id, ctrl) = match find_effect!(&effects, Effect::BidiChannelCreated(e) if e.author_id == id.into())
-            {
-                Some(Effect::BidiChannelCreated(e)) => {
-                    let afc_id: AfcId = e.channel_key_id.into();
-                    debug!(?afc_id, "processed afc ID");
-                    (afc_id, cmds)
-                }
-                _ => {
-                    error!("unable to find BidiChannelCreated effect");
-                    return Err(Error::Unknown);
-                }
-            };
 
-            self.handle_effects(&effects, Some(node_id))
-                .await
-                .map_err(|_| Error::Unknown)?;
-            return Ok((afc_id, ctrl));
-        }
-        debug!(?peer, "unable to lookup peer");
-        Err(Error::Unknown)
+        let peer_id = self
+            .afc_peers
+            .lock()
+            .await
+            .get(&peer)
+            .copied()
+            .context("unable to lookup peer")?;
+
+        let (ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .create_bidi_channel_off_graph(peer_id, label)
+            .await?;
+        let id = self.pk.ident_pk.id()?;
+
+        let Some(Effect::BidiChannelCreated(e)) =
+            find_effect!(&effects, Effect::BidiChannelCreated(e) if e.author_id == id.into())
+        else {
+            return Err(anyhow::anyhow!("unable to find BidiChannelCreated effect").into());
+        };
+        let afc_id: AfcId = e.channel_key_id.into();
+        debug!(?afc_id, "processed afc ID");
+
+        self.handle_effects(&effects, Some(node_id)).await?;
+        Ok((afc_id, ctrl))
     }
 
     #[instrument(skip(self))]
@@ -589,40 +551,23 @@ impl DaemonApi for DaemonApiHandler {
         node_id: NodeId,
         ctrl: AfcCtrl,
     ) -> ApiResult<(AfcId, Label)> {
-        let mut session = self
-            .client
-            .session_new(&team.into_id().into())
-            .await
-            .map_err(|_| Error::Unknown)?;
+        let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
-            let effects = self
-                .client
-                .session_receive(&mut session, &cmd)
-                .await
-                .map_err(|_| Error::Unknown)?;
-            let id = self.pk.ident_pk.id().map_err(|_| Error::Unknown)?;
-            self.handle_effects(&effects, Some(node_id))
-                .await
-                .map_err(|_| Error::Unknown)?;
-            match find_effect!(&effects, Effect::BidiChannelReceived(e) if e.peer_id == id.into()) {
-                Some(Effect::BidiChannelReceived(e)) => {
-                    let encap = match BidiPeerEncap::<CS>::from_bytes(&e.encap) {
-                        Ok(encap) => encap,
-                        Err(e) => {
-                            error!(?e, "unable to get encap");
-                            return Err(Error::Unknown);
-                        }
-                    };
-                    let afc_id: AfcId = encap.id().into();
-                    debug!(?afc_id, "processed afc ID");
-                    let label = Label::new(e.label.try_into().expect("expected label conversion"));
-                    return Ok((afc_id, label));
-                }
-                _ => continue,
+            let effects = self.client.session_receive(&mut session, &cmd).await?;
+            let id = self.pk.ident_pk.id()?;
+            self.handle_effects(&effects, Some(node_id)).await?;
+            let Some(Effect::BidiChannelReceived(e)) =
+                find_effect!(&effects, Effect::BidiChannelReceived(e) if e.peer_id == id.into())
+            else {
+                continue;
             };
+            let encap = BidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
+            let afc_id: AfcId = encap.id().into();
+            debug!(?afc_id, "processed afc ID");
+            let label = Label::new(e.label.try_into().expect("expected label conversion"));
+            return Ok((afc_id, label));
         }
-        error!("unable to find BidiChannelReceived effect");
-        return Err(Error::Unknown);
+        Err(anyhow!("unable to find BidiChannelReceived effect").into())
     }
 }
 

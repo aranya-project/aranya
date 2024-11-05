@@ -280,13 +280,14 @@ dependencies = [
 name = "aranya-daemon-api"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "aranya-crypto",
  "aranya-fast-channels",
  "aranya-util",
  "postcard",
  "serde",
  "tarpc",
- "thiserror",
+ "tracing",
 ]
 
 [[package]]
