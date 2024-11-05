@@ -1,5 +1,8 @@
 # Aranya
 
+Aranya is lovingly crafted and supported by [SpiderOak](https://spideroak.com). Aranya is licensed under the [AGPL](LICENSE.md)- if you want to use it commercially, drop us a line!
+
+## What is it?
 Aranya is a software development tool for governing access to data and services over a decentralized, zero-trust framework with secure end-to-end encrypted data exchange built-in.
 
 Aranya has been designed with an emphasis on security, efficiency, and portability.
