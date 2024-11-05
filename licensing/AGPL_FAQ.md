@@ -5,6 +5,9 @@ Aranya is licensed under Affero GPL v3.0.
 ## Q: What is the relationship between our open source vs. commercial product?
 A: SpiderOak offers our software development toolkit with your choice of an open source or commercial license. Through our open-source license, we enable widespread access to this technology, advocating for the developer community to collaborate, build and adopt protections to secure applications and devices to protect themselves against unauthorized access or data breaches. However, many developers may need different levels of regulatory compliance, as well as additional product features, and therefore our commercial product may be best suited for use. Contact SpiderOak to discuss which license might be best for you. 
 
+## Q: Why did we select the AGPL license for the Aranya project?
+A: As part of our SpiderOak mission, we want to provide the greatest access to developers as we look to help transform data security in the 21st century. However, as a business we want to make sure we are able to continue to fund the development of the Aranya project and support it within the community.
+
 ## Q: How can I contribute to the Aranya project?
 A: Thank you for your engagement and contribution to the Aranya project! As long as you have signed our Contributor License Agreement, you can contribute to our open-source project. However, SpiderOak may or may not choose to include your contributions in our SpiderOak commercial product offering.
 
