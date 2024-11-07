@@ -1,4 +1,5 @@
-//! AFC Data Router.
+//! Aranya Fast Channels (AFC) Data Router.
+//!
 //! Routes AFC ctrl/data messages between AFC peers.
 //! Encrypts outgoing plaintext from application with AFC `seal` operation before sending it over the network.
 //! Decrypts incoming ciphertext with AFC `open` operation from peers before forwarding to the application.
@@ -21,7 +22,7 @@ use tokio::{
 };
 use tracing::{debug, error};
 
-/// An error that can occur in the AFC data router.
+/// An error that can occur in the Aranya Fast Channels (AFC) data router.
 // TODO: split this into separate errors for app and router.
 #[derive(thiserror::Error, Debug)]
 pub enum AfcRouterError {
@@ -96,7 +97,18 @@ pub enum AfcRouterError {
     UnexpectedType,
 }
 
+/// Data types that can be polled by the AFC router.
+pub enum DataType {
+    /// Data message received by the router from the application.
+    Data(AppMsg),
+    /// Ctrl message received by the application from the router.
+    Ctrl(AppCtrl),
+    /// Incoming connection from the transport.
+    Txp((TcpStream, SocketAddr)),
+}
+
 /// AFC ctrl/data messages.
+///
 /// These messages are sent/received between AFC peers via the TCP transport.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum TxpMsg {
@@ -104,7 +116,12 @@ pub enum TxpMsg {
     Data(Data),
 }
 
-/// Ctrl message.
+/// AFC Ctrl message.
+///
+/// The current peer creates an AFC channel locally including populating the AFC shared-memory with channel keys.
+/// The peer then sends the encrypted Ctrl message effects to the peer on the other side of the channel.
+/// The recipient peer can then process the effects in order to setup corresponding channel keys in its AFC shared-memory.
+/// Once both peers have corresponding copies of the AFC channel keys, they can both perform encryption/decryption for the AFC channel.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Ctrl {
     /// AFC protocol version.
@@ -115,7 +132,9 @@ pub struct Ctrl {
     cmd: AfcCtrl,
 }
 
-/// Data message.
+/// AFC Data message.
+///
+/// Data messages contain ciphertext encrypted with the AFC `seal` operation using the appropriate channel keys for the channel.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Data {
     /// AFC protocol version.
@@ -128,19 +147,12 @@ pub struct Data {
 
 /// Ctrl message received by application from AFC router.
 pub struct AppCtrl {
+    /// AFC ctrl message.
     pub afc_ctrl: AfcCtrl,
+    /// Team ID.
     pub team_id: TeamId,
+    /// Node ID.
     pub node_id: NodeId,
-}
-
-/// Data types that can be polled by the AFC router.
-pub enum PollData {
-    /// Data message received by the router from the application.
-    Data(AppMsg),
-    /// Ctrl message received by the application from the router.
-    Ctrl(AppCtrl),
-    /// Incoming connection from the transport.
-    Txp((TcpStream, SocketAddr)),
 }
 
 /// AFC ctrl/data router.
@@ -153,11 +165,12 @@ pub struct Router<S> {
     send: Sender<AppMsg>,
     /// Receives an outgoing AFC message from application to send over transport.
     recv: Receiver<AppMsg>,
-    /// Map of [`AfcId`] to [`ChannelId`].
+    /// Map of [`AfcId`] to [`ChannelId`] for existing channels.
     chans: BTreeMap<AfcId, ChannelId>,
     /// Sends [`AfcCtrl`] data from AFC router to user library to be forwarded to daemon.
     ctrl_send: Sender<AppCtrl>,
     /// Incrementing counter for unique AFC node_id.
+    // TODO: move this counter into the daemon.
     counter: u32,
     /// Buffer for receiving bytes from a peer over the network.
     buf: Vec<u8>,
@@ -255,34 +268,35 @@ impl<S: AfcState> Router<S> {
     }
 
     /// Polls the AFC router for data.
+    ///
     /// Checks for incoming client connections.
     /// Receives ctrl/data messages from peers.
-    pub async fn poll(&mut self) -> Result<PollData, AfcRouterError> {
+    pub async fn poll(&mut self) -> Result<DataType, AfcRouterError> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
             // Check for new messages from the application.
             result = self.recv.recv() => {
                 match result {
-                    Some(msg) => Ok(PollData::Data(msg)),
+                    Some(msg) => Ok(DataType::Data(msg)),
                     None => Err(AfcRouterError::Poll(anyhow!("channel closed"))),
                 }
             }
             // Check for incoming messages from the transport.
             result = self.listener.accept() => {
                 match result {
-                    Ok((stream, addr)) => Ok(PollData::Txp((stream, addr))),
+                    Ok((stream, addr)) => Ok(DataType::Txp((stream, addr))),
                     Err(e) => Err(AfcRouterError::Poll(e.into())),
                 }
             }
         }
     }
 
-    /// Handles poll data.
-    pub async fn handle_data(&mut self, data: PollData) -> Result<(), AfcRouterError> {
+    /// Handles polled data.
+    pub async fn handle_data(&mut self, data: DataType) -> Result<(), AfcRouterError> {
         match data {
-            PollData::Data(msg) => self.recv_app_msg(msg).await,
-            PollData::Txp((mut stream, addr)) => {
+            DataType::Data(msg) => self.recv_app_msg(msg).await,
+            DataType::Txp((mut stream, addr)) => {
                 self.recv_incoming_connection(&mut stream, addr).await
             }
             _ => Err(AfcRouterError::UnexpectedType),
@@ -317,7 +331,7 @@ impl<S: AfcState> Router<S> {
         Ok(())
     }
 
-    /// Receive incoming connection from peer.
+    /// Receive incoming TCP connection from peer.
     async fn recv_incoming_connection(
         &mut self,
         stream: &mut TcpStream,
@@ -408,6 +422,7 @@ impl<S: AfcState> Router<S> {
         Ok(())
     }
 
+    /// Get the local address the AFC server bound to.
     pub fn local_addr(&self) -> Result<SocketAddr, AfcRouterError> {
         if let Ok(addr) = self.listener.local_addr() {
             return Ok(addr);
@@ -415,12 +430,14 @@ impl<S: AfcState> Router<S> {
         Err(AfcRouterError::RouterAddr)
     }
 
+    /// Get the next Node ID in the sequence.
     pub async fn get_next_node_id(&mut self) -> Result<NodeId, AfcRouterError> {
         let node_id = NodeId::new(self.counter);
         self.counter += 1;
         Ok(node_id)
     }
 
+    /// Insert a new channel into the AfcId -> ChannelId mapping.
     pub async fn insert_channel_id(
         &mut self,
         afc_id: AfcId,
@@ -432,6 +449,7 @@ impl<S: AfcState> Router<S> {
     }
 }
 
+/// Setup the Aranya Client's read side of the AFC channel keys shared memory.
 pub fn setup_afc_shm(shm_path: &Path, max_chans: usize) -> Result<ReadState<CS>, AfcRouterError> {
     debug!(?shm_path, "setting up afc shm read side");
     let Some(path) = shm_path.to_str() else {
@@ -449,6 +467,7 @@ pub fn setup_afc_shm(shm_path: &Path, max_chans: usize) -> Result<ReadState<CS>,
 /// AFC message coming from or going to the application.
 #[derive(Clone, Debug)]
 pub enum AppMsg {
+    /// Ctrl message.
     Ctrl {
         /// Peer's socket address.
         addr: SocketAddr,
@@ -457,6 +476,7 @@ pub enum AppMsg {
         /// Ephemeral command for creating AFC channel.
         cmd: AfcCtrl,
     },
+    /// Data message.
     Data {
         /// Peer's socket address.
         addr: SocketAddr,
@@ -518,9 +538,9 @@ impl App {
     }
 
     /// Receives AFC ctrl message from router.
-    pub async fn recv_ctrl(&mut self) -> Result<PollData, AfcRouterError> {
+    pub async fn recv_ctrl(&mut self) -> Result<DataType, AfcRouterError> {
         if let Some(ctrl) = self.ctrl_recv.recv().await {
-            return Ok(PollData::Ctrl(ctrl));
+            return Ok(DataType::Ctrl(ctrl));
         }
         Err(AfcRouterError::AppRead)
     }

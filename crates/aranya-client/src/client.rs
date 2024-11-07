@@ -1,3 +1,5 @@
+//! Aranya Client Rust library.
+
 use std::{collections::BTreeMap, net::SocketAddr, path::Path, str::FromStr, time::Duration};
 
 use aranya_daemon_api::{
@@ -9,17 +11,28 @@ use tarpc::{context, tokio_serde::formats::Json};
 use tracing::{debug, info, instrument};
 
 use crate::{
-    afc::{setup_afc_shm, App, PollData, Router},
+    afc::{setup_afc_shm, App, DataType, Router},
     Error, Result,
 };
 
+/// Data that can be polled by the AFC router.
+#[must_use]
+pub struct PollData(DataType);
+
+/// Aranya client for invoking actions on and processing effects from the Aranya graph.
+///
+/// The Aranya client interacts with the `daemon` via the `aranya-daemon-api` unix domain socket `tarpc` API.
+/// The client provides Aranya Fast Channels functionality by interfacing with Aranya Fast Channel utilities in the `aranya-core` repo.
 pub struct Client {
+    /// Client for interacting with the `aranya-daemon` process via the `aranya-daemon-api` API.
     daemon: DaemonApiClient,
-    /// AFC data router.
+    /// Aranya Fast Channels (AFC) data router.
+    /// Encrypts plaintext based on AFC labels and sends it via the TCP transport.
     afc: Router<ReadState<CS>>,
-    /// Application abstraction for sending/receiving data between application and the AFC router.
+    /// Application abstraction for sending/receiving data between the application and the AFC router.
     app: App,
-    /// AFC channels.
+    /// Aranya Fast Channel (AFC) channels.
+    /// Keeps track of info for each channel.
     chans: BTreeMap<AfcId, (TeamId, NetIdentifier, Label)>,
 }
 
@@ -58,12 +71,17 @@ impl Client {
         Ok(self.daemon.aranya_local_addr(context::current()).await??)
     }
 
-    /// Returns address AFC server bound to.
+    /// Returns address Aranya Fast Channels (AFC) server bound to.
     pub async fn afc_local_addr(&self) -> Result<SocketAddr> {
         self.afc.local_addr().map_err(Error::AfcRouter)
     }
 
-    /// Creates a bidirectional AFC channel.
+    /// Creates a bidirectional Aranya Fast Channel (AFC).
+    ///
+    /// The device initiates creation of an Aranya Fast Channel with another peer.
+    /// The channel is created using a specific label which means both peers must already have permission to use that label.
+    /// During setup, an encrypted `ctrl` message is sent to the peer containing effects required to initialize the channel keys.
+    /// When the peer receives the `ctrl` effects, it is able to configure a corresponding set of channel keys in order to perform `open`/`seal` operations for the channel.
     pub async fn create_channel(
         &mut self,
         team: TeamId,
@@ -93,6 +111,7 @@ impl Client {
         Ok(afc_id)
     }
 
+    /// Deletes an Aranya Fast Channel (AFC).
     pub async fn delete_channel(&mut self, chan: AfcId) -> Result<()> {
         let _ctrl = self
             .daemon
@@ -103,26 +122,26 @@ impl Client {
         todo!()
     }
 
-    /// Poll for new data and handle it.
+    /// Poll the Aranya Fast Channel router for new data and handle it.
     pub async fn poll(&mut self) -> Result<()> {
         let data = self.poll_data().await?;
         self.handle_data(data).await
     }
 
-    /// Poll for new data.
+    /// Poll the Aranya Fast Channel router for new data.
     pub async fn poll_data(&mut self) -> Result<PollData> {
         #![allow(clippy::disallowed_macros)]
         let data = tokio::select! {
             result = self.app.recv_ctrl() => result?,
             result = self.afc.poll() => result?,
         };
-        Ok(data)
+        Ok(PollData(data))
     }
 
-    /// Handle any received data.
+    /// Handle any received data from the Aranya Fast Channel router.
     pub async fn handle_data(&mut self, data: PollData) -> Result<()> {
-        match data {
-            PollData::Ctrl(ctrl) => {
+        match data.0 {
+            DataType::Ctrl(ctrl) => {
                 debug!("client lib received AFC ctrl msg");
                 let node_id = ctrl.node_id;
                 let (afc_id, label) = self
@@ -133,12 +152,13 @@ impl Client {
                 self.afc.insert_channel_id(afc_id, channel_id).await?;
             }
             _ => {
-                self.afc.handle_data(data).await?;
+                self.afc.handle_data(data.0).await?;
             }
         }
         Ok(())
     }
 
+    /// Send data via a specific Aranya Fast Channel.
     pub async fn send_data(&mut self, chan: AfcId, data: Vec<u8>) -> Result<()> {
         if let Some((_team_id, peer, label)) = self.chans.get(&chan) {
             let addr = Addr::from_str(&peer.0).map_err(|_| crate::afc::AfcRouterError::AppWrite)?;
@@ -153,6 +173,7 @@ impl Client {
         Ok(())
     }
 
+    /// Receive data from an Aranya Fast Channel.
     // TODO: return [`NetIdentifier`] instead of [`SocketAddr`].
     pub async fn recv_data(&mut self) -> Result<(Vec<u8>, SocketAddr, AfcId, Label)> {
         let (plaintext, addr, afc_id, label) = self.app.recv().await.map_err(Error::AfcRouter)?;
@@ -174,7 +195,7 @@ impl Client {
         Ok(self.daemon.get_key_bundle(context::current()).await??)
     }
 
-    /// Gets the public device id.
+    /// Gets the public device ID for this device.
     pub async fn get_device_id(&mut self) -> Result<DeviceId> {
         Ok(self.daemon.get_device_id(context::current()).await??)
     }
@@ -184,12 +205,12 @@ impl Client {
         Ok(self.daemon.create_team(context::current()).await??)
     }
 
-    /// remove a team from the local device store.
+    /// Add a team to the local device store.
     pub async fn add_team(&mut self, team: TeamId) -> Result<()> {
         Ok(self.daemon.add_team(context::current(), team).await??)
     }
 
-    /// remove a team from the local device store.
+    /// Remove a team from the local device store.
     pub async fn remove_team(&mut self, _team: TeamId) -> Result<()> {
         todo!()
     }
@@ -200,13 +221,23 @@ impl Client {
     }
 }
 
+/// Represents an Aranya Team.
+///
+/// The team allows a device to perform team related operations using the Aranya [`Client`].
+/// These operations include:
+/// - adding/removing sync peers.
+/// - adding/removing devices from the team.
+/// - assigning/revoking device roles.
+/// - creating/assigning/deleting labels.
+/// - creating/deleting fast channels.
+/// - assigning network identifiers to devices.
 pub struct Team<'a> {
     client: &'a mut Client,
     id: TeamId,
 }
 
 impl Team<'_> {
-    /// Adds the peer for automatic periodic syncing.
+    /// Adds a peer for automatic periodic Aranya state syncing.
     pub async fn add_sync_peer(&mut self, addr: Addr, interval: Duration) -> Result<()> {
         Ok(self
             .client
@@ -215,7 +246,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// Removes the peer from automatic syncing.
+    /// Removes a peer from automatic Aranya state syncing.
     pub async fn remove_sync_peer(&mut self, addr: Addr) -> Result<()> {
         Ok(self
             .client
@@ -224,7 +255,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// close the team and stop all operations on the graph.
+    /// Close the team and stop all operations on the graph.
     pub async fn close_team(&mut self) -> Result<()> {
         Ok(self
             .client
@@ -233,7 +264,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// add a device to the team with the default role
+    /// Add a device to the team with the default `Member` role.
     pub async fn add_device_to_team(&mut self, keys: KeyBundle) -> Result<()> {
         Ok(self
             .client
@@ -242,7 +273,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// remove a device from the team
+    /// Remove a device from the team.
     pub async fn remove_device_from_team(&mut self, device: DeviceId) -> Result<()> {
         Ok(self
             .client
@@ -251,7 +282,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// assign a role to a device
+    /// Assign a role to a device.
     pub async fn assign_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
         Ok(self
             .client
@@ -260,7 +291,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// remove a role from a device
+    /// Revoke a role from a device. This sets the device's role back to the default `Member` role.
     pub async fn revoke_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
         Ok(self
             .client
@@ -269,13 +300,11 @@ impl Team<'_> {
             .await??)
     }
 
-    /// associate a network address to a device for use with AFC.
+    /// Associate a network identifier to a device for use with AFC.
     ///
     /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
-    /// OpenChannel and receiving messages. Can take either DNS name or IPV4. MVP would need
-    /// reverse lookup. TODO more work required on the address assignment. Currently one name per
-    /// device.
+    /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
     pub async fn assign_net_name(
         &mut self,
         device: DeviceId,
@@ -288,7 +317,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// disassociate a network address from a device.
+    /// Disassociate a network identifier from a device.
     pub async fn remove_net_name(
         &mut self,
         device: DeviceId,
@@ -301,7 +330,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// create a label
+    /// Create an Aranya Fast Channels (AFC) label.
     pub async fn create_label(&mut self, label: Label) -> Result<()> {
         Ok(self
             .client
@@ -310,7 +339,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// delete a label
+    /// Delete an Aranya Fast Channels (AFC) label.
     pub async fn delete_label(&mut self, label: Label) -> Result<()> {
         Ok(self
             .client
@@ -319,7 +348,10 @@ impl Team<'_> {
             .await??)
     }
 
-    /// assign a label to a device so that it can be used for AFC
+    /// Assign an Aranya Fast Channels (AFC) label to a device.
+    ///
+    /// This grants the device permission to send/receive AFC data using that label.
+    /// A channel must be created with the label in order to send data using that label.
     pub async fn assign_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
         Ok(self
             .client
@@ -328,7 +360,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// revoke a label from a device
+    /// Revoke an Aranya Fast Channels (AFC) label from a device.
     pub async fn revoke_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
         Ok(self
             .client
