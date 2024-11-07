@@ -140,6 +140,9 @@ impl UserCtx {
 /// `ARANYA_DAEMON="debug" RUST_LOG="debug" cargo test integration_test -- --show-output --nocapture`
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn integration_test() -> Result<()> {
+    let sync_interval = Duration::from_millis(100);
+    let sleep_interval = sync_interval * 6;
+
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
@@ -172,45 +175,44 @@ async fn integration_test() -> Result<()> {
     let mut operator_team = team.operator.client.team(team_id);
     let mut member_team = team.membera.client.team(team_id);
 
-    let interval = Duration::from_millis(100);
     owner_team
-        .add_sync_peer(admin_addr.into(), interval)
+        .add_sync_peer(admin_addr.into(), sync_interval)
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), interval)
+        .add_sync_peer(operator_addr.into(), sync_interval)
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), interval)
+        .add_sync_peer(membera_addr.into(), sync_interval)
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), interval)
+        .add_sync_peer(owner_addr.into(), sync_interval)
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), interval)
+        .add_sync_peer(operator_addr.into(), sync_interval)
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), interval)
+        .add_sync_peer(membera_addr.into(), sync_interval)
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), interval)
+        .add_sync_peer(owner_addr.into(), sync_interval)
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), interval)
+        .add_sync_peer(admin_addr.into(), sync_interval)
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), interval)
+        .add_sync_peer(membera_addr.into(), sync_interval)
         .await?;
 
     member_team
-        .add_sync_peer(owner_addr.into(), interval)
+        .add_sync_peer(owner_addr.into(), sync_interval)
         .await?;
     member_team
-        .add_sync_peer(admin_addr.into(), interval)
+        .add_sync_peer(admin_addr.into(), sync_interval)
         .await?;
     member_team
-        .add_sync_peer(operator_addr.into(), interval)
+        .add_sync_peer(operator_addr.into(), sync_interval)
         .await?;
 
     // add admin to team.
@@ -219,28 +221,28 @@ async fn integration_test() -> Result<()> {
     owner_team.assign_role(team.admin.id, Role::Admin).await?;
 
     // wait for syncing.
-    sleep(interval * 3).await;
+    sleep(sleep_interval).await;
 
     // add operator to team.
     info!("adding operator to team");
     owner_team.add_device_to_team(team.operator.pk).await?;
 
     // wait for syncing.
-    sleep(interval * 3).await;
+    sleep(sleep_interval).await;
 
     admin_team
         .assign_role(team.operator.id, Role::Operator)
         .await?;
 
     // wait for syncing.
-    sleep(interval * 3).await;
+    sleep(sleep_interval).await;
 
     // add member to team.
     info!("adding member to team");
     operator_team.add_device_to_team(team.membera.pk).await?;
 
     // wait for syncing.
-    sleep(interval * 3).await;
+    sleep(sleep_interval).await;
 
     // remove devices from team.
     info!("removing member");
@@ -260,6 +262,9 @@ async fn integration_test() -> Result<()> {
 /// Tests Aranya Fast Channels data plane.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc() -> Result<()> {
+    let sync_interval = Duration::from_millis(100);
+    let sleep_interval = sync_interval * 6;
+
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
@@ -299,61 +304,60 @@ async fn test_afc() -> Result<()> {
     let mut membera_team = team.membera.client.team(team_id);
     let mut memberb_team = team.memberb.client.team(team_id);
 
-    let interval = Duration::from_millis(100);
     owner_team
-        .add_sync_peer(admin_addr.into(), interval)
+        .add_sync_peer(admin_addr.into(), sync_interval)
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), interval)
+        .add_sync_peer(operator_addr.into(), sync_interval)
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), interval)
+        .add_sync_peer(membera_addr.into(), sync_interval)
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), interval)
+        .add_sync_peer(owner_addr.into(), sync_interval)
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), interval)
+        .add_sync_peer(operator_addr.into(), sync_interval)
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), interval)
+        .add_sync_peer(membera_addr.into(), sync_interval)
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), interval)
+        .add_sync_peer(owner_addr.into(), sync_interval)
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), interval)
+        .add_sync_peer(admin_addr.into(), sync_interval)
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), interval)
+        .add_sync_peer(membera_addr.into(), sync_interval)
         .await?;
 
     membera_team
-        .add_sync_peer(owner_addr.into(), interval)
+        .add_sync_peer(owner_addr.into(), sync_interval)
         .await?;
     membera_team
-        .add_sync_peer(admin_addr.into(), interval)
+        .add_sync_peer(admin_addr.into(), sync_interval)
         .await?;
     membera_team
-        .add_sync_peer(operator_addr.into(), interval)
+        .add_sync_peer(operator_addr.into(), sync_interval)
         .await?;
     membera_team
-        .add_sync_peer(memberb_addr.into(), interval)
+        .add_sync_peer(memberb_addr.into(), sync_interval)
         .await?;
 
     memberb_team
-        .add_sync_peer(owner_addr.into(), interval)
+        .add_sync_peer(owner_addr.into(), sync_interval)
         .await?;
     memberb_team
-        .add_sync_peer(admin_addr.into(), interval)
+        .add_sync_peer(admin_addr.into(), sync_interval)
         .await?;
     memberb_team
-        .add_sync_peer(operator_addr.into(), interval)
+        .add_sync_peer(operator_addr.into(), sync_interval)
         .await?;
     memberb_team
-        .add_sync_peer(membera_addr.into(), interval)
+        .add_sync_peer(membera_addr.into(), sync_interval)
         .await?;
 
     // add admin to team.
@@ -362,21 +366,21 @@ async fn test_afc() -> Result<()> {
     owner_team.assign_role(team.admin.id, Role::Admin).await?;
 
     // wait for syncing.
-    sleep(interval * 3).await;
+    sleep(sleep_interval).await;
 
     // add operator to team.
     info!("adding operator to team");
     owner_team.add_device_to_team(team.operator.pk).await?;
 
     // wait for syncing.
-    sleep(interval * 3).await;
+    sleep(sleep_interval).await;
 
     admin_team
         .assign_role(team.operator.id, Role::Operator)
         .await?;
 
     // wait for syncing.
-    sleep(interval * 3).await;
+    sleep(sleep_interval).await;
 
     // add membera to team.
     info!("adding membera to team");
@@ -387,7 +391,7 @@ async fn test_afc() -> Result<()> {
     operator_team.add_device_to_team(team.memberb.pk).await?;
 
     // wait for syncing.
-    sleep(interval * 3).await;
+    sleep(sleep_interval).await;
 
     // operator assigns labels for AFC channels.
     let label1 = Label::new(1);
@@ -409,7 +413,7 @@ async fn test_afc() -> Result<()> {
         .await?;
 
     // wait for syncing.
-    sleep(interval * 3).await;
+    sleep(sleep_interval).await;
 
     // membera creates bidi channel with memberb
     let afc_id1 = team
