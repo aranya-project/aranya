@@ -807,6 +807,8 @@ pub fn delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::E
 
 /// Poll for new Aranya Fast Channels (AFC) data.
 ///
+/// If the operation times out, this will return an `::ARANYA_ERROR_TIMEOUT`.
+///
 /// @param client the Aranya Client [`Client`].
 /// @param timeout how long to wait before timing out the poll operation [`Duration`].
 ///

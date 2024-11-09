@@ -42,7 +42,7 @@ toolchain = "${NIGHTLY}"
 cwd = "crates/aranya-client-capi"
 command = "cbindgen"
 args = ["--config=cbindgen.toml", "--output=output/aranya-client.h"]
-dependencies = ["install-cbindgen"]
+dependencies = ["install-cbindgen", "install-nightly"]
 
 [tasks.build-capi-docs]
 category = "build"
@@ -55,7 +55,23 @@ category = "build"
 description = "Build C API shared library"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
-args = ["build"]
+args = ["build", "--release"]
+dependencies = ["install-nightly"]
+
+[tasks.zip-capi]
+category = "build"
+description = "Zip C API artifacts"
+script = '''
+capi=aranya-capi
+mkdir -p ${capi}/lib
+cp target/release/libaranya_client_capi.dylib ${capi}/lib/ || true
+cp target/release/libaranya_client_capi.so ${capi}/lib/ || true
+mkdir -p ${capi}/cmake
+cp examples/c/cmake/AranyaConfig.cmake ${capi}/cmake/
+mkdir -p ${capi}/include
+cp crates/aranya-client-capi/output/aranya-client.h ${capi}/include/
+zip -qr aranya-capi.zip ${capi}
+'''
 
 [tasks.install-cbindgen]
 private = true
@@ -200,3 +216,14 @@ fi
 [tasks.install-cargo-all-features]
 private = true
 install_crate = { crate_name = "cargo-all-features", version = "1.10.0", binary = "cargo-check-all-features", test_arg = ["-V"] }
+
+
+# Examples
+
+# C Example
+[tasks.run-capi-example]
+category = "examples"
+description = "Run C example application"
+cwd = "examples/c"
+script = "./run.bash"
+dependencies = ["build-capi", "install-cbindgen"]

@@ -49,3 +49,41 @@ jobs:
 
       - name: Verify build didn't change any checked-in files
         run: cargo make git-unchanged
+
+      - name: Publish daemon
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.runner }}-daemon
+          path: target/release/daemon
+          if-no-files-found: error
+
+  build-aranya-lib:
+    strategy:
+      matrix:
+        runner:
+          - "self-hosted-linux-arm"
+          - "self-hosted-linux-arm64"
+          - "self-hosted-linux-amd64"
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
+          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
+          runner: ${{ matrix.runner }}
+
+      - name: Build Aranya Shared Library
+        run: |
+          cargo make build-capi-lib
+          cargo make build-capi-header
+          cargo make zip-capi
+
+      - name: Publish aranya lib
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.runner }}-aranya-capi
+          path: aranya-capi
+          if-no-files-found: error

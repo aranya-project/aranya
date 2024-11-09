@@ -60,6 +60,29 @@ runs:
       run: ldd --version
       if: ${{ inputs.runner == 'self-hosted-linux-arm' }}
 
+    - name: compiler version
+      shell: bash
+      run: |
+        sudo apt-get install -y clang \
+            --no-install-recommends
+        clang --version
+        gcc --version
+        cmake --version
+
+    - name: doxygen
+      shell: bash
+      run: |
+        sudo apt-get install -y doxygen \
+            --no-install-recommends
+        doxygen --version
+
+    - name: zip
+      shell: bash
+      run: |
+        sudo apt-get install -y zip \
+            --no-install-recommends
+        zip --version
+
     - name: Install sccache
       uses: spideroak-inc/sccache-action@main
       with:

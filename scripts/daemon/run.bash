@@ -7,9 +7,9 @@ if command -v shellcheck; then
 fi
 
 cleanup() {
-	jobs -p | xargs -I{} kill {}
+	jobs -p | xargs -I{} kill {} || true
 }
-trap 'cleanup' EXIT
+trap 'cleanup || true' EXIT
 trap 'trap - SIGTERM && kill -- -$$ || true' SIGINT SIGTERM EXIT
 
 # flag to select debug or release builds

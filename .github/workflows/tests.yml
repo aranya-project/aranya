@@ -47,3 +47,27 @@ jobs:
 
       - name: Unit Tests
         run: cargo make unit-tests
+
+
+  c-example-application:
+    strategy:
+      matrix:
+        runner:
+          - "self-hosted-linux-arm"
+          - "self-hosted-linux-arm64"
+          - "self-hosted-linux-amd64"
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
+          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
+          runner: ${{ matrix.runner }}
+
+      - name: C Example Application
+        run: |
+          export CC=clang
+          cargo make run-capi-example

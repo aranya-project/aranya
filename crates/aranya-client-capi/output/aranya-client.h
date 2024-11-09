@@ -1136,6 +1136,8 @@ AranyaError aranya_delete_channel_ext(struct AranyaClient *client,
 /**
  * Poll for new Aranya Fast Channels (AFC) data.
  *
+ * If the operation times out, this will return an `::ARANYA_ERROR_TIMEOUT`.
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param timeout how long to wait before timing out the poll operation [`AranyaDuration`](@ref AranyaDuration).
  *
@@ -1146,6 +1148,8 @@ AranyaError aranya_poll_data(struct AranyaClient *client,
 
 /**
  * Poll for new Aranya Fast Channels (AFC) data.
+ *
+ * If the operation times out, this will return an `::ARANYA_ERROR_TIMEOUT`.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param timeout how long to wait before timing out the poll operation [`AranyaDuration`](@ref AranyaDuration).
