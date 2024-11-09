@@ -24,6 +24,43 @@ description = "Build Code"
 command = "cargo"
 args = ["build", "--verbose", "--release", "${@}"]
 
+# Build the `aranya-client-capi` C API.
+[tasks.build-capi]
+category = "build"
+description = "Build C API"
+run_task = { name = [
+    "build-capi-header",
+    "build-capi-docs",
+    "build-capi-lib",
+] }
+
+# Build the `aranya-client-capi` C API `aranya-client.h` header file.
+[tasks.build-capi-header]
+category = "build"
+description = "Build C API header"
+toolchain = "${NIGHTLY}"
+cwd = "crates/aranya-client-capi"
+command = "cbindgen"
+args = ["--config=cbindgen.toml", "--output=output/aranya-client.h"]
+dependencies = ["install-cbindgen"]
+
+[tasks.build-capi-docs]
+category = "build"
+description = "Build C API docs"
+cwd = "crates/aranya-client-capi"
+command = "doxygen"
+
+[tasks.build-capi-lib]
+category = "build"
+description = "Build C API shared library"
+cwd = "crates/aranya-client-capi"
+command = "cargo"
+args = ["build"]
+
+[tasks.install-cbindgen]
+private = true
+install_crate = { crate_name = "cbindgen", version = "0.27.0", binary = "cbindgen", test_arg = "-V" }
+
 
 # Test
 [tasks.unit-tests]

@@ -16,7 +16,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use aranya_client::Client;
+use aranya_client::{AfcMsg, Client};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
@@ -107,12 +107,6 @@ impl UserCtx {
             .retry(ExponentialBuilder::default())
             .await
             .context("unable to init client")?;
-
-        // Perform setup of a team.
-        client
-            .initialize()
-            .await
-            .expect("expected to initialize daemon");
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");
@@ -406,10 +400,10 @@ async fn test_afc() -> Result<()> {
 
     // assign network addresses.
     operator_team
-        .assign_net_name(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
+        .assign_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
         .await?;
     operator_team
-        .assign_net_name(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
+        .assign_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
         .await?;
 
     // wait for syncing.
@@ -419,14 +413,14 @@ async fn test_afc() -> Result<()> {
     let afc_id1 = team
         .membera
         .client
-        .create_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
     // membera creates bidi channel with memberb
     let afc_id2 = team
         .membera
         .client
-        .create_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
+        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
         .await?;
 
     // wait for ctrl message to be sent.
@@ -470,7 +464,7 @@ async fn test_afc() -> Result<()> {
     debug!("polling to recv data msg");
     team.memberb.client.poll().await?;
 
-    let (data, _addr, _afc_id, label) = team.memberb.client.recv_data().await?;
+    let AfcMsg { data, label, .. } = team.memberb.client.recv_data().await?;
     debug!(
         n = data.len(),
         ?label,
@@ -478,7 +472,7 @@ async fn test_afc() -> Result<()> {
         str::from_utf8(&data)?
     );
 
-    let (data, _addr, _afc_id, label) = team.memberb.client.recv_data().await?;
+    let AfcMsg { data, label, .. } = team.memberb.client.recv_data().await?;
     debug!(
         n = data.len(),
         ?label,

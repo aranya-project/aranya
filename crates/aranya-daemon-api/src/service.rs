@@ -82,6 +82,7 @@ const AFC_ID_LEN: usize = 16;
 /// [`AfcId`] is a [`BidiChannelId`] or [`UniChannelId`]
 /// truncated from 512 bits down to 128 bits.
 /// It uniquely identifies an Aranya fast channel.
+#[repr(transparent)]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
 pub struct AfcId {
     id: [u8; AFC_ID_LEN],
@@ -124,9 +125,6 @@ pub type AfcCtrl = Vec<Box<[u8]>>;
 
 #[tarpc::service]
 pub trait DaemonApi {
-    /// Initialize the API.
-    async fn initialize() -> Result<()>;
-
     /// Gets local address the Aranya sync server is bound to.
     async fn aranya_local_addr() -> Result<SocketAddr>;
 
@@ -164,9 +162,17 @@ pub trait DaemonApi {
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
     /// Assign a network identifier to a device.
-    async fn assign_net_name(team: TeamId, device: DeviceId, name: NetIdentifier) -> Result<()>;
+    async fn assign_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
     /// Remove a network identifier from a device.
-    async fn remove_net_name(team: TeamId, device: DeviceId, name: NetIdentifier) -> Result<()>;
+    async fn remove_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
 
     /// Create a fast channels label.
     async fn create_label(team: TeamId, label: Label) -> Result<()>;
@@ -178,7 +184,7 @@ pub trait DaemonApi {
     /// Revoke a fast channels label from a device.
     async fn revoke_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
     /// Create a fast channel.
-    async fn create_channel(
+    async fn create_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,

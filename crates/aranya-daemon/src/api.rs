@@ -288,12 +288,6 @@ impl DaemonApiHandler {
 
 impl DaemonApi for DaemonApiHandler {
     #[instrument(skip(self))]
-    async fn initialize(self, _: context::Context) -> ApiResult<()> {
-        info!("initialize");
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
     async fn aranya_local_addr(self, context: ::tarpc::context::Context) -> ApiResult<SocketAddr> {
         Ok(self.local_addr)
     }
@@ -418,7 +412,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn assign_net_name(
+    async fn assign_net_identifier(
         self,
         _: context::Context,
         team: TeamId,
@@ -435,7 +429,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn remove_net_name(
+    async fn remove_net_identifier(
         self,
         _: context::Context,
         team: TeamId,
@@ -500,7 +494,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip_all)]
-    async fn create_channel(
+    async fn create_bidi_channel(
         self,
         _: context::Context,
         team: TeamId,
@@ -508,7 +502,7 @@ impl DaemonApi for DaemonApiHandler {
         node_id: NodeId,
         label: Label,
     ) -> ApiResult<(AfcId, AfcCtrl)> {
-        info!("create_channel");
+        info!("create_bidi_channel");
 
         let peer_id = self
             .afc_peers

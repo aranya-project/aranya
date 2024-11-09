@@ -16,6 +16,6 @@ mod client;
 mod error;
 
 pub use crate::{
-    client::{Client, PollData, Team},
+    client::{AfcMsg, Client, PollData, Team},
     error::{Error, Result},
 };

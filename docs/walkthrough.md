@@ -390,8 +390,8 @@ translate between network names and users.
 let member_a_net_id = "127.0.0.1:8084";
 let member_b_net_id = "127.0.0.1:8085";
 
-operator_client.assign_net_name(member_a_device_id, member_a_net_id)?;
-operator_client.assign_net_name(member_b_device_id, member_b_net_id)?;
+operator_client.assign_net_identifier(member_a_device_id, member_a_net_id)?;
+operator_client.assign_net_identifier(member_b_device_id, member_b_net_id)?;
 ```
 
 # <a name="message-sending"></a>Message sending
@@ -459,7 +459,7 @@ Note: An ephemeral command is processed by Aranya but not added to the graph.
 Now, `Member A` or `Member B` could create a Fast Channel.
 
 ```rust
-let channel_id = member_a_client.create_channel(team_id, member_b_net_id, label_num)?;
+let channel_id = member_a_client.create_bidi_channel(team_id, member_b_net_id, label_num)?;
 ```
 
 The client library and daemon will handle the required communication to

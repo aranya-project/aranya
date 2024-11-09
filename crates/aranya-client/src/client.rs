@@ -36,6 +36,18 @@ pub struct Client {
     chans: BTreeMap<AfcId, (TeamId, NetIdentifier, Label)>,
 }
 
+/// An Aranya Fast Channel message.
+pub struct AfcMsg {
+    /// The plaintext data.
+    pub data: Vec<u8>,
+    /// The address from which the message was received.
+    pub addr: SocketAddr,
+    /// The channel from which the message was received.
+    pub channel: AfcId,
+    /// The Aranya Fast Channel label associated with the message.
+    pub label: Label,
+}
+
 impl Client {
     /// Creates a client connected to the daemon.
     #[instrument(skip_all)]
@@ -82,7 +94,7 @@ impl Client {
     /// The channel is created using a specific label which means both peers must already have permission to use that label.
     /// During setup, an encrypted `ctrl` message is sent to the peer containing effects required to initialize the channel keys.
     /// When the peer receives the `ctrl` effects, it is able to configure a corresponding set of channel keys in order to perform `open`/`seal` operations for the channel.
-    pub async fn create_channel(
+    pub async fn create_bidi_channel(
         &mut self,
         team: TeamId,
         peer: NetIdentifier,
@@ -92,10 +104,10 @@ impl Client {
         let node_id = self.afc.get_next_node_id().await?;
         let (afc_id, ctrl) = self
             .daemon
-            .create_channel(context::current(), team, peer.clone(), node_id, label)
+            .create_bidi_channel(context::current(), team, peer.clone(), node_id, label)
             .await??;
         debug!("creating AFC channel in AFC");
-        // TODO: use existing mapping from `assign_net_name`
+        // TODO: use existing mapping from `assign_net_identifier`
         let addr = Addr::from_str(&peer.0)
             .map_err(|_| Error::AfcRouter(crate::afc::AfcRouterError::AppWrite))?;
         let addr = addr
@@ -175,21 +187,19 @@ impl Client {
 
     /// Receive data from an Aranya Fast Channel.
     // TODO: return [`NetIdentifier`] instead of [`SocketAddr`].
-    pub async fn recv_data(&mut self) -> Result<(Vec<u8>, SocketAddr, AfcId, Label)> {
+    pub async fn recv_data(&mut self) -> Result<AfcMsg> {
         let (plaintext, addr, afc_id, label) = self.app.recv().await.map_err(Error::AfcRouter)?;
         debug!(n = plaintext.len(), "received AFC data message");
-        Ok((plaintext, addr, afc_id, label))
+        Ok(AfcMsg {
+            data: plaintext,
+            addr,
+            channel: afc_id,
+            label,
+        })
     }
 }
 
 impl Client {
-    /// Initializes the device if it doesn't exist.
-    ///
-    /// Creates directories, keys, etc.
-    pub async fn initialize(&mut self) -> Result<()> {
-        Ok(self.daemon.initialize(context::current()).await??)
-    }
-
     /// Gets the public key bundle for this device.
     pub async fn get_key_bundle(&mut self) -> Result<KeyBundle> {
         Ok(self.daemon.get_key_bundle(context::current()).await??)
@@ -305,7 +315,7 @@ impl Team<'_> {
     /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
-    pub async fn assign_net_name(
+    pub async fn assign_net_identifier(
         &mut self,
         device: DeviceId,
         net_identifier: NetIdentifier,
@@ -313,12 +323,12 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .assign_net_name(context::current(), self.id, device, net_identifier)
+            .assign_net_identifier(context::current(), self.id, device, net_identifier)
             .await??)
     }
 
     /// Disassociate a network identifier from a device.
-    pub async fn remove_net_name(
+    pub async fn remove_net_identifier(
         &mut self,
         device: DeviceId,
         net_identifier: NetIdentifier,
@@ -326,7 +336,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .remove_net_name(context::current(), self.id, device, net_identifier)
+            .remove_net_identifier(context::current(), self.id, device, net_identifier)
             .await??)
     }
 

@@ -116,6 +116,9 @@ exceptions = [
     { allow = ["AGPL-3.0"], crate = "aranya-afc-util" },
     { allow = ["AGPL-3.0"], crate = "aranya-base58" },
     { allow = ["AGPL-3.0"], crate = "aranya-buggy" },
+    { allow = ["AGPL-3.0"], crate = "aranya-capi-codegen" },
+    { allow = ["AGPL-3.0"], crate = "aranya-capi-core" },
+    { allow = ["AGPL-3.0"], crate = "aranya-capi-macro" },
     { allow = ["AGPL-3.0"], crate = "aranya-crypto" },
     { allow = ["AGPL-3.0"], crate = "aranya-crypto-derive" },
     { allow = ["AGPL-3.0"], crate = "aranya-crypto-ffi" },
@@ -123,6 +126,7 @@ exceptions = [
     { allow = ["AGPL-3.0"], crate = "aranya-envelope-ffi" },
     { allow = ["AGPL-3.0"], crate = "aranya-fast-channels" },
     { allow = ["AGPL-3.0"], crate = "aranya-idam-ffi" },
+    { allow = ["AGPL-3.0"], crate = "aranya-libc" },
     { allow = ["AGPL-3.0"], crate = "aranya-perspective-ffi" },
     { allow = ["AGPL-3.0"], crate = "aranya-policy-ast" },
     { allow = ["AGPL-3.0"], crate = "aranya-policy-compiler" },
@@ -272,9 +276,7 @@ unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 # List of URLs for allowed Git repositories
 allow-git = []
-private = [
-    "https://github.com/aranya-project/",
-]
+private = []
 
 [sources.allow-org]
 # 1 or more github.com organizations to allow git sources for

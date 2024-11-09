@@ -5,10 +5,6 @@ pub enum Error {
     #[error("could not connect to daemon: {0}")]
     Connecting(#[source] std::io::Error),
 
-    /// Buffer not large enough.
-    #[error("buffer not large enough")]
-    BuffSize,
-
     /// Aranya Fast Channels router error.
     #[error("afc router error: {0}")]
     AfcRouter(#[from] crate::afc::AfcRouterError),
