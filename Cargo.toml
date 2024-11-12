@@ -52,9 +52,9 @@ aranya-policy-lang = { version = "0.1.0" }
 aranya-policy-vm = { version = "0.1.0", features = ["std"] }
 aranya-runtime = { version = "0.1.0", features = ["std", "libc"] }
 
-aranya-client = { version = "0.1.0", path = "crates/aranya-client" }
-aranya-daemon = { version = "0.1.0", path = "crates/aranya-daemon" }
-aranya-daemon-api = { version = "0.1.0", path = "crates/aranya-daemon-api" }
+aranya-client = { version = "0.2.0", path = "crates/aranya-client" }
+aranya-daemon = { version = "0.2.0", path = "crates/aranya-daemon" }
+aranya-daemon-api = { version = "0.2.0", path = "crates/aranya-daemon-api" }
 aranya-keygen = { version = "0.1.0", path = "crates/aranya-keygen" }
 aranya-util = { version = "0.1.0", path = "crates/aranya-util" }
 
@@ -66,10 +66,10 @@ postcard = { version = "1", default-features = false, features = ["use-std", "he
 pretty_assertions = { version = "1.4" }
 serde = "1"
 serial_test = { version = "3" }
-tarpc = { version = "0.34.0", features = ["unix", "serde-transport", "serde-transport-json"] }
+tarpc = { version = "0.35.0", features = ["unix", "serde-transport", "serde-transport-json"] }
 tempfile = { version = "3.6.0" }
 test-log = { version = "0.2.14", default-features = false, features = ["trace"] }
-thiserror = { version = "1.0" }
+thiserror = { version = "2.0" }
 tokio = { version = "1.40" }
 tokio-util = { version = "0.7.12" }
 tracing = { version = "0.1.40" }

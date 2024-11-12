@@ -241,11 +241,11 @@ deny = [
 # Certain crates/versions that will be skipped when doing duplicate detection.
 skip = [
     "generic-array@0.14.7",
-    "hashbrown@0.12.3",
-    "indexmap@1.9.3",
     "regex-automata@0.1.10",
     "regex-syntax@0.6.29",
     "syn@1.0.109",
+    "thiserror-impl@1.0.69",
+    "thiserror@1.0.69",
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive
