@@ -1,15 +1,18 @@
-**ARANYA OVERVIEW**
+# ARANYA OVERVIEW
 
-Table of Contents
+**Table of Contents**
 
+- [ARANYA OVERVIEW](#aranya-overview)
 - [What is Aranya?](#what-is-aranya)
 - [What can I use Aranya for?](#what-can-i-use-aranya-for)
     - [Terminology](#terminology)
     - [Capabilities](#capabilities)
 - [Aranya Platform](#aranya-platform)
   - [Deployment Ecosystem](#deployment-ecosystem)
+    - [Designed for Embedded Device Support](#designed-for-embedded-device-support)
+    - [Supported Platforms](#supported-platforms)
 - [Aranya Architecture](#aranya-architecture)
-  - [Overview](#overview)
+  - [Technical Overview](#technical-overview)
   - [Control Plane vs. Data Plane](#control-plane-vs-data-plane)
     - [Control Plane](#control-plane)
     - [Data Plane](#data-plane)
@@ -116,7 +119,7 @@ As Aranya provides both access governance and secure data exchange, it analogous
 
 **Data Plane:** Similarly, Aranya defines the data plane as what provides the primary function for the data to _securely exchange and encrypt that data end-to-end between two connected peer nodes_. The data plane is also subject to the permission system specified by the underlying policy; messages can only be sent/received by peers that have been given the appropriate credentials (e.g., cryptographic keys), which can typically require some set of permissions be explicitly granted first. For example, **the Aranya Fast Channels (AFC) feature (see off-graph components below)** enables an endpoint to send encrypted data to another endpoint as long as both endpoints are assigned to the same attribute, called "label", which is managed by the policy. 
 
-## Overview
+## Technical Overview
 
 The components of Aranya come together to enable the control plane and data plane as needed, with the help of a built-in daemon, according to the underlying policy. For instance, the control plane needs a mechanism for tracking different access control operations so that it can determine how newly received operations should be executed. For this, Aranya includes a Directed Acyclic Graph (DAG) which stores policy commands at its nodes, in an immutable and verifiable format, and a Fact Database (FactDB) that keeps key-value pairs of information regarding the executed operations. These components make up the storage module that the control plane relies on for keeping track of previous executions, representing its current state, and assessing the authorization of new executions.  
 

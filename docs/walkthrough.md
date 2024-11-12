@@ -23,7 +23,7 @@ to each other using Aranya Fast Channels. There are a few things to keep in mind
 
 See the [examples](../examples) directory for example applications that
 follow scenarios similar to the one described in this document. Also, see the
-[technical documentation](tech-docs.md) for more details on the components
+[overview documentation](overview.md) for more details on the components
 used in this walkthrough.
 
 # Outline
