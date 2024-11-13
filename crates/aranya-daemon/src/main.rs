@@ -31,13 +31,15 @@ fn main() -> Result<()> {
         )
         .init();
 
+    info!("starting Aranya daemon");
+
     let pid = PidFile::create(&cfg.pid_file).context("unable to create PID file")?;
     info!(name = cfg.name, "wrote PID file to {pid}");
 
     let rt = Runtime::new()?;
     rt.block_on(async {
         let daemon = Daemon::load(cfg).await.context("unable to load daemon")?;
-        info!("loaded daemon");
+        info!("loaded Aranya daemon");
         daemon.run().await
     })
     .inspect_err(|err| error!(err = ?err))

@@ -57,6 +57,7 @@ impl Client {
         max_chans: usize,
         afc_addr: Addr,
     ) -> Result<Self> {
+        info!("starting Aranya client");
         info!("uds path: {:?}", daemon_sock);
         let transport = tarpc::serde_transport::unix::connect(daemon_sock, Json::default)
             .await
