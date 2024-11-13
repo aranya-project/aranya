@@ -26,6 +26,29 @@ concurrency:
 
 jobs:
   fmt:
+    # TODO: rm conditional after transitioning to github.com
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://github.com/aranya-project/aranya"
+    strategy:
+      matrix:
+        runner: ["ubuntu-latest"]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./.github/actions/setup
+        with:
+          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
+          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
+          runner: ${{ matrix.runner }}
+
+      - name: Check formatting
+        run: cargo make check-fmt
+
+  # TODO: rm job after transitioning to github.com
+  ghe-fmt:
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://git.spideroak-inc.com/spideroak-inc/aranya"
     strategy:
       matrix:
         runner: ["self-hosted-linux-amd64"]
@@ -43,6 +66,29 @@ jobs:
         run: cargo make check-fmt
 
   clippy:
+    # TODO: rm conditional after transitioning to github.com
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://github.com/aranya-project/aranya"
+    strategy:
+      matrix:
+        runner: ["ubuntu-latest"]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./.github/actions/setup
+        with:
+          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
+          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
+          runner: ${{ matrix.runner }}
+
+      - name: Run clippy
+        run: cargo make clippy
+
+  # TODO: rm job after transitioning to github.com
+  ghe-clippy:
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://git.spideroak-inc.com/spideroak-inc/aranya"
     strategy:
       matrix:
         runner: ["self-hosted-linux-amd64"]
@@ -60,6 +106,29 @@ jobs:
         run: cargo make clippy
 
   machete:
+    # TODO: rm conditional after transitioning to github.com
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://github.com/aranya-project/aranya"
+    strategy:
+      matrix:
+        runner: ["ubuntu-latest"]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./.github/actions/setup
+        with:
+          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
+          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
+          runner: ${{ matrix.runner }}
+
+      - name: Check dependency usage
+        run: cargo make machete
+
+  # TODO: rm job after transitioning to github.com
+  ghe-machete:
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://git.spideroak-inc.com/spideroak-inc/aranya"
     strategy:
       matrix:
         runner: ["self-hosted-linux-amd64"]
@@ -77,6 +146,30 @@ jobs:
         run: cargo make machete
 
   check:
+    # TODO: rm conditional after transitioning to github.com
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://github.com/aranya-project/aranya"
+    strategy:
+      matrix:
+        runner: ["ubuntu-latest"]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
+          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
+          runner: ${{ matrix.runner }}
+
+      - name: Check Features
+        run: cargo make check-features
+
+  # TODO: rm job after transitioning to github.com
+  ghe-check:
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://git.spideroak-inc.com/spideroak-inc/aranya"
     strategy:
       matrix:
         runner:

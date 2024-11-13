@@ -26,6 +26,44 @@ concurrency:
 
 jobs:
   doc:
+    # TODO: rm conditional after transitioning to github.com
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://github.com/aranya-project/aranya"
+    strategy:
+      matrix:
+        runner: ["ubuntu-latest"]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./.github/actions/setup
+        with:
+          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
+          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
+          runner: ${{ matrix.runner }}
+
+      - name: Generate docs
+        env:
+          RUSTDOCFLAGS: "-Dwarnings"
+        run: |
+          if ! command -v zip; then
+            sudo apt-get install -y zip \
+            --no-install-recommends
+          fi
+          cargo make gen-docs-nightly
+          cargo make zip-docs
+
+      - name: Publish docs
+        uses: actions/upload-artifact@v3
+        with:
+          name: docs
+          path: docs.zip
+          if-no-files-found: error
+
+  # TODO: rm job after transitioning to github.com
+  ghe-doc:
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://git.spideroak-inc.com/spideroak-inc/aranya"
     strategy:
       matrix:
         runner: ["self-hosted-linux-amd64"]

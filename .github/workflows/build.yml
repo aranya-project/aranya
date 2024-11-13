@@ -26,11 +26,42 @@ concurrency:
 
 jobs:
   build-release:
+    # TODO: rm conditional after transitioning to github.com
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://github.com/aranya-project/aranya"
+    strategy:
+      matrix:
+        runner: ["ubuntu-latest"]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: ./.github/actions/setup
+        with:
+          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
+          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
+          runner: ${{ matrix.runner }}
+
+      - name: Build code
+        run: cargo make build-code
+
+      - name: Verify build didn't change any checked-in files
+        run: cargo make git-unchanged
+
+      - name: Publish daemon
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.runner }}-daemon
+          path: target/release/daemon
+          if-no-files-found: error
+
+  # TODO: rm job after transitioning to github.com
+  ghe-build-release:
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://git.spideroak-inc.com/spideroak-inc/aranya"
     strategy:
       matrix:
         runner:
-          # TODO(eric): re-enable after we get macOS runners.
-          # - "macos-latest"
           - "self-hosted-linux-arm"
           - "self-hosted-linux-arm64"
           - "self-hosted-linux-amd64"
@@ -58,6 +89,40 @@ jobs:
           if-no-files-found: error
 
   build-aranya-lib:
+    # TODO: rm conditional after transitioning to github.com
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://github.com/aranya-project/aranya"
+    strategy:
+      matrix:
+        runner: ["ubuntu-latest"]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+        with:
+          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
+          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
+          runner: ${{ matrix.runner }}
+
+      - name: Build Aranya Shared Library
+        run: |
+          cargo make build-capi-lib
+          cargo make build-capi-header
+          cargo make zip-capi
+
+      - name: Publish aranya lib
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.runner }}-aranya-capi
+          path: aranya-capi
+          if-no-files-found: error
+
+  # TODO: rm job after transitioning to github.com
+  ghe-build-aranya-lib:
+    # Note: github actions don't support using env vars in the job conditional
+    if: ${{ github.server_url }}/${{ github.repository }} == "https://git.spideroak-inc.com/spideroak-inc/aranya"
     strategy:
       matrix:
         runner:
