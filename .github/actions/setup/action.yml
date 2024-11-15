@@ -84,7 +84,7 @@ runs:
         zip --version
 
     - name: Install sccache
-      uses: spideroak-inc/sccache-action@main
+      uses: aranya-project/sccache-action@main
       with:
         version: "v0.7.7"
 
