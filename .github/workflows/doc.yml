@@ -28,7 +28,14 @@ jobs:
   doc:
     strategy:
       matrix:
-        runner: ["self-hosted-linux-amd64"]
+        runner: >-
+          ${{ fromJson(
+            github.server_url == 'https://github.com' && '[
+              "ubuntu-latest",
+            ]' || '[
+              "self-hosted-linux-amd64",
+            ]'
+          ) }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3

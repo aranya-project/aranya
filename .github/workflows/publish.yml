@@ -20,7 +20,14 @@ jobs:
   release:
     strategy:
       matrix:
-        runner: ["self-hosted-linux-amd64"]
+        runner: >-
+          ${{ fromJson(
+            github.server_url == 'https://github.com' && '[
+              "ubuntu-latest",
+            ]' || '[
+              "self-hosted-linux-amd64",
+            ]'
+          ) }}
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Create Release
@@ -48,7 +55,14 @@ jobs:
       - build
     strategy:
       matrix:
-        runner: ["self-hosted-linux-amd64"]
+        runner: >-
+          ${{ fromJson(
+            github.server_url == 'https://github.com' && '[
+              "ubuntu-latest",
+            ]' || '[
+              "self-hosted-linux-amd64",
+            ]'
+          ) }}
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Download doc artifacts
