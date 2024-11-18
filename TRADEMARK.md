@@ -1,4 +1,4 @@
-![alt text](SpiderOak.png "SpiderOak Logo")
+![alt text](images/SpiderOak.png "SpiderOak Logo")
 
 # Trademark Guidelines
 Version 1.0 dated 4 Oct 2024.
@@ -9,7 +9,7 @@ While some of our software is available under a free and open source software li
 This Policy covers:
 1. Our word trademarks and service marks: SpiderOak, Aranya 
 2. Our logos: The COMPANY logo at the top of this policy and the following:
-![alt text](SpiderOak2.png "SpiderOak Logo 2")
+![alt text](images/SpiderOak2.png "SpiderOak Logo 2")
 
 This policy encompasses all trademarks and service marks, whether they are registered or not.
 
