@@ -89,12 +89,6 @@ runs:
       with:
         version: "v0.7.7"
 
-    - name: Install sccache
-      if: github.server_url != 'https://github.com'
-      uses: spideroak-inc/sccache-action@main
-      with:
-        version: "v0.7.7"
-
     - name: Configure sccache
       run: |
         echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV

@@ -28,14 +28,7 @@ jobs:
   security-checks:
     strategy:
       matrix:
-        runner: >-
-          ${{ fromJson(
-            github.server_url == 'https://github.com' && '[
-              "ubuntu-latest",
-            ]' || '[
-              "self-hosted-linux-amd64",
-            ]'
-          ) }}
+        runner: [ "ubuntu-latest" ]
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3

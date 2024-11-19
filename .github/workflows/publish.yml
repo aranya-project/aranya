@@ -20,23 +20,12 @@ jobs:
   release:
     strategy:
       matrix:
-        runner: >-
-          ${{ fromJson(
-            github.server_url == 'https://github.com' && '[
-              "ubuntu-latest",
-            ]' || '[
-              "self-hosted-linux-amd64",
-            ]'
-          ) }}
+        runner: [ "ubuntu-latest" ]
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Create Release
         id: release
-        uses: >-
-          ${{ fromJson(
-            github.server_url == 'https://github.com' && 'aranya-project/release-action@v1.12.0
-            ' || 'spideroak-inc/release-action@v1.12.0'
-          ) }}
+        uses: aranya-project/release-action@v1.12.0
         with:
           allowUpdates: true
           prerelease: false
@@ -59,14 +48,7 @@ jobs:
       - build
     strategy:
       matrix:
-        runner: >-
-          ${{ fromJson(
-            github.server_url == 'https://github.com' && '[
-              "ubuntu-latest",
-            ]' || '[
-              "self-hosted-linux-amd64",
-            ]'
-          ) }}
+        runner: [ "ubuntu-latest" ]
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Download doc artifacts
