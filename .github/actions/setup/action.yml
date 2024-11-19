@@ -84,7 +84,6 @@ runs:
         zip --version
 
     - name: Install sccache
-      if: github.server_url == 'https://github.com'
       uses: aranya-project/sccache-action@main
       with:
         version: "v0.7.7"
