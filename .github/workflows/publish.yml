@@ -32,7 +32,10 @@ jobs:
     steps:
       - name: Create Release
         id: release
-        uses: aranya-project/release-action@v1.12.0
+        uses: >-
+          ${{ fromJson(
+            github.server_url == 'https://github.com' && 'aranya-project/release-action@v1.12.0
+            ' || 'spideroak-inc/release-action@v1.12.0'
         with:
           allowUpdates: true
           prerelease: false

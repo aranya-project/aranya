@@ -6,7 +6,7 @@ inputs:
     description: "github.com Access Token"
     required: true
   ghe-token:
-    description: "git.aranya-project.com Access Token"
+    description: "git.spideroak-inc.com Access Token"
     required: true
   runner:
     description: "OS being used (e.g., macos-latest)"
@@ -22,7 +22,7 @@ runs:
 
     - name: Set up git
       run: |
-        git config --global --replace-all url."https://${{ inputs.ghe-token }}@git.aranya-project.com/".insteadOf 'https://git.aranya-project.com/'
+        git config --global --replace-all url."https://${{ inputs.ghe-token }}@git.spideroak-inc.com/".insteadOf 'https://git.spideroak-inc.com/'
         git config --global --replace-all url."https://${{ inputs.gh-token }}@github.com/".insteadOf 'https://github.com/'
         echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $GITHUB_ENV
       shell: bash
@@ -84,7 +84,14 @@ runs:
         zip --version
 
     - name: Install sccache
+      if: github.server_url == 'https://github.com'
       uses: aranya-project/sccache-action@main
+      with:
+        version: "v0.7.7"
+
+    - name: Install sccache
+      if: github.server_url != 'https://github.com'
+      uses: spideroak-inc/sccache-action@main
       with:
         version: "v0.7.7"
 
