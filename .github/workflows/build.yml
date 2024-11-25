@@ -37,9 +37,7 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Build code
         run: cargo make build-code
@@ -67,9 +65,7 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
         with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Build Aranya Shared Library
         run: |

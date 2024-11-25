@@ -38,9 +38,7 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
         with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Unit Tests
         run: cargo make unit-tests
@@ -59,9 +57,7 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
         with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: C Example Application
         run: |

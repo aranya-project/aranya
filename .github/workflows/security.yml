@@ -26,18 +26,13 @@ concurrency:
 
 jobs:
   security-checks:
-    strategy:
-      matrix:
-        runner: [ "ubuntu-latest" ]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
         with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Run cargo audit
         # TODO: https://github.com/rustsec/rustsec/issues/1217

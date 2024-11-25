@@ -26,27 +26,24 @@ concurrency:
 
 jobs:
   doc:
-    strategy:
-      matrix:
-        runner: [ "ubuntu-latest" ]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
         with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
+
+      - name: Install doxygen
+        run: |
+          sudo apt-get install -y doxygen \
+              --no-install-recommends
+          doxygen --version
 
       - name: Generate docs
         env:
           RUSTDOCFLAGS: "-Dwarnings"
         run: |
-          if ! command -v zip; then
-            sudo apt-get install -y zip \
-            --no-install-recommends
-          fi
           cargo make gen-docs-nightly
           cargo make zip-docs
 

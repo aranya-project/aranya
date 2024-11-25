@@ -26,52 +26,37 @@ concurrency:
 
 jobs:
   fmt:
-    strategy:
-      matrix:
-        runner: [ "ubuntu-latest" ]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
         with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Check formatting
         run: cargo make check-fmt
 
   clippy:
-    strategy:
-      matrix:
-        runner: [ "ubuntu-latest" ]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
         with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Run clippy
         run: cargo make clippy
 
   machete:
-    strategy:
-      matrix:
-        runner: [ "ubuntu-latest" ]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
         with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Check dependency usage
         run: cargo make machete
@@ -89,9 +74,7 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
         with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Check Features
         run: cargo make check-features

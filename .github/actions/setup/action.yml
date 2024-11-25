@@ -5,83 +5,24 @@ inputs:
   gh-token:
     description: "github.com Access Token"
     required: true
-  ghe-token:
-    description: "git.spideroak-inc.com Access Token"
-    required: true
-  runner:
-    description: "OS being used (e.g., macos-latest)"
-    required: true
 
 runs:
   using: "composite"
   steps:
-    # Our runners don't get wiped between runs :/
-    - name: nuke old .gitconfig
-      run: rm ~/.gitconfig || true
-      shell: bash
-
     - name: Set up git
       run: |
-        git config --global --replace-all url."https://${{ inputs.ghe-token }}@git.spideroak-inc.com/".insteadOf 'https://git.spideroak-inc.com/'
         git config --global --replace-all url."https://${{ inputs.gh-token }}@github.com/".insteadOf 'https://github.com/'
         echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> $GITHUB_ENV
       shell: bash
 
-    - name: Install Rust
-      run: |
-        cat<<EOF>>rustup.sh.sha256
-        32a680a84cf76014915b3f8aa44e3e40731f3af92cd45eb0fcc6264fd257c428  rustup.sh
-        EOF
-        wget 'https://sh.rustup.rs' -O rustup.sh
-        shasum -c rustup.sh.sha256
-        chmod +x ./rustup.sh
-        ./rustup.sh -y --default-toolchain none
-        source "$HOME/.cargo/env"
-        echo "${HOME}/.cargo/bin" >> $GITHUB_PATH
-      shell: bash
-
-    # Various runners have a 64-bit kernel with a 32-bit userspace.
-    # Setting rustup's default host to armv7 allows using the 32-bit executables.
-    - name: Set rustup's host
-      run: |
-        rustup set default-host armv7-unknown-linux-gnueabihf
-        rustup show active-toolchain
-      shell: bash
-      if: ${{ inputs.runner == 'self-hosted-linux-arm' }}
-
-    - name: cargo version
+    - name: Version info
       shell: bash
       run: |
-        file cargo
         cargo --version --verbose
-
-    - name: glibc version
-      shell: bash
-      run: ldd --version
-      if: ${{ inputs.runner == 'self-hosted-linux-arm' }}
-
-    - name: compiler version
-      shell: bash
-      run: |
-        sudo apt-get install -y clang \
-            --no-install-recommends
+        ldd --version
         clang --version
         gcc --version
         cmake --version
-
-    - name: doxygen
-      shell: bash
-      run: |
-        sudo apt-get install -y doxygen \
-            --no-install-recommends
-        doxygen --version
-
-    - name: zip
-      shell: bash
-      run: |
-        sudo apt-get install -y zip \
-            --no-install-recommends
-        zip --version
 
     - name: Install sccache
       uses: aranya-project/sccache-action@main

@@ -18,10 +18,7 @@ on:
 
 jobs:
   release:
-    strategy:
-      matrix:
-        runner: [ "ubuntu-latest" ]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - name: Create Release
         id: release
@@ -46,10 +43,7 @@ jobs:
     needs:
       - release
       - build
-    strategy:
-      matrix:
-        runner: [ "ubuntu-latest" ]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - name: Download doc artifacts
         uses: actions/download-artifact@v4
