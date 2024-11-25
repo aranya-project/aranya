@@ -136,6 +136,7 @@ toolchain = "${NIGHTLY}"
 command = "cargo"
 args = ["fmt", "--all"]
 dependencies = ["install-nightly"]
+install_crate = { rustup_component_name = "rustfmt", binary = "rustfmt", test_arg = "-V" }
 
 [tasks.check-fmt-toml]
 category = "correctness"
@@ -226,4 +227,4 @@ category = "examples"
 description = "Run C example application"
 cwd = "examples/c"
 script = "./run.bash"
-dependencies = ["build-capi", "install-cbindgen"]
+dependencies = ["build-capi-header", "build-capi-lib"]
