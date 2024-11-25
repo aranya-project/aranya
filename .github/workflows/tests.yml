@@ -33,7 +33,7 @@ jobs:
           - ubuntu2404-arm64-4core
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Environment
         uses: ./.github/actions/setup
@@ -54,7 +54,7 @@ jobs:
           - ubuntu2404-arm64-4core
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Environment
         uses: ./.github/actions/setup

@@ -33,7 +33,7 @@ jobs:
           - ubuntu2404-arm64-4core
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
         with:
@@ -48,7 +48,7 @@ jobs:
         run: cargo make git-unchanged
 
       - name: Publish daemon
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.runner }}-daemon
           path: target/release/daemon
@@ -62,7 +62,7 @@ jobs:
           - ubuntu2404-arm64-4core
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Environment
         uses: ./.github/actions/setup
@@ -78,7 +78,7 @@ jobs:
           cargo make zip-capi
 
       - name: Publish aranya lib
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.runner }}-aranya-capi
           path: aranya-capi
