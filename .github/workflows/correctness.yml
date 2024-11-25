@@ -79,7 +79,9 @@ jobs:
   check:
     strategy:
       matrix:
-        runner: [ "ubuntu-latest" ]
+        runner:
+          - ubuntu-latest
+          - ubuntu2404-arm64-4core
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
