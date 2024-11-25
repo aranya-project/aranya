@@ -37,8 +37,6 @@ jobs:
 
       - name: Setup Environment
         uses: ./.github/actions/setup
-        with:
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
 
       - name: Unit Tests
         run: cargo make unit-tests
@@ -56,8 +54,6 @@ jobs:
 
       - name: Setup Environment
         uses: ./.github/actions/setup
-        with:
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
 
       - name: C Example Application
         run: |

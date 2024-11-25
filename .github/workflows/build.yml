@@ -36,8 +36,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
-        with:
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
 
       - name: Build code
         run: cargo make build-code
@@ -64,8 +62,6 @@ jobs:
 
       - name: Setup Environment
         uses: ./.github/actions/setup
-        with:
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
 
       - name: Build Aranya Shared Library
         run: |

@@ -31,8 +31,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
-        with:
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
 
       - name: Run cargo audit
         # TODO: https://github.com/rustsec/rustsec/issues/1217

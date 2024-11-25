@@ -31,8 +31,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
-        with:
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
 
       - name: Check formatting
         run: cargo make check-fmt
@@ -43,8 +41,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
-        with:
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
 
       - name: Run clippy
         run: cargo make clippy
@@ -55,8 +51,6 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
-        with:
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
 
       - name: Check dependency usage
         run: cargo make machete
@@ -73,8 +67,6 @@ jobs:
 
       - name: Setup Environment
         uses: ./.github/actions/setup
-        with:
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
 
       - name: Check Features
         run: cargo make check-features
