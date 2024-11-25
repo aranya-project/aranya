@@ -136,7 +136,6 @@ toolchain = "${NIGHTLY}"
 command = "cargo"
 args = ["fmt", "--all"]
 dependencies = ["install-nightly"]
-install_crate = { rustup_component_name = "rustfmt", binary = "rustfmt", test_arg = "-V" }
 
 [tasks.check-fmt-toml]
 category = "correctness"
@@ -201,7 +200,7 @@ script = "zip -qr docs.zip target/doc"
 description = "Install nightly rust"
 # First check if the toolchain is installed, because that is much faster.
 # Don't do this if you want to keep a rolling channel up-to-date.
-script = "rustup run ${NIGHTLY} true 2>/dev/null || rustup toolchain install ${NIGHTLY}"
+script = "rustup run ${NIGHTLY} true 2>/dev/null || rustup toolchain install ${NIGHTLY} --profile minimal -c rustfmt"
 
 [tasks.git-unchanged]
 description = "Verify files are unchanged"
