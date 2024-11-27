@@ -168,7 +168,7 @@ impl Syncer {
         }
     }
 
-    #[instrument(skip_all, fields(%peer, graph_id = %id))]
+    #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
     async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
         info!("syncing with peer");
 
@@ -177,8 +177,8 @@ impl Syncer {
             self.client
                 .sync_peer(*id, &mut sink, peer)
                 .await
-                .inspect_err(|err| error!(?err, ?peer, "unable to sync with peer"))
-                .context("unable to sync with peer")?;
+                .context("sync_peer error")
+                .inspect_err(|err| error!("{err:?}"))?;
             sink.collect()?
         };
         let n = effects.len();
