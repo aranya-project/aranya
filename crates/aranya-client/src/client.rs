@@ -145,6 +145,7 @@ impl Client {
     pub async fn poll_data(&mut self) -> Result<PollData> {
         #![allow(clippy::disallowed_macros)]
         let data = tokio::select! {
+            biased;
             result = self.app.recv_ctrl() => result?,
             result = self.afc.poll() => result?,
         };
@@ -157,12 +158,13 @@ impl Client {
             DataType::Ctrl(ctrl) => {
                 debug!("client lib received AFC ctrl msg");
                 let node_id = ctrl.node_id;
-                let (afc_id, label) = self
+                let (afc_id, net, label) = self
                     .daemon
                     .receive_afc_ctrl(context::current(), ctrl.team_id, node_id, ctrl.afc_ctrl)
                     .await??;
                 let channel_id = ChannelId::new(node_id, label);
                 self.afc.insert_channel_id(afc_id, channel_id).await?;
+                self.chans.insert(afc_id, (ctrl.team_id, net, label));
             }
             _ => {
                 self.afc.handle_data(data.0).await?;
@@ -173,16 +175,18 @@ impl Client {
 
     /// Send data via a specific Aranya Fast Channel.
     pub async fn send_data(&mut self, chan: AfcId, data: Vec<u8>) -> Result<()> {
-        if let Some((_team_id, peer, label)) = self.chans.get(&chan) {
-            let addr = Addr::from_str(&peer.0).map_err(|_| crate::afc::AfcRouterError::AppWrite)?;
-            let addr = addr
-                .lookup()
-                .await
-                .map_err(|_| crate::afc::AfcRouterError::AppWrite)?;
-            self.app
-                .send_data(SocketAddr::V4(addr), *label, chan, data)
-                .await?;
-        }
+        let (_team_id, peer, label) = self
+            .chans
+            .get(&chan)
+            .ok_or(crate::afc::AfcRouterError::AppWrite)?;
+        let addr = Addr::from_str(&peer.0).map_err(|_| crate::afc::AfcRouterError::AppWrite)?;
+        let addr = addr
+            .lookup()
+            .await
+            .map_err(|_| crate::afc::AfcRouterError::AppWrite)?;
+        self.app
+            .send_data(SocketAddr::V4(addr), *label, chan, data)
+            .await?;
         Ok(())
     }
 

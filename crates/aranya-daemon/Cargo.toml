@@ -35,6 +35,7 @@ aranya-util = { workspace = true }
 aranya-fast-channels = { workspace = true }
 
 anyhow = { workspace = true }
+bimap = "0.6"
 ciborium = { workspace = true }
 clap = { workspace = true }
 deser-hjson = { version = "2" }

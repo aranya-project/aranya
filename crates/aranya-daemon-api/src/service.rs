@@ -197,5 +197,5 @@ pub trait DaemonApi {
         team: TeamId,
         node_id: NodeId,
         ctrl: AfcCtrl,
-    ) -> Result<(AfcId, Label)>;
+    ) -> Result<(AfcId, NetIdentifier, Label)>;
 }

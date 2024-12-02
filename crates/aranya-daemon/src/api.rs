@@ -4,7 +4,6 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use std::{
-    collections::BTreeMap,
     future::{self, Future},
     net::SocketAddr,
     path::PathBuf,
@@ -23,6 +22,7 @@ use aranya_daemon_api::{
 use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed, Label, NodeId};
 use aranya_keygen::PublicKeys;
 use aranya_util::Addr;
+use bimap::BiBTreeMap;
 use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,
@@ -93,7 +93,7 @@ impl DaemonApiServer {
                 eng,
                 pk,
                 peers,
-                afc_peers: Arc::new(Mutex::new(BTreeMap::new())),
+                afc_peers: Arc::default(),
                 handler: Arc::new(Mutex::new(Handler::new(user_id, store))),
             },
         })
@@ -160,7 +160,7 @@ struct DaemonApiHandler {
     /// Aranya sync peers,
     peers: SyncPeers,
     /// AFC peers.
-    afc_peers: Arc<Mutex<BTreeMap<NetIdentifier, UserId>>>,
+    afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, UserId>>>,
     /// Handles AFC effects.
     handler: Arc<Mutex<Handler<Store>>>,
 }
@@ -508,7 +508,7 @@ impl DaemonApi for DaemonApiHandler {
             .afc_peers
             .lock()
             .await
-            .get(&peer)
+            .get_by_left(&peer)
             .copied()
             .context("unable to lookup peer")?;
 
@@ -544,7 +544,7 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         node_id: NodeId,
         ctrl: AfcCtrl,
-    ) -> ApiResult<(AfcId, Label)> {
+    ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
         let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
@@ -559,7 +559,14 @@ impl DaemonApi for DaemonApiHandler {
             let afc_id: AfcId = encap.id().into();
             debug!(?afc_id, "processed afc ID");
             let label = Label::new(e.label.try_into().expect("expected label conversion"));
-            return Ok((afc_id, label));
+            let net = self
+                .afc_peers
+                .lock()
+                .await
+                .get_by_right(&e.author_id.into())
+                .context("missing net identifier for channel author")?
+                .clone();
+            return Ok((afc_id, net, label));
         }
         Err(anyhow!("unable to find BidiChannelReceived effect").into())
     }
