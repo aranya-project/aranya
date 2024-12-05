@@ -18,14 +18,11 @@ on:
 
 jobs:
   release:
-    strategy:
-      matrix:
-        runner: ["self-hosted-linux-amd64"]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - name: Create Release
         id: release
-        uses: spideroak-inc/release-action@v1.12.0
+        uses: aranya-project/release-action@v1.12.0
         with:
           allowUpdates: true
           prerelease: false
@@ -46,13 +43,10 @@ jobs:
     needs:
       - release
       - build
-    strategy:
-      matrix:
-        runner: ["self-hosted-linux-amd64"]
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - name: Download doc artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: docs
           path: docs
