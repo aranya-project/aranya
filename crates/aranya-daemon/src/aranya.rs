@@ -298,7 +298,7 @@ where
     }
 
     /// Responds to a sync.
-    #[instrument(skip_all)]
+    #[instrument(skip_all, fields(addr = %addr))]
     async fn sync(
         client: Arc<Mutex<ClientState<EN, SP>>>,
         stream: &mut TcpStream,
@@ -309,12 +309,15 @@ where
             .read_to_end(&mut recv)
             .await
             .context("failed to read sync request")?;
-        debug!(?addr, n = recv.len(), "received sync request");
+        debug!(n = recv.len(), "received sync request");
 
         // Generate a sync response for a sync request.
         let resp = match Self::sync_respond(client, &recv).await {
             Ok(data) => SyncResponse::Ok(data),
-            Err(err) => SyncResponse::Err(err.to_string()),
+            Err(err) => {
+                error!(?err, "error responding to sync request");
+                SyncResponse::Err(format!("{err:?}"))
+            }
         };
         // Serialize the sync response.
         let data =
@@ -322,7 +325,7 @@ where
 
         stream.write_all(data).await?;
         stream.shutdown().await?;
-        debug!(?addr, n = data.len(), "sent sync response");
+        debug!(n = data.len(), "sent sync response");
 
         Ok(())
     }

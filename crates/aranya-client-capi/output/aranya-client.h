@@ -8,8 +8,8 @@
  */
  
 
-#ifndef ARANYA_H
-#define ARANYA_H
+#ifndef ARANYA_CLIENT_H
+#define ARANYA_CLIENT_H
 
 #pragma once
 
@@ -1226,6 +1226,6 @@ AranyaError aranya_recv_data_ext(struct AranyaClient *client,
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  /* ARANYA_H */
+#endif  /* ARANYA_CLIENT_H */
 
 

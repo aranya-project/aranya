@@ -30,6 +30,20 @@ use test_log::test;
 use tokio::{fs, task, time::sleep};
 use tracing::{debug, info};
 
+macro_rules! do_poll {
+    ($($client:expr),*) => {
+        loop {
+            tokio::select! {
+                biased;
+                $(data = $client.poll_data() => {
+                    $client.handle_data(data?).await?;
+                },)*
+                _ = async {} => break,
+            }
+        }
+    };
+}
+
 struct TeamCtx {
     owner: UserCtx,
     admin: UserCtx,
@@ -478,6 +492,191 @@ async fn test_afc() -> Result<()> {
         ?label,
         "received message: {:?}",
         str::from_utf8(&data)?
+    );
+
+    Ok(())
+}
+
+/// Tests AFC two way communication within one channel.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_afc_two_way() -> Result<()> {
+    let sync_interval = Duration::from_millis(100);
+    let sleep_interval = sync_interval * 6;
+
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
+    let mut team = TeamCtx::new("test_afc_two_way".into(), work_dir).await?;
+
+    // create team.
+    let team_id = team
+        .owner
+        .client
+        .create_team()
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // get sync addresses.
+    let owner_addr = team.owner.aranya_local_addr().await?;
+    let admin_addr = team.admin.aranya_local_addr().await?;
+    let operator_addr = team.operator.aranya_local_addr().await?;
+    let membera_addr = team.membera.aranya_local_addr().await?;
+    let memberb_addr = team.memberb.aranya_local_addr().await?;
+
+    // get afc addresses.
+    let membera_afc_addr = team.membera.afc_local_addr().await?;
+    let memberb_afc_addr = team.memberb.afc_local_addr().await?;
+
+    // setup sync peers.
+    let mut owner_team = team.owner.client.team(team_id);
+    let mut admin_team = team.admin.client.team(team_id);
+    let mut operator_team = team.operator.client.team(team_id);
+    let mut membera_team = team.membera.client.team(team_id);
+    let mut memberb_team = team.memberb.client.team(team_id);
+
+    owner_team
+        .add_sync_peer(admin_addr.into(), sync_interval)
+        .await?;
+    owner_team
+        .add_sync_peer(operator_addr.into(), sync_interval)
+        .await?;
+    owner_team
+        .add_sync_peer(membera_addr.into(), sync_interval)
+        .await?;
+
+    admin_team
+        .add_sync_peer(owner_addr.into(), sync_interval)
+        .await?;
+    admin_team
+        .add_sync_peer(operator_addr.into(), sync_interval)
+        .await?;
+    admin_team
+        .add_sync_peer(membera_addr.into(), sync_interval)
+        .await?;
+
+    operator_team
+        .add_sync_peer(owner_addr.into(), sync_interval)
+        .await?;
+    operator_team
+        .add_sync_peer(admin_addr.into(), sync_interval)
+        .await?;
+    operator_team
+        .add_sync_peer(membera_addr.into(), sync_interval)
+        .await?;
+
+    membera_team
+        .add_sync_peer(owner_addr.into(), sync_interval)
+        .await?;
+    membera_team
+        .add_sync_peer(admin_addr.into(), sync_interval)
+        .await?;
+    membera_team
+        .add_sync_peer(operator_addr.into(), sync_interval)
+        .await?;
+    membera_team
+        .add_sync_peer(memberb_addr.into(), sync_interval)
+        .await?;
+
+    memberb_team
+        .add_sync_peer(owner_addr.into(), sync_interval)
+        .await?;
+    memberb_team
+        .add_sync_peer(admin_addr.into(), sync_interval)
+        .await?;
+    memberb_team
+        .add_sync_peer(operator_addr.into(), sync_interval)
+        .await?;
+    memberb_team
+        .add_sync_peer(membera_addr.into(), sync_interval)
+        .await?;
+
+    // add admin to team.
+    info!("adding admin to team");
+    owner_team.add_device_to_team(team.admin.pk).await?;
+    owner_team.assign_role(team.admin.id, Role::Admin).await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // add operator to team.
+    info!("adding operator to team");
+    owner_team.add_device_to_team(team.operator.pk).await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    admin_team
+        .assign_role(team.operator.id, Role::Operator)
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // add membera to team.
+    info!("adding membera to team");
+    operator_team.add_device_to_team(team.membera.pk).await?;
+
+    // add memberb to team.
+    info!("adding memberb to team");
+    operator_team.add_device_to_team(team.memberb.pk).await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // ==== BASIC SETUP DONE ====
+
+    // operator assigns labels for AFC channels.
+    let label1 = Label::new(1);
+    operator_team.create_label(label1).await?;
+    operator_team.assign_label(team.membera.id, label1).await?;
+    operator_team.assign_label(team.memberb.id, label1).await?;
+
+    // assign network addresses.
+    operator_team
+        .assign_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
+        .await?;
+    operator_team
+        .assign_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // membera creates bidi channel with memberb
+    let afc_id1 = team
+        .membera
+        .client
+        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .await?;
+
+    let msg = "a to b";
+    team.membera.client.send_data(afc_id1, msg.into()).await?;
+    debug!(?msg, "sent message");
+
+    do_poll!(team.membera.client, team.memberb.client);
+
+    let msg = team.memberb.client.recv_data().await?;
+    debug!(
+        len = msg.data.len(),
+        label = ?msg.label,
+        "received message: {:?}",
+        str::from_utf8(&msg.data)?
+    );
+
+    let msg = "b to a";
+    team.memberb.client.send_data(afc_id1, msg.into()).await?;
+    debug!(?msg, "sent message");
+
+    sleep(Duration::from_secs(1)).await;
+    do_poll!(team.membera.client, team.memberb.client);
+
+    let msg = team.membera.client.recv_data().await?;
+    debug!(
+        len = msg.data.len(),
+        label = ?msg.label,
+        "received message: {:?}",
+        str::from_utf8(&msg.data)?
     );
 
     Ok(())
