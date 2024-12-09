@@ -29,20 +29,13 @@ jobs:
     strategy:
       matrix:
         runner:
-          # TODO(eric): re-enable after we get macOS runners.
-          # - "macos-latest"
-          - "self-hosted-linux-arm"
-          - "self-hosted-linux-arm64"
-          - "self-hosted-linux-amd64"
+          - ubuntu-latest
+          - ubuntu2404-arm64-4core
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
-        with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Build code
         run: cargo make build-code
@@ -51,7 +44,7 @@ jobs:
         run: cargo make git-unchanged
 
       - name: Publish daemon
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.runner }}-daemon
           path: target/release/daemon
@@ -61,19 +54,14 @@ jobs:
     strategy:
       matrix:
         runner:
-          - "self-hosted-linux-arm"
-          - "self-hosted-linux-arm64"
-          - "self-hosted-linux-amd64"
+          - ubuntu-latest
+          - ubuntu2404-arm64-4core
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Environment
         uses: ./.github/actions/setup
-        with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Build Aranya Shared Library
         run: |
@@ -82,7 +70,7 @@ jobs:
           cargo make zip-capi
 
       - name: Publish aranya lib
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.runner }}-aranya-capi
           path: aranya-capi
