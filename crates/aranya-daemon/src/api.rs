@@ -1,5 +1,5 @@
 //! Implementation of daemon's `tarpc` API.
-//! Trait for API interface is defined in `crates/daemon-api`
+//! Trait for API interface is defined in `crates/aranya-daemon-api`
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 

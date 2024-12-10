@@ -26,7 +26,7 @@ trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
 rm -rf "${out}"
 
 # build the daemon.
-cargo build --bin daemon --release
+cargo build --bin aranya-daemon --release
 
 # copy the aranya-client.h header file
 mkdir -p "${example}"/include
@@ -34,7 +34,9 @@ cp "${capi}"/output/aranya-client.h "${example}"/include/aranya-client.h
 
 # copy the shared library
 mkdir -p "${example}"/lib
-cp "${release}"/libaranya_client_capi.* "${example}"/lib/
+cp "${release}"/libaranya_client_capi.dylib "${example}"/lib/libaranya_client.dylib || cp "${release}"/libaranya_client_capi.so "${example}"/lib/libaranya_client.so
+patchelf --set-soname libaranya_client.so "${example}"/lib/libaranya_client.so || true
+ls "${example}"/lib
 
 # build the example app.
 Aranya_DIR=. CMAKE_LIBRARY_PATH=. CMAKE_INCLUDE_PATH=. cmake -S "${example}" -B "${example}"/build
@@ -45,7 +47,7 @@ for user in "${users[@]}"; do
 	mkdir -p "${out}"/"${user}"
 	# TODO: autogenerate these config files
 	# Note: set ARANYA_DAEMON=debug to debug daemons.
-	"${release}"/daemon "${example}"/configs/"${user}"-config.json &
+	"${release}"/aranya-daemon "${example}"/configs/"${user}"-config.json &
 done
 # give the daemons time to startup
 sleep 1

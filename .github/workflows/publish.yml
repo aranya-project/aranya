@@ -32,6 +32,14 @@ jobs:
       upload-url: ${{ steps.release.outputs.upload_url }}
 
   build:
+    uses: ./.github/workflows/build.yml
+    with:
+      workflow: build
+    secrets:
+      CC_BUILD_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
+      GH_DOTCOM_TOKEN: ${{ secrets.GH_DOTCOM_TOKEN }}
+
+  docs:
     uses: ./.github/workflows/doc.yml
     with:
       workflow: doc
@@ -39,25 +47,83 @@ jobs:
       CC_BUILD_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
       GH_DOTCOM_TOKEN: ${{ secrets.GH_DOTCOM_TOKEN }}
 
-  publish-docs:
+  publish-daemon:
     needs:
       - release
       - build
+    strategy:
+      matrix:
+        target:
+          - aarch64-unknown-linux-gnu
+          - x86_64-unknown-linux-gnu
+    name: publish daemon ${{ matrix.target }}
     runs-on: ubuntu-latest
     steps:
-      - name: Download doc artifacts
+      - name: Download Rust doc artifacts
         uses: actions/download-artifact@v4
         with:
-          name: docs
-          path: docs
+          name: aranya-daemon-${{ matrix.target }}
+          path: aranya-daemon-${{ matrix.target }}
       - name: List files
         run: ls -R -al
-      - name: Upload docs to tagged release
+      - name: Upload Rust docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
         env:
           GITHUB_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
-          asset_path: docs/docs.zip
-          asset_name: docs/docs.zip
-          asset_content_type: application/zip
+          asset_path: aranya-daemon-${{ matrix.target }}/aranya-daemon.tar.gz
+          asset_name: aranya-daemon-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          asset_content_type: application/gzip
+
+  publish-capi-lib:
+    needs:
+      - release
+      - build
+    strategy:
+      matrix:
+        target:
+          - aarch64-unknown-linux-gnu
+          - x86_64-unknown-linux-gnu
+    name: publish capi ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Rust doc artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: aranya-client-capi-${{ matrix.target }}
+          path: aranya-client-capi-${{ matrix.target }}
+      - name: List files
+        run: ls -R -al
+      - name: Upload Rust docs to tagged release
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
+        with:
+          upload_url: ${{ needs.release.outputs.upload-url }}
+          asset_path: aranya-client-capi-${{ matrix.target }}/aranya-client-lib.tar.gz
+          asset_name: aranya-client-capi-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          asset_content_type: application/gzip
+
+  publish-capi-docs:
+    needs:
+      - release
+      - docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download capi doc artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: aranya-client-capi-docs
+          path: aranya-client-capi-docs
+      - name: List files
+        run: ls -R -al
+      - name: Upload capi docs to tagged release
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+          GITHUB_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
+        with:
+          upload_url: ${{ needs.release.outputs.upload-url }}
+          asset_path: aranya-client-capi-docs/aranya-client-capi-docs.tar.gz
+          asset_name: aranya-client-capi-docs-${{ github.ref_name }}.tar.gz
+          asset_content_type: application/gzip

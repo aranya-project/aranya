@@ -42,6 +42,6 @@ An example daemon configuration file can be found [here](example.json).
 
 Build and run the daemon crate:
 ```shell
-$ cargo build --bin daemon --release
-$ ./target/release/daemon <path to config>
+$ cargo build --bin aranya-daemon --release
+$ ./target/release/aranya-daemon <path to config>
 ```

@@ -28,9 +28,12 @@ jobs:
   build-release:
     strategy:
       matrix:
-        runner:
-          - ubuntu-latest
-          - ubuntu2404-arm64-4core
+        include:
+          - runner: "ubuntu2404-arm64-4core"
+            artifact: "aranya-daemon-aarch64-unknown-linux-gnu"
+          - runner: "ubuntu-latest"
+            artifact: "aranya-daemon-x86_64-unknown-linux-gnu"
+    name: build daemon ${{ matrix.artifact }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -38,7 +41,9 @@ jobs:
       - uses: ./.github/actions/setup
 
       - name: Build code
-        run: cargo make build-code
+        run: |
+          cargo make build-code
+          cargo make tgz-daemon
 
       - name: Verify build didn't change any checked-in files
         run: cargo make git-unchanged
@@ -46,16 +51,21 @@ jobs:
       - name: Publish daemon
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.runner }}-daemon
-          path: target/release/daemon
+          name: ${{ matrix.artifact }}
+          path: aranya-daemon.tar.gz
           if-no-files-found: error
 
   build-aranya-lib:
     strategy:
       matrix:
-        runner:
-          - ubuntu-latest
-          - ubuntu2404-arm64-4core
+        include:
+          - runner: "self-hosted-linux-arm"
+            artifact: "aranya-client-capi-arm-unknown-linux-gnueabi"
+          - runner: "ubuntu2404-arm64-4core"
+            artifact: "aranya-client-capi-aarch64-unknown-linux-gnu"
+          - runner: "ubuntu-latest"
+            artifact: "aranya-client-capi-x86_64-unknown-linux-gnu"
+    name: build lib ${{ matrix.artifact }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
@@ -67,11 +77,11 @@ jobs:
         run: |
           cargo make build-capi-lib
           cargo make build-capi-header
-          cargo make zip-capi
+          cargo make tgz-capi
 
       - name: Publish aranya lib
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.runner }}-aranya-capi
-          path: aranya-capi
+          name: ${{ matrix.artifact }}
+          path: aranya-client-lib.tar.gz
           if-no-files-found: error

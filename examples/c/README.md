@@ -1,6 +1,9 @@
 # C Application Example
 
 This example C application shows how to use the `aranya-client-capi` C API.
+Using the `run.bash` script, it starts the daemons and clients and then runs
+through a scenario involving five devices. For more details behind the actions
+performed in this example, see the [walkthrough](../../docs/walkthrough.md).
 
 `example.c` is the example C application.
 

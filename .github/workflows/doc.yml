@@ -25,18 +25,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  doc:
+  aranya-client-capi-docs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
 
-      - name: Install doxygen
+      - name: Generate Doxygen docs
         run: |
-          sudo apt-get install -y doxygen \
-              --no-install-recommends
-          doxygen --version
+          cargo make build-capi-docs
+          cargo make tgz-capi-docs
+
+      - name: Publish Doxygen docs
+        uses: actions/upload-artifact@v4
+        with:
+          name: aranya-client-capi-docs
+          path: aranya-client-capi-docs.tar.gz
+          if-no-files-found: error
+
+  aranya-rust-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
 
       - name: Generate docs
         env:
@@ -44,10 +56,3 @@ jobs:
         run: |
           cargo make gen-docs-nightly
           cargo make zip-docs
-
-      - name: Publish docs
-        uses: actions/upload-artifact@v4
-        with:
-          name: docs
-          path: docs.zip
-          if-no-files-found: error

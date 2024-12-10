@@ -19,12 +19,12 @@ runs:
         version: "v0.8.2"
 
     - name: Configure sccache
-      shell: bash
       run: |
         echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
         echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
         echo "CARGO_INCREMENTAL=0" >> $GITHUB_ENV
+      shell: bash
 
     - name: Install cargo-make
-      shell: bash
       run: cargo install --version '0.37.23' --locked cargo-make
+      shell: bash
