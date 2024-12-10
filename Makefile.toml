@@ -24,6 +24,11 @@ description = "Build Code"
 command = "cargo"
 args = ["build", "--verbose", "--release", "${@}"]
 
+[tasks.tgz-daemon]
+category = "build"
+description = "Archive daemon"
+script = "tar -czf aranya-daemon.tar.gz -C target/release aranya-daemon"
+
 # Build the `aranya-client-capi` C API.
 [tasks.build-capi]
 category = "build"
@@ -50,6 +55,11 @@ description = "Build C API docs"
 cwd = "crates/aranya-client-capi"
 command = "doxygen"
 
+[tasks.tgz-capi-docs]
+category = "docs"
+description = "Archive capi docs"
+script = "tar -cvzf aranya-client-capi-docs.tar.gz -C crates/aranya-client-capi/docs ."
+
 [tasks.build-capi-lib]
 category = "build"
 description = "Build C API shared library"
@@ -58,19 +68,20 @@ command = "cargo"
 args = ["build", "--release"]
 dependencies = ["install-nightly"]
 
-[tasks.zip-capi]
+[tasks.tgz-capi]
 category = "build"
-description = "Zip C API artifacts"
+description = "Archive C API artifacts"
 script = '''
-capi=aranya-capi
+capi=aranya-client-lib
 mkdir -p ${capi}/lib
-cp target/release/libaranya_client_capi.dylib ${capi}/lib/ || true
-cp target/release/libaranya_client_capi.so ${capi}/lib/ || true
+ls target/release/libaranya_client*
+cp target/release/libaranya_client_capi.dylib ${capi}/lib/libaranya_client.dylib || cp target/release/libaranya_client_capi.so ${capi}/lib/libaranya_client.so
+ls ${capi}/lib
 mkdir -p ${capi}/cmake
 cp examples/c/cmake/AranyaConfig.cmake ${capi}/cmake/
 mkdir -p ${capi}/include
 cp crates/aranya-client-capi/output/aranya-client.h ${capi}/include/
-zip -qr aranya-capi.zip ${capi}
+tar -cvzf aranya-client-lib.tar.gz -C ${capi} .
 '''
 
 [tasks.install-cbindgen]
@@ -189,11 +200,10 @@ command = "cargo"
 args = ["doc", "--all-features"]
 dependencies = ["install-nightly"]
 
-[tasks.zip-docs]
+[tasks.tgz-docs]
 category = "docs"
-description = "Zip docs"
-script = "zip -qr docs.zip target/doc"
-
+description = "Archive Rust docs"
+script = "tar -czf rust-docs.tar.gz -C target/doc ."
 
 # Misc
 [tasks.install-nightly]

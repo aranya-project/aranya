@@ -69,19 +69,19 @@ runs:
         gcc --version
         cmake --version
 
+    - name: patchelf
+      shell: bash
+      run: |
+        sudo apt-get install -y patchelf \
+            --no-install-recommends
+        patchelf --version
+
     - name: doxygen
       shell: bash
       run: |
         sudo apt-get install -y doxygen \
             --no-install-recommends
         doxygen --version
-
-    - name: zip
-      shell: bash
-      run: |
-        sudo apt-get install -y zip \
-            --no-install-recommends
-        zip --version
 
     - name: Install sccache
       uses: spideroak-inc/sccache-action@main

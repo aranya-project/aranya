@@ -28,12 +28,14 @@ jobs:
   build-release:
     strategy:
       matrix:
-        runner:
-          # TODO(eric): re-enable after we get macOS runners.
-          # - "macos-latest"
-          - "self-hosted-linux-arm"
-          - "self-hosted-linux-arm64"
-          - "self-hosted-linux-amd64"
+        include:
+          - runner: "self-hosted-linux-arm"
+            artifact: "aranya-daemon-arm-unknown-linux-gnueabi"
+          - runner: "self-hosted-linux-arm64"
+            artifact: "aranya-daemon-aarch64-unknown-linux-gnu"
+          - runner: "self-hosted-linux-amd64"
+            artifact: "aranya-daemon-x86_64-unknown-linux-gnu"
+    name: build daemon ${{ matrix.artifact }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
@@ -45,7 +47,9 @@ jobs:
           runner: ${{ matrix.runner }}
 
       - name: Build code
-        run: cargo make build-code
+        run: |
+          cargo make build-code
+          cargo make tgz-daemon
 
       - name: Verify build didn't change any checked-in files
         run: cargo make git-unchanged
@@ -53,17 +57,21 @@ jobs:
       - name: Publish daemon
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.runner }}-daemon
-          path: target/release/daemon
+          name: ${{ matrix.artifact }}
+          path: aranya-daemon.tar.gz
           if-no-files-found: error
 
   build-aranya-lib:
     strategy:
       matrix:
-        runner:
-          - "self-hosted-linux-arm"
-          - "self-hosted-linux-arm64"
-          - "self-hosted-linux-amd64"
+        include:
+          - runner: "self-hosted-linux-arm"
+            artifact: "aranya-client-capi-arm-unknown-linux-gnueabi"
+          - runner: "self-hosted-linux-arm64"
+            artifact: "aranya-client-capi-aarch64-unknown-linux-gnu"
+          - runner: "self-hosted-linux-amd64"
+            artifact: "aranya-client-capi-x86_64-unknown-linux-gnu"
+    name: build lib ${{ matrix.artifact }}
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v3
@@ -79,11 +87,11 @@ jobs:
         run: |
           cargo make build-capi-lib
           cargo make build-capi-header
-          cargo make zip-capi
+          cargo make tgz-capi
 
       - name: Publish aranya lib
         uses: actions/upload-artifact@v3
         with:
-          name: ${{ matrix.runner }}-aranya-capi
-          path: aranya-capi
+          name: ${{ matrix.artifact }}
+          path: aranya-client-lib.tar.gz
           if-no-files-found: error

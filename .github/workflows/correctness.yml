@@ -26,10 +26,7 @@ concurrency:
 
 jobs:
   fmt:
-    strategy:
-      matrix:
-        runner: ["self-hosted-linux-amd64"]
-    runs-on: ${{ matrix.runner }}
+    runs-on: self-hosted-linux-amd64
     steps:
       - uses: actions/checkout@v3
 
@@ -37,16 +34,13 @@ jobs:
         with:
           ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
+          runner: self-hosted-linux-amd64
 
       - name: Check formatting
         run: cargo make check-fmt
 
   clippy:
-    strategy:
-      matrix:
-        runner: ["self-hosted-linux-amd64"]
-    runs-on: ${{ matrix.runner }}
+    runs-on: self-hosted-linux-amd64
     steps:
       - uses: actions/checkout@v3
 
@@ -54,16 +48,13 @@ jobs:
         with:
           ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
+          runner: self-hosted-linux-amd64
 
       - name: Run clippy
         run: cargo make clippy
 
   machete:
-    strategy:
-      matrix:
-        runner: ["self-hosted-linux-amd64"]
-    runs-on: ${{ matrix.runner }}
+    runs-on: self-hosted-linux-amd64
     steps:
       - uses: actions/checkout@v3
 
@@ -71,7 +62,7 @@ jobs:
         with:
           ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
+          runner: self-hosted-linux-amd64
 
       - name: Check dependency usage
         run: cargo make machete

@@ -26,10 +26,7 @@ concurrency:
 
 jobs:
   security-checks:
-    strategy:
-      matrix:
-        runner: ["self-hosted-linux-amd64"]
-    runs-on: ${{ matrix.runner }}
+    runs-on: self-hosted-linux-amd64
     steps:
       - uses: actions/checkout@v3
 
@@ -37,7 +34,7 @@ jobs:
         with:
           ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
+          runner: self-hosted-linux-amd64
 
       - name: Run cargo audit
         # TODO: https://github.com/rustsec/rustsec/issues/1217

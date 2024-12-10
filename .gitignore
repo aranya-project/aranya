@@ -1,5 +1,7 @@
 /target
 
 .DS_Store
+*.zip
+*.tar.gz
 
-aranya-capi*
+aranya-client*

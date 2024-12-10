@@ -70,7 +70,7 @@ aranya-policy-ifgen-build = { workspace = true }
 
 
 [[bin]]
-name = "daemon"
+name = "aranya-daemon"
 path = "src/main.rs"
 test = false
 

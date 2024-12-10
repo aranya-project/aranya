@@ -41,4 +41,4 @@ rm -rf "${out_dir}" && mkdir -p "${out_dir}"
 cp ./config.json "${out_dir}"/config.json
 
 # start daemon
-ARANYA_DAEMON="debug" "${target_dir}"/daemon "${out_dir}"/config.json
+ARANYA_DAEMON="debug" "${target_dir}"/aranya-daemon "${out_dir}"/config.json

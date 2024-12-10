@@ -105,7 +105,7 @@ Now that the daemons have been configured, we can build and run them!
 To build the daemon, invoke `cargo build`:
 
 ```shell
-$ cargo build --bin daemon --release
+$ cargo build --bin aranya-daemon --release
 ```
 
 Since we have separate configuration files for each user, we only need one
@@ -116,17 +116,17 @@ build of the daemon. This step only needs to be performed once.
 To start the daemon for the owner, we run the following:
 
 ```shell
-$ target/release/daemon <path to owner's daemon config>
+$ target/release/aranya-daemon <path to owner's daemon config>
 ```
 
 Repeat this step for all users, substituting the associated configuration file
 for each user:
 
 ```shell
-$ target/release/daemon <path to admin's daemon config>
-$ target/release/daemon <path to operator's daemon config>
-$ target/release/daemon <path to member a's daemon config>
-$ target/release/daemon <path to member b's daemon config>
+$ target/release/aranya-daemon <path to admin's daemon config>
+$ target/release/aranya-daemon <path to operator's daemon config>
+$ target/release/aranya-daemon <path to member a's daemon config>
+$ target/release/aranya-daemon <path to member b's daemon config>
 ```
 
 Internally, the daemon is instantiated by loading the specified configuration
