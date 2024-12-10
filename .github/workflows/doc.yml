@@ -39,6 +39,14 @@ jobs:
 
       - name: Publish Doxygen docs
         uses: actions/upload-artifact@v4
+
+      - name: Generate Doxygen docs
+        run: |
+          cargo make build-capi-docs
+          cargo make tgz-capi-docs
+
+      - name: Publish Doxygen docs
+        uses: actions/upload-artifact@v3
         with:
           name: aranya-client-capi-docs
           path: aranya-client-capi-docs.tar.gz
@@ -55,4 +63,3 @@ jobs:
           RUSTDOCFLAGS: "-Dwarnings"
         run: |
           cargo make gen-docs-nightly
-          cargo make zip-docs
