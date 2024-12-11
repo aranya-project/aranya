@@ -11,13 +11,13 @@ on:
         required: true
         type: string
     secrets:
-      CC_BUILD_TOKEN:
-        required: true
       GH_DOTCOM_TOKEN:
         required: true
 
 jobs:
   release:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Create Release
@@ -27,7 +27,6 @@ jobs:
           allowUpdates: true
           prerelease: false
           makeLatest: legacy
-          token: ${{ secrets.CC_BUILD_TOKEN }}
     outputs:
       upload-url: ${{ steps.release.outputs.upload_url }}
 
@@ -36,7 +35,6 @@ jobs:
     with:
       workflow: build
     secrets:
-      CC_BUILD_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
       GH_DOTCOM_TOKEN: ${{ secrets.GH_DOTCOM_TOKEN }}
 
   docs:
@@ -44,10 +42,11 @@ jobs:
     with:
       workflow: doc
     secrets:
-      CC_BUILD_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
       GH_DOTCOM_TOKEN: ${{ secrets.GH_DOTCOM_TOKEN }}
 
   publish-daemon:
+    permissions:
+      contents: write
     needs:
       - release
       - build
@@ -68,8 +67,6 @@ jobs:
         run: ls -R -al
       - name: Upload Rust docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-daemon-${{ matrix.target }}/aranya-daemon.tar.gz
@@ -77,6 +74,8 @@ jobs:
           asset_content_type: application/gzip
 
   publish-capi-lib:
+    permissions:
+      contents: write
     needs:
       - release
       - build
@@ -97,8 +96,6 @@ jobs:
         run: ls -R -al
       - name: Upload Rust docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-client-capi-${{ matrix.target }}/aranya-client-lib.tar.gz
@@ -106,6 +103,8 @@ jobs:
           asset_content_type: application/gzip
 
   publish-capi-docs:
+    permissions:
+      contents: write
     needs:
       - release
       - docs
@@ -120,8 +119,6 @@ jobs:
         run: ls -R -al
       - name: Upload capi docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-client-capi-docs/aranya-client-capi-docs.tar.gz
