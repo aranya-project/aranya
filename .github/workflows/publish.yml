@@ -22,7 +22,7 @@ jobs:
     steps:
       - name: Create Release
         id: release
-        uses: aranya-project/release-action@v1.12.0
+        uses: aranya-project/release-action@main
         with:
           allowUpdates: true
           prerelease: false
