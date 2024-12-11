@@ -11,10 +11,10 @@ on:
         required: true
         type: string
 
+permissions: write-all
+
 jobs:
   release:
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
     steps:
       - name: Create Release
@@ -38,8 +38,6 @@ jobs:
       workflow: doc
 
   publish-daemon:
-    permissions:
-      contents: write
     needs:
       - release
       - build
@@ -67,8 +65,6 @@ jobs:
           asset_content_type: application/gzip
 
   publish-capi-lib:
-    permissions:
-      contents: write
     needs:
       - release
       - build
@@ -96,8 +92,6 @@ jobs:
           asset_content_type: application/gzip
 
   publish-capi-docs:
-    permissions:
-      contents: write
     needs:
       - release
       - docs
