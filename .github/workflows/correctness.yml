@@ -11,9 +11,6 @@ on:
       workflow:
         required: true
         type: string
-    secrets:
-      GH_DOTCOM_TOKEN:
-        required: true
 
 env:
   REV: ${{ github.run_id }}

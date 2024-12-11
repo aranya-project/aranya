@@ -11,11 +11,6 @@ on:
       workflow:
         required: true
         type: string
-    secrets:
-      CC_BUILD_TOKEN:
-        required: true
-      GH_DOTCOM_TOKEN:
-        required: true
 
 env:
   REV: ${{ github.run_id }}

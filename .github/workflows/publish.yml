@@ -10,9 +10,6 @@ on:
       workflow:
         required: true
         type: string
-    secrets:
-      GH_DOTCOM_TOKEN:
-        required: true
 
 jobs:
   release:
@@ -34,15 +31,11 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       workflow: build
-    secrets:
-      GH_DOTCOM_TOKEN: ${{ secrets.GH_DOTCOM_TOKEN }}
 
   docs:
     uses: ./.github/workflows/doc.yml
     with:
       workflow: doc
-    secrets:
-      GH_DOTCOM_TOKEN: ${{ secrets.GH_DOTCOM_TOKEN }}
 
   publish-daemon:
     permissions:
