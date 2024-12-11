@@ -10,27 +10,20 @@ on:
       workflow:
         required: true
         type: string
-    secrets:
-      CC_BUILD_TOKEN:
-        required: true
-      GH_DOTCOM_TOKEN:
-        required: true
 
 jobs:
   release:
-    strategy:
-      matrix:
-        runner: ["self-hosted-linux-amd64"]
-    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
     steps:
       - name: Create Release
         id: release
-        uses: spideroak-inc/release-action@v1.12.0
+        uses: aranya-project/release-action@main
         with:
           allowUpdates: true
           prerelease: false
           makeLatest: legacy
-          token: ${{ secrets.CC_BUILD_TOKEN }}
     outputs:
       upload-url: ${{ steps.release.outputs.upload_url }}
 
@@ -38,36 +31,28 @@ jobs:
     uses: ./.github/workflows/build.yml
     with:
       workflow: build
-    secrets:
-      CC_BUILD_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
-      GH_DOTCOM_TOKEN: ${{ secrets.GH_DOTCOM_TOKEN }}
 
   docs:
     uses: ./.github/workflows/doc.yml
     with:
       workflow: doc
-    secrets:
-      CC_BUILD_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
-      GH_DOTCOM_TOKEN: ${{ secrets.GH_DOTCOM_TOKEN }}
 
   publish-daemon:
+    permissions:
+      contents: write
     needs:
       - release
       - build
     strategy:
       matrix:
-        include:
-          - runner: "self-hosted-linux-amd64"
-            target: "arm-unknown-linux-gnueabi"
-          - runner: "self-hosted-linux-amd64"
-            target: "aarch64-unknown-linux-gnu"
-          - runner: "self-hosted-linux-amd64"
-            target: "x86_64-unknown-linux-gnu"
+        target:
+          - aarch64-unknown-linux-gnu
+          - x86_64-unknown-linux-gnu
     name: publish daemon ${{ matrix.target }}
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - name: Download Rust doc artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: aranya-daemon-${{ matrix.target }}
           path: aranya-daemon-${{ matrix.target }}
@@ -76,7 +61,7 @@ jobs:
       - name: Upload Rust docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
         env:
-          GITHUB_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
+            GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-daemon-${{ matrix.target }}/aranya-daemon.tar.gz
@@ -84,23 +69,21 @@ jobs:
           asset_content_type: application/gzip
 
   publish-capi-lib:
+    permissions:
+      contents: write
     needs:
       - release
       - build
     strategy:
       matrix:
-        include:
-          - runner: "self-hosted-linux-amd64"
-            target: "arm-unknown-linux-gnueabi"
-          - runner: "self-hosted-linux-amd64"
-            target: "aarch64-unknown-linux-gnu"
-          - runner: "self-hosted-linux-amd64"
-            target: "x86_64-unknown-linux-gnu"
+        target:
+          - aarch64-unknown-linux-gnu
+          - x86_64-unknown-linux-gnu
     name: publish capi ${{ matrix.target }}
-    runs-on: ${{ matrix.runner }}
+    runs-on: ubuntu-latest
     steps:
       - name: Download Rust doc artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: aranya-client-capi-${{ matrix.target }}
           path: aranya-client-capi-${{ matrix.target }}
@@ -109,7 +92,7 @@ jobs:
       - name: Upload Rust docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
         env:
-          GITHUB_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
+            GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-client-capi-${{ matrix.target }}/aranya-client-lib.tar.gz
@@ -117,13 +100,15 @@ jobs:
           asset_content_type: application/gzip
 
   publish-capi-docs:
+    permissions:
+      contents: write
     needs:
       - release
       - docs
-    runs-on: "self-hosted-linux-amd64"
+    runs-on: ubuntu-latest
     steps:
       - name: Download capi doc artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: aranya-client-capi-docs
           path: aranya-client-capi-docs
@@ -132,7 +117,7 @@ jobs:
       - name: Upload capi docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
         env:
-          GITHUB_TOKEN: ${{ secrets.CC_BUILD_TOKEN }}
+            GITHUB_TOKEN: ${{ github.token }}
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-client-capi-docs/aranya-client-capi-docs.tar.gz

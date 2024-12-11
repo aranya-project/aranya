@@ -11,11 +11,6 @@ on:
       workflow:
         required: true
         type: string
-    secrets:
-      CC_BUILD_TOKEN:
-        required: true
-      GH_DOTCOM_TOKEN:
-        required: true
 
 env:
   REV: ${{ github.run_id }}
@@ -26,15 +21,16 @@ concurrency:
 
 jobs:
   aranya-client-capi-docs:
-    runs-on: self-hosted-linux-amd64
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
-        with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: self-hosted-linux-amd64
+
+      - name: Generate Doxygen docs
+        run: |
+          cargo make build-capi-docs
+          cargo make tgz-capi-docs
 
       - name: Generate Doxygen docs
         run: |
@@ -42,28 +38,20 @@ jobs:
           cargo make tgz-capi-docs
 
       - name: Publish Doxygen docs
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: aranya-client-capi-docs
           path: aranya-client-capi-docs.tar.gz
           if-no-files-found: error
 
   aranya-rust-docs:
-    runs-on: self-hosted-linux-amd64
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
-        with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: self-hosted-linux-amd64
 
       - name: Generate docs
         env:
           RUSTDOCFLAGS: "-Dwarnings"
         run: |
-          if ! command -v zip; then
-            sudo apt-get install -y zip \
-            --no-install-recommends
-          fi
           cargo make gen-docs-nightly
