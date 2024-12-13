@@ -11,17 +11,14 @@ version = "0.10"
 [policy.aranya-client]
 audit-as-crates-io = true
 
-
 [policy.aranya-daemon]
 audit-as-crates-io = true
 
 [policy.aranya-daemon-api]
 audit-as-crates-io = true
 
-
 [policy.aranya-keygen]
 audit-as-crates-io = true
-
 
 [policy.aranya-util]
 audit-as-crates-io = true
@@ -111,7 +108,15 @@ version = "0.3.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.aranya-crypto]]
+version = "0.2.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.aranya-crypto]]
 version = "0.2.0@git:9a0b83dd0b0210ad0389b4190fb12d4b09f265a6"
+criteria = "safe-to-deploy"
+
+[[exemptions.aranya-crypto-derive]]
+version = "0.2.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.aranya-crypto-derive]]
@@ -135,6 +140,10 @@ version = "0.2.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.aranya-envelope-ffi]]
+version = "0.2.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.aranya-fast-channels]]
 version = "0.2.0"
 criteria = "safe-to-deploy"
 
@@ -196,6 +205,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.aranya-runtime]]
 version = "0.2.0"
+criteria = "safe-to-deploy"
+
+[[exemptions.aranya-trouble]]
+version = "0.1.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.aranya-trouble]]
