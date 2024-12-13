@@ -36,11 +36,5 @@ jobs:
           gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
           runner: self-hosted-linux-amd64
 
-      - name: Run cargo audit
-        # TODO: https://github.com/rustsec/rustsec/issues/1217
-        run: |
-          rustup toolchain install 1.79
-          cargo +1.79 make cargo-audit
-
-      - name: Run cargo deny
-        run: cargo make cargo-deny
+      - name: Run cargo security checks
+        run: cargo make security

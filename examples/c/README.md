@@ -1,3 +1,10 @@
+# Dependencies
+
+- `cargo`
+- `cargo make`
+- `cmake`
+- `clang`
+
 # C Application Example
 
 This example C application shows how to use the `aranya-client-capi` C API.
@@ -12,6 +19,10 @@ performed in this example, see the [walkthrough](../../docs/walkthrough.md).
 The `aranya-daemon` process is assumed to have been started before running the example application.
 
 A `config.json` file is provided for configuring the `aranya-daemon` when it starts up.
+
+# Running The Example With Prebuilt C library and daemon executable
+
+
 
 # Running The Example
 
