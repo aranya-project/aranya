@@ -55,10 +55,12 @@ aranya-runtime = { version = "0.2.0", features = ["std", "libc"] }
 aranya-client = { version = "0.3.0", path = "crates/aranya-client" }
 aranya-daemon = { version = "0.3.0", path = "crates/aranya-daemon" }
 aranya-daemon-api = { version = "0.3.0", path = "crates/aranya-daemon-api" }
+aranya-example = { version = "0.1.0", path = "crates/aranya-example" }
 aranya-keygen = { version = "0.1.0", path = "crates/aranya-keygen" }
 aranya-util = { version = "0.1.0", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
+backon = { version = "1.2.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 futures-util = { version = "0.3.30" }

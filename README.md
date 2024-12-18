@@ -39,6 +39,20 @@ configuring and running the daemon.
 
 After the daemon has started up, start the application.
 
+### Rust Example Application
+
+Generate a new workspace with the `crates/aranya-example` crate:
+`cargo generate https://github.com/aranya-project/aranya crates/aranya-example`
+
+Navigate into the new workspace directory:
+`cd aranya-example`
+
+Build the example:
+`cargo build`
+
+Run the example:
+`cargo run`
+
 ## What's Contained In This Repo
 
 This repository contains the following components:

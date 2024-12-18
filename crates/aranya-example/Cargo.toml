@@ -1,7 +1,7 @@
 [package]
-name = "aranya-client"
-description = "Client library for using Aranya"
-version = "0.3.0"
+name = "aranya-example"
+description = "Example Rust program using the Aranya client library"
+version = "0.1.0"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,28 +12,18 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
-aranya-daemon-api = { workspace = true }
+aranya-client = { workspace = true }
+aranya-daemon = { workspace = true }
 
 aranya-buggy = { workspace = true, features = ["std"] }
+aranya-daemon-api = { workspace = true }
 aranya-fast-channels = { workspace = true, features = ["std", "posix"] }
 aranya-util = { workspace = true }
 
 anyhow = { workspace = true }
-postcard = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-tarpc = { workspace = true }
+backon = { workspace = true }
+tempfile = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
 tracing = { workspace = true }
-
-[dev-dependencies]
-aranya-daemon = { workspace = true }
-
-backon = { workspace = true }
-serial_test = { workspace = true }
-tempfile = { workspace = true }
-test-log = { workspace = true }
-
-[[test]]
-name = "tests"
-path = "tests/tests.rs"
+tracing-subscriber = { workspace = true }
