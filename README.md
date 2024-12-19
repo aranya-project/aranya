@@ -51,7 +51,7 @@ Build the example:
 `cargo build`
 
 Run the example:
-`cargo run`
+`ARANYA_EXAMPLE=info cargo run`
 
 ## What's Contained In This Repo
 

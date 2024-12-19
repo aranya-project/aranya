@@ -1,16 +1,23 @@
 use core::str;
-use std::{net::SocketAddr, path::{Path, PathBuf}, time::Duration};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 use aranya_client::{AfcMsg, Client};
-use aranya_daemon::{config::{AfcConfig, Config}, Daemon};
+use aranya_daemon::{
+    config::{AfcConfig, Config},
+    Daemon,
+};
+use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_fast_channels::Label;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
+use tempfile::tempdir;
 use tokio::{fs, task, time::sleep};
 use tracing::{debug, info};
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
-use tempfile::tempdir;
 use tracing_subscriber::{prelude::*, EnvFilter};
 
 struct TeamCtx {
