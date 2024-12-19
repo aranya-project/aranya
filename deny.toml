@@ -97,10 +97,10 @@ version = 2
 # [possible values: any SPDX 3.11 short identifier (+ optional exception)].
 allow = [
     "Apache-2.0",
+    "AGPL-3.0",
     "BSD-3-Clause",
     "MIT",
     "Unicode-3.0",
-    "Unicode-DFS-2016",
     "Zlib",
 ]
 # The confidence threshold for detecting a license from license text.

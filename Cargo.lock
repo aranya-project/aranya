@@ -383,7 +383,6 @@ name = "aranya-example"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "aranya-buggy",
  "aranya-client",
  "aranya-daemon",
  "aranya-daemon-api",
@@ -391,7 +390,6 @@ dependencies = [
  "aranya-util",
  "backon",
  "tempfile",
- "thiserror 2.0.4",
  "tokio",
  "tracing",
  "tracing-subscriber",
