@@ -2,3 +2,189 @@
 # cargo-vet audits file
 
 [audits]
+
+[[trusted.aranya-afc-util]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-base58]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-buggy]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-capi-codegen]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-11-08"
+end = "2025-12-19"
+
+[[trusted.aranya-capi-core]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-11-08"
+end = "2025-12-19"
+
+[[trusted.aranya-capi-macro]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-11-08"
+end = "2025-12-19"
+
+[[trusted.aranya-client]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-crypto]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-crypto-derive]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-crypto-ffi]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-daemon]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-daemon-api]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-device-ffi]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-envelope-ffi]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-fast-channels]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-idam-ffi]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-keygen]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-libc]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-11-08"
+end = "2025-12-19"
+
+[[trusted.aranya-perspective-ffi]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-policy-ast]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-policy-compiler]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-policy-derive]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-policy-ifgen]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-policy-ifgen-build]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-policy-ifgen-macro]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-policy-lang]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-policy-module]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-policy-vm]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-runtime]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-trouble]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-10-16"
+end = "2025-12-19"
+
+[[trusted.aranya-util]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2024-11-12"
+end = "2025-12-19"
