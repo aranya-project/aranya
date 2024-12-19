@@ -28,6 +28,7 @@ runs:
       shell: bash
 
     - name: Install Rust
+      working-directory: ${{ runner.temp }}
       run: |
         cat<<EOF>>rustup.sh.sha256
         32a680a84cf76014915b3f8aa44e3e40731f3af92cd45eb0fcc6264fd257c428  rustup.sh

@@ -72,16 +72,15 @@ dependencies = ["install-nightly"]
 category = "build"
 description = "Archive C API artifacts"
 script = '''
-capi=aranya-client-lib
-mkdir -p ${capi}/lib
+#!/usr/bin/env bash
+capi="$(mktemp -d)"
+mkdir -p "${capi}/"{lib,cmake,include}
 ls target/release/libaranya_client*
-cp target/release/libaranya_client_capi.dylib ${capi}/lib/libaranya_client.dylib || cp target/release/libaranya_client_capi.so ${capi}/lib/libaranya_client.so
-ls ${capi}/lib
-mkdir -p ${capi}/cmake
-cp examples/c/cmake/AranyaConfig.cmake ${capi}/cmake/
-mkdir -p ${capi}/include
-cp crates/aranya-client-capi/output/aranya-client.h ${capi}/include/
-tar -cvzf aranya-client-lib.tar.gz -C ${capi} .
+cp target/release/libaranya_client_capi.dylib "${capi}"/lib/ || cp target/release/libaranya_client_capi.so "${capi}"/lib/
+ls "${capi}"/lib
+cp examples/c/cmake/AranyaConfig.cmake "${capi}"/cmake/
+cp crates/aranya-client-capi/output/aranya-client.h "${capi}"/include/
+tar -cvzf aranya-client-lib.tar.gz -C "${capi}" .
 '''
 
 [tasks.install-cbindgen]
@@ -231,7 +230,7 @@ description = "Verify files are unchanged"
 script = '''
 git diff
 status=$(git status -s)
-if [[ -n "$status" ]]; then
+if [ -n "$status" ]; then
     echo "$status"
     exit 1
 fi
