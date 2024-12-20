@@ -20,11 +20,45 @@ More documentation on Aranya is provided here:
 - [Aranya Overview](docs/overview.md)
 - [Getting Started With Aranya](docs/walkthrough.md)
 
-
 ## Getting Started
 
-Install Rust:
-<https://www.rust-lang.org/tools/install>
+### Dependencies
+
+- [Rust](https://www.rust-lang.org/tools/install)
+- [cmake](https://cmake.org/download/)
+- [clang](https://releases.llvm.org/download.html)
+- [patchelf](https://github.com/NixOS/patchelf)
+- [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation)
+
+To view documentation for the `aranya-client-capi` C API, download
+[doxygen](https://www.doxygen.nl/download.html).
+
+The following platforms are supported:
+- Linux/arm64
+- Linux/amd64
+- MacOS
+
+### Example application
+
+We have provided a runnable example application that uses the
+[`aranya-client-capi` C API](crates/aranya-client-capi/). This application
+goes through team setup, syncing and sending messages using Aranya Fast
+Channels.
+
+Download the source code from this repository. Navigate to the
+[`aranya-client-capi` C API example](examples/c/) and run the application:
+
+`cargo make run-capi-example`
+
+This will also build local doxygen documentation for the
+[`aranya-client-capi`](crates/aranya-client-capi/docs/). Open the
+[`docs/index.html`](crates/aranya-client-c-api/docs/index.html) file in a
+browser to view the docs.
+
+This [example](examples/c/example.c) and its [README](examples/c/README.md)
+contain more details on the steps being performed in this example once running.
+
+### Setting up your own application
 
 Download the source code from this repository or from [crates.io](https://crates.io):
 - [client](https://crates.io/crates/aranya-client)
