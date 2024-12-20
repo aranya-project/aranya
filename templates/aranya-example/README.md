@@ -10,16 +10,16 @@ During setup, the example application starts an instance of the `aranya-daemon` 
 
 # Building the example
 
-`cargo build`
+`cargo build --release`
 
 # Running the example
 
-`cargo run`
+`target/release/aranya-example`
 
 # Running the example with tracing
 
 Set the desired tracing level with the `ARANYA_EXAMPLE` environment variable:
-`ARANYA_EXAMPLE=info cargo run`
+`ARANYA_EXAMPLE=info target/release/aranya-example`
 
 # Create a new project based on this example with `cargo-generate`:
 

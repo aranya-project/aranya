@@ -6,7 +6,7 @@ authors = ["SpiderOak, Inc."]
 edition = "2021"
 license = "AGPL-3.0-only"
 repository = "https://github.com/aranya-project/aranya"
-rust-version = "1.80"
+rust-version = "1.81"
 
 [lints.rust]
 # missing_docs = "warn"
