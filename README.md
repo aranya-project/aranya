@@ -76,25 +76,25 @@ After the daemon has started up, start the application.
 ### Rust Example Application
 
 An example Rust program for using Aranya is located here:
-[Aranya Rust Example](crates/aranya-example)
+[Aranya Rust Example](templates/aranya-example)
 
-To generate a new workspace from the `crates/aranya-example` crate:
-`cargo generate https://github.com/aranya-project/aranya crates/aranya-example`
+To generate a new workspace from the `templates/aranya-example` crate:
+`cargo generate https://github.com/aranya-project/aranya templates/aranya-example`
 
 Navigate into the new workspace directory:
 `cd aranya-example`
 
 Build the example:
-`cargo build`
+`cargo build --release`
 
 Run the example:
-`cargo run`
+`target/release/aranya-example`
 
 Set the tracing log level with the `ARANYA_EXAMPLE` environment variable:
-`ARANYA_EXAMPLE=info cargo run`
+`ARANYA_EXAMPLE=info target/release/aranya-example`
 
 Refer to the `aranya-example` crate's README for more information:
-[Aranya Example README.md](crates/aranya-example/README.md)
+[Aranya Example README.md](templates/aranya-example/README.md)
 
 ## What's Contained In This Repo
 
