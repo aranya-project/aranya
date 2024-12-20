@@ -366,8 +366,13 @@ AranyaError run(Team *t) {
     AranyaAfcMsgInfo info;
     uint8_t buf[BUF_LEN];
     size_t len = BUF_LEN;
-    err        = aranya_recv_data(&t->clients.memberb.client, buf, &len, &info);
+    bool ok    = false;
+    err = aranya_recv_data(&t->clients.memberb.client, buf, &len, &info, &ok);
     EXPECT("error receiving data", err);
+    if (!ok) {
+        fprintf(stderr, "`aranya_recv_data` returned `false`\n");
+        return ARANYA_ERROR_AFC;
+    }
     printf("%s received afc message from %s: len: %zu, label: %d \r\n",
            t->clients_arr[MEMBERB].name, t->clients_arr[MEMBERA].name, len,
            info.label);

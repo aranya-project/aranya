@@ -50,10 +50,6 @@ pub enum Error {
     #[capi(msg = "could not connect to daemon")]
     Connecting,
 
-    /// AFC router error.
-    #[capi(msg = "AFC router error")]
-    AfcRouter,
-
     /// Could not send request to daemon.
     #[capi(msg = "could not send request to daemon")]
     Rpc,
@@ -61,10 +57,6 @@ pub enum Error {
     /// Daemon reported error.
     #[capi(msg = "daemon reported error")]
     Daemon,
-
-    /// AFC shared memory error.
-    #[capi(msg = "AFC shared memory error")]
-    AfcShm,
 
     /// AFC library error.
     #[capi(msg = "AFC library error")]
@@ -87,10 +79,8 @@ impl From<&imp::Error> for Error {
             imp::Error::BufferTooSmall => Self::BufferTooSmall,
             imp::Error::Client(err) => match err {
                 aranya_client::Error::Connecting(_) => Self::Connecting,
-                aranya_client::Error::AfcRouter(_) => Self::AfcRouter,
                 aranya_client::Error::Rpc(_) => Self::Rpc,
                 aranya_client::Error::Daemon(_) => Self::Daemon,
-                aranya_client::Error::AfcShm(_) => Self::AfcShm,
                 aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Bug(_) => Self::Bug,
             },
@@ -128,7 +118,7 @@ pub fn error_to_str(err: u32) -> *const c_char {
 
 /// Extended error information.
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 72, align = 8)]
+#[aranya_capi_core::opaque(size = 80, align = 8)]
 pub type ExtError = Safe<imp::ExtError>;
 
 /// Copies the extended error's message into `msg`.
@@ -172,7 +162,7 @@ pub fn init_logging() -> Result<(), imp::Error> {
 
 /// A handle to an Aranya Client.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 2624, align = 16)]
+#[aranya_capi_core::opaque(size = 2656, align = 16)]
 pub type Client = Safe<imp::Client>;
 
 /// Team ID.
@@ -250,7 +240,9 @@ impl NetIdentifier {
     }
 }
 
-/// Label is an Aranya Fast Channel label.
+/// An AFC label.
+///
+/// It identifies the policy rules that govern the AFC channel.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
 pub struct Label(u32);
@@ -382,8 +374,7 @@ pub unsafe fn client_init(
     let afc_addr =
         // SAFETY: Caller must ensure pointer is a valid C String.
         unsafe { std::ffi::CStr::from_ptr(config.afc.addr) }
-        .to_str()?
-        .parse()?;
+        .to_str()?;
     let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
     let inner = rt.block_on(aranya_client::Client::connect(
         daemon_sock,
@@ -832,19 +823,22 @@ pub fn poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Erro
 /// @relates AranyaClient.
 pub fn send_data(client: &mut Client, chan: ChannelId, data: &[u8]) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.send_data(chan.0, data.to_vec()))?;
+    client.rt.block_on(client.inner.send_data(chan.0, data))?;
     Ok(())
 }
 
 /// Aranya Fast Channels (AFC) message info.
 #[repr(C)]
+#[derive(Debug)]
 pub struct AfcMsgInfo {
-    /// AFC channel ID.
+    /// Uniquely (globally) identifies the channel.
     pub channel: ChannelId,
-    /// AFC channel label.
+    /// The label applied to the channel.
     pub label: Label,
+    /// Identifies the position of the message in the channel.
+    ///
+    /// This can be used to sort out-of-order messages.
+    pub seq: u64,
     /// Peer's network socket address.
     pub addr: SocketAddr,
 }
@@ -896,34 +890,35 @@ impl From<std::net::SocketAddr> for SocketAddr {
 /// @param buf buffer to store message into.
 /// @param buf_len length of buffer.
 /// @param info information about the message [`AfcMsgInfo`].
+/// @result A boolean indicating whether any data was available.
 ///
 /// @relates AranyaClient.
 pub unsafe fn recv_data(
     client: &mut Client,
     buf: Writer<u8>,
     info: &mut MaybeUninit<AfcMsgInfo>,
-) -> Result<(), imp::Error> {
+) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
 
-    let msg = if let Some(msg) = &mut client.msg {
-        msg
-    } else {
-        // TODO: block or return Error::WouldBlock?
-        let msg = client.rt.block_on(client.inner.recv_data())?;
-        client.msg.insert(msg)
+    if client.msg.is_none() {
+        client.msg = client.inner.try_recv_data();
+    }
+    let Some(msg) = &mut client.msg else {
+        return Ok(false);
     };
 
-    // SAFETY: Caller must ensure `buf` is valid.
+    // SAFETY: The caller must ensure `buf` is valid.
     unsafe { buf.copy_to(|buf| buf.write_all(&msg.data)) }
         .map_err(|_| imp::Error::BufferTooSmall)?;
 
     info.write(AfcMsgInfo {
-        addr: msg.addr.into(),
         channel: ChannelId(msg.channel),
         label: msg.label.into(),
+        seq: msg.seq.to_u64(),
+        addr: msg.addr.into(),
     });
 
     client.msg = None;
 
-    Ok(())
+    Ok(true)
 }

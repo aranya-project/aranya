@@ -79,8 +79,8 @@ where
         };
         debug!(?len, "sync poll finished");
         send_buf.truncate(len);
-        let addr = SocketAddr::V4(addr.lookup().await?);
-        let mut stream = TcpStream::connect(addr).await?;
+        let mut stream = TcpStream::connect(addr.to_socket_addrs()).await?;
+        let addr = stream.peer_addr()?;
 
         stream
             .write_all(&send_buf)
