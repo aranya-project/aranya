@@ -8,6 +8,8 @@ license = "AGPL-3.0-only"
 repository = "https://github.com/aranya-project/aranya"
 rust-version = "1.81"
 
+[workspace]
+
 [lints.rust]
 # missing_docs = "warn"
 rust_2018_idioms = { level = "warn", priority = -1 }
