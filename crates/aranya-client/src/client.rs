@@ -1,42 +1,51 @@
-//! Aranya Client Rust library.
+//! Client-daemon connection.
 
-use std::{collections::BTreeMap, net::SocketAddr, path::Path, str::FromStr, time::Duration};
+use std::{collections::VecDeque, net::SocketAddr, path::Path, time::Duration};
 
-use aranya_daemon_api::{
-    AfcId, DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, CS,
-};
-use aranya_fast_channels::{shm::ReadState, ChannelId, Label};
+pub use aranya_daemon_api::AfcId;
+use aranya_daemon_api::{DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, CS};
+use aranya_fast_channels::{self as afc, shm::ReadState, ChannelId};
+pub use aranya_fast_channels::{Label, Seq};
 use aranya_util::addr::Addr;
 use tarpc::{context, tokio_serde::formats::Json};
+use tokio::net::ToSocketAddrs;
 use tracing::{debug, info, instrument};
 
 use crate::{
-    afc::{setup_afc_shm, App, DataType, Router},
+    afc::{setup_afc_shm, Afc, Msg, State},
     Error, Result,
 };
 
 /// Data that can be polled by the AFC router.
 #[must_use]
-pub struct PollData(DataType);
+#[derive(Debug)]
+pub struct PollData(State);
 
-/// Aranya client for invoking actions on and processing effects from the Aranya graph.
+/// A client for invoking actions on and processing effects from
+/// the Aranya graph.
 ///
-/// The Aranya client interacts with the `daemon` via the `aranya-daemon-api` unix domain socket `tarpc` API.
-/// The client provides Aranya Fast Channels functionality by interfacing with Aranya Fast Channel utilities in the `aranya-core` repo.
+/// `Client` interacts with the [Aranya daemon] via
+/// [`aranya-daemon-api`] ([`tarpc`] over Unix domain sockets).
+/// The client provides AFC functionality by interfacing with AFC
+/// utilities in the Aranya core crates.
+///
+/// [Aranya daemon]: https://crates.io/crates/aranya-daemon
+/// [`aranya-daemon-api`]: https://crates.io/crates/aranya-daemon-api
+/// [`tarpc`]: https://crates.io/crates/tarpc
+#[derive(Debug)]
 pub struct Client {
-    /// Client for interacting with the `aranya-daemon` process via the `aranya-daemon-api` API.
+    /// RPC connection to the daemon.
     daemon: DaemonApiClient,
-    /// Aranya Fast Channels (AFC) data router.
-    /// Encrypts plaintext based on AFC labels and sends it via the TCP transport.
-    afc: Router<ReadState<CS>>,
-    /// Application abstraction for sending/receiving data between the application and the AFC router.
-    app: App,
-    /// Aranya Fast Channel (AFC) channels.
-    /// Keeps track of info for each channel.
-    chans: BTreeMap<AfcId, (TeamId, NetIdentifier, Label)>,
+    /// AFC support.
+    afc: Afc<ReadState<CS>>,
+    /// Messages from `handle_data`.
+    msgs: VecDeque<AfcMsg>,
+    #[cfg(feature = "debug")]
+    name: String,
 }
 
 /// An Aranya Fast Channel message.
+#[derive(Clone, Debug, PartialEq)]
 pub struct AfcMsg {
     /// The plaintext data.
     pub data: Vec<u8>,
@@ -46,161 +55,231 @@ pub struct AfcMsg {
     pub channel: AfcId,
     /// The Aranya Fast Channel label associated with the message.
     pub label: Label,
+    /// The order of the message in the channel.
+    pub seq: Seq,
 }
 
 impl Client {
-    /// Creates a client connected to the daemon.
-    #[instrument(skip_all)]
-    pub async fn connect(
+    /// Creates a client connection to the daemon.
+    ///
+    /// - `daemon_sock`: The socket path to communicate with the
+    ///   daemon.
+    /// - `afc_shm_path`: AFC's shared memory path. The daemon
+    ///   must also use the same path.
+    /// - `max_chans`: The maximum number of channels that AFC
+    ///   should support. The daemon must also use the same
+    ///   number.
+    /// - `afc_listen_addr`: The address that AFC listens for
+    ///   incoming connections on.
+    #[instrument(skip_all, fields(?daemon_sock, ?afc_shm_path, max_chans))]
+    pub async fn connect<A>(
         daemon_sock: &Path,
         afc_shm_path: &Path,
         max_chans: usize,
-        afc_addr: Addr,
-    ) -> Result<Self> {
+        afc_listen_addr: A,
+    ) -> Result<Self>
+    where
+        A: ToSocketAddrs,
+    {
         info!("starting Aranya client");
-        info!("uds path: {:?}", daemon_sock);
+
         let transport = tarpc::serde_transport::unix::connect(daemon_sock, Json::default)
             .await
             .map_err(Error::Connecting)?;
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
-        debug!("connected to: {:?}", daemon_sock);
+        debug!("connected to daemon");
+
         let read = setup_afc_shm(afc_shm_path, max_chans)?;
-        let afc = aranya_fast_channels::Client::new(read);
-        let (afc, app) = Router::new(afc, afc_addr).await.map_err(Error::AfcRouter)?;
+        let afc = Afc::new(afc::Client::new(read), afc_listen_addr).await?;
         debug!(
-            "afc router bound to: {:?}",
-            afc.local_addr().map_err(Error::AfcRouter)?
+            addr = ?afc.local_addr().map_err(Error::Afc)?,
+            "bound AFC router",
         );
         Ok(Self {
             daemon,
             afc,
-            app,
-            chans: BTreeMap::new(),
+            msgs: VecDeque::new(),
+            #[cfg(feature = "debug")]
+            name: String::new(),
         })
     }
 
-    /// Returns address Aranya sync server bound to.
+    #[doc(hidden)]
+    pub fn set_name(&mut self, _name: String) {
+        #[cfg(feature = "debug")]
+        {
+            self.name = _name;
+        }
+    }
+
+    #[cfg(feature = "debug")]
+    fn debug(&self) -> &str {
+        &self.name
+    }
+
+    #[cfg(not(feature = "debug"))]
+    fn debug(&self) -> tracing::field::Empty {
+        tracing::field::Empty
+    }
+
+    /// Returns the address that the Aranya sync server is bound
+    /// to.
     pub async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.daemon.aranya_local_addr(context::current()).await??)
     }
 
-    /// Returns address Aranya Fast Channels (AFC) server bound to.
+    /// Returns the address that AFC is bound to.
     pub async fn afc_local_addr(&self) -> Result<SocketAddr> {
-        self.afc.local_addr().map_err(Error::AfcRouter)
+        self.afc.local_addr().map_err(Into::into)
     }
 
-    /// Creates a bidirectional Aranya Fast Channel (AFC).
+    /// Creates a bidirectional AFC channel with a peer.
     ///
-    /// The device initiates creation of an Aranya Fast Channel with another peer.
-    /// The channel is created using a specific label which means both peers must already have permission to use that label.
-    /// During setup, an encrypted `ctrl` message is sent to the peer containing effects required to initialize the channel keys.
-    /// When the peer receives the `ctrl` effects, it is able to configure a corresponding set of channel keys in order to perform `open`/`seal` operations for the channel.
+    /// `label` associates the channel with a set of policy rules
+    /// that govern the channel. Both peers must already have
+    /// permission to use the label.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is NOT safe to cancel the resulting future. Doing so
+    /// might lose data.
+    #[instrument(skip_all, fields(self = self.debug(), %team_id, %peer, %label))]
     pub async fn create_bidi_channel(
         &mut self,
-        team: TeamId,
+        team_id: TeamId,
         peer: NetIdentifier,
         label: Label,
     ) -> Result<AfcId> {
-        debug!("creating AFC channel in Aranya");
+        debug!("creating bidi channel");
+
         let node_id = self.afc.get_next_node_id().await?;
+        debug!(%node_id, "selected node ID");
+
         let (afc_id, ctrl) = self
             .daemon
-            .create_bidi_channel(context::current(), team, peer.clone(), node_id, label)
+            .create_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
             .await??;
-        debug!("creating AFC channel in AFC");
-        // TODO: use existing mapping from `assign_net_identifier`
-        let addr = Addr::from_str(&peer.0)
-            .map_err(|_| Error::AfcRouter(crate::afc::AfcRouterError::AppWrite))?;
-        let addr = addr
-            .lookup()
-            .await
-            .map_err(|_| Error::AfcRouter(crate::afc::AfcRouterError::AppWrite))?;
-        debug!(?label, ?team, ?addr, "sending ctrl msg");
-        let channel_id = ChannelId::new(node_id, label);
-        self.afc.insert_channel_id(afc_id, channel_id).await?;
-        self.app.send_ctrl(SocketAddr::V4(addr), team, ctrl).await?;
-        self.chans.insert(afc_id, (team, peer, label));
-        debug!(?team, ?addr, ?label, "AFC channel created");
+        debug!(%afc_id, %node_id, %label, "created bidi channel");
+
+        let chan_id = ChannelId::new(node_id, label);
+        self.afc
+            .send_ctrl(peer, ctrl, team_id, afc_id, chan_id)
+            .await?;
+        debug!("sent control message");
+
         Ok(afc_id)
     }
 
-    /// Deletes an Aranya Fast Channel (AFC).
-    pub async fn delete_channel(&mut self, chan: AfcId) -> Result<()> {
-        let _ctrl = self
-            .daemon
-            .delete_channel(context::current(), chan)
-            .await??;
-        self.chans.remove(&chan);
-        // TODO: delete AFC channel from AFC router.
-        todo!()
+    /// Deletes an AFC channel.
+    // TODO(eric): Is it an error if the channel does not exist?
+    #[instrument(skip_all, fields(self = self.debug(), afc_id = %id))]
+    pub async fn delete_channel(&mut self, id: AfcId) -> Result<()> {
+        let _ctrl = self.daemon.delete_channel(context::current(), id).await??;
+        self.afc.remove_channel(id).await;
+        // TODO(eric): Send control message.
+        // self.afc.send_ctrl(peer, ctrl, team_id, id, chan_id);
+        Ok(())
     }
 
-    /// Poll the Aranya Fast Channel router for new data and handle it.
+    /// Polls the client to check for new data, then retrieves
+    /// any new data.
+    ///
+    /// This is shorthand for [`poll`][Self::poll] and
+    /// [`handle_data`][Self::handle_data].
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is NOT safe to cancel the resulting future. Doing so
+    /// might lose data.
+    #[instrument(skip_all)]
     pub async fn poll(&mut self) -> Result<()> {
         let data = self.poll_data().await?;
         self.handle_data(data).await
     }
 
-    /// Poll the Aranya Fast Channel router for new data.
+    /// Polls the client to check for new data.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is safe to cancel the resulting future.
+    #[instrument(skip_all)]
     pub async fn poll_data(&mut self) -> Result<PollData> {
-        #![allow(clippy::disallowed_macros)]
-        let data = tokio::select! {
-            biased;
-            result = self.app.recv_ctrl() => result?,
-            result = self.afc.poll() => result?,
-        };
+        let data = self.afc.poll().await?;
         Ok(PollData(data))
     }
 
-    /// Handle any received data from the Aranya Fast Channel router.
+    /// Retrieves data from [`poll`][Self::poll].
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is NOT safe to cancel the resulting future. Doing so
+    /// might lose data.
+    #[instrument(skip_all, fields(self = self.debug(), ?data))]
     pub async fn handle_data(&mut self, data: PollData) -> Result<()> {
         match data.0 {
-            DataType::Ctrl(ctrl) => {
-                debug!("client lib received AFC ctrl msg");
-                let node_id = ctrl.node_id;
-                let (afc_id, net, label) = self
-                    .daemon
-                    .receive_afc_ctrl(context::current(), ctrl.team_id, node_id, ctrl.afc_ctrl)
-                    .await??;
-                let channel_id = ChannelId::new(node_id, label);
-                self.afc.insert_channel_id(afc_id, channel_id).await?;
-                self.chans.insert(afc_id, (ctrl.team_id, net, label));
-            }
-            _ => {
-                self.afc.handle_data(data.0).await?;
-            }
+            State::Accept(addr) | State::Msg(addr) => match self.afc.read_msg(addr).await? {
+                Msg::Data(data) => {
+                    debug!(%addr, "read data message");
+
+                    let (data, channel, label, seq) = self.afc.open_data(data)?;
+                    self.msgs.push_back(AfcMsg {
+                        data,
+                        addr,
+                        channel,
+                        label,
+                        seq,
+                    });
+                    debug!(n = self.msgs.len(), "stored msg");
+                }
+                Msg::Ctrl(ctrl) => {
+                    debug!(%addr, "read control message");
+
+                    let node_id = self.afc.get_next_node_id().await?;
+                    debug!(%node_id, "selected node ID");
+
+                    let (afc_id, peer, label) = self
+                        .daemon
+                        .receive_afc_ctrl(context::current(), ctrl.team_id, node_id, ctrl.cmd)
+                        .await??;
+                    debug!(%node_id, %label, "applied AFC control msg");
+
+                    let chan_id = ChannelId::new(node_id, label);
+                    self.afc
+                        .add_channel(afc_id, peer, ctrl.team_id, chan_id, addr)
+                        .await?;
+                }
+            },
         }
         Ok(())
     }
 
-    /// Send data via a specific Aranya Fast Channel.
-    pub async fn send_data(&mut self, chan: AfcId, data: Vec<u8>) -> Result<()> {
-        let (_team_id, peer, label) = self
-            .chans
-            .get(&chan)
-            .ok_or(crate::afc::AfcRouterError::AppWrite)?;
-        let addr = Addr::from_str(&peer.0).map_err(|_| crate::afc::AfcRouterError::AppWrite)?;
-        let addr = addr
-            .lookup()
-            .await
-            .map_err(|_| crate::afc::AfcRouterError::AppWrite)?;
-        self.app
-            .send_data(SocketAddr::V4(addr), *label, chan, data)
-            .await?;
-        Ok(())
+    /// Send data over a specific fast channel.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is safe to cancel the resulting future. However,
+    /// a partial message may be written to the channel.
+    // TODO(eric): Return a sequence number?
+    #[instrument(skip_all, fields(self = self.debug(), afc_id = %id))]
+    pub async fn send_data(&mut self, id: AfcId, data: &[u8]) -> Result<()> {
+        self.afc.send_data(id, data).await.map_err(Into::into)
     }
 
-    /// Receive data from an Aranya Fast Channel.
+    /// Retrieves the next AFC message, if any.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is NOT safe to cancel the resulting future. Doing so
+    /// might lose data.
     // TODO: return [`NetIdentifier`] instead of [`SocketAddr`].
-    pub async fn recv_data(&mut self) -> Result<AfcMsg> {
-        let (plaintext, addr, afc_id, label) = self.app.recv().await.map_err(Error::AfcRouter)?;
-        debug!(n = plaintext.len(), "received AFC data message");
-        Ok(AfcMsg {
-            data: plaintext,
-            addr,
-            channel: afc_id,
-            label,
-        })
+    // TODO: read into buffer instead of returning `Vec<u8>`.
+    #[instrument(skip_all, fields(self = self.debug()))]
+    pub fn try_recv_data(&mut self) -> Option<AfcMsg> {
+        // TODO(eric): This method should block until a message
+        // has been received.
+        let msg = self.msgs.pop_front()?;
+        debug!(label = %msg.label, seq = %msg.seq, "received AFC data message");
+        Some(msg)
     }
 }
 

@@ -7,26 +7,26 @@
 //! - Conversions to/from SocketAddr, IPv4, IPv6.
 //! - Checking for valid formatting.
 
-use core::{
+use std::{
     cmp::Ordering,
-    fmt,
+    error, fmt,
     hash::{Hash, Hasher},
+    io,
     mem::size_of,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     ops::Deref,
     slice, str,
     str::FromStr,
 };
-use std::{error, net::SocketAddrV4};
 
-use anyhow::{bail, Context, Result};
+use anyhow::Result;
 use aranya_buggy::Bug;
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
 };
-use tokio::net;
-use tracing::debug;
+use tokio::net::{self, ToSocketAddrs};
+use tracing::{debug, instrument};
 
 macro_rules! const_assert {
     ($($tt:tt)*) => {
@@ -72,21 +72,17 @@ impl Addr {
         self.port
     }
 
-    /// Returns the first `SocketAddrV4` from DNS lookup.
-    pub async fn lookup(&self) -> Result<SocketAddrV4> {
-        debug!(addr = ?self, "dns lookup");
-        let addrs = net::lookup_host(Into::<(&str, u16)>::into(self))
-            .await
-            .context("could not resolve host")?;
+    /// Performs a DNS lookup.
+    #[instrument(skip_all, fields(host = %self))]
+    pub async fn lookup(&self) -> io::Result<impl Iterator<Item = SocketAddr> + '_> {
+        debug!("performing DNS lookup");
 
-        for addr in addrs {
-            if let SocketAddr::V4(sock_addr) = addr {
-                debug!(addr = ?self, ?sock_addr, "dns resolved");
-                return Ok(sock_addr);
-            };
-        }
+        net::lookup_host(Into::<(&str, u16)>::into(self)).await
+    }
 
-        bail!("dns could not resolve host: {}", self)
+    /// Converts the `Addr` to a [`ToSocketAddrs`].
+    pub fn to_socket_addrs(&self) -> impl ToSocketAddrs + '_ {
+        Into::<(&str, u16)>::into(self)
     }
 }
 
@@ -113,6 +109,9 @@ impl FromStr for Addr {
     type Err = AddrError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(addr) = SocketAddr::from_str(s) {
+            return Ok(addr.into());
+        }
         match s.split_once(':') {
             Some((host, port)) => {
                 let port = port
@@ -120,14 +119,19 @@ impl FromStr for Addr {
                     .map_err(|_| AddrError::InvalidAddr("invalid port syntax"))?;
                 Self::new(host, port)
             }
-            None => Err(AddrError::InvalidAddr("missing ':'")),
+            None => Err(AddrError::InvalidAddr("missing ':' in `host:port`")),
         }
     }
 }
 
 impl fmt::Display for Addr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.host(), self.port())
+        if self.host().contains(':') {
+            let ip = Ipv6Addr::from_str(self.host()).map_err(|_| fmt::Error)?;
+            SocketAddr::from((ip, self.port())).fmt(f)
+        } else {
+            write!(f, "{}:{}", self.host(), self.port())
+        }
     }
 }
 
@@ -573,8 +577,6 @@ impl From<Bug> for AddrError {
 #[allow(clippy::indexing_slicing, clippy::expect_used)]
 #[cfg(test)]
 mod tests {
-    use anyhow::Result;
-
     use super::*;
 
     #[test]
@@ -597,17 +599,14 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_addr_new() -> Result<()> {
-        let got = SocketAddr::V4(
-            Addr::new("localhost", 443)
-                .expect("should be valid `Addr`")
-                .lookup()
-                .await?,
-        );
-        let want: SocketAddr = (Ipv4Addr::LOCALHOST, 443).into();
-        assert_eq!(got, want);
-        Ok(())
+    #[test]
+    fn test_addr_parse() {
+        let tests = ["127.0.0.1:8080", "[2001:db8::1]:8080"];
+        for test in tests {
+            let got = Addr::from_str(test).unwrap();
+            let want = SocketAddr::from_str(test).unwrap();
+            assert_eq!(got, want.into());
+        }
     }
 
     #[test]

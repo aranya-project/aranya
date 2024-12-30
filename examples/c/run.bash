@@ -8,6 +8,21 @@ if command -v shellcheck; then
 	shellcheck "${0}"
 fi
 
+if ! command -v patchelf &>/dev/null; then
+	echo "please install patchelf"
+	exit 1
+fi
+
+if ! command -v cargo &>/dev/null; then
+	echo "please install Rust"
+	exit 1
+fi
+
+if ! command -v cmake &>/dev/null; then
+	echo "please install cmake"
+	exit 1
+fi
+
 declare -a users=("owner" "admin" "operator" "membera" "memberb")
 
 proj="$(cargo locate-project --workspace --message-format plain)"

@@ -94,6 +94,9 @@ typedef struct {
 } Client;
 
 // Aranya team.
+//
+// Contains the team ID and all Aranya clients for the users on this example's
+// team.
 typedef struct {
     AranyaTeamId id;
     union {
@@ -120,7 +123,7 @@ AranyaError add_sync_peers(Team *t);
 AranyaError run(Team *t);
 AranyaError cleanup_team(Team *t);
 
-// Initialize Aranya client.
+// Initialize an Aranya client.
 AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
                         const char *shm_path, const char *afc_addr) {
     AranyaError err;
@@ -148,7 +151,8 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
     return ARANYA_ERROR_SUCCESS;
 }
 
-// Initialize Aranya team.
+// Initialize the Aranya `Team` by first initializing the team's clients and
+// then creates the team.
 AranyaError init_team(Team *t) {
     AranyaError err;
 
@@ -160,13 +164,15 @@ AranyaError init_team(Team *t) {
     }
 
     // have owner create the team.
+    // The `aranya_create_team` method is used to create a new graph for the
+    // team to operate on.
     err = aranya_create_team(&t->clients.owner.client, &t->id);
     EXPECT("error creating team", err);
 
     return ARANYA_ERROR_SUCCESS;
 }
 
-// Cleanup Aranya team.
+// Cleanup Aranya `Team`.
 AranyaError cleanup_team(Team *t) {
     AranyaError err;
     AranyaError retErr = ARANYA_ERROR_SUCCESS;
@@ -226,6 +232,12 @@ AranyaError run(Team *t) {
     err = add_sync_peers(t);
     EXPECT("error adding sync peers", err);
 
+    // Team members are added to the team by first calling
+    // `aranya_add_device_to_team`, passing in the submitter's client, the
+    // team ID and the public key of the device to be added. In a real world
+    // scenario, the keys would be exchanged outside of Aranya using something
+    // like `scp`.
+
     // add admin to team.
     err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
                                     &t->clients.admin.pk);
@@ -258,10 +270,19 @@ AranyaError run(Team *t) {
 
     sleep(1);
 
+    // Once all team members are added and the appropriate roles have been
+    // assigned, the team works together to send data using Aranya Fast
+    // Channels.
+    // First, a label must be created to associate a channel to its permitted
+    // users using the `aranya_create_label` function.
+
     // operator creates AFC labels and assigns them to team members.
     AranyaLabel label = 42;
     err = aranya_create_label(&t->clients.operator.client, &t->id, label);
     EXPECT("error creating afc label", err);
+
+    // Then, the label is assigned to the `Member`s on the team, membera and
+    // memberb using `aranya_assign_label`.
 
     err = aranya_assign_label(&t->clients.operator.client, &t->id,
                               &t->clients.membera.id, label);
@@ -270,6 +291,12 @@ AranyaError run(Team *t) {
     err = aranya_assign_label(&t->clients.operator.client, &t->id,
                               &t->clients.memberb.id, label);
     EXPECT("error assigning afc label to memberb", err);
+
+    // Once the label is created and assigned, the devices that will
+    // communicate via Aranya Fast Channels must be assigned a network
+    // identifier. This is used by Fast Channels to properly translate
+    // between network names and devices. Network identifiers are assigned
+    // using the `aranya_assign_net_identifiers` function.
 
     // assign AFC network addresses.
     err = aranya_assign_net_identifier(&t->clients.operator.client, &t->id,
@@ -283,6 +310,11 @@ AranyaError run(Team *t) {
     EXPECT("error assigning net name to memberb", err);
 
     sleep(1);
+
+    // Once membera and memberb have been assigned the label and their network
+    // identifiers, a Fast Channel can be created. In this example, membera
+    // will create the channel using `aranya_create_bidi_channel`. This will
+    // create a bidirectional Aranya Fast Channel.
 
     // create AFC channel between membera and memberb.
     AranyaChannelId chan_id;
@@ -303,6 +335,9 @@ AranyaError run(Team *t) {
             break;
         }
     }
+
+    // Once created, membera can send a message over the channel using
+    // `aranya_send_data`.
 
     // send AFC data.
     const char *send = "hello world";
@@ -325,12 +360,19 @@ AranyaError run(Team *t) {
         }
     }
 
+    // Memberb uses `aranya_recv_data` to receive the incoming message.
+
     // receive AFC data.
     AranyaAfcMsgInfo info;
     uint8_t buf[BUF_LEN];
     size_t len = BUF_LEN;
-    err        = aranya_recv_data(&t->clients.memberb.client, buf, &len, &info);
+    bool ok    = false;
+    err = aranya_recv_data(&t->clients.memberb.client, buf, &len, &info, &ok);
     EXPECT("error receiving data", err);
+    if (!ok) {
+        fprintf(stderr, "`aranya_recv_data` returned `false`\n");
+        return ARANYA_ERROR_AFC;
+    }
     printf("%s received afc message from %s: len: %zu, label: %d \r\n",
            t->clients_arr[MEMBERB].name, t->clients_arr[MEMBERA].name, len,
            info.label);

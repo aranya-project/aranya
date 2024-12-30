@@ -1,7 +1,8 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-use core::{fmt, net::SocketAddr, time::Duration};
+use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
 
+use aranya_base58::ToBase58;
 use aranya_crypto::{
     afc::{BidiChannelId, UniChannelId},
     custom_id,
@@ -76,16 +77,30 @@ pub enum Role {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
 pub struct NetIdentifier(pub String);
 
-/// Number of bytes in the [`AfcId`]
-const AFC_ID_LEN: usize = 16;
+impl AsRef<str> for NetIdentifier {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
 
-/// [`AfcId`] is a [`BidiChannelId`] or [`UniChannelId`]
-/// truncated from 512 bits down to 128 bits.
-/// It uniquely identifies an Aranya fast channel.
+impl fmt::Display for NetIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// Uniquely identifies an AFC channel.
+///
+/// It is a [`BidiChannelId`] or [`UniChannelId`] truncated to
+/// 128 bits.
 #[repr(transparent)]
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-pub struct AfcId {
-    id: [u8; AFC_ID_LEN],
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct AfcId([u8; 16]);
+
+impl fmt::Display for AfcId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.to_base58())
+    }
 }
 
 fn truncate<const BIG: usize, const SMALL: usize>(arr: &[u8; BIG]) -> &[u8; SMALL] {
@@ -96,27 +111,21 @@ fn truncate<const BIG: usize, const SMALL: usize>(arr: &[u8; BIG]) -> &[u8; SMAL
 /// Convert from [`BidiChannelId`] to [`AfcId`]
 impl From<BidiChannelId> for AfcId {
     fn from(value: BidiChannelId) -> Self {
-        Self {
-            id: *truncate(value.as_array()),
-        }
+        Self(*truncate(value.as_array()))
     }
 }
 
 /// Convert from [`UniChannelId`] to [`AfcId`]
 impl From<UniChannelId> for AfcId {
     fn from(value: UniChannelId) -> Self {
-        Self {
-            id: *truncate(value.as_array()),
-        }
+        Self(*truncate(value.as_array()))
     }
 }
 
 /// Convert from [`Id`] to [`AfcId`]
 impl From<Id> for AfcId {
     fn from(value: Id) -> Self {
-        Self {
-            id: *truncate(value.as_array()),
-        }
+        Self(*truncate(value.as_array()))
     }
 }
 
