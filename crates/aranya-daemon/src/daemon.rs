@@ -1,4 +1,4 @@
-use std::{io, net::SocketAddr, path::Path, str::FromStr, sync::Arc};
+use std::{io, path::Path, str::FromStr, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use aranya_crypto::{
@@ -156,7 +156,7 @@ impl Daemon {
 
         let server = {
             info!(addr = %external_sync_addr, "starting TCP server");
-            let listener = TcpListener::bind(SocketAddr::V4(external_sync_addr.lookup().await?))
+            let listener = TcpListener::bind(external_sync_addr.to_socket_addrs())
                 .await
                 .context("unable to bind TCP listener")?;
             Server::new(Arc::clone(&aranya), listener)

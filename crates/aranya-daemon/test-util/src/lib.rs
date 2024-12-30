@@ -173,7 +173,7 @@ impl TestCtx {
                 .context("unable to generate `KeyBundle`")?;
 
             let (listener, local_addr) = {
-                let listener = TcpListener::bind(addr.lookup().await?)
+                let listener = TcpListener::bind(addr.to_socket_addrs())
                     .await
                     .context("unable to bind `TcpListener`")?;
                 let local_addr = listener.local_addr()?;
