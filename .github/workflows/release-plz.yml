@@ -30,6 +30,7 @@ jobs:
         run: cargo install --version '0.3.112' --locked release-plz
       - name: Run release-plz
         run: |
+            release-plz init
             release-plz release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -52,6 +53,7 @@ jobs:
         run: cargo install --version '0.3.112' --locked release-plz
       - name: Run release-plz
         run: |
+            release-plz init
             release-plz update
             release-plz release-pr
         env:
