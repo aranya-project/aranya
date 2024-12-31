@@ -26,7 +26,7 @@ aranya-buggy = { workspace = true }
 aranya-capi-core = "0.1.0"
 aranya-fast-channels = { workspace = true }
 
-libc = { version = "0.2", features = ["extra_traits"] }
+libc = { workspace = true, features = ["extra_traits"] }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }

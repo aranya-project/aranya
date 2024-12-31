@@ -132,10 +132,6 @@ enum AranyaError
      */
     ARANYA_ERROR_CONNECTING,
     /**
-     * AFC router error.
-     */
-    ARANYA_ERROR_AFC_ROUTER,
-    /**
      * Could not send request to daemon.
      */
     ARANYA_ERROR_RPC,
@@ -143,10 +139,6 @@ enum AranyaError
      * Daemon reported error.
      */
     ARANYA_ERROR_DAEMON,
-    /**
-     * AFC shared memory error.
-     */
-    ARANYA_ERROR_AFC_SHM,
     /**
      * AFC library error.
      */
@@ -195,7 +187,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaExtError {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[72];
+    uint8_t __for_size_only[80];
 } AranyaExtError;
 
 /**
@@ -207,7 +199,7 @@ typedef struct ARANYA_ALIGNED(16) AranyaClient {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[2624];
+    uint8_t __for_size_only[2656];
 } AranyaClient;
 
 /**
@@ -316,7 +308,9 @@ typedef uint64_t AranyaDuration;
 typedef const char *AranyaNetIdentifier;
 
 /**
- * Label is an Aranya Fast Channel label.
+ * An AFC label.
+ *
+ * It identifies the policy rules that govern the AFC channel.
  */
 typedef uint32_t AranyaLabel;
 
@@ -342,13 +336,19 @@ typedef struct sockaddr_storage AranyaSocketAddr;
  */
 typedef struct AranyaAfcMsgInfo {
     /**
-     * AFC channel ID.
+     * Uniquely (globally) identifies the channel.
      */
     struct AranyaChannelId channel;
     /**
-     * AFC channel label.
+     * The label applied to the channel.
      */
     AranyaLabel label;
+    /**
+     * Identifies the position of the message in the channel.
+     *
+     * This can be used to sort out-of-order messages.
+     */
+    uint64_t seq;
     /**
      * Peer's network socket address.
      */
@@ -1198,13 +1198,15 @@ AranyaError aranya_send_data_ext(struct AranyaClient *client,
  * @param buf buffer to store message into.
  * @param buf_len length of buffer.
  * @param info information about the message [`AranyaAfcMsgInfo`](@ref AranyaAfcMsgInfo).
+ * @result A boolean indicating whether any data was available.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_recv_data(struct AranyaClient *client,
                              uint8_t *buf,
                              size_t *buf_len,
-                             struct AranyaAfcMsgInfo *info);
+                             struct AranyaAfcMsgInfo *info,
+                             bool *__output);
 
 /**
  * Receive Aranya Fast Channels (AFC) data.
@@ -1213,6 +1215,7 @@ AranyaError aranya_recv_data(struct AranyaClient *client,
  * @param buf buffer to store message into.
  * @param buf_len length of buffer.
  * @param info information about the message [`AranyaAfcMsgInfo`](@ref AranyaAfcMsgInfo).
+ * @result A boolean indicating whether any data was available.
  *
  * @relates AranyaClient.
  */
@@ -1220,6 +1223,7 @@ AranyaError aranya_recv_data_ext(struct AranyaClient *client,
                                  uint8_t *buf,
                                  size_t *buf_len,
                                  struct AranyaAfcMsgInfo *info,
+                                 bool *__output,
                                  struct AranyaExtError *__ext_err);
 
 #ifdef __cplusplus
