@@ -1,5 +1,6 @@
 [package]
 name = "test-util"
+version = "0.1.0"
 description = "Test utilities for the daemon"
 publish = false
 authors.workspace = true
