@@ -475,7 +475,7 @@ version = "0.13.6"
 criteria = "safe-to-deploy"
 
 [[exemptions.proptest]]
-version = "1.5.0"
+version = "1.6.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.rand]]

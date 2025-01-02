@@ -9,13 +9,9 @@ audited_as = "0.2.0"
 version = "0.3.0"
 audited_as = "0.2.0"
 
-[[unpublished.aranya-daemon-api]]
-version = "0.3.0"
-audited_as = "0.2.0"
-
 [[publisher.aranya-afc-util]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -56,8 +52,8 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.2.1"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -68,8 +64,8 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto-ffi]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -80,32 +76,32 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-daemon-api]]
-version = "0.2.0"
-when = "2024-11-12"
+version = "0.3.0"
+when = "2024-12-20"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-device-ffi]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-envelope-ffi]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-fast-channels]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-idam-ffi]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -122,8 +118,8 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-perspective-ffi]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -134,20 +130,20 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-compiler]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-derive]]
-version = "0.1.1"
-when = "2024-12-04"
+version = "0.2.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.1"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -158,8 +154,8 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-macro]]
-version = "0.1.0"
-when = "2024-10-16"
+version = "0.2.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -170,20 +166,20 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-module]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-vm]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.1"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-runtime]]
-version = "0.2.0"
-when = "2024-12-04"
+version = "0.3.0"
+when = "2024-12-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
