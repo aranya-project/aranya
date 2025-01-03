@@ -48,7 +48,9 @@ Channels.
 Download the source code from this repository. Navigate to the
 [`aranya-client-capi` C API example](examples/c/) and run the application:
 
-`cargo make run-capi-example`
+```
+cargo make run-capi-example
+```
 
 This will also build local doxygen documentation for the
 [`aranya-client-capi`](crates/aranya-client-capi/docs/). Open the
@@ -82,16 +84,19 @@ To generate a new workspace from the `templates/aranya-example` crate:
 `cargo generate https://github.com/aranya-project/aranya templates/aranya-example`
 
 Navigate into the new workspace directory:
-`cd aranya-example`
-
-Build the example:
-`cargo build --release`
+```
+cd aranya-example
+```
 
 Run the example:
-`target/release/aranya-example`
+```
+cargo run --release --bin aranya-example
+```
 
 Set the tracing log level with the `ARANYA_EXAMPLE` environment variable:
-`ARANYA_EXAMPLE=info target/release/aranya-example`
+```
+ARANYA_EXAMPLE=info cargo run --release --bin aranya-example
+```
 
 Refer to the `aranya-example` crate's README for more information:
 [Aranya Example README.md](templates/aranya-example/README.md)
