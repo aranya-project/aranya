@@ -12,7 +12,7 @@ During setup, the example application starts an instance of the `aranya-daemon` 
 
 # Generate a new workspace from this template:
 
-`cargo generate https://github.com/aranya-project/aranya templates/aranya-example`
+`cargo generate aranya-project/aranya templates/aranya-example`
 
 # Building the example
 

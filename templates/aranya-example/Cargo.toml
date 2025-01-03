@@ -1,5 +1,5 @@
 [package]
-name = "aranya-example"
+name = "{{project-name}}"
 description = "Example Rust program using the Aranya client library"
 version = "0.1.0"
 authors = ["SpiderOak, Inc."]
@@ -30,12 +30,11 @@ wildcard_imports = "warn"
 
 [dependencies]
 # To allow `cargo-generate` to work, explicitly define dependency versions rather than importing the repo's workspace `Cargo.toml`.
-# TODO: use `cargo-generate` liquid rhai filters to autopopulate dependency versions.
-
 aranya-client = { version = "0.2.0" }
 aranya-daemon = { version = "0.2.0" }
 
 aranya-daemon-api = { version = "0.2.0" }
+# TODO: re-export required AFC types from another crate so this doesn't need to be imported here
 aranya-fast-channels = { version = "0.1.0", features = ["posix", "std", "memory"] }
 aranya-util = { version = "0.1.0" }
 
