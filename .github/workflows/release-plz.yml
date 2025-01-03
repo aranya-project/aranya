@@ -27,7 +27,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Run release-plz
-        uses: release-plz/action@v0.5
+        uses: aranya-project/release-plz-action@main
         with:
           command: release
         env:
@@ -48,7 +48,7 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/setup
       - name: Run release-plz
-        uses: release-plz/action@v0.5
+        uses: aranya-project/release-plz-action@main
         with:
           command: release-pr
         env:
