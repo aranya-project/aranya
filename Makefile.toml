@@ -209,7 +209,7 @@ script = "tar -czf rust-docs.tar.gz -C target/doc ."
 description = "Install nightly rust"
 # First check if the toolchain is installed, because that is much faster.
 # Don't do this if you want to keep a rolling channel up-to-date.
-script = "rustup run ${NIGHTLY} true 2>/dev/null || rustup toolchain install ${NIGHTLY}"
+script = "rustup run ${NIGHTLY} true 2>/dev/null || rustup toolchain install ${NIGHTLY} --profile minimal -c rustfmt"
 
 [tasks.git-unchanged]
 description = "Verify files are unchanged"
@@ -235,4 +235,4 @@ category = "examples"
 description = "Run C example application"
 cwd = "examples/c"
 script = "./run.bash"
-dependencies = ["build-capi", "install-cbindgen"]
+dependencies = ["build-capi-header", "build-capi-lib"]

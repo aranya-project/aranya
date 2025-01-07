@@ -11,11 +11,6 @@ on:
       workflow:
         required: true
         type: string
-    secrets:
-      CC_BUILD_TOKEN:
-        required: true
-      GH_DOTCOM_TOKEN:
-        required: true
 
 env:
   REV: ${{ github.run_id }}
@@ -29,22 +24,16 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner: "self-hosted-linux-arm"
-            artifact: "aranya-daemon-arm-unknown-linux-gnueabi"
-          - runner: "self-hosted-linux-arm64"
+          - runner: "ubuntu2404-arm64-4core"
             artifact: "aranya-daemon-aarch64-unknown-linux-gnu"
-          - runner: "self-hosted-linux-amd64"
+          - runner: "ubuntu-latest"
             artifact: "aranya-daemon-x86_64-unknown-linux-gnu"
     name: build daemon ${{ matrix.artifact }}
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
-        with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Build code
         run: |
@@ -55,7 +44,7 @@ jobs:
         run: cargo make git-unchanged
 
       - name: Publish daemon
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: aranya-daemon.tar.gz
@@ -65,23 +54,17 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner: "self-hosted-linux-arm"
-            artifact: "aranya-client-capi-arm-unknown-linux-gnueabi"
-          - runner: "self-hosted-linux-arm64"
+          - runner: "ubuntu2404-arm64-4core"
             artifact: "aranya-client-capi-aarch64-unknown-linux-gnu"
-          - runner: "self-hosted-linux-amd64"
+          - runner: "ubuntu-latest"
             artifact: "aranya-client-capi-x86_64-unknown-linux-gnu"
     name: build lib ${{ matrix.artifact }}
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup Environment
         uses: ./.github/actions/setup
-        with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: ${{ matrix.runner }}
 
       - name: Build Aranya Shared Library
         run: |
@@ -91,7 +74,7 @@ jobs:
           cargo make git-unchanged
 
       - name: Publish aranya lib
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
           path: aranya-client-lib.tar.gz
