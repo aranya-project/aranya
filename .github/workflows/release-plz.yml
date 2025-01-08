@@ -1,0 +1,56 @@
+# Workflow for automating Rust crate publishing and release PRs.
+# repo:
+# https://github.com/release-plz/release-plz
+# quickstart:
+# https://release-plz.dev/docs/github/quickstart
+name: Release-plz
+
+permissions:
+  pull-requests: write
+  contents: write
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+
+  # Release unpublished packages.
+  release-plz-release:
+    name: Release-plz release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Run release-plz
+        uses: aranya-project/release-plz-action@main
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.ARANYA_BOT_CRATESIO_CARGO_LOGIN_KEY }}
+
+  # Create a PR with the new versions and changelog, preparing the next release.
+  release-plz-pr:
+    name: Release-plz PR
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/setup
+      - name: Run release-plz
+        uses: aranya-project/release-plz-action@main
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CARGO_REGISTRY_TOKEN: ${{ secrets.ARANYA_BOT_CRATESIO_CARGO_LOGIN_KEY }}
