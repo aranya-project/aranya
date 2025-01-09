@@ -11,11 +11,6 @@ on:
       workflow:
         required: true
         type: string
-    secrets:
-      CC_BUILD_TOKEN:
-        required: true
-      GH_DOTCOM_TOKEN:
-        required: true
 
 env:
   REV: ${{ github.run_id }}
@@ -26,21 +21,11 @@ concurrency:
 
 jobs:
   security-checks:
-    runs-on: self-hosted-linux-amd64
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - uses: ./.github/actions/setup
-        with:
-          ghe-token: ${{ secrets.CC_BUILD_TOKEN }}
-          gh-token: ${{ secrets.GH_DOTCOM_TOKEN }}
-          runner: self-hosted-linux-amd64
 
-      - name: Run cargo audit
-        # TODO: https://github.com/rustsec/rustsec/issues/1217
-        run: |
-          rustup toolchain install 1.79
-          cargo +1.79 make cargo-audit
-
-      - name: Run cargo deny
-        run: cargo make cargo-deny
+      - name: Run cargo security checks
+        run: cargo make security
