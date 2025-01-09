@@ -33,7 +33,7 @@ target/release/aranya-example
 
 Optionally, you can set the tracing log level with:
 ```
-ARANYA_EXAMPLE=info
+ARANYA_EXAMPLE=info target/release/aranya-example
 ```
 
 Reference:
