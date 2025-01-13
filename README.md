@@ -20,6 +20,54 @@ More documentation on Aranya is provided here:
 - [Aranya Overview](https://github.com/aranya-project/aranya-docs/blob/main/docs/aranya-overview.md)
 - [Getting Started With Aranya](docs/walkthrough.md)
 
+## What's Contained In This Repo
+
+This repository contains the following components:
+- [Rust Client Library](crates/aranya-client)
+- [Daemon Process](crates/aranya-daemon)
+- [Aranya Policy](crates/aranya-daemon/src/policy.md)
+
+### Rust Client Library
+
+The [Rust Client Library](crates/aranya-client/) provides an interface for your
+application to interface with the
+[Aranya Daemon](crates/aranya-daemon-api/src/service.rs) in order to invoke
+actions on and process affects from the Aranya graph. The library also provides
+an interface to [Aranya Core](https://github.com/aranya-project/aranya-core)
+for Aranya Fast Channels functionality. Refer to the
+[client's README](crates/aranya-client/README.md) for more details on this
+component.
+
+### Daemon Process
+
+The [daemon](crates/aranya-daemon/) is a long-running process that forwards
+requests from the [client](crates/aranya-client) to the
+[Aranya Core](https://github.com/aranya-project/aranya-core). Refer to the
+[daemon's README](crates/aranya-daemon/README.md) for more information on
+this component.
+
+### Aranya Policy
+
+The [Aranya Policy](crates/aranya-daemon/src/policy.md) is a security control policy written in Aranya's domain-specific policy language and executed by the Aranya runtime.
+
+### Rust Example Application
+
+An example Rust program for using Aranya is located here:
+[Aranya Rust Example](templates/aranya-example)
+
+Refer to the `aranya-example` crate's README for more information:
+[Aranya Example README.md](templates/aranya-example/README.md)
+
+## Dependencies
+
+### Aranya Core
+
+The [Aranya Core](https://github.com/aranya-project/aranya-core) repo has all the main components of Aranya that are needed for the core functionality to work. This is a library that includes the storage module (for DAG and FactDB), crypto module (with default crypto engine automatically selected), sync engine, and runtime client (including policy VM).
+
+### Aranya Fast Channels
+
+[Aranya Fast Channels](https://github.com/aranya-project/aranya-core/tree/main/crates/aranya-fast-channels) are encrypted channels between 2 peers that could be either bidirectional or unidirectional.
+
 ## Getting Started
 
 ### Dependencies
@@ -74,54 +122,6 @@ The [daemon's README](crates/aranya-daemon/README.md) contains instructions for
 configuring and running the daemon.
 
 After the daemon has started up, start the application.
-
-### Rust Example Application
-
-An example Rust program for using Aranya is located here:
-[Aranya Rust Example](templates/aranya-example)
-
-Refer to the `aranya-example` crate's README for more information:
-[Aranya Example README.md](templates/aranya-example/README.md)
-
-## What's Contained In This Repo
-
-This repository contains the following components:
-- [Rust Client Library](crates/aranya-client)
-- [Daemon Process](crates/aranya-daemon)
-- [Aranya Policy](crates/aranya-daemon/src/policy.md)
-
-### Rust Client Library
-
-The [Rust Client Library](crates/aranya-client/) provides an interface for your
-application to interface with the
-[Aranya Daemon](crates/aranya-daemon-api/src/service.rs) in order to invoke
-actions on and process affects from the Aranya graph. The library also provides
-an interface to [Aranya Core](https://github.com/aranya-project/aranya-core)
-for Aranya Fast Channels functionality. Refer to the
-[client's README](crates/aranya-client/README.md) for more details on this
-component.
-
-### Daemon Process
-
-The [daemon](crates/aranya-daemon/) is a long-running process that forwards
-requests from the [client](crates/aranya-client) to the
-[Aranya Core](https://github.com/aranya-project/aranya-core). Refer to the
-[daemon's README](crates/aranya-daemon/README.md) for more information on
-this component.
-
-### Aranya Policy
-
-The [Aranya Policy](crates/aranya-daemon/src/policy.md) is a security control policy written in Aranya's domain-specific policy language and executed by the Aranya runtime.
-
-## Dependencies
-
-### Aranya Core
-
-The [Aranya Core](https://github.com/aranya-project/aranya-core) repo has all the main components of Aranya that are needed for the core functionality to work. This is a library that includes the storage module (for DAG and FactDB), crypto module (with default crypto engine automatically selected), sync engine, and runtime client (including policy VM).
-
-### Aranya Fast Channels
-
-[Aranya Fast Channels](https://github.com/aranya-project/aranya-core/tree/main/crates/aranya-fast-channels) are encrypted channels between 2 peers that could be either bidirectional or unidirectional.
 
 ## Maintainers
 
