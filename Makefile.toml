@@ -99,18 +99,32 @@ dependencies = ["install-cargo-all-features"]
 
 
 # Security
+[tasks.security]
+category = "security"
+description = "Run security checks"
+run_task = { name = [
+    "cargo-audit",
+    "cargo-deny",
+    "cargo-vet",
+] }
+
 [tasks.cargo-audit]
 category = "security"
-install_crate = { crate_name = "cargo-audit", version = "0.20.0", binary = "cargo-audit", test_arg = "-V" }
+install_crate = { crate_name = "cargo-audit", version = "0.21.0", binary = "cargo-audit", test_arg = "-V" }
 command = "cargo"
 args = ["audit"]
 
 [tasks.cargo-deny]
 category = "security"
-install_crate = { crate_name = "cargo-deny", version = "0.16.1", binary = "cargo-deny", test_arg = "-V" }
+install_crate = { crate_name = "cargo-deny", version = "0.16.3", binary = "cargo-deny", test_arg = "-V" }
 command = "cargo"
 args = ["deny", "check"]
 
+[tasks.cargo-vet]
+category = "security"
+install_crate = { crate_name = "cargo-vet", version = "0.10.0", binary = "cargo-vet", test_arg = "-V" }
+command = "cargo"
+args = ["vet", "check"]
 
 # Correctness
 [tasks.correctness]
