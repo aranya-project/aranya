@@ -21,7 +21,7 @@ to each other using Aranya Fast Channels. There are a few things to keep in mind
 
 See the [examples](../examples) directory for example applications that
 follow scenarios similar to the one described in this document. Also, see the
-[overview documentation](https://github.com/aranya-project/aranya-docs/blob/main/src/aranya-overview.md) for more details on the components
+[overview documentation](https://github.com/aranya-project/aranya-docs/blob/main/docs/aranya-overview.md) for more details on the components
 used in this walkthrough.
 
 # Outline
