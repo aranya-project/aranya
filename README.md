@@ -17,7 +17,7 @@ Aranya is our contribution to this effort. It is a batteries-included tool which
 For users, software built on Aranya is less complex to operate securely, and is secure regardless of the network it is run on.
 
 More documentation on Aranya is provided here:
-- [Aranya Overview](https://github.com/aranya-project/aranya-docs/blob/main/src/aranya-overview.md)
+- [Aranya Overview](https://github.com/aranya-project/aranya-docs/blob/main/docs/aranya-overview.md)
 - [Getting Started With Aranya](docs/walkthrough.md)
 
 ## Getting Started
