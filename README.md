@@ -48,7 +48,9 @@ Channels.
 Download the source code from this repository. Navigate to the
 [`aranya-client-capi` C API example](examples/c/) and run the application:
 
-`cargo make run-capi-example`
+```
+cargo make run-capi-example
+```
 
 This will also build local doxygen documentation for the
 [`aranya-client-capi`](crates/aranya-client-capi/docs/). Open the
@@ -72,6 +74,14 @@ The [daemon's README](crates/aranya-daemon/README.md) contains instructions for
 configuring and running the daemon.
 
 After the daemon has started up, start the application.
+
+### Rust Example Application
+
+An example Rust program for using Aranya is located here:
+[Aranya Rust Example](templates/aranya-example)
+
+Refer to the `aranya-example` crate's README for more information:
+[Aranya Example README.md](templates/aranya-example/README.md)
 
 ## What's Contained In This Repo
 

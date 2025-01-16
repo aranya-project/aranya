@@ -12,7 +12,7 @@ authors = ["SpiderOak, Inc."]
 edition = "2021"
 license = "AGPL-3.0-only"
 repository = "https://github.com/aranya-project/aranya"
-rust-version = "1.80"
+rust-version = "1.81"
 
 
 [workspace.lints.rust]
@@ -60,6 +60,7 @@ aranya-keygen = { version = "0.4.0", path = "crates/aranya-keygen" }
 aranya-util = { version = "0.4.0", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
+backon = { version = "1.2.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 futures-util = { version = "0.3.30" }
