@@ -40,7 +40,7 @@ tracing = { workspace = true }
 [dev-dependencies]
 aranya-daemon = { workspace = true }
 
-backon = "1.2.0"
+backon = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
