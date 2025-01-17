@@ -106,7 +106,7 @@ Download the source code from this repository or from [crates.io](https://crates
 
 `$ git clone git@github.com:aranya-project/aranya.git`
 
-Once the source code is downloaded, navigate to the Aranya project directory and run:
+Once the source-code is downloaded, navigate to the Aranya project workspace and run:
 
 `cargo build --release`
 
