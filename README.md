@@ -20,6 +20,11 @@ More documentation on Aranya is provided here:
 - [Aranya Overview](https://aranya-project.github.io/aranya-docs/overview/)
 - [Getting Started With Aranya](https://aranya-project.github.io/aranya-docs/walkthrough/)
 
+## Contributing
+
+Our `CONTRIBUTING.md` is located in the aranya-project organization's `.github` repo:
+[CONTRIBUTING.md](https://github.com/aranya-project/.github/blob/main/CONTRIBUTING.md)
+
 ## Getting Started
 
 ### Dependencies
