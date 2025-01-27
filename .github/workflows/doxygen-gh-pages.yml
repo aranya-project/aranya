@@ -1,0 +1,17 @@
+name: Doxygen GitHub Pages Deploy Action
+
+on:
+  push:
+    branches:
+      - main
+      - 45-host-doxygen-docs-on-gh-pages
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: aranya-project/doxygen-github-pages-action@main
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
