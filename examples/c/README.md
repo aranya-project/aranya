@@ -25,13 +25,23 @@ A `config.json` file is provided for configuring the `aranya-daemon` when it sta
 
 # Running The Example
 
+First, download the source code from this repository:
+
+`$ git clone git@github.com:aranya-project/aranya.git`
+
 A `run.bash` bash script is provided to help with running the example.
-Note that the script automatically starts the `aranya-daemon` executable before running the example C application.
+Note that the script automatically starts the `aranya-daemon` executable before
+running the example C application.
 
 Running the script:
-`cargo make run-capi-example`
 
-This command will also build local doxygen documentation for the
+```bash
+$ cd aranya
+$ cargo make run-capi-example
+```
+
+This starts the example and automatically runs through the aforementioned
+steps. This will also build local doxygen documentation for the
 [`aranya-client-capi`](crates/aranya-client-capi/docs/). Open the
 [`docs/index.html`](crates/aranya-client-c-api/docs/index.html) file in a
 browser to view the docs.
