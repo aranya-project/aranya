@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - 45-host-doxygen-docs-on-gh-pages
 
 jobs:
   deploy:
