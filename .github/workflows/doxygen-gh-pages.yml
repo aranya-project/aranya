@@ -12,6 +12,6 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: DenverCoder1/doxygen-github-pages-action@v2.0.0
+      - uses: aranya-project/doxygen-github-pages-action@main
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
