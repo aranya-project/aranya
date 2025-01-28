@@ -107,6 +107,8 @@ jobs:
       - docs
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download capi doc artifacts
         uses: actions/download-artifact@v4
         with:
