@@ -53,7 +53,11 @@ dependencies = ["install-cbindgen", "install-nightly"]
 category = "build"
 description = "Build C API docs"
 cwd = "crates/aranya-client-capi"
-command = "doxygen"
+script = '''
+#!/usr/bin/env bash
+doxygen
+touch docs/html/.nojekyll
+'''
 
 [tasks.tgz-capi-docs]
 category = "docs"
