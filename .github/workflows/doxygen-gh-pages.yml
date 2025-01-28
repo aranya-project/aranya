@@ -12,7 +12,8 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: aranya-project/doxygen-github-pages-action@main
+      # TODO: use main branch
+      - uses: aranya-project/doxygen-github-pages-action@use-v4-branch
         with:
           config_file: crates/aranya-client-capi/Doxyfile
           github_token: ${{ secrets.GITHUB_TOKEN }}
