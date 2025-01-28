@@ -5,14 +5,13 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result};
-use aranya_client::{AfcMsg, Client};
+use anyhow::{bail, Context, Result};
+use aranya_client::{AfcMsg, Client, Label};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
-use aranya_fast_channels::Label;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::tempdir;
@@ -94,10 +93,17 @@ impl UserCtx {
         sleep(Duration::from_millis(100)).await;
 
         // Initialize the user library.
-        let mut client = (|| Client::connect(&uds_api_path, Path::new(&shm_path), max_chans, any))
-            .retry(ExponentialBuilder::default())
-            .await
-            .context("unable to init client")?;
+        let mut client = (|| {
+            Client::connect(
+                &cfg.uds_api_path,
+                Path::new(&cfg.afc.shm_path),
+                cfg.afc.max_chans,
+                cfg.sync_addr.to_socket_addrs(),
+            )
+        })
+        .retry(ExponentialBuilder::default())
+        .await
+        .context("unable to initialize client")?;
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");
@@ -313,11 +319,17 @@ async fn main() -> Result<()> {
     team.memberb.client.poll().await?;
 
     let msg = "hello world label1";
-    team.membera.client.send_data(afc_id1, msg.into()).await?;
+    team.membera
+        .client
+        .send_data(afc_id1, msg.as_bytes())
+        .await?;
     debug!(?msg, "sent message");
 
     let msg = "hello world label2";
-    team.membera.client.send_data(afc_id2, msg.into()).await?;
+    team.membera
+        .client
+        .send_data(afc_id2, msg.as_bytes())
+        .await?;
     debug!(?msg, "sent message");
 
     // poll for data message.
@@ -332,7 +344,9 @@ async fn main() -> Result<()> {
     debug!("polling to recv data msg");
     team.memberb.client.poll().await?;
 
-    let AfcMsg { data, label, .. } = team.memberb.client.recv_data().await?;
+    let Some(AfcMsg { data, label, .. }) = team.memberb.client.try_recv_data() else {
+        bail!("no message available!")
+    };
     debug!(
         n = data.len(),
         ?label,
@@ -340,7 +354,9 @@ async fn main() -> Result<()> {
         str::from_utf8(&data)?
     );
 
-    let AfcMsg { data, label, .. } = team.memberb.client.recv_data().await?;
+    let Some(AfcMsg { data, label, .. }) = team.memberb.client.try_recv_data() else {
+        bail!("no message available!")
+    };
     debug!(
         n = data.len(),
         ?label,
