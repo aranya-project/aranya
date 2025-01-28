@@ -32,11 +32,6 @@ jobs:
           cargo make build-capi-docs
           cargo make tgz-capi-docs
 
-      - name: Generate Doxygen docs
-        run: |
-          cargo make build-capi-docs
-          cargo make tgz-capi-docs
-
       - name: Publish Doxygen docs
         uses: actions/upload-artifact@v4
         with:
