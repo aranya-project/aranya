@@ -12,8 +12,21 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: aranya-project/doxygen-github-pages-action@main
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - name: Generate Doxygen docs
+        run: |
+          cargo make build-capi-docs
+
+      - name: Add a .nojekyll file before deploying to GitHub pages so files with underscores work
+        run: |
+          touch ${{ github.workspace }}/crates/aranya-client-capi/docs/html/.nojekyll
+
+      - name: Deploy to GitHub Pages
+        uses: aranya-project/github-pages-deploy-action@v4
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: gh-pages
           folder: ${{ github.workspace }}/crates/aranya-client-capi/docs/html
-          config_file: ${{ github.workspace }}/crates/aranya-client-capi/Doxyfile
-          github_token: ${{ secrets.GITHUB_TOKEN }}
