@@ -129,7 +129,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: gh-pages
-          folder: aranya-client-capi-docs/aranya-client-capi-docs/html
+          folder: aranya-client-capi-docs/html
           target-folder: ${{ github.ref_name }}
 
       - name: Upload capi docs to tagged release
