@@ -121,6 +121,30 @@ impl UserCtx {
     }
 }
 
+/// Repeatedly calls `poll_data`, followed by `handle_data`,
+/// until all of the clients are pending.
+macro_rules! do_poll {
+    ($($client:expr),*) => {
+        debug!(
+            clients = stringify!($($client),*),
+            "start `do_poll`",
+        );
+        loop {
+            tokio::select! {
+                biased;
+                $(data = $client.poll_data() => {
+                    $client.handle_data(data?).await?
+                },)*
+                _ = async {} => break,
+            }
+        }
+        debug!(
+            clients = stringify!($($client),*),
+            "finish `do_poll`",
+        );
+    };
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::registry()
@@ -300,23 +324,7 @@ async fn main() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    // poll for ctrl message.
-    // TODO: poll in a separate task.
-    debug!("poll to send ctrl msg");
-    team.membera.client.poll().await?;
-    debug!("poll to recv ctrl msg");
-    team.memberb.client.poll().await?;
-    debug!("poll to recv ctrl msg");
-    team.memberb.client.poll().await?;
-
-    // poll for ctrl message.
-    // TODO: poll in a separate task.
-    debug!("poll to send ctrl msg");
-    team.membera.client.poll().await?;
-    debug!("poll to recv ctrl msg");
-    team.memberb.client.poll().await?;
-    debug!("poll to recv ctrl msg");
-    team.memberb.client.poll().await?;
+    do_poll!(team.membera.client, team.memberb.client);
 
     let msg = "hello world label1";
     team.membera
@@ -332,17 +340,8 @@ async fn main() -> Result<()> {
         .await?;
     debug!(?msg, "sent message");
 
-    // poll for data message.
-    debug!("polling to send data msg");
-    team.membera.client.poll().await?;
-    debug!("polling to recv data msg");
-    team.memberb.client.poll().await?;
-
-    // poll for data message.
-    debug!("polling to send data msg");
-    team.membera.client.poll().await?;
-    debug!("polling to recv data msg");
-    team.memberb.client.poll().await?;
+    sleep(Duration::from_millis(100)).await;
+    do_poll!(team.membera.client, team.memberb.client);
 
     let Some(AfcMsg { data, label, .. }) = team.memberb.client.try_recv_data() else {
         bail!("no message available!")
