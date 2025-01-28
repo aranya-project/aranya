@@ -14,4 +14,6 @@ jobs:
     steps:
       - uses: aranya-project/doxygen-github-pages-action@main
         with:
+          folder: crates/aranya-client-capi
+          config_file: Doxyfile
           github_token: ${{ secrets.GITHUB_TOKEN }}
