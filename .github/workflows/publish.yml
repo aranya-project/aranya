@@ -112,6 +112,13 @@ jobs:
         with:
           name: aranya-client-capi-docs
           path: aranya-client-capi-docs
+  
+      - name: List files
+        run: ls -R -al
+
+      - name: Extract
+        run:  tar -xzf aranya-client-capi-docs.tar.gz
+
       - name: List files
         run: ls -R -al
 
