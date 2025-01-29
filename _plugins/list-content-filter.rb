@@ -2,14 +2,18 @@
 
 module Jekyll
   module ListContent
-    def get_files(folder, type="*.png")
+    def echo_folder(folder)
+      "Your folder: " + folder
+    end
+
+    def list_files(folder, type="*.png")
       files = Dir
         .glob(folder + "**/" + type)
         .select { |e| File.file? e }
         .join("<br>")
     end
 
-    def get_folders(folder)
+    def list_folders(folder)
       folders = Dir
         .glob(folder + '**/*')
         .select { |e| File.directory? e }
