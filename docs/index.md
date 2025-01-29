@@ -4,7 +4,7 @@ title: Home
 permalink: "/"
 ---
 
-{{ "." | get_folders }}
+{{ "test/" | get_folders }}
 
 <ul>
     {% assign dir_list = "capi/" | get_folders %}
