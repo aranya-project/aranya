@@ -10,14 +10,14 @@ module Jekyll
       files = Dir
         .glob(folder + "**/" + type)
         .select { |e| File.file? e }
-        .join("<br>")
+        .join(" ")
     end
 
     def list_folders(folder)
       folders = Dir
         .glob(folder + '**/*')
         .select { |e| File.directory? e }
-        .join("<br>")
+        .join(" ")
     end
   end
 end
