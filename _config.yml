@@ -17,3 +17,5 @@ exclude:
   - LICENSE.md
   - README.md
 
+plugins:
+  - list-files-folders

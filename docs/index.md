@@ -4,15 +4,9 @@ title: Home
 permalink: "/"
 ---
 
-{% comment %}
-    Borrowed from https://ongclement.com/blog/github-pages-indexing-directory-copy
-{% endcomment %}
-
-{% assign doclist = site.pages | append: ' /capi ' | sort: 'url'  %}
 <ul>
-    {% for doc in doclist %}
-        {% if doc.name contains '.md' or doc.name contains '.html' %}
-            <li><a href="{{ site.baseurl }}{{ doc.url }}">{{ doc.url }}</a></li>
-        {% endif %}
+    {% assign dir_list = "capi/" | list_folders %}
+    {% for dir in dir_list %}
+        <li><a href="{{ site.baseurl }}/capi/{{ dir }}">{{ dir }}</a></li>
     {% endfor %}
 </ul>
