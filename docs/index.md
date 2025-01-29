@@ -5,7 +5,7 @@ permalink: "/"
 ---
 
 <ul>
-    {% assign dir_list = "capi/" | list_folders %}
+    {% assign dir_list = "capi/" | get_folders %}
     {% for dir in dir_list %}
         <li><a href="{{ site.baseurl }}/capi/{{ dir }}">{{ dir }}</a></li>
     {% endfor %}

@@ -1,23 +1,17 @@
-# Borrowed from: https://stackoverflow.com/questions/70391510/list-directory-in-jekyll
+# Based on: https://stackoverflow.com/questions/70391510/list-directory-in-jekyll
 
 module Jekyll
   module ListContent
-    def echo_folder(folder)
-      "Your folder: " + folder
-    end
-
-    def list_files(folder, type="*.png")
+    def get_files(folder, type="*.png")
       files = Dir
         .glob(folder + "**/" + type)
         .select { |e| File.file? e }
-        .join(" ")
     end
 
-    def list_folders(folder)
+    def get_folders(folder)
       folders = Dir
         .glob(folder + '**/*')
         .select { |e| File.directory? e }
-        .join(" ")
     end
   end
 end
