@@ -114,9 +114,6 @@ jobs:
         with:
           name: aranya-client-capi-docs
           path: aranya-client-capi-docs
-  
-      - name: List files
-        run: ls -R -al
 
       - name: Extract
         run:  |
@@ -132,7 +129,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: gh-pages
           folder: aranya-client-capi-docs/html
-          target-folder: ${{ github.ref_name }}
+          target-folder: capi/${{ github.ref_name }}
 
       - name: Upload capi docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
