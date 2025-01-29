@@ -1,5 +1,3 @@
-# Based on: https://stackoverflow.com/questions/70391510/list-directory-in-jekyll
-
 module Jekyll
   module ListContent
     def echo_folder(folder)
