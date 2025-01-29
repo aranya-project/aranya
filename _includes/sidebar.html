@@ -1,0 +1,53 @@
+<!-- Based on https://github.com/poole/lanyon under the MIT license. -->
+<!--
+    Target for toggling the sidebar `.sidebar-checkbox` is for regular
+    styles, `#sidebar-checkbox` for behavior.
+-->
+<input type="checkbox" class="sidebar-checkbox" id="sidebar-checkbox">
+
+<!-- Toggle-able sidebar -->
+<div class="sidebar" id="sidebar">
+    <div class="sidebar-item logo-wrapper">
+        <a href="{{ site.url }}">
+            <img class="logo" src="{{ site.url }}/assets/images/aranya-logo-white.png" alt="Aranya logo">
+        </a>
+    </div>
+    <div class="sidebar-item">
+        <p>{{ site.description }}</p>
+    </div>
+
+    <nav class="sidebar-nav">
+        <a class="sidebar-nav-item{% if page.title == 'Home' %} active{% endif %}" href="{{ '/' | absolute_url }}">Home</a>
+
+        {% comment %}
+            The code below dynamically generates a sidebar nav of pages with
+            `layout: page` in the front-matter. See readme for usage.
+        {% endcomment %}
+
+        {% assign pages_list = site.pages | sort:"url" %}
+        {% for node in pages_list %}
+            {% if node.title != null and node.title != 'Home' %}
+                {% if node.layout == "page" %}
+                    <a class="sidebar-nav-item{% if page.url == node.url %} active{% endif %}" href="{{ node.url | absolute_url }}">{{ node.title }}</a>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+    </nav>
+
+    <nav class="sidebar-item">
+        <a href="{{ site.project-repo }} " target="_blank">
+            <img class="nav-icon" src="{{ site.url }}/assets/images/icon-github-48.png" alt="GitHub project">
+        </a>
+    </nav>
+
+    <div class="sidebar-item sponsored logo-wrapper">
+        <p>Sponsored by</p>
+        <a href="https://spideroak.com">
+            <img class="logo" src="{{ site.url }}/assets/images/spideroak-logo-white.png" alt="SpiderOak logo">
+        </a>
+    </div>
+
+    <div class="sidebar-item">
+        <p>&copy; {{ site.time | date: '%Y' }}. All rights reserved.</p>
+    </div>
+</div>

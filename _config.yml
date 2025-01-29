@@ -1,0 +1,19 @@
+# Setup
+title:               Aranya API Documentation
+tagline:             'An overview of the Aranya project APIs'
+description:         'Aranya is an access governance and secure data exchange platform for organizations to control their critical data and services.'
+url:                 https://aranya-project.github.io/aranya
+project-repo:        https://github.com/aranya-project/aranya
+baseurl:             ''
+permalink:           pretty
+
+# Excludes
+exclude:
+  - .editorconfig
+  - .git
+  - .jekyll-cache
+  - Gemfile
+  - Gemfile.lock
+  - LICENSE.md
+  - README.md
+

@@ -1,0 +1,95 @@
+
+.masthead {
+    padding-top: 1.25rem;
+    padding-bottom: 1.25rem;
+}
+
+@media (min-width: 38em) {
+    .sidebar-toggle {
+        top: 1rem;
+    }
+}
+.sidebar {
+    padding-top: 0.75rem;
+}
+.sidebar .sidebar-nav {
+    border-bottom-width: 0;
+    border-top: 1px solid rgba(255,255,255,.1);
+    padding-bottom: 1rem;
+}
+@media (min-width: 38em) {
+    .sidebar .sidebar-nav {
+        padding-bottom: 1.5rem;
+    }
+}
+.sidebar .sidebar-nav-item {
+    border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.sidebar .sidebar-item {
+    padding: 0 1rem 1rem;
+}
+@media (min-width: 48em) {
+    .sidebar .sidebar-item {
+        padding: 0 1.5rem 1.5rem;
+    }
+}
+
+.sidebar .sidebar-item.logo-wrapper {
+    padding-bottom: 1rem;
+}
+.sidebar .sidebar-item.logo-wrapper .logo {
+    margin: 0;
+    max-width: 10rem;
+}
+.sidebar .logo-wrapper.sponsored p {
+    margin-bottom: 0.5rem;
+}
+.sidebar .logo-wrapper.sponsored .logo {
+    max-width: 75%;
+}
+
+.sidebar .nav-icon {
+    margin-bottom: 0;
+    width: 2rem;
+}
+@media (min-width: 38em) {
+    .sidebar .nav-icon {
+        width: 2.2rem;
+    }
+}
+
+@media (min-width: 80em) {
+    .container {
+        max-width: 55rem;
+    }
+}
+@media (min-width: 100em) {
+    .container {
+        max-width: 70rem;
+    }
+}
+.doc-image {
+    margin: 0 auto 1rem;
+    max-width: 50rem;
+    width: 100%;
+}
+@media (min-width: 38em) {
+    .doc-image {
+        margin-bottom: 1.5rem;
+    }
+}
+
+/* Hide raw Mermaid code to stop flash of unstyled content */
+.mermaid {
+    height: 0;
+    margin-bottom: 1rem;
+    overflow: hidden;
+}
+.mermaid.processed {
+    height: auto;
+    overflow: unset;
+}
+.mermaid svg {
+    margin: 0 auto;
+    display: block;
+}
