@@ -4,7 +4,7 @@ tagline:             'An overview of the Aranya project APIs'
 description:         'Aranya is an access governance and secure data exchange platform for organizations to control their critical data and services.'
 url:                 https://aranya-project.github.io/aranya
 project-repo:        aranya
-baseurl:             https://aranya-project.github.io
+baseurl:             https://aranya-project.github.io/aranya
 permalink:           pretty
 
 # Excludes
