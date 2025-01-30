@@ -4,31 +4,11 @@ title: Home
 permalink: "/"
 ---
 
-Echo just the folder
-
-{{ "assets/" | echo_folder }}
-
-<hr>
-
-List `png`-files (omit parameter, use default type) from `assets` folder (recursive)
-
-{{ "assets/" | list_files }}
-
-<hr>
-
-List `svg`-files from `assets` folder (recursive)
-
-{{ "assets/" | list_files: "*.svg" }}
-
-<hr>
-
-List `subfolders` from `assets` folder (recursive)
-
-{{ "assets/" | list_folders }}
-
+Aranya C API Doxygen docs:
+<!-- TODO: generate directory tree automatically -->
 <ul>
-    {% assign dir_list = "capi/" | get_folders %}
-    {% for dir in dir_list %}
-        <li><a href="{{ site.baseurl }}/capi/{{ dir }}">{{ dir }}</a></li>
-    {% endfor %}
+    <li><a href="{{ site.baseurl }}/capi/v0.4.0">v0.4.0</a></li>
+    <li><a href="{{ site.baseurl }}/capi/v0.3.0">v0.3.0</a></li>
+    <li><a href="{{ site.baseurl }}/capi/v0.2.0">v0.2.0</a></li>
+    <li><a href="{{ site.baseurl }}/capi/v0.1.0">v0.1.0</a></li>
 </ul>
