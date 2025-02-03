@@ -1,6 +1,6 @@
 # Example Rust Application
 
-This is a [`cargo-generate`](https://github.com/cargo-generate/cargo-generate) template, showing how to use the [`aranya-client`](../../crates/aranya-client) library to:
+This is a [`cargo-generate`](https://crates.io/crates/cargo-generate template, showing how to use the [`aranya-client`](../../crates/aranya-client) library to:
 - Setup a team
 - Sync Aranya graphs
 - Create an Aranya Fast Channel
@@ -10,7 +10,7 @@ During setup, the example application starts an instance of the [`aranya-daemon`
 
 # Generate a new workspace from this template:
 
-Install [cargo-generate](https://github.com/cargo-generate/cargo-generate).
+Install [cargo-generate](https://crates.io/crates/cargo-generate).
 
 Generate a new project from the template, which will prompt you for the name of the new project you wish to create:
 ```
