@@ -107,13 +107,30 @@ jobs:
       - docs
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download capi doc artifacts
         uses: actions/download-artifact@v4
         with:
           name: aranya-client-capi-docs
           path: aranya-client-capi-docs
+
+      - name: Extract
+        run:  |
+          cd aranya-client-capi-docs
+          tar -xzf aranya-client-capi-docs.tar.gz
+
       - name: List files
         run: ls -R -al
+
+      - name: Deploy to GitHub Pages
+        uses: aranya-project/github-pages-deploy-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: gh-pages
+          folder: aranya-client-capi-docs/html
+          target-folder: capi/${{ github.ref_name }}
+
       - name: Upload capi docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
         env:
