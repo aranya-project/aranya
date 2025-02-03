@@ -1,6 +1,6 @@
 # Example Rust Application
 
-This crate contains example code showing how to use Aranya in an application. In order to set it up, you'll need to install [`cargo-generate`](https://crates.io/crates/cargo-generate), which will allow you to create a new project that you can then modify as needed.
+This crate contains example code showing how to use Aranya in a Rust application. In order to set it up, you'll need to install [`cargo-generate`](https://crates.io/crates/cargo-generate), which will allow you to create a new Rust project with some boilerplate example code that you can then modify as needed.
 
 This example shows how to use the [`aranya-client`](../../crates/aranya-client) library to:
 - Setup a team
