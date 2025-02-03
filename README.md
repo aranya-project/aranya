@@ -179,15 +179,25 @@ using the Rust library and C API.
 
 ##### Rust
 
+The following snippet can be found in the
+[Rust example](templates/aranya-example/src/main.rs#L140).
+
 ```rust
-let client = Client::connect(owner_sock_path)?;
-let team_id = client.create_team()?;
+// create team.
+info!("creating team");
+let team_id = team
+	.owner
+	.client
+	.create_team()
+	.await
+	.expect("expected to create team");
+info!(?team_id);
 ```
 
 ##### C
 
 The following snippet has been modified for simplicity. For actual usage,
-see the [C example](../examples/c/example.c#L162).
+see the [C example](examples/c/example.c#L169).
 
 ```C
 // have owner create the team.
