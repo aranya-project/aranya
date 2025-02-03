@@ -168,7 +168,7 @@ and `Member B`.
 The examples go through the following steps:
 
 Step 1: Build or download the pre-built executable from the latest Aranya
-release. Then, providing a unique configuration file for each user, run the
+release. After providing a unique configuration file for each user, run the
 daemons.
 
 Step 2. The `Owner` initializes the team
