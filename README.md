@@ -93,9 +93,16 @@ most recent version of the following tools:
 - [patchelf](https://github.com/NixOS/patchelf)
 - [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation)
 
-### Install and Build Aranya
+### Integrate Aranya
 
-#### Rust
+Aranya may be integrated into your application using one of the following:
+
+1. [Rust library](#rust-lib)
+2. [C API](#c-api)
+
+#### <a href name="rust-lib"></a>Rust Library
+
+First, install the Aranya client.
 
 ##### From this repository:
 
@@ -105,7 +112,8 @@ Once the source-code is downloaded, navigate to the Aranya project workspace and
 
 `cargo build --release`
 
-This will build the Aranya client.
+This will build the Aranya [client](crates/aranya-client/) and the
+[daemon](crates/aranya-daemon/) executable.
 
 ##### From crates.io:
 
@@ -120,35 +128,22 @@ Or, add it to your project's `Cargo.toml`:
 aranya-client = { git = "git@github.com:aranya-project/aranya.git" }
 ```
 
-#### C
+Integrate the client library into your application. The
+[client's README](crates/aranya-client/README.md) has more information on using
+the Rust client.
+
+#### <a href name="c-api"></a>C API
 
 Pre-built versions of the library are uploaded (along with the [header file](https://github.com/aranya-project/aranya/blob/main/crates/aranya-client-capi/output/aranya-client.h)) to each Aranya [release](https://github.com/aranya-project/aranya/releases).
 
-#### Additional build options
+Otherwise, build the [`aranya-client-capi` C API](crates/aranya-client-capi/)
+for your target platform.
 
-This repository uses `cargo-make` to automate different tasks, including
-building the code, documentation and examples. Once the repository is
-downloaded and Rust is installed on your device, run the following to install
-`cargo-make`:
+Aranya can then be integrated using `cmake`. A
+[CMakeLists.txt](https://github.com/aranya-project/aranya/blob/main/examples/c/CMakeLists.txt)
+is provided to make it easier to build the library into an application.
 
-`$ cargo install cargo-make`
-
-Then, navigate to this directory and run the following to build Aranya:
-
-`$ cargo make build-code`
-
-Or, build the C API, example and its associated documentation:
-
-`$ cargo make build-capi`
-
-Run `$ cargo make` to see a list of all available tasks.
-
-### Integrate Aranya
-
-Aranya may be integrated using one of the following:
-
-1. [Rust library](#rust-lib)
-2. [C API](#c-api)
+### Run Aranya
 
 Regardless of the version of the Aranya library being integrated, you will need
 the [Aranya Daemon](crates/aranya-daemon/) executable. A prebuilt version is
@@ -156,30 +151,11 @@ available for supported platforms in the Aranya
 [release](https://github.com/aranya-project/aranya/releases). Otherwise,
 build the daemon locally.
 
-#### <a href name="rust-lib"></a>Rust Library
-
-Using the installation instructions above, get the code through this repository
-or crates.io and add it to your project.
-
-Integrate the [client](crates/aranya-client) library into your application. The
-[client's README](crates/aranya-client/README.md) has more information on using
-the Rust client.
-
-#### <a href name="c-api"></a>C API
-
-Use the [`aranya-client-capi` C API](crates/aranya-client-capi/) or download
-a prebuilt version (along with the [header file](https://github.com/aranya-project/aranya/blob/main/crates/aranya-client-capi/output/aranya-client.h)) for your target platform from the
-Aranya [release](https://github.com/aranya-project/aranya/releases/) to
-integrate into your application using `cmake`.
-
-A [CMakeLists.txt](https://github.com/aranya-project/aranya/blob/main/examples/c/CMakeLists.txt)
-is provided to make it easier to build the library into an application.
-
-### Run Aranya
-
-Before starting your application, configure and run the Aranya Daemon
-executable. Find more information on configuring and running the daemon
+Before starting your application, run the daemon by providing the path to a
+configuration file. Find more details on configuring and running the daemon
 [here](crates/aranya-daemon/README.md).
+
+Once the daemon is running, run your application and begin using Aranya!
 
 ### Example Applications
 
@@ -198,8 +174,8 @@ Step 2. Submit an action to the `Owner`'s daemon to create a team
 
 #### Example API calls
 
-The following section will show an example of using Aranya to create a team in
-Rust and using the [`aranya-client-capi` C API](crates/aranya-client-capi/).
+The following section will show an example of using Aranya to create a team
+using the Rust library and C API.
 
 ##### Rust
 
@@ -234,6 +210,9 @@ Channel
 Step 7. Call the Fast Channels API from `Member A`'s daemon to send a message.
 Optionally, call the Fast Channels API from `Member B`'s daemon to send a
 message back.
+
+For more details on how Aranya starts and the steps performed in the examples,
+see the [walkthrough](https://aranya-project.github.io/aranya-docs/walkthrough/).
 
 ## Maintainers
 
