@@ -167,10 +167,11 @@ and `Member B`.
 
 The examples go through the following steps:
 
-Step 1: Configure, build or download the pre-built executable from the latest
-Aranya release and run the daemon for each user
+Step 1: Build or download the pre-built executable from the latest Aranya
+release. Then, providing a unique configuration file for each user, run the
+daemons.
 
-Step 2. Submit an action to the `Owner`'s daemon to create a team
+Step 2. The `Owner` initializes the team
 
 #### Example API calls
 
@@ -205,21 +206,18 @@ err = aranya_create_team(&team->clients.owner.client, &team->id);
 EXPECT("error creating team", err);
 ```
 
-Step 3. Submit actions to populate the team with the rest of
-the users
+Step 3. The `Owner` adds the `Admin` and `Operator` to the team. `Member A` and
+`Member B` can either be added by the `Owner` or `Operator`.
 
-Step 4. Submit an action to the `Admin`'s daemon to create an Aranya Fast
-Channels label
+Step 4. The `Admin` creates an Aranya Fast Channels label
 
-Step 5. Submit actions to the `Operator`'s daemon to assign the Fast Channels
-label to `Member A` and `Member B`
+Step 5. The `Operator` assigns the created Fast Channels label to `Member A`
+and `Member B`
 
-Step 6. Submit an action to `Member A`'s daemon to create an Aranya Fast
-Channel
+Step 6. `Member A` creates an Aranya Fast Channel
 
-Step 7. Call the Fast Channels API from `Member A`'s daemon to send a message.
-Optionally, call the Fast Channels API from `Member B`'s daemon to send a
-message back.
+Step 7. `Member A` uses this channel to send a message to `Member B`.
+Optionally, `Member B` may also send a message back to `Member A`.
 
 For more details on how Aranya starts and the steps performed in the examples,
 see the [walkthrough](https://aranya-project.github.io/aranya-docs/walkthrough/).
