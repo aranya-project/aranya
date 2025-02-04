@@ -84,14 +84,14 @@ The following platforms are supported:
 
 ### Prerequisites
 
-To use Aranya and run the examples, your system must have the
-most recent version of the following tools:
+To use Aranya and run the examples, your system must have the following tools:
 
-- [Rust](https://www.rust-lang.org/tools/install)
-- [cmake](https://cmake.org/download/)
-- [clang](https://releases.llvm.org/download.html)
-- [patchelf](https://github.com/NixOS/patchelf)
-- [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation)
+- [Rust](https://www.rust-lang.org/tools/install) (find version info in the
+[rust-toolchain.toml](rust-toolchain.toml))
+- [cmake](https://cmake.org/download/) (v3.31)
+- [clang](https://releases.llvm.org/download.html) (v18.1)
+- [patchelf](https://github.com/NixOS/patchelf) (v0.18)
+- [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation) (v0.37.23)
 
 ### Integrate Aranya
 
