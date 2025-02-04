@@ -23,8 +23,8 @@ The daemon's responsibilities include:
   available to your application through the [Rust Client library](../aranya-client/).
 - Invokes actions received from the client and handles effects from the
   [Aranya Core](https://github.com/aranya-project/aranya-core) library. See the
-  [walkthrough](https://aranya-project.github.io/aranya-docs/walkthrough/) for
-  more details.
+  [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/)
+  for more details.
 - Generates and maintains cryptographic keys for encrypting and decrypting data
   for Aranya and Fast Channels
 

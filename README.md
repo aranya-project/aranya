@@ -18,7 +18,7 @@ For users, software built on Aranya is less complex to operate securely, and is 
 
 More documentation on Aranya is provided here:
 - [Aranya Overview](https://aranya-project.github.io/aranya-docs/overview/)
-- [Getting Started With Aranya](https://aranya-project.github.io/aranya-docs/walkthrough/)
+- [Getting Started With Aranya](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/)
 
 ## Contributing
 
@@ -220,7 +220,7 @@ Step 7. `Member A` uses this channel to send a message to `Member B`.
 Optionally, `Member B` may also send a message back to `Member A`.
 
 For more details on how Aranya starts and the steps performed in the examples,
-see the [walkthrough](https://aranya-project.github.io/aranya-docs/walkthrough/).
+see the [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
 
 ## Maintainers
 

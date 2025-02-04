@@ -46,9 +46,9 @@ actions. Instructions for running an instance of the `daemon` binary can be
 found in the [daemon's README](../aranya-daemon/README.md).
 
 For a full demonstration of the client's capabilities, see the
-[walkthrough](https://aranya-project.github.io/aranya-docs/walkthrough/). This
-also includes explanations for the steps performed by the daemon and Aranya
-based on the client's actions.
+[walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
+This also includes explanations for the steps performed by the daemon and
+Aranya based on the client's actions.
 
 Additionally, the [test module](tests/tests.rs) includes tests that have
 multiple users joining a team, syncing, and sending encrypted messages using
