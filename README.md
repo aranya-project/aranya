@@ -71,7 +71,7 @@ The [Aranya Core](https://github.com/aranya-project/aranya-core) repo has all th
 
 ### Aranya Fast Channels
 
-[Aranya Fast Channels](https://github.com/aranya-project/aranya-core/tree/main/crates/aranya-fast-channels) are encrypted channels between 2 peers that could be either bidirectional or unidirectional.
+[Aranya Fast Channels](https://github.com/aranya-project/aranya-core/tree/main/crates/aranya-fast-channels) are encrypted channels between 2 peers allowing either unidirectional or bidirectional communication.
 
 ## Integration & Development
 
