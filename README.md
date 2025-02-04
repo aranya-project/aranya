@@ -84,7 +84,11 @@ The following platforms are supported:
 
 ### Prerequisites
 
-To use Aranya and run the examples, your system must have the following tools:
+To use Aranya and run the examples, download the following tools directly or
+using a package manager:
+
+Note, we have tested using the specified versions. Other versions of these
+tools may also work.
 
 - [Rust](https://www.rust-lang.org/tools/install) (find version info in the
 [rust-toolchain.toml](rust-toolchain.toml))
@@ -125,7 +129,7 @@ $ cargo add aranya-client
 Or, add it to your project's `Cargo.toml`:
 ```
 [dependencies]
-aranya-client = { git = "git@github.com:aranya-project/aranya.git" }
+aranya-client = { version = ... }
 ```
 
 Integrate the client library into your application. The

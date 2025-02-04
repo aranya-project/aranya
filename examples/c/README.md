@@ -19,6 +19,9 @@ A `config.json` file is provided for configuring the `aranya-daemon` when it sta
 
 # Dependencies
 
+Note, we have tested using the specified versions. Other versions of these
+tools may also work.
+
 - [cmake](https://cmake.org/download/) (v3.31)
 - [rust](https://www.rust-lang.org/tools/install) (find version info in the
 [rust-toolchain.toml](../../rust-toolchain.toml))
