@@ -108,7 +108,7 @@ First, install the Aranya client.
 
 `$ git clone git@github.com:aranya-project/aranya.git`
 
-Once the source-code is downloaded, navigate to the Aranya project workspace and run:
+Once the source code is downloaded, navigate to the Aranya project workspace and run:
 
 `cargo build --release`
 
@@ -154,7 +154,7 @@ Otherwise, build the daemon locally:
 
 `$ git clone git@github.com:aranya-project/aranya.git`
 
-Once the source-code is downloaded, navigate to the Aranya project workspace.
+Once the source code is downloaded, navigate to the Aranya project workspace.
 
 Build the daemon using `cargo`:
 
