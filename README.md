@@ -22,8 +22,8 @@ More documentation on Aranya is provided here:
 
 ## Contributing
 
-Our `CONTRIBUTING.md` is located in the aranya-project organization's `.github` repo:
-[CONTRIBUTING.md](https://github.com/aranya-project/.github/blob/main/CONTRIBUTING.md)
+Find information on contributing to the Aranya project in
+[`CONTRIBUTING.md`](https://github.com/aranya-project/.github/blob/main/CONTRIBUTING.md).
 
 ## What's Contained In This Repo
 
@@ -39,8 +39,8 @@ application to interface with the
 [Aranya Daemon](crates/aranya-daemon-api/src/service.rs) in order to invoke
 actions on and process affects from the Aranya graph. The library also provides
 an interface to [Aranya Core](https://github.com/aranya-project/aranya-core)
-for Aranya Fast Channels functionality. Refer to the
-[client's README](crates/aranya-client/README.md) for more details on this
+for Aranya Fast Channels functionality. Refer to the `aranya-client`
+[README](crates/aranya-client/README.md) for more details on this
 component.
 
 ### Daemon Process
@@ -48,8 +48,8 @@ component.
 The [daemon](crates/aranya-daemon/) is a long-running process that forwards
 requests from the [client](crates/aranya-client) to the
 [Aranya Core](https://github.com/aranya-project/aranya-core). Refer to the
-[daemon's README](crates/aranya-daemon/README.md) for more information on
-this component.
+`aranya-daemon` [README](crates/aranya-daemon/README.md) for more information
+on this component.
 
 ### Aranya Policy
 
@@ -57,11 +57,9 @@ The [Aranya Policy](crates/aranya-daemon/src/policy.md) is a security control po
 
 ### Rust Example Application
 
-An example Rust program for using Aranya is located here:
-[Aranya Rust Example](templates/aranya-example)
+We have provided an [example Rust program](templates/aranya-example) using Aranya.
 
-Refer to the `aranya-example` crate's README for more information:
-[Aranya Example README.md](templates/aranya-example/README.md)
+Refer to the `aranya-example` crate's [README](templates/aranya-example/README.md) for more information.
 
 ## Dependencies
 
@@ -99,7 +97,7 @@ tools may also work.
 
 ### Integrate Aranya
 
-Aranya may be integrated into your application using one of the following:
+We currently provide the following integrations for Aranya:
 
 1. [Rust library](#rust-lib)
 2. [C API](#c-api)
@@ -132,8 +130,8 @@ Or, add it to your project's `Cargo.toml`:
 aranya-client = { version = ... }
 ```
 
-Integrate the client library into your application. The
-[client's README](crates/aranya-client/README.md) has more information on using
+Integrate the client library into your application. The `aranya-client`
+[README](crates/aranya-client/README.md) has more information on using
 the Rust client.
 
 #### <a href name="c-api"></a>C API
@@ -173,7 +171,7 @@ $ cargo make build-code
 
 Before starting your application, run the daemon by providing the path to a
 configuration file. Find more details on configuring and running the daemon
-[here](crates/aranya-daemon/README.md).
+in the `aranya-daemon` [README](crates/aranya-daemon/README.md).
 
 Once the daemon is running, run your application and begin using Aranya!
 

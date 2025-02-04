@@ -43,7 +43,7 @@ may differ depending on the policy implemented in your application.
 
 An instance of the daemon must be running before the client can perform
 actions. Instructions for running an instance of the `daemon` binary can be
-found in the [daemon's README](../aranya-daemon/README.md).
+found in the `aranya-daemon` [README](../aranya-daemon/README.md).
 
 For a full demonstration of the client's capabilities, see the
 [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
