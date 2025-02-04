@@ -3,10 +3,10 @@
 This crate contains example code showing how to use Aranya in a Rust application. In order to set it up, you'll need to install [`cargo-generate`](https://crates.io/crates/cargo-generate), which will allow you to create a new Rust project with some boilerplate example code that you can then modify as needed.
 
 This example shows how to use the [`aranya-client`](../../crates/aranya-client) library to:
-- Setup a team
-- Sync Aranya graphs
-- Create an Aranya Fast Channel
-- Send encrypted data between peers
+- [Setup a team](https://aranya-project.github.io/aranya-docs/walkthrough/)
+- [Sync Aranya graphs](https://aranya-project.github.io/aranya-docs/sync/)
+- [Create an Aranya Fast Channel](https://aranya-project.github.io/aranya-docs/afc/)
+- [Send encrypted data between peers](https://aranya-project.github.io/aranya-docs/afc-cryptography/)
 
 During setup, the example application starts an instance of the [`aranya-daemon`](../../crates/aranya-daemon) for each Aranya user in the background. The daemon handles low-level operations such as syncing between different users so that the client can focus on the operations it wants to perform on the team.
 
