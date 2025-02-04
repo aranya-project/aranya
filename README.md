@@ -148,8 +148,24 @@ is provided to make it easier to build the library into an application.
 Regardless of the version of the Aranya library being integrated, you will need
 the [Aranya Daemon](crates/aranya-daemon/) executable. A prebuilt version is
 available for supported platforms in the Aranya
-[release](https://github.com/aranya-project/aranya/releases). Otherwise,
-build the daemon locally.
+[release](https://github.com/aranya-project/aranya/releases).
+
+Otherwise, build the daemon locally:
+
+`$ git clone git@github.com:aranya-project/aranya.git`
+
+Once the source-code is downloaded, navigate to the Aranya project workspace.
+
+Build the daemon using `cargo`:
+
+`cargo build --release`
+
+Or, install and use `cargo-make`:
+
+```bash
+$ cargo install --version '0.37.23' --locked cargo-make
+$ cargo make build-code
+```
 
 Before starting your application, run the daemon by providing the path to a
 configuration file. Find more details on configuring and running the daemon
@@ -168,7 +184,8 @@ and `Member B`.
 The examples go through the following steps:
 
 Step 1: Build or download the pre-built executable from the latest Aranya
-release. After providing a unique configuration file for each user, run the
+release. After providing a unique configuration file (see
+[example.json](crates/aranya-daemon/example.json)) for each user, run the
 daemons.
 
 Step 2. The `Owner` initializes the team
