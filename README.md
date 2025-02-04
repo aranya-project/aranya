@@ -106,7 +106,7 @@ We currently provide the following integrations for Aranya:
 
 First, install the Aranya client.
 
-##### From this repository:
+From this repository:
 
 `$ git clone git@github.com:aranya-project/aranya.git`
 
@@ -117,7 +117,7 @@ Once the source code is downloaded, navigate to the Aranya project workspace and
 This will build the Aranya [client](crates/aranya-client/) and the
 [daemon](crates/aranya-daemon/) executable.
 
-##### From crates.io:
+From crates.io:
 
 Run the following in your project's directory:
 ```bash
@@ -134,6 +134,23 @@ Integrate the client library into your application. The `aranya-client`
 [README](crates/aranya-client/README.md) has more information on using
 the Rust client.
 
+An example of the Rust client library being used to create a team follows:
+
+```rust
+// create team.
+info!("creating team");
+let team_id = team
+	.owner
+	.client
+	.create_team()
+	.await
+	.expect("expected to create team");
+info!(?team_id);
+```
+
+This snippet can be found in the
+[Rust example](templates/aranya-example/src/main.rs#L140).
+
 #### <a href name="c-api"></a>C API
 
 Pre-built versions of the library are uploaded (along with the [header file](https://github.com/aranya-project/aranya/blob/main/crates/aranya-client-capi/output/aranya-client.h)) to each Aranya [release](https://github.com/aranya-project/aranya/releases).
@@ -144,6 +161,17 @@ for your target platform.
 Aranya can then be integrated using `cmake`. A
 [CMakeLists.txt](https://github.com/aranya-project/aranya/blob/main/examples/c/CMakeLists.txt)
 is provided to make it easier to build the library into an application.
+
+An example of the C API being used to create a team follows:
+
+```C
+// have owner create the team.
+err = aranya_create_team(&team->clients.owner.client, &team->id);
+EXPECT("error creating team", err);
+```
+
+This snippet has been modified for simplicity. For actual usage,
+see the [C example](examples/c/example.c#L169).
 
 ### Run Aranya
 
@@ -191,39 +219,6 @@ release. After providing a unique configuration file (see
 daemons.
 
 Step 2. The `Owner` initializes the team
-
-#### Example API calls
-
-The following section will show an example of using Aranya to create a team
-using the Rust library and C API.
-
-##### Rust
-
-The following snippet can be found in the
-[Rust example](templates/aranya-example/src/main.rs#L140).
-
-```rust
-// create team.
-info!("creating team");
-let team_id = team
-	.owner
-	.client
-	.create_team()
-	.await
-	.expect("expected to create team");
-info!(?team_id);
-```
-
-##### C
-
-The following snippet has been modified for simplicity. For actual usage,
-see the [C example](examples/c/example.c#L169).
-
-```C
-// have owner create the team.
-err = aranya_create_team(&team->clients.owner.client, &team->id);
-EXPECT("error creating team", err);
-```
 
 Step 3. The `Owner` adds the `Admin` and `Operator` to the team. `Member A` and
 `Member B` can either be added by the `Owner` or `Operator`.
