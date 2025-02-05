@@ -35,9 +35,9 @@ This repository contains the following components:
 ### Rust Client Library
 
 The [Rust Client Library](crates/aranya-client/) provides an interface for your
-application to interface with the
+application to interact with the
 [Aranya Daemon](crates/aranya-daemon-api/src/service.rs) in order to invoke
-actions on and process affects from the Aranya graph. The library also provides
+actions on and process effects from the Aranya graph. The library also provides
 an interface to [Aranya Core](https://github.com/aranya-project/aranya-core)
 for Aranya Fast Channels functionality. Refer to the `aranya-client`
 [README](crates/aranya-client/README.md) for more details on this
