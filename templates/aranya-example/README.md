@@ -14,10 +14,10 @@ During setup, the example application starts an instance of the [`aranya-daemon`
 
 Install [cargo-generate](https://crates.io/crates/cargo-generate) using cargo (you should have the [Rust toolchain](https://www.rust-lang.org/tools/install) installed):
 ```
-cargo install cargo-generate
+cargo install --locked cargo-generate
 ```
 
-Then, generate a new workspace from the template, which will prompt you for the name of the new project you wish to create:
+Then, generate a new project from the template, which will prompt you for the name of the new project you wish to create:
 ```
 cargo generate aranya-project/aranya templates/aranya-example
 ```
