@@ -16,26 +16,19 @@ Aranya is our contribution to this effort. It is a batteries-included tool which
 
 For users, software built on Aranya is less complex to operate securely, and is secure regardless of the network it is run on.
 
-More documentation on Aranya is provided here:
-- [Aranya Overview](https://aranya-project.github.io/aranya-docs/overview/)
-- [Getting Started With Aranya](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/)
-
-## Contributing
-
-Find information on contributing to the Aranya project in
-[`CONTRIBUTING.md`](https://github.com/aranya-project/.github/blob/main/CONTRIBUTING.md).
+Find more information on the [Aranya Project docs site](https://aranya-project.github.io/aranya-docs/).
 
 ## What's Contained In This Repo
 
 This repository contains the following components:
 
-- [Rust Client Library](crates/aranya-client/): interface for your application to interact 
-with the [Aranya Daemon](crates/aranya-daemon-api/src/service.rs) in order to invoke
-actions on the Aranya graph and process returned effects. The library also provides
-an interface to [Aranya Core](https://github.com/aranya-project/aranya-core)
-for Aranya Fast Channels functionality. Refer to the `aranya-client`
-[README](crates/aranya-client/README.md) for more details on this
-component.
+- [Rust Client Library](crates/aranya-client/): interface for your application
+to interact with the [Aranya Daemon](crates/aranya-daemon-api/src/service.rs)
+in order to invoke actions on the Aranya graph and process returned effects.
+The library also provides an interface to
+[Aranya Core](https://github.com/aranya-project/aranya-core) for Aranya Fast
+Channels functionality. Refer to the `aranya-client`
+[README](crates/aranya-client/README.md) for more details on this component.
 
 - [Daemon Process](crates/aranya-daemon/): a long-running process that forwards
 requests from the [client](crates/aranya-client) to the
@@ -45,33 +38,25 @@ on this component.
 
 - [Aranya Policy](crates/aranya-daemon/src/policy.md): a markdown file of the security control policy written in Aranya's domain-specific policy language and executed by the Aranya runtime.
 
-The [Aranya Policy](crates/aranya-daemon/src/policy.md) is a security control policy written in Aranya's domain-specific policy language and executed by the Aranya runtime.
+## Aranya Components
 
-### Rust Example Application
+- [Aranya Core](https://github.com/aranya-project/aranya-core): all the main
+components of Aranya that are needed for the core functionality to work. This
+is a library that includes the storage module (for DAG and FactDB), crypto
+module (with default crypto engine automatically selected), sync engine, and
+runtime client (including policy VM).
 
-We have provided an [example Rust program](templates/aranya-example) using Aranya.
-
-Refer to the `aranya-example` crate's [README](templates/aranya-example/README.md) for more information.
-
-## Dependencies
-
-### Aranya Core
-
-The [Aranya Core](https://github.com/aranya-project/aranya-core) repo has all the main components of Aranya that are needed for the core functionality to work. This is a library that includes the storage module (for DAG and FactDB), crypto module (with default crypto engine automatically selected), sync engine, and runtime client (including policy VM).
-
-### Aranya Fast Channels
-
-[Aranya Fast Channels](https://github.com/aranya-project/aranya-core/tree/main/crates/aranya-fast-channels) are encrypted channels between 2 peers allowing either unidirectional or bidirectional communication.
+- [Aranya Fast Channels](https://github.com/aranya-project/aranya-core/tree/main/crates/aranya-fast-channels):
+Enables encrypted channels between 2 peers allowing either unidirectional or bidirectional communication.
 
 ## Getting Started
-
 
 The following platforms are supported:
 - Linux/arm64
 - Linux/amd64
 - MacOS
 
-### Prerequisites
+### Dependencies
 
 To use Aranya and run the examples, download the following tools directly or
 using a package manager:
@@ -198,9 +183,9 @@ Once the daemon is running, run your application and begin using Aranya!
 
 We have provided runnable example applications in both
 [Rust](templates/aranya-example/) and [C](examples/c/). These examples will
-use the default policy that's contained in this repo to configure and run the daemon automatically. The examples follow five users who
-are referred to by their user role, `Owner`, `Admin`, `Operator`, `Member A`
-and `Member B`.
+use the default policy that's contained in this repo to configure and run the
+daemon automatically. The examples follow five users who are referred to by
+their user role, `Owner`, `Admin`, `Operator`, `Member A` and `Member B`.
 
 The examples go through the following steps:
 
@@ -226,6 +211,11 @@ Optionally, `Member B` may also send a message back to `Member A`.
 
 For more details on how Aranya starts and the steps performed in the examples,
 see the [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
+
+## Contributing
+
+Find information on contributing to the Aranya project in
+[`CONTRIBUTING.md`](https://github.com/aranya-project/.github/blob/main/CONTRIBUTING.md).
 
 ## Maintainers
 

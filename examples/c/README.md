@@ -13,8 +13,6 @@ between two of the team members.
 
 `cmake` is used to build the program and link to the `aranya-client-capi` shared library.
 
-The `aranya-daemon` process is assumed to have been started before running the example application.
-
 A `config.json` file is provided for configuring the `aranya-daemon` when it starts up.
 
 # Dependencies
@@ -26,6 +24,7 @@ tools may also work.
 - [rust](https://www.rust-lang.org/tools/install) (find version info in the
 [rust-toolchain.toml](../../rust-toolchain.toml))
 - [patchelf](https://github.com/NixOS/patchelf) (v0.18)
+- [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation) (v0.37.23)
 
 # Running The Example
 
