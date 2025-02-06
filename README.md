@@ -28,30 +28,22 @@ Find information on contributing to the Aranya project in
 ## What's Contained In This Repo
 
 This repository contains the following components:
-- [Rust Client Library](crates/aranya-client)
-- [Daemon Process](crates/aranya-daemon)
-- [Aranya Policy](crates/aranya-daemon/src/policy.md)
 
-### Rust Client Library
-
-The [Rust Client Library](crates/aranya-client/) provides an interface for your
-application to interact with the
-[Aranya Daemon](crates/aranya-daemon-api/src/service.rs) in order to invoke
-actions on and process effects from the Aranya graph. The library also provides
+- [Rust Client Library](crates/aranya-client/): interface for your application to interact 
+with the [Aranya Daemon](crates/aranya-daemon-api/src/service.rs) in order to invoke
+actions on the Aranya graph and process returned effects. The library also provides
 an interface to [Aranya Core](https://github.com/aranya-project/aranya-core)
 for Aranya Fast Channels functionality. Refer to the `aranya-client`
 [README](crates/aranya-client/README.md) for more details on this
 component.
 
-### Daemon Process
-
-The [daemon](crates/aranya-daemon/) is a long-running process that forwards
+- [Daemon Process](crates/aranya-daemon/): a long-running process that forwards
 requests from the [client](crates/aranya-client) to the
 [Aranya Core](https://github.com/aranya-project/aranya-core). Refer to the
 `aranya-daemon` [README](crates/aranya-daemon/README.md) for more information
 on this component.
 
-### Aranya Policy
+- [Aranya Policy](crates/aranya-daemon/src/policy.md): a markdown file of the security control policy written in Aranya's domain-specific policy language and executed by the Aranya runtime.
 
 The [Aranya Policy](crates/aranya-daemon/src/policy.md) is a security control policy written in Aranya's domain-specific policy language and executed by the Aranya runtime.
 
@@ -71,9 +63,8 @@ The [Aranya Core](https://github.com/aranya-project/aranya-core) repo has all th
 
 [Aranya Fast Channels](https://github.com/aranya-project/aranya-core/tree/main/crates/aranya-fast-channels) are encrypted channels between 2 peers allowing either unidirectional or bidirectional communication.
 
-## Integration & Development
+## Getting Started
 
-### Supported Platforms
 
 The following platforms are supported:
 - Linux/arm64
@@ -85,15 +76,15 @@ The following platforms are supported:
 To use Aranya and run the examples, download the following tools directly or
 using a package manager:
 
-Note, we have tested using the specified versions. Other versions of these
-tools may also work.
-
 - [Rust](https://www.rust-lang.org/tools/install) (find version info in the
 [rust-toolchain.toml](rust-toolchain.toml))
 - [cmake](https://cmake.org/download/) (v3.31)
 - [clang](https://releases.llvm.org/download.html) (v18.1)
 - [patchelf](https://github.com/NixOS/patchelf) (v0.18)
 - [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation) (v0.37.23)
+
+Note, we have tested using the specified versions above. Other versions of these
+tools may also work.
 
 ### Integrate Aranya
 
@@ -207,7 +198,7 @@ Once the daemon is running, run your application and begin using Aranya!
 
 We have provided runnable example applications in both
 [Rust](templates/aranya-example/) and [C](examples/c/). These examples will
-configure and run the daemon automatically. The examples follow five users who
+use the default policy that's contained in this repo to configure and run the daemon automatically. The examples follow five users who
 are referred to by their user role, `Owner`, `Admin`, `Operator`, `Member A`
 and `Member B`.
 
