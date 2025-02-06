@@ -56,55 +56,61 @@ The following platforms are supported:
 - Linux/amd64
 - MacOS
 
-### Dependencies
-
-To use Aranya and run the examples, download the following tools directly or
-using a package manager:
-
-- [Rust](https://www.rust-lang.org/tools/install) (find version info in the
-[rust-toolchain.toml](rust-toolchain.toml))
-- [cmake](https://cmake.org/download/) (v3.31)
-- [clang](https://releases.llvm.org/download.html) (v18.1)
-- [patchelf](https://github.com/NixOS/patchelf) (v0.18)
-- [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation) (v0.37.23)
-
-Note, we have tested using the specified versions above. Other versions of these
-tools may also work.
-
-### Integrate Aranya
-
 We currently provide the following integrations for Aranya:
 
 1. [Rust library](#rust-lib)
 2. [C API](#c-api)
 
-#### <a href name="rust-lib"></a>Rust Library
+### <a href name="rust-lib"></a>Rust Library
+
+#### Dependencies
+
+- [Rust](https://www.rust-lang.org/tools/install) (find version info in the
+[rust-toolchain.toml](rust-toolchain.toml))
+- (Optional) [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation) (v0.37.23)
+- (Optional) Git for cloning the repository
+
+> NOTE: we have tested using the specified versions above. Other versions of these tools may also work.
+
+#### Install
 
 First, install the Aranya client.
 
 From this repository:
 
-`$ git clone git@github.com:aranya-project/aranya.git`
-
-Once the source code is downloaded, navigate to the Aranya project workspace and run:
-
-`cargo build --release`
-
-This will build the Aranya [client](crates/aranya-client/) and the
-[daemon](crates/aranya-daemon/) executable.
+`git clone git@github.com:aranya-project/aranya.git`
 
 From crates.io:
 
 Run the following in your project's directory:
-```bash
-$ cargo add aranya-client
-```
+
+`cargo add aranya-client`
 
 Or, add it to your project's `Cargo.toml`:
+
 ```
 [dependencies]
 aranya-client = { version = ... }
 ```
+
+#### Build
+
+If the source code has been downloaded, navigate to the Aranya project
+workspace.
+
+Build using `cargo`:
+
+`cargo build --release`
+
+Build using `cargo-make`:
+
+`cargo make build-code`
+
+This will build the Aranya [client](crates/aranya-client/) and the
+[daemon](crates/aranya-daemon/) executable. The built versions are available
+in the `target/release` directory.
+
+#### Integrate
 
 Integrate the client library into your application. The `aranya-client`
 [README](crates/aranya-client/README.md) has more information on using
@@ -127,12 +133,61 @@ info!(?team_id);
 This snippet can be found in the
 [Rust example](templates/aranya-example/src/main.rs#L140).
 
-#### <a href name="c-api"></a>C API
+Before starting your application, run the daemon by providing the path to a
+[configuration file](crates/aranya-daemon/example.json). Find more details on
+configuring and running the daemon in the `aranya-daemon`
+[README](crates/aranya-daemon/README.md).
+
+### <a href name="c-api"></a>C API
+
+#### Dependencies
+
+- [Rust](https://www.rust-lang.org/tools/install) (find version info in the
+[rust-toolchain.toml](rust-toolchain.toml))
+- [cmake](https://cmake.org/download/) (v3.31)
+- [clang](https://releases.llvm.org/download.html) (v18.1)
+- [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation) (v0.37.23)
+- (Optional) Git for cloning the repository
+
+> NOTE: we have tested using the specified versions above. Other versions of these tools may also work.
+
+#### Install
 
 Pre-built versions of the library are uploaded (along with the [header file](https://github.com/aranya-project/aranya/blob/main/crates/aranya-client-capi/output/aranya-client.h)) to each Aranya [release](https://github.com/aranya-project/aranya/releases).
 
-Otherwise, build the [`aranya-client-capi` C API](crates/aranya-client-capi/)
-for your target platform.
+A prebuilt version of the `aranya-daemon` is available for supported platforms
+in the Aranya [release](https://github.com/aranya-project/aranya/releases).
+
+If your platform is unsupported, you must download the source code and build
+locally.
+
+Download the source code:
+
+`git clone git@github.com:aranya-project/aranya.git`
+
+#### Build
+
+As mentioned, prebuilt versions of the Aranya C API library, header file, and
+the Aranya daemon are uploaded to each Aranya
+[release](https://github.com/aranya-project/aranya/releases).
+
+Instructions for generating the Aranya client library and `aranya-client.h`
+header file locally are available in the `aranya-client-capi`
+[README](crates/aranya-client-capi/README.md).
+
+To build the daemon locally, use `cargo` or `cargo-make`.
+
+Using `cargo`:
+
+`cargo build --release`
+
+Using `cargo-make`:
+
+`cargo make build-code`
+
+The daemon executable will be available in the `target/release` directory.
+
+#### Integrate
 
 Aranya can then be integrated using `cmake`. A
 [CMakeLists.txt](https://github.com/aranya-project/aranya/blob/main/examples/c/CMakeLists.txt)
@@ -149,37 +204,12 @@ EXPECT("error creating team", err);
 This snippet has been modified for simplicity. For actual usage,
 see the [C example](examples/c/example.c#L169).
 
-### Run Aranya
-
-Regardless of the version of the Aranya library being integrated, you will need
-the [Aranya Daemon](crates/aranya-daemon/) executable. A prebuilt version is
-available for supported platforms in the Aranya
-[release](https://github.com/aranya-project/aranya/releases).
-
-Otherwise, build the daemon locally:
-
-`$ git clone git@github.com:aranya-project/aranya.git`
-
-Once the source code is downloaded, navigate to the Aranya project workspace.
-
-Build the daemon using `cargo`:
-
-`cargo build --release`
-
-Or, install and use `cargo-make`:
-
-```bash
-$ cargo install --version '0.37.23' --locked cargo-make
-$ cargo make build-code
-```
-
 Before starting your application, run the daemon by providing the path to a
-configuration file. Find more details on configuring and running the daemon
-in the `aranya-daemon` [README](crates/aranya-daemon/README.md).
+[configuration file](crates/aranya-daemon/example.json). Find more details on
+configuring and running the daemon in the `aranya-daemon`
+[README](crates/aranya-daemon/README.md).
 
-Once the daemon is running, run your application and begin using Aranya!
-
-### Example Applications
+## Example Applications
 
 We have provided runnable example applications in both
 [Rust](templates/aranya-example/) and [C](examples/c/). These examples will
