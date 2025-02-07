@@ -23,11 +23,7 @@ Find more information on the [Aranya Project docs site](https://aranya-project.g
 This repository contains the following components:
 
 - [Rust Client Library](crates/aranya-client/): interface for your application
-to interact with the [Aranya Daemon](crates/aranya-daemon-api/src/service.rs)
-in order to invoke actions on the Aranya graph and process returned effects.
-The library also provides an interface to
-[Aranya Core](https://github.com/aranya-project/aranya-core) for Aranya Fast
-Channels functionality. Refer to the `aranya-client`
+to interact with the [Aranya Daemon](https://docs.rs/aranya-daemon-api/0.4.0/aranya_daemon_api/trait.DaemonApi.html) in order to invoke [Aranya Core](https://github.com/aranya-project/aranya-core) functionality. Refer to the `aranya-client`
 [README](crates/aranya-client/README.md) for more details on this component.
 
 - [Daemon Process](crates/aranya-daemon/): a long-running process that forwards
@@ -38,16 +34,8 @@ on this component.
 
 - [Aranya Policy](crates/aranya-daemon/src/policy.md): a markdown file of the security control policy written in Aranya's domain-specific policy language and executed by the Aranya runtime.
 
-## Aranya Components
-
-- [Aranya Core](https://github.com/aranya-project/aranya-core): all the main
-components of Aranya that are needed for the core functionality to work. This
-is a library that includes the storage module (for DAG and FactDB), crypto
-module (with default crypto engine automatically selected), sync engine, and
-runtime client (including policy VM).
-
-- [Aranya Fast Channels](https://github.com/aranya-project/aranya-core/tree/main/crates/aranya-fast-channels):
-Enables encrypted channels between 2 peers allowing either unidirectional or bidirectional communication.
+For more information on Aranya's internal components, see the Aranya Core
+[README](https://github.com/aranya-project/aranya-core/README.md).
 
 ## Getting Started
 
@@ -55,6 +43,10 @@ The following platforms are supported:
 - Linux/arm64
 - Linux/amd64
 - MacOS
+
+Aranya can be integrated into an existing project using the Rust Library or C
+API. For a step-by-step tutorial on how to run Aranya as a standalone app, see
+the [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
 
 We currently provide the following integrations for Aranya:
 
@@ -72,15 +64,17 @@ We currently provide the following integrations for Aranya:
 
 > NOTE: we have tested using the specified versions above. Other versions of these tools may also work.
 
+If you'd like to run the Rust example app, see [below](#example-applications).
+
 #### Install
 
 First, install the Aranya client.
 
-From this repository:
+**From this repository**:
 
 `git clone git@github.com:aranya-project/aranya.git`
 
-From crates.io:
+**From crates.io**:
 
 Run the following in your project's directory:
 
@@ -98,11 +92,13 @@ aranya-client = { version = ... }
 If the source code has been downloaded, navigate to the Aranya project
 workspace.
 
-Build using `cargo`:
+Build the code using `cargo` or `cargo-make`.
+
+**Using `cargo`**:
 
 `cargo build --release`
 
-Build using `cargo-make`:
+**Using `cargo-make`**:
 
 `cargo make build-code`
 
@@ -151,6 +147,8 @@ configuring and running the daemon in the `aranya-daemon`
 
 > NOTE: we have tested using the specified versions above. Other versions of these tools may also work.
 
+If you'd like to run the C example app, see [below](#example-applications).
+
 #### Install
 
 Pre-built versions of the library are uploaded (along with the [header file](https://github.com/aranya-project/aranya/blob/main/crates/aranya-client-capi/output/aranya-client.h)) to each Aranya [release](https://github.com/aranya-project/aranya/releases).
@@ -161,7 +159,7 @@ in the Aranya [release](https://github.com/aranya-project/aranya/releases).
 If your platform is unsupported, you must download the source code and build
 locally.
 
-Download the source code:
+**Download the source code**:
 
 `git clone git@github.com:aranya-project/aranya.git`
 
@@ -177,11 +175,11 @@ header file locally are available in the `aranya-client-capi`
 
 To build the daemon locally, use `cargo` or `cargo-make`.
 
-Using `cargo`:
+**Using `cargo`**:
 
 `cargo build --release`
 
-Using `cargo-make`:
+**Using `cargo-make`**:
 
 `cargo make build-code`
 
