@@ -90,6 +90,10 @@ aranya-client = { version = ... }
 See the [`aranya-client` crate](https://crates.io/crates/aranya-client) on
 `crates.io` for the latest version.
 
+Alternatively, we provide a way to generate a new workspace with a Rust example
+app that includes the Aranya client as a dependency. See the Rust example
+[README](/templates/aranya-example/README.md) for more information.
+
 #### Build
 
 If the source code has been downloaded, navigate to the Aranya project
@@ -156,7 +160,7 @@ If you'd like to run the C example app, see [below](#example-applications).
 
 #### Install
 
-Pre-built versions of the library are uploaded (along with the [header file](https://github.com/aranya-project/aranya/blob/main/crates/aranya-client-capi/output/aranya-client.h)) to each Aranya [release](https://github.com/aranya-project/aranya/releases).
+Prebuilt versions of the library are uploaded (along with the [header file](https://github.com/aranya-project/aranya/blob/main/crates/aranya-client-capi/output/aranya-client.h)) to each Aranya [release](https://github.com/aranya-project/aranya/releases).
 
 A prebuilt version of the `aranya-daemon` is available for supported platforms
 in the Aranya [release](https://github.com/aranya-project/aranya/releases).
@@ -222,7 +226,7 @@ their user role, `Owner`, `Admin`, `Operator`, `Member A` and `Member B`.
 
 The examples go through the following steps:
 
-Step 1: Build or download the pre-built executable from the latest Aranya
+Step 1: Build or download the prebuilt executable from the latest Aranya
 release. After providing a unique configuration file (see
 [example.json](crates/aranya-daemon/example.json)) for each user, run the
 daemons.
