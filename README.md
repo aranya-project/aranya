@@ -44,7 +44,7 @@ The following platforms are supported:
 - Linux/amd64
 - MacOS
 
-Aranya can be integrated into an existing project using the options below. See [Example Applications](___) to run a standalone Aranya app in C or Rust, or for a step-by-step tutorial on how to manually configure and integrate the example scenario, see the [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
+Aranya can be integrated into an existing project using the options below. See [Example Applications](#example-applications) to run a standalone Aranya app in C or Rust, or for a step-by-step tutorial on how to manually configure and integrate the example scenario, see the [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
 
 We currently provide the following integrations for Aranya:
 
@@ -212,7 +212,7 @@ Before starting your application, run the daemon by providing the path to a
 configuring and running the daemon in the `aranya-daemon`
 [README](crates/aranya-daemon/README.md).
 
-## Example Applications
+## <a name="example-applications"></a>Example Applications
 
 We have provided runnable example applications in both
 [Rust](templates/aranya-example/) and [C](examples/c/). These examples will
