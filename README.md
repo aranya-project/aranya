@@ -35,7 +35,7 @@ on this component.
 - [Aranya Policy](crates/aranya-daemon/src/policy.md): a markdown file of the security control policy written in Aranya's domain-specific policy language and executed by the Aranya runtime.
 
 For more information on Aranya's internal components, see the Aranya Core
-[README](https://github.com/aranya-project/aranya-core/README.md).
+[README](https://github.com/aranya-project/aranya-core/blob/main/README.md).
 
 ## Getting Started
 
