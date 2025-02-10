@@ -23,7 +23,7 @@ Find more information on the [Aranya Project docs site](https://aranya-project.g
 This repository contains the following components:
 
 - [Rust Client Library](crates/aranya-client/): interface for your application
-to interact with the [Aranya Daemon](https://docs.rs/aranya-daemon-api/0.4.0/aranya_daemon_api/trait.DaemonApi.html) in order to invoke [Aranya Core](https://github.com/aranya-project/aranya-core) functionality. Refer to the `aranya-client`
+to interact with the [Aranya Daemon](https://docs.rs/aranya-daemon-api/latest/aranya_daemon_api/trait.DaemonApi.html) in order to invoke [Aranya Core](https://github.com/aranya-project/aranya-core) functionality. Refer to the `aranya-client`
 [README](crates/aranya-client/README.md) for more details on this component.
 
 - [Daemon Process](crates/aranya-daemon/): a long-running process that forwards
@@ -44,9 +44,9 @@ The following platforms are supported:
 - Linux/amd64
 - MacOS
 
-Aranya can be integrated into an existing project using the Rust Library or C
-API. For a step-by-step tutorial on how to run Aranya as a standalone app, see
-the [walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
+Aranya can be integrated into an existing project using the options below. For
+a step-by-step tutorial on how to run Aranya as a standalone app, see the
+[walkthrough](https://aranya-project.github.io/aranya-docs/getting-started/walkthrough/).
 
 We currently provide the following integrations for Aranya:
 
@@ -57,8 +57,10 @@ We currently provide the following integrations for Aranya:
 
 #### Dependencies
 
-- [Rust](https://www.rust-lang.org/tools/install) (find version info in the
+- [Rust](https://www.rust-lang.org/tools/install) (Find version info in the
 [rust-toolchain.toml](rust-toolchain.toml))
+> NOTE: When building with Rust, the compiler will automatically download and
+> use the version specified by the `rust-toolchain.toml`.
 - (Optional) [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation) (v0.37.23)
 - (Optional) Git for cloning the repository
 
@@ -86,6 +88,9 @@ Or, add it to your project's `Cargo.toml`:
 [dependencies]
 aranya-client = { version = ... }
 ```
+
+See the [`aranya-client` crate](https://crates.io/crates/aranya-client) on
+`crates.io` for the latest version.
 
 #### Build
 
@@ -140,6 +145,8 @@ configuring and running the daemon in the `aranya-daemon`
 
 - [Rust](https://www.rust-lang.org/tools/install) (find version info in the
 [rust-toolchain.toml](rust-toolchain.toml))
+> NOTE: When building with Rust, the compiler will automatically download and
+> use the version specified by the `rust-toolchain.toml`.
 - [cmake](https://cmake.org/download/) (v3.31)
 - [clang](https://releases.llvm.org/download.html) (v18.1)
 - [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation) (v0.37.23)
@@ -156,7 +163,7 @@ Pre-built versions of the library are uploaded (along with the [header file](htt
 A prebuilt version of the `aranya-daemon` is available for supported platforms
 in the Aranya [release](https://github.com/aranya-project/aranya/releases).
 
-If your platform is unsupported, you must download the source code and build
+If your platform is unsupported, you may download the source code and build
 locally.
 
 **Download the source code**:

@@ -23,6 +23,8 @@ tools may also work.
 - [cmake](https://cmake.org/download/) (v3.31)
 - [rust](https://www.rust-lang.org/tools/install) (find version info in the
 [rust-toolchain.toml](../../rust-toolchain.toml))
+> NOTE: When building with Rust, the compiler will automatically download and
+> use the version specified by the `rust-toolchain.toml`.
 - [patchelf](https://github.com/NixOS/patchelf) (v0.18)
 - [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation) (v0.37.23)
 
