@@ -8,7 +8,7 @@ This example shows how to use the [`aranya-client`](../../crates/aranya-client) 
 - [Create an Aranya Fast Channel](https://aranya-project.github.io/aranya-docs/afc/)
 - [Send encrypted data between peers](https://aranya-project.github.io/aranya-docs/afc-cryptography/)
 
-During setup, the example application starts an instance of the [`aranya-daemon`](../../crates/aranya-daemon) for each Aranya user in the background. The daemon handles low-level operations such as automatically syncing graph states between different users so that the client can focus on the operations it wants to perform on the team.
+During setup, the example application starts an instance of the [`aranya-daemon`](../../crates/aranya-daemon) for each Aranya device in the background. The daemon handles low-level operations such as automatically syncing graph states between different devices so that the client can focus on the operations it wants to perform on the team.
 
 # Generate a New Project
 
