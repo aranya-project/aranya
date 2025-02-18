@@ -1,11 +1,10 @@
-use core::str;
 use std::{
     net::SocketAddr,
     path::{Path, PathBuf},
     time::Duration,
 };
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Context as _, Result};
 use aranya_client::{AfcMsg, Client, Label};
 use aranya_daemon::{
     config::{AfcConfig, Config},
@@ -16,8 +15,12 @@ use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::tempdir;
 use tokio::{fs, task, time::sleep};
-use tracing::{debug, info};
-use tracing_subscriber::{prelude::*, EnvFilter};
+use tracing::{debug, info, Metadata};
+use tracing_subscriber::{
+    layer::{Context, Filter},
+    prelude::*,
+    EnvFilter,
+};
 
 struct TeamCtx {
     owner: UserCtx,
@@ -145,14 +148,34 @@ macro_rules! do_poll {
     };
 }
 
+struct DemoFilter {
+    env_filter: EnvFilter,
+}
+
+impl<S> Filter<S> for DemoFilter {
+    fn enabled(&self, metadata: &Metadata<'_>, context: &Context<'_, S>) -> bool {
+        if metadata.target().starts_with(module_path!()) {
+            true
+        } else {
+            self.env_filter.enabled(metadata, context.clone())
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_file(false)
-        .with_target(false)
-        .compact()
-        .with_env_filter(
-            EnvFilter::try_from_env("ARANYA_EXAMPLE").unwrap_or_else(|_| EnvFilter::new("info")),
+    let filter = DemoFilter {
+        env_filter: EnvFilter::try_from_env("ARANYA_EXAMPLE")
+            .unwrap_or_else(|_| EnvFilter::new("off")),
+    };
+
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_file(false)
+                .with_target(false)
+                .compact()
+                .with_filter(filter),
         )
         .init();
 
@@ -349,7 +372,7 @@ async fn main() -> Result<()> {
         n = data.len(),
         ?label,
         "received message: {:?}",
-        str::from_utf8(&data)?
+        core::str::from_utf8(&data)?
     );
 
     let Some(AfcMsg { data, label, .. }) = team.memberb.client.try_recv_data() else {
@@ -359,7 +382,7 @@ async fn main() -> Result<()> {
         n = data.len(),
         ?label,
         "received message: {:?}",
-        str::from_utf8(&data)?
+        core::str::from_utf8(&data)?
     );
 
     info!("completed example Aranya application");
