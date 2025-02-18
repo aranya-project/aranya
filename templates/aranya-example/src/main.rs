@@ -147,13 +147,12 @@ macro_rules! do_poll {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_file(false)
-                .with_target(false)
-                .compact()
-                .with_filter(EnvFilter::from_env("ARANYA_EXAMPLE")),
+    tracing_subscriber::fmt()
+        .with_file(false)
+        .with_target(false)
+        .compact()
+        .with_env_filter(
+            EnvFilter::try_from_env("ARANYA_EXAMPLE").unwrap_or_else(|_| EnvFilter::new("info")),
         )
         .init();
 
