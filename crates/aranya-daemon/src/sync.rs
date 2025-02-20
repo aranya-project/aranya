@@ -15,7 +15,7 @@ use aranya_util::Addr;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
-use tracing::{debug, error, instrument};
+use tracing::{error, info, instrument};
 
 use crate::{
     daemon::{Client, EF},
@@ -170,7 +170,7 @@ impl Syncer {
 
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
     async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
-        debug!("syncing with peer");
+        info!("syncing with peer");
 
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
@@ -186,7 +186,7 @@ impl Syncer {
             .send(effects)
             .await
             .context("unable to send effects")?;
-        debug!(?n, "completed sync");
+        info!(?n, "completed sync");
         Ok(())
     }
 }
