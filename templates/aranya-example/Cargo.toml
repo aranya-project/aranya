@@ -1,5 +1,5 @@
 [package]
-name = "aranya-example"
+name = "{{project-name}}"
 description = "Example Rust program using the Aranya client library"
 version = "0.1.0"
 authors = ["SpiderOak, Inc."]
