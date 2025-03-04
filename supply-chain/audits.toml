@@ -1,7 +1,15 @@
 
 # cargo-vet audits file
 
-[audits]
+[[audits.serde_derive]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.217 -> 1.0.218"
+
+[[audits.zerofrom-derive]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.5 -> 0.1.6"
 
 [[trusted.aranya-afc-util]]
 criteria = "safe-to-deploy"

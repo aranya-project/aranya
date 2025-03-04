@@ -817,7 +817,3 @@ criteria = "safe-to-deploy"
 [[exemptions.zerofrom]]
 version = "0.1.5"
 criteria = "safe-to-deploy"
-
-[[exemptions.zerofrom-derive]]
-version = "0.1.5"
-criteria = "safe-to-deploy"
