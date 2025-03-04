@@ -9,9 +9,9 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
-use buggy::BugExt;
 use aranya_runtime::storage::GraphId;
 use aranya_util::Addr;
+use buggy::BugExt;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
