@@ -22,8 +22,8 @@ aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 
-aranya-buggy = { workspace = true }
-aranya-capi-core = "0.1.0"
+buggy = { workspace = true }
+aranya-capi-core = { workspace = true }
 aranya-fast-channels = { workspace = true }
 
 libc = { workspace = true, features = ["extra_traits"] }

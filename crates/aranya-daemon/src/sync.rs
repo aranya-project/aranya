@@ -9,7 +9,7 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
-use aranya_buggy::BugExt;
+use buggy::BugExt;
 use aranya_runtime::storage::GraphId;
 use aranya_util::Addr;
 use futures_util::StreamExt;

@@ -1,6 +1,6 @@
 use core::{ffi::c_char, mem::MaybeUninit};
 
-use aranya_buggy::Bug;
+use buggy::Bug;
 use aranya_capi_core::{
     safe::{TypeId, Typed},
     write_c_str, ExtendedError, InvalidArg, WriteCStrError,

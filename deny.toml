@@ -113,8 +113,6 @@ exceptions = [
     # Each entry is the crate and version constraint, and its specific allow
     # list
     { allow = ["AGPL-3.0"], crate = "aranya-afc-util" },
-    { allow = ["AGPL-3.0"], crate = "aranya-base58" },
-    { allow = ["AGPL-3.0"], crate = "aranya-buggy" },
     { allow = ["AGPL-3.0"], crate = "aranya-capi-codegen" },
     { allow = ["AGPL-3.0"], crate = "aranya-capi-core" },
     { allow = ["AGPL-3.0"], crate = "aranya-capi-macro" },
