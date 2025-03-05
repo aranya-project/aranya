@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+# This script makes it easier to automatically open cargo vet diffs and certify deps.
+# It runs `cargo vet check` and loops over each `cargo vet diff` and `cargo vet inspect` command in the output.
+# The user can press enter to open the diff for each dependency in a new browser tab.
+# Once the changes have been reviewed, the user should close the opened browser tab and press enter again to certify the change.
+#
+# The default run mode will look at diffs and certify each dependency.
+# DIFF=0 ./diff.bash will skip dependency diffs.
+# CERTIFY=0 ./diff.bash will skip certifying dependencies.
+
 set -aeuo pipefail
 
 if command -v shellcheck; then
