@@ -12,7 +12,7 @@
 set -aeuo pipefail
 
 if command -v shellcheck; then
-	shellcheck "${0}"
+    shellcheck "${0}"
 fi
 
 # cargo vet diff
