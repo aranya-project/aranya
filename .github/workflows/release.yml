@@ -12,9 +12,9 @@ on:
       - main
 
 jobs:
-  # Release unreleased crates and create a git tag
-  release:
-    name: Release
+  # Publish unpublished crates and create a git tag
+  tag:
+    name: Tag
     runs-on: ubuntu-latest
     concurrency:
       group: release-${{ github.ref }}
@@ -22,8 +22,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: ./.github/actions/setup
 
@@ -34,25 +32,191 @@ jobs:
 
       - name: Create tags
         id: tag
-        run: cargo release tag -v --execute
+        run: |
+          cargo release tag -v --execute --no-confirm
         # Continue on error so we don't get a CI failure (red X) when no release is needed.
         # Each following step must check `steps.tag.outcome` (NOT `steps.tag.conclusion`).
         continue-on-error: true
 
       - name: Publish to crates.io
         if: success() && steps.tag.outcome == 'success'
-        run: cargo release publish -v --execute
+        run: |
+          cargo release publish -v --execute --no-confirm
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.ARANYA_BOT_CRATESIO_CARGO_LOGIN_KEY }}
 
       - name: Push tags to github
+        id: push
         if: success() && steps.tag.outcome == 'success'
-        run: cargo release push -v --execute
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          cargo release push -v --execute --no-confirm
+        # Continue on error so we don't get a CI failure (red X) when no release is needed.
+        # Each following step must check `steps.push.outcome` (NOT `steps.push.conclusion`).
+        continue-on-error: true
 
-      - name: Call publish workflow
-        if: success() && steps.tag.outcome == 'success'
-        uses: ./.github/workflows/publish.yml
+      - name: Version
+        if: success()
+        run: |
+          echo "VERSION=$(cargo metadata --format-version=1 --no-deps | jq --raw-output '.packages[0].version')" >> $GITHUB_OUTPUT
+        id: version
+
+      - name: Show Outputs
+        if: success()
+        run: |
+          echo "version=v${{ steps.version.outputs.VERSION }}"
+          echo "steps.push.outcome=${{ steps.push.outcome }}"
+
+    outputs:
+      tag: v${{ steps.version.outputs.VERSION }}
+      outcome: ${{ steps.push.outcome }}
+
+  release:
+    needs:
+      - tag
+    if: needs.tag.outputs.outcome == 'success'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show Outputs
+        if: success()
+        run: |
+          echo "tag=${{ needs.tag.outputs.tag }}"
+          echo "needs.tag.outputs.outcome=${{ needs.tag.outputs.outcome }}"
+
+      - name: Create Release
+        id: release
+        uses: aranya-project/release-action@main
         with:
-          workflow: publish
+          allowUpdates: true
+          prerelease: false
+          makeLatest: legacy
+          tag: ${{ needs.tag.outputs.tag }}
+    outputs:
+      upload-url: ${{ steps.release.outputs.upload_url }}
+
+  build:
+    needs:
+      - tag
+    if: needs.tag.outputs.outcome == 'success'
+    uses: ./.github/workflows/build.yml
+    with:
+      workflow: build
+
+  docs:
+    needs:
+      - tag
+    if: needs.tag.outputs.outcome == 'success'
+    uses: ./.github/workflows/doc.yml
+    with:
+      workflow: doc
+
+  publish-daemon:
+    permissions:
+      contents: write
+    needs:
+      - tag
+      - release
+      - build
+    if: needs.tag.outputs.outcome == 'success'
+    strategy:
+      matrix:
+        target:
+          - aarch64-unknown-linux-gnu
+          - x86_64-unknown-linux-gnu
+    name: publish daemon ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Rust doc artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: aranya-daemon-${{ matrix.target }}
+          path: aranya-daemon-${{ matrix.target }}
+      - name: List files
+        run: ls -R -al
+      - name: Upload Rust docs to tagged release
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+            GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ needs.release.outputs.upload-url }}
+          asset_path: aranya-daemon-${{ matrix.target }}/aranya-daemon.tar.gz
+          asset_name: aranya-daemon-${{ needs.tag.outputs.tag }}-${{ matrix.target }}.tar.gz
+          asset_content_type: application/gzip
+
+  publish-capi-lib:
+    permissions:
+      contents: write
+    needs:
+      - tag
+      - release
+      - build
+    if: needs.tag.outputs.outcome == 'success'
+    strategy:
+      matrix:
+        target:
+          - aarch64-unknown-linux-gnu
+          - x86_64-unknown-linux-gnu
+    name: publish capi ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Rust doc artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: aranya-client-capi-${{ matrix.target }}
+          path: aranya-client-capi-${{ matrix.target }}
+      - name: List files
+        run: ls -R -al
+      - name: Upload Rust docs to tagged release
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+            GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ needs.release.outputs.upload-url }}
+          asset_path: aranya-client-capi-${{ matrix.target }}/aranya-client-lib.tar.gz
+          asset_name: aranya-client-capi-${{ needs.tag.outputs.tag }}-${{ matrix.target }}.tar.gz
+          asset_content_type: application/gzip
+
+  publish-capi-docs:
+    permissions:
+      contents: write
+    needs:
+      - tag
+      - release
+      - docs
+    if: needs.tag.outputs.outcome == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download capi doc artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: aranya-client-capi-docs
+          path: aranya-client-capi-docs
+
+      - name: Extract
+        run:  |
+          cd aranya-client-capi-docs
+          tar -xzf aranya-client-capi-docs.tar.gz
+
+      - name: List files
+        run: ls -R -al
+
+      - name: Deploy to GitHub Pages
+        uses: aranya-project/github-pages-deploy-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: gh-pages
+          folder: aranya-client-capi-docs/html
+          target-folder: capi/${{ needs.tag.outputs.tag }}
+
+      - name: Upload capi docs to tagged release
+        uses: actions/upload-release-asset@v1.0.2
+        env:
+            GITHUB_TOKEN: ${{ github.token }}
+        with:
+          upload_url: ${{ needs.release.outputs.upload-url }}
+          asset_path: aranya-client-capi-docs/aranya-client-capi-docs.tar.gz
+          asset_name: aranya-client-capi-docs-${{ needs.tag.outputs.tag }}.tar.gz
+          asset_content_type: application/gzip
