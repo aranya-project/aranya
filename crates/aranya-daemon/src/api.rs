@@ -14,7 +14,7 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler};
 use aranya_buggy::BugExt;
-use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, Rng, DeviceId};
+use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, DeviceId, Rng};
 use aranya_daemon_api::{
     AfcCtrl, AfcId, DaemonApi, DeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
     Result as ApiResult, Role as ApiRole, TeamId, CS,

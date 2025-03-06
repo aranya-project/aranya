@@ -1,7 +1,8 @@
 use anyhow::{Context, Result};
 use aranya_crypto::{
-    CipherSuite, EncryptionKey, EncryptionKeyId, EncryptionPublicKey, Engine, IdentityKey,
-    IdentityVerifyingKey, KeyStore, KeyStoreExt, SigningKey, SigningKeyId, DeviceId, VerifyingKey,
+    CipherSuite, DeviceId, EncryptionKey, EncryptionKeyId, EncryptionPublicKey, Engine,
+    IdentityKey, IdentityVerifyingKey, KeyStore, KeyStoreExt, SigningKey, SigningKeyId,
+    VerifyingKey,
 };
 use serde::{Deserialize, Serialize};
 

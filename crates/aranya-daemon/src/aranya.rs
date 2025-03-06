@@ -3,7 +3,7 @@
 use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
 
 use anyhow::{bail, Context, Result};
-use aranya_crypto::{Csprng, Rng, DeviceId};
+use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_fast_channels::Label;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
@@ -396,7 +396,10 @@ where
 
     /// Remove a Member instance from the team.
     #[instrument(skip(self), fields(device_id = %device_id))]
-    fn remove_member(&self, device_id: DeviceId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn remove_member(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
             actor.remove_member(device_id.into())?;
             Ok(())
