@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use aranya_crypto::{
     CipherSuite, EncryptionKey, EncryptionKeyId, EncryptionPublicKey, Engine, IdentityKey,
-    IdentityVerifyingKey, KeyStore, KeyStoreExt, SigningKey, SigningKeyId, UserId, VerifyingKey,
+    IdentityVerifyingKey, KeyStore, KeyStoreExt, SigningKey, SigningKeyId, DeviceId, VerifyingKey,
 };
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeyBundle {
     /// See [`IdentityKey`].
-    pub user_id: UserId,
+    pub device_id: DeviceId,
     /// See [`EncryptionKey`].
     pub enc_id: EncryptionKeyId,
     /// See [`SigningKey`].
@@ -52,7 +52,7 @@ impl KeyBundle {
             }};
         }
         Ok(Self {
-            user_id: gen!(IdentityKey),
+            device_id: gen!(IdentityKey),
             enc_id: gen!(EncryptionKey),
             sign_id: gen!(SigningKey),
         })
@@ -66,7 +66,7 @@ impl KeyBundle {
     {
         Ok(PublicKeys {
             ident_pk: store
-                .get_key::<_, IdentityKey<E::CS>>(eng, self.user_id.into())
+                .get_key::<_, IdentityKey<E::CS>>(eng, self.device_id.into())
                 .context("unable to load `IdentityKey`")?
                 .context("unable to find `IdentityKey`")?
                 .public()?,
