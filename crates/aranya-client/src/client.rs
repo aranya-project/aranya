@@ -38,7 +38,7 @@ pub struct Client {
     daemon: DaemonApiClient,
     /// AFC support.
     afc: Afc<ReadState<CS>>,
-    /// Messages from `handle_data`.
+    /// Messages from `afc_handle_data`.
     afc_msgs: VecDeque<AfcMsg>,
     #[cfg(feature = "debug")]
     name: String,
@@ -187,8 +187,8 @@ impl Client {
     /// Polls the client to check for new AFC data, then retrieves
     /// any new data.
     ///
-    /// This is shorthand for [`poll`][Self::poll] and
-    /// [`handle_data`][Self::handle_data].
+    /// This is shorthand for [`afc_poll`][Self::afc_poll] and
+    /// [`afc_handle_data`][Self::afc_handle_data].
     ///
     /// # Cancellation Safety
     ///
@@ -211,7 +211,7 @@ impl Client {
         Ok(PollData(data))
     }
 
-    /// Retrieves AFC data from [`poll`][Self::poll].
+    /// Retrieves AFC data from [`afc_poll`][Self::afc_poll].
     ///
     /// # Cancellation Safety
     ///

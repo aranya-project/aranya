@@ -132,7 +132,7 @@ fn trim(mut d: u128, mut width: usize) -> (u128, usize) {
     (d, width)
 }
 
-/// Repeatedly calls `poll_data`, followed by `handle_data`,
+/// Repeatedly calls `afc_poll_data`, followed by `afc_handle_data`,
 /// until all of the clients are pending.
 macro_rules! do_poll {
     ($($client:expr),*) => {
