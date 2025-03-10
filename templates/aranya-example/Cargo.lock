@@ -151,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-client"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "05433dafe99d3a0ca99cafe44f6deef432dcd639000dfbbcc12cd2b09d7927aa"
 dependencies = [
@@ -238,7 +238,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8b5a4ed7d2986d27e9885aa56035bea5f32d48349c5657c458775917d39f9c7"
 dependencies = [
@@ -277,7 +277,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon-api"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3c7cb04b509606a75ecbb52c90cf0bd9994f7d56acc11d38caeb007d8a45d5d0"
 dependencies = [
@@ -359,7 +359,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-keygen"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0618c7769bcb3772276200aa8cec2a8ea114abd625a5c2c320ec6b6b7246779"
 dependencies = [
@@ -535,7 +535,7 @@ checksum = "c292729db9cbe6ad3c699bae15416c2e0596a9815046b49e27ad5d30ad54732d"
 
 [[package]]
 name = "aranya-util"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df943f3e6a0f398f7fa7d9e024438d2baebd5b347c2fbe2b82f090d34c31977f"
 dependencies = [
@@ -959,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "embedded-io"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef1a6892d9eef45c8fa6b9e0086428a2cca8491aca8f787c534a3d6d0bcb3ced"
 
@@ -1780,7 +1780,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "rfc6979"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f8dd2a808d456c4a54e300a23e9f5a67e122c3024119acbfd73e3bf664491cb2"
 dependencies = [
@@ -1796,7 +1796,7 @@ checksum = "719b953e2095829ee67db738b3bfa9fa368c94900df327b3f07fe6e794d2fe1f"
 
 [[package]]
 name = "rustc_version"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cfcb3a22ef46e85b45de6ee7e79d063319ebb6594faafcf1c225ea92ab6e9b92"
 dependencies = [
@@ -2424,13 +2424,13 @@ dependencies = [
 
 [[package]]
 name = "winapi-i686-pc-windows-gnu"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
 
 [[package]]
 name = "winapi-x86_64-pc-windows-gnu"
-version = "0.4.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 

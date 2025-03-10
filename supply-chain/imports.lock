@@ -2,23 +2,23 @@
 # cargo-vet imports lock
 
 [[unpublished.aranya-client]]
-version = "0.4.1"
+version = "0.5.0"
 audited_as = "0.4.0"
 
 [[unpublished.aranya-daemon]]
-version = "0.4.1"
+version = "0.5.0"
 audited_as = "0.4.0"
 
 [[unpublished.aranya-daemon-api]]
-version = "0.4.1"
+version = "0.5.0"
 audited_as = "0.4.0"
 
 [[unpublished.aranya-keygen]]
-version = "0.4.1"
+version = "0.5.0"
 audited_as = "0.4.0"
 
 [[unpublished.aranya-util]]
-version = "0.4.1"
+version = "0.5.0"
 audited_as = "0.4.0"
 
 [[publisher.aranya-afc-util]]
@@ -558,7 +558,7 @@ aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_p
 [[audits.google.audits.heck]]
 who = "Lukasz Anforowicz <lukasza@chromium.org>"
 criteria = "safe-to-deploy"
-version = "0.4.1"
+version = "0.5.0"
 notes = """
 Grepped for `-i cipher`, `-i crypto`, `'\bfs\b'``, `'\bnet\b'``, `'\bunsafe\b'``
 and there were no hits.
@@ -1380,7 +1380,7 @@ delta = "2.5.0 -> 2.6.1"
 [[audits.isrg.audits.universal-hash]]
 who = "David Cook <dcook@divviup.org>"
 criteria = "safe-to-deploy"
-version = "0.4.1"
+version = "0.5.0"
 
 [[audits.isrg.audits.universal-hash]]
 who = "David Cook <dcook@divviup.org>"

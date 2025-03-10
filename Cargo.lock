@@ -197,7 +197,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-client"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "aranya-base58",
@@ -308,7 +308,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "aranya-afc-util",
@@ -350,7 +350,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon-api"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "aranya-base58",
@@ -414,7 +414,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-keygen"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -588,7 +588,7 @@ checksum = "c292729db9cbe6ad3c699bae15416c2e0596a9815046b49e27ad5d30ad54732d"
 
 [[package]]
 name = "aranya-util"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "aranya-buggy",
