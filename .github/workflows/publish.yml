@@ -1,15 +1,25 @@
-name: "Publish Release Artifacts On Tag Creation"
+name: "Publish Release Artifacts To GitHub Release On Tag Creation"
 
 on:
-  push:
-    tags:
-      - "*"
   workflow_dispatch:
+    inputs:
+      workflow:
+        required: true
+        type: string
+      tag:
+        required: true
+        type: string
   workflow_call:
     inputs:
       workflow:
         required: true
         type: string
+      tag:
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow }}-${{ inputs.tag }}
 
 jobs:
   release:
@@ -24,6 +34,7 @@ jobs:
           allowUpdates: true
           prerelease: false
           makeLatest: legacy
+          tag: ${{ inputs.tag }}
     outputs:
       upload-url: ${{ steps.release.outputs.upload_url }}
 
@@ -65,7 +76,7 @@ jobs:
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-daemon-${{ matrix.target }}/aranya-daemon.tar.gz
-          asset_name: aranya-daemon-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          asset_name: aranya-daemon-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
           asset_content_type: application/gzip
 
   publish-capi-lib:
@@ -96,7 +107,7 @@ jobs:
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-client-capi-${{ matrix.target }}/aranya-client-lib.tar.gz
-          asset_name: aranya-client-capi-${{ github.ref_name }}-${{ matrix.target }}.tar.gz
+          asset_name: aranya-client-capi-${{ inputs.tag }}-${{ matrix.target }}.tar.gz
           asset_content_type: application/gzip
 
   publish-capi-docs:
@@ -129,7 +140,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: gh-pages
           folder: aranya-client-capi-docs/html
-          target-folder: capi/${{ github.ref_name }}
+          target-folder: capi/${{ inputs.tag }}
 
       - name: Upload capi docs to tagged release
         uses: actions/upload-release-asset@v1.0.2
@@ -138,5 +149,5 @@ jobs:
         with:
           upload_url: ${{ needs.release.outputs.upload-url }}
           asset_path: aranya-client-capi-docs/aranya-client-capi-docs.tar.gz
-          asset_name: aranya-client-capi-docs-${{ github.ref_name }}.tar.gz
+          asset_name: aranya-client-capi-docs-${{ inputs.tag }}.tar.gz
           asset_content_type: application/gzip
