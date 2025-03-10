@@ -313,13 +313,13 @@ AranyaError run(Team *t) {
 
     // Once membera and memberb have been assigned the label and their network
     // identifiers, a Fast Channel can be created. In this example, membera
-    // will create the channel using `aranya_create_bidi_channel`. This will
+    // will create the channel using `aranya_afc_create_bidi_channel`. This will
     // create a bidirectional Aranya Fast Channel.
 
     // create AFC channel between membera and memberb.
     AranyaChannelId chan_id;
-    err = aranya_create_bidi_channel(&t->clients.membera.client, &t->id,
-                                     afc_addrs[MEMBERB], label, &chan_id);
+    err = aranya_afc_create_bidi_channel(&t->clients.membera.client, &t->id,
+                                         afc_addrs[MEMBERB], label, &chan_id);
     EXPECT("error creating afc channel", err);
     AranyaDuration timeout = ARANYA_DURATION_SECONDS * 1;
     // TODO: poll in separate task.
@@ -328,8 +328,8 @@ AranyaError run(Team *t) {
         AranyaError err1, err2;
 
         printf("polling for ctrl\r\n");
-        err1 = aranya_poll_data(&t->clients.membera.client, timeout);
-        err2 = aranya_poll_data(&t->clients.memberb.client, timeout);
+        err1 = aranya_afc_poll_data(&t->clients.membera.client, timeout);
+        err2 = aranya_afc_poll_data(&t->clients.memberb.client, timeout);
         if (err1 == ARANYA_ERROR_TIMEOUT && err2 == ARANYA_ERROR_TIMEOUT) {
             printf("polling timed out\r\n");
             break;
@@ -337,12 +337,12 @@ AranyaError run(Team *t) {
     }
 
     // Once created, membera can send a message over the channel using
-    // `aranya_send_data`.
+    // `aranya_afc_send_data`.
 
     // send AFC data.
     const char *send = "hello world";
-    err              = aranya_send_data(&t->clients.membera.client, chan_id,
-                                        (const uint8_t *)send, (int)strlen(send));
+    err              = aranya_afc_send_data(&t->clients.membera.client, chan_id,
+                                            (const uint8_t *)send, (int)strlen(send));
     EXPECT("error sending data", err);
     printf("%s sent afc message: len: %d \r\n", t->clients_arr[MEMBERA].name,
            (int)strlen(send));
@@ -352,25 +352,26 @@ AranyaError run(Team *t) {
         AranyaError err1, err2;
 
         printf("polling for data\r\n");
-        err1 = aranya_poll_data(&t->clients.membera.client, timeout);
-        err2 = aranya_poll_data(&t->clients.memberb.client, timeout);
+        err1 = aranya_afc_poll_data(&t->clients.membera.client, timeout);
+        err2 = aranya_afc_poll_data(&t->clients.memberb.client, timeout);
         if (err1 == ARANYA_ERROR_TIMEOUT && err2 == ARANYA_ERROR_TIMEOUT) {
             printf("polling timed out\r\n");
             break;
         }
     }
 
-    // Memberb uses `aranya_recv_data` to receive the incoming message.
+    // Memberb uses `aranya_afc_recv_data` to receive the incoming message.
 
     // receive AFC data.
     AranyaAfcMsgInfo info;
     uint8_t buf[BUF_LEN];
     size_t len = BUF_LEN;
     bool ok    = false;
-    err = aranya_recv_data(&t->clients.memberb.client, buf, &len, &info, &ok);
+    err =
+        aranya_afc_recv_data(&t->clients.memberb.client, buf, &len, &info, &ok);
     EXPECT("error receiving data", err);
     if (!ok) {
-        fprintf(stderr, "`aranya_recv_data` returned `false`\n");
+        fprintf(stderr, "`aranya_afc_recv_data` returned `false`\n");
         return ARANYA_ERROR_AFC;
     }
     printf("%s received afc message from %s: len: %zu, label: %d \r\n",

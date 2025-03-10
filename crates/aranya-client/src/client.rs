@@ -39,7 +39,7 @@ pub struct Client {
     /// AFC support.
     afc: Afc<ReadState<CS>>,
     /// Messages from `handle_data`.
-    msgs: VecDeque<AfcMsg>,
+    afc_msgs: VecDeque<AfcMsg>,
     #[cfg(feature = "debug")]
     name: String,
 }
@@ -98,7 +98,7 @@ impl Client {
         Ok(Self {
             daemon,
             afc,
-            msgs: VecDeque::new(),
+            afc_msgs: VecDeque::new(),
             #[cfg(feature = "debug")]
             name: String::new(),
         })
@@ -144,7 +144,7 @@ impl Client {
     /// It is NOT safe to cancel the resulting future. Doing so
     /// might lose data.
     #[instrument(skip_all, fields(self = self.debug(), %team_id, %peer, %label))]
-    pub async fn create_bidi_channel(
+    pub async fn afc_create_bidi_channel(
         &mut self,
         team_id: TeamId,
         peer: NetIdentifier,
@@ -157,7 +157,7 @@ impl Client {
 
         let (afc_id, ctrl) = self
             .daemon
-            .create_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
+            .afc_create_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
             .await??;
         debug!(%afc_id, %node_id, %label, "created bidi channel");
 
@@ -173,15 +173,18 @@ impl Client {
     /// Deletes an AFC channel.
     // TODO(eric): Is it an error if the channel does not exist?
     #[instrument(skip_all, fields(self = self.debug(), afc_id = %id))]
-    pub async fn delete_channel(&mut self, id: AfcId) -> Result<()> {
-        let _ctrl = self.daemon.delete_channel(context::current(), id).await??;
+    pub async fn afc_delete_channel(&mut self, id: AfcId) -> Result<()> {
+        let _ctrl = self
+            .daemon
+            .afc_delete_channel(context::current(), id)
+            .await??;
         self.afc.remove_channel(id).await;
         // TODO(eric): Send control message.
         // self.afc.send_ctrl(peer, ctrl, team_id, id, chan_id);
         Ok(())
     }
 
-    /// Polls the client to check for new data, then retrieves
+    /// Polls the client to check for new AFC data, then retrieves
     /// any new data.
     ///
     /// This is shorthand for [`poll`][Self::poll] and
@@ -192,44 +195,44 @@ impl Client {
     /// It is NOT safe to cancel the resulting future. Doing so
     /// might lose data.
     #[instrument(skip_all)]
-    pub async fn poll(&mut self) -> Result<()> {
-        let data = self.poll_data().await?;
-        self.handle_data(data).await
+    pub async fn afc_poll(&mut self) -> Result<()> {
+        let data = self.afc_poll_data().await?;
+        self.afc_handle_data(data).await
     }
 
-    /// Polls the client to check for new data.
+    /// Polls the client to check for new AFC data.
     ///
     /// # Cancellation Safety
     ///
     /// It is safe to cancel the resulting future.
     #[instrument(skip_all)]
-    pub async fn poll_data(&mut self) -> Result<PollData> {
+    pub async fn afc_poll_data(&mut self) -> Result<PollData> {
         let data = self.afc.poll().await?;
         Ok(PollData(data))
     }
 
-    /// Retrieves data from [`poll`][Self::poll].
+    /// Retrieves AFC data from [`poll`][Self::poll].
     ///
     /// # Cancellation Safety
     ///
     /// It is NOT safe to cancel the resulting future. Doing so
     /// might lose data.
     #[instrument(skip_all, fields(self = self.debug(), ?data))]
-    pub async fn handle_data(&mut self, data: PollData) -> Result<()> {
+    pub async fn afc_handle_data(&mut self, data: PollData) -> Result<()> {
         match data.0 {
             State::Accept(addr) | State::Msg(addr) => match self.afc.read_msg(addr).await? {
                 Msg::Data(data) => {
                     debug!(%addr, "read data message");
 
                     let (data, channel, label, seq) = self.afc.open_data(data)?;
-                    self.msgs.push_back(AfcMsg {
+                    self.afc_msgs.push_back(AfcMsg {
                         data,
                         addr,
                         channel,
                         label,
                         seq,
                     });
-                    debug!(n = self.msgs.len(), "stored msg");
+                    debug!(n = self.afc_msgs.len(), "stored msg");
                 }
                 Msg::Ctrl(ctrl) => {
                     debug!(%addr, "read control message");
@@ -253,7 +256,7 @@ impl Client {
         Ok(())
     }
 
-    /// Send data over a specific fast channel.
+    /// Send AFC data over a specific fast channel.
     ///
     /// # Cancellation Safety
     ///
@@ -261,7 +264,7 @@ impl Client {
     /// a partial message may be written to the channel.
     // TODO(eric): Return a sequence number?
     #[instrument(skip_all, fields(self = self.debug(), afc_id = %id))]
-    pub async fn send_data(&mut self, id: AfcId, data: &[u8]) -> Result<()> {
+    pub async fn afc_send_data(&mut self, id: AfcId, data: &[u8]) -> Result<()> {
         self.afc.send_data(id, data).await.map_err(Into::into)
     }
 
@@ -274,10 +277,10 @@ impl Client {
     // TODO: return [`NetIdentifier`] instead of [`SocketAddr`].
     // TODO: read into buffer instead of returning `Vec<u8>`.
     #[instrument(skip_all, fields(self = self.debug()))]
-    pub fn try_recv_data(&mut self) -> Option<AfcMsg> {
+    pub fn afc_try_recv_data(&mut self) -> Option<AfcMsg> {
         // TODO(eric): This method should block until a message
         // has been received.
-        let msg = self.msgs.pop_front()?;
+        let msg = self.afc_msgs.pop_front()?;
         debug!(label = %msg.label, seq = %msg.seq, "received AFC data message");
         Some(msg)
     }

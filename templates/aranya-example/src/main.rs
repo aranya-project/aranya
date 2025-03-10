@@ -135,7 +135,7 @@ macro_rules! do_poll {
         loop {
             tokio::select! {
                 biased;
-                $(data = $client.poll_data() => {
+                $(data = $client.afc_poll_data() => {
                     $client.handle_data(data?).await?
                 },)*
                 _ = async {} => break,
@@ -333,14 +333,14 @@ async fn main() -> Result<()> {
     let afc_id1 = team
         .membera
         .client
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .afc_create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
     // membera creates bidi channel with memberb
     let afc_id2 = team
         .membera
         .client
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
+        .afc_create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
         .await?;
 
     // wait for ctrl message to be sent.
@@ -351,14 +351,14 @@ async fn main() -> Result<()> {
     let msg = "hello world label1";
     team.membera
         .client
-        .send_data(afc_id1, msg.as_bytes())
+        .afc_send_data(afc_id1, msg.as_bytes())
         .await?;
     debug!(?msg, "sent message");
 
     let msg = "hello world label2";
     team.membera
         .client
-        .send_data(afc_id2, msg.as_bytes())
+        .afc_send_data(afc_id2, msg.as_bytes())
         .await?;
     debug!(?msg, "sent message");
 

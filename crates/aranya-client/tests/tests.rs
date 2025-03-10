@@ -143,8 +143,8 @@ macro_rules! do_poll {
         loop {
             tokio::select! {
                 biased;
-                $(data = $client.poll_data() => {
-                    $client.handle_data(data?).await?
+                $(data = $client.afc_poll_data() => {
+                    $client.afc_handle_data(data?).await?
                 },)*
                 _ = async {} => break,
             }
@@ -578,14 +578,14 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let afc_id1 = team
         .membera
         .client
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .afc_create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
     // membera creates bidi channel with memberb
     let afc_id2 = team
         .membera
         .client
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
+        .afc_create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
         .await?;
 
     // wait for ctrl message to be sent.
@@ -597,13 +597,13 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
 
     team.membera
         .client
-        .send_data(afc_id1, msgs[0].as_bytes())
+        .afc_send_data(afc_id1, msgs[0].as_bytes())
         .await?;
     debug!(msg = msgs[0], "sent message");
 
     team.membera
         .client
-        .send_data(afc_id2, msgs[1].as_bytes())
+        .afc_send_data(afc_id2, msgs[1].as_bytes())
         .await?;
     debug!(msg = msgs[1], "sent message");
 
@@ -613,7 +613,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let got = team
         .memberb
         .client
-        .try_recv_data()
+        .afc_try_recv_data()
         .expect("should have a message");
     let want = AfcMsg {
         data: msgs[0].as_bytes().to_vec(),
@@ -629,7 +629,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let got = team
         .memberb
         .client
-        .try_recv_data()
+        .afc_try_recv_data()
         .expect("should have a message");
     let want = AfcMsg {
         data: msgs[1].as_bytes().to_vec(),
@@ -801,13 +801,13 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let afc_id1 = team
         .membera
         .client
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .afc_create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
     let msg = "a to b";
     team.membera
         .client
-        .send_data(afc_id1, msg.as_bytes())
+        .afc_send_data(afc_id1, msg.as_bytes())
         .await?;
     debug!(msg = msg, "sent message");
 
@@ -816,7 +816,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let got = team
         .memberb
         .client
-        .try_recv_data()
+        .afc_try_recv_data()
         .expect("should have a message");
     let want = AfcMsg {
         data: msg.as_bytes().to_vec(),
@@ -832,7 +832,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let msg = "b to a";
     team.memberb
         .client
-        .send_data(afc_id1, msg.as_bytes())
+        .afc_send_data(afc_id1, msg.as_bytes())
         .await?;
     debug!(msg, "sent message");
 
@@ -849,7 +849,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let got = team
         .membera
         .client
-        .try_recv_data()
+        .afc_try_recv_data()
         .expect("should have a message");
     assert_eq!(got, want, "b->a");
 
@@ -1012,7 +1012,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     let afc_id1 = team
         .membera
         .client
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .afc_create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
     for i in 0..10u64 {
@@ -1021,7 +1021,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
         let msg = format!("ping {i}");
         team.membera
             .client
-            .send_data(afc_id1, msg.as_bytes())
+            .afc_send_data(afc_id1, msg.as_bytes())
             .await?;
         debug!(msg = msg, "sent message");
 
@@ -1032,7 +1032,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
         let got = team
             .memberb
             .client
-            .try_recv_data()
+            .afc_try_recv_data()
             .expect("should have a message");
         let want = AfcMsg {
             data: msg.into(),
@@ -1048,7 +1048,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
         let msg = format!("pong {i}");
         team.memberb
             .client
-            .send_data(afc_id1, msg.as_bytes())
+            .afc_send_data(afc_id1, msg.as_bytes())
             .await?;
         debug!(msg, "sent message");
 
@@ -1066,7 +1066,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
         let got = team
             .membera
             .client
-            .try_recv_data()
+            .afc_try_recv_data()
             .expect("should have a message");
         assert_eq!(got, want, "b->a");
     }

@@ -1081,11 +1081,11 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_create_bidi_channel(struct AranyaClient *client,
-                                       const struct AranyaTeamId *team,
-                                       AranyaNetIdentifier peer,
-                                       AranyaLabel label,
-                                       struct AranyaChannelId *__output);
+AranyaError aranya_afc_create_bidi_channel(struct AranyaClient *client,
+                                           const struct AranyaTeamId *team,
+                                           AranyaNetIdentifier peer,
+                                           AranyaLabel label,
+                                           struct AranyaChannelId *__output);
 
 /**
  * Create an Aranya Fast Channel (AFC).
@@ -1103,12 +1103,12 @@ AranyaError aranya_create_bidi_channel(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_create_bidi_channel_ext(struct AranyaClient *client,
-                                           const struct AranyaTeamId *team,
-                                           AranyaNetIdentifier peer,
-                                           AranyaLabel label,
-                                           struct AranyaChannelId *__output,
-                                           struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_create_bidi_channel_ext(struct AranyaClient *client,
+                                               const struct AranyaTeamId *team,
+                                               AranyaNetIdentifier peer,
+                                               AranyaLabel label,
+                                               struct AranyaChannelId *__output,
+                                               struct AranyaExtError *__ext_err);
 
 /**
  * Delete an Aranya Fast Channel (AFC).
@@ -1118,8 +1118,8 @@ AranyaError aranya_create_bidi_channel_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_delete_channel(struct AranyaClient *client,
-                                  struct AranyaChannelId chan);
+AranyaError aranya_afc_delete_channel(struct AranyaClient *client,
+                                      struct AranyaChannelId chan);
 
 /**
  * Delete an Aranya Fast Channel (AFC).
@@ -1129,9 +1129,9 @@ AranyaError aranya_delete_channel(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_delete_channel_ext(struct AranyaClient *client,
-                                      struct AranyaChannelId chan,
-                                      struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_delete_channel_ext(struct AranyaClient *client,
+                                          struct AranyaChannelId chan,
+                                          struct AranyaExtError *__ext_err);
 
 /**
  * Poll for new Aranya Fast Channels (AFC) data.
@@ -1143,8 +1143,8 @@ AranyaError aranya_delete_channel_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_poll_data(struct AranyaClient *client,
-                             AranyaDuration timeout);
+AranyaError aranya_afc_poll_data(struct AranyaClient *client,
+                                 AranyaDuration timeout);
 
 /**
  * Poll for new Aranya Fast Channels (AFC) data.
@@ -1156,9 +1156,9 @@ AranyaError aranya_poll_data(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_poll_data_ext(struct AranyaClient *client,
-                                 AranyaDuration timeout,
-                                 struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_poll_data_ext(struct AranyaClient *client,
+                                     AranyaDuration timeout,
+                                     struct AranyaExtError *__ext_err);
 
 /**
  * Send Aranya Fast Channels (AFC) data.
@@ -1170,26 +1170,26 @@ AranyaError aranya_poll_data_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_send_data(struct AranyaClient *client,
-                             struct AranyaChannelId chan,
-                             const uint8_t *data,
-                             size_t data_len);
-
-/**
- * Send Aranya Fast Channels (AFC) data.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AFC channel's ID [`AranyaChannelId`](@ref AranyaChannelId).
- * @param data raw bytes of data to send.
- * @param data_len length of data to send.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_send_data_ext(struct AranyaClient *client,
+AranyaError aranya_afc_send_data(struct AranyaClient *client,
                                  struct AranyaChannelId chan,
                                  const uint8_t *data,
-                                 size_t data_len,
-                                 struct AranyaExtError *__ext_err);
+                                 size_t data_len);
+
+/**
+ * Send Aranya Fast Channels (AFC) data.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param chan the AFC channel's ID [`AranyaChannelId`](@ref AranyaChannelId).
+ * @param data raw bytes of data to send.
+ * @param data_len length of data to send.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_send_data_ext(struct AranyaClient *client,
+                                     struct AranyaChannelId chan,
+                                     const uint8_t *data,
+                                     size_t data_len,
+                                     struct AranyaExtError *__ext_err);
 
 /**
  * Receive Aranya Fast Channels (AFC) data.
@@ -1202,29 +1202,29 @@ AranyaError aranya_send_data_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_recv_data(struct AranyaClient *client,
-                             uint8_t *buf,
-                             size_t *buf_len,
-                             struct AranyaAfcMsgInfo *info,
-                             bool *__output);
-
-/**
- * Receive Aranya Fast Channels (AFC) data.
- *
- * @param client the Aranya Client.
- * @param buf buffer to store message into.
- * @param buf_len length of buffer.
- * @param info information about the message [`AranyaAfcMsgInfo`](@ref AranyaAfcMsgInfo).
- * @result A boolean indicating whether any data was available.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_recv_data_ext(struct AranyaClient *client,
+AranyaError aranya_afc_recv_data(struct AranyaClient *client,
                                  uint8_t *buf,
                                  size_t *buf_len,
                                  struct AranyaAfcMsgInfo *info,
-                                 bool *__output,
-                                 struct AranyaExtError *__ext_err);
+                                 bool *__output);
+
+/**
+ * Receive Aranya Fast Channels (AFC) data.
+ *
+ * @param client the Aranya Client.
+ * @param buf buffer to store message into.
+ * @param buf_len length of buffer.
+ * @param info information about the message [`AranyaAfcMsgInfo`](@ref AranyaAfcMsgInfo).
+ * @result A boolean indicating whether any data was available.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
+                                     uint8_t *buf,
+                                     size_t *buf_len,
+                                     struct AranyaAfcMsgInfo *info,
+                                     bool *__output,
+                                     struct AranyaExtError *__ext_err);
 
 #ifdef __cplusplus
 }  // extern "C"

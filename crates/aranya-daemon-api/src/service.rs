@@ -193,14 +193,14 @@ pub trait DaemonApi {
     /// Revoke a fast channels label from a device.
     async fn revoke_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
     /// Create a fast channel.
-    async fn create_bidi_channel(
+    async fn afc_create_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
         label: Label,
     ) -> Result<(AfcId, AfcCtrl)>;
     /// Delete a fast channel.
-    async fn delete_channel(chan: AfcId) -> Result<AfcCtrl>;
+    async fn afc_delete_channel(chan: AfcId) -> Result<AfcCtrl>;
     /// Receive a fast channel ctrl message.
     async fn receive_afc_ctrl(
         team: TeamId,
