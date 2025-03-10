@@ -20,7 +20,6 @@ diff=${DIFF:-1}
 # cargo vet certify
 certify=${CERTIFY:-1}
 
-pushd ../../
 cargo vet check | while read -r line ; do
     echo "$line"
     # diff
@@ -34,4 +33,3 @@ cargo vet check | while read -r line ; do
         eval "$(echo "$line" | grep "cargo vet inspect" | awk '{print "cargo vet certify --accept-all " $4 " " $5}')"
     fi
 done
-popd
