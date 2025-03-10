@@ -88,3 +88,10 @@ opt-level = 1
 lto = true
 opt-level = "z"
 strip = true
+
+
+[workspace.metadata.release]
+allow-branch = ["main"]
+shared-version = true
+tag-message = ""
+tag-prefix = ""
