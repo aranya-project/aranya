@@ -11,8 +11,10 @@ This example shows how to use the [`aranya-client`](../../crates/aranya-client) 
 During setup, the example application starts an instance of the [`aranya-daemon`](../../crates/aranya-daemon) for each Aranya device in the background. [The daemon](https://aranya-project.github.io/aranya-docs/technical-apis/rust-api/#aranya-daemon) handles low-level operations such as automatically syncing graph states between different devices so that [the client](https://aranya-project.github.io/aranya-docs/technical-apis/rust-api/#aranya-client) can focus on the operations it wants to perform on the team.
 
 # Generate a New Project
+Install the [Rust toolchain](https://www.rust-lang.org/tools/install), this will install the toolchain manager `rustup`, the rust compiler `rustc` and package manager/build tool `cargo`. 
 
-Install [cargo-generate](https://crates.io/crates/cargo-generate) using cargo (you should have the [Rust toolchain](https://www.rust-lang.org/tools/install) installed):
+
+Install [cargo-generate](https://crates.io/crates/cargo-generate) using cargo:
 ```
 cargo install --locked cargo-generate
 ```
