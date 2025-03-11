@@ -177,6 +177,10 @@ pub struct TeamId(aranya_daemon_api::TeamId);
 #[aranya_capi_core::opaque(size = 64, align = 1)]
 pub struct DeviceId(aranya_daemon_api::DeviceId);
 
+#[derive(Copy, Clone, Debug)]
+#[aranya_capi_core::opaque(size = 0, align = 1)]
+pub struct TeamOperationConfig(aranya_daemon_api::TeamOperationConfig);
+
 /// Channel ID for a fast channel.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
@@ -423,9 +427,9 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
 /// @param __output the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-pub fn create_team(client: &mut Client) -> Result<TeamId, imp::Error> {
+pub fn create_team(client: &mut Client, cfg: TeamOperationConfig) -> Result<TeamId, imp::Error> {
     let client = client.deref_mut();
-    let id = client.rt.block_on(client.inner.create_team())?;
+    let id = client.rt.block_on(client.inner.create_team(cfg))?;
     Ok(TeamId(id))
 }
 
@@ -435,9 +439,13 @@ pub fn create_team(client: &mut Client) -> Result<TeamId, imp::Error> {
 /// @param team the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-pub fn add_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+pub fn add_team(
+    client: &mut Client,
+    team: &TeamId,
+    cfg: TeamOperationConfig,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(client.inner.add_team(team.0))?;
+    client.rt.block_on(client.inner.add_team(team.0, cfg))?;
     Ok(())
 }
 

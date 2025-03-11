@@ -235,6 +235,14 @@ typedef struct ARANYA_DESIGNATED_INIT AranyaClientConfig {
 } AranyaClientConfig;
 
 /**
+ * Aranya config struct passed when creating a team or adding a team.
+ * Empty for now.
+ */
+typedef struct ARANYA_DESIGNATED_INIT AranyaTeamOperationConfig {
+    
+} AranyaTeamOperationConfig;
+
+/**
  * Public Key bundle for a device.
  */
 typedef struct ARANYA_DESIGNATED_INIT AranyaKeyBundle {

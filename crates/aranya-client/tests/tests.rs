@@ -24,7 +24,7 @@ use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamOperationConfig};
 use aranya_util::addr::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::tempdir;
@@ -302,7 +302,7 @@ async fn integration_test() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(TeamOperationConfig {})
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -427,7 +427,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(TeamOperationConfig {})
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -660,7 +660,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(TeamOperationConfig {})
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -871,7 +871,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(TeamOperationConfig {})
         .await
         .expect("expected to create team");
     info!(?team_id);

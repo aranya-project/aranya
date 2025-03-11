@@ -3,7 +3,9 @@
 use std::{collections::VecDeque, net::SocketAddr, path::Path, time::Duration};
 
 pub use aranya_daemon_api::AfcId;
-use aranya_daemon_api::{DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, CS};
+use aranya_daemon_api::{
+    DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, TeamOperationConfig, CS,
+};
 use aranya_fast_channels::{self as afc, shm::ReadState, ChannelId};
 pub use aranya_fast_channels::{Label, Seq};
 use aranya_util::addr::Addr;
@@ -295,13 +297,16 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self) -> Result<TeamId> {
-        Ok(self.daemon.create_team(context::current()).await??)
+    pub async fn create_team(&mut self, cfg: TeamOperationConfig) -> Result<TeamId> {
+        Ok(self.daemon.create_team(context::current(), cfg).await??)
     }
 
     /// Add a team to the local device store.
-    pub async fn add_team(&mut self, team: TeamId) -> Result<()> {
-        Ok(self.daemon.add_team(context::current(), team).await??)
+    pub async fn add_team(&mut self, team: TeamId, cfg: TeamOperationConfig) -> Result<()> {
+        Ok(self
+            .daemon
+            .add_team(context::current(), team, cfg)
+            .await??)
     }
 
     /// Remove a team from the local device store.
