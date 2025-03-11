@@ -1,5 +1,5 @@
 ---
-policy-version: 1
+policy-version: 2
 ---
 
 # Default Policy
