@@ -143,8 +143,8 @@ macro_rules! do_poll {
         loop {
             tokio::select! {
                 biased;
-                $(result = $client.afc.poll() => {
-                    result?
+                $(data = $client.afc.poll_data() => {
+                    $client.afc.handle_data(data?).await?
                 },)*
                 _ = async {} => break,
             }

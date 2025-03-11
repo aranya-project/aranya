@@ -247,7 +247,7 @@ const MAX_MSG_SIZE: u32 = 10 * 1024 * 1024;
 /// Data that can be polled by the AFC router.
 #[must_use]
 #[derive(Debug)]
-struct PollData(State);
+pub struct PollData(State);
 
 /// Sends and receives AFC messages.
 pub struct FastChannel<S> {
@@ -756,7 +756,7 @@ impl<S: AfcState> FastChannel<S> {
     ///
     /// It is safe to cancel the resulting future.
     #[instrument(skip_all)]
-    async fn poll_data(&mut self) -> Result<PollData, AfcError> {
+    pub async fn poll_data(&mut self) -> Result<PollData, AfcError> {
         let data = self.inner_poll().await?;
         Ok(PollData(data))
     }
@@ -768,7 +768,7 @@ impl<S: AfcState> FastChannel<S> {
     /// It is NOT safe to cancel the resulting future. Doing so
     /// might lose data.
     #[instrument(skip_all, fields(self = self.debug(), ?data))]
-    async fn handle_data(&mut self, data: PollData) -> Result<(), AfcError> {
+    pub async fn handle_data(&mut self, data: PollData) -> Result<(), AfcError> {
         match data.0 {
             State::Accept(addr) | State::Msg(addr) => match self.read_msg(addr).await? {
                 StreamMsg::Data(data) => {
