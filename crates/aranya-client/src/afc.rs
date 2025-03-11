@@ -1,4 +1,4 @@
-//! AFC support.
+//! Support for Aranya Fast Channels.
 //!
 //! # Wire Format
 //!
@@ -10,10 +10,13 @@
 //!   value `"AFC\0"`.
 //! - `len` is a 32-bit little endian integer that contains the
 //!   size in bytes of `msg`.
-//! - `msg`: A postcard-encoded [`Msg`].
+//! - `msg`: A postcard-encoded [`StreamMsg`].
 
 use std::{
-    collections::btree_map::{self, BTreeMap},
+    collections::{
+        btree_map::{self, BTreeMap},
+        VecDeque,
+    },
     ffi::c_int,
     fmt,
     future::Future,
@@ -23,22 +26,26 @@ use std::{
     path::Path,
     pin::Pin,
     str::FromStr,
+    sync::Arc,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use anyhow::anyhow;
 use aranya_buggy::{bug, Bug, BugExt};
 use aranya_crypto::{csprng::Random, default::Rng};
-use aranya_daemon_api::{AfcCtrl, AfcId, NetIdentifier, TeamId, CS};
+pub use aranya_daemon_api::ChannelId;
+use aranya_daemon_api::{AfcCtrl, DaemonApiClient, NetIdentifier, TeamId, CS};
 use aranya_fast_channels::{
     self as afc,
     shm::{Flag, InvalidPathError, Mode, ReadState},
-    AfcState, ChannelId, Client, Header, HeaderError, Label, Message, NodeId, Payload, Seq,
+    AfcState, Client, Header, HeaderError, Label, Message as InnerMsg, NodeId, Payload, Seq,
     Version,
 };
 use aranya_util::util::ShmPathBuf;
 use indexmap::{map, IndexMap};
 use serde::{Deserialize, Serialize};
+use tarpc::context;
 use tokio::{
     io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf},
     net::{lookup_host, TcpListener, TcpStream, ToSocketAddrs},
@@ -48,6 +55,18 @@ use tracing::{debug, error, instrument, warn};
 /// An AFC error.
 #[derive(thiserror::Error, Debug)]
 pub enum AfcError {
+    /// Unable to communicate with the daemon.
+    #[error("Unable to communicate with the daemon: {0}")]
+    Rpc(#[from] tarpc::client::RpcError),
+
+    /// An error occurred in the daemon.
+    #[error("Daemon Reported Error: {0}")]
+    Daemon(#[from] aranya_daemon_api::Error),
+
+    /// An operation timed out.
+    #[error("An operation timed out.")]
+    Timeout(#[from] tokio::time::error::Elapsed),
+
     /// Unable to bind a network addresss.
     #[error("unable to bind address: {0}")]
     Bind(io::Error),
@@ -58,7 +77,7 @@ pub enum AfcError {
 
     /// The channel was not found.
     #[error("channel not found: {0}")]
-    ChannelNotFound(AfcId),
+    ChannelNotFound(ChannelId),
 
     /// AFC message decryption failure.
     #[error("decryption failure: {0}")]
@@ -96,7 +115,7 @@ pub enum AfcError {
 
     /// AFC message was replayed.
     #[error("AFC message was replayed: {0}")]
-    MsgReplayed(Seq),
+    MsgReplayed(String),
 
     /// The message length prefix was larger than the maximum
     /// allowed size.
@@ -160,6 +179,21 @@ pub enum AfcError {
     Other(#[from] anyhow::Error),
 }
 
+/// An Aranya Fast Channel message.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Message {
+    /// The plaintext data.
+    pub data: Vec<u8>,
+    /// The address from which the message was received.
+    pub addr: SocketAddr,
+    /// The channel from which the message was received.
+    pub channel: ChannelId,
+    /// The Aranya Fast Channel label associated with the message.
+    pub label: Label,
+    /// The order of the message in the channel.
+    pub seq: Seq,
+}
+
 /// The most recent state from [`poll`][Afc::poll].
 #[derive(Clone, Debug)]
 pub(crate) enum State {
@@ -174,7 +208,7 @@ pub(crate) enum State {
 /// These messages are sent/received between AFC peers via the
 /// TCP transport.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub(crate) enum Msg {
+pub(crate) enum StreamMsg {
     Ctrl(Ctrl),
     Data(Data),
 }
@@ -192,7 +226,7 @@ pub(crate) struct Ctrl {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct Data {
     version: Version,
-    afc_id: AfcId,
+    afc_id: ChannelId,
     ciphertext: Vec<u8>,
 }
 
@@ -204,14 +238,19 @@ const WIRE_HEADER_SIZE: usize = 4 + 4;
 /// See the wire format description.
 const WIRE_MAGIC: &[u8; 4] = b"AFC\0";
 
-/// The maximum allowed size of a [`Msg`].
+/// The maximum allowed size of a [`StreamMsg`].
 ///
 /// Helps prevent DoS attacks.
 // TODO(eric): make this configurable.
 const MAX_MSG_SIZE: u32 = 10 * 1024 * 1024;
 
+/// Data that can be polled by the AFC router.
+#[must_use]
+#[derive(Debug)]
+struct PollData(State);
+
 /// Sends and receives AFC messages.
-pub(crate) struct Afc<S> {
+pub struct FastChannel<S> {
     /// The underlying AFC client.
     afc: Client<S>,
     /// Listens for incoming connections from peers.
@@ -222,15 +261,25 @@ pub(crate) struct Afc<S> {
     // streams that peers opened.
     streams: TcpStreams,
     /// All open channels.
-    chans: BTreeMap<AfcId, Chan>,
+    chans: BTreeMap<ChannelId, Channel>,
     /// Incrementing counter for unique [`NodeId`]s.
     // TODO: move this counter into the daemon.
     next_node_id: u32,
+    daemon: Arc<DaemonApiClient>,
+
+    /// Messages from `handle_data`.
+    msgs: VecDeque<Message>,
+    #[cfg(feature = "debug")]
+    name: String,
 }
 
-impl<S: AfcState> Afc<S> {
+impl<S: AfcState> FastChannel<S> {
     /// Creates a new `Afc` listening for connections on `addr`.
-    pub async fn new<A>(afc: Client<S>, addr: A) -> Result<Self, AfcError>
+    pub async fn new<A>(
+        afc: Client<S>,
+        addr: A,
+        daemon: Arc<DaemonApiClient>,
+    ) -> Result<Self, AfcError>
     where
         A: ToSocketAddrs,
     {
@@ -241,6 +290,10 @@ impl<S: AfcState> Afc<S> {
             streams: TcpStreams::new(),
             chans: BTreeMap::new(),
             next_node_id: 0,
+            daemon,
+            msgs: VecDeque::new(),
+            #[cfg(feature = "debug")]
+            name: String::new(),
         })
     }
 
@@ -259,7 +312,7 @@ impl<S: AfcState> Afc<S> {
 
     /// Polls the current AFC state.
     #[instrument(skip_all)]
-    pub async fn poll(&mut self) -> Result<State, AfcError> {
+    async fn inner_poll(&mut self) -> Result<State, AfcError> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
@@ -279,14 +332,13 @@ impl<S: AfcState> Afc<S> {
                     })
                     .map_err(AfcError::StreamAccept)?
                     .map(State::Accept)
-                    .map_err(Into::into)
             }
         }
     }
 
     /// Sends a control message to the peer at `net_id`.
     // NB: Eliding `net_id` and `team_id` since
-    // `create_bidi_channel` (in client.rs) also adds those.
+    // `afc_create_bidi_channel` (in client.rs) also adds those.
     #[instrument(skip_all, fields(
         %afc_id,
         %chan_id,
@@ -296,13 +348,13 @@ impl<S: AfcState> Afc<S> {
         net_id: NetIdentifier,
         cmd: AfcCtrl,
         team_id: TeamId,
-        afc_id: AfcId,
-        chan_id: ChannelId,
+        afc_id: ChannelId,
+        chan_id: aranya_fast_channels::ChannelId,
     ) -> Result<(), AfcError> {
         debug!("sending control message");
 
         // TODO(eric): Don't allocate here.
-        let data = postcard::to_allocvec(&Msg::Ctrl(Ctrl {
+        let data = postcard::to_allocvec(&StreamMsg::Ctrl(Ctrl {
             version: Version::V1,
             team_id,
             cmd,
@@ -350,13 +402,19 @@ impl<S: AfcState> Afc<S> {
     }
 
     /// Encrypts `plaintext` and sends it over the AFC channel.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is safe to cancel the resulting future. However,
+    /// a partial message may be written to the channel.
     // NB: Eliding `id` since send_data` (in client.rs) also adds
     // it.
+    // TODO(eric): Return a sequence number?
     #[instrument(skip_all)]
-    pub async fn send_data(&mut self, id: AfcId, plaintext: &[u8]) -> Result<(), AfcError> {
+    pub async fn send_data(&mut self, id: ChannelId, plaintext: &[u8]) -> Result<(), AfcError> {
         debug!(pt_len = plaintext.len(), "sending data");
 
-        let Chan {
+        let Channel {
             net_id,
             chan_id,
             addr,
@@ -388,7 +446,7 @@ impl<S: AfcState> Afc<S> {
         debug!(len = datagram.len(), "created datagram");
 
         // TODO(eric): Don't allocate here.
-        let data = postcard::to_allocvec(&Msg::Data(Data {
+        let data = postcard::to_allocvec(&StreamMsg::Data(Data {
             version: Version::V1,
             afc_id: id,
             ciphertext: datagram,
@@ -415,9 +473,9 @@ impl<S: AfcState> Afc<S> {
         Ok(())
     }
 
-    /// Reads a [`Msg`] from the stream.
+    /// Reads a [`StreamMsg`] from the stream.
     #[instrument(skip_all, fields(%addr))]
-    pub async fn read_msg(&mut self, addr: SocketAddr) -> Result<Msg, AfcError> {
+    pub async fn read_msg(&mut self, addr: SocketAddr) -> Result<StreamMsg, AfcError> {
         debug!("reading message from stream");
 
         let stream = self
@@ -462,7 +520,10 @@ impl<S: AfcState> Afc<S> {
 
     /// Decrypts `data`.
     #[instrument(skip_all, fields(afc_id = %data.afc_id))]
-    pub fn open_data(&mut self, data: Data) -> Result<(Vec<u8>, AfcId, Label, Seq), AfcError> {
+    pub(crate) fn open_data(
+        &mut self,
+        data: Data,
+    ) -> Result<(Vec<u8>, ChannelId, Label, Seq), AfcError> {
         debug!(n = data.ciphertext.len(), "decrypting data");
 
         self.check_version(data.version)?;
@@ -478,13 +539,13 @@ impl<S: AfcState> Afc<S> {
         // we do for expired channels.
         let next_min_seq = chan.next_min_seq()?;
 
-        let Message { payload, .. } = Message::try_parse(&data.ciphertext)?;
+        let InnerMsg { payload, .. } = InnerMsg::try_parse(&data.ciphertext)?;
         let ciphertext = match payload {
             Payload::Data(v) => v,
             Payload::Control(_) => bug!("`Data` should not contain control messages"),
         };
 
-        // TODO(eric): Update `Message` to handle both shared and
+        // TODO(eric): Update `StreamMsg` to handle both shared and
         // exclusive refs so that we can reuse the
         // `data.ciphertext` allocation.
         let plaintext_len = ciphertext
@@ -505,7 +566,7 @@ impl<S: AfcState> Afc<S> {
 
         if seq < next_min_seq {
             // TODO(eric): zeroize `plaintext`.
-            return Err(AfcError::MsgReplayed(seq));
+            return Err(AfcError::MsgReplayed(format!("{:?}", seq)));
         }
         chan.next_min_seq = seq.to_u64().checked_add(1).map(Seq::new);
         debug!(next = %FmtOr(chan.next_min_seq, "expired"), "min next seq number");
@@ -537,10 +598,10 @@ impl<S: AfcState> Afc<S> {
     ))]
     pub async fn add_channel(
         &mut self,
-        id: AfcId,
+        id: ChannelId,
         net_id: NetIdentifier,
         team_id: TeamId,
-        chan_id: ChannelId,
+        chan_id: aranya_fast_channels::ChannelId,
         addr: SocketAddr,
     ) -> Result<(), AfcError> {
         debug!("adding channel");
@@ -562,7 +623,7 @@ impl<S: AfcState> Afc<S> {
                 // a duplicate control message.
             }
             btree_map::Entry::Vacant(v) => {
-                v.insert(Chan {
+                v.insert(Channel {
                     net_id,
                     chan_id,
                     // `addr` comes from either `Status::Accept`
@@ -584,14 +645,185 @@ impl<S: AfcState> Afc<S> {
 
     /// Deletes a channel.
     #[instrument(skip_all, fields(afc_id = %id))]
-    pub async fn remove_channel(&mut self, id: AfcId) {
+    pub async fn remove_channel(&mut self, id: ChannelId) {
         debug!("removing channel");
 
         self.chans.remove(&id);
     }
 }
 
-impl<S> fmt::Debug for Afc<S> {
+impl<S: AfcState> FastChannel<S> {
+    // Debugging APIs used in unit testing
+    #[doc(hidden)]
+    pub fn set_name(&mut self, _name: String) {
+        #[cfg(feature = "debug")]
+        {
+            self.name = _name;
+        }
+    }
+
+    #[cfg(feature = "debug")]
+    fn debug(&self) -> &str {
+        &self.name
+    }
+
+    #[cfg(not(feature = "debug"))]
+    fn debug(&self) -> tracing::field::Empty {
+        tracing::field::Empty
+    }
+
+    /// Creates a bidirectional AFC channel with a peer.
+    ///
+    /// `label` associates the channel with a set of policy rules
+    /// that govern the channel. Both peers must already have
+    /// permission to use the label.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is NOT safe to cancel the resulting future. Doing so
+    /// might lose data.
+    #[instrument(skip_all, fields(self = self.debug(), %team_id, %peer, %label))]
+    pub async fn create_bidi_channel(
+        &mut self,
+        team_id: TeamId,
+        peer: NetIdentifier,
+        label: Label,
+    ) -> Result<ChannelId, AfcError> {
+        debug!("creating bidi channel");
+
+        let node_id = self.get_next_node_id().await?;
+        debug!(%node_id, "selected node ID");
+
+        let (afc_id, ctrl) = self
+            .daemon
+            .afc_create_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
+            .await??;
+        debug!(%afc_id, %node_id, %label, "created bidi channel");
+
+        let chan_id = aranya_fast_channels::ChannelId::new(node_id, label);
+        self.send_ctrl(peer, ctrl, team_id, afc_id, chan_id).await?;
+        debug!("sent control message");
+
+        Ok(afc_id)
+    }
+
+    // TODO: create_uni_channel
+
+    /// Deletes an AFC channel.
+    // TODO(eric): Is it an error if the channel does not exist?
+    #[instrument(skip_all, fields(self = self.debug(), afc_id = %id))]
+    pub async fn delete_channel(&mut self, id: ChannelId) -> Result<(), AfcError> {
+        let _ctrl = self
+            .daemon
+            .afc_delete_channel(context::current(), id)
+            .await??;
+        self.remove_channel(id).await;
+        // TODO(eric): Send control message.
+        // self.send_ctrl(peer, ctrl, team_id, id, chan_id);
+        Ok(())
+    }
+
+    /// Polls the client to check for new Fast Channel data, then retrieves
+    /// any new data.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is NOT safe to cancel the resulting future. Doing so
+    /// might lose data.
+    #[instrument(skip_all)]
+    pub async fn poll(&mut self) -> Result<(), AfcError> {
+        let data = self.poll_data().await?;
+        self.handle_data(data).await
+    }
+
+    /// Attempts to poll the client to check for new data, then retrieves any
+    /// new data.
+    ///
+    /// If the operation times out, this will return [`AfcError::Timeout`].
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is NOT safe to cancel the resulting future. Doing so might lose data.
+    #[instrument(skip_all)]
+    pub async fn try_poll(&mut self, timeout: Duration) -> Result<(), AfcError> {
+        let data = tokio::time::timeout(timeout, self.poll_data()).await??;
+        self.handle_data(data).await
+    }
+
+    /// Polls the client to check for new data.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is safe to cancel the resulting future.
+    #[instrument(skip_all)]
+    async fn poll_data(&mut self) -> Result<PollData, AfcError> {
+        let data = self.inner_poll().await?;
+        Ok(PollData(data))
+    }
+
+    /// Retrieves data from [`poll`][Self::poll].
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is NOT safe to cancel the resulting future. Doing so
+    /// might lose data.
+    #[instrument(skip_all, fields(self = self.debug(), ?data))]
+    async fn handle_data(&mut self, data: PollData) -> Result<(), AfcError> {
+        match data.0 {
+            State::Accept(addr) | State::Msg(addr) => match self.read_msg(addr).await? {
+                StreamMsg::Data(data) => {
+                    debug!(%addr, "read data message");
+
+                    let (data, channel, label, seq) = self.open_data(data)?;
+                    self.msgs.push_back(Message {
+                        data,
+                        addr,
+                        channel,
+                        label,
+                        seq,
+                    });
+                    debug!(n = self.msgs.len(), "stored msg");
+                }
+                StreamMsg::Ctrl(ctrl) => {
+                    debug!(%addr, "read control message");
+
+                    let node_id = self.get_next_node_id().await?;
+                    debug!(%node_id, "selected node ID");
+
+                    let (afc_id, peer, label) = self
+                        .daemon
+                        .receive_afc_ctrl(context::current(), ctrl.team_id, node_id, ctrl.cmd)
+                        .await??;
+                    debug!(%node_id, %label, "applied AFC control msg");
+
+                    let chan_id = aranya_fast_channels::ChannelId::new(node_id, label);
+                    self.add_channel(afc_id, peer, ctrl.team_id, chan_id, addr)
+                        .await?;
+                }
+            },
+        }
+        Ok(())
+    }
+
+    /// Retrieves the next AFC message, if any.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is NOT safe to cancel the resulting future. Doing so
+    /// might lose data.
+    // TODO: return [`NetIdentifier`] instead of [`SocketAddr`].
+    // TODO: read into buffer instead of returning `Vec<u8>`.
+    #[instrument(skip_all, fields(self = self.debug()))]
+    pub fn try_recv_data(&mut self) -> Option<Message> {
+        // TODO(eric): This method should block until a message
+        // has been received.
+        let msg = self.msgs.pop_front()?;
+        debug!(label = %msg.label, seq = %msg.seq, "received AFC data message");
+        Some(msg)
+    }
+}
+
+impl<S> fmt::Debug for FastChannel<S> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Router")
             .field("listener", &self.listener)
@@ -832,7 +1064,7 @@ fn ioctl_fionread(stream: &TcpStream) -> io::Result<usize> {
         // if errno() == Errno::EINTR {
         //     continue;
         // }
-        return Err(io::Error::new(io::ErrorKind::Other, "ioctl returned -1"));
+        return Err(io::Error::other("ioctl returned -1"));
     }
     usize::try_from(n).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "n < 0"))
 }
@@ -874,9 +1106,9 @@ impl<W: AsyncWrite + ?Sized> AsyncWriteVectored for W {}
 
 /// An open channel.
 #[derive(Debug)]
-struct Chan {
+struct Channel {
     net_id: NetIdentifier,
-    chan_id: ChannelId,
+    chan_id: aranya_fast_channels::ChannelId,
     /// Used to look up the TCP stream.
     addr: SocketAddr,
     /// The minimum allowed next sequence number for a channel,
@@ -891,7 +1123,7 @@ struct Chan {
     next_min_seq: Option<Seq>,
 }
 
-impl Chan {
+impl Channel {
     fn next_min_seq(&self) -> Result<Seq, AfcError> {
         match self.next_min_seq {
             Some(v) => Ok(v),

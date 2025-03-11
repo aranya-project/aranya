@@ -116,16 +116,15 @@ impl UserCtx {
     }
 
     async fn aranya_local_addr(&self) -> Result<SocketAddr> {
-        Ok(self.client.aranya_local_addr().await?)
+        Ok(self.client.local_addr().await?)
     }
 
     async fn afc_local_addr(&self) -> Result<SocketAddr> {
-        Ok(self.client.afc_local_addr().await?)
+        Ok(self.client.afc.local_addr().await?)
     }
 }
 
-/// Repeatedly calls `poll_data`, followed by `handle_data`,
-/// until all of the clients are pending.
+/// Repeatedly calls `poll` until all of the clients are pending.
 macro_rules! do_poll {
     ($($client:expr),*) => {
         debug!(
@@ -135,8 +134,8 @@ macro_rules! do_poll {
         loop {
             tokio::select! {
                 biased;
-                $(data = $client.poll_data() => {
-                    $client.handle_data(data?).await?
+                $(result = $client.afc.poll() => {
+                    result?
                 },)*
                 _ = async {} => break,
             }
@@ -333,14 +332,14 @@ async fn main() -> Result<()> {
     let afc_id1 = team
         .membera
         .client
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .afc.create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
     // membera creates bidi channel with memberb
     let afc_id2 = team
         .membera
         .client
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
+        .afc.create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
         .await?;
 
     // wait for ctrl message to be sent.
@@ -351,14 +350,14 @@ async fn main() -> Result<()> {
     let msg = "hello world label1";
     team.membera
         .client
-        .send_data(afc_id1, msg.as_bytes())
+        .afc.send_data(afc_id1, msg.as_bytes())
         .await?;
     debug!(?msg, "sent message");
 
     let msg = "hello world label2";
     team.membera
         .client
-        .send_data(afc_id2, msg.as_bytes())
+        .afc.send_data(afc_id2, msg.as_bytes())
         .await?;
     debug!(?msg, "sent message");
 

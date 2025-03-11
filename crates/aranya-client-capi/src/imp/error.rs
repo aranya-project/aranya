@@ -35,6 +35,9 @@ pub enum Error {
     #[error("client error: {0}")]
     Client(#[from] aranya_client::Error),
 
+    #[error("afc error: {0}")]
+    FastChannel(#[from] aranya_client::afc::AfcError),
+
     #[error("tokio runtime error: {0}")]
     Runtime(#[source] std::io::Error),
 }

@@ -513,13 +513,13 @@ where
 
     /// Creates a bidirectional AFC channel.
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
-    fn create_bidi_channel(
+    fn afc_create_bidi_channel(
         &self,
         peer_id: UserId,
         label: Label,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_bidi_channel(peer_id.into(), i64::from(label.to_u32()))?;
+            actor.afc_create_bidi_channel(peer_id.into(), i64::from(label.to_u32()))?;
             Ok(())
         })
         .in_current_span()
@@ -528,13 +528,13 @@ where
     /// Creates a bidirectional AFC channel off graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
-    fn create_bidi_channel_off_graph(
+    fn afc_create_bidi_channel_off_graph(
         &self,
         peer_id: UserId,
         label: Label,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "create_bidi_channel",
+            name: "afc_create_bidi_channel",
             args: Cow::Owned(vec![
                 Value::from(peer_id),
                 Value::from(i64::from(label.to_u32())),
@@ -552,7 +552,11 @@ where
         label: Label,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_uni_channel(seal_id.into(), open_id.into(), i64::from(label.to_u32()))?;
+            actor.afc_create_uni_channel(
+                seal_id.into(),
+                open_id.into(),
+                i64::from(label.to_u32()),
+            )?;
             Ok(())
         })
         .in_current_span()

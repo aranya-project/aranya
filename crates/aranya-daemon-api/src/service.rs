@@ -95,9 +95,9 @@ impl fmt::Display for NetIdentifier {
 /// 128 bits.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct AfcId([u8; 16]);
+pub struct ChannelId([u8; 16]);
 
-impl fmt::Display for AfcId {
+impl fmt::Display for ChannelId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0.to_base58())
     }
@@ -108,22 +108,22 @@ fn truncate<const BIG: usize, const SMALL: usize>(arr: &[u8; BIG]) -> &[u8; SMAL
     arr[..SMALL].try_into().expect("array must fit")
 }
 
-/// Convert from [`BidiChannelId`] to [`AfcId`]
-impl From<BidiChannelId> for AfcId {
+/// Convert from [`BidiChannelId`] to [`ChannelId`]
+impl From<BidiChannelId> for ChannelId {
     fn from(value: BidiChannelId) -> Self {
         Self(*truncate(value.as_array()))
     }
 }
 
-/// Convert from [`UniChannelId`] to [`AfcId`]
-impl From<UniChannelId> for AfcId {
+/// Convert from [`UniChannelId`] to [`ChannelId`]
+impl From<UniChannelId> for ChannelId {
     fn from(value: UniChannelId) -> Self {
         Self(*truncate(value.as_array()))
     }
 }
 
-/// Convert from [`Id`] to [`AfcId`]
-impl From<Id> for AfcId {
+/// Convert from [`Id`] to [`ChannelId`]
+impl From<Id> for ChannelId {
     fn from(value: Id) -> Self {
         Self(*truncate(value.as_array()))
     }
@@ -193,18 +193,18 @@ pub trait DaemonApi {
     /// Revoke a fast channels label from a device.
     async fn revoke_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
     /// Create a fast channel.
-    async fn create_bidi_channel(
+    async fn afc_create_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
         label: Label,
-    ) -> Result<(AfcId, AfcCtrl)>;
+    ) -> Result<(ChannelId, AfcCtrl)>;
     /// Delete a fast channel.
-    async fn delete_channel(chan: AfcId) -> Result<AfcCtrl>;
+    async fn afc_delete_channel(chan: ChannelId) -> Result<AfcCtrl>;
     /// Receive a fast channel ctrl message.
     async fn receive_afc_ctrl(
         team: TeamId,
         node_id: NodeId,
         ctrl: AfcCtrl,
-    ) -> Result<(AfcId, NetIdentifier, Label)>;
+    ) -> Result<(ChannelId, NetIdentifier, Label)>;
 }

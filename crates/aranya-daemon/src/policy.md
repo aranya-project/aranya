@@ -250,7 +250,7 @@ function get_allowed_op(user_id id, label int) enum ChanOp {
 }
 
 // Reports whether the users have permission to create a bidirectional channel with each other.
-function can_create_bidi_channel(user1 id, user2 id, label int) bool {
+function can_create_afc_bidi_channel(user1 id, user2 id, label int) bool {
     let user1_op = get_allowed_op(user1, label)
     let user2_op = get_allowed_op(user2, label)
 
@@ -284,7 +284,7 @@ function select_peer_id(user_id id, id_a id, id_b id) id {
 }
 
 // Reports whether the users have permission to create a unidirectional channel with each other.
-function can_create_uni_channel(writer_id id, reader_id id, label int) bool {
+function can_create_afc_uni_channel(writer_id id, reader_id id, label int) bool {
     let writer_op = get_allowed_op(writer_id, label)
     let reader_op = get_allowed_op(reader_id, label)
 
@@ -1238,17 +1238,17 @@ command UnsetNetworkName {
 
 ## CreateChannel
 
-### CreateBidChannel
+### AfcCreateBidiChannel
 Creates a bidirectional "AFC" channel for off-graph messaging. This is an ephemeral command, which
 means that it can only be emitted within an ephemeral session so that it is not added to the graph
 of commands. Furthermore, it cannot persist any changes to the factDB.
 
-The `create_bidi_channel` action creates the `ChannelKeys`, encapsulates them for the peer and the
-author, and sends the encapsulations through the `CreateBidiChannel` command. When processing the
+The `afc_create_bidi_channel` action creates the `ChannelKeys`, encapsulates them for the peer and the
+author, and sends the encapsulations through the `AfcCreateBidiChannel` command. When processing the
 command, the user will decapsulate their keys and store them in the shared memory DB.
 
 ```policy
-action create_bidi_channel(peer_id id, label int) {
+action afc_create_bidi_channel(peer_id id, label int) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_user_id()
     let author = get_valid_user(author_id)
@@ -1263,7 +1263,7 @@ action create_bidi_channel(peer_id id, label int) {
         label,
     )
 
-    publish CreateBidiChannel {
+    publish AfcCreateBidiChannel {
         peer_id: peer_id,
         label: label,
         peer_encap: channel.peer_encap,
@@ -1271,7 +1271,7 @@ action create_bidi_channel(peer_id id, label int) {
     }
 }
 
-effect BidiChannelCreated {
+effect AfcBidiChannelCreated {
     parent_cmd_id id,
     author_id id,
     author_enc_key_id id,
@@ -1281,7 +1281,7 @@ effect BidiChannelCreated {
     channel_key_id id,
 }
 
-effect BidiChannelReceived {
+effect AfcBidiChannelReceived {
     parent_cmd_id id,
     author_id id,
     author_enc_pk bytes,
@@ -1291,7 +1291,7 @@ effect BidiChannelReceived {
     encap bytes,
 }
 
-command CreateBidiChannel {
+command AfcCreateBidiChannel {
     fields {
         peer_id id,
         label int,
@@ -1311,7 +1311,7 @@ command CreateBidiChannel {
         check is_member(peer.role)
 
         // Members must be different and both must have bidirectional permissions over valid label.
-        check can_create_bidi_channel(author.user_id, peer.user_id, this.label)
+        check can_create_afc_bidi_channel(author.user_id, peer.user_id, this.label)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_user_id = device::current_user_id()
@@ -1320,7 +1320,7 @@ command CreateBidiChannel {
         if current_user_id == author.user_id {
             let peer_enc_pk = get_enc_pk(peer.user_id)
             finish {
-                emit BidiChannelCreated {
+                emit AfcBidiChannelCreated {
                     parent_cmd_id: parent_cmd_id,
                     author_id: author.user_id,
                     author_enc_key_id: author.enc_key_id,
@@ -1335,7 +1335,7 @@ command CreateBidiChannel {
         else if current_user_id == peer.user_id {
             let author_enc_pk = get_enc_pk(author.user_id)
             finish {
-                emit BidiChannelReceived {
+                emit AfcBidiChannelReceived {
                     parent_cmd_id: parent_cmd_id,
                     author_id: author.user_id,
                     author_enc_pk: author_enc_pk,
@@ -1361,17 +1361,17 @@ command CreateBidiChannel {
 - Members can only communicate over a bidi channel when they have `ChanOp::ReadWrite` permission.
 
 
-### CreateUniChannel
+### AfcCreateUniChannel
 Creates a unidirectional "AFC" channel. This is an ephemeral command, which means that it can only
 be emitted within an ephemeral session and is not added to the graph of commands. Furthermore, it
 does not persist any changes to the factDB.
 
-The `create_uni_channel` action creates the `ChannelKey`, encapsulates it for the peer, and sends
-the encapsulation through the `CreateUniChannel` command. When processing the command, the
+The `afc_create_uni_channel` action creates the `ChannelKey`, encapsulates it for the peer, and sends
+the encapsulation through the `AfcCreateUniChannel` command. When processing the command, the
 corresponding recipient will decapsulate their key and store it in the shared memory DB.
 
 ```policy
-action create_uni_channel(writer_id id, reader_id id, label int) {
+action afc_create_uni_channel(writer_id id, reader_id id, label int) {
     let parent_cmd_id = perspective::head_id()
     let author = get_valid_user(device::current_user_id())
     let peer_id = select_peer_id(author.user_id, writer_id, reader_id)
@@ -1386,7 +1386,7 @@ action create_uni_channel(writer_id id, reader_id id, label int) {
         label,
     )
 
-    publish CreateUniChannel {
+    publish AfcCreateUniChannel {
         writer_id: writer_id,
         reader_id: reader_id,
         label: label,
@@ -1395,7 +1395,7 @@ action create_uni_channel(writer_id id, reader_id id, label int) {
     }
 }
 
-effect UniChannelCreated {
+effect AfcUniChannelCreated {
     parent_cmd_id id,
     author_id id,
     writer_id id,
@@ -1406,7 +1406,7 @@ effect UniChannelCreated {
     channel_key_id id,
 }
 
-effect UniChannelReceived {
+effect AfcUniChannelReceived {
     parent_cmd_id id,
     author_id id,
     writer_id id,
@@ -1417,7 +1417,7 @@ effect UniChannelReceived {
     encap bytes,
 }
 
-command CreateUniChannel {
+command AfcCreateUniChannel {
     fields {
         // The UserID of the side that can encrypt data.
         writer_id id,
@@ -1446,7 +1446,7 @@ command CreateUniChannel {
         check is_member(peer.role)
 
         // Both users must have valid permissions.
-        check can_create_uni_channel(this.writer_id, this.reader_id, this.label)
+        check can_create_afc_uni_channel(this.writer_id, this.reader_id, this.label)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_user_id = device::current_user_id()
@@ -1456,7 +1456,7 @@ command CreateUniChannel {
             let peer_enc_pk = get_enc_pk(peer_id)
 
             finish {
-                emit UniChannelCreated {
+                emit AfcUniChannelCreated {
                     parent_cmd_id: parent_cmd_id,
                     author_id: author.user_id,
                     writer_id: this.writer_id,
@@ -1473,7 +1473,7 @@ command CreateUniChannel {
             let author_enc_pk = get_enc_pk(author.user_id)
 
             finish {
-                emit UniChannelReceived {
+                emit AfcUniChannelReceived {
                     parent_cmd_id: parent_cmd_id,
                     author_id: author.user_id,
                     writer_id: this.writer_id,
