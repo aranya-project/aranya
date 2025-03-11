@@ -6,11 +6,7 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_buggy::BugExt;
@@ -164,7 +160,7 @@ impl Syncer {
                 match msg {
                     Msg::SyncNow{ peer } => {
                         // sync with peer right now.
-                        self.sync(&peer.graph_id, &peer.addr);
+                        self.sync(&peer.graph_id, &peer.addr).await?;
                     },
                     Msg::AddPeer { peer, interval } => self.add_peer(peer, interval),
                     Msg::RemovePeer { peer } => self.remove_peer(peer),
