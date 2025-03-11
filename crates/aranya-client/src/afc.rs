@@ -10,7 +10,7 @@
 //!   value `"AFC\0"`.
 //! - `len` is a 32-bit little endian integer that contains the
 //!   size in bytes of `msg`.
-//! - `msg`: A postcard-encoded [`StreamMsg`].
+//! - `msg`: A postcard-encoded `StreamMsg`.
 
 use std::{
     collections::{
@@ -34,13 +34,13 @@ use std::{
 use anyhow::anyhow;
 use aranya_buggy::{bug, Bug, BugExt};
 use aranya_crypto::{csprng::Random, default::Rng};
-pub use aranya_daemon_api::ChannelId;
+pub use aranya_daemon_api::AfcId;
 use aranya_daemon_api::{AfcCtrl, DaemonApiClient, NetIdentifier, TeamId, CS};
 use aranya_fast_channels::{
     self as afc,
     shm::{Flag, InvalidPathError, Mode, ReadState},
-    AfcState, Client, Header, HeaderError, Label, Message as InnerMsg, NodeId, Payload, Seq,
-    Version,
+    AfcState, ChannelId, Client, Header, HeaderError, Label, Message as InnerMsg, NodeId, Payload,
+    Seq, Version,
 };
 use aranya_util::util::ShmPathBuf;
 use indexmap::{map, IndexMap};
@@ -77,7 +77,7 @@ pub enum AfcError {
 
     /// The channel was not found.
     #[error("channel not found: {0}")]
-    ChannelNotFound(ChannelId),
+    ChannelNotFound(AfcId),
 
     /// AFC message decryption failure.
     #[error("decryption failure: {0}")]
@@ -187,7 +187,7 @@ pub struct Message {
     /// The address from which the message was received.
     pub addr: SocketAddr,
     /// The channel from which the message was received.
-    pub channel: ChannelId,
+    pub channel: AfcId,
     /// The Aranya Fast Channel label associated with the message.
     pub label: Label,
     /// The order of the message in the channel.
@@ -226,7 +226,7 @@ pub(crate) struct Ctrl {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct Data {
     version: Version,
-    afc_id: ChannelId,
+    afc_id: AfcId,
     ciphertext: Vec<u8>,
 }
 
@@ -261,7 +261,7 @@ pub struct FastChannel<S> {
     // streams that peers opened.
     streams: TcpStreams,
     /// All open channels.
-    chans: BTreeMap<ChannelId, Channel>,
+    chans: BTreeMap<AfcId, Channel>,
     /// Incrementing counter for unique [`NodeId`]s.
     // TODO: move this counter into the daemon.
     next_node_id: u32,
@@ -348,8 +348,8 @@ impl<S: AfcState> FastChannel<S> {
         net_id: NetIdentifier,
         cmd: AfcCtrl,
         team_id: TeamId,
-        afc_id: ChannelId,
-        chan_id: aranya_fast_channels::ChannelId,
+        afc_id: AfcId,
+        chan_id: ChannelId,
     ) -> Result<(), AfcError> {
         debug!("sending control message");
 
@@ -411,7 +411,7 @@ impl<S: AfcState> FastChannel<S> {
     // it.
     // TODO(eric): Return a sequence number?
     #[instrument(skip_all)]
-    pub async fn send_data(&mut self, id: ChannelId, plaintext: &[u8]) -> Result<(), AfcError> {
+    pub async fn send_data(&mut self, id: AfcId, plaintext: &[u8]) -> Result<(), AfcError> {
         debug!(pt_len = plaintext.len(), "sending data");
 
         let Channel {
@@ -475,7 +475,7 @@ impl<S: AfcState> FastChannel<S> {
 
     /// Reads a [`StreamMsg`] from the stream.
     #[instrument(skip_all, fields(%addr))]
-    pub async fn read_msg(&mut self, addr: SocketAddr) -> Result<StreamMsg, AfcError> {
+    async fn read_msg(&mut self, addr: SocketAddr) -> Result<StreamMsg, AfcError> {
         debug!("reading message from stream");
 
         let stream = self
@@ -523,7 +523,7 @@ impl<S: AfcState> FastChannel<S> {
     pub(crate) fn open_data(
         &mut self,
         data: Data,
-    ) -> Result<(Vec<u8>, ChannelId, Label, Seq), AfcError> {
+    ) -> Result<(Vec<u8>, AfcId, Label, Seq), AfcError> {
         debug!(n = data.ciphertext.len(), "decrypting data");
 
         self.check_version(data.version)?;
@@ -598,10 +598,10 @@ impl<S: AfcState> FastChannel<S> {
     ))]
     pub async fn add_channel(
         &mut self,
-        id: ChannelId,
+        id: AfcId,
         net_id: NetIdentifier,
         team_id: TeamId,
-        chan_id: aranya_fast_channels::ChannelId,
+        chan_id: ChannelId,
         addr: SocketAddr,
     ) -> Result<(), AfcError> {
         debug!("adding channel");
@@ -645,7 +645,7 @@ impl<S: AfcState> FastChannel<S> {
 
     /// Deletes a channel.
     #[instrument(skip_all, fields(afc_id = %id))]
-    pub async fn remove_channel(&mut self, id: ChannelId) {
+    pub async fn remove_channel(&mut self, id: AfcId) {
         debug!("removing channel");
 
         self.chans.remove(&id);
@@ -688,7 +688,7 @@ impl<S: AfcState> FastChannel<S> {
         team_id: TeamId,
         peer: NetIdentifier,
         label: Label,
-    ) -> Result<ChannelId, AfcError> {
+    ) -> Result<AfcId, AfcError> {
         debug!("creating bidi channel");
 
         let node_id = self.get_next_node_id().await?;
@@ -700,7 +700,7 @@ impl<S: AfcState> FastChannel<S> {
             .await??;
         debug!(%afc_id, %node_id, %label, "created bidi channel");
 
-        let chan_id = aranya_fast_channels::ChannelId::new(node_id, label);
+        let chan_id = ChannelId::new(node_id, label);
         self.send_ctrl(peer, ctrl, team_id, afc_id, chan_id).await?;
         debug!("sent control message");
 
@@ -712,7 +712,7 @@ impl<S: AfcState> FastChannel<S> {
     /// Deletes an AFC channel.
     // TODO(eric): Is it an error if the channel does not exist?
     #[instrument(skip_all, fields(self = self.debug(), afc_id = %id))]
-    pub async fn delete_channel(&mut self, id: ChannelId) -> Result<(), AfcError> {
+    pub async fn delete_channel(&mut self, id: AfcId) -> Result<(), AfcError> {
         let _ctrl = self
             .daemon
             .afc_delete_channel(context::current(), id)
@@ -796,7 +796,7 @@ impl<S: AfcState> FastChannel<S> {
                         .await??;
                     debug!(%node_id, %label, "applied AFC control msg");
 
-                    let chan_id = aranya_fast_channels::ChannelId::new(node_id, label);
+                    let chan_id = ChannelId::new(node_id, label);
                     self.add_channel(afc_id, peer, ctrl.team_id, chan_id, addr)
                         .await?;
                 }
@@ -1108,7 +1108,7 @@ impl<W: AsyncWrite + ?Sized> AsyncWriteVectored for W {}
 #[derive(Debug)]
 struct Channel {
     net_id: NetIdentifier,
-    chan_id: aranya_fast_channels::ChannelId,
+    chan_id: ChannelId,
     /// Used to look up the TCP stream.
     addr: SocketAddr,
     /// The minimum allowed next sequence number for a channel,

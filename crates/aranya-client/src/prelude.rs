@@ -1,6 +1,6 @@
 #[doc(inline)]
 pub use crate::{
-    afc::{AfcError, ChannelId, Message},
+    afc::{AfcError, AfcId, Message},
     client::{Client, Label, Team},
     error::{Error, Result},
 };

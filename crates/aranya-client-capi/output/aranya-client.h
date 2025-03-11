@@ -187,7 +187,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaExtError {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[80];
+    uint8_t __for_size_only[88];
 } AranyaExtError;
 
 /**

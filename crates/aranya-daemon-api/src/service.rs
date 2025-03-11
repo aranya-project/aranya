@@ -95,9 +95,9 @@ impl fmt::Display for NetIdentifier {
 /// 128 bits.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct ChannelId([u8; 16]);
+pub struct AfcId([u8; 16]);
 
-impl fmt::Display for ChannelId {
+impl fmt::Display for AfcId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0.to_base58())
     }
@@ -109,21 +109,21 @@ fn truncate<const BIG: usize, const SMALL: usize>(arr: &[u8; BIG]) -> &[u8; SMAL
 }
 
 /// Convert from [`BidiChannelId`] to [`ChannelId`]
-impl From<BidiChannelId> for ChannelId {
+impl From<BidiChannelId> for AfcId {
     fn from(value: BidiChannelId) -> Self {
         Self(*truncate(value.as_array()))
     }
 }
 
 /// Convert from [`UniChannelId`] to [`ChannelId`]
-impl From<UniChannelId> for ChannelId {
+impl From<UniChannelId> for AfcId {
     fn from(value: UniChannelId) -> Self {
         Self(*truncate(value.as_array()))
     }
 }
 
 /// Convert from [`Id`] to [`ChannelId`]
-impl From<Id> for ChannelId {
+impl From<Id> for AfcId {
     fn from(value: Id) -> Self {
         Self(*truncate(value.as_array()))
     }
@@ -198,13 +198,13 @@ pub trait DaemonApi {
         peer: NetIdentifier,
         node_id: NodeId,
         label: Label,
-    ) -> Result<(ChannelId, AfcCtrl)>;
+    ) -> Result<(AfcId, AfcCtrl)>;
     /// Delete a fast channel.
-    async fn afc_delete_channel(chan: ChannelId) -> Result<AfcCtrl>;
+    async fn afc_delete_channel(chan: AfcId) -> Result<AfcCtrl>;
     /// Receive a fast channel ctrl message.
     async fn receive_afc_ctrl(
         team: TeamId,
         node_id: NodeId,
         ctrl: AfcCtrl,
-    ) -> Result<(ChannelId, NetIdentifier, Label)>;
+    ) -> Result<(AfcId, NetIdentifier, Label)>;
 }

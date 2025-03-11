@@ -182,7 +182,7 @@ pub struct DeviceId(aranya_daemon_api::DeviceId);
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
 #[aranya_capi_core::opaque(size = 16, align = 1)]
-pub struct ChannelId(aranya_daemon_api::ChannelId);
+pub struct ChannelId(aranya_daemon_api::AfcId);
 
 /// An enum containing team roles defined in the Aranya policy.
 #[repr(u8)]

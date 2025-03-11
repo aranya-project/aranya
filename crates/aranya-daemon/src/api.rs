@@ -16,7 +16,7 @@ use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler
 use aranya_buggy::BugExt;
 use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, Rng, UserId};
 use aranya_daemon_api::{
-    AfcCtrl, ChannelId, DaemonApi, DeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
+    AfcCtrl, AfcId, DaemonApi, DeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
     Result as ApiResult, Role as ApiRole, TeamId, CS,
 };
 use aranya_fast_channels::{shm::WriteState, AranyaState, Directed, Label, NodeId};
@@ -498,7 +498,7 @@ impl DaemonApi for DaemonApiHandler {
         peer: NetIdentifier,
         node_id: NodeId,
         label: Label,
-    ) -> ApiResult<(ChannelId, AfcCtrl)> {
+    ) -> ApiResult<(AfcId, AfcCtrl)> {
         info!("afc_create_bidi_channel");
 
         let peer_id = self
@@ -521,7 +521,7 @@ impl DaemonApi for DaemonApiHandler {
         else {
             return Err(anyhow::anyhow!("unable to find BidiChannelCreated effect").into());
         };
-        let afc_id: ChannelId = e.channel_key_id.into();
+        let afc_id: AfcId = e.channel_key_id.into();
         debug!(?afc_id, "processed afc ID");
 
         self.handle_effects(&effects, Some(node_id)).await?;
@@ -529,7 +529,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn afc_delete_channel(self, _: context::Context, chan: ChannelId) -> ApiResult<AfcCtrl> {
+    async fn afc_delete_channel(self, _: context::Context, chan: AfcId) -> ApiResult<AfcCtrl> {
         // TODO: remove AFC channel from Aranya.
         todo!();
     }
@@ -541,7 +541,7 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         node_id: NodeId,
         ctrl: AfcCtrl,
-    ) -> ApiResult<(ChannelId, NetIdentifier, Label)> {
+    ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
         let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
@@ -553,7 +553,7 @@ impl DaemonApi for DaemonApiHandler {
                 continue;
             };
             let encap = BidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
-            let afc_id: ChannelId = encap.id().into();
+            let afc_id: AfcId = encap.id().into();
             debug!(?afc_id, "processed afc ID");
             let label = Label::new(e.label.try_into().expect("expected label conversion"));
             let net = self
