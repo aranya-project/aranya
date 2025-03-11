@@ -20,11 +20,11 @@ debug = []
 [dependencies]
 aranya-daemon-api = { workspace = true }
 
-spideroak-base58 = { workspace = true, features = ["std"] }
-buggy = { workspace = true, features = ["std"] }
 aranya-crypto = { workspace = true }
 aranya-fast-channels = { workspace = true, features = ["std", "posix"] }
 aranya-util = { workspace = true }
+buggy = { workspace = true, features = ["std"] }
+spideroak-base58 = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
 indexmap = { version = "2.7" }

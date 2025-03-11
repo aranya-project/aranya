@@ -18,7 +18,6 @@ aranya-daemon-api = { workspace = true }
 aranya-keygen = { workspace = true }
 
 aranya-afc-util = { workspace = true }
-buggy = { workspace = true }
 aranya-crypto = { workspace = true }
 aranya-crypto-ffi = { workspace = true }
 aranya-device-ffi = { workspace = true }
@@ -31,6 +30,7 @@ aranya-policy-lang = { workspace = true }
 aranya-policy-vm = { workspace = true }
 aranya-runtime = { workspace = true }
 aranya-util = { workspace = true }
+buggy = { workspace = true }
 
 aranya-fast-channels = { workspace = true }
 

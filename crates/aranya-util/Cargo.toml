@@ -14,8 +14,8 @@ workspace = true
 
 
 [dependencies]
-buggy = { workspace = true }
 aranya-fast-channels = { workspace = true }
+buggy = { workspace = true }
 
 anyhow = { workspace = true }
 serde = { workspace = true }
