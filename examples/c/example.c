@@ -203,7 +203,7 @@ AranyaError add_sync_peers(Team *t) {
             printf("adding sync peer %s to %s\r\n", t->clients_arr[j].name,
                    t->clients_arr[i].name);
             err = aranya_add_sync_peer(&t->clients_arr[i].client, &t->id,
-                                       sync_addrs[j], interval);
+                                       sync_addrs[j], interval, true);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr, "error adding sync peer %s to %s: %s\r\n",
                         t->clients_arr[j].name, t->clients_arr[i].name,

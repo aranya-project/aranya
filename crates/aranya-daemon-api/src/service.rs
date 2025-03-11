@@ -144,7 +144,10 @@ pub trait DaemonApi {
     async fn get_device_id() -> Result<DeviceId>;
 
     /// Adds the peer for automatic periodic syncing.
-    async fn add_sync_peer(addr: Addr, team: TeamId, interval: Duration) -> Result<()>;
+    async fn add_sync_peer(addr: Addr, team: TeamId, interval: Duration, sync_now: bool) -> Result<()>;
+
+    /// Sync with peer immediately.
+    async fn sync_now(addr: Addr, team: TeamId) -> Result<()>;
 
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;

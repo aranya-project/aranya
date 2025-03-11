@@ -463,6 +463,7 @@ pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error>
 /// @param team the team's ID [`TeamId`].
 /// @param addr the peer's Aranya network address [`Addr`].
 /// @param interval the time [`Duration`] to wait between syncs with peer.
+/// @param sync_now whether to sync with the peer immediately.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_sync_peer(
@@ -470,6 +471,7 @@ pub unsafe fn add_sync_peer(
     team: &TeamId,
     addr: Addr,
     interval: Duration,
+    sync_now: bool,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `addr` is a valid C String.
@@ -478,7 +480,35 @@ pub unsafe fn add_sync_peer(
         client
             .inner
             .team(team.0)
-            .add_sync_peer(addr, interval.into()),
+            .add_sync_peer(addr, interval.into(), sync_now.into()),
+    )?;
+    Ok(())
+}
+
+/// Sync with peer immediately.
+///
+/// If a peer is not reachable on the network, sync errors
+/// will appear in the tracing logs and
+/// Aranya will be unable to sync state with that peer.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param addr the peer's Aranya network address [`Addr`].
+///
+/// @relates AranyaClient.
+pub unsafe fn sync_now(
+    client: &mut Client,
+    team: &TeamId,
+    addr: Addr,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { addr.as_underlying() }?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .sync_now(addr),
     )?;
     Ok(())
 }

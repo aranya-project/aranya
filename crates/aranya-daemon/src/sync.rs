@@ -6,7 +6,7 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::{HashMap, VecDeque}, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_buggy::BugExt;
@@ -25,6 +25,7 @@ use crate::{
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
 enum Msg {
+    SyncNow { peer: SyncPeer },
     AddPeer { peer: SyncPeer, interval: Duration },
     RemovePeer { peer: SyncPeer },
 }
@@ -53,7 +54,7 @@ impl SyncPeers {
     }
 
     /// Add peer to [`Syncer`].
-    pub async fn add_peer(&self, addr: Addr, interval: Duration, graph_id: GraphId) -> Result<()> {
+    pub async fn add_peer(&self, addr: Addr, interval: Duration, graph_id: GraphId, sync_now: bool) -> Result<()> {
         let peer = Msg::AddPeer {
             peer: SyncPeer { addr, graph_id },
             interval,
@@ -61,6 +62,9 @@ impl SyncPeers {
         if let Err(e) = self.send.send(peer).await.context("unable to add peer") {
             error!(?e, "error adding peer to syncer");
             return Err(e);
+        }
+        if sync_now {
+            self.sync_now(addr, graph_id).await?
         }
         Ok(())
     }
@@ -80,6 +84,19 @@ impl SyncPeers {
         }
         Ok(())
     }
+
+    /// Sync with a peer immediately.
+    pub async fn sync_now(&self, addr: Addr, graph_id: GraphId) -> Result<()> {
+        let peer = Msg::SyncNow {
+            peer: SyncPeer { addr, graph_id },
+        };
+        if let Err(e) = self.send.send(peer).await.context("unable to add sync now peer") {
+            error!(?e, "error adding sync now peer to syncer");
+            return Err(e);
+        }
+        Ok(())
+    }
+    
 }
 
 /// Syncs with each peer after the specified interval.
@@ -131,10 +148,13 @@ impl Syncer {
             // receive added/removed peers.
             Some(msg) = self.recv.recv() => {
                 match msg {
+                    Msg::SyncNow{ peer } => {
+                        // sync with peer right now.
+                        self.sync(&peer.graph_id, &peer.addr);
+                    },
                     Msg::AddPeer { peer, interval } => self.add_peer(peer, interval),
                     Msg::RemovePeer { peer } => self.remove_peer(peer),
                 }
-
             }
             // get next peer from delay queue.
             Some(expired) = self.queue.next() => {
@@ -168,6 +188,7 @@ impl Syncer {
         }
     }
 
+    /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
     async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
         info!("syncing with peer");

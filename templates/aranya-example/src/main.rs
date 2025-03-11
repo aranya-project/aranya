@@ -219,59 +219,59 @@ async fn main() -> Result<()> {
 
     info!("adding sync peers");
     owner_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_interval, true)
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_interval, true)
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_interval, true)
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_interval, true)
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_interval, true)
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_interval, true)
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_interval, true)
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_interval, true)
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_interval, true)
         .await?;
 
     membera_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_interval, true)
         .await?;
     membera_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_interval, true)
         .await?;
     membera_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_interval, true)
         .await?;
     membera_team
-        .add_sync_peer(memberb_addr.into(), sync_interval)
+        .add_sync_peer(memberb_addr.into(), sync_interval, true)
         .await?;
 
     memberb_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_interval, true)
         .await?;
     memberb_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_interval, true)
         .await?;
     memberb_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_interval, true)
         .await?;
     memberb_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_interval, true)
         .await?;
 
     // add admin to team.
