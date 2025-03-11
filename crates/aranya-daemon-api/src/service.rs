@@ -132,6 +132,22 @@ impl From<Id> for AfcId {
 // serialized command which must be passed over AFC.
 pub type AfcCtrl = Vec<Box<[u8]>>;
 
+/// TODO(steve)
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct SyncPeerConfig {
+    pub interval: Duration,
+    pub sync_now: bool,
+}
+
+impl Default for SyncPeerConfig {
+    fn default() -> Self {
+        Self {
+            interval: Duration::from_millis(100),
+            sync_now: false,
+        }
+    }
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
     /// Gets local address the Aranya sync server is bound to.
@@ -147,8 +163,7 @@ pub trait DaemonApi {
     async fn add_sync_peer(
         addr: Addr,
         team: TeamId,
-        interval: Duration,
-        sync_now: bool,
+        config: SyncPeerConfig,
     ) -> Result<()>;
 
     /// Sync with peer immediately.

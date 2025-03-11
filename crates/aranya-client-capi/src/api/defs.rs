@@ -349,6 +349,36 @@ pub struct AfcConfig {
     pub addr: *const c_char,
 }
 
+/// An type that represents when the first sync with a peer should occur.
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+pub enum SyncWhen {
+    Now,
+    Later,
+}
+
+/// Sync Peer config.
+#[repr(C)]
+#[must_use]
+#[derive(Copy, Clone, Debug)]
+pub struct SyncPeerConfig {
+    pub interval: Duration,
+    pub sync_when: SyncWhen,
+}
+
+impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
+    fn from(value: SyncPeerConfig) -> Self {
+        let sync_now = match value.sync_when {
+            SyncWhen::Now => true,
+            SyncWhen::Later => false,
+        };
+        Self {
+            interval: value.interval.into(),
+            sync_now,
+        }
+    }
+}
+
 /// Initializes a new client instance.
 ///
 /// @param client the uninitialized Aranya Client [`Client`].
@@ -462,24 +492,21 @@ pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error>
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param addr the peer's Aranya network address [`Addr`].
-/// @param interval the time [`Duration`] to wait between syncs with peer.
-/// @param sync_now whether to sync with the peer immediately.
+/// @param config configuration values for syncing with a peer.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_sync_peer(
     client: &mut Client,
     team: &TeamId,
     addr: Addr,
-    interval: Duration,
-    sync_now: bool,
+    config: SyncPeerConfig,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
     client.rt.block_on(client.inner.team(team.0).add_sync_peer(
         addr,
-        interval.into(),
-        sync_now.into(),
+        config.into(),
     ))?;
     Ok(())
 }

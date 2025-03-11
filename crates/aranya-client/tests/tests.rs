@@ -24,7 +24,7 @@ use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, SyncPeerConfig};
 use aranya_util::addr::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::tempdir;
@@ -290,8 +290,8 @@ impl Drop for UserCtx {
 /// `RUST_LOG="aranya_client=debug,aranya_daemon=info" cargo test integration_test -- --show-output --nocapture`
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn integration_test() -> Result<()> {
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
+    let sync_config: SyncPeerConfig = Default::default();
+    let sleep_interval = sync_config.interval * 6;
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
@@ -328,43 +328,43 @@ async fn integration_test() -> Result<()> {
     owner_team.sync_now(admin_addr.into()).await?;
 
     owner_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     member_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     member_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     member_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
 
     // add admin to team.
@@ -417,8 +417,8 @@ async fn integration_test() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_one_way_two_chans() -> Result<()> {
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
+    let sync_config: SyncPeerConfig = Default::default();
+    let sleep_interval = sync_config.interval * 6;
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
@@ -460,59 +460,59 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let mut memberb_team = team.memberb.client.team(team_id);
 
     owner_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     membera_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(memberb_addr.into(), sync_interval, true)
+        .add_sync_peer(memberb_addr.into(), sync_config)
         .await?;
 
     memberb_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     // add admin to team.
@@ -650,8 +650,8 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
 /// Tests AFC two way communication within one channel.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_two_way_one_chan() -> Result<()> {
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
+    let sync_config: SyncPeerConfig = Default::default();
+    let sleep_interval = sync_config.interval * 6;
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
@@ -686,59 +686,59 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let mut memberb_team = team.memberb.client.team(team_id);
 
     owner_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     membera_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(memberb_addr.into(), sync_interval, true)
+        .add_sync_peer(memberb_addr.into(), sync_config)
         .await?;
 
     memberb_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     // add admin to team.
@@ -861,8 +861,8 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
 /// A positive test that sequence numbers are monotonic.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_monotonic_seq() -> Result<()> {
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
+    let sync_config: SyncPeerConfig = Default::default();
+    let sleep_interval = sync_config.interval * 6;
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
@@ -897,59 +897,59 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     let mut memberb_team = team.memberb.client.team(team_id);
 
     owner_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     membera_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(memberb_addr.into(), sync_interval, true)
+        .add_sync_peer(memberb_addr.into(), sync_config)
         .await?;
 
     memberb_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     // add admin to team.

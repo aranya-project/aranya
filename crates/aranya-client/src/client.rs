@@ -1,9 +1,11 @@
 //! Client-daemon connection.
 
-use std::{collections::VecDeque, net::SocketAddr, path::Path, time::Duration};
+use std::{collections::VecDeque, net::SocketAddr, path::Path};
 
 pub use aranya_daemon_api::AfcId;
-use aranya_daemon_api::{DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, CS};
+use aranya_daemon_api::{
+    DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, SyncPeerConfig, TeamId, CS,
+};
 use aranya_fast_channels::{self as afc, shm::ReadState, ChannelId};
 pub use aranya_fast_channels::{Label, Seq};
 use aranya_util::addr::Addr;
@@ -335,13 +337,12 @@ impl Team<'_> {
     pub async fn add_sync_peer(
         &mut self,
         addr: Addr,
-        interval: Duration,
-        sync_now: bool,
+        config: SyncPeerConfig,
     ) -> Result<()> {
         Ok(self
             .client
             .daemon
-            .add_sync_peer(context::current(), addr, self.id, interval, sync_now)
+            .add_sync_peer(context::current(), addr, self.id, config)
             .await??)
     }
 

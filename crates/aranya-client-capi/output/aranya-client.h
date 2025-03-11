@@ -179,6 +179,21 @@ typedef uint8_t AranyaRole;
 #endif // __cplusplus
 
 /**
+ * An type that represents when the first sync with a peer should occur.
+ */
+enum AranyaSyncWhen
+#ifdef __cplusplus
+  : uint8_t
+#endif // __cplusplus
+ {
+    ARANYA_SYNC_WHEN_NOW,
+    ARANYA_SYNC_WHEN_LATER,
+};
+#ifndef __cplusplus
+typedef uint8_t AranyaSyncWhen;
+#endif // __cplusplus
+
+/**
  * Extended error information.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaExtError {
@@ -299,6 +314,14 @@ typedef const char *AranyaAddr;
  * A type to represent a span of time.
  */
 typedef uint64_t AranyaDuration;
+
+/**
+ * Sync Peer config.
+ */
+typedef struct ARANYA_DESIGNATED_INIT AranyaSyncPeerConfig {
+    AranyaDuration interval;
+    AranyaSyncWhen sync_when;
+} AranyaSyncPeerConfig;
 
 /**
  * A network identifier for an Aranya client.
@@ -640,14 +663,14 @@ AranyaError aranya_remove_team_ext(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param interval the time [`AranyaDuration`](@ref AranyaDuration) to wait between syncs with peer.
+ * @param config configuration values for syncing with a peer.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_sync_peer(struct AranyaClient *client,
                                  const struct AranyaTeamId *team,
                                  AranyaAddr addr,
-                                 AranyaDuration interval);
+                                 struct AranyaSyncPeerConfig config);
 
 /**
  * Add the peer for automatic periodic Aranya state syncing.
@@ -659,15 +682,50 @@ AranyaError aranya_add_sync_peer(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param interval the time [`AranyaDuration`](@ref AranyaDuration) to wait between syncs with peer.
+ * @param config configuration values for syncing with a peer.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_sync_peer_ext(struct AranyaClient *client,
                                      const struct AranyaTeamId *team,
                                      AranyaAddr addr,
-                                     AranyaDuration interval,
+                                     struct AranyaSyncPeerConfig config,
                                      struct AranyaExtError *__ext_err);
+
+/**
+ * Sync with peer immediately.
+ *
+ * If a peer is not reachable on the network, sync errors
+ * will appear in the tracing logs and
+ * Aranya will be unable to sync state with that peer.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_sync_now(struct AranyaClient *client,
+                            const struct AranyaTeamId *team,
+                            AranyaAddr addr);
+
+/**
+ * Sync with peer immediately.
+ *
+ * If a peer is not reachable on the network, sync errors
+ * will appear in the tracing logs and
+ * Aranya will be unable to sync state with that peer.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_sync_now_ext(struct AranyaClient *client,
+                                const struct AranyaTeamId *team,
+                                AranyaAddr addr,
+                                struct AranyaExtError *__ext_err);
 
 /**
  * Remove the peer from automatic Aranya state syncing.
