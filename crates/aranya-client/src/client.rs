@@ -332,7 +332,12 @@ pub struct Team<'a> {
 
 impl Team<'_> {
     /// Adds a peer for automatic periodic Aranya state syncing.
-    pub async fn add_sync_peer(&mut self, addr: Addr, interval: Duration, sync_now: bool) -> Result<()> {
+    pub async fn add_sync_peer(
+        &mut self,
+        addr: Addr,
+        interval: Duration,
+        sync_now: bool,
+    ) -> Result<()> {
         Ok(self
             .client
             .daemon

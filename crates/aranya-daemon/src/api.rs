@@ -318,15 +318,8 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn sync_now(
-        self,
-        _: context::Context,
-        peer: Addr,
-        team: TeamId,
-    ) -> ApiResult<()> {
-        self.peers
-            .sync_now(peer, team.into_id().into())
-            .await?;
+    async fn sync_now(self, _: context::Context, peer: Addr, team: TeamId) -> ApiResult<()> {
+        self.peers.sync_now(peer, team.into_id().into()).await?;
         Ok(())
     }
 

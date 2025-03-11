@@ -6,7 +6,11 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::{HashMap, VecDeque}, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 use aranya_buggy::BugExt;
@@ -54,7 +58,13 @@ impl SyncPeers {
     }
 
     /// Add peer to [`Syncer`].
-    pub async fn add_peer(&self, addr: Addr, interval: Duration, graph_id: GraphId, sync_now: bool) -> Result<()> {
+    pub async fn add_peer(
+        &self,
+        addr: Addr,
+        interval: Duration,
+        graph_id: GraphId,
+        sync_now: bool,
+    ) -> Result<()> {
         let peer = Msg::AddPeer {
             peer: SyncPeer { addr, graph_id },
             interval,
@@ -90,13 +100,17 @@ impl SyncPeers {
         let peer = Msg::SyncNow {
             peer: SyncPeer { addr, graph_id },
         };
-        if let Err(e) = self.send.send(peer).await.context("unable to add sync now peer") {
+        if let Err(e) = self
+            .send
+            .send(peer)
+            .await
+            .context("unable to add sync now peer")
+        {
             error!(?e, "error adding sync now peer to syncer");
             return Err(e);
         }
         Ok(())
     }
-    
 }
 
 /// Syncs with each peer after the specified interval.
