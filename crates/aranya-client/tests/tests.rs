@@ -18,13 +18,14 @@ use std::{
 
 use anyhow::{Context, Result};
 use aranya_base58::ToBase58;
-use aranya_client::{AfcMsg, Client, Label, Seq};
+use aranya_client::client::{AfcMsg, Client};
 use aranya_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_fast_channels::{Label, Seq};
 use aranya_util::addr::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::tempdir;

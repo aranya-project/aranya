@@ -11,8 +11,9 @@
 //! [README]: https://github.com/aranya-project/aranya/tree/main/crates/aranya-client/README.md
 //! [walkthrough]: https://github.com/aranya-project/aranya/tree/main/docs/walkthrough.md
 
-mod afc;
-mod client;
+pub mod afc;
+pub mod client;
+
 mod error;
 
 pub use crate::{
