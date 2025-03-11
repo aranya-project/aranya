@@ -107,7 +107,7 @@ Build the code using `cargo` or `cargo-make`.
 
 **Using `cargo-make`**:
 
-`cargo make build-code`
+`cargo make build`
 
 This will build the Aranya [client](crates/aranya-client/) and the
 [daemon](crates/aranya-daemon/) executable. The built versions are available
@@ -190,9 +190,14 @@ To build the daemon locally, use `cargo` or `cargo-make`.
 
 **Using `cargo-make`**:
 
-`cargo make build-code`
+`cargo make build`
 
 The daemon executable will be available in the `target/release` directory.
+
+#### Unit Tests
+
+To run unit tests, run the following `cargo-make` command:
+`cargo make test`
 
 #### Integrate
 

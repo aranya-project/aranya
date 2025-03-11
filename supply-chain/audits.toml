@@ -1,7 +1,355 @@
 
 # cargo-vet audits file
 
-[audits]
+[[audits.anstyle-wincon]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "3.0.6 -> 3.0.7"
+
+[[audits.anyhow]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.94 -> 1.0.97"
+
+[[audits.async-trait]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.83 -> 0.1.87"
+
+[[audits.backon]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-run"
+delta = "1.3.0 -> 1.4.0"
+
+[[audits.bitflags]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "2.8.0 -> 2.9.0"
+
+[[audits.bytes]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.9.0 -> 1.10.0"
+
+[[audits.clap]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "4.5.23 -> 4.5.31"
+
+[[audits.clap_builder]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "4.5.23 -> 4.5.31"
+
+[[audits.clap_derive]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "4.5.18 -> 4.5.28"
+
+[[audits.cpufeatures]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.16 -> 0.2.17"
+
+[[audits.crunchy]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.2 -> 0.2.3"
+
+[[audits.getrandom]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.15 -> 0.3.1"
+
+[[audits.inout]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.3 -> 0.1.4"
+
+[[audits.itoa]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.14 -> 1.0.15"
+
+[[audits.js-sys]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.3.76 -> 0.3.77"
+
+[[audits.libc]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.168 -> 0.2.170"
+
+[[audits.linux-raw-sys]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.4.14 -> 0.4.15"
+
+[[audits.log]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.4.25 -> 0.4.26"
+
+[[audits.miniz_oxide]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.8.4 -> 0.8.5"
+
+[[audits.object]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.36.5 -> 0.36.7"
+
+[[audits.p384]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.13.0 -> 0.13.1"
+
+[[audits.pin-project]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.1.7 -> 1.1.10"
+
+[[audits.pin-project-internal]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.1.7 -> 1.1.10"
+
+[[audits.pin-project-lite]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.15 -> 0.2.16"
+
+[[audits.prettyplease]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.25 -> 0.2.30"
+
+[[audits.proc-macro2]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.93 -> 1.0.94"
+
+[[audits.quote]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.38 -> 1.0.39"
+
+[[audits.redox_syscall]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-run"
+delta = "0.5.8 -> 0.5.10"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rfc6979]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.rustix]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.38.42 -> 0.38.44"
+
+[[audits.rustversion]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.19 -> 1.0.20"
+
+[[audits.ryu]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.18 -> 1.0.20"
+
+[[audits.scc]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-run"
+delta = "2.2.5 -> 2.3.3"
+
+[[audits.sdd]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-run"
+delta = "3.0.4 -> 3.0.7"
+
+[[audits.semver]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.24 -> 1.0.26"
+
+[[audits.serde]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.217 -> 1.0.218"
+
+[[audits.serde_derive]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.217 -> 1.0.218"
+
+[[audits.serde_json]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.133 -> 1.0.140"
+
+[[audits.syn]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "2.0.90 -> 2.0.99"
+
+[[audits.tempfile]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "3.14.0 -> 3.17.1"
+
+[[audits.test-log]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-run"
+delta = "0.2.16 -> 0.2.17"
+
+[[audits.test-log-macros]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-run"
+delta = "0.2.16 -> 0.2.17"
+
+[[audits.thiserror]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "2.0.6 -> 2.0.12"
+
+[[audits.thiserror-impl]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "2.0.6 -> 2.0.12"
+
+[[audits.tokio]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.42.0 -> 1.43.0"
+
+[[audits.tokio-macros]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "2.4.0 -> 2.5.0"
+
+[[audits.typenum]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.17.0 -> 1.18.0"
+
+[[audits.unicode-ident]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.0.16 -> 1.0.18"
+
+[[audits.valuable]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.0 -> 0.1.1"
+
+[[audits.wasi]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.11.0+wasi-snapshot-preview1 -> 0.13.3+wasi-0.2.2"
+
+[[audits.wasm-bindgen]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.99 -> 0.2.100"
+
+[[audits.wasm-bindgen-backend]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.99 -> 0.2.100"
+
+[[audits.wasm-bindgen-macro]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.99 -> 0.2.100"
+
+[[audits.wasm-bindgen-macro-support]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.99 -> 0.2.100"
+
+[[audits.wasm-bindgen-shared]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.99 -> 0.2.100"
+
+[[audits.winapi-i686-pc-windows-gnu]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.winapi-x86_64-pc-windows-gnu]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
+[[audits.zerofrom]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.5 -> 0.1.6"
+
+[[audits.zerofrom-derive]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.5 -> 0.1.6"
 
 [[trusted.aranya-afc-util]]
 criteria = "safe-to-deploy"

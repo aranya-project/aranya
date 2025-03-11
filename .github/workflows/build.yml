@@ -37,7 +37,7 @@ jobs:
 
       - name: Build code
         run: |
-          cargo make build-code
+          cargo make build
           cargo make tgz-daemon
 
       - name: Verify build didn't change any checked-in files

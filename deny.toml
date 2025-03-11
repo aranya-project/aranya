@@ -240,6 +240,7 @@ deny = [
 # Certain crates/versions that will be skipped when doing duplicate detection.
 skip = [
     "generic-array@0.14.7",
+    "getrandom@0.2.15",
     "regex-automata@0.1.10",
     "regex-syntax@0.6.29",
     "syn@1.0.109",
