@@ -20,7 +20,7 @@ use std::{
 };
 
 use anyhow::Result;
-use aranya_buggy::Bug;
+use buggy::Bug;
 use serde::{
     de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
