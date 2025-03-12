@@ -872,9 +872,9 @@ AranyaError aranya_revoke_role_ext(struct AranyaClient *client,
  * @relates AranyaClient.
  */
 AranyaError aranya_afc_assign_net_identifier(struct AranyaClient *client,
-                                         const struct AranyaTeamId *team,
-                                         const struct AranyaDeviceId *device,
-                                         AranyaNetIdentifier net_identifier);
+                                             const struct AranyaTeamId *team,
+                                             const struct AranyaDeviceId *device,
+                                             AranyaNetIdentifier net_identifier);
 
 /**
  * Associate a network identifier to a device for use with AFC.
