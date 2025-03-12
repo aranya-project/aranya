@@ -187,7 +187,7 @@ impl Client {
     /// Polls the client to check for new AFC data, then retrieves
     /// any new data.
     ///
-    /// This is shorthand for [`afc_poll`][Self::afc_poll] and
+    /// This is shorthand for [`poll_afc`][Self::poll_afc] and
     /// [`handle_afc_data`][Self::handle_afc_data].
     ///
     /// # Cancellation Safety
@@ -211,7 +211,7 @@ impl Client {
         Ok(PollData(data))
     }
 
-    /// Retrieves AFC data from [`afc_poll`][Self::afc_poll].
+    /// Retrieves AFC data from [`poll_afc`][Self::poll_afc].
     ///
     /// # Cancellation Safety
     ///
