@@ -10,9 +10,10 @@ use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, PeerCache, Policy, Session, Sink,
-    StorageProvider, SyncRequester, SyncResponder, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
+    StorageProvider, SyncRequester, SyncResponder, SyncType, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::Addr;
+use buggy::bug;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -67,7 +68,10 @@ where
         S: Sink<<EN as Engine>::Effect>,
     {
         // send the sync request.
-        let mut syncer = SyncRequester::new(id, &mut Rng);
+
+        // TODO: Real server address.
+        let server_addr = ();
+        let mut syncer = SyncRequester::new(id, &mut Rng, server_addr);
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let (len, _) = {
@@ -115,9 +119,15 @@ where
                 let mut trx = client.transaction(id);
                 // TODO: save PeerCache somewhere.
                 client
-                    .add_commands(&mut trx, sink, &cmds, &mut PeerCache::new())
+                    .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
                 client.commit(&mut trx, sink).context("commit failed")?;
+                // TODO: Update heads
+                // client.update_heads(
+                //     id,
+                //     cmds.iter().filter_map(|cmd| cmd.address().ok()),
+                //     heads,
+                // )?;
                 debug!("committed");
             }
         }
@@ -267,7 +277,7 @@ impl<EN, SP> Server<EN, SP> {
 
 impl<EN, SP> Server<EN, SP>
 where
-    EN: Engine + Send + Sync + 'static,
+    EN: Engine + Send + 'static,
     SP: StorageProvider + Send + Sync + 'static,
 {
     /// Begins accepting incoming requests.
@@ -336,8 +346,20 @@ where
         client: Arc<Mutex<ClientState<EN, SP>>>,
         request: &[u8],
     ) -> Result<Box<[u8]>> {
-        let mut resp = SyncResponder::new();
+        // TODO: Use real server address
+        let server_address = ();
+        let mut resp = SyncResponder::new(server_address);
+
+        let SyncType::Poll {
+            request,
+            address: (),
+        } = postcard::from_bytes(request)?
+        else {
+            bug!("Other sync types are not implemented");
+        };
+
         resp.receive(request).context("sync recv failed")?;
+
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
         // TODO: save PeerCache somewhere.
         let len = resp

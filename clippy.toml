@@ -1,4 +1,4 @@
 allow-unwrap-in-tests = true
 disallowed-macros = [
-    { path = "core::unreachable", reason = "use aranya_buggy::bug" },
+    { path = "core::unreachable", reason = "use buggy::bug" },
 ]

@@ -346,10 +346,6 @@ criteria = "safe-to-deploy"
 version = "1.0.3"
 criteria = "safe-to-deploy"
 
-[[exemptions.more-asserts]]
-version = "0.3.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.object]]
 version = "0.36.5"
 criteria = "safe-to-deploy"

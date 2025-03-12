@@ -7,7 +7,7 @@ pub enum Error {
 
     /// Unexpected internal error.
     #[error("Unexpected internal error: {0}")]
-    Bug(#[from] aranya_buggy::Bug),
+    Bug(#[from] buggy::Bug),
 
     /// Could not connect to the daemon.
     #[error("could not connect to daemon: {0}")]

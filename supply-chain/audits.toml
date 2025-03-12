@@ -26,6 +26,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "2.8.0 -> 2.9.0"
 
+[[audits.buggy]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+
 [[audits.bytes]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -60,6 +65,16 @@ delta = "0.2.2 -> 0.2.3"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.2.15 -> 0.3.1"
+
+[[audits.hash32]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.1 -> 0.3.1"
+
+[[audits.heapless]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.7.17 -> 0.8.0"
 
 [[audits.inout]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -245,6 +260,26 @@ delta = "1.0.217 -> 1.0.218"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.133 -> 1.0.140"
+
+[[audits.sha3-utils]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.3.1"
+
+[[audits.spideroak-base58]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.1.0"
+
+[[audits.spideroak-crypto]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.2.1"
+
+[[audits.spideroak-crypto-derive]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.1.0"
 
 [[audits.syn]]
 who = "gknopf <gknopf@spideroak.com>"

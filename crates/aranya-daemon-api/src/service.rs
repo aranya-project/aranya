@@ -2,7 +2,6 @@
 
 use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
 
-use aranya_base58::ToBase58;
 use aranya_crypto::{
     afc::{BidiChannelId, UniChannelId},
     custom_id,
@@ -12,6 +11,7 @@ use aranya_crypto::{
 use aranya_fast_channels::{Label, NodeId};
 use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
+use spideroak_base58::ToBase58;
 use tracing::error;
 
 /// CS = Cipher Suite
