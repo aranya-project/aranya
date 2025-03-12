@@ -34,7 +34,7 @@ tracing-subscriber = { workspace = true }
 
 
 [build-dependencies]
-aranya-capi-codegen = "0.1.0"
+aranya-capi-codegen = { workspace = true }
 
 anyhow = { workspace = true }
 quote = "1"

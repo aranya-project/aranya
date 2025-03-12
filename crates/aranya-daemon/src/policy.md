@@ -1164,7 +1164,7 @@ command SetNetworkName {
         if net_id_exists is Some {
             let net_id = unwrap net_id_exists
             finish {
-                update MemberNetworkId[user_id: this.user_id]=>{net_identifier: net_id} to {
+                update MemberNetworkId[user_id: this.user_id]=>{net_identifier: net_id.net_identifier} to {
                     net_identifier: this.net_identifier
                 }
 
