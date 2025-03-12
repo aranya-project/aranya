@@ -32,19 +32,19 @@ url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 url = "https://raw.githubusercontent.com/zcash/rust-ecosystem/main/supply-chain/audits.toml"
 
 [policy.aranya-client]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.aranya-daemon]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.aranya-daemon-api]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.aranya-keygen]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.aranya-util]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [[exemptions.addr2line]]
 version = "0.24.2"

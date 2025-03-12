@@ -1,26 +1,6 @@
 
 # cargo-vet imports lock
 
-[[unpublished.aranya-client]]
-version = "0.5.0"
-audited_as = "0.4.0"
-
-[[unpublished.aranya-daemon]]
-version = "0.5.0"
-audited_as = "0.4.0"
-
-[[unpublished.aranya-daemon-api]]
-version = "0.5.0"
-audited_as = "0.4.0"
-
-[[unpublished.aranya-keygen]]
-version = "0.5.0"
-audited_as = "0.4.0"
-
-[[unpublished.aranya-util]]
-version = "0.5.0"
-audited_as = "0.4.0"
-
 [[publisher.aranya-afc-util]]
 version = "0.4.0"
 when = "2025-03-12"
@@ -45,12 +25,6 @@ when = "2025-03-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
-[[publisher.aranya-client]]
-version = "0.4.0"
-when = "2025-01-10"
-user-id = 293722
-user-login = "aranya-project-bot"
-
 [[publisher.aranya-crypto]]
 version = "0.3.0"
 when = "2025-03-12"
@@ -60,18 +34,6 @@ user-login = "aranya-project-bot"
 [[publisher.aranya-crypto-ffi]]
 version = "0.4.0"
 when = "2025-03-12"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-daemon]]
-version = "0.4.0"
-when = "2025-01-10"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-daemon-api]]
-version = "0.4.0"
-when = "2025-01-09"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -96,12 +58,6 @@ user-login = "aranya-project-bot"
 [[publisher.aranya-idam-ffi]]
 version = "0.4.0"
 when = "2025-03-12"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-keygen]]
-version = "0.4.0"
-when = "2025-01-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -174,12 +130,6 @@ user-login = "aranya-project-bot"
 [[publisher.aranya-runtime]]
 version = "0.4.0"
 when = "2025-03-12"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-util]]
-version = "0.4.0"
-when = "2025-01-09"
 user-id = 293722
 user-login = "aranya-project-bot"
 
