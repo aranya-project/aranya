@@ -409,7 +409,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn assign_net_identifier(
+    async fn assign_afc_net_identifier(
         self,
         _: context::Context,
         team: TeamId,
@@ -426,7 +426,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn remove_net_identifier(
+    async fn remove_afc_net_identifier(
         self,
         _: context::Context,
         team: TeamId,
@@ -491,7 +491,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip_all)]
-    async fn afc_create_bidi_channel(
+    async fn create_afc_bidi_channel(
         self,
         _: context::Context,
         team: TeamId,
@@ -499,7 +499,7 @@ impl DaemonApi for DaemonApiHandler {
         node_id: NodeId,
         label: Label,
     ) -> ApiResult<(AfcId, AfcCtrl)> {
-        info!("afc_create_bidi_channel");
+        info!("create_afc_bidi_channel");
 
         let peer_id = self
             .afc_peers
@@ -512,7 +512,7 @@ impl DaemonApi for DaemonApiHandler {
         let (ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
-            .afc_create_bidi_channel_off_graph(peer_id, label)
+            .create_afc_bidi_channel_off_graph(peer_id, label)
             .await?;
         let id = self.pk.ident_pk.id()?;
 
@@ -529,7 +529,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn afc_delete_channel(self, _: context::Context, chan: AfcId) -> ApiResult<AfcCtrl> {
+    async fn delete_afc_channel(self, _: context::Context, chan: AfcId) -> ApiResult<AfcCtrl> {
         // TODO: remove AFC channel from Aranya.
         todo!();
     }

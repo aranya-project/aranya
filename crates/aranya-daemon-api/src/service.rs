@@ -171,13 +171,13 @@ pub trait DaemonApi {
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
     /// Assign a network identifier to a device.
-    async fn assign_net_identifier(
+    async fn assign_afc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
     ) -> Result<()>;
     /// Remove a network identifier from a device.
-    async fn remove_net_identifier(
+    async fn remove_afc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
@@ -193,14 +193,14 @@ pub trait DaemonApi {
     /// Revoke a fast channels label from a device.
     async fn revoke_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
     /// Create a fast channel.
-    async fn afc_create_bidi_channel(
+    async fn create_afc_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
         label: Label,
     ) -> Result<(AfcId, AfcCtrl)>;
     /// Delete a fast channel.
-    async fn afc_delete_channel(chan: AfcId) -> Result<AfcCtrl>;
+    async fn delete_afc_channel(chan: AfcId) -> Result<AfcCtrl>;
     /// Receive a fast channel ctrl message.
     async fn receive_afc_ctrl(
         team: TeamId,

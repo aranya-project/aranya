@@ -1243,12 +1243,12 @@ Creates a bidirectional "AFC" channel for off-graph messaging. This is an epheme
 means that it can only be emitted within an ephemeral session so that it is not added to the graph
 of commands. Furthermore, it cannot persist any changes to the factDB.
 
-The `afc_create_bidi_channel` action creates the `ChannelKeys`, encapsulates them for the peer and the
+The `create_afc_bidi_channel` action creates the `ChannelKeys`, encapsulates them for the peer and the
 author, and sends the encapsulations through the `AfcCreateBidiChannel` command. When processing the
 command, the user will decapsulate their keys and store them in the shared memory DB.
 
 ```policy
-action afc_create_bidi_channel(peer_id id, label int) {
+action create_afc_bidi_channel(peer_id id, label int) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_user_id()
     let author = get_valid_user(author_id)
@@ -1366,12 +1366,12 @@ Creates a unidirectional "AFC" channel. This is an ephemeral command, which mean
 be emitted within an ephemeral session and is not added to the graph of commands. Furthermore, it
 does not persist any changes to the factDB.
 
-The `afc_create_uni_channel` action creates the `ChannelKey`, encapsulates it for the peer, and sends
+The `create_afc_uni_channel` action creates the `ChannelKey`, encapsulates it for the peer, and sends
 the encapsulation through the `AfcCreateUniChannel` command. When processing the command, the
 corresponding recipient will decapsulate their key and store it in the shared memory DB.
 
 ```policy
-action afc_create_uni_channel(writer_id id, reader_id id, label int) {
+action create_afc_uni_channel(writer_id id, reader_id id, label int) {
     let parent_cmd_id = perspective::head_id()
     let author = get_valid_user(device::current_user_id())
     let peer_id = select_peer_id(author.user_id, writer_id, reader_id)

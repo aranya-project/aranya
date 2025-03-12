@@ -215,12 +215,12 @@ pub trait ActorExt {
         net_identifier: String,
     ) -> Result<(), ClientError>;
     fn unset_network_name(&mut self, user_id: Id) -> Result<(), ClientError>;
-    fn afc_create_bidi_channel(
+    fn create_afc_bidi_channel(
         &mut self,
         peer_id: Id,
         label: i64,
     ) -> Result<(), ClientError>;
-    fn afc_create_uni_channel(
+    fn create_afc_uni_channel(
         &mut self,
         writer_id: Id,
         reader_id: Id,

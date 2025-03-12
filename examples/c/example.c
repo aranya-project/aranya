@@ -296,15 +296,15 @@ AranyaError run(Team *t) {
     // communicate via Aranya Fast Channels must be assigned a network
     // identifier. This is used by Fast Channels to properly translate
     // between network names and devices. Network identifiers are assigned
-    // using the `aranya_assign_net_identifiers` function.
+    // using the `aranya_afc_assign_net_identifiers` function.
 
     // assign AFC network addresses.
-    err = aranya_assign_net_identifier(&t->clients.operator.client, &t->id,
+    err = aranya_afc_assign_net_identifier(&t->clients.operator.client, &t->id,
                                        &t->clients.membera.id,
                                        afc_addrs[MEMBERA]);
     EXPECT("error assigning net name to membera", err);
 
-    err = aranya_assign_net_identifier(&t->clients.operator.client, &t->id,
+    err = aranya_afc_assign_net_identifier(&t->clients.operator.client, &t->id,
                                        &t->clients.memberb.id,
                                        afc_addrs[MEMBERB]);
     EXPECT("error assigning net name to memberb", err);

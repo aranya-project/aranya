@@ -128,7 +128,7 @@ async fn test_bidirectional_channel() -> Result<()> {
     team.memberb.sync(team.operator).await?;
     team.membera
         .actions()
-        .afc_create_bidi_channel(team.memberb.pk.ident_pk.id()?, label)
+        .create_afc_bidi_channel(team.memberb.pk.ident_pk.id()?, label)
         .await
         .context("unable to create bidi channel")?;
 
@@ -164,7 +164,7 @@ async fn test_revoke_label() -> Result<()> {
     team.memberb.sync(team.operator).await?;
     team.membera
         .actions()
-        .afc_create_bidi_channel(team.memberb.pk.ident_pk.id()?, label)
+        .create_afc_bidi_channel(team.memberb.pk.ident_pk.id()?, label)
         .await
         .context("unable to create bidi channel")?;
 
@@ -223,7 +223,7 @@ async fn test_unidirectional_channels() -> Result<()> {
 
     team.membera
         .actions()
-        .create_uni_channel(
+        .create_afc_uni_channel(
             team.memberb.pk.ident_pk.id()?,
             team.membera.pk.ident_pk.id()?,
             label1,
@@ -254,7 +254,7 @@ async fn test_unidirectional_channels() -> Result<()> {
 
     team.memberb
         .actions()
-        .create_uni_channel(
+        .create_afc_uni_channel(
             team.membera.pk.ident_pk.id()?,
             team.memberb.pk.ident_pk.id()?,
             label2,

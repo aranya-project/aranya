@@ -871,7 +871,7 @@ AranyaError aranya_revoke_role_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_net_identifier(struct AranyaClient *client,
+AranyaError aranya_afc_assign_net_identifier(struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
                                          const struct AranyaDeviceId *device,
                                          AranyaNetIdentifier net_identifier);
@@ -892,11 +892,11 @@ AranyaError aranya_assign_net_identifier(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_net_identifier_ext(struct AranyaClient *client,
-                                             const struct AranyaTeamId *team,
-                                             const struct AranyaDeviceId *device,
-                                             AranyaNetIdentifier net_identifier,
-                                             struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_assign_net_identifier_ext(struct AranyaClient *client,
+                                                 const struct AranyaTeamId *team,
+                                                 const struct AranyaDeviceId *device,
+                                                 AranyaNetIdentifier net_identifier,
+                                                 struct AranyaExtError *__ext_err);
 
 /**
  * Disassociate a network identifier from a device.
@@ -910,10 +910,10 @@ AranyaError aranya_assign_net_identifier_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_net_identifier(struct AranyaClient *client,
-                                         const struct AranyaTeamId *team,
-                                         const struct AranyaDeviceId *device,
-                                         AranyaNetIdentifier net_identifier);
+AranyaError aranya_afc_remove_net_identifier(struct AranyaClient *client,
+                                             const struct AranyaTeamId *team,
+                                             const struct AranyaDeviceId *device,
+                                             AranyaNetIdentifier net_identifier);
 
 /**
  * Disassociate a network identifier from a device.
@@ -927,11 +927,11 @@ AranyaError aranya_remove_net_identifier(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_net_identifier_ext(struct AranyaClient *client,
-                                             const struct AranyaTeamId *team,
-                                             const struct AranyaDeviceId *device,
-                                             AranyaNetIdentifier net_identifier,
-                                             struct AranyaExtError *__ext_err);
+AranyaError aranya_afc_remove_net_identifier_ext(struct AranyaClient *client,
+                                                 const struct AranyaTeamId *team,
+                                                 const struct AranyaDeviceId *device,
+                                                 AranyaNetIdentifier net_identifier,
+                                                 struct AranyaExtError *__ext_err);
 
 /**
  * Create an AFC label.

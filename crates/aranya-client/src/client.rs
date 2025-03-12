@@ -38,7 +38,7 @@ pub struct Client {
     daemon: DaemonApiClient,
     /// AFC support.
     afc: Afc<ReadState<CS>>,
-    /// Messages from `afc_handle_data`.
+    /// Messages from `handle_afc_data`.
     afc_msgs: VecDeque<AfcMsg>,
     #[cfg(feature = "debug")]
     name: String,
@@ -144,7 +144,7 @@ impl Client {
     /// It is NOT safe to cancel the resulting future. Doing so
     /// might lose data.
     #[instrument(skip_all, fields(self = self.debug(), %team_id, %peer, %label))]
-    pub async fn afc_create_bidi_channel(
+    pub async fn create_afc_bidi_channel(
         &mut self,
         team_id: TeamId,
         peer: NetIdentifier,
@@ -157,7 +157,7 @@ impl Client {
 
         let (afc_id, ctrl) = self
             .daemon
-            .afc_create_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
+            .create_afc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
             .await??;
         debug!(%afc_id, %node_id, %label, "created bidi channel");
 
@@ -173,10 +173,10 @@ impl Client {
     /// Deletes an AFC channel.
     // TODO(eric): Is it an error if the channel does not exist?
     #[instrument(skip_all, fields(self = self.debug(), afc_id = %id))]
-    pub async fn afc_delete_channel(&mut self, id: AfcId) -> Result<()> {
+    pub async fn delete_afc_channel(&mut self, id: AfcId) -> Result<()> {
         let _ctrl = self
             .daemon
-            .afc_delete_channel(context::current(), id)
+            .delete_afc_channel(context::current(), id)
             .await??;
         self.afc.remove_channel(id).await;
         // TODO(eric): Send control message.
@@ -188,16 +188,16 @@ impl Client {
     /// any new data.
     ///
     /// This is shorthand for [`afc_poll`][Self::afc_poll] and
-    /// [`afc_handle_data`][Self::afc_handle_data].
+    /// [`handle_afc_data`][Self::handle_afc_data].
     ///
     /// # Cancellation Safety
     ///
     /// It is NOT safe to cancel the resulting future. Doing so
     /// might lose data.
     #[instrument(skip_all)]
-    pub async fn afc_poll(&mut self) -> Result<()> {
-        let data = self.afc_poll_data().await?;
-        self.afc_handle_data(data).await
+    pub async fn poll_afc(&mut self) -> Result<()> {
+        let data = self.poll_afc_data().await?;
+        self.handle_afc_data(data).await
     }
 
     /// Polls the client to check for new AFC data.
@@ -206,7 +206,7 @@ impl Client {
     ///
     /// It is safe to cancel the resulting future.
     #[instrument(skip_all)]
-    pub async fn afc_poll_data(&mut self) -> Result<PollData> {
+    pub async fn poll_afc_data(&mut self) -> Result<PollData> {
         let data = self.afc.poll().await?;
         Ok(PollData(data))
     }
@@ -218,7 +218,7 @@ impl Client {
     /// It is NOT safe to cancel the resulting future. Doing so
     /// might lose data.
     #[instrument(skip_all, fields(self = self.debug(), ?data))]
-    pub async fn afc_handle_data(&mut self, data: PollData) -> Result<()> {
+    pub async fn handle_afc_data(&mut self, data: PollData) -> Result<()> {
         match data.0 {
             State::Accept(addr) | State::Msg(addr) => match self.afc.read_msg(addr).await? {
                 Msg::Data(data) => {
@@ -264,7 +264,7 @@ impl Client {
     /// a partial message may be written to the channel.
     // TODO(eric): Return a sequence number?
     #[instrument(skip_all, fields(self = self.debug(), afc_id = %id))]
-    pub async fn afc_send_data(&mut self, id: AfcId, data: &[u8]) -> Result<()> {
+    pub async fn send_afc_data(&mut self, id: AfcId, data: &[u8]) -> Result<()> {
         self.afc.send_data(id, data).await.map_err(Into::into)
     }
 
@@ -277,7 +277,7 @@ impl Client {
     // TODO: return [`NetIdentifier`] instead of [`SocketAddr`].
     // TODO: read into buffer instead of returning `Vec<u8>`.
     #[instrument(skip_all, fields(self = self.debug()))]
-    pub fn afc_try_recv_data(&mut self) -> Option<AfcMsg> {
+    pub fn try_recv_afc_data(&mut self) -> Option<AfcMsg> {
         // TODO(eric): This method should block until a message
         // has been received.
         let msg = self.afc_msgs.pop_front()?;
@@ -402,7 +402,7 @@ impl Team<'_> {
     /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
-    pub async fn assign_net_identifier(
+    pub async fn assign_afc_net_identifier(
         &mut self,
         device: DeviceId,
         net_identifier: NetIdentifier,
@@ -410,12 +410,12 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .assign_net_identifier(context::current(), self.id, device, net_identifier)
+            .assign_afc_net_identifier(context::current(), self.id, device, net_identifier)
             .await??)
     }
 
     /// Disassociate a network identifier from a device.
-    pub async fn remove_net_identifier(
+    pub async fn remove_afc_net_identifier(
         &mut self,
         device: DeviceId,
         net_identifier: NetIdentifier,
@@ -423,7 +423,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .remove_net_identifier(context::current(), self.id, device, net_identifier)
+            .remove_afc_net_identifier(context::current(), self.id, device, net_identifier)
             .await??)
     }
 
