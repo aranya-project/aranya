@@ -153,23 +153,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aranya-capi-codegen"
-version = "0.1.0"
-source = "git+https://github.com/aranya-project/aranya-core.git#4f9bcf2ce0bffa87cc485d13112ab02fcbb8ba2d"
-dependencies = [
- "aho-corasick",
- "anyhow",
- "bimap",
- "codespan-reporting",
- "prettyplease",
- "proc-macro2",
- "quote",
- "strum",
- "syn 2.0.99",
- "tracing",
-]
-
-[[package]]
 name = "aranya-capi-core"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
