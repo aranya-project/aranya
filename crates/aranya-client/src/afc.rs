@@ -27,7 +27,7 @@ use std::{
 };
 
 use anyhow::anyhow;
-use aranya_buggy::{bug, Bug, BugExt as _};
+use buggy::{bug, Bug, BugExt as _};
 use aranya_crypto::{Random as _, Rng};
 pub use aranya_daemon_api::AfcId;
 use aranya_daemon_api::{AfcCtrl, DaemonApiClient, NetIdentifier, TeamId, CS};

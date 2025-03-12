@@ -34,7 +34,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Unit Tests
-        run: cargo make unit-tests
+        run: cargo make test
 
 
   c-example-application:
