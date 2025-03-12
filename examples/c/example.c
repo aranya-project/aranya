@@ -119,7 +119,7 @@ typedef struct {
 AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
                         const char *shm_path, const char *afc_addr);
 AranyaError init_team(Team *t);
-AranyaError add_sync_peers(Team *t);
+AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig cfg);
 AranyaError run(Team *t);
 AranyaError cleanup_team(Team *t);
 
@@ -191,9 +191,8 @@ AranyaError cleanup_team(Team *t) {
 // Add sync peers.
 // This creates a complete graph where each Aranya client can sync with all
 // the other Aranya client peers on the network.
-AranyaError add_sync_peers(Team *t) {
+AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig cfg) {
     AranyaError err;
-    AranyaDuration interval = ARANYA_DURATION_MILLISECONDS * 100;
 
     for (int i = 0; i < NUM_CLIENTS; i++) {
         for (int j = 0; j < NUM_CLIENTS; j++) {
@@ -203,7 +202,7 @@ AranyaError add_sync_peers(Team *t) {
             printf("adding sync peer %s to %s\r\n", t->clients_arr[j].name,
                    t->clients_arr[i].name);
             err = aranya_add_sync_peer(&t->clients_arr[i].client, &t->id,
-                                       sync_addrs[j], interval, true);
+                                       sync_addrs[j], cfg);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr, "error adding sync peer %s to %s: %s\r\n",
                         t->clients_arr[j].name, t->clients_arr[i].name,
@@ -229,7 +228,12 @@ AranyaError run(Team *t) {
     EXPECT("error initializing team", err);
 
     // add sync peers.
-    err = add_sync_peers(t);
+    AranyaDuration interval = ARANYA_DURATION_MILLISECONDS * 100;
+    AranyaSyncPeerConfig cfg = {
+        .interval = interval,
+        .sync_when = ARANYA_SYNC_WHEN_NOW,
+    };
+    err = add_sync_peers(t, cfg);
     EXPECT("error adding sync peers", err);
 
     // Team members are added to the team by first calling

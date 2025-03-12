@@ -10,7 +10,7 @@ use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, SyncPeerConfig};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::tempdir;
@@ -183,6 +183,7 @@ async fn main() -> Result<()> {
 
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
+    let sync_config = SyncPeerConfig { interval: sync_interval, sync_now: true };
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
@@ -219,59 +220,59 @@ async fn main() -> Result<()> {
 
     info!("adding sync peers");
     owner_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     membera_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     membera_team
-        .add_sync_peer(memberb_addr.into(), sync_interval, true)
+        .add_sync_peer(memberb_addr.into(), sync_config)
         .await?;
 
     memberb_team
-        .add_sync_peer(owner_addr.into(), sync_interval, true)
+        .add_sync_peer(owner_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(admin_addr.into(), sync_interval, true)
+        .add_sync_peer(admin_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(operator_addr.into(), sync_interval, true)
+        .add_sync_peer(operator_addr.into(), sync_config)
         .await?;
     memberb_team
-        .add_sync_peer(membera_addr.into(), sync_interval, true)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     // add admin to team.
