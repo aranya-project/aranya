@@ -173,7 +173,7 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4522117cae376f1f428a77ff85f603521394964a6f679a8225a7b3ff6b30e9c"
 dependencies = [
- "aranya-capi-codegen 0.1.0 (git+https://github.com/aranya-project/aranya-core.git)",
+ "aranya-capi-codegen",
  "proc-macro2",
  "quote",
  "syn 2.0.99",
