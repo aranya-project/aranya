@@ -16,8 +16,9 @@ pub mod client;
 
 mod error;
 
+#[doc(inline)]
 pub use crate::{
-    afc::AfcError,
-    client::{AfcId, AfcMsg, Client, Label, PollData, Seq, Team},
+    afc::{AfcError, AfcId, Label, Message, PollData},
+    client::{Client, Team},
     error::{Error, Result},
 };

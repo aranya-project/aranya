@@ -85,6 +85,7 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Bug(_) => Self::Bug,
             },
             imp::Error::Runtime(_) => Self::Runtime,
+            imp::Error::FastChannel(_) => Self::Afc,
         }
     }
 }
@@ -118,7 +119,7 @@ pub fn error_to_str(err: u32) -> *const c_char {
 
 /// Extended error information.
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 80, align = 8)]
+#[aranya_capi_core::opaque(size = 88, align = 8)]
 pub type ExtError = Safe<imp::ExtError>;
 
 /// Copies the extended error's message into `msg`.
@@ -778,9 +779,11 @@ pub unsafe fn create_bidi_channel(
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
-    let id = client
-        .rt
-        .block_on(client.inner.create_bidi_channel(team.0, peer, label.into()))?;
+    let id = client.rt.block_on(client.inner.afc.create_bidi_channel(
+        team.0,
+        peer,
+        label.into(),
+    ))?;
     Ok(ChannelId(id))
 }
 
@@ -792,7 +795,9 @@ pub unsafe fn create_bidi_channel(
 /// @relates AranyaClient.
 pub fn delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(client.inner.delete_channel(chan.0))?;
+    client
+        .rt
+        .block_on(client.inner.afc.delete_channel(chan.0))?;
     Ok(())
 }
 
@@ -807,8 +812,8 @@ pub fn delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::E
 pub fn poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client.rt.block_on(async {
-        let data = tokio::time::timeout(timeout.into(), client.inner.poll_data()).await??;
-        client.inner.handle_data(data).await?;
+        let data = tokio::time::timeout(timeout.into(), client.inner.afc.poll_data()).await??;
+        client.inner.afc.handle_data(data).await?;
         Ok(())
     })
 }
@@ -823,7 +828,9 @@ pub fn poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Erro
 /// @relates AranyaClient.
 pub fn send_data(client: &mut Client, chan: ChannelId, data: &[u8]) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(client.inner.send_data(chan.0, data))?;
+    client
+        .rt
+        .block_on(client.inner.afc.send_data(chan.0, data))?;
     Ok(())
 }
 
@@ -901,7 +908,7 @@ pub unsafe fn recv_data(
     let client = client.deref_mut();
 
     if client.msg.is_none() {
-        client.msg = client.inner.try_recv_data();
+        client.msg = client.inner.afc.try_recv_data();
     }
     let Some(msg) = &mut client.msg else {
         return Ok(false);
