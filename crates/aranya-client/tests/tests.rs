@@ -325,7 +325,7 @@ async fn integration_test() -> Result<()> {
     let mut operator_team = team.operator.client.team(team_id);
     let mut member_team = team.membera.client.team(team_id);
 
-    owner_team.sync_now(admin_addr.into()).await?;
+    owner_team.sync_now(admin_addr.into(), None).await?;
 
     owner_team
         .add_sync_peer(admin_addr.into(), sync_config)

@@ -504,10 +504,9 @@ pub unsafe fn add_sync_peer(
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-    client.rt.block_on(client.inner.team(team.0).add_sync_peer(
-        addr,
-        config.into(),
-    ))?;
+    client
+        .rt
+        .block_on(client.inner.team(team.0).add_sync_peer(addr, config.into()))?;
     Ok(())
 }
 
@@ -522,13 +521,21 @@ pub unsafe fn add_sync_peer(
 /// @param addr the peer's Aranya network address [`Addr`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn sync_now(client: &mut Client, team: &TeamId, addr: Addr) -> Result<(), imp::Error> {
+pub unsafe fn sync_now(
+    client: &mut Client,
+    team: &TeamId,
+    addr: Addr,
+    config: SyncPeerConfig,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-    client
-        .rt
-        .block_on(client.inner.team(team.0).sync_now(addr))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .sync_now(addr, Some(config.into())),
+    )?;
     Ok(())
 }
 

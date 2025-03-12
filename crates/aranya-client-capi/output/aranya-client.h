@@ -707,7 +707,8 @@ AranyaError aranya_add_sync_peer_ext(struct AranyaClient *client,
  */
 AranyaError aranya_sync_now(struct AranyaClient *client,
                             const struct AranyaTeamId *team,
-                            AranyaAddr addr);
+                            AranyaAddr addr,
+                            struct AranyaSyncPeerConfig config);
 
 /**
  * Sync with peer immediately.
@@ -725,6 +726,7 @@ AranyaError aranya_sync_now(struct AranyaClient *client,
 AranyaError aranya_sync_now_ext(struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaAddr addr,
+                                struct AranyaSyncPeerConfig config,
                                 struct AranyaExtError *__ext_err);
 
 /**

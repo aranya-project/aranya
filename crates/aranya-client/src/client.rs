@@ -334,11 +334,7 @@ pub struct Team<'a> {
 
 impl Team<'_> {
     /// Adds a peer for automatic periodic Aranya state syncing.
-    pub async fn add_sync_peer(
-        &mut self,
-        addr: Addr,
-        config: SyncPeerConfig,
-    ) -> Result<()> {
+    pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         Ok(self
             .client
             .daemon
@@ -347,11 +343,11 @@ impl Team<'_> {
     }
 
     /// Sync with peer immediately.
-    pub async fn sync_now(&mut self, addr: Addr) -> Result<()> {
+    pub async fn sync_now(&mut self, addr: Addr, maybe_cfg: Option<SyncPeerConfig>) -> Result<()> {
         Ok(self
             .client
             .daemon
-            .sync_now(context::current(), addr, self.id)
+            .sync_now(context::current(), addr, self.id, maybe_cfg)
             .await??)
     }
 

@@ -303,21 +303,29 @@ impl DaemonApi for DaemonApiHandler {
 
     #[instrument(skip(self))]
     async fn add_sync_peer(
-        self,
+        mut self,
         _: context::Context,
         peer: Addr,
         team: TeamId,
-        SyncPeerConfig { interval, sync_now }: SyncPeerConfig,
+        cfg: SyncPeerConfig,
     ) -> ApiResult<()> {
         self.peers
-            .add_peer(peer, interval, team.into_id().into(), sync_now)
+            .add_peer(peer, team.into_id().into(), cfg)
             .await?;
         Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn sync_now(self, _: context::Context, peer: Addr, team: TeamId) -> ApiResult<()> {
-        self.peers.sync_now(peer, team.into_id().into()).await?;
+    async fn sync_now(
+        self,
+        _: context::Context,
+        peer: Addr,
+        team: TeamId,
+        cfg: Option<SyncPeerConfig>,
+    ) -> ApiResult<()> {
+        self.peers
+            .sync_now(peer, team.into_id().into(), cfg)
+            .await?;
         Ok(())
     }
 

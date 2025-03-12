@@ -10,6 +10,7 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_buggy::BugExt;
+use aranya_daemon_api::SyncPeerConfig;
 use aranya_runtime::storage::GraphId;
 use aranya_util::Addr;
 use futures_util::StreamExt;
@@ -45,33 +46,40 @@ struct SyncPeer {
 pub struct SyncPeers {
     /// Send messages to add/remove peers.
     send: mpsc::Sender<Msg>,
+    /// Configuration values for syncing
+    cfgs: HashMap<Addr, SyncPeerConfig>,
 }
 
 impl SyncPeers {
     /// Create a new peer manager.
     fn new(send: mpsc::Sender<Msg>) -> Self {
-        Self { send }
+        Self {
+            send,
+            cfgs: HashMap::new(),
+        }
     }
 
     /// Add peer to [`Syncer`].
     pub async fn add_peer(
-        &self,
+        &mut self,
         addr: Addr,
-        interval: Duration,
         graph_id: GraphId,
-        sync_now: bool,
+        cfg: SyncPeerConfig,
     ) -> Result<()> {
         let peer = Msg::AddPeer {
             peer: SyncPeer { addr, graph_id },
-            interval,
+            interval: cfg.interval,
         };
         if let Err(e) = self.send.send(peer).await.context("unable to add peer") {
             error!(?e, "error adding peer to syncer");
             return Err(e);
         }
-        if sync_now {
-            self.sync_now(addr, graph_id).await?
+        if cfg.sync_now {
+            self.sync_now(addr, graph_id, Some(cfg)).await?
         }
+
+        self.cfgs.insert(addr, cfg);
+
         Ok(())
     }
 
@@ -92,7 +100,21 @@ impl SyncPeers {
     }
 
     /// Sync with a peer immediately.
-    pub async fn sync_now(&self, addr: Addr, graph_id: GraphId) -> Result<()> {
+    pub async fn sync_now(
+        &self,
+        addr: Addr,
+        graph_id: GraphId,
+        maybe_cfg: Option<SyncPeerConfig>,
+    ) -> Result<()> {
+        let _cfg = match maybe_cfg {
+            Some(c) => c,
+            None => self
+                .cfgs
+                .get(&addr)
+                .cloned()
+                .unwrap_or_else(|| Default::default()),
+        };
+
         let peer = Msg::SyncNow {
             peer: SyncPeer { addr, graph_id },
         };
