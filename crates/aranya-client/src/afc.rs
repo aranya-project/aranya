@@ -27,7 +27,6 @@ use std::{
 };
 
 use anyhow::anyhow;
-use buggy::{bug, Bug, BugExt as _};
 use aranya_crypto::{Random as _, Rng};
 pub use aranya_daemon_api::AfcId;
 use aranya_daemon_api::{AfcCtrl, DaemonApiClient, NetIdentifier, TeamId, CS};
@@ -37,6 +36,7 @@ use aranya_fast_channels::{
     AfcState, ChannelId, Client, Header, Message as InnerMsg, NodeId, Payload, Seq, Version,
 };
 use aranya_util::ShmPathBuf;
+use buggy::{bug, Bug, BugExt as _};
 use indexmap::{map, IndexMap};
 use serde::{Deserialize, Serialize};
 use tokio::{
