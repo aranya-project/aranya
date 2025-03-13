@@ -115,7 +115,7 @@ impl SyncPeers {
                 .cfgs
                 .get(&(addr, graph_id))
                 .cloned()
-                .unwrap_or_else(|| Default::default()),
+                .unwrap_or_default(),
         };
 
         let peer = Msg::SyncNow {
