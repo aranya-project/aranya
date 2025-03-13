@@ -12,7 +12,7 @@ The root cause of cyber insecurity is complexity; and yet when we attempt to pro
 
 Software developers must not expect customers to mitigate defects using external security tools and an endless cycle of patching. Software must become secure by design.
 
-Aranya is our contribution to this effort. It is a batteries-included tool which allows developers to produce software with built-in micro-segmentation. This complete solution covers access management with user onboarding, authentication and authorization, freeing the developer to focus on the problem they wish to solve.
+Aranya is our contribution to this effort. It is a batteries-included tool which allows developers to produce software with built-in micro-segmentation. This complete solution covers access management with device onboarding, authentication and authorization, freeing the developer to focus on the problem they wish to solve.
 
 For users, software built on Aranya is less complex to operate securely, and is secure regardless of the network it is run on.
 
@@ -226,14 +226,14 @@ configuring and running the daemon in the `aranya-daemon`
 We have provided runnable example applications in both
 [Rust](templates/aranya-example/) and [C](examples/c/). These examples will
 use the default policy that's contained in this repo to configure and run the
-daemon automatically. The examples follow five users who are referred to by
-their user role, `Owner`, `Admin`, `Operator`, `Member A` and `Member B`.
+daemon automatically. The examples follow five devices who are referred to by
+their device role, `Owner`, `Admin`, `Operator`, `Member A` and `Member B`.
 
 The examples go through the following steps:
 
 Step 1: Build or download the prebuilt executable from the latest Aranya
 release. After providing a unique configuration file (see
-[example.json](crates/aranya-daemon/example.json)) for each user, run the
+[example.json](crates/aranya-daemon/example.json)) for each device, run the
 daemons.
 
 Step 2. The `Owner` initializes the team

@@ -28,8 +28,7 @@ The daemon's responsibilities include:
 - Generates and maintains cryptographic keys for encrypting and decrypting data
   for Aranya and Fast Channels
 
-Note: The Aranya Daemon supports a single user. As such, device and user may be
-used interchangeably throughout the code base.
+Note: The Aranya Daemon supports a single device.
 
 ## Configuration
 
