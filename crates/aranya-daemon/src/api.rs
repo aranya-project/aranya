@@ -331,7 +331,7 @@ impl DaemonApi for DaemonApiHandler {
 
     #[instrument(skip(self))]
     async fn remove_sync_peer(
-        self,
+        mut self,
         _: context::Context,
         peer: Addr,
         team: TeamId,

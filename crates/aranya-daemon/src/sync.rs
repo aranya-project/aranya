@@ -47,7 +47,7 @@ pub struct SyncPeers {
     /// Send messages to add/remove peers.
     send: mpsc::Sender<Msg>,
     /// Configuration values for syncing
-    cfgs: HashMap<Addr, SyncPeerConfig>,
+    cfgs: HashMap<(Addr, GraphId), SyncPeerConfig>,
 }
 
 impl SyncPeers {
@@ -78,13 +78,13 @@ impl SyncPeers {
             self.sync_now(addr, graph_id, Some(cfg)).await?
         }
 
-        self.cfgs.insert(addr, cfg);
+        self.cfgs.insert((addr, graph_id), cfg);
 
         Ok(())
     }
 
     /// Remove peer from [`Syncer`].
-    pub async fn remove_peer(&self, addr: Addr, graph_id: GraphId) -> Result<()> {
+    pub async fn remove_peer(&mut self, addr: Addr, graph_id: GraphId) -> Result<()> {
         if let Err(e) = self
             .send
             .send(Msg::RemovePeer {
@@ -96,6 +96,9 @@ impl SyncPeers {
             error!(?e, "error removing peer from syncer");
             return Err(e);
         }
+
+        self.cfgs.remove(&(addr, graph_id));
+
         Ok(())
     }
 
@@ -110,7 +113,7 @@ impl SyncPeers {
             Some(c) => c,
             None => self
                 .cfgs
-                .get(&addr)
+                .get(&(addr, graph_id))
                 .cloned()
                 .unwrap_or_else(|| Default::default()),
         };
