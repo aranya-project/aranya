@@ -11,12 +11,14 @@
 //! [README]: https://github.com/aranya-project/aranya/tree/main/crates/aranya-client/README.md
 //! [walkthrough]: https://github.com/aranya-project/aranya/tree/main/docs/walkthrough.md
 
-mod afc;
-mod client;
+pub mod afc;
+pub mod client;
+
 mod error;
 
+#[doc(inline)]
 pub use crate::{
-    afc::AfcError,
-    client::{AfcId, AfcMsg, Client, Label, PollData, Seq, Team},
+    afc::{AfcError, AfcId, Label, Message, PollData},
+    client::{Client, Team},
     error::{Error, Result},
 };
