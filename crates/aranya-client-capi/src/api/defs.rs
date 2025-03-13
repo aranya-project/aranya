@@ -519,7 +519,7 @@ pub unsafe fn add_sync_peer(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param addr the peer's Aranya network address [`Addr`].
-///
+/// @param config configuration values for syncing with a peer.
 /// @relates AranyaClient.
 pub unsafe fn sync_now(
     client: &mut Client,
