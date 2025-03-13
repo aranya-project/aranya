@@ -12,7 +12,6 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler};
-use aranya_buggy::BugExt;
 use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, Rng, UserId};
 use aranya_daemon_api::{
     AfcCtrl, AfcId, DaemonApi, DeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
@@ -22,6 +21,7 @@ use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed, La
 use aranya_keygen::PublicKeys;
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
+use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,

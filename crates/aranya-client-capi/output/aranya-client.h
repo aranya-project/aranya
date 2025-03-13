@@ -179,7 +179,7 @@ typedef uint8_t AranyaRole;
 #endif // __cplusplus
 
 /**
- * An type that represents when the first sync with a peer should occur.
+ * A type that represents when the first sync with a peer should occur.
  */
 enum AranyaSyncWhen
 #ifdef __cplusplus
