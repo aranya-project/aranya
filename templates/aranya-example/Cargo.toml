@@ -30,10 +30,10 @@ wildcard_imports = "warn"
 
 [dependencies]
 # To allow `cargo-generate` to work, explicitly define dependency versions rather than importing the repo's workspace `Cargo.toml`.
-aranya-client = { version = "0.4.0" }
-aranya-daemon = { version = "0.4.0" }
-aranya-daemon-api = { version = "0.4.0" }
-aranya-util = { version = "0.4.0" }
+aranya-client = { version = "0.5.0" }
+aranya-daemon = { version = "0.5.0" }
+aranya-daemon-api = { version = "0.5.0" }
+aranya-util = { version = "0.5.0" }
 
 anyhow = { version = "1.0.94" }
 backon = { version = "1.3.0" }
