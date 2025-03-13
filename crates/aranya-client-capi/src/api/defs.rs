@@ -349,7 +349,7 @@ pub struct AfcConfig {
     pub addr: *const c_char,
 }
 
-/// An type that represents when the first sync with a peer should occur.
+/// A type that represents when the first sync with a peer should occur.
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum SyncWhen {

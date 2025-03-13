@@ -132,7 +132,7 @@ impl From<Id> for AfcId {
 // serialized command which must be passed over AFC.
 pub type AfcCtrl = Vec<Box<[u8]>>;
 
-/// TODO(steve)
+/// Configuration values for syncing with a peer
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct SyncPeerConfig {
     pub interval: Duration,
