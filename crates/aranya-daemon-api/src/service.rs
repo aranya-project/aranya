@@ -170,14 +170,27 @@ pub trait DaemonApi {
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
-    /// Assign a network identifier to a device.
+    /// Assign an AFC network identifier to a device.
     async fn assign_afc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
     ) -> Result<()>;
-    /// Remove a network identifier from a device.
+    /// Remove an AFC network identifier from a device.
     async fn remove_afc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
+
+    /// Assign an AQC network identifier to a device.
+    async fn assign_aqc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
+    /// Remove an AQC network identifier from a device.
+    async fn remove_aqc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
@@ -207,4 +220,14 @@ pub trait DaemonApi {
         node_id: NodeId,
         ctrl: AfcCtrl,
     ) -> Result<(AfcId, NetIdentifier, Label)>;
+    /// Query device role.
+    async fn query_device_role(team: TeamId, device: DeviceId) -> Result<Role>;
+    /// Query device keybundle.
+    async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
+    /// Query AFC network ID.
+    async fn query_afc_net_identifier(team: TeamId, device: DeviceId) -> Result<NetIdentifier>;
+    /// Query AQC network ID.
+    async fn query_aqc_net_identifier(team: TeamId, device: DeviceId) -> Result<NetIdentifier>;
+    /// Query label exists.
+    async fn query_label_exists(team: TeamId, label: Label) -> Result<bool>;
 }

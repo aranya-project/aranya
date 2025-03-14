@@ -414,7 +414,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// Disassociate a network identifier from a device.
+    /// Disassociate an AFC network identifier from a device.
     pub async fn remove_afc_net_identifier(
         &mut self,
         device: DeviceId,
@@ -424,6 +424,36 @@ impl Team<'_> {
             .client
             .daemon
             .remove_afc_net_identifier(context::current(), self.id, device, net_identifier)
+            .await??)
+    }
+
+    /// Associate a network identifier to a device for use with AQC.
+    ///
+    /// If the address already exists for this device, it is replaced with the new address. Capable
+    /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
+    /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+    pub async fn assign_aqc_net_identifier(
+        &mut self,
+        device: DeviceId,
+        net_identifier: NetIdentifier,
+    ) -> Result<()> {
+        Ok(self
+            .client
+            .daemon
+            .assign_aqc_net_identifier(context::current(), self.id, device, net_identifier)
+            .await??)
+    }
+
+    /// Disassociate an AQC network identifier from a device.
+    pub async fn remove_aqc_net_identifier(
+        &mut self,
+        device: DeviceId,
+        net_identifier: NetIdentifier,
+    ) -> Result<()> {
+        Ok(self
+            .client
+            .daemon
+            .remove_aqc_net_identifier(context::current(), self.id, device, net_identifier)
             .await??)
     }
 
@@ -463,6 +493,50 @@ impl Team<'_> {
             .client
             .daemon
             .revoke_label(context::current(), self.id, device, label)
+            .await??)
+    }
+    /// Query device role.
+    pub async fn query_device_role(&mut self, device: DeviceId) -> Result<Role> {
+        Ok(self
+            .client
+            .daemon
+            .query_device_role(context::current(), self.id, device)
+            .await??)
+    }
+
+    /// Query device keybundle.
+    pub async fn query_device_keybundle(&mut self, device: DeviceId) -> Result<KeyBundle> {
+        Ok(self
+            .client
+            .daemon
+            .query_device_keybundle(context::current(), self.id, device)
+            .await??)
+    }
+
+    /// Query AFC network ID.
+    pub async fn query_afc_net_identifier(&mut self, device: DeviceId) -> Result<NetIdentifier> {
+        Ok(self
+            .client
+            .daemon
+            .query_afc_net_identifier(context::current(), self.id, device)
+            .await??)
+    }
+
+    /// Query AQC network ID.
+    pub async fn query_aqc_net_identifier(&mut self, device: DeviceId) -> Result<NetIdentifier> {
+        Ok(self
+            .client
+            .daemon
+            .query_aqc_net_identifier(context::current(), self.id, device)
+            .await??)
+    }
+
+    /// Query label exists.
+    pub async fn query_label_exists(&mut self, label: Label) -> Result<bool> {
+        Ok(self
+            .client
+            .daemon
+            .query_label_exists(context::current(), self.id, label)
             .await??)
     }
 }

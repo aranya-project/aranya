@@ -504,30 +504,59 @@ where
         .in_current_span()
     }
 
-    /// Sets a network name.
+    /// Sets an AFC network name.
     #[instrument(skip(self), fields(user_id = %user_id, net_identifier = %net_identifier))]
-    fn set_network_name(
+    fn set_afc_network_name(
         &self,
         user_id: UserId,
         net_identifier: String,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%user_id, %net_identifier, "setting network name");
+        info!(%user_id, %net_identifier, "setting AFC network name");
         self.with_actor(move |actor| {
-            actor.set_network_name(user_id.into(), net_identifier)?;
+            actor.set_afc_network_name(user_id.into(), net_identifier)?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Sets a network name.
+    /// Sets an AFC network name.
     #[instrument(skip(self), fields(user_id = %user_id))]
-    fn unset_network_name(
+    fn unset_afc_network_name(
         &self,
         user_id: UserId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%user_id, "unsetting network name");
+        info!(%user_id, "unsetting AFC network name");
         self.with_actor(move |actor| {
-            actor.unset_network_name(user_id.into())?;
+            actor.unset_afc_network_name(user_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Sets an AQC network name.
+    #[instrument(skip(self), fields(user_id = %user_id, net_identifier = %net_identifier))]
+    fn set_aqc_network_name(
+        &self,
+        user_id: UserId,
+        net_identifier: String,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        info!(%user_id, %net_identifier, "setting AQC network name");
+        self.with_actor(move |actor| {
+            actor.set_aqc_network_name(user_id.into(), net_identifier)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Sets an AQC network name.
+    #[instrument(skip(self), fields(user_id = %user_id))]
+    fn unset_aqc_network_name(
+        &self,
+        user_id: UserId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        info!(%user_id, "unsetting AQC network name");
+        self.with_actor(move |actor| {
+            actor.unset_aqc_network_name(user_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -600,6 +629,76 @@ where
                 Value::from(open_id),
                 Value::from(i64::from(label.to_u32())),
             ]),
+        })
+        .in_current_span()
+    }
+
+    /// Query device role off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_device_role_off_graph(
+        &self,
+        device_id: UserId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_device_role",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query device keybundle off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_device_keybundle_off_graph(
+        &self,
+        device_id: UserId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_device_keybundle",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query AFC net identifier off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_afc_net_identifier_off_graph(
+        &self,
+        device_id: UserId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_afc_net_identifier",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query AQC net identifier off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_aqc_net_identifier_off_graph(
+        &self,
+        device_id: UserId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_aqc_net_identifier",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query label exists off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_label_exists_off_graph(
+        &self,
+        label: Label,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_label_exists",
+            args: Cow::Owned(vec![Value::from(i64::from(label.to_u32()))]),
         })
         .in_current_span()
     }
