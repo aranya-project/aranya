@@ -132,6 +132,22 @@ impl From<Id> for AfcId {
 // serialized command which must be passed over AFC.
 pub type AfcCtrl = Vec<Box<[u8]>>;
 
+/// Configuration values for syncing with a peer
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct SyncPeerConfig {
+    pub interval: Duration,
+    pub sync_now: bool,
+}
+
+impl Default for SyncPeerConfig {
+    fn default() -> Self {
+        Self {
+            interval: Duration::from_millis(100),
+            sync_now: false,
+        }
+    }
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
     /// Gets local address the Aranya sync server is bound to.
@@ -144,7 +160,10 @@ pub trait DaemonApi {
     async fn get_device_id() -> Result<DeviceId>;
 
     /// Adds the peer for automatic periodic syncing.
-    async fn add_sync_peer(addr: Addr, team: TeamId, interval: Duration) -> Result<()>;
+    async fn add_sync_peer(addr: Addr, team: TeamId, config: SyncPeerConfig) -> Result<()>;
+
+    /// Sync with peer immediately.
+    async fn sync_now(addr: Addr, team: TeamId, maybe_cfg: Option<SyncPeerConfig>) -> Result<()>;
 
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
