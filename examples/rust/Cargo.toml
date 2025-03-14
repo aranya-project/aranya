@@ -1,5 +1,5 @@
 [package]
-name = "{{project-name}}"
+name = "aranya-example"
 description = "Example Rust program using the Aranya client library"
 version = "0.1.0"
 authors = ["SpiderOak, Inc."]
@@ -41,8 +41,3 @@ tempfile = { version = "3.14.0" }
 tokio = { version = "1.42.0", features = ["io-util", "macros", "net", "sync"] }
 tracing = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-
-[[bin]]
-name = "aranya-example"
-path = "src/main.rs"
-test = false
