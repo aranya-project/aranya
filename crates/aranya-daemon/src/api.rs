@@ -16,7 +16,7 @@ use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler
 use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, Rng, UserId};
 use aranya_daemon_api::{
     AfcCtrl, AfcId, DaemonApi, DeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
-    Result as ApiResult, Role as ApiRole, TeamId, CS,
+    Result as ApiResult, Role as ApiRole, TeamId, TeamOperationConfig, CS,
 };
 use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed, Label, NodeId};
 use aranya_keygen::PublicKeys;
@@ -325,7 +325,12 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn add_team(self, _: context::Context, team: TeamId) -> ApiResult<()> {
+    async fn add_team(
+        self,
+        _: context::Context,
+        team: TeamId,
+        cfg: TeamOperationConfig,
+    ) -> ApiResult<()> {
         todo!()
     }
 
@@ -335,7 +340,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn create_team(self, _: context::Context) -> ApiResult<TeamId> {
+    async fn create_team(self, _: context::Context, cfg: TeamOperationConfig) -> ApiResult<TeamId> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
