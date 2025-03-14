@@ -285,8 +285,8 @@ impl<S: AfcState> Afc<S> {
     }
 
     /// Sends a control message to the peer at `net_id`.
-    // NB: Eliding `net_id` and `team_id` since
-    // `create_bidi_channel` (in client.rs) also adds those.
+    // NB: Eliding `net_id` and `team_id` since `create_afc_bidi_channel` (in
+    // client.rs) also adds those.
     #[instrument(skip_all, fields(
         %afc_id,
         %chan_id,
