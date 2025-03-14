@@ -208,6 +208,17 @@ impl From<Role> for aranya_daemon_api::Role {
     }
 }
 
+impl From<aranya_daemon_api::Role> for Role {
+    fn from(value: aranya_daemon_api::Role) -> Self {
+        match value {
+            aranya_daemon_api::Role::Owner => Self::Owner,
+            aranya_daemon_api::Role::Admin => Self::Admin,
+            aranya_daemon_api::Role::Operator => Self::Operator,
+            aranya_daemon_api::Role::Member => Self::Member,
+        }
+    }
+}
+
 /// A network socket address for an Aranya client.
 ///
 /// E.g. "localhost:8080", "127.0.0.1:8080"
@@ -928,3 +939,26 @@ pub unsafe fn afc_recv_data(
 
     Ok(true)
 }
+
+/*
+/// Query Aranya for device role.
+///
+/// @param client the Aranya Client.
+/// @param the device ID.
+/// @result the device role.
+///
+/// @relates AranyaClient.
+// TODO: waiting on capi generator bugfix for returning role
+pub unsafe fn query_device_role(
+    client: &mut Client,
+    team: &TeamId,
+    device_id: &DeviceId,
+) -> Result<Role, imp::Error> {
+    let client = client.deref_mut();
+
+    let role = client
+        .rt
+        .block_on(client.inner.team(team.0).query_device_role(device_id.0))?;
+    Ok(role.into())
+}
+*/
