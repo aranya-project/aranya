@@ -154,7 +154,7 @@ pub trait DaemonApi {
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
 
     /// add a team to the local device store that was created by someone else. Not an aranya action/command.
-    async fn add_team(team: TeamId, _cfg: TeamOperationConfig) -> Result<()>;
+    async fn add_team(team: TeamId, cfg: TeamOperationConfig) -> Result<()>;
 
     /// remove a team from the local device store.
     async fn remove_team(team: TeamId) -> Result<()>;
