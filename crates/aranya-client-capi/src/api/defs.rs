@@ -623,7 +623,7 @@ pub fn revoke_role(
 /// @param net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn assign_net_identifier(
+pub unsafe fn afc_assign_net_identifier(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -636,7 +636,7 @@ pub unsafe fn assign_net_identifier(
         client
             .inner
             .team(team.0)
-            .assign_net_identifier(device.0, net_identifier),
+            .assign_afc_net_identifier(device.0, net_identifier),
     )?;
     Ok(())
 }
@@ -651,7 +651,7 @@ pub unsafe fn assign_net_identifier(
 /// @param net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn remove_net_identifier(
+pub unsafe fn afc_remove_net_identifier(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -664,7 +664,7 @@ pub unsafe fn remove_net_identifier(
         client
             .inner
             .team(team.0)
-            .remove_net_identifier(device.0, net_identifier),
+            .remove_afc_net_identifier(device.0, net_identifier),
     )?;
     Ok(())
 }
@@ -769,7 +769,7 @@ pub fn revoke_label(
 /// @param __output the channel's ID [`ChannelId`]
 ///
 /// @relates AranyaClient.
-pub unsafe fn create_bidi_channel(
+pub unsafe fn afc_create_bidi_channel(
     client: &mut Client,
     team: &TeamId,
     peer: NetIdentifier,
@@ -778,9 +778,11 @@ pub unsafe fn create_bidi_channel(
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
-    let id = client
-        .rt
-        .block_on(client.inner.create_bidi_channel(team.0, peer, label.into()))?;
+    let id = client.rt.block_on(client.inner.create_afc_bidi_channel(
+        team.0,
+        peer,
+        label.into(),
+    ))?;
     Ok(ChannelId(id))
 }
 
@@ -790,9 +792,11 @@ pub unsafe fn create_bidi_channel(
 /// @param chan the AFC channel ID [`ChannelId`] of the channel to delete.
 ///
 /// @relates AranyaClient.
-pub fn delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::Error> {
+pub fn afc_delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(client.inner.delete_channel(chan.0))?;
+    client
+        .rt
+        .block_on(client.inner.delete_afc_channel(chan.0))?;
     Ok(())
 }
 
@@ -804,11 +808,11 @@ pub fn delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::E
 /// @param timeout how long to wait before timing out the poll operation [`Duration`].
 ///
 /// @relates AranyaClient.
-pub fn poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Error> {
+pub fn afc_poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client.rt.block_on(async {
-        let data = tokio::time::timeout(timeout.into(), client.inner.poll_data()).await??;
-        client.inner.handle_data(data).await?;
+        let data = tokio::time::timeout(timeout.into(), client.inner.poll_afc_data()).await??;
+        client.inner.handle_afc_data(data).await?;
         Ok(())
     })
 }
@@ -821,9 +825,11 @@ pub fn poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Erro
 /// @param data_len length of data to send.
 ///
 /// @relates AranyaClient.
-pub fn send_data(client: &mut Client, chan: ChannelId, data: &[u8]) -> Result<(), imp::Error> {
+pub fn afc_send_data(client: &mut Client, chan: ChannelId, data: &[u8]) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(client.inner.send_data(chan.0, data))?;
+    client
+        .rt
+        .block_on(client.inner.send_afc_data(chan.0, data))?;
     Ok(())
 }
 
@@ -893,7 +899,7 @@ impl From<std::net::SocketAddr> for SocketAddr {
 /// @result A boolean indicating whether any data was available.
 ///
 /// @relates AranyaClient.
-pub unsafe fn recv_data(
+pub unsafe fn afc_recv_data(
     client: &mut Client,
     buf: Writer<u8>,
     info: &mut MaybeUninit<AfcMsgInfo>,
@@ -901,7 +907,7 @@ pub unsafe fn recv_data(
     let client = client.deref_mut();
 
     if client.msg.is_none() {
-        client.msg = client.inner.try_recv_data();
+        client.msg = client.inner.try_recv_afc_data();
     }
     let Some(msg) = &mut client.msg else {
         return Ok(false);

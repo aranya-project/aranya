@@ -51,10 +51,10 @@ pub enum Effect {
     LabelRevoked(LabelRevoked),
     NetworkNameSet(NetworkNameSet),
     NetworkNameUnset(NetworkNameUnset),
-    BidiChannelCreated(BidiChannelCreated),
-    BidiChannelReceived(BidiChannelReceived),
-    UniChannelCreated(UniChannelCreated),
-    UniChannelReceived(UniChannelReceived),
+    AfcBidiChannelCreated(AfcBidiChannelCreated),
+    AfcBidiChannelReceived(AfcBidiChannelReceived),
+    AfcUniChannelCreated(AfcUniChannelCreated),
+    AfcUniChannelReceived(AfcUniChannelReceived),
 }
 /// TeamCreated policy effect.
 #[effect]
@@ -141,9 +141,9 @@ pub struct NetworkNameSet {
 pub struct NetworkNameUnset {
     pub user_id: Id,
 }
-/// BidiChannelCreated policy effect.
+/// AfcBidiChannelCreated policy effect.
 #[effect]
-pub struct BidiChannelCreated {
+pub struct AfcBidiChannelCreated {
     pub parent_cmd_id: Id,
     pub author_id: Id,
     pub author_enc_key_id: Id,
@@ -152,9 +152,9 @@ pub struct BidiChannelCreated {
     pub label: i64,
     pub channel_key_id: Id,
 }
-/// BidiChannelReceived policy effect.
+/// AfcBidiChannelReceived policy effect.
 #[effect]
-pub struct BidiChannelReceived {
+pub struct AfcBidiChannelReceived {
     pub parent_cmd_id: Id,
     pub author_id: Id,
     pub author_enc_pk: Vec<u8>,
@@ -163,9 +163,9 @@ pub struct BidiChannelReceived {
     pub label: i64,
     pub encap: Vec<u8>,
 }
-/// UniChannelCreated policy effect.
+/// AfcUniChannelCreated policy effect.
 #[effect]
-pub struct UniChannelCreated {
+pub struct AfcUniChannelCreated {
     pub parent_cmd_id: Id,
     pub author_id: Id,
     pub writer_id: Id,
@@ -175,9 +175,9 @@ pub struct UniChannelCreated {
     pub label: i64,
     pub channel_key_id: Id,
 }
-/// UniChannelReceived policy effect.
+/// AfcUniChannelReceived policy effect.
 #[effect]
-pub struct UniChannelReceived {
+pub struct AfcUniChannelReceived {
     pub parent_cmd_id: Id,
     pub author_id: Id,
     pub writer_id: Id,
@@ -215,12 +215,12 @@ pub trait ActorExt {
         net_identifier: String,
     ) -> Result<(), ClientError>;
     fn unset_network_name(&mut self, user_id: Id) -> Result<(), ClientError>;
-    fn create_bidi_channel(
+    fn create_afc_bidi_channel(
         &mut self,
         peer_id: Id,
         label: i64,
     ) -> Result<(), ClientError>;
-    fn create_uni_channel(
+    fn create_afc_uni_channel(
         &mut self,
         writer_id: Id,
         reader_id: Id,
