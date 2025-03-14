@@ -1,0 +1,4 @@
+[template]
+ignore = [
+  "run.bash"
+]
