@@ -43,12 +43,13 @@ $ cd aranya/example/rust
 # Build the binary
 $ cargo build --release
 
-# Run the binary [^1]:
+# Run the binary[^1]:
 $ target/release/aranya-example
 ```
 
 You can optionally set the [tracing log level](https://docs.rs/tracing/latest/tracing/struct.Level.html#impl-Level) by adding a prefix to the command:
 ```bash
+# Run the binary[^1] with extra logging:
 $ ARANYA_EXAMPLE=info target/release/aranya-example
 ```
 
@@ -63,18 +64,16 @@ Install [cargo-generate](https://crates.io/crates/cargo-generate) using cargo:
 $ cargo install --locked cargo-generate
 ```
 
-Navigate to your desired destination directory. Then, generate a new project from the template, which will prompt you for the name of the new project you wish to create:
+Navigate to your desired destination parentcd  directory. Then, generate a new project from the template, which will prompt you for the name of the new project you wish to create:
 ```bash
 # Create Aranya example project
 $ cargo generate aranya-project/aranya examples/rust
 ```
 
-<!-- cargo generate --path <path_to_local_template> --branch <branch_name> --name <project_name> -->
-
-<!-- TODO: is this creating a `aranya-example` dir from the generate command??? -->
-
-Change into the `aranya-example` directory[^1] and then you can build your new project (release mode will provide faster binaries):
+Change into your new project directory and then build your new project (release mode will provide faster binaries):
 ```bash
+# Change into project directory
+$ cd <project-name>
 # Build the binary
 $ cargo build --release
 ```
@@ -85,4 +84,4 @@ Finally, you can run your newly created project[^1]:
 $ target/release/aranya-example
 ```
 
-[^1]: "aranya-example" is the default binary name, you can change it in the `[[bin]]` section of the `Cargo.toml`.
+[^1]: "aranya-example" is the default binary name, you can change it in the `[package] name` section of the `Cargo.toml`.
