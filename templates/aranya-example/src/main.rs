@@ -124,8 +124,8 @@ impl UserCtx {
     }
 }
 
-/// Repeatedly calls `poll_data`, followed by `handle_data`,
-/// until all of the clients are pending.
+/// Repeatedly calls `poll_afc_data`, followed by `handle_afc_data`, until all
+/// of the clients are pending.
 macro_rules! do_poll {
     ($($client:expr),*) => {
         debug!(
@@ -320,10 +320,10 @@ async fn main() -> Result<()> {
 
     // assign network addresses.
     operator_team
-        .assign_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
+        .assign_afc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
         .await?;
     operator_team
-        .assign_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
+        .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
         .await?;
 
     // wait for syncing.

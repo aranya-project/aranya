@@ -571,3 +571,9 @@ criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2024-11-12"
 end = "2025-12-19"
+
+[[trusted.buggy]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2025-01-24"
+end = "2026-03-12"

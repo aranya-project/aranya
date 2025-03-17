@@ -624,7 +624,7 @@ pub fn revoke_role(
 /// @param net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn assign_net_identifier(
+pub unsafe fn afc_assign_net_identifier(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -637,7 +637,7 @@ pub unsafe fn assign_net_identifier(
         client
             .inner
             .team(team.0)
-            .assign_net_identifier(device.0, net_identifier),
+            .assign_afc_net_identifier(device.0, net_identifier),
     )?;
     Ok(())
 }
@@ -652,7 +652,7 @@ pub unsafe fn assign_net_identifier(
 /// @param net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn remove_net_identifier(
+pub unsafe fn afc_remove_net_identifier(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -665,7 +665,7 @@ pub unsafe fn remove_net_identifier(
         client
             .inner
             .team(team.0)
-            .remove_net_identifier(device.0, net_identifier),
+            .remove_afc_net_identifier(device.0, net_identifier),
     )?;
     Ok(())
 }
@@ -770,7 +770,7 @@ pub fn revoke_label(
 /// @param __output the channel's ID [`ChannelId`]
 ///
 /// @relates AranyaClient.
-pub unsafe fn create_bidi_channel(
+pub unsafe fn afc_create_bidi_channel(
     client: &mut Client,
     team: &TeamId,
     peer: NetIdentifier,
@@ -793,7 +793,7 @@ pub unsafe fn create_bidi_channel(
 /// @param chan the AFC channel ID [`ChannelId`] of the channel to delete.
 ///
 /// @relates AranyaClient.
-pub fn delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::Error> {
+pub fn afc_delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
         .rt
@@ -809,7 +809,7 @@ pub fn delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::E
 /// @param timeout how long to wait before timing out the poll operation [`Duration`].
 ///
 /// @relates AranyaClient.
-pub fn poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Error> {
+pub fn afc_poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client.rt.block_on(async {
         let data = tokio::time::timeout(timeout.into(), client.inner.afc.poll_data()).await??;
@@ -826,7 +826,7 @@ pub fn poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Erro
 /// @param data_len length of data to send.
 ///
 /// @relates AranyaClient.
-pub fn send_data(client: &mut Client, chan: ChannelId, data: &[u8]) -> Result<(), imp::Error> {
+pub fn afc_send_data(client: &mut Client, chan: ChannelId, data: &[u8]) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
         .rt
@@ -900,7 +900,7 @@ impl From<std::net::SocketAddr> for SocketAddr {
 /// @result A boolean indicating whether any data was available.
 ///
 /// @relates AranyaClient.
-pub unsafe fn recv_data(
+pub unsafe fn afc_recv_data(
     client: &mut Client,
     buf: Writer<u8>,
     info: &mut MaybeUninit<AfcMsgInfo>,
