@@ -13,7 +13,7 @@ use tokio::net::ToSocketAddrs;
 use tracing::{debug, info, instrument};
 
 use crate::{
-    afc::{setup_afc_shm, FastChannel},
+    afc::{setup_afc_shm, FastChannel, FastChannels},
     error::{Error, Result},
 };
 
@@ -31,9 +31,9 @@ use crate::{
 #[derive(Debug)]
 pub struct Client {
     /// RPC connection to the daemon.
-    daemon: Arc<DaemonApiClient>,
+    pub(crate) daemon: Arc<DaemonApiClient>,
     /// AFC support.
-    pub afc: FastChannel<ReadState<CS>>,
+    pub(crate) afc: FastChannel<ReadState<CS>>,
 }
 
 impl Client {
@@ -113,6 +113,11 @@ impl Client {
     /// Get an existing team.
     pub fn team(&mut self, id: TeamId) -> Team<'_> {
         Team { client: self, id }
+    }
+
+    /// Get access to Aranya Fast Channels.
+    pub fn afc(&mut self) -> FastChannels<'_> {
+        FastChannels { client: self }
     }
 }
 

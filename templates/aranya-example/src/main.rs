@@ -135,8 +135,8 @@ macro_rules! do_poll {
         loop {
             tokio::select! {
                 biased;
-                $(data = $client.afc.poll_data() => {
-                    $client.afc.handle_data(data?).await?
+                $(data = $client.afc().poll_data() => {
+                    $client.afc().handle_data(data?).await?
                 },)*
                 _ = async {} => break,
             }
@@ -333,7 +333,7 @@ async fn main() -> Result<()> {
     let afc_id1 = team
         .membera
         .client
-        .afc
+        .afc()
         .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
@@ -341,7 +341,7 @@ async fn main() -> Result<()> {
     let afc_id2 = team
         .membera
         .client
-        .afc
+        .afc()
         .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
         .await?;
 
@@ -353,7 +353,7 @@ async fn main() -> Result<()> {
     let msg = "hello world label1";
     team.membera
         .client
-        .afc
+        .afc()
         .send_data(afc_id1, msg.as_bytes())
         .await?;
     debug!(?msg, "sent message");
@@ -361,7 +361,7 @@ async fn main() -> Result<()> {
     let msg = "hello world label2";
     team.membera
         .client
-        .afc
+        .afc()
         .send_data(afc_id2, msg.as_bytes())
         .await?;
     debug!(?msg, "sent message");
@@ -369,7 +369,7 @@ async fn main() -> Result<()> {
     sleep(Duration::from_millis(100)).await;
     do_poll!(team.membera.client, team.memberb.client);
 
-    let Some(AfcMsg { data, label, .. }) = team.memberb.client.afc.try_recv_data() else {
+    let Some(AfcMsg { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
         bail!("no message available!")
     };
     debug!(
@@ -379,7 +379,7 @@ async fn main() -> Result<()> {
         core::str::from_utf8(&data)?
     );
 
-    let Some(AfcMsg { data, label, .. }) = team.memberb.client.afc.try_recv_data() else {
+    let Some(AfcMsg { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
         bail!("no message available!")
     };
     debug!(

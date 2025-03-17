@@ -808,6 +808,110 @@ impl<S> fmt::Debug for FastChannel<S> {
     }
 }
 
+pub struct FastChannels<'a> {
+    pub(crate) client: &'a mut crate::Client,
+}
+
+impl FastChannels<'_> {
+    #[doc(hidden)]
+    pub fn set_name(&mut self, name: String) {
+        self.client.afc.set_name(name)
+    }
+
+    pub async fn local_addr(&self) -> crate::Result<SocketAddr> {
+        self.client.afc.local_addr().map_err(Into::into)
+    }
+
+    pub async fn create_bidi_channel(
+        &mut self,
+        team_id: TeamId,
+        peer: NetIdentifier,
+        label: Label,
+    ) -> crate::Result<AfcId> {
+        self.client
+            .afc
+            .create_bidi_channel(team_id, peer, label)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn delete_channel(&mut self, id: AfcId) -> crate::Result<()> {
+        self.client.afc.delete_channel(id).await.map_err(Into::into)
+    }
+
+    pub async fn send_data(&mut self, id: AfcId, plaintext: &[u8]) -> crate::Result<()> {
+        self.client
+            .afc
+            .send_data(id, plaintext)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub fn try_recv_data(&mut self) -> Option<Message> {
+        self.client.afc.try_recv_data()
+    }
+
+    pub async fn poll(&mut self) -> crate::Result<()> {
+        self.client.afc.poll().await.map_err(Into::into)
+    }
+
+    /// Polls the client to check for new data.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is safe to cancel the resulting future.
+    #[instrument(skip_all)]
+    pub async fn poll_data(&mut self) -> crate::Result<PollData> {
+        let data = self.client.afc.inner_poll().await?;
+        Ok(PollData(data))
+    }
+
+    /// Retrieves data from [`poll_data`][Self::poll_data].
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is NOT safe to cancel the resulting future. Doing so
+    /// might lose data.
+    #[instrument(skip_all, fields(self = self.client.afc.debug(), ?data))]
+    pub async fn handle_data(&mut self, data: PollData) -> crate::Result<()> {
+        let afc = &mut self.client.afc;
+        match data.0 {
+            State::Accept(addr) | State::Msg(addr) => match afc.read_msg(addr).await? {
+                StreamMsg::Data(data) => {
+                    debug!(%addr, "read data message");
+
+                    let (data, channel, label, seq) = afc.open_data(data)?;
+                    afc.msgs.push_back(Message {
+                        data,
+                        addr,
+                        channel,
+                        label,
+                        seq,
+                    });
+                    debug!(n = afc.msgs.len(), "stored msg");
+                }
+                StreamMsg::Ctrl(ctrl) => {
+                    debug!(%addr, "read control message");
+
+                    let node_id = afc.get_next_node_id().await?;
+                    debug!(%node_id, "selected node ID");
+
+                    let (afc_id, peer, label) = afc
+                        .daemon
+                        .receive_afc_ctrl(context::current(), ctrl.team_id, node_id, ctrl.cmd)
+                        .await??;
+                    debug!(%node_id, %label, "applied AFC control msg");
+
+                    let chan_id = ChannelId::new(node_id, label);
+                    afc.add_channel(afc_id, peer, ctrl.team_id, chan_id, addr)
+                        .await?;
+                }
+            },
+        }
+        Ok(())
+    }
+}
+
 /// Setup the Aranya Client's read side of the AFC channel keys shared memory.
 pub(super) fn setup_afc_shm(shm_path: &Path, max_chans: usize) -> Result<ReadState<CS>, AfcError> {
     debug!(?shm_path, "setting up afc shm read side");
