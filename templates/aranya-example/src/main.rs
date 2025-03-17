@@ -124,8 +124,9 @@ impl UserCtx {
     }
 }
 
-/// Repeatedly calls `poll_afc_data`, followed by `handle_afc_data`, until all
-/// of the clients are pending.
+/// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the
+/// clients are pending.
+// TODO: alternative to select!{} to resolve lifetime issues
 macro_rules! do_poll {
     ($($client:expr),*) => {
         debug!(
@@ -133,9 +134,11 @@ macro_rules! do_poll {
             "start `do_poll`",
         );
         loop {
+            let mut afcs = [ $($client.afc()),* ];
+            let mut afcs = afcs.iter_mut();
             tokio::select! {
                 biased;
-                $(data = $client.afc().poll_data() => {
+                $(data = afcs.next().unwrap().poll_data() => {
                     $client.afc().handle_data(data?).await?
                 },)*
                 _ = async {} => break,
