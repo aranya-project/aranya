@@ -15,8 +15,9 @@
 use std::{
     collections::{btree_map, BTreeMap, VecDeque},
     ffi::c_int,
+    fmt,
     future::Future,
-    io::IoSlice,
+    io::{self, IoSlice},
     net::SocketAddr,
     os::fd::AsRawFd as _,
     path::Path,
@@ -39,6 +40,7 @@ use aranya_util::ShmPathBuf;
 use buggy::{bug, Bug, BugExt as _};
 use indexmap::{map, IndexMap};
 use serde::{Deserialize, Serialize};
+use tarpc::context;
 use tokio::{
     io::{AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, ReadBuf},
     net::{TcpListener, TcpStream, ToSocketAddrs},
@@ -50,7 +52,7 @@ use tracing::{debug, error, instrument, warn};
 pub enum AfcError {
     /// Unable to bind a network addresss.
     #[error("unable to bind address: {0}")]
-    Bind(std::io::Error),
+    Bind(io::Error),
 
     /// An internal bug was discovered.
     #[error("internal bug: {0}")]
@@ -66,7 +68,7 @@ pub enum AfcError {
 
     /// DNS lookup failed.
     #[error("DNS lookup failed: {0}")]
-    DnsLookup(std::io::Error),
+    DnsLookup(io::Error),
 
     /// AFC message encryption failure.
     #[error("encryption failure: {0}")]
@@ -109,7 +111,7 @@ pub enum AfcError {
 
     /// Local address failure.
     #[error("unable to get local address: {0}")]
-    RouterAddr(std::io::Error),
+    RouterAddr(io::Error),
 
     /// Serde serialization/deserialization error.
     #[error("serialization/deserialization error: {0}")]
@@ -125,27 +127,27 @@ pub enum AfcError {
 
     /// Unable to accept a TCP stream.
     #[error("unable to accept to TCP stream: {0}")]
-    StreamAccept(std::io::Error),
+    StreamAccept(io::Error),
 
     /// Unable to create a TCP stream.
     #[error("unable to connect to TCP stream: {0}")]
-    StreamConnect(std::io::Error),
+    StreamConnect(io::Error),
 
     /// Unable to read from TCP stream.
     #[error("unable to read from TCP stream: {0}")]
-    StreamRead(std::io::Error),
+    StreamRead(io::Error),
 
     /// Unable to write to TCP stream.
     #[error("unable to write to TCP stream: {0}")]
-    StreamWrite(std::io::Error),
+    StreamWrite(io::Error),
 
     /// Unable to shutdown TCP stream.
     #[error("unable to shutdown TCP stream: {0}")]
-    StreamShutdown(std::io::Error),
+    StreamShutdown(io::Error),
 
     /// Unable to get the remote peer's address.
     #[error("unable to get remote peer's address: {0}")]
-    StreamPeerAddr(std::io::Error),
+    StreamPeerAddr(io::Error),
 
     /// The stream was not found.
     #[error("stream not found: {0}")]
@@ -681,13 +683,7 @@ impl<S: AfcState> FastChannel<S> {
 
         let (afc_id, ctrl) = self
             .daemon
-            .create_bidi_channel(
-                tarpc::context::current(),
-                team_id,
-                peer.clone(),
-                node_id,
-                label,
-            )
+            .create_afc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
             .await??;
         debug!(%afc_id, %node_id, %label, "created bidi channel");
 
@@ -704,7 +700,7 @@ impl<S: AfcState> FastChannel<S> {
     pub async fn delete_channel(&mut self, id: AfcId) -> Result<(), AfcError> {
         let _ctrl = self
             .daemon
-            .delete_channel(tarpc::context::current(), id)
+            .delete_afc_channel(context::current(), id)
             .await??;
         self.remove_channel(id).await;
         // TODO(eric): Send control message.
@@ -770,12 +766,7 @@ impl<S: AfcState> FastChannel<S> {
 
                     let (afc_id, peer, label) = self
                         .daemon
-                        .receive_afc_ctrl(
-                            tarpc::context::current(),
-                            ctrl.team_id,
-                            node_id,
-                            ctrl.cmd,
-                        )
+                        .receive_afc_ctrl(context::current(), ctrl.team_id, node_id, ctrl.cmd)
                         .await??;
                     debug!(%node_id, %label, "applied AFC control msg");
 
@@ -806,8 +797,8 @@ impl<S: AfcState> FastChannel<S> {
     }
 }
 
-impl<S> std::fmt::Debug for FastChannel<S> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<S> fmt::Debug for FastChannel<S> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Router")
             .field("listener", &self.listener)
             .field("streams", &self.streams)
@@ -1007,7 +998,7 @@ impl Future for NextStream<'_> {
 ///
 /// A stream is "ready" if we've received at least the wire
 /// format header.
-fn stream_is_ready(cx: &mut Context<'_>, stream: &TcpStream) -> std::io::Result<bool> {
+fn stream_is_ready(cx: &mut Context<'_>, stream: &TcpStream) -> io::Result<bool> {
     match stream.poll_read_ready(cx) {
         Poll::Ready(Ok(())) => {}
         Poll::Ready(Err(err)) => return Err(err),
@@ -1037,7 +1028,7 @@ fn stream_is_ready(cx: &mut Context<'_>, stream: &TcpStream) -> std::io::Result<
 }
 
 #[cfg(target_family = "unix")]
-fn ioctl_fionread(stream: &TcpStream) -> std::io::Result<usize> {
+fn ioctl_fionread(stream: &TcpStream) -> io::Result<usize> {
     let mut n: c_int = 0;
     // SAFETY: FFI call, no invariants.
     let ret = unsafe { libc::ioctl(stream.as_raw_fd(), libc::FIONREAD, &mut n) };
@@ -1047,16 +1038,16 @@ fn ioctl_fionread(stream: &TcpStream) -> std::io::Result<usize> {
         // if errno() == Errno::EINTR {
         //     continue;
         // }
-        return Err(std::io::Error::other("ioctl returned -1"));
+        return Err(io::Error::other("ioctl returned -1"));
     }
-    usize::try_from(n).map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "n < 0"))
+    usize::try_from(n).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "n < 0"))
 }
 
 trait AsyncWriteVectored: AsyncWrite {
     async fn write_all_vectored<'a, 'b>(
         &'a mut self,
         mut bufs: &mut [IoSlice<'b>],
-    ) -> Result<(), std::io::Error>
+    ) -> Result<(), io::Error>
     where
         'a: 'b,
         Self: Unpin,
@@ -1065,16 +1056,16 @@ trait AsyncWriteVectored: AsyncWrite {
         while !bufs.is_empty() {
             let n = self.write_vectored(bufs).await?;
             if n == 0 {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::WriteZero,
+                return Err(io::Error::new(
+                    io::ErrorKind::WriteZero,
                     "wrote 0 bytes, but `bufs` is not empty",
                 ));
             }
             // Sanity check since `advance_slices` panics of `n`
             // is out of range.
             if n > remain {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::InvalidData,
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
                     "bogus response from `write_vectored`",
                 ));
             }
@@ -1118,8 +1109,8 @@ impl Channel {
 #[derive(Debug)]
 struct FmtOr<T>(T, &'static str);
 
-impl<T: std::fmt::Display> std::fmt::Display for FmtOr<Option<T>> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl<T: fmt::Display> fmt::Display for FmtOr<Option<T>> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
             Some(v) => v.fmt(f),
             None => self.1.fmt(f),
@@ -1130,12 +1121,12 @@ impl<T: std::fmt::Display> std::fmt::Display for FmtOr<Option<T>> {
 #[derive(Debug)]
 struct TryFmt<T>(T);
 
-impl<T, E> std::fmt::Display for TryFmt<Result<T, E>>
+impl<T, E> fmt::Display for TryFmt<Result<T, E>>
 where
-    T: std::fmt::Display,
-    E: std::fmt::Display,
+    T: fmt::Display,
+    E: fmt::Display,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
             Ok(v) => v.fmt(f),
             Err(err) => err.fmt(f),

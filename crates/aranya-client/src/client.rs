@@ -8,7 +8,7 @@ use aranya_fast_channels::{
     Label, {self as afc},
 };
 use aranya_util::Addr;
-use tarpc::tokio_serde::formats::Json;
+use tarpc::{context, tokio_serde::formats::Json};
 use tokio::net::ToSocketAddrs;
 use tracing::{debug, info, instrument};
 
@@ -80,41 +80,29 @@ impl Client {
     /// Returns the address that the Aranya sync server is bound
     /// to.
     pub async fn local_addr(&self) -> Result<SocketAddr> {
-        Ok(self
-            .daemon
-            .aranya_local_addr(tarpc::context::current())
-            .await??)
+        Ok(self.daemon.aranya_local_addr(context::current()).await??)
     }
 }
 
 impl Client {
     /// Gets the public key bundle for this device.
     pub async fn get_key_bundle(&mut self) -> Result<KeyBundle> {
-        Ok(self
-            .daemon
-            .get_key_bundle(tarpc::context::current())
-            .await??)
+        Ok(self.daemon.get_key_bundle(context::current()).await??)
     }
 
     /// Gets the public device ID for this device.
     pub async fn get_device_id(&mut self) -> Result<DeviceId> {
-        Ok(self
-            .daemon
-            .get_device_id(tarpc::context::current())
-            .await??)
+        Ok(self.daemon.get_device_id(context::current()).await??)
     }
 
     /// Create a new graph/team with the current device as the owner.
     pub async fn create_team(&mut self) -> Result<TeamId> {
-        Ok(self.daemon.create_team(tarpc::context::current()).await??)
+        Ok(self.daemon.create_team(context::current()).await??)
     }
 
     /// Add a team to the local device store.
     pub async fn add_team(&mut self, team: TeamId) -> Result<()> {
-        Ok(self
-            .daemon
-            .add_team(tarpc::context::current(), team)
-            .await??)
+        Ok(self.daemon.add_team(context::current(), team).await??)
     }
 
     /// Remove a team from the local device store.
@@ -149,7 +137,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .add_sync_peer(tarpc::context::current(), addr, self.id, interval)
+            .add_sync_peer(context::current(), addr, self.id, interval)
             .await??)
     }
 
@@ -158,7 +146,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .remove_sync_peer(tarpc::context::current(), addr, self.id)
+            .remove_sync_peer(context::current(), addr, self.id)
             .await??)
     }
 
@@ -167,7 +155,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .close_team(tarpc::context::current(), self.id)
+            .close_team(context::current(), self.id)
             .await??)
     }
 
@@ -176,7 +164,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .add_device_to_team(tarpc::context::current(), self.id, keys)
+            .add_device_to_team(context::current(), self.id, keys)
             .await??)
     }
 
@@ -185,7 +173,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .remove_device_from_team(tarpc::context::current(), self.id, device)
+            .remove_device_from_team(context::current(), self.id, device)
             .await??)
     }
 
@@ -194,7 +182,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .assign_role(tarpc::context::current(), self.id, device, role)
+            .assign_role(context::current(), self.id, device, role)
             .await??)
     }
 
@@ -203,7 +191,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .revoke_role(tarpc::context::current(), self.id, device, role)
+            .revoke_role(context::current(), self.id, device, role)
             .await??)
     }
 
@@ -220,7 +208,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .assign_afc_net_identifier(tarpc::context::current(), self.id, device, net_identifier)
+            .assign_afc_net_identifier(context::current(), self.id, device, net_identifier)
             .await??)
     }
 
@@ -233,7 +221,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .remove_afc_net_identifier(tarpc::context::current(), self.id, device, net_identifier)
+            .remove_afc_net_identifier(context::current(), self.id, device, net_identifier)
             .await??)
     }
 
@@ -242,7 +230,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .create_label(tarpc::context::current(), self.id, label)
+            .create_label(context::current(), self.id, label)
             .await??)
     }
 
@@ -251,7 +239,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .delete_label(tarpc::context::current(), self.id, label)
+            .delete_label(context::current(), self.id, label)
             .await??)
     }
 
@@ -263,7 +251,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .assign_label(tarpc::context::current(), self.id, device, label)
+            .assign_label(context::current(), self.id, device, label)
             .await??)
     }
 
@@ -272,7 +260,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .revoke_label(tarpc::context::current(), self.id, device, label)
+            .revoke_label(context::current(), self.id, device, label)
             .await??)
     }
 }
