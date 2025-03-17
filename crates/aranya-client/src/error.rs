@@ -1,25 +1,25 @@
-/// Errors that could occur in the Aranya client.
+/// Possible errors that could happen in the Aranya client.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// AFC error.
-    #[error("AFC error: {0}")]
-    Afc(#[from] crate::afc::AfcError),
-
-    /// Unexpected internal error.
-    #[error("Unexpected internal error: {0}")]
-    Bug(#[from] buggy::Bug),
-
-    /// Could not connect to the daemon.
-    #[error("could not connect to daemon: {0}")]
+    /// Unable to connect to the daemon.
+    #[error("Unable to connect to the daemon: {0}")]
     Connecting(#[source] std::io::Error),
 
-    /// Daemon reported error.
-    #[error("daemon reported error: {0}")]
+    /// Unable to communicate with the daemon.
+    #[error("Unable to communicate with the daemon: {0}")]
+    Rpc(#[from] tarpc::client::RpcError),
+
+    /// The daemon returned an error.
+    #[error("Daemon reported error: {0}")]
     Daemon(#[from] aranya_daemon_api::Error),
 
-    /// Could not send request to daemon.
-    #[error("could not send request to daemon: {0}")]
-    Rpc(#[from] tarpc::client::RpcError),
+    /// An Aranya Fast Channel error happened.
+    #[error("Fast Channel error: {0}")]
+    Afc(#[from] crate::afc::AfcError),
+
+    /// An unexpected internal error happened.
+    #[error("Unexpected internal error: {0}")]
+    Bug(#[from] buggy::Bug),
 }
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
