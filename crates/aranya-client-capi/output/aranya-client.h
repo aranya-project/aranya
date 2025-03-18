@@ -1226,35 +1226,6 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
                                      bool *__output,
                                      struct AranyaExtError *__ext_err);
 
-/**
- * Query Aranya for device role.
- *
- * @param client the Aranya Client.
- * @param the device ID.
- * @result the device role.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_role(struct AranyaClient *client,
-                                     const struct AranyaTeamId *team,
-                                     const struct AranyaDeviceId *device_id,
-                                     AranyaRole *__output);
-
-/**
- * Query Aranya for device role.
- *
- * @param client the Aranya Client.
- * @param the device ID.
- * @result the device role.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_role_ext(struct AranyaClient *client,
-                                         const struct AranyaTeamId *team,
-                                         const struct AranyaDeviceId *device_id,
-                                         AranyaRole *__output,
-                                         struct AranyaExtError *__ext_err);
-
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
