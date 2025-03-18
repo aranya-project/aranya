@@ -220,16 +220,18 @@ pub trait DaemonApi {
         node_id: NodeId,
         ctrl: AfcCtrl,
     ) -> Result<(AfcId, NetIdentifier, Label)>;
+    /// Query devices on team.
+    async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
     /// Query device role.
     async fn query_device_role(team: TeamId, device: DeviceId) -> Result<Role>;
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
+    /// Query device label assignments.
+    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
     /// Query AFC network ID.
     async fn query_afc_net_identifier(team: TeamId, device: DeviceId) -> Result<NetIdentifier>;
     /// Query AQC network ID.
     async fn query_aqc_net_identifier(team: TeamId, device: DeviceId) -> Result<NetIdentifier>;
     /// Query label exists.
     async fn query_label_exists(team: TeamId, label: Label) -> Result<bool>;
-    /// Query device label assignments.
-    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
 }

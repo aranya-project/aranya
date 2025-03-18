@@ -109,7 +109,7 @@ struct KeyIds {
 
 ```policy
 // A user on the team.
-fact User[user_id id]=>{role enum Role, sign_key_id id, enc_key_id id}
+fact User[user_id id]=>{role enum Role, sign_key_id id, enc_key_id id, user_id_value id}
 
 // A user's public IdentityKey
 fact UserIdentKey[user_id id]=>{key bytes}
@@ -390,6 +390,7 @@ finish function add_new_user(key_bundle struct KeyBundle, key_ids struct KeyIds,
         role: role,
         sign_key_id: key_ids.sign_key_id,
         enc_key_id: key_ids.enc_key_id,
+        user_id_value: key_ids.user_id,
     }
 
     create UserIdentKey[user_id: key_ids.user_id]=>{key: key_bundle.ident_key}
@@ -636,10 +637,12 @@ finish function assign_role(user struct User, role enum Role) {
         role: user.role,
         sign_key_id: user.sign_key_id,
         enc_key_id: user.enc_key_id,
+        user_id_value: user.user_id,
         } to {
             role: role,
             sign_key_id: user.sign_key_id,
             enc_key_id: user.enc_key_id,
+            user_id_value: user.user_id,
         }
 }
 ```
@@ -799,10 +802,12 @@ finish function revoke_role(user struct User) {
         role: user.role,
         sign_key_id: user.sign_key_id,
         enc_key_id: user.enc_key_id,
+        user_id_value: user.user_id,
         } to {
             role: Role::Member,
             sign_key_id: user.sign_key_id,
             enc_key_id: user.enc_key_id,
+            user_id_value: user.user_id,
             }
 }
 ```
@@ -1617,25 +1622,28 @@ Queries devices on team.
 
 ```policy
 action query_devices_on_team() {
-    publish QueryDevicesOnTeam {}
+    map User[user_id:?] as f {
+        publish QueryDevicesOnTeam { user_id: f.user_id_value }
+    }
 }
 
 effect QueryDevicesOnTeamResult {
-    label int,
+    user_id id,
 }
 
 command QueryDevicesOnTeam {
-    fields {}
+    fields {
+        user_id id,
+    }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
         finish {
-            // TODO: lookup devices on a team with map
-            //map TeamDevices[i:?] as f {
-            //    publish QueryDevicesOnTeamResult { }
-            //}
+            emit QueryDevicesOnTeamResult {
+                user_id: this.user_id,
+            }
         }
     }
 }
@@ -1720,6 +1728,38 @@ command QueryDeviceKeyBundle {
         finish {
             emit QueryDeviceKeyBundleResult {
                 user_keys: user_keys,
+            }
+        }
+    }
+}
+```
+
+### QueryDeviceLabelAssignment
+Queries device label assignments.
+
+```policy
+action query_device_label_assignments(user_id id) {
+    map AssignedLabel[user_id: user_id, label:?] as f {
+        publish QueryDeviceLabelAssignments { label: f.assigned_label }
+    }
+}
+
+effect QueryDeviceLabelAssignmentsResult {
+    label int,
+}
+
+command QueryDeviceLabelAssignments {
+    fields {
+        label int,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        finish {
+            emit QueryDeviceLabelAssignmentsResult {
+                label: this.label
             }
         }
     }
@@ -1852,38 +1892,6 @@ command QueryLabelExists {
         finish {
             emit QueryLabelExistsResult {
                 label_exists: label_exists,
-            }
-        }
-    }
-}
-```
-
-### QueryDeviceLabelAssignment
-Queries device label assignments.
-
-```policy
-action query_device_label_assignments(user_id id) {
-    map AssignedLabel[user_id: user_id, label:?] as f {
-        publish QueryDeviceLabelAssignments { label: f.assigned_label }
-    }
-}
-
-effect QueryDeviceLabelAssignmentsResult {
-    label int,
-}
-
-command QueryDeviceLabelAssignments {
-    fields {
-        label int,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        finish {
-            emit QueryDeviceLabelAssignmentsResult {
-                label: this.label
             }
         }
     }

@@ -495,6 +495,16 @@ impl Team<'_> {
             .revoke_label(context::current(), self.id, device, label)
             .await??)
     }
+
+    /// Query devices on team.
+    pub async fn query_devices_on_team(&mut self) -> Result<Vec<DeviceId>> {
+        Ok(self
+            .client
+            .daemon
+            .query_devices_on_team(context::current(), self.id)
+            .await??)
+    }
+
     /// Query device role.
     pub async fn query_device_role(&mut self, device: DeviceId) -> Result<Role> {
         Ok(self
@@ -510,6 +520,15 @@ impl Team<'_> {
             .client
             .daemon
             .query_device_keybundle(context::current(), self.id, device)
+            .await??)
+    }
+
+    /// Query device label assignments.
+    pub async fn query_device_label_assignments(&mut self, device: DeviceId) -> Result<Vec<Label>> {
+        Ok(self
+            .client
+            .daemon
+            .query_device_label_assignments(context::current(), self.id, device)
             .await??)
     }
 
@@ -537,15 +556,6 @@ impl Team<'_> {
             .client
             .daemon
             .query_label_exists(context::current(), self.id, label)
-            .await??)
-    }
-
-    /// Query device label assignments.
-    pub async fn query_device_label_assignments(&mut self, device: DeviceId) -> Result<Vec<Label>> {
-        Ok(self
-            .client
-            .daemon
-            .query_device_label_assignments(context::current(), self.id, device)
             .await??)
     }
 }
