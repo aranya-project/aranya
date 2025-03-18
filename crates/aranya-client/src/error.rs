@@ -27,7 +27,6 @@ pub enum Error {
 
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
-#[doc(hidden)]
 pub enum AfcError {
     // Connection-related errors
     /// Unable to bind a network addresss.
