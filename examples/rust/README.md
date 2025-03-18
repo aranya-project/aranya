@@ -67,7 +67,7 @@ $ cargo install --locked cargo-generate
 Navigate to your desired destination parent directory. Then, generate a new project from the template, which will prompt you for the name of the new project you wish to create:
 ```bash
 # Create Aranya example project
-$ cargo generate aranya-project/aranya examples/rust
+$ cargo generate aranya-project/aranya examples/rust --name rust-example
 ```
 
 Change into your new project directory and then build your new project (release mode will provide faster binaries):
@@ -75,6 +75,9 @@ Change into your new project directory and then build your new project (release 
 # Change into project directory
 $ cd <project-name>
 
-# Build and run the binary
-$ ./run.bash
+# Build the binary
+$ cargo build --release
+
+# Run the binary:
+$ target/release/aranya-example
 ```
