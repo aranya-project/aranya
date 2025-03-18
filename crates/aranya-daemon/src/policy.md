@@ -109,7 +109,7 @@ struct KeyIds {
 
 ```policy
 // A user on the team.
-fact User[user_id id]=>{role enum Role, sign_key_id id, enc_key_id id, user_id_value id}
+fact User[user_id id]=>{role enum Role, sign_key_id id, enc_key_id id}
 
 // A user's public IdentityKey
 fact UserIdentKey[user_id id]=>{key bytes}
@@ -127,7 +127,7 @@ fact TeamEnd[]=>{}
 fact Label[label int]=>{}
 
 // Records that a user is allowed to use an AFC label.
-fact AssignedLabel[user_id id, label int]=>{op enum ChanOp, assigned_label int}
+fact AssignedLabel[user_id id, label int]=>{op enum ChanOp}
 
 // Stores a Member's associated network identifier for AFC.
 fact AfcMemberNetworkId[user_id id]=>{net_identifier string}
@@ -390,7 +390,6 @@ finish function add_new_user(key_bundle struct KeyBundle, key_ids struct KeyIds,
         role: role,
         sign_key_id: key_ids.sign_key_id,
         enc_key_id: key_ids.enc_key_id,
-        user_id_value: key_ids.user_id,
     }
 
     create UserIdentKey[user_id: key_ids.user_id]=>{key: key_bundle.ident_key}
@@ -637,12 +636,10 @@ finish function assign_role(user struct User, role enum Role) {
         role: user.role,
         sign_key_id: user.sign_key_id,
         enc_key_id: user.enc_key_id,
-        user_id_value: user.user_id,
         } to {
             role: role,
             sign_key_id: user.sign_key_id,
             enc_key_id: user.enc_key_id,
-            user_id_value: user.user_id,
         }
 }
 ```
@@ -802,12 +799,10 @@ finish function revoke_role(user struct User) {
         role: user.role,
         sign_key_id: user.sign_key_id,
         enc_key_id: user.enc_key_id,
-        user_id_value: user.user_id,
         } to {
             role: Role::Member,
             sign_key_id: user.sign_key_id,
             enc_key_id: user.enc_key_id,
-            user_id_value: user.user_id,
             }
 }
 ```
@@ -1052,7 +1047,7 @@ command AssignLabel {
         check exists Label[label: this.label]
 
         finish {
-            create AssignedLabel[user_id: user.user_id, label: this.label]=>{op: this.op, assigned_label: this.label}
+            create AssignedLabel[user_id: user.user_id, label: this.label]=>{op: this.op}
 
             emit LabelAssigned {
                 user_id: user.user_id,
@@ -1623,7 +1618,7 @@ Queries devices on team.
 ```policy
 action query_devices_on_team() {
     map User[user_id:?] as f {
-        publish QueryDevicesOnTeam { user_id: f.user_id_value }
+        publish QueryDevicesOnTeam { user_id: f.user_id }
     }
 }
 
@@ -1740,7 +1735,7 @@ Queries device label assignments.
 ```policy
 action query_device_label_assignments(user_id id) {
     map AssignedLabel[user_id: user_id, label:?] as f {
-        publish QueryDeviceLabelAssignments { label: f.assigned_label }
+        publish QueryDeviceLabelAssignments { label: f.label }
     }
 }
 
