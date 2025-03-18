@@ -725,7 +725,11 @@ impl DaemonApi for DaemonApiHandler {
         let mut labels = Vec::new();
         for e in effects {
             if let Effect::QueryDeviceLabelAssignmentsResult(e) = e {
-                let label = Label::new(u32::try_from(e.label).assume("`label` is out of range").context("label is out of range")?);
+                let label = Label::new(
+                    u32::try_from(e.label)
+                        .assume("`label` is out of range")
+                        .context("label is out of range")?,
+                );
                 debug!("found label: {} assigned to device: {}", label, device);
                 labels.push(label);
             }
