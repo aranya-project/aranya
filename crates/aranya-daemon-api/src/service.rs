@@ -230,4 +230,6 @@ pub trait DaemonApi {
     async fn query_aqc_net_identifier(team: TeamId, device: DeviceId) -> Result<NetIdentifier>;
     /// Query label exists.
     async fn query_label_exists(team: TeamId, label: Label) -> Result<bool>;
+    /// Query device label assignments.
+    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
 }

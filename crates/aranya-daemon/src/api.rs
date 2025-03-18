@@ -709,7 +709,29 @@ impl DaemonApi for DaemonApiHandler {
         };
         Err(anyhow!("unable to query aqc network identifier").into())
     }
-    // TODO: query label assignments
+    /// Query device label assignments.
+    #[instrument(skip(self))]
+    async fn query_device_label_assignments(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: DeviceId,
+    ) -> ApiResult<Vec<Label>> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_device_label_assignments_off_graph(device.into_id().into())
+            .await?;
+        let mut labels = Vec::new();
+        for e in effects {
+            if let Effect::QueryDeviceLabelAssignmentsResult(e) = e {
+                let label = Label::new(u32::try_from(e.label).assume("`label` is out of range").context("label is out of range")?);
+                debug!("found label: {} assigned to device: {}", label, device);
+                labels.push(label);
+            }
+        }
+        return Ok(labels);
+    }
 }
 
 impl From<ApiKeyBundle> for KeyBundle {

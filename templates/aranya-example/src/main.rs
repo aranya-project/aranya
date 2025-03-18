@@ -346,6 +346,8 @@ async fn main() -> Result<()> {
     info!("membera aqc_net_identifer: {:?}", aqc_net_identifier);
     let label_exists = membera_team.query_label_exists(label1).await?;
     info!("membera label1 exists?: {:?}", label_exists);
+    let labels = membera_team.query_device_label_assignments(team.membera.id).await?;
+    info!("membera labels: {:?}", labels);
 
     // membera creates bidi channel with memberb
     let afc_id1 = team

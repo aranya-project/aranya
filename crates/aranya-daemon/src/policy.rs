@@ -293,8 +293,5 @@ pub trait ActorExt {
     fn query_afc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_label_exists(&mut self, label: i64) -> Result<(), ClientError>;
-    fn query_device_label_assignments(
-        &mut self,
-        device_id: Id,
-    ) -> Result<(), ClientError>;
+    fn query_device_label_assignments(&mut self, user_id: Id) -> Result<(), ClientError>;
 }

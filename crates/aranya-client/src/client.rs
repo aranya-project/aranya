@@ -539,4 +539,13 @@ impl Team<'_> {
             .query_label_exists(context::current(), self.id, label)
             .await??)
     }
+
+    /// Query device label assignments.
+    pub async fn query_device_label_assignments(&mut self, device: DeviceId) -> Result<Vec<Label>> {
+        Ok(self
+            .client
+            .daemon
+            .query_device_label_assignments(context::current(), self.id, device)
+            .await??)
+    }
 }

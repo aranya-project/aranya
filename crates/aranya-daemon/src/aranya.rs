@@ -702,6 +702,20 @@ where
         })
         .in_current_span()
     }
+
+    /// Query device label assignments off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_device_label_assignments_off_graph(
+        &self,
+        device_id: UserId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_device_label_assignments",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
 }
 
 /// An implementation of [`Actor`].

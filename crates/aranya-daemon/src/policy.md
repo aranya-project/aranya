@@ -127,7 +127,7 @@ fact TeamEnd[]=>{}
 fact Label[label int]=>{}
 
 // Records that a user is allowed to use an AFC label.
-fact AssignedLabel[label int, user_id id]=>{op enum ChanOp}
+fact AssignedLabel[label int, user_id id]=>{op enum ChanOp, assigned_label int}
 
 // Stores a Member's associated network identifier for AFC.
 fact AfcMemberNetworkId[user_id id]=>{net_identifier string}
@@ -1047,7 +1047,7 @@ command AssignLabel {
         check exists Label[label: this.label]
 
         finish {
-            create AssignedLabel[label: this.label, user_id: user.user_id]=>{op: this.op}
+            create AssignedLabel[label: this.label, user_id: user.user_id]=>{op: this.op, assigned_label: this.label}
 
             emit LabelAssigned {
                 user_id: user.user_id,
@@ -1862,9 +1862,9 @@ command QueryLabelExists {
 Queries device label assignments.
 
 ```policy
-action query_device_label_assignments(device_id id) {
-    publish QueryDeviceLabelAssignments {
-        device_id: device_id,
+action query_device_label_assignments(user_id id) {
+    map AssignedLabel[label:?, user_id: user_id] as f {
+        publish QueryDeviceLabelAssignments { label: f.assigned_label }
     }
 }
 
@@ -1874,7 +1874,7 @@ effect QueryDeviceLabelAssignmentsResult {
 
 command QueryDeviceLabelAssignments {
     fields {
-        device_id id,
+        label int,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -1882,10 +1882,9 @@ command QueryDeviceLabelAssignments {
 
     policy {
         finish {
-            // TODO: lookup labels assigned to device with map
-            //map AssignedLabel[i:?] as f {
-            //    publish QueryDeviceLabelAssignmentsResult { label: f.label }
-            //}
+            emit QueryDeviceLabelAssignmentsResult {
+                label: this.label
+            }
         }
     }
 }
