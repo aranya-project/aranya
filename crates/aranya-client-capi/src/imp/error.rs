@@ -37,9 +37,6 @@ pub enum Error {
 
     #[error("tokio runtime error: {0}")]
     Runtime(#[source] std::io::Error),
-
-    #[error("Fast Channel error: {0}")]
-    FastChannel(#[from] aranya_client::afc::AfcError),
 }
 
 impl From<WriteCStrError> for Error {

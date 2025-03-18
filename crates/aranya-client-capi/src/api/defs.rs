@@ -85,7 +85,6 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Bug(_) => Self::Bug,
             },
             imp::Error::Runtime(_) => Self::Runtime,
-            imp::Error::FastChannel(_) => Self::Afc,
         }
     }
 }
@@ -119,7 +118,7 @@ pub fn error_to_str(err: u32) -> *const c_char {
 
 /// Extended error information.
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 88, align = 8)]
+#[aranya_capi_core::opaque(size = 80, align = 8)]
 pub type ExtError = Safe<imp::ExtError>;
 
 /// Copies the extended error's message into `msg`.
