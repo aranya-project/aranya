@@ -45,75 +45,21 @@ use tokio::{
 };
 use tracing::{debug, error, instrument, warn};
 
-/// An AFC error.
+/// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
 pub enum AfcError {
+    // Connection-related errors
     /// Unable to bind a network addresss.
     #[error("unable to bind address: {0}")]
     Bind(io::Error),
-
-    /// An internal bug was discovered.
-    #[error("internal bug: {0}")]
-    Bug(#[from] Bug),
-
-    /// The channel was not found.
-    #[error("channel not found: {0}")]
-    ChannelNotFound(AfcId),
-
-    /// AFC message decryption failure.
-    #[error("decryption failure: {0}")]
-    Decryption(aranya_fast_channels::Error),
 
     /// DNS lookup failed.
     #[error("DNS lookup failed: {0}")]
     DnsLookup(io::Error),
 
-    /// AFC message encryption failure.
-    #[error("encryption failure: {0}")]
-    Encryption(aranya_fast_channels::Error),
-
-    /// The 64-bit sequence number overflowed and the end of the channel was
-    /// reached. A new channel must be created.
-    ///
-    /// # Note
-    ///
-    /// This likely indicates that the peer manually set a very high sequence
-    /// number.
-    #[error("end of channel reached")]
-    EndOfChannel,
-
-    /// Invalid AFC header.
-    #[error("invalid AFC header: {0}")]
-    InvalidHeader(#[from] aranya_fast_channels::HeaderError),
-
-    /// Invalid AFC magic.
-    #[error("invalid magic: {0}")]
-    InvalidMagic(u32),
-
-    /// Invalid AFC message.
-    #[error("invalid message: {0}")]
-    InvalidMsg(#[from] aranya_fast_channels::ParseError),
-
-    /// AFC message was replayed.
-    #[error("AFC message was replayed: {0}")]
-    MsgReplayed(String),
-
-    /// The message length prefix was larger than the maximum
-    /// allowed size.
-    #[error("message too large: {got} > {max}")]
-    MsgTooLarge { got: usize, max: usize },
-
-    /// Payload is too small to be ciphertext.
-    #[error("payload is too small to be ciphertext")]
-    PayloadTooSmall,
-
     /// Local address failure.
     #[error("unable to get local address: {0}")]
     RouterAddr(io::Error),
-
-    /// Serde serialization/deserialization error.
-    #[error("serialization/deserialization error: {0}")]
-    Serde(postcard::Error),
 
     /// Unable to parse shm path.
     #[error("unable to parse shared memory path: {0}")]
@@ -151,22 +97,76 @@ pub enum AfcError {
     #[error("stream not found: {0}")]
     StreamNotFound(SocketAddr),
 
+    // Protocol-related errors
+    /// Invalid AFC header.
+    #[error("invalid AFC header: {0}")]
+    InvalidHeader(#[from] aranya_fast_channels::HeaderError),
+
+    /// Invalid AFC magic.
+    #[error("invalid magic: {0}")]
+    InvalidMagic(u32),
+
+    /// Invalid AFC message.
+    #[error("invalid message: {0}")]
+    InvalidMsg(#[from] aranya_fast_channels::ParseError),
+
+    /// AFC message was replayed.
+    #[error("AFC message was replayed: {0}")]
+    MsgReplayed(String),
+
+    /// The message length prefix was larger than the maximum
+    /// allowed size.
+    #[error("message too large: {got} > {max}")]
+    MsgTooLarge { got: usize, max: usize },
+
+    /// Payload is too small to be ciphertext.
+    #[error("payload is too small to be ciphertext")]
+    PayloadTooSmall,
+
+    /// AFC message decryption failure.
+    #[error("decryption failure: {0}")]
+    Decryption(aranya_fast_channels::Error),
+
+    /// AFC message encryption failure.
+    #[error("encryption failure: {0}")]
+    Encryption(aranya_fast_channels::Error),
+
+    /// Serde serialization/deserialization error.
+    #[error("serialization/deserialization error: {0}")]
+    Serde(postcard::Error),
+
     /// AFC version mismatch.
     #[error("AFC version mismatch: got {actual:?}, expected {expected:?}")]
     VersionMismatch { expected: Version, actual: Version },
 
-    /// Daemon reported error.
-    #[error("daemon reported error: {0}")]
-    Daemon(#[from] aranya_daemon_api::Error),
+    // General errors
+    /// The channel was not found.
+    #[error("channel not found: {0}")]
+    ChannelNotFound(AfcId),
 
-    /// Could not send request to daemon.
-    #[error("could not send request to daemon: {0}")]
-    Rpc(#[from] tarpc::client::RpcError),
+    /// The 64-bit sequence number overflowed and the end of the channel was
+    /// reached. A new channel must be created.
+    ///
+    /// # Note
+    ///
+    /// This likely indicates that the peer manually set a very high sequence
+    /// number.
+    #[error("end of channel reached")]
+    EndOfChannel,
 
     /// Some other error.
     #[error("{0}")]
     Other(#[from] anyhow::Error),
+
+    /// An internal bug was discovered.
+    #[error("internal bug: {0}")]
+    Bug(#[from] Bug),
 }
+
+/// Data that can be polled from an Aranya Fast Channel.
+#[must_use]
+#[derive(Debug)]
+pub struct PollData(State);
 
 /// The most recent state from [`poll`][FastChannel::poll].
 #[derive(Clone, Debug)]
@@ -176,6 +176,35 @@ enum State {
     /// We recieved an incoming message.
     Msg(SocketAddr),
 }
+
+/// An Aranya Fast Channel message.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Message {
+    /// The plaintext data.
+    pub data: Vec<u8>,
+    /// The address from which the message was received.
+    pub address: SocketAddr,
+    /// The channel from which the message was received.
+    pub channel: AfcId,
+    /// The Aranya Fast Channel label associated with the message.
+    pub label: Label,
+    /// The order of the message in the channel.
+    pub seq: Seq,
+}
+
+/// The size in bytes of `magic || len`.
+///
+/// See the wire format description.
+const WIRE_HEADER_SIZE: usize = 4 + 4;
+
+/// See the wire format description.
+const WIRE_MAGIC: &[u8; 4] = b"AFC\0";
+
+/// The maximum allowed size of a `StreamMsg`.
+///
+/// Helps prevent DoS attacks.
+// TODO(eric): make this configurable.
+const MAX_MSG_SIZE: u32 = 10 * 1024 * 1024;
 
 /// AFC messages.
 ///
@@ -203,40 +232,6 @@ struct Data {
     ciphertext: Vec<u8>,
 }
 
-/// The size in bytes of `magic || len`.
-///
-/// See the wire format description.
-const WIRE_HEADER_SIZE: usize = 4 + 4;
-
-/// See the wire format description.
-const WIRE_MAGIC: &[u8; 4] = b"AFC\0";
-
-/// The maximum allowed size of a `StreamMsg`.
-///
-/// Helps prevent DoS attacks.
-// TODO(eric): make this configurable.
-const MAX_MSG_SIZE: u32 = 10 * 1024 * 1024;
-
-/// Data that can be polled by the AFC router.
-#[must_use]
-#[derive(Debug)]
-pub struct PollData(State);
-
-/// An Aranya Fast Channel message.
-#[derive(Clone, Debug, PartialEq)]
-pub struct Message {
-    /// The plaintext data.
-    pub data: Vec<u8>,
-    /// The address from which the message was received.
-    pub addr: SocketAddr,
-    /// The channel from which the message was received.
-    pub channel: AfcId,
-    /// The Aranya Fast Channel label associated with the message.
-    pub label: Label,
-    /// The order of the message in the channel.
-    pub seq: Seq,
-}
-
 /// Sends and receives AFC messages.
 pub struct FastChannelsImpl<S> {
     /// The underlying AFC client.
@@ -249,7 +244,8 @@ pub struct FastChannelsImpl<S> {
     // peers opened.
     streams: TcpStreams,
     /// All open channels.
-    chans: BTreeMap<AfcId, Channel>,
+    // TODO: expose FastChannel to the user and add more methods to it
+    channels: BTreeMap<AfcId, FastChannel>,
     /// Incrementing counter for unique [`NodeId`]s.
     // TODO: move this counter into the daemon.
     next_node_id: u32,
@@ -260,17 +256,17 @@ pub struct FastChannelsImpl<S> {
 }
 
 impl<S: AfcState> FastChannelsImpl<S> {
-    /// Creates a new `FastChannel` listening for connections on `addr`.
-    pub(crate) async fn new<A>(afc: Client<S>, addr: A) -> Result<Self, AfcError>
+    /// Creates a new `FastChannelsImpl` listening for connections on `address`.
+    pub(crate) async fn new<A>(afc: Client<S>, address: A) -> Result<Self, AfcError>
     where
         A: ToSocketAddrs,
     {
-        let listener = TcpListener::bind(addr).await.map_err(AfcError::Bind)?;
+        let listener = TcpListener::bind(address).await.map_err(AfcError::Bind)?;
         Ok(Self {
             afc,
             listener,
             streams: TcpStreams::new(),
-            chans: BTreeMap::new(),
+            channels: BTreeMap::new(),
             next_node_id: 0,
             msgs: VecDeque::new(),
             #[cfg(feature = "debug")]
@@ -291,9 +287,14 @@ impl<S: AfcState> FastChannelsImpl<S> {
         }
     }
 
+    /// Returns the address that AFC is bound to.
+    pub(crate) fn local_addr(&self) -> Result<SocketAddr, AfcError> {
+        self.listener.local_addr().map_err(AfcError::RouterAddr)
+    }
+
     /// Polls the current AFC state.
     #[instrument(skip_all)]
-    async fn inner_poll(&mut self) -> Result<State, AfcError> {
+    async fn poll(&mut self) -> Result<State, AfcError> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
@@ -306,10 +307,10 @@ impl<S: AfcState> FastChannelsImpl<S> {
             // We have an incoming connection.
             result = self.listener.accept() => {
                 result
-                    .map(|(stream, addr)| {
-                        debug!(%addr, "accepted incoming TCP stream");
+                    .map(|(stream, address)| {
+                        debug!(%address, "accepted incoming TCP stream");
                         self.streams.insert(stream)?;
-                        Ok::<_, AfcError>(addr)
+                        Ok::<_, AfcError>(address)
                     })
                     .map_err(AfcError::StreamAccept)?
                     .map(State::Accept)
@@ -322,7 +323,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
     // those.
     #[instrument(skip_all, fields(
         %afc_id,
-        %chan_id,
+        %channel_id,
     ))]
     async fn send_ctrl(
         &mut self,
@@ -330,7 +331,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
         cmd: AfcCtrl,
         team_id: TeamId,
         afc_id: AfcId,
-        chan_id: ChannelId,
+        channel_id: ChannelId,
     ) -> Result<(), AfcError> {
         debug!("sending control message");
 
@@ -349,19 +350,19 @@ impl<S: AfcState> FastChannelsImpl<S> {
 
         let stream = {
             // Try to find an open stream with this peer.
-            let addr = tokio::net::lookup_host(net_id.as_ref())
+            let address = tokio::net::lookup_host(net_id.as_ref())
                 .await
                 .map_err(AfcError::DnsLookup)?
-                .find(|addr| {
-                    debug!(%addr, "resolved potential address");
-                    self.streams.contains(addr)
+                .find(|address| {
+                    debug!(%address, "resolved potential address");
+                    self.streams.contains(address)
                 });
             self.streams
-                .try_get_or_open((addr, net_id.as_ref()))
+                .try_get_or_open((address, net_id.as_ref()))
                 .await?
         };
-        let addr = stream.peer_addr().map_err(AfcError::StreamPeerAddr)?;
-        debug!(%addr, "connected to peer");
+        let address = stream.peer_addr().map_err(AfcError::StreamPeerAddr)?;
+        debug!(%address, "connected to peer");
 
         stream
             .write_all_vectored(&mut [
@@ -376,7 +377,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
 
         // TODO(eric): This throws away `stream` if we already have a stream
         // with this address.
-        self.add_channel(afc_id, net_id, team_id, chan_id, addr)
+        self.add_channel(afc_id, net_id, team_id, channel_id, address)
             .await?;
 
         Ok(())
@@ -388,16 +389,16 @@ impl<S: AfcState> FastChannelsImpl<S> {
     async fn send_data(&mut self, id: AfcId, plaintext: &[u8]) -> Result<(), AfcError> {
         debug!(pt_len = plaintext.len(), "sending data");
 
-        let Channel {
+        let FastChannel {
             net_id,
-            chan_id,
-            addr,
+            channel_id,
+            address,
             ..
         } = self
-            .chans
+            .channels
             .get(&id)
             .ok_or_else(|| AfcError::ChannelNotFound(id))?;
-        debug!(%chan_id, %addr, "found channel");
+        debug!(%channel_id, %address, "found channel");
 
         // TODO(eric): Don't allocate here. Use `IoSlice` instead.
         let datagram = {
@@ -406,12 +407,12 @@ impl<S: AfcState> FastChannelsImpl<S> {
             let (header, ciphertext) = buf
                 .split_first_chunk_mut()
                 .assume("`buf.len()` >= `Header::PACKED_SIZE`")?;
-            debug!(%chan_id, "sealing message");
+            debug!(%channel_id, "sealing message");
             let hdr = self
                 .afc
-                .seal(*chan_id, ciphertext, plaintext)
+                .seal(*channel_id, ciphertext, plaintext)
                 .map_err(AfcError::Encryption)?;
-            debug!(%chan_id, "sealed message");
+            debug!(%channel_id, "sealed message");
             hdr.encode(header)?;
             buf
         };
@@ -430,7 +431,10 @@ impl<S: AfcState> FastChannelsImpl<S> {
             .assume("`data` should be < 2^32-1")?
             .to_le_bytes();
 
-        let stream = self.streams.get_or_open((*addr, net_id.as_ref())).await?;
+        let stream = self
+            .streams
+            .get_or_open((*address, net_id.as_ref()))
+            .await?;
         stream
             .write_all_vectored(&mut [
                 IoSlice::new(WIRE_MAGIC),
@@ -446,14 +450,14 @@ impl<S: AfcState> FastChannelsImpl<S> {
     }
 
     /// Reads a `StreamMsg` from the stream.
-    #[instrument(skip_all, fields(%addr))]
-    async fn read_msg(&mut self, addr: SocketAddr) -> Result<StreamMsg, AfcError> {
+    #[instrument(skip_all, fields(%address))]
+    async fn read_msg(&mut self, address: SocketAddr) -> Result<StreamMsg, AfcError> {
         debug!("reading message from stream");
 
         let stream = self
             .streams
-            .get_mut(&addr)
-            .ok_or_else(|| AfcError::StreamNotFound(addr))?;
+            .get_mut(&address)
+            .ok_or_else(|| AfcError::StreamNotFound(address))?;
 
         stream.readable().await.map_err(AfcError::StreamRead)?;
 
@@ -498,11 +502,11 @@ impl<S: AfcState> FastChannelsImpl<S> {
         self.check_version(data.version)?;
 
         let chan = self
-            .chans
+            .channels
             .get_mut(&data.afc_id)
             .ok_or_else(|| AfcError::ChannelNotFound(data.afc_id))?;
-        let chan_id = chan.chan_id;
-        debug!(%chan_id, "found channel");
+        let channel_id = chan.channel_id;
+        debug!(%channel_id, "found channel");
 
         // Might as well check this first to limit how much work we do for
         // expired channels.
@@ -523,12 +527,12 @@ impl<S: AfcState> FastChannelsImpl<S> {
         let mut plaintext = vec![0; plaintext_len];
         let (label, seq) = self
             .afc
-            .open(chan_id.node_id(), &mut plaintext, ciphertext)
+            .open(channel_id.node_id(), &mut plaintext, ciphertext)
             .map_err(AfcError::Decryption)?;
         debug!(%label, %seq, "decrypted data");
 
-        if chan_id.label() != label {
-            error!(got = %label, expected = %chan_id.label(), "mismatched labels");
+        if channel_id.label() != label {
+            error!(got = %label, expected = %channel_id.label(), "mismatched labels");
             bug!("decrypted data with mismatched labels");
         }
 
@@ -540,11 +544,6 @@ impl<S: AfcState> FastChannelsImpl<S> {
         debug!(next = %FmtOr(chan.next_min_seq, "expired"), "min next seq number");
 
         Ok((plaintext, data.afc_id, label, seq))
-    }
-
-    /// Returns the address that AFC is bound to.
-    pub(crate) fn local_addr(&self) -> Result<SocketAddr, AfcError> {
-        self.listener.local_addr().map_err(AfcError::RouterAddr)
     }
 
     /// Get the next Node ID in the sequence.
@@ -561,20 +560,20 @@ impl<S: AfcState> FastChannelsImpl<S> {
         afc_id = %id,
         %net_id,
         %team_id,
-        %chan_id,
-        %addr,
+        %channel_id,
+        %address,
     ))]
     async fn add_channel(
         &mut self,
         id: AfcId,
         net_id: NetIdentifier,
         team_id: TeamId,
-        chan_id: ChannelId,
-        addr: SocketAddr,
+        channel_id: ChannelId,
+        address: SocketAddr,
     ) -> Result<(), AfcError> {
         debug!("adding channel");
 
-        match self.chans.entry(id) {
+        match self.channels.entry(id) {
             // Reject duplicates because
             // 1. Channel IDs are globally unique (a cryptographically
             //    negligible probability of collisions). This probably means
@@ -589,15 +588,15 @@ impl<S: AfcState> FastChannelsImpl<S> {
                 // that we're processing a duplicate control message.
             }
             btree_map::Entry::Vacant(v) => {
-                v.insert(Channel {
+                v.insert(FastChannel {
                     net_id,
-                    chan_id,
-                    // `addr` comes from either `Status::Accept` or `send_ctrl`,
+                    channel_id,
+                    // `address` comes from either `Status::Accept` or `send_ctrl`,
                     // so use it instead of performing a DNS lookup. In both
                     // cases we likely already have an open TCP stream. If we
                     // don't, the next operation on the channel will perform the
                     // DNS lookup anyway.
-                    addr,
+                    address,
                     next_min_seq: Some(Seq::ZERO),
                 });
             }
@@ -612,7 +611,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
     async fn remove_channel(&mut self, id: AfcId) {
         debug!("removing channel");
 
-        self.chans.remove(&id);
+        self.channels.remove(&id);
     }
 }
 
@@ -641,12 +640,40 @@ impl<S> fmt::Debug for FastChannelsImpl<S> {
         f.debug_struct("Router")
             .field("listener", &self.listener)
             .field("streams", &self.streams)
-            .field("chans", &self.chans)
+            .field("channels", &self.channels)
             .field("next_node_id", &self.next_node_id)
             .finish_non_exhaustive()
     }
 }
 
+/// An open channel.
+#[derive(Debug)]
+struct FastChannel {
+    net_id: NetIdentifier,
+    channel_id: ChannelId,
+    /// Used to look up the TCP stream.
+    address: SocketAddr,
+    /// The minimum allowed next sequence number for a channel, used to prevent
+    /// replay attacks.
+    ///
+    /// `None` indicates that the sequence number would've overflowed and
+    /// [`AfcError::EndOfChannel`] should be returned.
+    ///
+    /// It's `Option<Seq>` instead of `Result<Seq, AfcError>` for size purposes.
+    next_min_seq: Option<Seq>,
+}
+
+impl FastChannel {
+    fn next_min_seq(&self) -> Result<Seq, AfcError> {
+        match self.next_min_seq {
+            Some(v) => Ok(v),
+            None => Err(AfcError::EndOfChannel),
+        }
+    }
+}
+
+/// Aranya Fast Channels client that allows for opening and closing channels and
+/// sending data between peers.
 pub struct FastChannels<'a> {
     client: &'a mut crate::Client,
 }
@@ -693,10 +720,10 @@ impl<'a> FastChannels<'a> {
             .await??;
         debug!(%afc_id, %node_id, %label, "created bidi channel");
 
-        let chan_id = ChannelId::new(node_id, label);
+        let channel_id = ChannelId::new(node_id, label);
         self.client
             .afc
-            .send_ctrl(peer, ctrl, team_id, afc_id, chan_id)
+            .send_ctrl(peer, ctrl, team_id, afc_id, channel_id)
             .await?;
         debug!("sent control message");
 
@@ -714,7 +741,7 @@ impl<'a> FastChannels<'a> {
             .await??;
         self.client.afc.remove_channel(id).await;
         // TODO(eric): Send control message.
-        // self.afc.send_ctrl(peer, ctrl, team_id, id, chan_id);
+        // self.afc.send_ctrl(peer, ctrl, team_id, id, channel_id);
         Ok(())
     }
 
@@ -771,7 +798,7 @@ impl<'a> FastChannels<'a> {
     /// It is safe to cancel the resulting future.
     #[instrument(skip_all)]
     pub async fn poll_data(&mut self) -> crate::Result<PollData> {
-        let data = self.client.afc.inner_poll().await?;
+        let data = self.client.afc.poll().await?;
         Ok(PollData(data))
     }
 
@@ -784,14 +811,14 @@ impl<'a> FastChannels<'a> {
     pub async fn handle_data(&mut self, data: PollData) -> crate::Result<()> {
         let afc = &mut self.client.afc;
         match data.0 {
-            State::Accept(addr) | State::Msg(addr) => match afc.read_msg(addr).await? {
+            State::Accept(address) | State::Msg(address) => match afc.read_msg(address).await? {
                 StreamMsg::Data(data) => {
-                    debug!(%addr, "read data message");
+                    debug!(%address, "read data message");
 
                     let (data, channel, label, seq) = afc.open_data(data)?;
                     afc.msgs.push_back(Message {
                         data,
-                        addr,
+                        address,
                         channel,
                         label,
                         seq,
@@ -799,7 +826,7 @@ impl<'a> FastChannels<'a> {
                     debug!(n = afc.msgs.len(), "stored msg");
                 }
                 StreamMsg::Ctrl(ctrl) => {
-                    debug!(%addr, "read control message");
+                    debug!(%address, "read control message");
 
                     let node_id = afc.get_next_node_id().await?;
                     debug!(%node_id, "selected node ID");
@@ -812,7 +839,7 @@ impl<'a> FastChannels<'a> {
                     debug!(%node_id, %label, "applied AFC control msg");
 
                     let channel_id = ChannelId::new(node_id, label);
-                    afc.add_channel(afc_id, peer, ctrl.team_id, channel_id, addr)
+                    afc.add_channel(afc_id, peer, ctrl.team_id, channel_id, address)
                         .await?;
                 }
             },
@@ -853,9 +880,9 @@ impl TcpStreams {
         &mut self,
         peer: (SocketAddr, impl ToSocketAddrs),
     ) -> Result<&mut TcpStream, AfcError> {
-        let (addr, host) = peer;
+        let (address, host) = peer;
         let prev_len = self.streams.len();
-        match self.streams.entry(addr) {
+        match self.streams.entry(address) {
             map::Entry::Occupied(v) => Ok(v.into_mut()),
             map::Entry::Vacant(v) => {
                 debug!("opening new stream");
@@ -863,7 +890,7 @@ impl TcpStreams {
                 let stream = TcpStream::connect(host)
                     .await
                     .map_err(AfcError::StreamConnect)?;
-                debug!(addr = %TryFmt(stream.peer_addr()), "connected to peer");
+                debug!(address = %TryFmt(stream.peer_addr()), "connected to peer");
 
                 let stream = v.insert(stream);
                 debug!(len = prev_len + 1, "inserted stream");
@@ -877,9 +904,9 @@ impl TcpStreams {
         &mut self,
         peer: (Option<SocketAddr>, impl ToSocketAddrs),
     ) -> Result<&mut TcpStream, AfcError> {
-        let (addr, host) = peer;
-        if let Some(addr) = addr {
-            self.get_or_open((addr, host)).await
+        let (address, host) = peer;
+        if let Some(address) = address {
+            self.get_or_open((address, host)).await
         } else {
             self.connect(host).await
         }
@@ -892,7 +919,7 @@ impl TcpStreams {
         let stream = TcpStream::connect(peer)
             .await
             .map_err(AfcError::StreamConnect)?;
-        debug!(addr = %TryFmt(stream.peer_addr()), "connected to peer");
+        debug!(address = %TryFmt(stream.peer_addr()), "connected to peer");
 
         let (old, new) = self.insert(stream)?;
         if let Some(mut stream) = new {
@@ -912,11 +939,11 @@ impl TcpStreams {
         &mut self,
         stream: TcpStream,
     ) -> Result<(&mut TcpStream, Option<TcpStream>), AfcError> {
-        let addr = stream.peer_addr().map_err(AfcError::StreamPeerAddr)?;
+        let address = stream.peer_addr().map_err(AfcError::StreamPeerAddr)?;
         let prev_len = self.streams.len();
-        let (stream, dupe) = match self.streams.entry(addr) {
+        let (stream, dupe) = match self.streams.entry(address) {
             map::Entry::Occupied(v) => {
-                warn!(%addr, "duplicate stream");
+                warn!(%address, "duplicate stream");
                 (v.into_mut(), Some(stream))
             }
             map::Entry::Vacant(v) => {
@@ -929,13 +956,13 @@ impl TcpStreams {
     }
 
     /// Reports whether the stream exists.
-    fn contains(&mut self, addr: &SocketAddr) -> bool {
-        self.streams.contains_key(addr)
+    fn contains(&mut self, address: &SocketAddr) -> bool {
+        self.streams.contains_key(address)
     }
 
     /// Retrieves an exclusive reference to a stream.
-    fn get_mut(&mut self, addr: &SocketAddr) -> Option<&mut TcpStream> {
-        self.streams.get_mut(addr)
+    fn get_mut(&mut self, address: &SocketAddr) -> Option<&mut TcpStream> {
+        self.streams.get_mut(address)
     }
 
     /// Identifies the next readable stream.
@@ -1085,32 +1112,6 @@ trait AsyncWriteVectored: AsyncWrite {
 }
 
 impl<W: AsyncWrite + ?Sized> AsyncWriteVectored for W {}
-
-/// An open channel.
-#[derive(Debug)]
-struct Channel {
-    net_id: NetIdentifier,
-    chan_id: ChannelId,
-    /// Used to look up the TCP stream.
-    addr: SocketAddr,
-    /// The minimum allowed next sequence number for a channel, used to prevent
-    /// replay attacks.
-    ///
-    /// `None` indicates that the sequence number would've overflowed and
-    /// [`AfcError::EndOfChannel`] should be returned.
-    ///
-    /// It's `Option<Seq>` instead of `Result<Seq, AfcError>` for size purposes.
-    next_min_seq: Option<Seq>,
-}
-
-impl Channel {
-    fn next_min_seq(&self) -> Result<Seq, AfcError> {
-        match self.next_min_seq {
-            Some(v) => Ok(v),
-            None => Err(AfcError::EndOfChannel),
-        }
-    }
-}
 
 #[derive(Debug)]
 struct FmtOr<T>(T, &'static str);

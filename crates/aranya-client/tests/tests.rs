@@ -628,7 +628,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         data: msgs[0].as_bytes().to_vec(),
         // We don't know the address of outgoing connections, so
         // assume `got.addr` is correct here.
-        addr: got.addr,
+        address: got.address,
         channel: afc_id1,
         label: label1,
         seq: Seq::ZERO,
@@ -645,7 +645,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         data: msgs[1].as_bytes().to_vec(),
         // We don't know the address of outgoing connections, so
         // assume `got.addr` is correct here.
-        addr: got.addr,
+        address: got.address,
         channel: afc_id2,
         label: label2,
         seq: Seq::ZERO,
@@ -835,7 +835,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
         data: msg.as_bytes().to_vec(),
         // We don't know the address of outgoing connections, so
         // assume `got.addr` is correct here.
-        addr: got.addr,
+        address: got.address,
         channel: afc_id1,
         label: label1,
         seq: Seq::ZERO,
@@ -855,7 +855,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
 
     let want = Message {
         data: msg.as_bytes().to_vec(),
-        addr: memberb_afc_addr,
+        address: memberb_afc_addr,
         channel: afc_id1,
         label: label1,
         seq: Seq::ZERO,
@@ -1056,7 +1056,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
             data: msg.into(),
             // We don't know the address of outgoing connections,
             // so assume `got.addr` is correct here.
-            addr: got.addr,
+            address: got.address,
             channel: afc_id1,
             label: label1,
             seq,
@@ -1077,7 +1077,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
 
         let want = Message {
             data: msg.into(),
-            addr: memberb_afc_addr,
+            address: memberb_afc_addr,
             channel: afc_id1,
             label: label1,
             seq,

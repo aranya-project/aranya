@@ -922,7 +922,7 @@ pub unsafe fn afc_recv_data(
         channel: ChannelId(msg.channel),
         label: msg.label.into(),
         seq: msg.seq.to_u64(),
-        addr: msg.addr.into(),
+        addr: msg.address.into(),
     });
 
     client.msg = None;
