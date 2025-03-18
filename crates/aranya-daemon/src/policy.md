@@ -127,7 +127,7 @@ fact TeamEnd[]=>{}
 fact Label[label int]=>{}
 
 // Records that a user is allowed to use an AFC label.
-fact AssignedLabel[label int, user_id id]=>{op enum ChanOp, assigned_label int}
+fact AssignedLabel[user_id id, label int]=>{op enum ChanOp, assigned_label int}
 
 // Stores a Member's associated network identifier for AFC.
 fact AfcMemberNetworkId[user_id id]=>{net_identifier string}
@@ -248,7 +248,7 @@ function is_valid_label(label int) bool {
 
 // Returns the channel operation for a particular label.
 function get_allowed_op(user_id id, label int) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedLabel[label: label, user_id: user_id]
+    let assigned_label = check_unwrap query AssignedLabel[user_id: user_id, label: label]
     return assigned_label.op
 }
 
@@ -1047,7 +1047,7 @@ command AssignLabel {
         check exists Label[label: this.label]
 
         finish {
-            create AssignedLabel[label: this.label, user_id: user.user_id]=>{op: this.op, assigned_label: this.label}
+            create AssignedLabel[user_id: user.user_id, label: this.label]=>{op: this.op, assigned_label: this.label}
 
             emit LabelAssigned {
                 user_id: user.user_id,
@@ -1107,10 +1107,10 @@ command RevokeLabel {
         check is_member(user.role)
 
         // Verify that AFC label has been assigned to this Member
-        check exists AssignedLabel[label: this.label, user_id: user.user_id]
+        check exists AssignedLabel[user_id: user.user_id, label: this.label]
 
         finish {
-            delete AssignedLabel[label: this.label, user_id: user.user_id]
+            delete AssignedLabel[user_id: user.user_id, label: this.label]
 
             emit LabelRevoked {
                 user_id: user.user_id,
@@ -1863,7 +1863,7 @@ Queries device label assignments.
 
 ```policy
 action query_device_label_assignments(user_id id) {
-    map AssignedLabel[label:?, user_id: user_id] as f {
+    map AssignedLabel[user_id: user_id, label:?] as f {
         publish QueryDeviceLabelAssignments { label: f.assigned_label }
     }
 }
