@@ -233,7 +233,7 @@ struct Data {
 }
 
 /// Sends and receives AFC messages.
-pub struct FastChannelsImpl<S> {
+pub(crate) struct FastChannelsImpl<S> {
     /// The underlying AFC client.
     afc: Client<S>,
     /// Listens for incoming connections from peers.

@@ -18,7 +18,7 @@ mod error;
 
 #[doc(inline)]
 pub use crate::{
-    afc::{AfcError, AfcId, Label, Message, PollData},
+    afc::{AfcError, AfcId, FastChannels, Label, Message, PollData},
     client::{Client, Team},
     error::{Error, Result},
 };

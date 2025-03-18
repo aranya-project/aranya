@@ -12,10 +12,8 @@ use tarpc::{context, tokio_serde::formats::Json};
 use tokio::net::ToSocketAddrs;
 use tracing::{debug, info, instrument};
 
-use crate::{
-    afc::{setup_afc_shm, FastChannels, FastChannelsImpl},
-    error::{Error, Result},
-};
+use crate::afc::{setup_afc_shm, FastChannels, FastChannelsImpl};
+pub use crate::error::{Error, Result};
 
 /// A client for invoking actions on and processing effects from the Aranya
 /// graph.
