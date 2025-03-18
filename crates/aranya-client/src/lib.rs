@@ -13,12 +13,11 @@
 
 pub mod afc;
 pub mod client;
-
-mod error;
+pub mod error;
 
 #[doc(inline)]
 pub use crate::{
-    afc::{AfcError, AfcId, FastChannels, Label, Message, PollData},
+    afc::{AfcId, FastChannels, Label, Message, PollData},
     client::{Client, Team},
-    error::{Error, Result},
+    error::{AfcError, Error, Result},
 };
