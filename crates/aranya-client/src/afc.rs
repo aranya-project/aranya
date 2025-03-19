@@ -128,7 +128,7 @@ pub(crate) struct FastChannelsImpl<S> {
     // peers opened.
     streams: TcpStreams,
     /// All open channels.
-    // TODO: expose FastChannel to the user and add more methods to it
+    // TODO(nikki): expose FastChannel to the user and add more methods to it
     chans: BTreeMap<AfcId, FastChannel>,
     /// Incrementing counter for unique [`NodeId`]s.
     // TODO: move this counter into the daemon.
