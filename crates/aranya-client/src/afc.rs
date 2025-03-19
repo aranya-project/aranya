@@ -601,10 +601,10 @@ impl<'a> FastChannels<'a> {
             .await??;
         debug!(%afc_id, %node_id, %label, "created bidi channel");
 
-        let channel_id = ChannelId::new(node_id, label);
+        let chan_id = ChannelId::new(node_id, label);
         self.client
             .afc
-            .send_ctrl(peer, ctrl, team_id, afc_id, channel_id)
+            .send_ctrl(peer, ctrl, team_id, afc_id, chan_id)
             .await?;
         debug!("sent control message");
 
