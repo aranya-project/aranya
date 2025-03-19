@@ -136,7 +136,7 @@ fn trim(mut d: u128, mut width: usize) -> (u128, usize) {
 
 /// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the
 /// clients are pending.
-// TODO: alternative to select!{} to resolve lifetime issues
+// TODO(nikki): alternative to select!{} to resolve lifetime issues
 macro_rules! do_poll {
     ($($client:expr),*) => {
         debug!(

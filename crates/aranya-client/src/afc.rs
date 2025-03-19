@@ -6,9 +6,10 @@
 //! magic || len || msg
 //! ```
 //!
-//! - `magic` is a 32-bit little-endian integer with the magic value `"AFC\0"`.
-//! - `len` is a 32-bit little endian integer that contains the size in bytes of
-//!   `msg`.
+//! - `magic` is a 32-bit little-endian integer with the magic
+//!   value `"AFC\0"`.
+//! - `len` is a 32-bit little endian integer that contains the
+//!   size in bytes of `msg`.
 //! - `msg`: A postcard-encoded `StreamMsg`.
 
 use std::{
@@ -92,7 +93,8 @@ const MAX_MSG_SIZE: u32 = 10 * 1024 * 1024;
 
 /// AFC messages.
 ///
-/// These messages are sent/received between AFC peers via the TCP transport.
+/// These messages are sent/received between AFC peers via the
+/// TCP transport.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 enum StreamMsg {
     Ctrl(Ctrl),
@@ -124,8 +126,8 @@ pub(crate) struct FastChannelsImpl<S> {
     listener: TcpListener,
     /// Open TCP connections.
     // TODO(eric): prune unused/idle streams.
-    // TODO(eric): use different maps for streams we opened vs streams that
-    // peers opened.
+    // TODO(eric): use different maps for streams we opened vs
+    // streams that peers opened.
     streams: TcpStreams,
     /// All open channels.
     // TODO(nikki): expose FastChannel to the user and add more methods to it
@@ -259,8 +261,8 @@ impl<S: AfcState> FastChannelsImpl<S> {
         stream.flush().await.map_err(AfcError::StreamWrite)?;
         debug!("sent control message");
 
-        // TODO(eric): This throws away `stream` if we already have a stream
-        // with this address.
+        // TODO(eric): This throws away `stream` if we already
+        // have a stream with this address.
         self.add_channel(afc_id, net_id, team_id, chan_id, addr)
             .await?;
 
@@ -284,9 +286,11 @@ impl<S: AfcState> FastChannelsImpl<S> {
             .ok_or_else(|| AfcError::ChannelNotFound(id))?;
         debug!(%chan_id, %addr, "found channel");
 
-        // TODO(eric): Don't allocate here. Use `IoSlice` instead.
+        // TODO(eric): Don't allocate here. Use `IoSlice`
+        // instead.
         let datagram = {
-            // We need enough space to write [header || ciphertext]
+            // We need enough space to write
+            //   header || ciphertext
             let mut buf = vec![0u8; Header::PACKED_SIZE + plaintext.len() + Client::<S>::OVERHEAD];
             let (header, ciphertext) = buf
                 .split_first_chunk_mut()
@@ -389,8 +393,8 @@ impl<S: AfcState> FastChannelsImpl<S> {
         let chan_id = chan.channel_id;
         debug!(%chan_id, "found channel");
 
-        // Might as well check this first to limit how much work we do for
-        // expired channels.
+        // Might as well check this first to limit how much work
+        // we do for expired channels.
         let next_min_seq = chan.next_min_seq()?;
 
         let InnerMsg { payload, .. } = InnerMsg::try_parse(&data.ciphertext)?;
@@ -399,8 +403,9 @@ impl<S: AfcState> FastChannelsImpl<S> {
             Payload::Control(_) => bug!("`Data` should not contain control messages"),
         };
 
-        // TODO(eric): Update `Message` to handle both shared and exclusive refs
-        // so that we can reuse the `data.ciphertext` allocation.
+        // TODO(eric): Update `Message` to handle both shared and
+        // exclusive refs so that we can reuse the
+        // `data.ciphertext` allocation.
         let plaintext_len = ciphertext
             .len()
             .checked_sub(Client::<S>::OVERHEAD)
@@ -456,27 +461,31 @@ impl<S: AfcState> FastChannelsImpl<S> {
 
         match self.chans.entry(id) {
             // Reject duplicates because
-            // 1. Channel IDs are globally unique (a cryptographically
-            //    negligible probability of collisions). This probably means
-            //    we're processing the same `ctrl` again. It might mean that the
-            //    graph/daemon/whatever is buggy?
-            // 2. It would reset the sequence number, which would allow replay
-            //    attacks.
+            // 1. Channel IDs are globally unique (a
+            //    cryptographically negligible probability of
+            //    collisions). This probably means we're
+            //    processing the same `ctrl` again. It might mean
+            //    that the graph/daemon/whatever is buggy?
+            // 2. It would reset the sequence number, which would
+            //    allow replay attacks.
             btree_map::Entry::Occupied(_) => {
                 warn!(%id, "duplicate channel ID");
 
-                // Don't return an error, though, since the most likely cause is
-                // that we're processing a duplicate control message.
+                // Don't return an error, though, since the most
+                // likely cause is that we're processing
+                // a duplicate control message.
             }
             btree_map::Entry::Vacant(v) => {
                 v.insert(FastChannel {
                     net_id,
                     channel_id,
-                    // `address` comes from either `Status::Accept` or `send_ctrl`,
-                    // so use it instead of performing a DNS lookup. In both
-                    // cases we likely already have an open TCP stream. If we
-                    // don't, the next operation on the channel will perform the
-                    // DNS lookup anyway.
+                    // `addr` comes from either `Status::Accept`
+                    // or `send_ctrl`, so use it instead of
+                    // performing a DNS lookup. In both cases we
+                    // likely already have an open TCP stream. If
+                    // we don't, the next operation on the
+                    // channel will perform the DNS lookup
+                    // anyway.
                     address: addr,
                     next_min_seq: Some(Seq::ZERO),
                 });
@@ -814,8 +823,9 @@ impl TcpStreams {
 
     /// Adds a stream, returning an exclusive reference to it.
     ///
-    /// It refuses to clobber an existing stream. If a stream already exists, it
-    /// returns the existing stream and `Some(stream)`.
+    /// It refuses to clobber an existing stream. If a stream
+    /// already exists, it returns the existing stream and
+    /// `Some(stream)`.
     fn insert(
         &mut self,
         stream: TcpStream,
@@ -847,14 +857,16 @@ impl TcpStreams {
     }
 
     /// Identifies the next readable stream.
-    // The implementation is partially borrowed from Tokio's `StreamMap`.
+    // The implementation is partially borrowed from Tokio's
+    // `StreamMap`.
     #[instrument(skip_all)]
     fn next_ready(&mut self, cx: &mut Context<'_>) -> Result<Poll<SocketAddr>, Bug> {
         if self.streams.is_empty() {
             debug!("no streams to check");
             return Ok(Poll::Pending);
         }
-        // Distribution via % isn't uniform, but it doesn't matter here.
+        // Distribution via % isn't uniform, but it doesn't
+        // matter here.
         let start = usize::random(&mut Rng) % self.streams.len();
         let mut idx = start;
         for _ in 0..self.streams.len() {
@@ -872,8 +884,8 @@ impl TcpStreams {
                     if idx == self.streams.len() {
                         idx = 0;
                     } else if idx < start && start <= self.streams.len() {
-                        // Already polled the stream being swapped, so ignore
-                        // it.
+                        // Already polled the stream being
+                        // swapped, so ignore it.
                         idx = idx.wrapping_add(1) % self.streams.len();
                     }
                 }
@@ -888,7 +900,8 @@ impl TcpStreams {
         Ok(Poll::Pending)
     }
 
-    /// Returns a future that identifies the next readable stream.
+    /// Returns a future that identifies the next readable
+    /// stream.
     fn next(&mut self) -> NextStream<'_> {
         NextStream { streams: self }
     }
@@ -913,7 +926,8 @@ impl Future for NextStream<'_> {
 
 /// Is the stream ready to be read from?
 ///
-/// A stream is "ready" if we've received at least the wire format header.
+/// A stream is "ready" if we've received at least the wire
+/// format header.
 fn stream_is_ready(cx: &mut Context<'_>, stream: &TcpStream) -> io::Result<bool> {
     match stream.poll_read_ready(cx) {
         Poll::Ready(Ok(())) => {}
@@ -977,8 +991,8 @@ trait AsyncWriteVectored: AsyncWrite {
                     "wrote 0 bytes, but `bufs` is not empty",
                 ));
             }
-            // Sanity check since `advance_slices` panics of `n` is out of
-            // range.
+            // Sanity check since `advance_slices` panics of `n`
+            // is out of range.
             if n > remain {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,

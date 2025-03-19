@@ -17,12 +17,13 @@ use crate::{
     error::{Error, Result},
 };
 
-/// A client for invoking actions on and processing effects from the Aranya
-/// graph.
+/// A client for invoking actions on and processing effects from
+/// the Aranya graph.
 ///
-/// `Client` interacts with the [Aranya daemon] via [`aranya-daemon-api`]
-/// ([`tarpc`] over Unix domain sockets). The client provides AFC functionality
-/// by interfacing with AFC utilities in the Aranya core crates.
+/// `Client` interacts with the [Aranya daemon] via
+/// [`aranya-daemon-api`] ([`tarpc`] over Unix domain sockets).
+/// The client provides AFC functionality by interfacing with AFC
+/// utilities in the Aranya core crates.
 ///
 /// [Aranya daemon]: https://crates.io/crates/aranya-daemon
 /// [`aranya-daemon-api`]: https://crates.io/crates/aranya-daemon-api
@@ -38,10 +39,10 @@ pub struct Client {
 impl Client {
     /// Creates a client connection to the daemon.
     ///
-    /// - `daemon_sock`: The socket path to communicate with the daemon.
+    /// - `daemon_socket`: The socket path to communicate with the daemon.
     /// - `afc_shm_path`: AFC's shared memory path. The daemon must also use the
     ///   same path.
-    /// - `max_chans`: The maximum number of channels that AFC should support.
+    /// - `max_channels`: The maximum number of channels that AFC should support.
     ///   The daemon must also use the same number.
     /// - `afc_address`: The address that AFC listens for incoming connections
     ///   on.
@@ -116,8 +117,8 @@ impl Client {
 
 /// Represents an Aranya Team.
 ///
-/// The team allows a device to perform team related operations using the Aranya
-/// [`Client`]. These operations include:
+/// The team allows a device to perform team related operations using the Aranya [`Client`].
+/// These operations include:
 /// - adding/removing sync peers.
 /// - adding/removing devices from the team.
 /// - assigning/revoking device roles.
@@ -157,7 +158,8 @@ impl Team<'_> {
             .await??)
     }
 
-    /// Add a device to the team with the default `Member` role.
+    /// Add a device to the team with the
+    /// default `Member` role.
     pub async fn add_device_to_team(&mut self, keys: KeyBundle) -> Result<()> {
         Ok(self
             .client
@@ -196,10 +198,9 @@ impl Team<'_> {
 
     /// Associate a network identifier to a device for use with AFC.
     ///
-    /// If the address already exists for this device, it is replaced with the
-    /// new address. Capable of resolving addresses via DNS, required to be
-    /// statically mapped to IPV4. For use with OpenChannel and receiving
-    /// messages. Can take either DNS name or IPV4.
+    /// If the address already exists for this device, it is replaced with the new address. Capable
+    /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
+    /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
     pub async fn assign_afc_net_identifier(
         &mut self,
         device: DeviceId,
@@ -245,9 +246,8 @@ impl Team<'_> {
 
     /// Assign an Aranya Fast Channels (AFC) label to a device.
     ///
-    /// This grants the device permission to send/receive AFC data using that
-    /// label. A channel must be created with the label in order to send data
-    /// using that label.
+    /// This grants the device permission to send/receive AFC data using that label.
+    /// A channel must be created with the label in order to send data using that label.
     pub async fn assign_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
         Ok(self
             .client
