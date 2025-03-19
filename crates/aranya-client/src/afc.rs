@@ -191,10 +191,10 @@ impl<S: AfcState> FastChannelsImpl<S> {
             // We have an incoming connection.
             result = self.listener.accept() => {
                 result
-                    .map(|(stream, address)| {
-                        debug!(%address, "accepted incoming TCP stream");
+                    .map(|(stream, addr)| {
+                        debug!(%addr, "accepted incoming TCP stream");
                         self.streams.insert(stream)?;
-                        Ok::<_, AfcError>(address)
+                        Ok::<_, AfcError>(addr)
                     })
                     .map_err(AfcError::StreamAccept)?
                     .map(State::Accept)
@@ -234,19 +234,19 @@ impl<S: AfcState> FastChannelsImpl<S> {
 
         let stream = {
             // Try to find an open stream with this peer.
-            let address = tokio::net::lookup_host(net_id.as_ref())
+            let addr = tokio::net::lookup_host(net_id.as_ref())
                 .await
                 .map_err(AfcError::DnsLookup)?
-                .find(|address| {
-                    debug!(%address, "resolved potential address");
-                    self.streams.contains(address)
+                .find(|addr| {
+                    debug!(%addr, "resolved potential address");
+                    self.streams.contains(addr)
                 });
             self.streams
-                .try_get_or_open((address, net_id.as_ref()))
+                .try_get_or_open((addr, net_id.as_ref()))
                 .await?
         };
-        let address = stream.peer_addr().map_err(AfcError::StreamPeerAddr)?;
-        debug!(%address, "connected to peer");
+        let addr = stream.peer_addr().map_err(AfcError::StreamPeerAddr)?;
+        debug!(%addr, "connected to peer");
 
         stream
             .write_all_vectored(&mut [
@@ -261,7 +261,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
 
         // TODO(eric): This throws away `stream` if we already have a stream
         // with this address.
-        self.add_channel(afc_id, net_id, team_id, channel_id, address)
+        self.add_channel(afc_id, net_id, team_id, channel_id, addr)
             .await?;
 
         Ok(())
@@ -276,13 +276,13 @@ impl<S: AfcState> FastChannelsImpl<S> {
         let FastChannel {
             net_id,
             channel_id,
-            address,
+            address: addr,
             ..
         } = self
             .channels
             .get(&id)
             .ok_or_else(|| AfcError::ChannelNotFound(id))?;
-        debug!(%channel_id, %address, "found channel");
+        debug!(%channel_id, %addr, "found channel");
 
         // TODO(eric): Don't allocate here. Use `IoSlice` instead.
         let datagram = {
@@ -317,7 +317,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
 
         let stream = self
             .streams
-            .get_or_open((*address, net_id.as_ref()))
+            .get_or_open((*addr, net_id.as_ref()))
             .await?;
         stream
             .write_all_vectored(&mut [
@@ -334,14 +334,14 @@ impl<S: AfcState> FastChannelsImpl<S> {
     }
 
     /// Reads a `StreamMsg` from the stream.
-    #[instrument(skip_all, fields(%address))]
-    async fn read_msg(&mut self, address: SocketAddr) -> Result<StreamMsg, AfcError> {
+    #[instrument(skip_all, fields(%addr))]
+    async fn read_msg(&mut self, addr: SocketAddr) -> Result<StreamMsg, AfcError> {
         debug!("reading message from stream");
 
         let stream = self
             .streams
-            .get_mut(&address)
-            .ok_or_else(|| AfcError::StreamNotFound(address))?;
+            .get_mut(&addr)
+            .ok_or_else(|| AfcError::StreamNotFound(addr))?;
 
         stream.readable().await.map_err(AfcError::StreamRead)?;
 
@@ -445,7 +445,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
         %net_id,
         %team_id,
         %channel_id,
-        %address,
+        %addr,
     ))]
     async fn add_channel(
         &mut self,
@@ -453,7 +453,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
         net_id: NetIdentifier,
         team_id: TeamId,
         channel_id: ChannelId,
-        address: SocketAddr,
+        addr: SocketAddr,
     ) -> Result<(), AfcError> {
         debug!("adding channel");
 
@@ -480,7 +480,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
                     // cases we likely already have an open TCP stream. If we
                     // don't, the next operation on the channel will perform the
                     // DNS lookup anyway.
-                    address,
+                    address: addr,
                     next_min_seq: Some(Seq::ZERO),
                 });
             }
@@ -695,14 +695,14 @@ impl<'a> FastChannels<'a> {
     pub async fn handle_data(&mut self, data: PollData) -> crate::Result<()> {
         let afc = &mut self.client.afc;
         match data.0 {
-            State::Accept(address) | State::Msg(address) => match afc.read_msg(address).await? {
+            State::Accept(addr) | State::Msg(addr) => match afc.read_msg(addr).await? {
                 StreamMsg::Data(data) => {
-                    debug!(%address, "read data message");
+                    debug!(%addr, "read data message");
 
                     let (data, channel, label, seq) = afc.open_data(data)?;
                     afc.msgs.push_back(Message {
                         data,
-                        address,
+                        address: addr,
                         channel,
                         label,
                         seq,
@@ -710,7 +710,7 @@ impl<'a> FastChannels<'a> {
                     debug!(n = afc.msgs.len(), "stored msg");
                 }
                 StreamMsg::Ctrl(ctrl) => {
-                    debug!(%address, "read control message");
+                    debug!(%addr, "read control message");
 
                     let node_id = afc.get_next_node_id().await?;
                     debug!(%node_id, "selected node ID");
@@ -723,7 +723,7 @@ impl<'a> FastChannels<'a> {
                     debug!(%node_id, %label, "applied AFC control msg");
 
                     let channel_id = ChannelId::new(node_id, label);
-                    afc.add_channel(afc_id, peer, ctrl.team_id, channel_id, address)
+                    afc.add_channel(afc_id, peer, ctrl.team_id, channel_id, addr)
                         .await?;
                 }
             },
@@ -764,9 +764,9 @@ impl TcpStreams {
         &mut self,
         peer: (SocketAddr, impl ToSocketAddrs),
     ) -> Result<&mut TcpStream, AfcError> {
-        let (address, host) = peer;
+        let (addr, host) = peer;
         let prev_len = self.streams.len();
-        match self.streams.entry(address) {
+        match self.streams.entry(addr) {
             map::Entry::Occupied(v) => Ok(v.into_mut()),
             map::Entry::Vacant(v) => {
                 debug!("opening new stream");
@@ -774,7 +774,7 @@ impl TcpStreams {
                 let stream = TcpStream::connect(host)
                     .await
                     .map_err(AfcError::StreamConnect)?;
-                debug!(address = %TryFmt(stream.peer_addr()), "connected to peer");
+                debug!(addr = %TryFmt(stream.peer_addr()), "connected to peer");
 
                 let stream = v.insert(stream);
                 debug!(len = prev_len + 1, "inserted stream");
@@ -788,9 +788,9 @@ impl TcpStreams {
         &mut self,
         peer: (Option<SocketAddr>, impl ToSocketAddrs),
     ) -> Result<&mut TcpStream, AfcError> {
-        let (address, host) = peer;
-        if let Some(address) = address {
-            self.get_or_open((address, host)).await
+        let (addr, host) = peer;
+        if let Some(addr) = addr {
+            self.get_or_open((addr, host)).await
         } else {
             self.connect(host).await
         }
@@ -803,7 +803,7 @@ impl TcpStreams {
         let stream = TcpStream::connect(peer)
             .await
             .map_err(AfcError::StreamConnect)?;
-        debug!(address = %TryFmt(stream.peer_addr()), "connected to peer");
+        debug!(addr = %TryFmt(stream.peer_addr()), "connected to peer");
 
         let (old, new) = self.insert(stream)?;
         if let Some(mut stream) = new {
@@ -823,11 +823,11 @@ impl TcpStreams {
         &mut self,
         stream: TcpStream,
     ) -> Result<(&mut TcpStream, Option<TcpStream>), AfcError> {
-        let address = stream.peer_addr().map_err(AfcError::StreamPeerAddr)?;
+        let addr = stream.peer_addr().map_err(AfcError::StreamPeerAddr)?;
         let prev_len = self.streams.len();
-        let (stream, dupe) = match self.streams.entry(address) {
+        let (stream, dupe) = match self.streams.entry(addr) {
             map::Entry::Occupied(v) => {
-                warn!(%address, "duplicate stream");
+                warn!(%addr, "duplicate stream");
                 (v.into_mut(), Some(stream))
             }
             map::Entry::Vacant(v) => {
@@ -840,13 +840,13 @@ impl TcpStreams {
     }
 
     /// Reports whether the stream exists.
-    fn contains(&mut self, address: &SocketAddr) -> bool {
-        self.streams.contains_key(address)
+    fn contains(&mut self, addr: &SocketAddr) -> bool {
+        self.streams.contains_key(addr)
     }
 
     /// Retrieves an exclusive reference to a stream.
-    fn get_mut(&mut self, address: &SocketAddr) -> Option<&mut TcpStream> {
-        self.streams.get_mut(address)
+    fn get_mut(&mut self, addr: &SocketAddr) -> Option<&mut TcpStream> {
+        self.streams.get_mut(addr)
     }
 
     /// Identifies the next readable stream.

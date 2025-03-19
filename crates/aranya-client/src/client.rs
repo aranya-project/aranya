@@ -43,14 +43,14 @@ impl Client {
     ///   same path.
     /// - `max_chans`: The maximum number of channels that AFC should support.
     ///   The daemon must also use the same number.
-    /// - `afc_listen_addr`: The address that AFC listens for incoming
-    ///   connections on.
+    /// - `afc_address`: The address that AFC listens for incoming connections
+    ///   on.
     #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, max_channels))]
     pub async fn connect<A>(
         daemon_socket: &Path,
         afc_shm_path: &Path,
         max_channels: usize,
-        afc_listen_addr: A,
+        afc_address: A,
     ) -> Result<Self>
     where
         A: ToSocketAddrs,
@@ -64,7 +64,7 @@ impl Client {
         debug!("connected to daemon");
 
         let read = setup_afc_shm(afc_shm_path, max_channels)?;
-        let afc = FastChannelsImpl::new(afc::Client::new(read), afc_listen_addr).await?;
+        let afc = FastChannelsImpl::new(afc::Client::new(read), afc_address).await?;
         debug!(
             addr = ?afc.local_addr().map_err(Error::Afc)?,
             "bound AFC router",

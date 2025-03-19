@@ -317,9 +317,9 @@ AranyaError run(Team *t) {
     // create a bidirectional Aranya Fast Channel.
 
     // create AFC channel between membera and memberb.
-    AranyaChannelId chan_id;
+    AranyaChannelId channel_id;
     err = aranya_afc_create_bidi_channel(&t->clients.membera.client, &t->id,
-                                         afc_addrs[MEMBERB], label, &chan_id);
+                                         afc_addrs[MEMBERB], label, &channel_id);
     EXPECT("error creating afc channel", err);
     AranyaDuration timeout = ARANYA_DURATION_SECONDS * 1;
     // TODO: poll in separate task.
@@ -341,7 +341,7 @@ AranyaError run(Team *t) {
 
     // send AFC data.
     const char *send = "hello world";
-    err              = aranya_afc_send_data(&t->clients.membera.client, chan_id,
+    err              = aranya_afc_send_data(&t->clients.membera.client, channel_id,
                                             (const uint8_t *)send, (int)strlen(send));
     EXPECT("error sending data", err);
     printf("%s sent afc message: len: %d \r\n", t->clients_arr[MEMBERA].name,
