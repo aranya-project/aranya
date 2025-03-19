@@ -65,7 +65,7 @@ pub struct KeyBundle {
 }
 
 /// A device's role on the team.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Role {
     Owner,
     Admin,
