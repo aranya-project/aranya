@@ -662,9 +662,9 @@ impl DaemonApi for DaemonApiHandler {
             .query_device_keybundle_off_graph(device.into_id().into())
             .await?;
         if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
-            find_effect!(&effects, Effect::QueryDeviceKeyBundleResult(_e))
+            find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
         {
-            return Ok(ApiKeyBundle::from(e.user_keys.clone()));
+            return Ok(ApiKeyBundle::from(e.user_keys));
         };
         Err(anyhow!("unable to query device keybundle").into())
     }
@@ -709,9 +709,9 @@ impl DaemonApi for DaemonApiHandler {
             .query_afc_net_identifier_off_graph(device.into_id().into())
             .await?;
         if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
-            find_effect!(&effects, Effect::QueryAfcNetIdentifierResult(_e))
+            find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
         {
-            return Ok(NetIdentifier(e.net_identifier.clone()));
+            return Ok(NetIdentifier(e.net_identifier));
         };
         Err(anyhow!("unable to query afc network identifier").into())
     }
@@ -729,9 +729,9 @@ impl DaemonApi for DaemonApiHandler {
             .query_aqc_net_identifier_off_graph(device.into_id().into())
             .await?;
         if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
-            find_effect!(&effects, Effect::QueryAqcNetIdentifierResult(_e))
+            find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
         {
-            return Ok(NetIdentifier(e.net_identifier.clone()));
+            return Ok(NetIdentifier(e.net_identifier));
         };
         Err(anyhow!("unable to query aqc network identifier").into())
     }
