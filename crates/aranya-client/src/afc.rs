@@ -129,7 +129,7 @@ pub(crate) struct FastChannelsImpl<S> {
     streams: TcpStreams,
     /// All open channels.
     // TODO: expose FastChannel to the user and add more methods to it
-    channels: BTreeMap<AfcId, FastChannel>,
+    chans: BTreeMap<AfcId, FastChannel>,
     /// Incrementing counter for unique [`NodeId`]s.
     // TODO: move this counter into the daemon.
     next_node_id: u32,
@@ -150,7 +150,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
             afc,
             listener,
             streams: TcpStreams::new(),
-            channels: BTreeMap::new(),
+            chans: BTreeMap::new(),
             next_node_id: 0,
             msgs: VecDeque::new(),
             #[cfg(feature = "debug")]
@@ -207,7 +207,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
     // those.
     #[instrument(skip_all, fields(
         %afc_id,
-        %channel_id,
+        %chan_id,
     ))]
     async fn send_ctrl(
         &mut self,
@@ -215,7 +215,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
         cmd: AfcCtrl,
         team_id: TeamId,
         afc_id: AfcId,
-        channel_id: ChannelId,
+        chan_id: ChannelId,
     ) -> Result<(), AfcError> {
         debug!("sending control message");
 
@@ -261,7 +261,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
 
         // TODO(eric): This throws away `stream` if we already have a stream
         // with this address.
-        self.add_channel(afc_id, net_id, team_id, channel_id, addr)
+        self.add_channel(afc_id, net_id, team_id, chan_id, addr)
             .await?;
 
         Ok(())
@@ -275,14 +275,14 @@ impl<S: AfcState> FastChannelsImpl<S> {
 
         let FastChannel {
             net_id,
-            channel_id,
+            channel_id: chan_id,
             address: addr,
             ..
         } = self
-            .channels
+            .chans
             .get(&id)
             .ok_or_else(|| AfcError::ChannelNotFound(id))?;
-        debug!(%channel_id, %addr, "found channel");
+        debug!(%chan_id, %addr, "found channel");
 
         // TODO(eric): Don't allocate here. Use `IoSlice` instead.
         let datagram = {
@@ -291,12 +291,12 @@ impl<S: AfcState> FastChannelsImpl<S> {
             let (header, ciphertext) = buf
                 .split_first_chunk_mut()
                 .assume("`buf.len()` >= `Header::PACKED_SIZE`")?;
-            debug!(%channel_id, "sealing message");
+            debug!(%chan_id, "sealing message");
             let hdr = self
                 .afc
-                .seal(*channel_id, ciphertext, plaintext)
+                .seal(*chan_id, ciphertext, plaintext)
                 .map_err(AfcError::Encryption)?;
-            debug!(%channel_id, "sealed message");
+            debug!(%chan_id, "sealed message");
             hdr.encode(header)?;
             buf
         };
@@ -315,10 +315,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
             .assume("`data` should be < 2^32-1")?
             .to_le_bytes();
 
-        let stream = self
-            .streams
-            .get_or_open((*addr, net_id.as_ref()))
-            .await?;
+        let stream = self.streams.get_or_open((*addr, net_id.as_ref())).await?;
         stream
             .write_all_vectored(&mut [
                 IoSlice::new(WIRE_MAGIC),
@@ -386,11 +383,11 @@ impl<S: AfcState> FastChannelsImpl<S> {
         self.check_version(data.version)?;
 
         let chan = self
-            .channels
+            .chans
             .get_mut(&data.afc_id)
             .ok_or_else(|| AfcError::ChannelNotFound(data.afc_id))?;
-        let channel_id = chan.channel_id;
-        debug!(%channel_id, "found channel");
+        let chan_id = chan.channel_id;
+        debug!(%chan_id, "found channel");
 
         // Might as well check this first to limit how much work we do for
         // expired channels.
@@ -411,12 +408,12 @@ impl<S: AfcState> FastChannelsImpl<S> {
         let mut plaintext = vec![0; plaintext_len];
         let (label, seq) = self
             .afc
-            .open(channel_id.node_id(), &mut plaintext, ciphertext)
+            .open(chan_id.node_id(), &mut plaintext, ciphertext)
             .map_err(AfcError::Decryption)?;
         debug!(%label, %seq, "decrypted data");
 
-        if channel_id.label() != label {
-            error!(got = %label, expected = %channel_id.label(), "mismatched labels");
+        if chan_id.label() != label {
+            error!(got = %label, expected = %chan_id.label(), "mismatched labels");
             bug!("decrypted data with mismatched labels");
         }
 
@@ -457,7 +454,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
     ) -> Result<(), AfcError> {
         debug!("adding channel");
 
-        match self.channels.entry(id) {
+        match self.chans.entry(id) {
             // Reject duplicates because
             // 1. Channel IDs are globally unique (a cryptographically
             //    negligible probability of collisions). This probably means
@@ -495,7 +492,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
     async fn remove_channel(&mut self, id: AfcId) {
         debug!("removing channel");
 
-        self.channels.remove(&id);
+        self.chans.remove(&id);
     }
 }
 
@@ -524,7 +521,7 @@ impl<S> fmt::Debug for FastChannelsImpl<S> {
         f.debug_struct("Router")
             .field("listener", &self.listener)
             .field("streams", &self.streams)
-            .field("channels", &self.channels)
+            .field("channels", &self.chans)
             .field("next_node_id", &self.next_node_id)
             .finish_non_exhaustive()
     }
@@ -722,8 +719,8 @@ impl<'a> FastChannels<'a> {
                         .await??;
                     debug!(%node_id, %label, "applied AFC control msg");
 
-                    let channel_id = ChannelId::new(node_id, label);
-                    afc.add_channel(afc_id, peer, ctrl.team_id, channel_id, addr)
+                    let chan_id = ChannelId::new(node_id, label);
+                    afc.add_channel(afc_id, peer, ctrl.team_id, chan_id, addr)
                         .await?;
                 }
             },
