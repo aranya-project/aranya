@@ -13,6 +13,7 @@ use aranya_daemon::{
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
+use buggy::BugExt;
 use tempfile::tempdir;
 use tokio::{fs, task, time::sleep};
 use tracing::{debug, info, Metadata};
@@ -138,7 +139,7 @@ macro_rules! do_poll {
             let mut afcs = afcs.iter_mut();
             tokio::select! {
                 biased;
-                $(data = afcs.next().unwrap().poll_data() => {
+                $(data = afcs.next().assume("macro enforces client count")?.poll_data() => {
                     $client.afc().handle_data(data?).await?
                 },)*
                 _ = async {} => break,

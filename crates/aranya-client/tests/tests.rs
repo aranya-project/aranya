@@ -27,6 +27,7 @@ use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_fast_channels::{Label, Seq};
 use aranya_util::addr::Addr;
 use backon::{ExponentialBuilder, Retryable};
+use buggy::BugExt;
 use spideroak_base58::ToBase58;
 use tempfile::tempdir;
 use test_log::test;
@@ -147,7 +148,7 @@ macro_rules! do_poll {
             let mut afcs = afcs.iter_mut();
             tokio::select! {
                 biased;
-                $(data = afcs.next().unwrap().poll_data() => {
+                $(data = afcs.next().assume("macro enforces client count")?.poll_data() => {
                     $client.afc().handle_data(data?).await?
                 },)*
                 _ = async {} => break,
