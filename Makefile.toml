@@ -18,7 +18,7 @@ script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 
 
 # Build
-[tasks.build-code]
+[tasks.build]
 category = "build"
 description = "Build Code"
 command = "cargo"
@@ -89,7 +89,7 @@ install_crate = { crate_name = "cbindgen", version = "0.27.0", binary = "cbindge
 
 
 # Test
-[tasks.unit-tests]
+[tasks.test]
 category = "test"
 description = "Run Unit Tests"
 workspace = true

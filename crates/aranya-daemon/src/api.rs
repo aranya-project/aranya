@@ -13,7 +13,6 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler};
-use aranya_buggy::BugExt;
 use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, Rng, UserId};
 use aranya_daemon_api::{
     AfcCtrl, AfcId, DaemonApi, DeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
@@ -23,6 +22,7 @@ use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed, La
 use aranya_keygen::PublicKeys;
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
+use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,
@@ -34,10 +34,7 @@ use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
     aranya::Actions,
-    policy::{
-        BidiChannelCreated as AfcBidiChannelCreated, BidiChannelReceived as AfcBidiChannelReceived,
-        ChanOp, Effect, KeyBundle, Role,
-    },
+    policy::{AfcBidiChannelCreated, AfcBidiChannelReceived, ChanOp, Effect, KeyBundle, Role},
     sync::SyncPeers,
     Client, CE, EF,
 };
@@ -197,21 +194,21 @@ impl DaemonApiHandler {
                         .insert(NetIdentifier(e.net_identifier.clone()), e.user_id.into());
                 }
                 Effect::NetworkNameUnset(_network_name_unset) => {}
-                Effect::BidiChannelCreated(v) => {
+                Effect::AfcBidiChannelCreated(v) => {
                     debug!("received BidiChannelCreated effect");
                     if let Some(node_id) = node_id {
                         self.afc_bidi_channel_created(v, node_id).await?
                     }
                 }
-                Effect::BidiChannelReceived(v) => {
+                Effect::AfcBidiChannelReceived(v) => {
                     debug!("received BidiChannelReceived effect");
                     if let Some(node_id) = node_id {
                         self.afc_bidi_channel_received(v, node_id).await?
                     }
                 }
                 // TODO: unidirectional channels
-                Effect::UniChannelCreated(_uni_channel_created) => {}
-                Effect::UniChannelReceived(_uni_channel_received) => {}
+                Effect::AfcUniChannelCreated(_uni_channel_created) => {}
+                Effect::AfcUniChannelReceived(_uni_channel_received) => {}
             }
         }
         Ok(())
@@ -417,7 +414,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn assign_net_identifier(
+    async fn assign_afc_net_identifier(
         self,
         _: context::Context,
         team: TeamId,
@@ -434,7 +431,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn remove_net_identifier(
+    async fn remove_afc_net_identifier(
         self,
         _: context::Context,
         team: TeamId,
@@ -499,7 +496,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip_all)]
-    async fn create_bidi_channel(
+    async fn create_afc_bidi_channel(
         self,
         _: context::Context,
         team: TeamId,
@@ -507,7 +504,7 @@ impl DaemonApi for DaemonApiHandler {
         node_id: NodeId,
         label: Label,
     ) -> ApiResult<(AfcId, AfcCtrl)> {
-        info!("create_bidi_channel");
+        info!("create_afc_bidi_channel");
 
         let peer_id = self
             .afc_peers
@@ -520,12 +517,12 @@ impl DaemonApi for DaemonApiHandler {
         let (ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
-            .create_bidi_channel_off_graph(peer_id, label)
+            .create_afc_bidi_channel_off_graph(peer_id, label)
             .await?;
         let id = self.pk.ident_pk.id()?;
 
-        let Some(Effect::BidiChannelCreated(e)) =
-            find_effect!(&effects, Effect::BidiChannelCreated(e) if e.author_id == id.into())
+        let Some(Effect::AfcBidiChannelCreated(e)) =
+            find_effect!(&effects, Effect::AfcBidiChannelCreated(e) if e.author_id == id.into())
         else {
             return Err(anyhow::anyhow!("unable to find BidiChannelCreated effect").into());
         };
@@ -537,7 +534,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn delete_channel(self, _: context::Context, chan: AfcId) -> ApiResult<AfcCtrl> {
+    async fn delete_afc_channel(self, _: context::Context, chan: AfcId) -> ApiResult<AfcCtrl> {
         // TODO: remove AFC channel from Aranya.
         todo!();
     }
@@ -555,8 +552,8 @@ impl DaemonApi for DaemonApiHandler {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
             let id = self.pk.ident_pk.id()?;
             self.handle_effects(&effects, Some(node_id)).await?;
-            let Some(Effect::BidiChannelReceived(e)) =
-                find_effect!(&effects, Effect::BidiChannelReceived(e) if e.peer_id == id.into())
+            let Some(Effect::AfcBidiChannelReceived(e)) =
+                find_effect!(&effects, Effect::AfcBidiChannelReceived(e) if e.peer_id == id.into())
             else {
                 continue;
             };
@@ -573,7 +570,7 @@ impl DaemonApi for DaemonApiHandler {
                 .clone();
             return Ok((afc_id, net, label));
         }
-        Err(anyhow!("unable to find BidiChannelReceived effect").into())
+        Err(anyhow!("unable to find AfcBidiChannelReceived effect").into())
     }
 }
 

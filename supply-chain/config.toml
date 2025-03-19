@@ -32,19 +32,19 @@ url = "https://raw.githubusercontent.com/mozilla/supply-chain/main/audits.toml"
 url = "https://raw.githubusercontent.com/zcash/rust-ecosystem/main/supply-chain/audits.toml"
 
 [policy.aranya-client]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.aranya-daemon]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.aranya-daemon-api]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.aranya-keygen]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [policy.aranya-util]
-audit-as-crates-io = true
+audit-as-crates-io = false
 
 [[exemptions.addr2line]]
 version = "0.24.2"
@@ -96,10 +96,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.atomic-polyfill]]
 version = "1.0.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.autocfg]]
-version = "1.4.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.backon]]
@@ -246,36 +242,12 @@ criteria = "safe-to-deploy"
 version = "4.3.1"
 criteria = "safe-to-deploy"
 
-[[exemptions.errno]]
-version = "0.3.10"
-criteria = "safe-to-deploy"
-
 [[exemptions.fastrand]]
 version = "2.3.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.ff]]
 version = "0.13.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.futures]]
-version = "0.3.31"
-criteria = "safe-to-deploy"
-
-[[exemptions.futures-channel]]
-version = "0.3.31"
-criteria = "safe-to-deploy"
-
-[[exemptions.futures-executor]]
-version = "0.3.31"
-criteria = "safe-to-deploy"
-
-[[exemptions.futures-io]]
-version = "0.3.31"
-criteria = "safe-to-deploy"
-
-[[exemptions.futures-macro]]
-version = "0.3.31"
 criteria = "safe-to-deploy"
 
 [[exemptions.futures-task]]
@@ -338,10 +310,6 @@ criteria = "safe-to-deploy"
 version = "2.1.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.indexmap]]
-version = "2.7.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.is_terminal_polyfill]]
 version = "1.70.1"
 criteria = "safe-to-deploy"
@@ -376,10 +344,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.mio]]
 version = "1.0.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.more-asserts]]
-version = "0.3.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.object]]
@@ -502,14 +466,6 @@ criteria = "safe-to-deploy"
 version = "0.6.29"
 criteria = "safe-to-deploy"
 
-[[exemptions.regex-syntax]]
-version = "0.8.5"
-criteria = "safe-to-deploy"
-
-[[exemptions.rfc6979]]
-version = "0.4.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.rustix]]
 version = "0.38.42"
 criteria = "safe-to-deploy"
@@ -562,10 +518,6 @@ criteria = "safe-to-deploy"
 version = "0.4.9"
 criteria = "safe-to-deploy"
 
-[[exemptions.smallvec]]
-version = "1.13.2"
-criteria = "safe-to-deploy"
-
 [[exemptions.socket2]]
 version = "0.5.8"
 criteria = "safe-to-deploy"
@@ -576,18 +528,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.spki]]
 version = "0.7.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.stable_deref_trait]]
-version = "1.2.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.strum]]
-version = "0.26.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.strum_macros]]
-version = "0.26.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.syn]]
@@ -686,10 +626,6 @@ criteria = "safe-to-deploy"
 version = "0.3.5"
 criteria = "safe-to-deploy"
 
-[[exemptions.unicode-width]]
-version = "0.1.14"
-criteria = "safe-to-deploy"
-
 [[exemptions.unsafe-libyaml]]
 version = "0.2.11"
 criteria = "safe-to-deploy"
@@ -738,16 +674,8 @@ criteria = "safe-to-deploy"
 version = "0.3.9"
 criteria = "safe-to-deploy"
 
-[[exemptions.winapi-i686-pc-windows-gnu]]
-version = "0.4.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.winapi-util]]
 version = "0.1.9"
-criteria = "safe-to-deploy"
-
-[[exemptions.winapi-x86_64-pc-windows-gnu]]
-version = "0.4.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.windows-sys]]
@@ -798,26 +726,10 @@ criteria = "safe-to-deploy"
 version = "1.0.1"
 criteria = "safe-to-run"
 
-[[exemptions.yoke]]
-version = "0.7.5"
-criteria = "safe-to-deploy"
-
-[[exemptions.yoke-derive]]
-version = "0.7.5"
-criteria = "safe-to-deploy"
-
 [[exemptions.zerocopy]]
 version = "0.7.35"
 criteria = "safe-to-deploy"
 
 [[exemptions.zerocopy-derive]]
 version = "0.7.35"
-criteria = "safe-to-deploy"
-
-[[exemptions.zerofrom]]
-version = "0.1.5"
-criteria = "safe-to-deploy"
-
-[[exemptions.zerofrom-derive]]
-version = "0.1.5"
 criteria = "safe-to-deploy"
