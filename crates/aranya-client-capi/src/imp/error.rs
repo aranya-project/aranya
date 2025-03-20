@@ -61,8 +61,7 @@ impl ExtError {
         Self { err: Some(err) }
     }
 
-    /// Copies the error message to `msg` as a null-terminated
-    /// C string.
+    /// Copies the error message to `msg` as a null-terminated C string.
     pub fn copy_msg(&self, msg: &mut [MaybeUninit<c_char>], len: &mut usize) -> Result<(), Error> {
         if let Some(err) = &self.err {
             write_c_str(msg, err, len).map_err(Into::into)

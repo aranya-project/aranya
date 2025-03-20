@@ -116,10 +116,9 @@ packed = "ARANYA_PACKED"
 aligned_n = "ARANYA_ALIGNED"
 
 [parse]
-# Required because we expand capi to generate doc comments, which
-# uses -Zunpretty=expanded, which requires nightly, which screws
-# up clippy, etc. afterward because the packages were compiled
-# with a different compiler.
+# Required because we expand capi to generate doc comments, which uses
+# -Zunpretty=expanded, which requires nightly, which screws up clippy, etc.
+# afterward because the packages were compiled with a different compiler.
 clean = true
 
 [parse.expand]
