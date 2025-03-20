@@ -1,6 +1,6 @@
 use core::{ffi::c_char, ops::DerefMut, ptr, slice};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
-
+use std::ffi::CString;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use libc;
 use tracing::debug;
@@ -237,6 +237,11 @@ impl NetIdentifier {
         Ok(aranya_daemon_api::NetIdentifier(String::from(
             cstr.to_str()?,
         )))
+    }
+    // TODO: not sure if this is right.
+    fn from_underlying(net_identifier: aranya_daemon_api::NetIdentifier) -> Self {
+        let cstr = CString::new(net_identifier.0.as_str()).expect("expected valid C str");
+        NetIdentifier(cstr.as_c_str().as_ptr())
     }
 }
 
@@ -641,7 +646,7 @@ pub unsafe fn afc_assign_net_identifier(
     Ok(())
 }
 
-/// Disassociate a network identifier from a device.
+/// Disassociate an AFC network identifier from a device.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -669,7 +674,67 @@ pub unsafe fn afc_remove_net_identifier(
     Ok(())
 }
 
-/// Create an AFC label.
+/// Associate a network identifier to a device for use with AQC.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// If the address already exists for this device, it is replaced with the new address. Capable
+/// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
+/// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param net_identifier the device's network identifier [`NetIdentifier`].
+///
+/// @relates AranyaClient.
+pub unsafe fn aqc_assign_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    net_identifier: NetIdentifier,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
+    let net_identifier = unsafe { net_identifier.as_underlying() }?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .assign_aqc_net_identifier(device.0, net_identifier),
+    )?;
+    Ok(())
+}
+
+/// Disassociate an AQC network identifier from a device.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param net_identifier the device's network identifier [`NetIdentifier`].
+///
+/// @relates AranyaClient.
+pub unsafe fn aqc_remove_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    net_identifier: NetIdentifier,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
+    let net_identifier = unsafe { net_identifier.as_underlying() }?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .remove_aqc_net_identifier(device.0, net_identifier),
+    )?;
+    Ok(())
+}
+
+/// Create a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -686,13 +751,13 @@ pub fn create_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
     Ok(())
 }
 
-/// Delete an AFC label.
+/// Delete a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param label the AFC channel label [`Label`] to delete.
+/// @param label the channel label [`Label`] to delete.
 ///
 /// @relates AranyaClient.
 pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
@@ -927,4 +992,102 @@ pub unsafe fn afc_recv_data(
     client.msg = None;
 
     Ok(true)
+}
+
+// TODO: query_devices_on_team
+
+// TODO: query_device_role
+
+/// Query device's keybundle.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param __output the device's key bundle [`KeyBundle`].
+/// 
+/// @relates AranyaClient.
+pub unsafe fn query_device_keybundle(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+) -> Result<KeyBundle, imp::Error> {
+    let client = client.deref_mut();
+    let keys = client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .query_device_keybundle(device.0),
+    )?;
+    Ok(KeyBundle::from_underlying(keys))
+}
+
+// TODO: query_device_label_assignments
+
+/// Query device's AFC network identifier.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param __output the device's network identifier [`NetIdentifier`].
+/// 
+/// @relates AranyaClient.
+pub unsafe fn query_afc_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+) -> Result<NetIdentifier, imp::Error> {
+    let client = client.deref_mut();
+    let net_identifier = client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .query_afc_net_identifier(device.0),
+    )?;
+    Ok(NetIdentifier::from_underlying(net_identifier))
+}
+
+/// Query device's AQC network identifier.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param __output the device's network identifier [`NetIdentifier`].
+/// 
+/// @relates AranyaClient.
+pub unsafe fn query_aqc_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+) -> Result<NetIdentifier, imp::Error> {
+    let client = client.deref_mut();
+    let net_identifier = client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .query_aqc_net_identifier(device.0),
+    )?;
+    Ok(NetIdentifier::from_underlying(net_identifier))
+}
+
+/// Query device's AQC network identifier.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param __output the device's network identifier [`NetIdentifier`].
+/// 
+/// @relates AranyaClient.
+pub unsafe fn query_label_exists(
+    client: &mut Client,
+    team: &TeamId,
+    label: &Label,
+) -> Result<bool, imp::Error> {
+    let client = client.deref_mut();
+    let exists = client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .query_label_exists(label.0.into()),
+    )?;
+    Ok(exists)
 }

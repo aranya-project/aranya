@@ -300,16 +300,53 @@ AranyaError run(Team *t) {
 
     // assign AFC network addresses.
     err = aranya_afc_assign_net_identifier(&t->clients.operator.client, &t->id,
-                                       &t->clients.membera.id,
-                                       afc_addrs[MEMBERA]);
-    EXPECT("error assigning net name to membera", err);
+                                           &t->clients.membera.id,
+                                           afc_addrs[MEMBERA]);
+    EXPECT("error assigning afc net name to membera", err);
 
     err = aranya_afc_assign_net_identifier(&t->clients.operator.client, &t->id,
-                                       &t->clients.memberb.id,
-                                       afc_addrs[MEMBERB]);
-    EXPECT("error assigning net name to memberb", err);
+                                           &t->clients.memberb.id,
+                                           afc_addrs[MEMBERB]);
+    EXPECT("error assigning afc net name to memberb", err);
+    // assign AQC network addresses.
+    err = aranya_aqc_assign_net_identifier(&t->clients.operator.client, &t->id,
+                                           &t->clients.membera.id,
+                                           afc_addrs[MEMBERA]);
+    EXPECT("error assigning aqc net name to membera", err);
+
+    err = aranya_aqc_assign_net_identifier(&t->clients.operator.client, &t->id,
+                                           &t->clients.memberb.id,
+                                           afc_addrs[MEMBERB]);
+    EXPECT("error assigning aqc net name to memberb", err);
 
     sleep(1);
+
+    // Queries
+    AranyaKeyBundle memberb_keybundle;
+    err = aranya_query_device_keybundle(&t->clients.operator.client, &t->id,
+                                        &t->clients.memberb.id,
+                                        &memberb_keybundle);
+    EXPECT("error querying memberb key bundle", err);
+    AranyaNetIdentifier memberb_afc_net_identifier;
+    err = aranya_query_afc_net_identifier(&t->clients.operator.client, &t->id,
+                                          &t->clients.memberb.id,
+                                          &memberb_afc_net_identifier);
+    EXPECT("error querying memberb afc net identifier", err);
+    // TODO: not working
+    // printf("%s memberb afc net identifier: %s \r\n",
+    //       t->clients_arr[MEMBERB].name, (char *)memberb_afc_net_identifier);
+    AranyaNetIdentifier memberb_aqc_net_identifier;
+    err = aranya_query_aqc_net_identifier(&t->clients.operator.client, &t->id,
+                                          &t->clients.memberb.id,
+                                          &memberb_aqc_net_identifier);
+    EXPECT("error querying memberb aqc net identifier", err);
+    // TODO: print out aqc net identifier
+    bool exists = false;
+    err = aranya_query_label_exists(&t->clients.membera.client, &t->id, &label,
+                                    &exists);
+    EXPECT("error querying label exists", err);
+    printf("%s label exists: %s \r\n", t->clients_arr[MEMBERB].name,
+           exists ? "true" : "false");
 
     // Once membera and memberb have been assigned the label and their network
     // identifiers, a Fast Channel can be created. In this example, membera
