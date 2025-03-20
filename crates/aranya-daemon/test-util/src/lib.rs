@@ -15,7 +15,7 @@ use aranya_crypto::{
 use aranya_daemon::{
     aranya::{self, Actions},
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
-    vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
+    vm_policy::{PolicyEngine, TEST_POLICY_1, VecSink},
 };
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{

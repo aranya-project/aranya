@@ -4,7 +4,7 @@ use std::{fmt, marker::PhantomData, str::FromStr};
 
 use anyhow::{Context, Result, anyhow};
 use aranya_afc_util::Ffi as AfcFfi;
-use aranya_crypto::{keystore::fs_keystore::Store, DeviceId};
+use aranya_crypto::{DeviceId, keystore::fs_keystore::Store};
 use aranya_crypto_ffi::Ffi as CryptoFfi;
 use aranya_device_ffi::FfiDevice as DeviceFfi;
 use aranya_envelope_ffi::Ffi as EnvelopeFfi;

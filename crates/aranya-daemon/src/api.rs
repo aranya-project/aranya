@@ -13,10 +13,10 @@ use std::{
 
 use anyhow::{Context, Result, anyhow};
 use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler};
-use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, DeviceId, Rng};
+use aranya_crypto::{Csprng, DeviceId, Rng, afc::BidiPeerEncap, keystore::fs_keystore::Store};
 use aranya_daemon_api::{
-    AfcCtrl, AfcId, DaemonApi, DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
-    Result as ApiResult, Role as ApiRole, TeamId, CS,
+    AfcCtrl, AfcId, CS, DaemonApi, DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle,
+    NetIdentifier, Result as ApiResult, Role as ApiRole, TeamId,
 };
 use aranya_fast_channels::{AranyaState, ChannelId, Directed, Label, NodeId, shm::WriteState};
 use aranya_keygen::PublicKeys;
