@@ -1,6 +1,6 @@
 use core::{ffi::c_char, ops::DerefMut, ptr, slice};
 use std::{
-    ffi::{CString, OsStr},
+    ffi::OsStr,
     os::unix::ffi::OsStrExt,
 };
 
@@ -240,11 +240,6 @@ impl NetIdentifier {
         Ok(aranya_daemon_api::NetIdentifier(String::from(
             cstr.to_str()?,
         )))
-    }
-    // TODO: not sure if this is right.
-    fn from_underlying(net_identifier: aranya_daemon_api::NetIdentifier) -> Self {
-        let cstr = CString::new(net_identifier.0.as_str()).expect("expected valid C str");
-        NetIdentifier(cstr.as_c_str().as_ptr())
     }
 }
 
@@ -1028,19 +1023,22 @@ pub unsafe fn query_device_keybundle(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param __output the device's network identifier [`NetIdentifier`].
+/// @param network identifier string [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_afc_net_identifier(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-) -> Result<NetIdentifier, imp::Error> {
+    ident: &mut [MaybeUninit<c_char>],
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let net_identifier = client
         .rt
         .block_on(client.inner.team(team.0).query_afc_net_identifier(device.0))?;
-    Ok(NetIdentifier::from_underlying(net_identifier))
+    let mut ident_len = net_identifier.0.len();
+    aranya_capi_core::write_c_str(ident, &net_identifier, &mut ident_len)?;
+    Ok(())
 }
 
 /// Query device's AQC network identifier.
@@ -1048,19 +1046,22 @@ pub unsafe fn query_afc_net_identifier(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param __output the device's network identifier [`NetIdentifier`].
+/// @param network identifier string [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_aqc_net_identifier(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-) -> Result<NetIdentifier, imp::Error> {
+    ident: &mut [MaybeUninit<c_char>],
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let net_identifier = client
         .rt
         .block_on(client.inner.team(team.0).query_aqc_net_identifier(device.0))?;
-    Ok(NetIdentifier::from_underlying(net_identifier))
+    let mut ident_len = net_identifier.0.len();
+    aranya_capi_core::write_c_str(ident, &net_identifier, &mut ident_len)?;
+    Ok(())
 }
 
 /// Query device's AQC network identifier.

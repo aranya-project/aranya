@@ -327,20 +327,27 @@ AranyaError run(Team *t) {
                                         &t->clients.memberb.id,
                                         &memberb_keybundle);
     EXPECT("error querying memberb key bundle", err);
-    AranyaNetIdentifier memberb_afc_net_identifier;
+    printf(
+        "%s key bundle enc_key_len %lu, sign_key_len %lu, ident_key_len %lu "
+        "\r\n",
+        t->clients_arr[MEMBERB].name, memberb_keybundle.enc_key_len,
+        memberb_keybundle.sign_key_len, memberb_keybundle.ident_key_len);
+    char *memberb_afc_net_identifier = malloc(BUF_LEN);
     err = aranya_query_afc_net_identifier(&t->clients.operator.client, &t->id,
                                           &t->clients.memberb.id,
-                                          &memberb_afc_net_identifier);
+                                          memberb_afc_net_identifier, BUF_LEN);
     EXPECT("error querying memberb afc net identifier", err);
-    // TODO: not working
-    // printf("%s memberb afc net identifier: %s \r\n",
-    //       t->clients_arr[MEMBERB].name, (char *)memberb_afc_net_identifier);
-    AranyaNetIdentifier memberb_aqc_net_identifier;
+    printf("%s afc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
+           memberb_afc_net_identifier);
+    free(memberb_afc_net_identifier);
+    char *memberb_aqc_net_identifier = malloc(BUF_LEN);
     err = aranya_query_aqc_net_identifier(&t->clients.operator.client, &t->id,
                                           &t->clients.memberb.id,
-                                          &memberb_aqc_net_identifier);
+                                          memberb_aqc_net_identifier, BUF_LEN);
     EXPECT("error querying memberb aqc net identifier", err);
-    // TODO: print out aqc net identifier
+    printf("%s aqc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
+           memberb_aqc_net_identifier);
+    free(memberb_aqc_net_identifier);
     bool exists = false;
     err = aranya_query_label_exists(&t->clients.membera.client, &t->id, &label,
                                     &exists);

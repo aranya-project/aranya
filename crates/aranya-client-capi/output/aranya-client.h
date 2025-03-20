@@ -1341,14 +1341,15 @@ AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_query_afc_net_identifier(struct AranyaClient *client,
                                             const struct AranyaTeamId *team,
                                             const struct AranyaDeviceId *device,
-                                            AranyaNetIdentifier *__output);
+                                            char *ident,
+                                            size_t ident_len);
 
 /**
  * Query device's AFC network identifier.
@@ -1356,14 +1357,15 @@ AranyaError aranya_query_afc_net_identifier(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_query_afc_net_identifier_ext(struct AranyaClient *client,
                                                 const struct AranyaTeamId *team,
                                                 const struct AranyaDeviceId *device,
-                                                AranyaNetIdentifier *__output,
+                                                char *ident,
+                                                size_t ident_len,
                                                 struct AranyaExtError *__ext_err);
 
 /**
@@ -1372,14 +1374,15 @@ AranyaError aranya_query_afc_net_identifier_ext(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_query_aqc_net_identifier(struct AranyaClient *client,
                                             const struct AranyaTeamId *team,
                                             const struct AranyaDeviceId *device,
-                                            AranyaNetIdentifier *__output);
+                                            char *ident,
+                                            size_t ident_len);
 
 /**
  * Query device's AQC network identifier.
@@ -1387,14 +1390,15 @@ AranyaError aranya_query_aqc_net_identifier(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_query_aqc_net_identifier_ext(struct AranyaClient *client,
                                                 const struct AranyaTeamId *team,
                                                 const struct AranyaDeviceId *device,
-                                                AranyaNetIdentifier *__output,
+                                                char *ident,
+                                                size_t ident_len,
                                                 struct AranyaExtError *__ext_err);
 
 /**
