@@ -1,8 +1,5 @@
 use core::{ffi::c_char, ops::DerefMut, ptr, slice};
-use std::{
-    ffi::OsStr,
-    os::unix::ffi::OsStrExt,
-};
+use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use libc;
