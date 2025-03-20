@@ -1,6 +1,9 @@
 use core::{ffi::c_char, ops::DerefMut, ptr, slice};
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
-use std::ffi::CString;
+use std::{
+    ffi::{CString, OsStr},
+    os::unix::ffi::OsStrExt,
+};
+
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use libc;
 use tracing::debug;
@@ -1004,7 +1007,7 @@ pub unsafe fn afc_recv_data(
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
 /// @param __output the device's key bundle [`KeyBundle`].
-/// 
+///
 /// @relates AranyaClient.
 pub unsafe fn query_device_keybundle(
     client: &mut Client,
@@ -1012,12 +1015,9 @@ pub unsafe fn query_device_keybundle(
     device: &DeviceId,
 ) -> Result<KeyBundle, imp::Error> {
     let client = client.deref_mut();
-    let keys = client.rt.block_on(
-        client
-            .inner
-            .team(team.0)
-            .query_device_keybundle(device.0),
-    )?;
+    let keys = client
+        .rt
+        .block_on(client.inner.team(team.0).query_device_keybundle(device.0))?;
     Ok(KeyBundle::from_underlying(keys))
 }
 
@@ -1029,7 +1029,7 @@ pub unsafe fn query_device_keybundle(
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
 /// @param __output the device's network identifier [`NetIdentifier`].
-/// 
+///
 /// @relates AranyaClient.
 pub unsafe fn query_afc_net_identifier(
     client: &mut Client,
@@ -1037,12 +1037,9 @@ pub unsafe fn query_afc_net_identifier(
     device: &DeviceId,
 ) -> Result<NetIdentifier, imp::Error> {
     let client = client.deref_mut();
-    let net_identifier = client.rt.block_on(
-        client
-            .inner
-            .team(team.0)
-            .query_afc_net_identifier(device.0),
-    )?;
+    let net_identifier = client
+        .rt
+        .block_on(client.inner.team(team.0).query_afc_net_identifier(device.0))?;
     Ok(NetIdentifier::from_underlying(net_identifier))
 }
 
@@ -1052,7 +1049,7 @@ pub unsafe fn query_afc_net_identifier(
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
 /// @param __output the device's network identifier [`NetIdentifier`].
-/// 
+///
 /// @relates AranyaClient.
 pub unsafe fn query_aqc_net_identifier(
     client: &mut Client,
@@ -1060,12 +1057,9 @@ pub unsafe fn query_aqc_net_identifier(
     device: &DeviceId,
 ) -> Result<NetIdentifier, imp::Error> {
     let client = client.deref_mut();
-    let net_identifier = client.rt.block_on(
-        client
-            .inner
-            .team(team.0)
-            .query_aqc_net_identifier(device.0),
-    )?;
+    let net_identifier = client
+        .rt
+        .block_on(client.inner.team(team.0).query_aqc_net_identifier(device.0))?;
     Ok(NetIdentifier::from_underlying(net_identifier))
 }
 
@@ -1075,7 +1069,7 @@ pub unsafe fn query_aqc_net_identifier(
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
 /// @param __output the device's network identifier [`NetIdentifier`].
-/// 
+///
 /// @relates AranyaClient.
 pub unsafe fn query_label_exists(
     client: &mut Client,
@@ -1083,11 +1077,8 @@ pub unsafe fn query_label_exists(
     label: &Label,
 ) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
-    let exists = client.rt.block_on(
-        client
-            .inner
-            .team(team.0)
-            .query_label_exists(label.0.into()),
-    )?;
+    let exists = client
+        .rt
+        .block_on(client.inner.team(team.0).query_label_exists(label.0.into()))?;
     Ok(exists)
 }
