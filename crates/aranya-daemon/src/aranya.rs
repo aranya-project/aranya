@@ -2,8 +2,8 @@
 
 use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
 
-use anyhow::{Context, Result, bail};
-use aranya_crypto::{Csprng, Rng, UserId};
+use anyhow::{bail, Context, Result};
+use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_fast_channels::Label;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
@@ -425,10 +425,13 @@ where
     }
 
     /// Remove a Member instance from the team.
-    #[instrument(skip(self), fields(user_id = %user_id))]
-    fn remove_member(&self, user_id: UserId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    #[instrument(skip(self), fields(device_id = %device_id))]
+    fn remove_member(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.remove_member(user_id.into())?;
+            actor.remove_member(device_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -438,11 +441,11 @@ where
     #[instrument(skip_all)]
     fn assign_role(
         &self,
-        user_id: UserId,
+        device_id: DeviceId,
         role: Role,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_role(user_id.into(), role)?;
+            actor.assign_role(device_id.into(), role)?;
             Ok(())
         })
         .in_current_span()
@@ -452,11 +455,11 @@ where
     #[instrument(skip_all)]
     fn revoke_role(
         &self,
-        user_id: UserId,
+        device_id: DeviceId,
         role: Role,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.revoke_role(user_id.into(), role)?;
+            actor.revoke_role(device_id.into(), role)?;
             Ok(())
         })
         .in_current_span()
@@ -483,59 +486,59 @@ where
     }
 
     /// Grants an app permission to use an AFC label.
-    #[instrument(skip(self), fields(user_id = %user_id, label = %label, op = %op))]
+    #[instrument(skip(self), fields(device_id = %device_id, label = %label, op = %op))]
     fn assign_label(
         &self,
-        user_id: UserId,
+        device_id: DeviceId,
         label: Label,
         op: ChanOp,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_label(user_id.into(), i64::from(label.to_u32()), op)?;
+            actor.assign_label(device_id.into(), i64::from(label.to_u32()), op)?;
             Ok(())
         })
         .in_current_span()
     }
 
     /// Revokes an AFC label.
-    #[instrument(skip(self), fields(user_id = %user_id, label = %label))]
+    #[instrument(skip(self), fields(device_id = %device_id, label = %label))]
     fn revoke_label(
         &self,
-        user_id: UserId,
+        device_id: DeviceId,
         label: Label,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%user_id, %label, "revoking AFC label");
+        info!(%device_id, %label, "revoking AFC label");
         self.with_actor(move |actor| {
-            actor.revoke_label(user_id.into(), i64::from(label.to_u32()))?;
+            actor.revoke_label(device_id.into(), i64::from(label.to_u32()))?;
             Ok(())
         })
         .in_current_span()
     }
 
     /// Sets a network name.
-    #[instrument(skip(self), fields(user_id = %user_id, net_identifier = %net_identifier))]
+    #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
     fn set_network_name(
         &self,
-        user_id: UserId,
+        device_id: DeviceId,
         net_identifier: String,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%user_id, %net_identifier, "setting network name");
+        info!(%device_id, %net_identifier, "setting network name");
         self.with_actor(move |actor| {
-            actor.set_network_name(user_id.into(), net_identifier)?;
+            actor.set_network_name(device_id.into(), net_identifier)?;
             Ok(())
         })
         .in_current_span()
     }
 
     /// Sets a network name.
-    #[instrument(skip(self), fields(user_id = %user_id))]
+    #[instrument(skip(self), fields(device_id = %device_id))]
     fn unset_network_name(
         &self,
-        user_id: UserId,
+        device_id: DeviceId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%user_id, "unsetting network name");
+        info!(%device_id, "unsetting network name");
         self.with_actor(move |actor| {
-            actor.unset_network_name(user_id.into())?;
+            actor.unset_network_name(device_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -545,7 +548,7 @@ where
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
     fn create_afc_bidi_channel(
         &self,
-        peer_id: UserId,
+        peer_id: DeviceId,
         label: Label,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
@@ -560,7 +563,7 @@ where
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
     fn create_afc_bidi_channel_off_graph(
         &self,
-        peer_id: UserId,
+        peer_id: DeviceId,
         label: Label,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
@@ -577,8 +580,8 @@ where
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
     fn create_afc_uni_channel(
         &self,
-        seal_id: UserId,
-        open_id: UserId,
+        seal_id: DeviceId,
+        open_id: DeviceId,
         label: Label,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
@@ -597,8 +600,8 @@ where
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
     fn create_afc_uni_channel_off_graph(
         &self,
-        seal_id: UserId,
-        open_id: UserId,
+        seal_id: DeviceId,
+        open_id: DeviceId,
         label: Label,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {

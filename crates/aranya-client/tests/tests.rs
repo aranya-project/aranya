@@ -160,23 +160,23 @@ macro_rules! do_poll {
 }
 
 struct TeamCtx {
-    owner: UserCtx,
-    admin: UserCtx,
-    operator: UserCtx,
-    membera: UserCtx,
-    memberb: UserCtx,
+    owner: DeviceCtx,
+    admin: DeviceCtx,
+    operator: DeviceCtx,
+    membera: DeviceCtx,
+    memberb: DeviceCtx,
 }
 
 impl TeamCtx {
     pub async fn new(name: String, work_dir: PathBuf) -> Result<Self> {
-        let owner = UserCtx::new(name.clone(), "owner".into(), work_dir.join("owner")).await?;
-        let admin = UserCtx::new(name.clone(), "admin".into(), work_dir.join("admin")).await?;
+        let owner = DeviceCtx::new(name.clone(), "owner".into(), work_dir.join("owner")).await?;
+        let admin = DeviceCtx::new(name.clone(), "admin".into(), work_dir.join("admin")).await?;
         let operator =
-            UserCtx::new(name.clone(), "operator".into(), work_dir.join("operator")).await?;
+            DeviceCtx::new(name.clone(), "operator".into(), work_dir.join("operator")).await?;
         let membera =
-            UserCtx::new(name.clone(), "membera".into(), work_dir.join("membera")).await?;
+            DeviceCtx::new(name.clone(), "membera".into(), work_dir.join("membera")).await?;
         let memberb =
-            UserCtx::new(name.clone(), "memberb".into(), work_dir.join("memberb")).await?;
+            DeviceCtx::new(name.clone(), "memberb".into(), work_dir.join("memberb")).await?;
 
         Ok(Self {
             owner,
@@ -188,14 +188,14 @@ impl TeamCtx {
     }
 }
 
-struct UserCtx {
+struct DeviceCtx {
     client: Client,
     pk: KeyBundle,
     id: DeviceId,
     daemon: AbortHandle,
 }
 
-impl UserCtx {
+impl DeviceCtx {
     pub async fn new(team_name: String, name: String, work_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(work_dir.clone()).await?;
 
@@ -274,7 +274,7 @@ impl UserCtx {
     }
 }
 
-impl Drop for UserCtx {
+impl Drop for DeviceCtx {
     fn drop(&mut self) {
         self.daemon.abort();
     }

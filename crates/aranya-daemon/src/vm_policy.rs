@@ -4,7 +4,7 @@ use std::{fmt, marker::PhantomData, str::FromStr};
 
 use anyhow::{Context, Result, anyhow};
 use aranya_afc_util::Ffi as AfcFfi;
-use aranya_crypto::{UserId, keystore::fs_keystore::Store};
+use aranya_crypto::{keystore::fs_keystore::Store, DeviceId};
 use aranya_crypto_ffi::Ffi as CryptoFfi;
 use aranya_device_ffi::FfiDevice as DeviceFfi;
 use aranya_envelope_ffi::Ffi as EnvelopeFfi;
@@ -58,7 +58,7 @@ where
     E: aranya_crypto::Engine,
 {
     /// Creates a `PolicyEngine` from a policy document.
-    pub fn new(policy_doc: &str, eng: E, store: Store, user_id: UserId) -> Result<Self> {
+    pub fn new(policy_doc: &str, eng: E, store: Store, device_id: DeviceId) -> Result<Self> {
         // compile the policy.
         let ast = parse_policy_document(policy_doc).context("unable to parse policy document")?;
         let module = Compiler::new(&ast)
@@ -78,7 +78,7 @@ where
         let ffis: Vec<Box<dyn FfiCallable<E> + Send + 'static>> = vec![
             Box::from(AfcFfi::new(store.try_clone()?)),
             Box::from(CryptoFfi::new(store.try_clone()?)),
-            Box::from(DeviceFfi::new(user_id)),
+            Box::from(DeviceFfi::new(device_id)),
             Box::from(EnvelopeFfi),
             Box::from(IdamFfi::new(store)),
             Box::from(PerspectiveFfi),
