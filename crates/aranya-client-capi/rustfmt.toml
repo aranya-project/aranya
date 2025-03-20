@@ -3,4 +3,5 @@ style_edition = "2024"
 group_imports = "StdExternalCrate"
 imports_granularity = "Crate"
 wrap_comments = true
-comment_width = 100
+# Manually override comment_width for capi crates
+comment_width = 65

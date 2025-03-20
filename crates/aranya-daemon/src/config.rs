@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::{Context, Result};
 use aranya_util::Addr;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -92,8 +92,7 @@ pub struct AfcConfig {
 
     /// Unlink `shm_path` before on exit?
     ///
-    /// If false, the shared memory will persist across daemon
-    /// restarts.
+    /// If false, the shared memory will persist across daemon restarts.
     pub unlink_at_exit: bool,
 
     /// Create the shared memory?

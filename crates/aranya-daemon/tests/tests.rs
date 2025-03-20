@@ -15,7 +15,7 @@ use aranya_daemon::{
 use aranya_fast_channels::Label;
 use serial_test::serial;
 use test_log::test;
-use test_util::{contains_effect, TestCtx, TestTeam};
+use test_util::{TestCtx, TestTeam, contains_effect};
 
 /// Smoke test for [`TestCtx::new_group`].
 #[test(tokio::test(flavor = "multi_thread"))]

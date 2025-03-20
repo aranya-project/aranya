@@ -94,8 +94,7 @@ pub enum AfcError {
     #[error("AFC message was replayed: {0}")]
     MsgReplayed(String),
 
-    /// The message length prefix was larger than the maximum
-    /// allowed size.
+    /// The message length prefix was larger than the maximum allowed size.
     #[error("message too large: {got} > {max}")]
     MsgTooLarge { got: usize, max: usize },
 
@@ -124,13 +123,12 @@ pub enum AfcError {
     #[error("channel not found: {0}")]
     ChannelNotFound(AfcId),
 
-    /// The 64-bit sequence number overflowed and the end of the channel was
-    /// reached. A new channel must be created.
+    /// The 64-bit sequence number overflowed and the end of the channel was reached. A new channel
+    /// must be created.
     ///
     /// # Note
     ///
-    /// This likely indicates that the peer manually set a very high sequence
-    /// number.
+    /// This likely indicates that the peer manually set a very high sequence number.
     #[error("end of channel reached")]
     EndOfChannel,
 

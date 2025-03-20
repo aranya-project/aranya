@@ -22,8 +22,8 @@ use std::{
 use anyhow::Result;
 use buggy::Bug;
 use serde::{
-    de::{self, Visitor},
     Deserialize, Deserializer, Serialize, Serializer,
+    de::{self, Visitor},
 };
 use tokio::net::{self, ToSocketAddrs};
 use tracing::{debug, instrument};
@@ -36,8 +36,7 @@ macro_rules! const_assert {
 
 /// A 'host:port' network address.
 ///
-/// The 'host' portion can be a domain name, IPv4 address, or
-/// IPv6 address.
+/// The 'host' portion can be a domain name, IPv4 address, or IPv6 address.
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Addr {
     host: Host,
@@ -48,8 +47,7 @@ const_assert!(size_of::<Addr>() == 256);
 impl Addr {
     /// Creates a new `Addr`.
     ///
-    /// `host` can be a domain name, IPv4 address, or IPv6
-    /// address.
+    /// `host` can be a domain name, IPv4 address, or IPv6 address.
     pub fn new<T>(host: T, port: u16) -> Result<Self, AddrError>
     where
         T: AsRef<str>,
@@ -171,8 +169,7 @@ impl<'de> Deserialize<'de> for Addr {
 /// A hostname.
 #[derive(Copy, Clone)]
 struct Host {
-    // NB: `Host` is exactly 254 bytes long. This allows `Addr`
-    // to be exactly 256 bytes long.
+    // NB: `Host` is exactly 254 bytes long. This allows `Addr` to be exactly 256 bytes long.
     len: u8,
     buf: [u8; 253],
 }
@@ -295,8 +292,7 @@ where
 
 /// Reports whether `s` is a valid domain name.
 ///
-/// See
-/// <https://github.com/golang/go/blob/a66a3bf494f652bc4fb209d861cbdba1dea71303/src/net/dnsclient.go#L78>.
+/// See <https://github.com/golang/go/blob/a66a3bf4/src/net/dnsclient.go#L78>.
 fn is_domain_name(s: &str) -> bool {
     if s == "." {
         return true;
@@ -347,8 +343,8 @@ fn is_domain_name(s: &str) -> bool {
 struct FmtBuf {
     /// The number of bytes written.
     len: u8,
-    /// The size of this buffer lets the compiler prove that all
-    /// writes are in bounds without panicking.
+    /// The size of this buffer lets the compiler prove that all writes are in bounds without
+    /// panicking.
     ///
     /// Contents are `buf[..len]`.
     buf: [u8; 256],
@@ -386,8 +382,7 @@ impl FmtBuf {
     fn write(&mut self, c: u8) {
         debug_assert!(self.available() > 0);
 
-        // NB: the compiler can prove that `self.idx` is in
-        // bounds.
+        // NB: the compiler can prove that `self.idx` is in bounds.
         self.buf[usize::from(self.len)] = c;
         self.len += 1;
     }
@@ -444,8 +439,7 @@ impl FmtBuf {
         buf
     }
 
-    /// Formats `ip` per [RFC
-    /// 5952](https://tools.ietf.org/html/rfc5952).
+    /// Formats `ip` per [RFC 5952](https://tools.ietf.org/html/rfc5952).
     fn fmt_ipv6(ip: &Ipv6Addr) -> Self {
         let mut buf = Self::new();
 
@@ -496,10 +490,8 @@ impl FmtBuf {
             max
         };
 
-        // TODO(eric): if we make this a little simpler we can
-        // probably convince the compiler to elide all bounds
-        // checks. That would let us make the internal buffer
-        // 253 bytes.
+        // TODO(eric): if we make this a little simpler we can probably convince the compiler to
+        // elide all bounds checks. That would let us make the internal buffer 253 bytes.
         let mut iter = segments.iter().enumerate();
         while let Some((i, &seg)) = iter.next() {
             if zeros.contains(i) {
@@ -519,24 +511,18 @@ impl FmtBuf {
     }
 }
 
-/// Converts `c`, which must be in `0..=9`, to its base-10
-/// representation.
+/// Converts `c`, which must be in `0..=9`, to its base-10 representation.
 const fn base10(x: u8) -> u8 {
     debug_assert!(x <= 9);
 
     x + b'0'
 }
 
-/// Converts `c`, which must be in `0..=15`, to its base-16
-/// representation.
+/// Converts `c`, which must be in `0..=15`, to its base-16 representation.
 const fn base16(x: u8) -> u8 {
     debug_assert!(x <= 15);
 
-    if x < 10 {
-        base10(x)
-    } else {
-        x - 10 + b'a'
-    }
+    if x < 10 { base10(x) } else { x - 10 + b'a' }
 }
 
 /// An error returned by [`Addr`].

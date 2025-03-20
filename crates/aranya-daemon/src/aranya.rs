@@ -2,15 +2,15 @@
 
 use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use aranya_crypto::{Csprng, Rng, UserId};
 use aranya_fast_channels::Label;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
 use aranya_runtime::{
-    vm_action, ClientError, ClientState, Engine, GraphId, PeerCache, Policy, Session, Sink,
-    StorageProvider, SyncRequester, SyncResponder, SyncType, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
+    ClientError, ClientState, Engine, GraphId, MAX_SYNC_MESSAGE_SIZE, PeerCache, Policy, Session,
+    Sink, StorageProvider, SyncRequester, SyncResponder, SyncType, VmPolicy, vm_action,
 };
 use aranya_util::Addr;
 use buggy::bug;
@@ -21,7 +21,7 @@ use tokio::{
     sync::Mutex,
     task::JoinSet,
 };
-use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
+use tracing::{Instrument, debug, error, info, info_span, instrument, warn};
 
 use crate::{
     policy::{ActorExt, ChanOp, Effect, KeyBundle, Role},
@@ -61,6 +61,7 @@ where
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
     /// Syncs with the peer.
+    /// 
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
     pub async fn sync_peer<S>(&self, id: GraphId, sink: &mut S, addr: &Addr) -> Result<()>
@@ -136,8 +137,9 @@ where
     }
 
     /// Creates the team.
-    /// Creates a new graph, adds the `CreateTeam` command to the root of the graph.
-    /// Returns the [`GraphId`] of the newly created graph.
+    /// 
+    /// Creates a new graph, adds the `CreateTeam` command to the root of the graph. Returns the
+    /// [`GraphId`] of the newly created graph.
     #[instrument(skip_all)]
     pub async fn create_team(
         &self,
@@ -161,8 +163,7 @@ where
         Ok((id, sink.collect()?))
     }
 
-    /// Returns an implementation of [`Actions`] for a particular
-    /// storage.
+    /// Returns an implementation of [`Actions`] for a particular storage.
     #[instrument(skip_all, fields(id = %id))]
     pub fn actions(&self, id: &GraphId) -> impl Actions<EN, SP, CE> {
         ActionsImpl {
@@ -173,7 +174,9 @@ where
     }
 
     /// Create new ephemeral Session.
-    /// Once the Session has been created, call `session_receive` to add an ephemeral command to the Session.
+    /// 
+    /// Once the Session has been created, call `session_receive` to add an ephemeral command to the
+    /// Session.
     #[instrument(skip_all, fields(id = %id))]
     pub async fn session_new(&self, id: &GraphId) -> Result<Session<SP, EN>> {
         let session = self.aranya.lock().await.session(*id)?;
@@ -181,7 +184,9 @@ where
     }
 
     /// Receives an ephemeral command from another ephemeral Session.
-    /// Assumes an ephemeral Session has already been created before adding an ephemeral command to the Session.
+    /// 
+    /// Assumes an ephemeral Session has already been created before adding an ephemeral command to
+    /// the Session.
     #[instrument(skip_all)]
     pub async fn session_receive(
         &self,
@@ -230,8 +235,9 @@ where
     }
 
     /// Creates a new ephemeral session and invokes an action on it.
-    /// Returns the [`MsgSink`] of serialized ephemeral commands added to the graph
-    /// and a vector of [`Effect`]s produced by the action.
+    /// 
+    /// Returns the [`MsgSink`] of serialized ephemeral commands added to the graph and a vector of
+    /// [`Effect`]s produced by the action.
     #[instrument(skip_all)]
     #[allow(clippy::type_complexity)] // 2advanced4u
     async fn session_action<'a, F>(&self, f: F) -> Result<(Vec<Box<[u8]>>, Vec<Effect>)>
@@ -248,7 +254,9 @@ where
 }
 
 /// The Aranya sync server.
-/// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
+/// 
+/// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are
+/// received.
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
@@ -606,6 +614,7 @@ where
 }
 
 /// An implementation of [`Actor`].
+/// 
 /// Simplifies the process of calling an action on the Aranya graph.
 /// Enables more consistency and less repeated code for each action.
 pub struct ActorImpl<'a, EN, SP, CE, S> {

@@ -1,7 +1,7 @@
 use core::{ffi::c_char, ops::DerefMut, ptr, slice};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
-use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
+use aranya_capi_core::{ErrorCode, InvalidArg, prelude::*};
 use libc;
 use tracing::debug;
 
@@ -124,14 +124,13 @@ pub type ExtError = Safe<imp::ExtError>;
 /// Copies the extended error's message into `msg`.
 ///
 /// If `msg_len` is large enough to fit the entire message,
-/// including the trailing null byte, it updates `msg_len`
-/// with the length of the message and copies the message
-/// into `msg`.
+/// including the trailing null byte, it updates `msg_len` with
+/// the length of the message and copies the message into `msg`.
 ///
-/// Otherwise, if `msg_len` is not large enough to fit the
-/// entire message, including the trailing null byte, it
-/// updates `msg_len` with the length of the message and
-/// returns `::ARANYA_ERROR_BUFFER_TOO_SMALL`.
+/// Otherwise, if `msg_len` is not large enough to fit the entire
+/// message, including the trailing null byte, it updates
+/// `msg_len` with the length of the message and returns
+/// `::ARANYA_ERROR_BUFFER_TOO_SMALL`.
 ///
 /// @param err the error to get a message for [`ExtError`].
 /// @param msg buffer to copy error message into.
@@ -149,10 +148,10 @@ pub fn ext_error_msg(
 
 /// Initializes logging.
 ///
-/// Assumes the `ARANYA_CAPI` environment variable has been set to the desired tracing log level.
-/// E.g. `ARANYA_CAPI=debug`.
+/// Assumes the `ARANYA_CAPI` environment variable has been set
+/// to the desired tracing log level. E.g. `ARANYA_CAPI=debug`.
 pub fn init_logging() -> Result<(), imp::Error> {
-    use tracing_subscriber::{prelude::*, EnvFilter};
+    use tracing_subscriber::{EnvFilter, prelude::*};
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(EnvFilter::from_env("ARANYA_CAPI"))
@@ -455,14 +454,15 @@ pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error>
 
 /// Add the peer for automatic periodic Aranya state syncing.
 ///
-/// If a peer is not reachable on the network, sync errors
-/// will appear in the tracing logs and
-/// Aranya will be unable to sync state with that peer.
+/// If a peer is not reachable on the network, sync errors will
+/// appear in the tracing logs and Aranya will be unable to sync
+/// state with that peer.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param addr the peer's Aranya network address [`Addr`].
-/// @param interval the time [`Duration`] to wait between syncs with peer.
+/// @param interval the time [`Duration`] to wait between syncs
+/// with peer.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_sync_peer(
@@ -518,7 +518,8 @@ pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> 
 
 /// Add a device to the team with the default role.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Permission to perform this operation is checked against the
+/// Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
@@ -542,7 +543,8 @@ pub unsafe fn add_device_to_team(
 
 /// Remove a device from the team.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Permission to perform this operation is checked against the
+/// Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
@@ -563,9 +565,11 @@ pub fn remove_device_from_team(
 
 /// Assign a role to a device.
 ///
-/// This will change the device's current role to the new role assigned.
+/// This will change the device's current role to the new role
+/// assigned.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Permission to perform this operation is checked against the
+/// Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
@@ -588,7 +592,8 @@ pub fn assign_role(
 
 /// Revoke a role from a device.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Permission to perform this operation is checked against the
+/// Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
@@ -611,16 +616,20 @@ pub fn revoke_role(
 
 /// Associate a network identifier to a device for use with AFC.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Permission to perform this operation is checked against the
+/// Aranya policy.
 ///
-/// If the address already exists for this device, it is replaced with the new address. Capable
-/// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
-/// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+/// If the address already exists for this device, it is replaced
+/// with the new address. Capable of resolving addresses via DNS,
+/// required to be statically mapped to IPV4. For use with
+/// OpenChannel and receiving messages. Can take either DNS name
+/// or IPV4.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
+/// @param net_identifier the device's network identifier
+/// [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
 pub unsafe fn afc_assign_net_identifier(
@@ -630,7 +639,8 @@ pub unsafe fn afc_assign_net_identifier(
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
+    // SAFETY: Caller must ensure `net_identifier` is a valid
+    // C String.
     let net_identifier = unsafe { net_identifier.as_underlying() }?;
     client.rt.block_on(
         client
@@ -643,12 +653,14 @@ pub unsafe fn afc_assign_net_identifier(
 
 /// Disassociate a network identifier from a device.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Permission to perform this operation is checked against the
+/// Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
+/// @param net_identifier the device's network identifier
+/// [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
 pub unsafe fn afc_remove_net_identifier(
@@ -658,7 +670,8 @@ pub unsafe fn afc_remove_net_identifier(
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
+    // SAFETY: Caller must ensure `net_identifier` is a valid
+    // C String.
     let net_identifier = unsafe { net_identifier.as_underlying() }?;
     client.rt.block_on(
         client
@@ -671,7 +684,8 @@ pub unsafe fn afc_remove_net_identifier(
 
 /// Create an AFC label.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Permission to perform this operation is checked against the
+/// Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
@@ -688,7 +702,8 @@ pub fn create_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
 
 /// Delete an AFC label.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Permission to perform this operation is checked against the
+/// Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
@@ -703,14 +718,17 @@ pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
     Ok(())
 }
 
-/// Assign an AFC label to a device so that it can be used for an AFC channel.
+/// Assign an AFC label to a device so that it can be used for an
+/// AFC channel.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Permission to perform this operation is checked against the
+/// Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to assign the label to.
-/// @param label the AFC channel label [`Label`].
+/// @param device the device ID [`DeviceId`] of the device to
+/// assign the label to. @param label the AFC channel label
+/// [`Label`].
 ///
 /// @relates AranyaClient.
 pub fn assign_label(
@@ -731,11 +749,13 @@ pub fn assign_label(
 
 /// Revoke an AFC label from a device.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Permission to perform this operation is checked against the
+/// Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to revoke the label from.
+/// @param device the device ID [`DeviceId`] of the device to
+/// revoke the label from.
 /// @param label the AFC channel label [`Label`].
 ///
 /// @relates AranyaClient.
@@ -757,15 +777,17 @@ pub fn revoke_label(
 
 /// Create an Aranya Fast Channel (AFC).
 ///
-/// Creates a bidirectional AFC channel between the current device
-/// and another peer.
+/// Creates a bidirectional AFC channel between the current
+/// device and another peer.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Permission to perform this operation is checked against the
+/// Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param peer the peer's network identifier [`NetIdentifier`].
-/// @param label the AFC channel label [`Label`] to create the channel with.
+/// @param label the AFC channel label [`Label`] to create the
+/// channel with.
 /// @param __output the channel's ID [`ChannelId`]
 ///
 /// @relates AranyaClient.
@@ -789,7 +811,8 @@ pub unsafe fn afc_create_bidi_channel(
 /// Delete an Aranya Fast Channel (AFC).
 ///
 /// @param client the Aranya Client [`Client`].
-/// @param chan the AFC channel ID [`ChannelId`] of the channel to delete.
+/// @param chan the AFC channel ID [`ChannelId`] of the channel
+/// to delete.
 ///
 /// @relates AranyaClient.
 pub fn afc_delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::Error> {
@@ -802,10 +825,12 @@ pub fn afc_delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), im
 
 /// Poll for new Aranya Fast Channels (AFC) data.
 ///
-/// If the operation times out, this will return an `::ARANYA_ERROR_TIMEOUT`.
+/// If the operation times out, this will return an
+/// `::ARANYA_ERROR_TIMEOUT`.
 ///
 /// @param client the Aranya Client [`Client`].
-/// @param timeout how long to wait before timing out the poll operation [`Duration`].
+/// @param timeout how long to wait before timing out the poll
+/// operation [`Duration`].
 ///
 /// @relates AranyaClient.
 pub fn afc_poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Error> {

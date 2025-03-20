@@ -1,10 +1,12 @@
 //! Aranya sync task.
+//! 
 //! A task for syncing with Aranya peers at specified intervals.
-//! A [`DelayQueue`] is used to retrieve the next peer to sync with at the specified interval.
-//! [`SyncPeers`] handles adding/removing peers for the [`Syncer`].
-//! [`Syncer`] syncs with the next available peer from the [`DelayQueue`].
-//! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
-//! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
+//! * A [`DelayQueue`] is used to retrieve the next peer to sync with at the specified interval.
+//! * [`SyncPeers`] handles adding/removing peers for the [`Syncer`].
+//! * [`Syncer`] syncs with the next available peer from the [`DelayQueue`].
+//! * [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently. This
+//! prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from
+//! the [`DelayQueue`]
 
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
@@ -14,7 +16,7 @@ use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
-use tokio_util::time::{delay_queue::Key, DelayQueue};
+use tokio_util::time::{DelayQueue, delay_queue::Key};
 use tracing::{error, info, instrument};
 
 use crate::{

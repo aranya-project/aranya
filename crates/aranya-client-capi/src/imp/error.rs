@@ -1,8 +1,9 @@
 use core::{ffi::c_char, mem::MaybeUninit};
 
 use aranya_capi_core::{
+    ExtendedError, InvalidArg, WriteCStrError,
     safe::{TypeId, Typed},
-    write_c_str, ExtendedError, InvalidArg, WriteCStrError,
+    write_c_str,
 };
 use buggy::Bug;
 use tracing::warn;

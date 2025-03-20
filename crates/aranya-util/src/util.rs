@@ -34,8 +34,7 @@ pub struct ShmPathBuf(Vec<u8>);
 
 impl AsRef<shm::Path> for ShmPathBuf {
     fn as_ref(&self) -> &shm::Path {
-        // TODO(eric): I guess `Path` needs a `new_unchecked`
-        // method or something.
+        // TODO(eric): I guess `Path` needs a `new_unchecked` method or something.
         #[allow(clippy::expect_used)]
         shm::Path::from_bytes(&self.0[..]).expect("should already be validated")
     }

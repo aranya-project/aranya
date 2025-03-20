@@ -1,20 +1,20 @@
 use std::{io, path::Path, str::FromStr, sync::Arc};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result, anyhow, bail};
 use aranya_crypto::{
-    aead::Aead, default::DefaultEngine, generic_array::GenericArray, import::Import,
-    keys::SecretKeyBytes, keystore::fs_keystore::Store, CipherSuite, Random, Rng,
+    CipherSuite, Random, Rng, aead::Aead, default::DefaultEngine, generic_array::GenericArray,
+    import::Import, keys::SecretKeyBytes, keystore::fs_keystore::Store,
 };
 use aranya_daemon_api::CS;
 use aranya_fast_channels::shm::{self, Flag, Mode, WriteState};
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
-    storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState,
+    storage::linear::{LinearStorageProvider, libc::FileManager},
 };
-use aranya_util::{util, Addr};
+use aranya_util::{Addr, util};
 use ciborium as cbor;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
 use tracing::{debug, error, info};
 
@@ -57,8 +57,7 @@ impl Daemon {
 
     /// The daemon's entrypoint.
     pub async fn run(self) -> Result<()> {
-        // Setup environment for daemon's working directory.
-        // E.g. creating subdirectories.
+        // Setup environment for daemon's working directory, e.g. creating subdirectories.
         self.setup_env().await?;
 
         let mut set = JoinSet::new();
@@ -88,8 +87,7 @@ impl Daemon {
             (client, local_addr)
         };
 
-        // Sync in the background at some specified interval.
-        // Effects are sent to `Api` via `mux`.
+        // Sync in the background at some specified interval. Effects are sent to `Api` via `mux`.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
         let (mut syncer, peers) = Syncer::new(Arc::clone(&client), send_effects);
         set.spawn(async move {

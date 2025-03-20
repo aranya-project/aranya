@@ -20,8 +20,8 @@ use anyhow::{Context, Result};
 use aranya_client::{afc::Message, client::Client};
 use aranya_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
-    config::{AfcConfig, Config},
     Daemon,
+    config::{AfcConfig, Config},
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_fast_channels::{Label, Seq};
@@ -73,8 +73,7 @@ impl fmt::Display for FmtDuration {
             const MICROSECOND: u128 = 1000;
             const MILLISECOND: u128 = 1000 * MICROSECOND;
 
-            // NB: the unwrap and error cases should never happen
-            // since `d` is less than one second.
+            // NB: the unwrap and error cases should never happen since `d` is less than one second.
             let ns = d.as_nanos();
             if ns < MICROSECOND {
                 return write!(f, "{ns}ns");
@@ -134,8 +133,7 @@ fn trim(mut d: u128, mut width: usize) -> (u128, usize) {
     (d, width)
 }
 
-/// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the
-/// clients are pending.
+/// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the clients are pending.
 // TODO(nikki): alternative to select!{} to resolve lifetime issues
 macro_rules! do_poll {
     ($($client:expr),*) => {
@@ -203,8 +201,7 @@ impl UserCtx {
 
         let mut shm_path = format!("/{team_name}_{name}");
         if cfg!(target_os = "macos") && shm_path.len() > 31 {
-            // Shrink the size of the team name down to 22 bytes
-            // to work within macOS's limits.
+            // Shrink the size of the team name down to 22 bytes to work within macOS's limits.
             let d = Sha256::hash(shm_path.as_bytes());
             let t: [u8; 16] = d[..16].try_into().unwrap();
             shm_path = format!("/{}", t.to_base58())
@@ -285,14 +282,17 @@ impl Drop for UserCtx {
 
 /// Integration test for the user library and daemon.
 /// Tests creating a team with the user library.
-/// More extensive integration testing is conducted inside the daemon crate.
+/// More extensive integration testing is conducted inside the daemon crate. 
+/// 
 /// The goal of this integration test is to validate the user library's end-to-end functionality.
-/// This includes exercising the user library's idiomatic Rust API as well as the daemon's `tarpc` API.
+/// This includes exercising the user library's idiomatic Rust API as well as the daemon's `tarpc`
+/// API.
 ///
 /// Example of debugging test with tracing:
-/// `RUST_LOG="debug" cargo test integration_test -- --show-output --nocapture`
-/// `RUST_LOG="aranya_client::afc=debug" cargo test integration_test -- --show-output --nocapture`
-/// `RUST_LOG="aranya_client=debug,aranya_daemon=info" cargo test integration_test -- --show-output --nocapture`
+/// * `RUST_LOG="debug" cargo test integration_test -- --show-output --nocapture`
+/// * `RUST_LOG="aranya_client::afc=debug" cargo test integration_test -- --show-output --nocapture`
+/// * `RUST_LOG="aranya_client=debug,aranya_daemon=info" cargo test integration_test --
+/// --show-output --nocapture`
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn integration_test() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
@@ -627,8 +627,8 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .expect("should have a message");
     let want = Message {
         data: msgs[0].as_bytes().to_vec(),
-        // We don't know the address of outgoing connections, so
-        // assume `got.addr` is correct here.
+        // We don't know the address of outgoing connections, so assume `got.address` is correct
+        // here.
         address: got.address,
         channel: afc_id1,
         label: label1,
@@ -644,8 +644,8 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .expect("should have a message");
     let want = Message {
         data: msgs[1].as_bytes().to_vec(),
-        // We don't know the address of outgoing connections, so
-        // assume `got.addr` is correct here.
+        // We don't know the address of outgoing connections, so assume `got.address` is correct
+        // here.
         address: got.address,
         channel: afc_id2,
         label: label2,
@@ -834,8 +834,8 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
         .expect("should have a message");
     let want = Message {
         data: msg.as_bytes().to_vec(),
-        // We don't know the address of outgoing connections, so
-        // assume `got.addr` is correct here.
+        // We don't know the address of outgoing connections, so assume `got.address` is correct
+        // here.
         address: got.address,
         channel: afc_id1,
         label: label1,
@@ -1055,8 +1055,8 @@ async fn test_afc_monotonic_seq() -> Result<()> {
             .expect("should have a message");
         let want = Message {
             data: msg.into(),
-            // We don't know the address of outgoing connections,
-            // so assume `got.addr` is correct here.
+            // We don't know the address of outgoing connections, so assume `got.address` is correct
+            // here.
             address: got.address,
             channel: afc_id1,
             label: label1,

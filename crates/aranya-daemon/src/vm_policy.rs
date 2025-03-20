@@ -2,9 +2,9 @@
 
 use std::{fmt, marker::PhantomData, str::FromStr};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use aranya_afc_util::Ffi as AfcFfi;
-use aranya_crypto::{keystore::fs_keystore::Store, UserId};
+use aranya_crypto::{UserId, keystore::fs_keystore::Store};
 use aranya_crypto_ffi::Ffi as CryptoFfi;
 use aranya_device_ffi::FfiDevice as DeviceFfi;
 use aranya_envelope_ffi::Ffi as EnvelopeFfi;
@@ -12,10 +12,10 @@ use aranya_idam_ffi::Ffi as IdamFfi;
 use aranya_perspective_ffi::FfiPerspective as PerspectiveFfi;
 use aranya_policy_compiler::Compiler;
 use aranya_policy_lang::lang::parse_policy_document;
-use aranya_policy_vm::{ffi::FfiModule, Machine};
+use aranya_policy_vm::{Machine, ffi::FfiModule};
 use aranya_runtime::{
-    engine::{Engine, EngineError, PolicyId},
     FfiCallable, Sink, VmEffect, VmPolicy,
+    engine::{Engine, EngineError, PolicyId},
 };
 use tracing::instrument;
 
