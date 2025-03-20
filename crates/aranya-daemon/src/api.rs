@@ -187,13 +187,15 @@ impl DaemonApiHandler {
                 Effect::LabelUndefined(_label_undefined) => {}
                 Effect::LabelAssigned(_label_assigned) => {}
                 Effect::LabelRevoked(_label_revoked) => {}
-                Effect::NetworkNameSet(e) => {
+                Effect::AfcNetworkNameSet(e) => {
                     self.afc_peers
                         .lock()
                         .await
                         .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
                 }
-                Effect::NetworkNameUnset(_network_name_unset) => {}
+                Effect::AfcNetworkNameUnset(_network_name_unset) => {}
+                Effect::AqcNetworkNameSet(_network_name_set) => {}
+                Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::AfcBidiChannelCreated(v) => {
                     debug!("received BidiChannelCreated effect");
                     if let Some(node_id) = node_id {
@@ -209,6 +211,13 @@ impl DaemonApiHandler {
                 // TODO: unidirectional channels
                 Effect::AfcUniChannelCreated(_uni_channel_created) => {}
                 Effect::AfcUniChannelReceived(_uni_channel_received) => {}
+                Effect::QueryDevicesOnTeamResult(_) => {}
+                Effect::QueryDeviceRoleResult(_) => {}
+                Effect::QueryDeviceKeyBundleResult(_) => {}
+                Effect::QueryAfcNetIdentifierResult(_) => {}
+                Effect::QueryAqcNetIdentifierResult(_) => {}
+                Effect::QueryLabelExistsResult(_) => {}
+                Effect::QueryDeviceLabelAssignmentsResult(_) => {}
             }
         }
         Ok(())
@@ -419,7 +428,7 @@ impl DaemonApi for DaemonApiHandler {
         let effects = self
             .client
             .actions(&team.into_id().into())
-            .set_network_name(device.into_id().into(), name.0)
+            .set_afc_network_name(device.into_id().into(), name.0)
             .await?;
         self.handle_effects(&effects, None).await?;
         Ok(())
@@ -435,7 +444,39 @@ impl DaemonApi for DaemonApiHandler {
     ) -> ApiResult<()> {
         self.client
             .actions(&team.into_id().into())
-            .unset_network_name(device.into_id().into())
+            .unset_afc_network_name(device.into_id().into())
+            .await?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn assign_aqc_net_identifier(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+        name: NetIdentifier,
+    ) -> ApiResult<()> {
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .set_aqc_network_name(device.into_id().into(), name.0)
+            .await?;
+        self.handle_effects(&effects, None).await?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn remove_aqc_net_identifier(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+        name: NetIdentifier,
+    ) -> ApiResult<()> {
+        self.client
+            .actions(&team.into_id().into())
+            .unset_aqc_network_name(device.into_id().into())
             .await?;
         Ok(())
     }
@@ -567,6 +608,158 @@ impl DaemonApi for DaemonApiHandler {
         }
         Err(anyhow!("unable to find AfcBidiChannelReceived effect").into())
     }
+    /// Query devices on team.
+    #[instrument(skip(self))]
+    async fn query_devices_on_team(
+        self,
+        _: context::Context,
+        team: TeamId,
+    ) -> ApiResult<Vec<ApiDeviceId>> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_devices_on_team_off_graph()
+            .await?;
+        let mut devices: Vec<ApiDeviceId> = Vec::new();
+        for e in effects {
+            if let Effect::QueryDevicesOnTeamResult(e) = e {
+                devices.push(e.device_id.into());
+            }
+        }
+        return Ok(devices);
+    }
+    /// Query device role.
+    #[instrument(skip(self))]
+    async fn query_device_role(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+    ) -> ApiResult<ApiRole> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_device_role_off_graph(device.into_id().into())
+            .await?;
+        if let Some(Effect::QueryDeviceRoleResult(e)) =
+            find_effect!(&effects, Effect::QueryDeviceRoleResult(_e))
+        {
+            Ok(ApiRole::from(e.role))
+        } else {
+            Err(anyhow!("unable to query device role").into())
+        }
+    }
+    /// Query device keybundle.
+    #[instrument(skip(self))]
+    async fn query_device_keybundle(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+    ) -> ApiResult<ApiKeyBundle> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_device_keybundle_off_graph(device.into_id().into())
+            .await?;
+        if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
+            find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
+        {
+            Ok(ApiKeyBundle::from(e.device_keys))
+        } else {
+            Err(anyhow!("unable to query device keybundle").into())
+        }
+    }
+    /// Query device label assignments.
+    #[instrument(skip(self))]
+    async fn query_device_label_assignments(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+    ) -> ApiResult<Vec<Label>> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_device_label_assignments_off_graph(device.into_id().into())
+            .await?;
+        let mut labels = Vec::new();
+        for e in effects {
+            if let Effect::QueryDeviceLabelAssignmentsResult(e) = e {
+                let label = Label::new(
+                    u32::try_from(e.label)
+                        .assume("`label` is out of range")
+                        .context("label is out of range")?,
+                );
+                debug!("found label: {} assigned to device: {}", label, device);
+                labels.push(label);
+            }
+        }
+        return Ok(labels);
+    }
+    /// Query AFC network ID.
+    #[instrument(skip(self))]
+    async fn query_afc_net_identifier(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+    ) -> ApiResult<NetIdentifier> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_afc_net_identifier_off_graph(device.into_id().into())
+            .await?;
+        if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
+            find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
+        {
+            Ok(NetIdentifier(e.net_identifier))
+        } else {
+            Err(anyhow!("unable to query afc network identifier").into())
+        }
+    }
+    /// Query AQC network ID.
+    #[instrument(skip(self))]
+    async fn query_aqc_net_identifier(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+    ) -> ApiResult<NetIdentifier> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_aqc_net_identifier_off_graph(device.into_id().into())
+            .await?;
+        if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
+            find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
+        {
+            Ok(NetIdentifier(e.net_identifier))
+        } else {
+            Err(anyhow!("unable to query aqc network identifier").into())
+        }
+    }
+    /// Query label exists.
+    #[instrument(skip(self))]
+    async fn query_label_exists(
+        self,
+        _: context::Context,
+        team: TeamId,
+        label: Label,
+    ) -> ApiResult<bool> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_label_exists_off_graph(label)
+            .await?;
+        if let Some(Effect::QueryLabelExistsResult(e)) =
+            find_effect!(&effects, Effect::QueryLabelExistsResult(_e))
+        {
+            Ok(e.label_exists)
+        } else {
+            Err(anyhow!("unable to query aqc network identifier").into())
+        }
+    }
 }
 
 impl From<ApiKeyBundle> for KeyBundle {
@@ -596,6 +789,17 @@ impl From<ApiRole> for Role {
             ApiRole::Admin => Role::Admin,
             ApiRole::Operator => Role::Operator,
             ApiRole::Member => Role::Member,
+        }
+    }
+}
+
+impl From<Role> for ApiRole {
+    fn from(value: Role) -> Self {
+        match value {
+            Role::Owner => ApiRole::Owner,
+            Role::Admin => ApiRole::Admin,
+            Role::Operator => ApiRole::Operator,
+            Role::Member => ApiRole::Member,
         }
     }
 }

@@ -21,13 +21,23 @@ cargo install --locked cargo-generate
 
 Then, generate a new project from the template, which will prompt you for the name of the new project you wish to create:
 ```
-cargo generate aranya-project/aranya templates/aranya-example
+cargo generate aranya-project/aranya templates/aranya-example --name rust-example
+```
+
+The `--branch` option can be used with `cargo generate` to select a particular branch to generate the template from.
+The `--revision` option can be used with `cargo generate` to select a particular commit to generate the template from. 
+
+To generate a template based on the your local copy of the repository:
+```
+cd <repo>
+cargo generate --path templates/aranya-example --name rust-example
 ```
 
 # Building the Example
 
 You can then build your new project (release mode will provide faster binaries):
 ```
+cd rust-example
 cargo build --release
 ```
 
@@ -35,11 +45,13 @@ cargo build --release
 
 Finally, you can run your newly created project[^1]:
 ```
+cd rust-example
 target/release/aranya-example
 ```
 
 You can optionally set the [tracing log level](https://docs.rs/tracing/latest/tracing/struct.Level.html#impl-Level) by adding a prefix to the command:
 ```
+cd rust-example
 ARANYA_EXAMPLE=info target/release/aranya-example
 ```
 
