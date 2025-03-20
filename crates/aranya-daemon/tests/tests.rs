@@ -51,7 +51,7 @@ async fn test_remove_members() -> Result<()> {
         .remove_member(team.membera.pk.ident_pk.id()?)
         .await
         .context("unable to remove membera")?;
-    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.user_id ==  team.membera.pk.ident_pk.id().expect("id").into())
+    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.membera.pk.ident_pk.id().expect("id").into())
     {
         panic!("expected MemberRemoved effect: {:?}", effects)
     }
@@ -61,7 +61,7 @@ async fn test_remove_members() -> Result<()> {
         .remove_member(team.memberb.pk.ident_pk.id()?)
         .await
         .context("unable to remove memberb")?;
-    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.user_id ==  team.memberb.pk.ident_pk.id().expect("id").into())
+    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.memberb.pk.ident_pk.id().expect("id").into())
     {
         panic!("expected MemberRemoved effect: {:?}", effects)
     }
@@ -76,7 +76,7 @@ async fn test_remove_members() -> Result<()> {
         .remove_member(team.operator.pk.ident_pk.id()?)
         .await
         .context("unable to remove operator")?;
-    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.user_id ==  team.operator.pk.ident_pk.id().expect("id").into())
+    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.operator.pk.ident_pk.id().expect("id").into())
     {
         panic!("expected OperatorRemoved effect: {:?}", effects)
     }
@@ -90,7 +90,7 @@ async fn test_remove_members() -> Result<()> {
         .remove_member(team.admin.pk.ident_pk.id()?)
         .await
         .context("unable to remove admin")?;
-    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.user_id ==  team.admin.pk.ident_pk.id().expect("id").into())
+    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.admin.pk.ident_pk.id().expect("id").into())
     {
         panic!("expected AdminRemoved effect: {:?}", effects)
     }
@@ -174,7 +174,7 @@ async fn test_revoke_label() -> Result<()> {
         .revoke_label(team.membera.pk.ident_pk.id()?, label)
         .await
         .context("unable to revoke label membera")?;
-    if !contains_effect!(&effects, Effect::LabelRevoked(e) if e.user_id == team.membera.pk.ident_pk.id().expect("id").into())
+    if !contains_effect!(&effects, Effect::LabelRevoked(e) if e.device_id == team.membera.pk.ident_pk.id().expect("id").into())
     {
         panic!("expected AfcLabelRevoked effect: {:?}", effects)
     }
@@ -184,7 +184,7 @@ async fn test_revoke_label() -> Result<()> {
         .revoke_label(team.memberb.pk.ident_pk.id()?, label)
         .await
         .context("unable to revoke label memberb")?;
-    if !contains_effect!(&effects, Effect::LabelRevoked(e) if e.user_id ==  team.memberb.pk.ident_pk.id().expect("id").into())
+    if !contains_effect!(&effects, Effect::LabelRevoked(e) if e.device_id ==  team.memberb.pk.ident_pk.id().expect("id").into())
     {
         panic!("expected AfcLabelRevoked effect: {:?}", effects)
     }

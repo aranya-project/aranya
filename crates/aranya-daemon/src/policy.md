@@ -15,9 +15,9 @@ limitations that will likely be changed for the MVP.
 
 ## Roles & Permissions
 
-The MVP will likely support multiple role assignments per user, but we restrict to 1 role per user
-for the beta. Hence, users can only be onboarded to the team under the `Member` role and the role
-assignment commands can be thought of as a promotion of the user's single role. Similarly, only the
+The MVP will likely support multiple role assignments per device, but we restrict to 1 role per device
+for the beta. Hence, devices can only be onboarded to the team under the `Member` role and the role
+assignment commands can be thought of as a promotion of the devices's single role. Similarly, only the
 `Member` role can be removed from the team and so role revocation commands will simply demote any
 higher role back down to `Member`.
 
@@ -48,15 +48,15 @@ higher role back down to `Member`.
 
 **Invariants**:
 
-- Owner is the "root user" (has all permissions except sending data on AFC channel).
-- A user can only have one role at a time.
-- If the `User` fact exists, then so will the `UserIdentKey`, `UserSignKey`, and `UserEncKey`
-  facts. Similarly, the latter three facts are predicated on the user fact.
-- A user can only have one of each user key type at a time.
-- Only the creator of the team is added as an `Owner`. All other users are onboarded as `Member`s.
-- Only onboarded users can be assigned to a higher role than `Member`.
-- Revoking a user's role will automatically set their role down to `Member`.
-- Only a `Member` can be removed from the team. All other roles must be revoked from a user before
+- Owner is the "root device" (has all permissions except sending data on AFC channel).
+- A device can only have one role at a time.
+- If the `Device` fact exists, then so will the `DeviceIdentKey`, `DeviceSignKey`, and `DeviceEncKey`
+  facts. Similarly, the latter three facts are predicated on the device fact.
+- A device can only have one of each device key type at a time.
+- Only the creator of the team is added as an `Owner`. All other devices are onboarded as `Member`s.
+- Only onboarded devices can be assigned to a higher role than `Member`.
+- Revoking A device's role will automatically set their role down to `Member`.
+- Only a `Member` can be removed from the team. All other roles must be revoked from A device before
   they can be removed from the team.
 
 
@@ -89,17 +89,17 @@ enum ChanOp {
     ReadWrite,
 }
 
-// Collection of public UserKeys for a user.
+// Collection of public DeviceKeys for A device.
 struct KeyBundle {
     ident_key bytes,
     sign_key bytes,
     enc_key bytes,
 }
 
-// The set of key IDs derived from each UserKey.
-// NB: Key ID of the IdentityKey is the user ID.
+// The set of key IDs derived from each DeviceKey.
+// NB: Key ID of the IdentityKey is the device ID.
 struct KeyIds {
-    user_id id,
+    device_id id,
     sign_key_id id,
     enc_key_id id,
 }
@@ -108,17 +108,17 @@ struct KeyIds {
 ### Facts
 
 ```policy
-// A user on the team.
-fact User[user_id id]=>{role enum Role, sign_key_id id, enc_key_id id}
+// A device on the team.
+fact Device[device_id id]=>{role enum Role, sign_key_id id, enc_key_id id}
 
-// A user's public IdentityKey
-fact UserIdentKey[user_id id]=>{key bytes}
+// A device's public IdentityKey
+fact DeviceIdentKey[device_id id]=>{key bytes}
 
-// A user's public SigningKey.
-fact UserSignKey[user_id id]=>{key_id id, key bytes}
+// A device's public SigningKey.
+fact DeviceSignKey[device_id id]=>{key_id id, key bytes}
 
-// A user's public EncryptionKey.
-fact UserEncKey[user_id id]=>{key_id id, key bytes}
+// A device's public EncryptionKey.
+fact DeviceEncKey[device_id id]=>{key_id id, key bytes}
 
 // Indicates that the team has been terminated.
 fact TeamEnd[]=>{}
@@ -126,28 +126,28 @@ fact TeamEnd[]=>{}
 // Records an AFC label that has been defined for use.
 fact Label[label int]=>{}
 
-// Records that a user is allowed to use an AFC label.
-fact AssignedLabel[user_id id, label int]=>{op enum ChanOp}
+// Records that a device is allowed to use an AFC label.
+fact AssignedLabel[device_id id, label int]=>{op enum ChanOp}
 
 // Stores a Member's associated network identifier for AFC.
-fact AfcMemberNetworkId[user_id id]=>{net_identifier string}
+fact AfcMemberNetworkId[device_id id]=>{net_identifier string}
 
 // Stores a Member's associated network identifier for AQC.
-fact AqcMemberNetworkId[user_id id]=>{net_identifier string}
+fact AqcMemberNetworkId[device_id id]=>{net_identifier string}
 ```
 
 ### Functions
 
 ```policy
-// Check if there is an existing user.
-// Returns the user struct if so, otherwise returns `None`.
-function find_existing_user(user_id id) optional struct User {
-    let user = query User[user_id: user_id]
-    let has_ident = exists UserIdentKey[user_id: user_id]
-    let has_sign = exists UserSignKey[user_id: user_id]
-    let has_enc = exists UserEncKey[user_id: user_id]
+// Check if there is an existing device.
+// Returns the device struct if so, otherwise returns `None`.
+function find_existing_device(device_id id) optional struct Device {
+    let device = query Device[device_id: device_id]
+    let has_ident = exists DeviceIdentKey[device_id: device_id]
+    let has_sign = exists DeviceSignKey[device_id: device_id]
+    let has_enc = exists DeviceEncKey[device_id: device_id]
 
-    if user is Some {
+    if device is Some {
         check has_ident
         check has_sign
         check has_enc
@@ -157,29 +157,29 @@ function find_existing_user(user_id id) optional struct User {
         check !has_enc
     }
 
-    // Return the resulting User struct for further checks.
-    return user
+    // Return the resulting device struct for further checks.
+    return device
 }
 
-// Sanity checks the user per the stated invariants.
-function get_valid_user(user_id id) struct User {
+// Sanity checks the device per the stated invariants.
+function get_valid_device(device_id id) struct Device {
     // Check to see if team is active.
     check !exists TeamEnd[]=> {}
 
-    // Get and return user info.
-    let user = check_unwrap find_existing_user(user_id)
-    return user
+    // Get and return device info.
+    let device = check_unwrap find_existing_device(device_id)
+    return device
 }
 
-// Derives the key ID for each of the UserKeys in the bundle.
-// (The IdentityKey's ID is the UserID.)
-function derive_user_key_ids(user_keys struct KeyBundle) struct KeyIds {
-    let user_id = idam::derive_user_id(user_keys.ident_key)
-    let sign_key_id = idam::derive_sign_key_id(user_keys.sign_key)
-    let enc_key_id = idam::derive_enc_key_id(user_keys.enc_key)
+// Derives the key ID for each of the DeviceKeys in the bundle.
+// (The IdentityKey's ID is the DeviceID.)
+function derive_device_key_ids(device_keys struct KeyBundle) struct KeyIds {
+    let device_id = idam::derive_device_id(device_keys.ident_key)
+    let sign_key_id = idam::derive_sign_key_id(device_keys.sign_key)
+    let enc_key_id = idam::derive_enc_key_id(device_keys.enc_key)
 
     return KeyIds {
-        user_id: user_id,
+        device_id: device_id,
         sign_key_id: sign_key_id,
         enc_key_id: enc_key_id,
     }
@@ -205,11 +205,11 @@ function is_member(role enum Role) bool {
     return role == Role::Member
 }
 
-// Seals a serialized basic command into an envelope, using the stored SigningKey for this user.
+// Seals a serialized basic command into an envelope, using the stored SigningKey for this device.
 function seal_command(payload bytes) struct Envelope {
     let parent_id = perspective::head_id()
-    let author_id = device::current_user_id()
-    let author_sign_pk = check_unwrap query UserSignKey[user_id: author_id]
+    let author_id = device::current_device_id()
+    let author_sign_pk = check_unwrap query DeviceSignKey[device_id: author_id]
 
     let signed = crypto::sign(author_sign_pk.key_id, payload)
     return envelope::new(
@@ -225,7 +225,7 @@ function seal_command(payload bytes) struct Envelope {
 // basic command once its been verified.
 function open_envelope(sealed_envelope struct Envelope) bytes {
     let author_id = envelope::author_id(sealed_envelope)
-    let author_sign_pk = check_unwrap query UserSignKey[user_id: author_id]
+    let author_sign_pk = check_unwrap query DeviceSignKey[device_id: author_id]
 
     let verified_command = crypto::verify(
         author_sign_pk.key,
@@ -247,46 +247,46 @@ function is_valid_label(label int) bool {
 }
 
 // Returns the channel operation for a particular label.
-function get_allowed_op(user_id id, label int) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedLabel[user_id: user_id, label: label]
+function get_allowed_op(device_id id, label int) enum ChanOp {
+    let assigned_label = check_unwrap query AssignedLabel[device_id: device_id, label: label]
     return assigned_label.op
 }
 
-// Reports whether the users have permission to create a bidirectional channel with each other.
-function can_create_afc_bidi_channel(user1 id, user2 id, label int) bool {
-    let user1_op = get_allowed_op(user1, label)
-    let user2_op = get_allowed_op(user2, label)
+// Reports whether the devices have permission to create a bidirectional channel with each other.
+function can_create_afc_bidi_channel(device1 id, device2 id, label int) bool {
+    let device1_op = get_allowed_op(device1, label)
+    let device2_op = get_allowed_op(device2, label)
 
     // Label must be valid.
     check is_valid_label(label)
     // Members can't create channels with themselves.
-    check user1 != user2
+    check device1 != device2
 
-    // Both users must have permissions to encrypt and decrypt data.
-    check user1_op == user2_op
-    check user1_op == ChanOp::ReadWrite
+    // Both devices must have permissions to encrypt and decrypt data.
+    check device1_op == device2_op
+    check device1_op == ChanOp::ReadWrite
 
     return true
 }
 
-// Returns the user's public EncryptionKey.
-function get_enc_pk(user_id id) bytes {
-    let user_enc_pk = check_unwrap query UserEncKey[user_id: user_id]
-    return user_enc_pk.key
+// Returns the device's public EncryptionKey.
+function get_enc_pk(device_id id) bytes {
+    let device_enc_pk = check_unwrap query DeviceEncKey[device_id: device_id]
+    return device_enc_pk.key
 }
 
-// Selects the ID which doesn't match `user_id`.
-function select_peer_id(user_id id, id_a id, id_b id) id {
-    if user_id == id_a {
+// Selects the ID which doesn't match `Device_id`.
+function select_peer_id(device_id id, id_a id, id_b id) id {
+    if device_id == id_a {
         return id_b
-    } else if user_id == id_b {
+    } else if device_id == id_b {
         return id_a
     } else {
         check false
     }
 }
 
-// Reports whether the users have permission to create a unidirectional channel with each other.
+// Reports whether the devices have permission to create a unidirectional channel with each other.
 function can_create_afc_uni_channel(writer_id id, reader_id id, label int) bool {
     let writer_op = get_allowed_op(writer_id, label)
     let reader_op = get_allowed_op(reader_id, label)
@@ -321,13 +321,13 @@ action create_team(owner_keys struct KeyBundle, nonce bytes) {
 }
 
 effect TeamCreated {
-    // The UserID of the creator of the Team.
+    // The DeviceID of the creator of the Team.
     owner_id id,
 }
 
 command CreateTeam {
     fields {
-        // The initial owner's public UserKeys.
+        // The initial owner's public DeviceKeys.
         owner_keys struct KeyBundle,
         // Random nonce to enforce this team's uniqueness.
         nonce bytes,
@@ -335,7 +335,7 @@ command CreateTeam {
 
     seal {
         let parent_id = perspective::head_id()
-        let author_id = device::current_user_id()
+        let author_id = device::current_device_id()
         let payload = serialize(this)
         let author_sign_key_id = idam::derive_sign_key_id(this.owner_keys.sign_key)
 
@@ -368,14 +368,14 @@ command CreateTeam {
     policy {
         // Get author of command
         let author_id = envelope::author_id(envelope)
-        // Derive the key ids from the user_keys
-        let owner_key_ids = derive_user_key_ids(this.owner_keys)
+        // Derive the key ids from the device_keys
+        let owner_key_ids = derive_device_key_ids(this.owner_keys)
 
-        // Check that author_id matches the user_id being created
-        check author_id == owner_key_ids.user_id
+        // Check that author_id matches the device_id being created
+        check author_id == owner_key_ids.device_id
 
         finish {
-            add_new_user(this.owner_keys, owner_key_ids, Role::Owner)
+            add_new_device(this.owner_keys, owner_key_ids, Role::Owner)
 
             emit TeamCreated {
                 owner_id: author_id,
@@ -384,20 +384,20 @@ command CreateTeam {
     }
 }
 
-// Adds the user to the Team.
-finish function add_new_user(key_bundle struct KeyBundle, key_ids struct KeyIds, role enum Role) {
-    create User[user_id: key_ids.user_id]=>{
+// Adds the device to the Team.
+finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, role enum Role) {
+    create Device[device_id: key_ids.device_id]=>{
         role: role,
         sign_key_id: key_ids.sign_key_id,
         enc_key_id: key_ids.enc_key_id,
     }
 
-    create UserIdentKey[user_id: key_ids.user_id]=>{key: key_bundle.ident_key}
-    create UserSignKey[user_id: key_ids.user_id]=>{
+    create DeviceIdentKey[device_id: key_ids.device_id]=>{key: key_bundle.ident_key}
+    create DeviceSignKey[device_id: key_ids.device_id]=>{
         key_id: key_ids.sign_key_id,
         key: key_bundle.sign_key,
     }
-    create UserEncKey[user_id: key_ids.user_id]=>{
+    create DeviceEncKey[device_id: key_ids.device_id]=>{
         key_id: key_ids.enc_key_id,
         key: key_bundle.enc_key,
     }
@@ -430,7 +430,7 @@ command TerminateTeam {
 
     policy {
         // Check that the team is active and return the author's info if they exist in the team.
-        let author = get_valid_user(envelope::author_id(envelope))
+        let author = get_valid_device(envelope::author_id(envelope))
         // Only the Owner can close the Team
         check is_owner(author.role)
 
@@ -438,7 +438,7 @@ command TerminateTeam {
             create TeamEnd[]=>{}
 
             emit TeamTerminated{
-                owner_id: author.user_id,
+                owner_id: author.device_id,
             }
         }
     }
@@ -456,45 +456,45 @@ command TerminateTeam {
 
 ```policy
 // Adds a Member to the Team.
-action add_member(user_keys struct KeyBundle){
+action add_member(device_keys struct KeyBundle){
     publish AddMember {
-        user_keys: user_keys,
+        device_keys: device_keys,
     }
 }
 
 // A Member was added to the Team.
 effect MemberAdded {
-    // The id of the user to be added.
-    user_id id,
-    // The user's set of public UserKeys.
-    user_keys struct KeyBundle,
+    // The id of the device to be added.
+    device_id id,
+    // The device's set of public DeviceKeys.
+    device_keys struct KeyBundle,
 }
 
 command AddMember {
     fields {
-        // The new user's public UserKeys.
-        user_keys struct KeyBundle,
+        // The new device's public DeviceKeys.
+        device_keys struct KeyBundle,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
+        let author = get_valid_device(envelope::author_id(envelope))
         // Derive the key IDs from the provided KeyBundle.
-        let user_key_ids = derive_user_key_ids(this.user_keys)
+        let device_key_ids = derive_device_key_ids(this.device_keys)
 
         // Only Operator and Owner can add a Member.
         check is_operator(author.role) || is_owner(author.role)
         // Check that the Member doesn't already exist.
-        check find_existing_user(user_key_ids.user_id) is None
+        check find_existing_device(device_key_ids.device_id) is None
 
         finish {
-            add_new_user(this.user_keys, user_key_ids, Role::Member)
+            add_new_device(this.device_keys, device_key_ids, Role::Member)
 
             emit MemberAdded {
-                user_id: user_key_ids.user_id,
-                user_keys: this.user_keys,
+                device_id: device_key_ids.device_id,
+                device_keys: this.device_keys,
             }
         }
     }
@@ -511,82 +511,82 @@ command AddMember {
 
 ```policy
 // Removes a Member from the Team.
-action remove_member(user_id id){
+action remove_member(device_id id){
     publish RemoveMember {
-        user_id: user_id,
+        device_id: device_id,
     }
 }
 
 // A Member was removed from the Team.
 effect MemberRemoved {
-    user_id id,
+    device_id id,
 }
 
 command RemoveMember{
     fields {
-        // The removed user's ID.
-        user_id id,
+        // The removed device's ID.
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Operators and Owners can remove a Member
         check is_operator(author.role) || is_owner(author.role)
-        // Check that the user is a Member
-        check is_member(user.role)
+        // Check that the device is a Member
+        check is_member(device.role)
 
         finish {
-            remove_user(this.user_id)
+            remove_device(this.device_id)
 
             emit MemberRemoved {
-                user_id: this.user_id,
+                device_id: this.device_id,
             }
         }
     }
 }
 
-// Removes the user from the Team.
-finish function remove_user(user_id id) {
-    delete User[user_id: user_id]
-    delete UserIdentKey[user_id: user_id]
-    delete UserSignKey[user_id: user_id]
-    delete UserEncKey[user_id: user_id]
+// Removes the device from the Team.
+finish function remove_device(device_id id) {
+    delete Device[device_id: device_id]
+    delete DeviceIdentKey[device_id: device_id]
+    delete DeviceSignKey[device_id: device_id]
+    delete DeviceEncKey[device_id: device_id]
 }
 ```
 
 **Invariants**:
 
 - Members can only be removed by Operators and Owners.
-- Removing non-Members requires revoking their higher role so the user is made into a Member first.
+- Removing non-Members requires revoking their higher role so the device is made into a Member first.
 
 
 ## AssignRole
 
 ```policy
-// Assigns the specified role to the user.
-action assign_role(user_id id, role enum Role){
+// Assigns the specified role to the device.
+action assign_role(device_id id, role enum Role){
     match role {
         Role::Owner => {
             // Assigns the Owner role.
             publish AssignOwner {
-                user_id: user_id,
+                device_id: device_id,
             }
         }
         Role::Admin => {
             // Assigns the Admin role.
             publish AssignAdmin {
-                user_id: user_id,
+                device_id: device_id,
             }
         }
         Role::Operator => {
             // Assigns the Operator role.
             publish AssignOperator {
-                user_id: user_id,
+                device_id: device_id,
             }
         }
         _ => { check false }
@@ -597,49 +597,49 @@ action assign_role(user_id id, role enum Role){
 ### AssignOwner
 
 ```policy
-// A user was assigned with the Owner role.
+// A device was assigned with the Owner role.
 effect OwnerAssigned {
-    user_id id,
+    device_id id,
 }
 
 command AssignOwner{
     fields {
-        // The assigned user's ID.
-        user_id id,
+        // The assigned device's ID.
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only an Owner can assign the Owner role.
         check is_owner(author.role)
-        // The user must not already have the Owner role.
-        check user.role != Role::Owner
+        // The device must not already have the Owner role.
+        check device.role != Role::Owner
 
         finish {
-            assign_role(user, Role::Owner)
+            assign_role(device, Role::Owner)
 
             emit OwnerAssigned {
-                user_id: this.user_id,
+                device_id: this.device_id,
             }
         }
     }
 }
 
-// Assigns the user to the specified role.
-finish function assign_role(user struct User, role enum Role) {
-    update User[user_id: user.user_id]=>{
-        role: user.role,
-        sign_key_id: user.sign_key_id,
-        enc_key_id: user.enc_key_id,
+// Assigns the device to the specified role.
+finish function assign_role(device struct Device, role enum Role) {
+    update Device[device_id: device.device_id]=>{
+        role: device.role,
+        sign_key_id: device.sign_key_id,
+        enc_key_id: device.enc_key_id,
         } to {
             role: role,
-            sign_key_id: user.sign_key_id,
-            enc_key_id: user.enc_key_id,
+            sign_key_id: device.sign_key_id,
+            enc_key_id: device.enc_key_id,
         }
 }
 ```
@@ -647,34 +647,34 @@ finish function assign_role(user struct User, role enum Role) {
 ### AssignAdmin
 
 ```policy
-// A user was assigned with the Admin role.
+// A device was assigned with the Admin role.
 effect AdminAssigned {
-    user_id id,
+    device_id id,
 }
 
 command AssignAdmin{
     fields {
-        // The assigned user's ID.
-        user_id id,
+        // The assigned device's ID.
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only an Owner can assign the Admin role.
         check is_owner(author.role)
-        // The user must not already have the Admin role.
-        check user.role != Role::Admin
+        // The device must not already have the Admin role.
+        check device.role != Role::Admin
 
         finish {
-            assign_role(user, Role::Admin)
+            assign_role(device, Role::Admin)
 
             emit AdminAssigned {
-                user_id: this.user_id,
+                device_id: this.device_id,
             }
         }
     }
@@ -685,34 +685,34 @@ command AssignAdmin{
 ### AssignOperator
 
 ```policy
-// A user was assigned with the Operator role.
+// A device was assigned with the Operator role.
 effect OperatorAssigned {
-    user_id id,
+    device_id id,
 }
 
 command AssignOperator{
     fields {
-        // The assigned user's ID.
-        user_id id,
+        // The assigned device's ID.
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Owners and Admins can assign the Operator role.
         check is_owner(author.role) || is_admin(author.role)
-        // The user must not already have the Operator role.
-        check user.role != Role::Operator
+        // The device must not already have the Operator role.
+        check device.role != Role::Operator
 
         finish {
-            assign_role(user, Role::Operator)
+            assign_role(device, Role::Operator)
 
             emit OperatorAssigned {
-                user_id: this.user_id,
+                device_id: this.device_id,
             }
         }
     }
@@ -722,7 +722,7 @@ command AssignOperator{
 
 **Invariants**:
 
-- Users cannot assign roles to themselves.
+- devices cannot assign roles to themselves.
 - Only Owners can assign the Owner role.
 - Only Owners can assign the Admin role.
 - Only Owners and Admins can assign the Operator role.
@@ -731,25 +731,25 @@ command AssignOperator{
 ## RevokeRole
 
 ```policy
-// Revokes the specified role from the user.
-action revoke_role(user_id id, role enum Role){
+// Revokes the specified role from the device.
+action revoke_role(device_id id, role enum Role){
     match role {
         Role::Owner => {
             // Revokes the Owner role.
             publish RevokeOwner {
-                user_id: user_id,
+                device_id: device_id,
             }
         }
         Role::Admin => {
             // Revokes the Admin role.
             publish RevokeAdmin {
-                user_id: user_id,
+                device_id: device_id,
             }
         }
         Role::Operator => {
             // Revokes the Operator role.
             publish RevokeOperator {
-                user_id: user_id,
+                device_id: device_id,
             }
         }
         _ => { check false }
@@ -760,49 +760,49 @@ action revoke_role(user_id id, role enum Role){
 ### RevokeOwner
 
 ```policy
-// The Owner role was revoked from a user.
+// The Owner role was revoked from A device.
 effect OwnerRevoked {
-    user_id id,
+    device_id id,
 }
 
 command RevokeOwner{
     fields {
-        // The revoked user's ID.
-        user_id id,
+        // The revoked device's ID.
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Owner can only revoke the role from itself.
-        check author.user_id == this.user_id
-        // Check that the user is an Owner.
+        check author.device_id == this.device_id
+        // Check that the device is an Owner.
         check is_owner(author.role)
 
         finish {
-            revoke_role(user)
+            revoke_role(device)
 
             emit OwnerRevoked {
-                user_id: this.user_id,
+                device_id: this.device_id,
             }
         }
     }
 }
 
-// Revokes the specified role from the user. This automatically sets their role to Member instead.
-finish function revoke_role(user struct User) {
-    update User[user_id: user.user_id]=>{
-        role: user.role,
-        sign_key_id: user.sign_key_id,
-        enc_key_id: user.enc_key_id,
+// Revokes the specified role from the device. This automatically sets their role to Member instead.
+finish function revoke_role(device struct Device) {
+    update Device[device_id: device.device_id]=>{
+        role: device.role,
+        sign_key_id: device.sign_key_id,
+        enc_key_id: device.enc_key_id,
         } to {
             role: Role::Member,
-            sign_key_id: user.sign_key_id,
-            enc_key_id: user.enc_key_id,
+            sign_key_id: device.sign_key_id,
+            enc_key_id: device.enc_key_id,
             }
 }
 ```
@@ -810,34 +810,34 @@ finish function revoke_role(user struct User) {
 ### RevokeAdmin
 
 ```policy
-// The Admin role was revoke from a user.
+// The Admin role was revoke from A device.
 effect AdminRevoked {
-    user_id id,
+    device_id id,
 }
 
 command RevokeAdmin{
     fields {
-        // The revoked user's ID.
-        user_id id,
+        // The revoked device's ID.
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Owners can revoke the Admin role.
         check is_owner(author.role)
-        // Check that the user is an Admin.
-        check is_admin(user.role)
+        // Check that the device is an Admin.
+        check is_admin(device.role)
 
         finish {
-            revoke_role(user)
+            revoke_role(device)
 
             emit AdminRevoked {
-                user_id: this.user_id,
+                device_id: this.device_id,
             }
         }
     }
@@ -847,34 +847,34 @@ command RevokeAdmin{
 ### RevokeOperator
 
 ```policy
-// The Operator role was revoke from a user.
+// The Operator role was revoke from A device.
 effect OperatorRevoked {
-    user_id id,
+    device_id id,
 }
 
 command RevokeOperator{
     fields {
-        // The revoked user's ID.
-        user_id id,
+        // The revoked device's ID.
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Owners and Admins can revoke the Operator role.
         check is_owner(author.role) || is_admin(author.role)
-        // Check that the user is an Operator.
-        check is_operator(user.role)
+        // Check that the device is an Operator.
+        check is_operator(device.role)
 
         finish {
-            revoke_role(user)
+            revoke_role(device)
 
             emit OperatorRevoked {
-                user_id: this.user_id,
+                device_id: this.device_id,
             }
         }
     }
@@ -883,9 +883,9 @@ command RevokeOperator{
 
 **Invariants**:
 
-- Revoking a role from a user will assign them with the Member role.
+- Revoking a role from A device will assign them with the Member role.
 - If all Owners revoke their own role, it is possible for the team to be left without any Owners.
-- As long as there is at least one Owner in the team, new users can continue to be added and
+- As long as there is at least one Owner in the team, new devices can continue to be added and
   assigned to the different roles.
 - Only Owners can revoke the Admin role.
 - Only Owners and Admins can revoke the Operator role.
@@ -916,7 +916,7 @@ command DefineLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
+        let author = get_valid_device(envelope::author_id(envelope))
 
         // Owners, Admins and Operators can define AFC labels.
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
@@ -956,8 +956,8 @@ action undefine_label(label int) {
     }
 
     // TODO: add back when transaction bug is resolved
-    // map AssignedLabel[label: label, user_id: ?] as member {
-    //     action revoke_label(member.user_id, label)
+    // map AssignedLabel[label: label, device_id: ?] as member {
+    //     action revoke_label(member.device_id, label)
     // }
 }
 
@@ -975,7 +975,7 @@ command UndefineLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
+        let author = get_valid_device(envelope::author_id(envelope))
 
         // Only Owners and Admins can undefine AFC labels.
         check is_owner(author.role) || is_admin(author.role)
@@ -1002,18 +1002,18 @@ command UndefineLabel {
 Assigns an "AFC" label to a Member.
 
 ```policy
-// Assigns the user a `label` to .
-action assign_label(user_id id, label int, op enum ChanOp) {
+// Assigns the device a `label` to .
+action assign_label(device_id id, label int, op enum ChanOp) {
     publish AssignLabel {
-        user_id: user_id,
+        device_id: device_id,
         label: label,
         op: op,
     }
 }
 
 effect LabelAssigned {
-    // The user being assigned the label.
-    user_id id,
+    // The device being assigned the label.
+    device_id id,
     // The label being assigned.
     label int,
     // The operation that can be performed with the label.
@@ -1022,8 +1022,8 @@ effect LabelAssigned {
 
 command AssignLabel {
     fields {
-        // The user being assigned the label.
-        user_id id,
+        // The device being assigned the label.
+        device_id id,
         // The label being assigned.
         label int,
         // The operations that can be performed with the label.
@@ -1034,12 +1034,12 @@ command AssignLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Owners and Operators can assign AFC labels to Members.
         check is_owner(author.role) || is_operator(author.role)
-        check is_member(user.role)
+        check is_member(device.role)
 
         // Obviously it must be a valid label.
         check is_valid_label(this.label)
@@ -1047,10 +1047,10 @@ command AssignLabel {
         check exists Label[label: this.label]
 
         finish {
-            create AssignedLabel[user_id: user.user_id, label: this.label]=>{op: this.op}
+            create AssignedLabel[device_id: device.device_id, label: this.label]=>{op: this.op}
 
             emit LabelAssigned {
-                user_id: user.user_id,
+                device_id: device.device_id,
                 label: this.label,
                 op: this.op,
             }
@@ -1072,25 +1072,25 @@ channel under the revoked label should delete their channel once the label revoc
 received.
 
 ```policy
-// Revokes the user's access to the AFC `label`.
-action revoke_label(user_id id, label int) {
+// Revokes the device's access to the AFC `label`.
+action revoke_label(device_id id, label int) {
     publish RevokeLabel {
-        user_id: user_id,
+        device_id: device_id,
         label: label,
     }
 }
 
 effect LabelRevoked {
-    // The user for whom the label is being revoked.
-    user_id id,
+    // The device for whom the label is being revoked.
+    device_id id,
     // The label being revoked.
     label int,
 }
 
 command RevokeLabel {
     fields {
-        // The user for whom the label is being revoked.
-        user_id id,
+        // The device for whom the label is being revoked.
+        device_id id,
         // The label being revoked.
         label int,
     }
@@ -1099,21 +1099,21 @@ command RevokeLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Owners, Admins, and Operators are allowed to revoke a label from a Member.
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
-        check is_member(user.role)
+        check is_member(device.role)
 
         // Verify that AFC label has been assigned to this Member
-        check exists AssignedLabel[user_id: user.user_id, label: this.label]
+        check exists AssignedLabel[device_id: device.device_id, label: this.label]
 
         finish {
-            delete AssignedLabel[user_id: user.user_id, label: this.label]
+            delete AssignedLabel[device_id: device.device_id, label: this.label]
 
             emit LabelRevoked {
-                user_id: user.user_id,
+                device_id: device.device_id,
                 label: this.label,
             }
         }
@@ -1131,21 +1131,21 @@ command RevokeLabel {
 Associates a network name and address to a Member for use in AFC.
 
 ```policy
-action set_afc_network_name (user_id id, net_identifier string) {
+action set_afc_network_name (device_id id, net_identifier string) {
     publish SetAfcNetworkName {
-        user_id: user_id,
+        device_id: device_id,
         net_identifier: net_identifier,
     }
 }
 
 effect AfcNetworkNameSet {
-    user_id id,
+    device_id id,
     net_identifier string,
 }
 
 command SetAfcNetworkName {
     fields {
-        user_id id,
+        device_id id,
         net_identifier string,
     }
 
@@ -1153,36 +1153,36 @@ command SetAfcNetworkName {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Owners and Operators can associate a network name.
         check is_owner(author.role) || is_operator(author.role)
         // Only Members can be associated a network name.
-        check is_member(user.role)
+        check is_member(device.role)
 
         // TODO: check that the network identifier is valid.
-        let net_id_exists = query AfcMemberNetworkId[user_id: this.user_id]
+        let net_id_exists = query AfcMemberNetworkId[device_id: this.device_id]
 
         if net_id_exists is Some {
             let net_id = unwrap net_id_exists
             finish {
-                update AfcMemberNetworkId[user_id: this.user_id]=>{net_identifier: net_id.net_identifier} to {
+                update AfcMemberNetworkId[device_id: this.device_id]=>{net_identifier: net_id.net_identifier} to {
                     net_identifier: this.net_identifier
                 }
 
                 emit AfcNetworkNameSet {
-                    user_id: user.user_id,
+                    device_id: device.device_id,
                     net_identifier: this.net_identifier,
                 }
             }
         }
         else {
             finish {
-                create AfcMemberNetworkId[user_id: this.user_id]=>{net_identifier: this.net_identifier}
+                create AfcMemberNetworkId[device_id: this.device_id]=>{net_identifier: this.net_identifier}
 
                 emit AfcNetworkNameSet {
-                    user_id: user.user_id,
+                    device_id: device.device_id,
                     net_identifier: this.net_identifier,
                 }
             }
@@ -1200,34 +1200,34 @@ command SetAfcNetworkName {
 Dissociates an AFC network name and address from a Member.
 
 ```policy
-action unset_afc_network_name (user_id id) {}
+action unset_afc_network_name (device_id id) {}
 
 effect AfcNetworkNameUnset {
-    user_id id,
+    device_id id,
 }
 
 command UnsetAfcNetworkName {
     fields {
-        user_id id,
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Owners, Admins, and Operators can unset a Member's network name.
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
-        check is_member(user.role)
+        check is_member(device.role)
 
-        check exists AfcMemberNetworkId[user_id: this.user_id]
+        check exists AfcMemberNetworkId[device_id: this.device_id]
         finish {
-            delete AfcMemberNetworkId[user_id: this.user_id]
+            delete AfcMemberNetworkId[device_id: this.device_id]
 
             emit AfcNetworkNameUnset {
-                user_id: user.user_id,
+                device_id: device.device_id,
             }
         }
     }
@@ -1242,21 +1242,21 @@ command UnsetAfcNetworkName {
 Associates a network name and address to a Member for use in AQC.
 
 ```policy
-action set_aqc_network_name (user_id id, net_identifier string) {
+action set_aqc_network_name (device_id id, net_identifier string) {
     publish SetAqcNetworkName {
-        user_id: user_id,
+        device_id: device_id,
         net_identifier: net_identifier,
     }
 }
 
 effect AqcNetworkNameSet {
-    user_id id,
+    device_id id,
     net_identifier string,
 }
 
 command SetAqcNetworkName {
     fields {
-        user_id id,
+        device_id id,
         net_identifier string,
     }
 
@@ -1264,36 +1264,36 @@ command SetAqcNetworkName {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Owners and Operators can associate a network name.
         check is_owner(author.role) || is_operator(author.role)
         // Only Members can be associated a network name.
-        check is_member(user.role)
+        check is_member(device.role)
 
         // TODO: check that the network identifier is valid.
-        let net_id_exists = query AqcMemberNetworkId[user_id: this.user_id]
+        let net_id_exists = query AqcMemberNetworkId[device_id: this.device_id]
 
         if net_id_exists is Some {
             let net_id = unwrap net_id_exists
             finish {
-                update AqcMemberNetworkId[user_id: this.user_id]=>{net_identifier: net_id.net_identifier} to {
+                update AqcMemberNetworkId[device_id: this.device_id]=>{net_identifier: net_id.net_identifier} to {
                     net_identifier: this.net_identifier
                 }
 
                 emit AqcNetworkNameSet {
-                    user_id: user.user_id,
+                    device_id: device.device_id,
                     net_identifier: this.net_identifier,
                 }
             }
         }
         else {
             finish {
-                create AqcMemberNetworkId[user_id: this.user_id]=>{net_identifier: this.net_identifier}
+                create AqcMemberNetworkId[device_id: this.device_id]=>{net_identifier: this.net_identifier}
 
                 emit AqcNetworkNameSet {
-                    user_id: user.user_id,
+                    device_id: device.device_id,
                     net_identifier: this.net_identifier,
                 }
             }
@@ -1311,34 +1311,34 @@ command SetAqcNetworkName {
 Dissociates an AQC network name and address from a Member.
 
 ```policy
-action unset_aqc_network_name (user_id id) {}
+action unset_aqc_network_name (device_id id) {}
 
 effect AqcNetworkNameUnset {
-    user_id id,
+    device_id id,
 }
 
 command UnsetAqcNetworkName {
     fields {
-        user_id id,
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Owners, Admins, and Operators can unset a Member's network name.
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
-        check is_member(user.role)
+        check is_member(device.role)
 
-        check exists AqcMemberNetworkId[user_id: this.user_id]
+        check exists AqcMemberNetworkId[device_id: this.device_id]
         finish {
-            delete AqcMemberNetworkId[user_id: this.user_id]
+            delete AqcMemberNetworkId[device_id: this.device_id]
 
             emit AqcNetworkNameUnset {
-                user_id: user.user_id,
+                device_id: device.device_id,
             }
         }
     }
@@ -1358,13 +1358,13 @@ of commands. Furthermore, it cannot persist any changes to the factDB.
 
 The `create_afc_bidi_channel` action creates the `ChannelKeys`, encapsulates them for the peer and the
 author, and sends the encapsulations through the `AfcCreateBidiChannel` command. When processing the
-command, the user will decapsulate their keys and store them in the shared memory DB.
+command, the device will decapsulate their keys and store them in the shared memory DB.
 
 ```policy
 action create_afc_bidi_channel(peer_id id, label int) {
     let parent_cmd_id = perspective::head_id()
-    let author_id = device::current_user_id()
-    let author = get_valid_user(author_id)
+    let author_id = device::current_device_id()
+    let author = get_valid_device(author_id)
     let peer_enc_pk = get_enc_pk(peer_id)
 
     let channel = afc::create_bidi_channel(
@@ -1416,28 +1416,28 @@ command AfcCreateBidiChannel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let peer = check_unwrap find_existing_user(this.peer_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let peer = check_unwrap find_existing_device(this.peer_id)
 
         // Only Members can create AFC channels with other peer Members
         check is_member(author.role)
         check is_member(peer.role)
 
         // Members must be different and both must have bidirectional permissions over valid label.
-        check can_create_afc_bidi_channel(author.user_id, peer.user_id, this.label)
+        check can_create_afc_bidi_channel(author.device_id, peer.device_id, this.label)
 
         let parent_cmd_id = envelope::parent_id(envelope)
-        let current_user_id = device::current_user_id()
+        let current_device_id = device::current_device_id()
 
         // We authored this command.
-        if current_user_id == author.user_id {
-            let peer_enc_pk = get_enc_pk(peer.user_id)
+        if current_device_id == author.device_id {
+            let peer_enc_pk = get_enc_pk(peer.device_id)
             finish {
                 emit AfcBidiChannelCreated {
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.user_id,
+                    author_id: author.device_id,
                     author_enc_key_id: author.enc_key_id,
-                    peer_id: peer.user_id,
+                    peer_id: peer.device_id,
                     peer_enc_pk: peer_enc_pk,
                     label: this.label,
                     channel_key_id: this.channel_key_id,
@@ -1445,14 +1445,14 @@ command AfcCreateBidiChannel {
             }
         }
         // We're the intended recipient of this command.
-        else if current_user_id == peer.user_id {
-            let author_enc_pk = get_enc_pk(author.user_id)
+        else if current_device_id == peer.device_id {
+            let author_enc_pk = get_enc_pk(author.device_id)
             finish {
                 emit AfcBidiChannelReceived {
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.user_id,
+                    author_id: author.device_id,
                     author_enc_pk: author_enc_pk,
-                    peer_id: peer.user_id,
+                    peer_id: peer.device_id,
                     peer_enc_key_id: peer.enc_key_id,
                     label: this.label,
                     encap: this.peer_encap,
@@ -1486,8 +1486,8 @@ corresponding recipient will decapsulate their key and store it in the shared me
 ```policy
 action create_afc_uni_channel(writer_id id, reader_id id, label int) {
     let parent_cmd_id = perspective::head_id()
-    let author = get_valid_user(device::current_user_id())
-    let peer_id = select_peer_id(author.user_id, writer_id, reader_id)
+    let author = get_valid_device(device::current_device_id())
+    let peer_id = select_peer_id(author.device_id, writer_id, reader_id)
     let peer_enc_pk = get_enc_pk(peer_id)
 
     let channel = afc::create_uni_channel(
@@ -1532,9 +1532,9 @@ effect AfcUniChannelReceived {
 
 command AfcCreateUniChannel {
     fields {
-        // The UserID of the side that can encrypt data.
+        // The DeviceID of the side that can encrypt data.
         writer_id id,
-        // The UserID of the side that can decrypt data.
+        // The DeviceID of the side that can decrypt data.
         reader_id id,
         // The label to use.
         label int,
@@ -1548,30 +1548,30 @@ command AfcCreateUniChannel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
+        let author = get_valid_device(envelope::author_id(envelope))
 
         // Ensure that the author is half the channel and return the peer's info.
-        let peer_id = select_peer_id(author.user_id, this.writer_id, this.reader_id)
-        let peer = check_unwrap find_existing_user(peer_id)
+        let peer_id = select_peer_id(author.device_id, this.writer_id, this.reader_id)
+        let peer = check_unwrap find_existing_device(peer_id)
 
         // Only Members can create AFC channels with other peer Members
         check is_member(author.role)
         check is_member(peer.role)
 
-        // Both users must have valid permissions.
+        // Both devices must have valid permissions.
         check can_create_afc_uni_channel(this.writer_id, this.reader_id, this.label)
 
         let parent_cmd_id = envelope::parent_id(envelope)
-        let current_user_id = device::current_user_id()
+        let current_device_id = device::current_device_id()
 
         // We authored this command.
-        if current_user_id == author.user_id {
+        if current_device_id == author.device_id {
             let peer_enc_pk = get_enc_pk(peer_id)
 
             finish {
                 emit AfcUniChannelCreated {
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.user_id,
+                    author_id: author.device_id,
                     writer_id: this.writer_id,
                     reader_id: this.reader_id,
                     author_enc_key_id: author.enc_key_id,
@@ -1582,13 +1582,13 @@ command AfcCreateUniChannel {
             }
         }
         // We're the intended recipient of this command.
-        else if current_user_id == peer.user_id {
-            let author_enc_pk = get_enc_pk(author.user_id)
+        else if current_device_id == peer.device_id {
+            let author_enc_pk = get_enc_pk(author.device_id)
 
             finish {
                 emit AfcUniChannelReceived {
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.user_id,
+                    author_id: author.device_id,
                     writer_id: this.writer_id,
                     reader_id: this.reader_id,
                     author_enc_pk: author_enc_pk,
@@ -1617,18 +1617,18 @@ Queries devices on team.
 
 ```policy
 action query_devices_on_team() {
-    map User[user_id:?] as f {
-        publish QueryDevicesOnTeam { user_id: f.user_id }
+    map Device[device_id:?] as f {
+        publish QueryDevicesOnTeam { device_id: f.device_id }
     }
 }
 
 effect QueryDevicesOnTeamResult {
-    user_id id,
+    device_id id,
 }
 
 command QueryDevicesOnTeam {
     fields {
-        user_id id,
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -1637,7 +1637,7 @@ command QueryDevicesOnTeam {
     policy {
         finish {
             emit QueryDevicesOnTeamResult {
-                user_id: this.user_id,
+                device_id: this.device_id,
             }
         }
     }
@@ -1668,7 +1668,7 @@ command QueryDeviceRole {
 
     policy {
         // Check that the team is active and return the author's info if they exist in the team.
-        let author = get_valid_user(this.device_id)
+        let author = get_valid_device(this.device_id)
 
         finish {
             emit QueryDeviceRoleResult {
@@ -1684,11 +1684,11 @@ Queries device KeyBundle.
 
 ```policy
 
-// Returns the user's key bundle.
-function get_user_keybundle(user_id id) struct KeyBundle {
-    let ident_key = check_unwrap query UserIdentKey[user_id: user_id]
-    let sign_key = check_unwrap query UserSignKey[user_id: user_id]
-    let enc_key = check_unwrap query UserEncKey[user_id: user_id]
+// Returns the device's key bundle.
+function get_device_keybundle(device_id id) struct KeyBundle {
+    let ident_key = check_unwrap query DeviceIdentKey[device_id: device_id]
+    let sign_key = check_unwrap query DeviceSignKey[device_id: device_id]
+    let enc_key = check_unwrap query DeviceEncKey[device_id: device_id]
 
     return KeyBundle {
         ident_key: ident_key.key,
@@ -1704,7 +1704,7 @@ action query_device_keybundle(device_id id) {
 }
 
 effect QueryDeviceKeyBundleResult {
-    user_keys struct KeyBundle,
+    device_keys struct KeyBundle,
 }
 
 command QueryDeviceKeyBundle {
@@ -1717,12 +1717,12 @@ command QueryDeviceKeyBundle {
 
     policy {
         // Check that the team is active and return the author's info if they exist in the team.
-        let author = get_valid_user(this.device_id)
-        let user_keys = get_user_keybundle(author.user_id)
+        let author = get_valid_device(this.device_id)
+        let device_keys = get_device_keybundle(author.device_id)
 
         finish {
             emit QueryDeviceKeyBundleResult {
-                user_keys: user_keys,
+                device_keys: device_keys,
             }
         }
     }
@@ -1733,8 +1733,8 @@ command QueryDeviceKeyBundle {
 Queries device label assignments.
 
 ```policy
-action query_device_label_assignments(user_id id) {
-    map AssignedLabel[user_id: user_id, label:?] as f {
+action query_device_label_assignments(device_id id) {
+    map AssignedLabel[device_id: device_id, label:?] as f {
         publish QueryDeviceLabelAssignments { label: f.label }
     }
 }
@@ -1766,9 +1766,9 @@ Queries AFC network identifier.
 
 ```policy
 
-// Returns the user's AFC network identifier.
-function get_afc_net_identifier(user_id id) string {
-    let net_identifier = check_unwrap query AfcMemberNetworkId[user_id: user_id]
+// Returns the device's AFC network identifier.
+function get_afc_net_identifier(device_id id) string {
+    let net_identifier = check_unwrap query AfcMemberNetworkId[device_id: device_id]
 
     return net_identifier.net_identifier
 }
@@ -1793,8 +1793,8 @@ command QueryAfcNetIdentifier {
 
     policy {
         // Check that the team is active and return the author's info if they exist in the team.
-        let author = get_valid_user(this.device_id)
-        let net_identifier = get_afc_net_identifier(author.user_id)
+        let author = get_valid_device(this.device_id)
+        let net_identifier = get_afc_net_identifier(author.device_id)
 
         finish {
             emit QueryAfcNetIdentifierResult {
@@ -1810,9 +1810,9 @@ Queries AQC network identifier.
 
 ```policy
 
-// Returns the user's AQC network identifier.
-function get_aqc_net_identifier(user_id id) string {
-    let net_identifier = check_unwrap query AqcMemberNetworkId[user_id: user_id]
+// Returns the device's AQC network identifier.
+function get_aqc_net_identifier(device_id id) string {
+    let net_identifier = check_unwrap query AqcMemberNetworkId[device_id: device_id]
 
     return net_identifier.net_identifier
 }
@@ -1837,8 +1837,8 @@ command QueryAqcNetIdentifier {
 
     policy {
         // Check that the team is active and return the author's info if they exist in the team.
-        let author = get_valid_user(this.device_id)
-        let net_identifier = get_aqc_net_identifier(author.user_id)
+        let author = get_valid_device(this.device_id)
+        let net_identifier = get_aqc_net_identifier(author.device_id)
 
         finish {
             emit QueryAqcNetIdentifierResult {
@@ -1901,8 +1901,8 @@ command QueryLabelExists {
 
 <!-- The commented out code below this line is not part of the beta, but could be needed for MVP -->
 
-<!-- ## AddUser
-The `add_owner`, `add_admin`, `add_operator`, and `add_user` actions add an Owner, Admin, Operator,
+<!-- ## AddDevice
+The `add_owner`, `add_admin`, `add_operator`, and `add_device` actions add an Owner, Admin, Operator,
 and Member to the team, respectively.
 
 ### AddOwner
@@ -1917,13 +1917,13 @@ action add_owner(owner_keys struct KeyBundle){
 
 // An Owner was added to the Team.
 effect OwnerAdded {
-    user_id id,
-    user_keys struct KeyBundle,
+    device_id id,
+    device_keys struct KeyBundle,
 }
 
 command AddOwner{
     fields {
-        // The new owner's public UserKeys.
+        // The new owner's public DeviceKeys.
         owner_keys struct KeyBundle,
     }
 
@@ -1931,21 +1931,21 @@ command AddOwner{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
+        let author = get_valid_device(envelope::author_id(envelope))
         // Only Owner can add an Owner.
         check is_owner(author.role)
 
         // Derive the key IDs from the provided KeyBundle.
-        let owner_key_ids = derive_user_key_ids(this.owner_keys)
+        let owner_key_ids = derive_device_key_ids(this.owner_keys)
         // Check that the Owner doesn't already exist.
-        check find_existing_user(owner_key_ids.user_id) is None
+        check find_existing_device(owner_key_ids.device_id) is None
 
         finish {
-            add_new_user(this.owner_keys, owner_key_ids, Role::Owner)
+            add_new_device(this.owner_keys, owner_key_ids, Role::Owner)
 
             emit OwnerAdded {
-                user_id: owner_key_ids.user_id,
-                user_keys: this.owner_keys,
+                device_id: owner_key_ids.device_id,
+                device_keys: this.owner_keys,
             }
         }
     }
@@ -1964,13 +1964,13 @@ action add_admin(admin_keys struct KeyBundle){
 
 // A Admin was added to the Team.
 effect AdminAdded {
-    user_id id,
-    user_keys struct KeyBundle,
+    device_id id,
+    device_keys struct KeyBundle,
 }
 
 command AddAdmin{
     fields {
-        // The new admin's public UserKeys.
+        // The new admin's public DeviceKeys.
         admin_keys struct KeyBundle,
     }
 
@@ -1978,21 +1978,21 @@ command AddAdmin{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
+        let author = get_valid_device(envelope::author_id(envelope))
         // Only Owner can add an Admin.
         check is_owner(author.role)
 
         // Derive the key IDs from the provided KeyBundle.
-        let admin_key_ids = derive_user_key_ids(this.admin_keys)
+        let admin_key_ids = derive_device_key_ids(this.admin_keys)
         // Check that the Admin doesn't already exist.
-        check find_existing_user(admin_key_ids.user_id) is None
+        check find_existing_device(admin_key_ids.device_id) is None
 
         finish {
-            add_new_user(this.admin_keys, admin_key_ids, Role::Admin)
+            add_new_device(this.admin_keys, admin_key_ids, Role::Admin)
 
             emit AdminAdded {
-                user_id: admin_key_ids.user_id,
-                user_keys: this.admin_keys,
+                device_id: admin_key_ids.device_id,
+                device_keys: this.admin_keys,
             }
         }
     }
@@ -2011,13 +2011,13 @@ action add_operator(operator_keys struct KeyBundle){
 
 // A Operator was added to the Team.
 effect OperatorAdded {
-    user_id id,
-    user_keys struct KeyBundle,
+    device_id id,
+    device_keys struct KeyBundle,
 }
 
 command AddOperator{
     fields {
-        // The new operator's public UserKeys.
+        // The new operator's public DeviceKeys.
         operator_keys struct KeyBundle,
     }
 
@@ -2025,21 +2025,21 @@ command AddOperator{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
+        let author = get_valid_device(envelope::author_id(envelope))
         // Only Admin can add an Operator.
         check is_admin(author.role)
 
         // Derive the key IDs from the provided KeyBundle.
-        let operator_key_ids = derive_user_key_ids(this.operator_keys)
+        let operator_key_ids = derive_device_key_ids(this.operator_keys)
         // Check that the Admin doesn't already exist.
-        check find_existing_user(operator_key_ids.user_id) is None
+        check find_existing_device(operator_key_ids.device_id) is None
 
         finish {
-            add_new_user(this.operator_keys, operator_key_ids, Role::Operator)
+            add_new_device(this.operator_keys, operator_key_ids, Role::Operator)
 
             emit OperatorAdded {
-                user_id: user_key_ids.user_id,
-                user_keys: this.operator_keys,
+                device_id: device_key_ids.device_id,
+                device_keys: this.operator_keys,
             }
         }
     }
@@ -2054,46 +2054,46 @@ command AddOperator{
 - No role can add themselves.
 
 
-## RemoveUser
-The `remove_owner`, `remove_admin`, `remove_operator`, and `remove_user` actions remove an Admin, Operator, and Member from the team, respectively.
+## RemoveDevice
+The `remove_owner`, `remove_admin`, `remove_operator`, and `remove_device` actions remove an Admin, Operator, and Member from the team, respectively.
 
 ### RemoveOwner
 
 ```policy
 // Removes an Owner from the Team.
-action remove_owner(user_id id){
+action remove_owner(device_id id){
     publish RemoveOwner {
-        user_id: user_id,
+        device_id: device_id,
     }
 }
 
 // An Owner was removed from the Team.
 effect OwnerRemoved {
-    user_id id,
+    device_id id,
 }
 
 command RemoveOwner{
     fields {
-        // The removed user's ID.
-        user_id id,
+        // The removed device's ID.
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
+        let author = get_valid_device(envelope::author_id(envelope))
 
         // Owner can only be remove by itself.
-        check author.user_id == this.user_id
-        // Check that the user is an Owner.
+        check author.device_id == this.device_id
+        // Check that the device is an Owner.
         check is_owner(author.role)
 
         finish {
-            remove_user(this.user_id)
+            remove_device(this.device_id)
 
             emit OwnerRemoved {
-                user_id: this.user_id,
+                device_id: this.device_id,
             }
         }
     }
@@ -2104,40 +2104,40 @@ command RemoveOwner{
 
 ```policy
 // Removes an Admin from the Team.
-action remove_admin(user_id id){
+action remove_admin(device_id id){
     publish RemoveAdmin {
-        user_id: user_id,
+        device_id: device_id,
     }
 }
 
 // An Admin was removed from the Team.
 effect AdminRemoved {
-    user_id id,
+    device_id id,
 }
 
 command RemoveAdmin{
     fields {
-        // The removed user's ID.
-        user_id id,
+        // The removed device's ID.
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Owner can remove an Admin.
         check is_owner(author.role)
-        // Check that the user is an Admin.
-        check is_admin(user.role)
+        // Check that the device is an Admin.
+        check is_admin(device.role)
 
         finish {
-            remove_user(this.user_id)
+            remove_device(this.device_id)
 
             emit AdminRemoved {
-                user_id: this.user_id,
+                device_id: this.device_id,
             }
         }
     }
@@ -2148,40 +2148,40 @@ command RemoveAdmin{
 
 ```policy
 // Removes a Operator from the Team.
-action remove_operator(user_id id){
+action remove_operator(device_id id){
     publish RemoveAdmin {
-        user_id: user_id,
+        device_id: device_id,
     }
 }
 
 // A Operator was removed from the Team.
 effect OperatorRemoved {
-    user_id id,
+    device_id id,
 }
 
 command RemoveOperator{
     fields {
-        // The removed user's ID.
-        user_id id,
+        // The removed device's ID.
+        device_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        let user = check_unwrap find_existing_user(this.user_id)
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
 
         // Only Admin can remove a Operator
         check is_admin(author.role)
-        // Check that the user is a Operator
-        check is_operator(user.role)
+        // Check that the device is a Operator
+        check is_operator(device.role)
 
         finish {
-            remove_user(this.user_id)
+            remove_device(this.device_id)
 
             emit OperatorRemoved {
-                user_id: this.user_id,
+                device_id: this.device_id,
             }
         }
     }
@@ -2203,8 +2203,8 @@ action send_message(plaintext string) {
     // Generate a new key to use for message encryption.
     let key = idam::generate_group_key()
     // The author's public SigningKey is needed for encryption.
-    let author_id = device::current_user_id()
-    let author_sign_pk = unwrap query UserSignKey[user_id: author_id]
+    let author_id = device::current_device_id()
+    let author_sign_pk = unwrap query DeviceSignKey[device_id: author_id]
     let ciphertext = idam::encrypt_message(parent_id, plaintext, key.wrapped, author_sign_pk.key)
     publish Message{
         ciphertext: ciphertext,
@@ -2212,7 +2212,7 @@ action send_message(plaintext string) {
     }
 }
 effect MessageReceived {
-    user id,
+    device ID,
     plaintext bytes,
 }
 command Message {
@@ -2223,10 +2223,10 @@ command Message {
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
     policy {
-        let author = get_valid_user(envelope::author_id(envelope))
-        // Only a User can send a message
+        let author = get_valid_device(envelope::author_id(envelope))
+        // Only A device can send a message
         check is_member(author.role)
-        let author_sign_pk = check_unwrap query UserSignKey[user_id: author.user_id]
+        let author_sign_pk = check_unwrap query DeviceSignKey[device_id: author.device_id]
         let plaintext = idam::decrypt_message(
             parent_id,
             this.ciphertext,
@@ -2235,7 +2235,7 @@ command Message {
         )
         finish {
             emit MessageReceived{
-                user: author.user_id,
+                device: author.device_id,
                 plaintext: plaintext,
             }
         }
