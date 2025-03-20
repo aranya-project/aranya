@@ -644,9 +644,10 @@ impl DaemonApi for DaemonApiHandler {
         if let Some(Effect::QueryDeviceRoleResult(e)) =
             find_effect!(&effects, Effect::QueryDeviceRoleResult(_e))
         {
-            return Ok(ApiRole::from(e.role));
-        };
-        Err(anyhow!("unable to query device role").into())
+            Ok(ApiRole::from(e.role))
+        } else {
+            Err(anyhow!("unable to query device role").into())
+        }
     }
     /// Query device keybundle.
     #[instrument(skip(self))]
@@ -664,9 +665,10 @@ impl DaemonApi for DaemonApiHandler {
         if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
             find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
         {
-            return Ok(ApiKeyBundle::from(e.device_keys));
-        };
-        Err(anyhow!("unable to query device keybundle").into())
+            Ok(ApiKeyBundle::from(e.device_keys))
+        } else {
+            Err(anyhow!("unable to query device keybundle").into())
+        }
     }
     /// Query device label assignments.
     #[instrument(skip(self))]
@@ -711,9 +713,10 @@ impl DaemonApi for DaemonApiHandler {
         if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
             find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
         {
-            return Ok(NetIdentifier(e.net_identifier));
-        };
-        Err(anyhow!("unable to query afc network identifier").into())
+            Ok(NetIdentifier(e.net_identifier))
+        } else {
+            Err(anyhow!("unable to query afc network identifier").into())
+        }
     }
     /// Query AQC network ID.
     #[instrument(skip(self))]
@@ -731,9 +734,10 @@ impl DaemonApi for DaemonApiHandler {
         if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
             find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
         {
-            return Ok(NetIdentifier(e.net_identifier));
-        };
-        Err(anyhow!("unable to query aqc network identifier").into())
+            Ok(NetIdentifier(e.net_identifier))
+        } else {
+            Err(anyhow!("unable to query aqc network identifier").into())
+        }
     }
     /// Query label exists.
     #[instrument(skip(self))]
@@ -751,9 +755,10 @@ impl DaemonApi for DaemonApiHandler {
         if let Some(Effect::QueryLabelExistsResult(e)) =
             find_effect!(&effects, Effect::QueryLabelExistsResult(_e))
         {
-            return Ok(e.label_exists);
-        };
-        Err(anyhow!("unable to query aqc network identifier").into())
+            Ok(e.label_exists)
+        } else {
+            Err(anyhow!("unable to query aqc network identifier").into())
+        }
     }
 }
 
