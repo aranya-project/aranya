@@ -341,7 +341,7 @@ AranyaError run(Team *t) {
 
     // send AFC data.
     const char *send = "hello world";
-    err              = aranya_afc_send_data(&t->clients.membera.client, channel_id,
+    err              = aranya_afc_send_data(&t->clients.membera.client, chan_id,
                                             (const uint8_t *)send, (int)strlen(send));
     EXPECT("error sending data", err);
     printf("%s sent afc message: len: %d \r\n", t->clients_arr[MEMBERA].name,
