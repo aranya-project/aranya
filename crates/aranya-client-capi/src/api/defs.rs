@@ -707,8 +707,7 @@ pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to assign the label
-/// to.
+/// @param device the device ID [`DeviceId`] to assign the label to.
 /// @param label the AFC channel label [`Label`].
 ///
 /// @relates AranyaClient.
@@ -734,8 +733,7 @@ pub fn assign_label(
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to revoke the label
-/// from.
+/// @param device the device ID [`DeviceId`] to revoke the label from.
 /// @param label the AFC channel label [`Label`].
 ///
 /// @relates AranyaClient.
@@ -757,8 +755,7 @@ pub fn revoke_label(
 
 /// Create an Aranya Fast Channel (AFC).
 ///
-/// Creates a bidirectional AFC channel between the current device and another
-/// peer.
+/// Creates a bidirectional AFC channel between this device and another peer.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///

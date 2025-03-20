@@ -998,8 +998,7 @@ AranyaError aranya_delete_label_ext(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to assign the label
- * to.
+ * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) to assign the label to.
  * @param label the AFC channel label [`AranyaLabel`](@ref AranyaLabel).
  *
  * @relates AranyaClient.
@@ -1016,8 +1015,7 @@ AranyaError aranya_assign_label(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to assign the label
- * to.
+ * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) to assign the label to.
  * @param label the AFC channel label [`AranyaLabel`](@ref AranyaLabel).
  *
  * @relates AranyaClient.
@@ -1035,8 +1033,7 @@ AranyaError aranya_assign_label_ext(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to revoke the label
- * from.
+ * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) to revoke the label from.
  * @param label the AFC channel label [`AranyaLabel`](@ref AranyaLabel).
  *
  * @relates AranyaClient.
@@ -1053,8 +1050,7 @@ AranyaError aranya_revoke_label(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to revoke the label
- * from.
+ * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) to revoke the label from.
  * @param label the AFC channel label [`AranyaLabel`](@ref AranyaLabel).
  *
  * @relates AranyaClient.
@@ -1068,8 +1064,7 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
 /**
  * Create an Aranya Fast Channel (AFC).
  *
- * Creates a bidirectional AFC channel between the current device and another
- * peer.
+ * Creates a bidirectional AFC channel between this device and another peer.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -1090,8 +1085,7 @@ AranyaError aranya_afc_create_bidi_channel(struct AranyaClient *client,
 /**
  * Create an Aranya Fast Channel (AFC).
  *
- * Creates a bidirectional AFC channel between the current device and another
- * peer.
+ * Creates a bidirectional AFC channel between this device and another peer.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
