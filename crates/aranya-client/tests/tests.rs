@@ -282,8 +282,8 @@ impl Drop for UserCtx {
 
 /// Integration test for the user library and daemon.
 /// Tests creating a team with the user library.
-/// More extensive integration testing is conducted inside the daemon crate. 
-/// 
+/// More extensive integration testing is conducted inside the daemon crate.
+///
 /// The goal of this integration test is to validate the user library's end-to-end functionality.
 /// This includes exercising the user library's idiomatic Rust API as well as the daemon's `tarpc`
 /// API.

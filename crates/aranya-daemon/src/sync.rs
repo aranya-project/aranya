@@ -1,5 +1,5 @@
 //! Aranya sync task.
-//! 
+//!
 //! A task for syncing with Aranya peers at specified intervals.
 //! * A [`DelayQueue`] is used to retrieve the next peer to sync with at the specified interval.
 //! * [`SyncPeers`] handles adding/removing peers for the [`Syncer`].

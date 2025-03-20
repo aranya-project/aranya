@@ -61,7 +61,7 @@ where
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
     /// Syncs with the peer.
-    /// 
+    ///
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
     pub async fn sync_peer<S>(&self, id: GraphId, sink: &mut S, addr: &Addr) -> Result<()>
@@ -137,7 +137,7 @@ where
     }
 
     /// Creates the team.
-    /// 
+    ///
     /// Creates a new graph, adds the `CreateTeam` command to the root of the graph. Returns the
     /// [`GraphId`] of the newly created graph.
     #[instrument(skip_all)]
@@ -174,7 +174,7 @@ where
     }
 
     /// Create new ephemeral Session.
-    /// 
+    ///
     /// Once the Session has been created, call `session_receive` to add an ephemeral command to the
     /// Session.
     #[instrument(skip_all, fields(id = %id))]
@@ -184,7 +184,7 @@ where
     }
 
     /// Receives an ephemeral command from another ephemeral Session.
-    /// 
+    ///
     /// Assumes an ephemeral Session has already been created before adding an ephemeral command to
     /// the Session.
     #[instrument(skip_all)]
@@ -235,7 +235,7 @@ where
     }
 
     /// Creates a new ephemeral session and invokes an action on it.
-    /// 
+    ///
     /// Returns the [`MsgSink`] of serialized ephemeral commands added to the graph and a vector of
     /// [`Effect`]s produced by the action.
     #[instrument(skip_all)]
@@ -254,7 +254,7 @@ where
 }
 
 /// The Aranya sync server.
-/// 
+///
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are
 /// received.
 pub struct Server<EN, SP> {
@@ -614,7 +614,7 @@ where
 }
 
 /// An implementation of [`Actor`].
-/// 
+///
 /// Simplifies the process of calling an action on the Aranya graph.
 /// Enables more consistency and less repeated code for each action.
 pub struct ActorImpl<'a, EN, SP, CE, S> {

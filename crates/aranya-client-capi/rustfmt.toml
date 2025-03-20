@@ -5,3 +5,4 @@ imports_granularity = "Crate"
 wrap_comments = true
 # Manually override comment_width for capi crates
 comment_width = 65
+format_code_in_doc_comments = true

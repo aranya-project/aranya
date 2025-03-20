@@ -529,8 +529,8 @@ struct FastChannel {
     address: SocketAddr,
     /// The minimum allowed next sequence number for a channel, used to prevent replay attacks.
     ///
-    /// `None` indicates that the sequence number would've overflowed and [`AfcError::EndOfChannel`]
-    /// should be returned.
+    /// `None` indicates that the sequence number would've overflowed and
+    /// [`AfcError::EndOfChannel`] should be returned.
     ///
     /// It's `Option<Seq>` instead of `Result<Seq, AfcError>` for size purposes.
     next_min_seq: Option<Seq>,
