@@ -13,6 +13,7 @@ use aranya_daemon::{
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
+use buggy::BugExt;
 use tempfile::tempdir;
 use tokio::{fs, task, time::sleep};
 use tracing::{debug, info, Metadata};
@@ -124,8 +125,9 @@ impl UserCtx {
     }
 }
 
-/// Repeatedly calls `poll_afc_data`, followed by `handle_afc_data`, until all
-/// of the clients are pending.
+/// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the
+/// clients are pending.
+// TODO(nikki): alternative to select!{} to resolve lifetime issues
 macro_rules! do_poll {
     ($($client:expr),*) => {
         debug!(
@@ -133,10 +135,12 @@ macro_rules! do_poll {
             "start `do_poll`",
         );
         loop {
+            let mut afcs = [ $($client.afc()),* ];
+            let mut afcs = afcs.iter_mut();
             tokio::select! {
                 biased;
-                $(data = $client.poll_afc_data() => {
-                    $client.handle_afc_data(data?).await?
+                $(data = afcs.next().assume("macro enforces client count")?.poll_data() => {
+                    $client.afc().handle_data(data?).await?
                 },)*
                 _ = async {} => break,
             }
@@ -355,14 +359,16 @@ async fn main() -> Result<()> {
     let afc_id1 = team
         .membera
         .client
-        .create_afc_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .afc()
+        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
     // membera creates bidi channel with memberb
     let afc_id2 = team
         .membera
         .client
-        .create_afc_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
+        .afc()
+        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
         .await?;
 
     // wait for ctrl message to be sent.
@@ -373,21 +379,23 @@ async fn main() -> Result<()> {
     let msg = "hello world label1";
     team.membera
         .client
-        .send_afc_data(afc_id1, msg.as_bytes())
+        .afc()
+        .send_data(afc_id1, msg.as_bytes())
         .await?;
     debug!(?msg, "sent message");
 
     let msg = "hello world label2";
     team.membera
         .client
-        .send_afc_data(afc_id2, msg.as_bytes())
+        .afc()
+        .send_data(afc_id2, msg.as_bytes())
         .await?;
     debug!(?msg, "sent message");
 
     sleep(Duration::from_millis(100)).await;
     do_poll!(team.membera.client, team.memberb.client);
 
-    let Some(AfcMsg { data, label, .. }) = team.memberb.client.try_recv_afc_data() else {
+    let Some(AfcMsg { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
         bail!("no message available!")
     };
     debug!(
@@ -397,7 +405,7 @@ async fn main() -> Result<()> {
         core::str::from_utf8(&data)?
     );
 
-    let Some(AfcMsg { data, label, .. }) = team.memberb.client.try_recv_afc_data() else {
+    let Some(AfcMsg { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
         bail!("no message available!")
     };
     debug!(
