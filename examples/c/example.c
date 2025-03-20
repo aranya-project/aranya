@@ -317,9 +317,9 @@ AranyaError run(Team *t) {
     // create a bidirectional Aranya Fast Channel.
 
     // create AFC channel between membera and memberb.
-    AranyaChannelId channel_id;
+    AranyaChannelId chan_id;
     err = aranya_afc_create_bidi_channel(&t->clients.membera.client, &t->id,
-                                         afc_addrs[MEMBERB], label, &channel_id);
+                                         afc_addrs[MEMBERB], label, &chan_id);
     EXPECT("error creating afc channel", err);
     AranyaDuration timeout = ARANYA_DURATION_SECONDS * 1;
     // TODO: poll in separate task.

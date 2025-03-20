@@ -158,8 +158,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// Add a device to the team with the
-    /// default `Member` role.
+    /// Add a device to the team with the default `Member` role.
     pub async fn add_device_to_team(&mut self, keys: KeyBundle) -> Result<()> {
         Ok(self
             .client
@@ -186,8 +185,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// Revoke a role from a device. This sets the device's role back to the
-    /// default `Member` role.
+    /// Revoke a role from a device. This sets the device's role back to the default `Member` role.
     pub async fn revoke_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
         Ok(self
             .client
