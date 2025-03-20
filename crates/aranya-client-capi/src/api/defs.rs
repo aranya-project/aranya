@@ -628,8 +628,7 @@ pub unsafe fn afc_assign_net_identifier(
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    // SAFETY: Caller must ensure `net_identifier` is a valid
-    // C String.
+    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
     let net_identifier = unsafe { net_identifier.as_underlying() }?;
     client.rt.block_on(
         client
@@ -657,8 +656,7 @@ pub unsafe fn afc_remove_net_identifier(
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    // SAFETY: Caller must ensure `net_identifier` is a valid
-    // C String.
+    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
     let net_identifier = unsafe { net_identifier.as_underlying() }?;
     client.rt.block_on(
         client
