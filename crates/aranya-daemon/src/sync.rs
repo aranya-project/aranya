@@ -5,8 +5,8 @@
 //! * [`SyncPeers`] handles adding/removing peers for the [`Syncer`].
 //! * [`Syncer`] syncs with the next available peer from the [`DelayQueue`].
 //! * [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently. This
-//! prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from
-//! the [`DelayQueue`]
+//!   prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from
+//!   the [`DelayQueue`]
 
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
