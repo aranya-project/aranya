@@ -70,14 +70,14 @@ where
     {
         // send the sync request.
 
-        // TODO: Real server address.
+        // TODO(dygert): Real server address.
         let server_addr = ();
         let mut syncer = SyncRequester::new(id, &mut Rng, server_addr);
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let (len, _) = {
             let mut client = self.aranya.lock().await;
-            // TODO: save PeerCache somewhere.
+            // TODO(geoff): save PeerCache somewhere.
             syncer
                 .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
                 .context("sync poll failed")?
@@ -118,12 +118,12 @@ where
             if !cmds.is_empty() {
                 let mut client = self.aranya.lock().await;
                 let mut trx = client.transaction(id);
-                // TODO: save PeerCache somewhere.
+                // TODO(geoff): save PeerCache somewhere.
                 client
                     .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
                 client.commit(&mut trx, sink).context("commit failed")?;
-                // TODO: Update heads
+                // TODO(dygert): Update heads
                 // client.update_heads(
                 //     id,
                 //     cmds.iter().filter_map(|cmd| cmd.address().ok()),
@@ -352,7 +352,7 @@ where
         client: Arc<Mutex<ClientState<EN, SP>>>,
         request: &[u8],
     ) -> Result<Box<[u8]>> {
-        // TODO: Use real server address
+        // TODO(dygert): Use real server address
         let server_address = ();
         let mut resp = SyncResponder::new(server_address);
 
@@ -367,7 +367,7 @@ where
         resp.receive(request).context("sync recv failed")?;
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
-        // TODO: save PeerCache somewhere.
+        // TODO(geoff): save PeerCache somewhere.
         let len = resp
             .poll(
                 &mut buf,

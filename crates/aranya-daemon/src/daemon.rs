@@ -167,8 +167,8 @@ impl Daemon {
 
     /// Creates AFC shm.
     fn setup_afc(&self) -> Result<WriteState<CS, Rng>> {
-        // TODO: issue stellar-tapestry#34
-        // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
+        // TODO(geoff): issue stellar-tapestry#34
+        // afc::shm::{ReadState, WriteState} doesn't work on linux/arm64
         debug!(
             shm_path = self.cfg.afc.shm_path,
             "setting up afc shm write side"

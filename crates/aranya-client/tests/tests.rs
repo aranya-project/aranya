@@ -310,7 +310,7 @@ async fn integration_test() -> Result<()> {
         .await
         .expect("expected to create team");
     info!(?team_id);
-    // TODO: implement add_team.
+    // TODO(geoff): implement add_team.
     /*
     team.admin.client.add_team(team_id).await?;
     team.operator.client.add_team(team_id).await?;
@@ -435,7 +435,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .await
         .expect("expected to create team");
     info!(?team_id);
-    // TODO: implement add_team.
+    // TODO(geoff): implement add_team.
     /*
     team.admin.client.add_team(team_id).await?;
     team.operator.client.add_team(team_id).await?;

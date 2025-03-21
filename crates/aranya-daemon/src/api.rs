@@ -110,8 +110,8 @@ impl DaemonApiServer {
                 .expect("expected uds api path to be set")
         );
         listener.config_mut().max_frame_length(usize::MAX);
-        // TODO: determine if there's a performance benefit to putting these branches in different
-        // threads.
+        // TODO(geoff): determine if there's a performance benefit to putting these branches in
+        // different threads.
         tokio::join!(
             listener
                 .inspect_err(|err| warn!(%err, "accept error"))
@@ -207,7 +207,7 @@ impl DaemonApiHandler {
                         self.afc_bidi_channel_received(v, node_id).await?
                     }
                 }
-                // TODO: unidirectional channels
+                // TODO(geoff): unidirectional channels
                 Effect::AfcUniChannelCreated(_uni_channel_created) => {}
                 Effect::AfcUniChannelReceived(_uni_channel_received) => {}
             }
@@ -226,7 +226,7 @@ impl DaemonApiHandler {
         // NB: this shouldn't happen because the policy should ensure that label fits inside a
         // `u32`.
         let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
-        // TODO: don't clone the eng.
+        // TODO(geoff): don't clone the eng.
         let BidiKeys { seal, open } = self.handler.lock().await.bidi_channel_created(
             &mut self.eng.clone(),
             &BidiChannelCreated {
@@ -467,7 +467,7 @@ impl DaemonApi for DaemonApiHandler {
         device: ApiDeviceId,
         label: Label,
     ) -> ApiResult<()> {
-        // TODO: support other channel permissions.
+        // TODO(dygert): support other channel permissions.
         self.client
             .actions(&team.into_id().into())
             .assign_label(device.into_id().into(), label, ChanOp::ReadWrite)
@@ -531,7 +531,7 @@ impl DaemonApi for DaemonApiHandler {
 
     #[instrument(skip(self))]
     async fn delete_afc_channel(self, _: context::Context, chan: AfcId) -> ApiResult<AfcCtrl> {
-        // TODO: remove AFC channel from Aranya.
+        // TODO(geoff): remove AFC channel from Aranya.
         todo!();
     }
 

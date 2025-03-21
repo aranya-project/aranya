@@ -28,7 +28,7 @@ spideroak-base58 = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
 indexmap = { version = "2.7" }
-# TODO: gate behind `target_family = unix`
+# TODO(eric): gate behind `target_family = unix`
 libc = { workspace = true }
 postcard = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

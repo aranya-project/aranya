@@ -308,7 +308,7 @@ impl KeyBundle {
     }
 
     fn from_underlying(keys: aranya_daemon_api::KeyBundle) -> Self {
-        // TODO: Don't leak
+        // TODO(dygert): Don't leak
         let identity = keys.identity.leak();
         let signing = keys.signing.leak();
         let encoding = keys.encoding.leak();
@@ -357,8 +357,8 @@ pub unsafe fn client_init(
     client: &mut MaybeUninit<Client>,
     config: &ClientConfig,
 ) -> Result<(), imp::Error> {
-    // TODO: builder?
-    // TODO: Clean this up.
+    // TODO(dygert): builder?
+    // TODO(dygert): Clean this up.
     let daemon_sock = OsStr::from_bytes(
         // SAFETY: Caller must ensure pointer is a valid C String.
         unsafe { std::ffi::CStr::from_ptr(config.daemon_sock) }.to_bytes(),
@@ -851,7 +851,7 @@ pub struct AfcMsgInfo {
 #[derive(Copy, Clone, Debug)]
 pub struct SocketAddr(
     /// libc Socket address.
-    // TODO: Custom type instead?
+    // TODO(dygert): Custom type instead?
     pub  libc::sockaddr_storage,
 );
 

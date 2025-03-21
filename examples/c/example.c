@@ -129,7 +129,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
     AranyaError err;
 
     c->name = name;
-    // TODO: methods for initializing cfg types?
+    // TODO(geoff): methods for initializing cfg types?
     AranyaAfcConfig afc_cfg = {
         .shm_path = shm_path, .max_channels = MAX_CHANS, .addr = afc_addr};
     AranyaClientConfig cli_cfg = {.daemon_sock = daemon_sock, .afc = afc_cfg};
@@ -322,7 +322,7 @@ AranyaError run(Team *t) {
                                          afc_addrs[MEMBERB], label, &chan_id);
     EXPECT("error creating afc channel", err);
     AranyaDuration timeout = ARANYA_DURATION_SECONDS * 1;
-    // TODO: poll in separate task.
+    // TODO(geoff): poll in separate task.
     // poll for ctrl message.
     while (true) {
         AranyaError err1, err2;
@@ -385,7 +385,7 @@ int main(void) {
     AranyaError err;
     int retErr = EXIT_SUCCESS;
 
-    // TODO: take work_dirs, shm_paths, daemon_socks, IP addresses as input?
+    // TODO(geoff): take work_dirs, shm_paths, daemon_socks, IP addresses as input?
 
     // run the example.
     err = run(&team);

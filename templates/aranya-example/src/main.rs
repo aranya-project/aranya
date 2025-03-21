@@ -82,7 +82,7 @@ impl UserCtx {
             },
         };
         // Load daemon from config.
-        // TODO: start daemons from binary rather than objects.
+        // TODO(geoff): start daemons from binary rather than objects.
         let daemon = Daemon::load(cfg.clone())
             .await
             .context("unable to init daemon")?;

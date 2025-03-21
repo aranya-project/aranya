@@ -952,7 +952,7 @@ action undefine_label(label int) {
         label: label,
     }
 
-    // TODO: add back when transaction bug is resolved
+    // TODO(yael): add back when transaction bug is resolved
     // map AssignedLabel[label: label, device_id: ?] as member {
     //     action revoke_label(member.device_id, label)
     // }
@@ -1158,7 +1158,7 @@ command SetNetworkName {
         // Only Members can be associated a network name.
         check is_member(device.role)
 
-        // TODO: check that the network identifier is valid.
+        // TODO(yael): check that the network identifier is valid.
         let net_id_exists = query MemberNetworkId[device_id: this.device_id]
 
         if net_id_exists is Some {
@@ -1499,7 +1499,7 @@ command AfcCreateUniChannel {
   either `ChanOp::ReadWrite` or `ChanOp::ReadOnly` permissions for the label.
 
 
-<!-- TODO: add delete channel commands? -->
+<!-- TODO(yael): add delete channel commands? -->
 
 
 

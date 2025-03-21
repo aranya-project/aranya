@@ -129,7 +129,7 @@ pub(crate) struct FastChannelsImpl<S> {
     // TODO(nikki): expose FastChannel to the user and add more methods to it
     chans: BTreeMap<AfcId, FastChannel>,
     /// Incrementing counter for unique [`NodeId`]s.
-    // TODO: move this counter into the daemon.
+    // TODO(geoff): move this counter into the daemon.
     next_node_id: u32,
     /// Messages from `handle_data`.
     msgs: VecDeque<Message>,
@@ -639,8 +639,8 @@ impl<'a> FastChannels<'a> {
     /// # Cancellation Safety
     ///
     /// It is NOT safe to cancel the resulting future. Doing so might lose data.
-    // TODO: return [`NetIdentifier`] instead of [`SocketAddr`].
-    // TODO: read into buffer instead of returning `Vec<u8>`.
+    // TODO(geoff): return [`NetIdentifier`] instead of [`SocketAddr`].
+    // TODO(eric): read into buffer instead of returning `Vec<u8>`.
     #[instrument(skip_all, fields(self = self.client.afc.debug()))]
     pub fn try_recv_data(&mut self) -> Option<Message> {
         // TODO(eric): This method should block until a message has been received.

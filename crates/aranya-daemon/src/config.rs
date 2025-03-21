@@ -32,7 +32,7 @@ pub struct Config {
     pub afc: AfcConfig,
 }
 
-// TODO: remove allow dead_code once all methods are used.
+// TODO(geoff): remove allow dead_code once all methods are used.
 #[allow(dead_code)]
 impl Config {
     /// Reads the configuration from `path`.

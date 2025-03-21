@@ -94,7 +94,7 @@ async fn test_remove_members() -> Result<()> {
     {
         panic!("expected AdminRemoved effect: {:?}", effects)
     }
-    // TODO: should an owner be able to remove itself?
+    // TODO(geoff): should an owner be able to remove itself?
     Ok(())
 }
 
@@ -107,7 +107,7 @@ async fn test_bidirectional_channel() -> Result<()> {
     let team = TestTeam::new(&clients);
     let label = Label::new(1);
 
-    // TODO: assign label with operator when it works.
+    // TODO(geoff): assign label with operator when it works.
     team.operator.sync(team.owner).await?;
     team.operator
         .actions()
