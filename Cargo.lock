@@ -197,7 +197,6 @@ dependencies = [
  "postcard",
  "serde",
  "serial_test",
- "spideroak-base58",
  "tarpc",
  "tempfile",
  "test-log",
