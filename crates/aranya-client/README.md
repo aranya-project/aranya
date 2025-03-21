@@ -50,13 +50,10 @@ For a full demonstration of the client's capabilities, see the
 This also includes explanations for the steps performed by the daemon and
 Aranya based on the client's actions.
 
-Additionally, the [test module](tests/tests.rs) includes tests that have
-multiple devices joining a team, syncing, and sending encrypted messages using
-Aranya Fast Channels. Instructions for running these tests are below.
-
-## Testing
-
-To run the client tests from this directory, use:
+Additionally, the [Aranya example app](../../examples/rust/src/main.rs) includes
+examples of multiple devices joining a team, syncing, and sending encrypted
+messages using Aranya Fast Channels. The Aranya rust example app can be run from
+the project root with:
 ```shell
-$ cargo test
+$ cargo make run-rust-example
 ```
