@@ -175,8 +175,7 @@ where
 
     /// Create new ephemeral Session.
     ///
-    /// Once the Session has been created, call `session_receive` to add an ephemeral command to the
-    /// Session.
+    /// Once the Session is created, call `session_receive` to add an ephemeral command to it.
     #[instrument(skip_all, fields(id = %id))]
     pub async fn session_new(&self, id: &GraphId) -> Result<Session<SP, EN>> {
         let session = self.aranya.lock().await.session(*id)?;
@@ -185,8 +184,7 @@ where
 
     /// Receives an ephemeral command from another ephemeral Session.
     ///
-    /// Assumes an ephemeral Session has already been created before adding an ephemeral command to
-    /// the Session.
+    /// Assumes an ephemeral Session was already created before adding an ephemeral command to it.
     #[instrument(skip_all)]
     pub async fn session_receive(
         &self,

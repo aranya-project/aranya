@@ -283,10 +283,9 @@ impl Drop for DeviceCtx {
 /// Integration test for the user library and daemon.
 /// Tests creating a team with the user library.
 /// More extensive integration testing is conducted inside the daemon crate.
-///
+/// 
 /// The goal of this integration test is to validate the user library's end-to-end functionality.
-/// This includes exercising the user library's idiomatic Rust API as well as the daemon's `tarpc`
-/// API.
+/// This includes testing the user library's idiomatic Rust API as well as the daemon's `tarpc` API.
 ///
 /// Example of debugging test with tracing:
 /// * `RUST_LOG="debug" cargo test integration_test -- --show-output --nocapture`
@@ -627,8 +626,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .expect("should have a message");
     let want = Message {
         data: msgs[0].as_bytes().to_vec(),
-        // We don't know the address of outgoing connections, so assume `got.address` is correct
-        // here.
+        // We don't know the address of outgoing connections, so assume `got.address` is correct.
         address: got.address,
         channel: afc_id1,
         label: label1,
@@ -644,8 +642,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .expect("should have a message");
     let want = Message {
         data: msgs[1].as_bytes().to_vec(),
-        // We don't know the address of outgoing connections, so assume `got.address` is correct
-        // here.
+        // We don't know the address of outgoing connections, so assume `got.address` is correct.
         address: got.address,
         channel: afc_id2,
         label: label2,
@@ -834,8 +831,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
         .expect("should have a message");
     let want = Message {
         data: msg.as_bytes().to_vec(),
-        // We don't know the address of outgoing connections, so assume `got.address` is correct
-        // here.
+        // We don't know the address of outgoing connections, so assume `got.address` is correct.
         address: got.address,
         channel: afc_id1,
         label: label1,
@@ -1055,8 +1051,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
             .expect("should have a message");
         let want = Message {
             data: msg.into(),
-            // We don't know the address of outgoing connections, so assume `got.address` is correct
-            // here.
+            // We don't know the address of outgoing connections, so assume `got.address` is correct.
             address: got.address,
             channel: afc_id1,
             label: label1,

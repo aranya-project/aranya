@@ -802,8 +802,7 @@ pub fn afc_delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), im
 /// If the operation times out, this will return an `::ARANYA_ERROR_TIMEOUT`.
 ///
 /// @param client the Aranya Client [`Client`].
-/// @param timeout how long to wait before timing out the poll operation
-/// [`Duration`].
+/// @param timeout how long to wait before the poll [`Duration`] times out.
 ///
 /// @relates AranyaClient.
 pub fn afc_poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Error> {
