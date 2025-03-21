@@ -17,6 +17,8 @@ mod error;
 
 pub use crate::{
     afc::AfcError,
-    client::{AfcId, AfcMsg, Client, Label, PollData, Seq, Team},
+    client::{
+        AfcId, AfcMsg, Client, Label, PollData, Seq, SyncPeerConfig, SyncPeerConfigBuilder, Team,
+    },
     error::{Error, Result},
 };

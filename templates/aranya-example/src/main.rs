@@ -5,12 +5,12 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{AfcMsg, Client, Label};
+use aranya_client::{AfcMsg, Client, Label, SyncPeerConfig};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, SyncPeerConfig};
+use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::tempdir;
@@ -183,7 +183,7 @@ async fn main() -> Result<()> {
 
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
-    let sync_config = SyncPeerConfig { interval: sync_interval, sync_now: true };
+    let sync_config = SyncPeerConfig::builder().interval(interval).build();
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();

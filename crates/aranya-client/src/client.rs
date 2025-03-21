@@ -1,11 +1,9 @@
 //! Client-daemon connection.
 
-use std::{collections::VecDeque, net::SocketAddr, path::Path};
+use std::{collections::VecDeque, net::SocketAddr, path::Path, time::Duration};
 
 pub use aranya_daemon_api::AfcId;
-use aranya_daemon_api::{
-    DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, SyncPeerConfig, TeamId, CS,
-};
+use aranya_daemon_api::{DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, CS};
 use aranya_fast_channels::{self as afc, shm::ReadState, ChannelId};
 pub use aranya_fast_channels::{Label, Seq};
 use aranya_util::addr::Addr;
@@ -341,7 +339,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .add_sync_peer(context::current(), addr, self.id, config)
+            .add_sync_peer(context::current(), addr, self.id, config.into())
             .await??)
     }
 
@@ -350,7 +348,7 @@ impl Team<'_> {
         Ok(self
             .client
             .daemon
-            .sync_now(context::current(), addr, self.id, maybe_cfg)
+            .sync_now(context::current(), addr, self.id, maybe_cfg.map(Into::into))
             .await??)
     }
 
@@ -475,5 +473,63 @@ impl Team<'_> {
             .daemon
             .revoke_label(context::current(), self.id, device, label)
             .await??)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SyncPeerConfig {
+    interval: Duration,
+    sync_now: bool,
+}
+
+impl SyncPeerConfig {
+    pub fn builder() -> SyncPeerConfigBuilder {
+        Default::default()
+    }
+}
+
+impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
+    fn from(value: SyncPeerConfig) -> Self {
+        Self {
+            interval: value.interval,
+            sync_now: value.sync_now,
+        }
+    }
+}
+
+pub struct SyncPeerConfigBuilder {
+    interval: Duration,
+    sync_now: bool,
+}
+
+impl SyncPeerConfigBuilder {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn build(self) -> SyncPeerConfig {
+        SyncPeerConfig {
+            interval: self.interval,
+            sync_now: self.sync_now,
+        }
+    }
+
+    pub fn interval(mut self, duration: Duration) -> Self {
+        self.interval = duration;
+        self
+    }
+
+    pub fn sync_now(mut self, sync_now: bool) -> Self {
+        self.sync_now = sync_now;
+        self
+    }
+}
+
+impl Default for SyncPeerConfigBuilder {
+    fn default() -> Self {
+        Self {
+            interval: Duration::from_millis(100),
+            sync_now: true,
+        }
     }
 }
