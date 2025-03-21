@@ -1,8 +1,9 @@
 use core::{ffi::c_char, mem::MaybeUninit};
 
 use aranya_capi_core::{
+    ExtendedError, InvalidArg, WriteCStrError,
     safe::{TypeId, Typed},
-    write_c_str, ExtendedError, InvalidArg, WriteCStrError,
+    write_c_str,
 };
 use buggy::Bug;
 use tracing::warn;
@@ -60,8 +61,7 @@ impl ExtError {
         Self { err: Some(err) }
     }
 
-    /// Copies the error message to `msg` as a null-terminated
-    /// C string.
+    /// Copies the error message to `msg` as a null-terminated C string.
     pub fn copy_msg(&self, msg: &mut [MaybeUninit<c_char>], len: &mut usize) -> Result<(), Error> {
         if let Some(err) = &self.err {
             write_c_str(msg, err, len).map_err(Into::into)

@@ -3,10 +3,10 @@
 use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
 
 use aranya_crypto::{
+    Id,
     afc::{BidiChannelId, UniChannelId},
     custom_id,
     default::DefaultCipherSuite,
-    Id,
 };
 use aranya_fast_channels::{Label, NodeId};
 use aranya_util::Addr;
@@ -149,7 +149,8 @@ pub trait DaemonApi {
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
 
-    /// add a team to the local device store that was created by someone else. Not an aranya action/command.
+    /// add a team to the local device store that was created by someone else. Not an aranya
+    /// action/command.
     async fn add_team(team: TeamId) -> Result<()>;
 
     /// remove a team from the local device store.

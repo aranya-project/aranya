@@ -1,7 +1,8 @@
 //! The Aranya client library.
 //!
 //! The Aranya Client library provides the following features to application developers:
-//! - IDAM/RBAC/ABAC (identity & access management, role-based access controls, attribute-based access controls, security controls)
+//! - IDAM/RBAC/ABAC (identity & access management, role-based access controls, attribute-based
+//!   access controls, security controls)
 //! - Aranya Fast Channels (secure, encrypted bidirectional data transmission)
 //!
 //! For more information refer to:

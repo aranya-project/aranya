@@ -2,10 +2,11 @@
 
 use std::{net::SocketAddr, path::Path, time::Duration};
 
-use aranya_daemon_api::{DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, CS};
+use aranya_daemon_api::{CS, DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId};
 use aranya_fast_channels::{
+    Label,
     shm::ReadState,
-    Label, {self as afc},
+    {self as afc},
 };
 use aranya_util::Addr;
 use tarpc::{context, tokio_serde::formats::Json};
@@ -13,17 +14,15 @@ use tokio::net::ToSocketAddrs;
 use tracing::{debug, info, instrument};
 
 use crate::{
-    afc::{setup_afc_shm, FastChannels, FastChannelsImpl},
+    afc::{FastChannels, FastChannelsImpl, setup_afc_shm},
     error::{Error, Result},
 };
 
-/// A client for invoking actions on and processing effects from
-/// the Aranya graph.
+/// A client for invoking actions on and processing effects from the Aranya graph.
 ///
-/// `Client` interacts with the [Aranya daemon] via
-/// [`aranya-daemon-api`] ([`tarpc`] over Unix domain sockets).
-/// The client provides AFC functionality by interfacing with AFC
-/// utilities in the Aranya core crates.
+/// `Client` interacts with the [Aranya daemon] via [`aranya-daemon-api`] ([`tarpc`] over Unix
+/// domain sockets). The client provides AFC functionality by interfacing with AFC utilities in the
+/// Aranya core crates.
 ///
 /// [Aranya daemon]: https://crates.io/crates/aranya-daemon
 /// [`aranya-daemon-api`]: https://crates.io/crates/aranya-daemon-api
@@ -40,12 +39,10 @@ impl Client {
     /// Creates a client connection to the daemon.
     ///
     /// - `daemon_socket`: The socket path to communicate with the daemon.
-    /// - `afc_shm_path`: AFC's shared memory path. The daemon must also use the
-    ///   same path.
-    /// - `max_channels`: The maximum number of channels that AFC should support.
-    ///   The daemon must also use the same number.
-    /// - `afc_address`: The address that AFC listens for incoming connections
-    ///   on.
+    /// - `afc_shm_path`: AFC's shared memory path. The daemon must also use the same path.
+    /// - `max_channels`: The maximum number of channels that AFC should support. The daemon must
+    ///   also use the same number.
+    /// - `afc_address`: The address that AFC listens for incoming connections on.
     #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, max_channels))]
     pub async fn connect<A>(
         daemon_socket: &Path,
@@ -244,8 +241,8 @@ impl Team<'_> {
 
     /// Assign an Aranya Fast Channels (AFC) label to a device.
     ///
-    /// This grants the device permission to send/receive AFC data using that label.
-    /// A channel must be created with the label in order to send data using that label.
+    /// This grants the device permission to send/receive AFC data using that label. A channel must
+    /// be created with the label in order to send data using that label.
     pub async fn assign_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
         Ok(self
             .client

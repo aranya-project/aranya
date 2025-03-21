@@ -10,11 +10,11 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use aranya_daemon::{config::Config, Daemon};
+use aranya_daemon::{Daemon, config::Config};
 use clap::Parser;
 use tokio::runtime::Runtime;
 use tracing::{error, info};
-use tracing_subscriber::{prelude::*, EnvFilter};
+use tracing_subscriber::{EnvFilter, prelude::*};
 
 fn main() -> Result<()> {
     let flags = Args::parse();

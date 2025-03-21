@@ -82,7 +82,7 @@ impl UserCtx {
             },
         };
         // Load daemon from config.
-        // TODO: start daemons from binary rather than objects.
+        // TODO(geoff): start daemons from binary rather than objects.
         let daemon = Daemon::load(cfg.clone())
             .await
             .context("unable to init daemon")?;
@@ -125,8 +125,7 @@ impl UserCtx {
     }
 }
 
-/// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the
-/// clients are pending.
+/// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the clients are pending.
 // TODO(nikki): alternative to select!{} to resolve lifetime issues
 macro_rules! do_poll {
     ($($client:expr),*) => {

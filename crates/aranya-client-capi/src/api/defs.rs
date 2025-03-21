@@ -1,7 +1,7 @@
 use core::{ffi::c_char, ops::DerefMut, ptr, slice};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
-use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
+use aranya_capi_core::{ErrorCode, InvalidArg, prelude::*};
 use libc;
 use tracing::debug;
 
@@ -123,15 +123,13 @@ pub type ExtError = Safe<imp::ExtError>;
 
 /// Copies the extended error's message into `msg`.
 ///
-/// If `msg_len` is large enough to fit the entire message,
-/// including the trailing null byte, it updates `msg_len`
-/// with the length of the message and copies the message
-/// into `msg`.
+/// If `msg_len` is large enough to fit the entire message, including the
+/// trailing null byte, it updates `msg_len` with the length of the message and
+/// copies the message into `msg`.
 ///
-/// Otherwise, if `msg_len` is not large enough to fit the
-/// entire message, including the trailing null byte, it
-/// updates `msg_len` with the length of the message and
-/// returns `::ARANYA_ERROR_BUFFER_TOO_SMALL`.
+/// Otherwise, if `msg_len` is not large enough to fit the entire message,
+/// including the trailing null byte, it updates `msg_len` with the length of
+/// the message and returns `::ARANYA_ERROR_BUFFER_TOO_SMALL`.
 ///
 /// @param err the error to get a message for [`ExtError`].
 /// @param msg buffer to copy error message into.
@@ -149,10 +147,10 @@ pub fn ext_error_msg(
 
 /// Initializes logging.
 ///
-/// Assumes the `ARANYA_CAPI` environment variable has been set to the desired tracing log level.
-/// E.g. `ARANYA_CAPI=debug`.
+/// Assumes the `ARANYA_CAPI` environment variable has been set to the desired
+/// tracing log level. E.g. `ARANYA_CAPI=debug`.
 pub fn init_logging() -> Result<(), imp::Error> {
-    use tracing_subscriber::{prelude::*, EnvFilter};
+    use tracing_subscriber::{EnvFilter, prelude::*};
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(EnvFilter::from_env("ARANYA_CAPI"))
@@ -310,7 +308,7 @@ impl KeyBundle {
     }
 
     fn from_underlying(keys: aranya_daemon_api::KeyBundle) -> Self {
-        // TODO: Don't leak
+        // TODO(dygert): Don't leak
         let identity = keys.identity.leak();
         let signing = keys.signing.leak();
         let encoding = keys.encoding.leak();
@@ -359,8 +357,8 @@ pub unsafe fn client_init(
     client: &mut MaybeUninit<Client>,
     config: &ClientConfig,
 ) -> Result<(), imp::Error> {
-    // TODO: builder?
-    // TODO: Clean this up.
+    // TODO(dygert): builder?
+    // TODO(dygert): Clean this up.
     let daemon_sock = OsStr::from_bytes(
         // SAFETY: Caller must ensure pointer is a valid C String.
         unsafe { std::ffi::CStr::from_ptr(config.daemon_sock) }.to_bytes(),
@@ -455,9 +453,8 @@ pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error>
 
 /// Add the peer for automatic periodic Aranya state syncing.
 ///
-/// If a peer is not reachable on the network, sync errors
-/// will appear in the tracing logs and
-/// Aranya will be unable to sync state with that peer.
+/// If a peer is not reachable on the network, sync errors will appear in the
+/// tracing logs and Aranya will be unable to sync state with that peer.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
@@ -613,9 +610,10 @@ pub fn revoke_role(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// If the address already exists for this device, it is replaced with the new address. Capable
-/// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
-/// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+/// If the address already exists for this device, it is replaced with the new
+/// address. Capable of resolving addresses via DNS, required to be statically
+/// mapped to IPV4. For use with OpenChannel and receiving messages. Can take
+/// either DNS name or IPV4.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
@@ -709,7 +707,7 @@ pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to assign the label to.
+/// @param device the device ID [`DeviceId`] to assign the label to.
 /// @param label the AFC channel label [`Label`].
 ///
 /// @relates AranyaClient.
@@ -735,7 +733,7 @@ pub fn assign_label(
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to revoke the label from.
+/// @param device the device ID [`DeviceId`] to revoke the label from.
 /// @param label the AFC channel label [`Label`].
 ///
 /// @relates AranyaClient.
@@ -757,8 +755,7 @@ pub fn revoke_label(
 
 /// Create an Aranya Fast Channel (AFC).
 ///
-/// Creates a bidirectional AFC channel between the current device
-/// and another peer.
+/// Creates a bidirectional AFC channel between this device and another peer.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -805,7 +802,7 @@ pub fn afc_delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), im
 /// If the operation times out, this will return an `::ARANYA_ERROR_TIMEOUT`.
 ///
 /// @param client the Aranya Client [`Client`].
-/// @param timeout how long to wait before timing out the poll operation [`Duration`].
+/// @param timeout how long to wait before the poll [`Duration`] times out.
 ///
 /// @relates AranyaClient.
 pub fn afc_poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Error> {
@@ -854,7 +851,7 @@ pub struct AfcMsgInfo {
 #[derive(Copy, Clone, Debug)]
 pub struct SocketAddr(
     /// libc Socket address.
-    // TODO: Custom type instead?
+    // TODO(dygert): Custom type instead?
     pub  libc::sockaddr_storage,
 );
 
