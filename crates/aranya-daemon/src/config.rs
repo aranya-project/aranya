@@ -32,8 +32,6 @@ pub struct Config {
     pub afc: AfcConfig,
 }
 
-// TODO(geoff): remove allow dead_code once all methods are used.
-#[allow(dead_code)]
 impl Config {
     /// Reads the configuration from `path`.
     pub fn load<P>(path: P) -> Result<Self>
@@ -44,11 +42,6 @@ impl Config {
             .context(format!("unable to parse config: {:?}", path.as_ref()))?;
 
         Ok(cfg)
-    }
-
-    /// Path to `State`.
-    pub(crate) fn state_path(&self) -> PathBuf {
-        self.work_dir.join("app_state.cbor")
     }
 
     /// Path to the [`DefaultEngine`]'s key wrapping key.
