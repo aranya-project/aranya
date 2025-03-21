@@ -1,0 +1,2 @@
+# saves user the hassle of creating their own .gitignore after running `cargo-generate`
+target/
