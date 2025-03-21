@@ -44,7 +44,3 @@ backon = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
-
-[[test]]
-name = "tests"
-path = "tests/tests.rs"
