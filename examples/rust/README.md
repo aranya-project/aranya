@@ -52,32 +52,3 @@ You can optionally set the [tracing log level](https://docs.rs/tracing/latest/tr
 # Run the binary with extra logging:
 $ ARANYA_EXAMPLE=info target/release/aranya-example
 ```
-
-## 3. Create a project template
-You can also create a standalone project from a template:
-
-Install the [Rust toolchain](https://www.rust-lang.org/tools/install), this will install the toolchain manager `rustup`, the rust compiler `rustc` and package manager/build tool `cargo`.
-
-Install [cargo-generate](https://crates.io/crates/cargo-generate) using cargo:
-```bash
-#  Install cargo-generate
-$ cargo install --locked cargo-generate
-```
-
-Navigate to your desired destination parent directory. Then, generate a new project from the template, which will prompt you for the name of the new project you wish to create:
-```bash
-# Create Aranya example project
-$ cargo generate aranya-project/aranya examples/rust --name rust-example
-```
-
-Change into your new project directory and then build your new project (release mode will provide faster binaries):
-```bash
-# Change into project directory
-$ cd <project-name>
-
-# Build the binary
-$ cargo build --release
-
-# Run the binary:
-$ target/release/aranya-example
-```

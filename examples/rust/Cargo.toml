@@ -29,13 +29,15 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [dependencies]
-aranya-client = { git = "https://github.com/aranya-project/aranya.git" }
-aranya-daemon = { git = "https://github.com/aranya-project/aranya.git" }
-aranya-daemon-api = { git = "https://github.com/aranya-project/aranya.git" }
-aranya-util = { git = "https://github.com/aranya-project/aranya.git" }
+aranya-client = { path = "../../crates/aranya-client" }
+aranya-daemon = { path = "../../crates/aranya-daemon" }
+aranya-daemon-api = { path = "../../crates/aranya-daemon-api" }
+aranya-util = { path = "../../crates/aranya-util" }
+aranya-fast-channels = { version = "0.5.0", features = ["posix", "std", "memory"] }
 
 anyhow = { version = "1.0.94" }
 backon = { version = "1.3.0" }
+buggy = { version = "0.1.0" }
 tempfile = { version = "3.14.0" }
 tokio = { version = "1.42.0", features = ["io-util", "macros", "net", "sync"] }
 tracing = { version = "0.1.41" }
