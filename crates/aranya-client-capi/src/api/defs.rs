@@ -334,6 +334,8 @@ pub struct ClientConfig {
     pub daemon_sock: *const c_char,
     /// Aranya Fast Channels (AFC) config.
     pub afc: AfcConfig,
+    /// Aranya QUIC Channels (AQC) config.
+    pub aqc: AqcConfig,
 }
 
 /// Aranya Fast Channels (AFC) config.
@@ -341,6 +343,19 @@ pub struct ClientConfig {
 #[must_use]
 #[derive(Copy, Clone, Debug)]
 pub struct AfcConfig {
+    /// Shared memory path.
+    pub shm_path: *const c_char,
+    /// Maximum number of channels to store in shared-memory.
+    pub max_channels: usize,
+    /// Address to bind AFC server to.
+    pub addr: *const c_char,
+}
+
+/// Aranya QUIC Channels (AQC) config.
+#[repr(C)]
+#[must_use]
+#[derive(Copy, Clone, Debug)]
+pub struct AqcConfig {
     /// Shared memory path.
     pub shm_path: *const c_char,
     /// Maximum number of channels to store in shared-memory.
@@ -375,10 +390,16 @@ pub unsafe fn client_init(
         // SAFETY: Caller must ensure pointer is a valid C String.
         unsafe { std::ffi::CStr::from_ptr(config.afc.addr) }
         .to_str()?;
+    let aqc_shm_path = OsStr::from_bytes(
+        // SAFETY: Caller must ensure pointer is a valid C String.
+        unsafe { std::ffi::CStr::from_ptr(config.aqc.shm_path) }.to_bytes(),
+    )
+    .as_ref();
     let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
     let inner = rt.block_on(aranya_client::Client::connect(
         daemon_sock,
         afc_shm_path,
+        aqc_shm_path,
         config.afc.max_channels,
         afc_addr,
     ))?;

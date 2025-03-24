@@ -15,8 +15,8 @@ use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler};
 use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, DeviceId, Rng};
 use aranya_daemon_api::{
-    AfcCtrl, AfcId, DaemonApi, DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
-    Result as ApiResult, Role as ApiRole, TeamId, CS,
+    AfcCtrl, AfcId, AqcCtrl, AqcId, DaemonApi, DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle,
+    NetIdentifier, Result as ApiResult, Role as ApiRole, TeamId, CS,
 };
 use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed, Label, NodeId};
 use aranya_keygen::PublicKeys;
@@ -34,7 +34,10 @@ use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
     aranya::Actions,
-    policy::{AfcBidiChannelCreated, AfcBidiChannelReceived, ChanOp, Effect, KeyBundle, Role},
+    policy::{
+        AfcBidiChannelCreated, AfcBidiChannelReceived, AqcBidiChannelCreated,
+        AqcBidiChannelReceived, ChanOp, Effect, KeyBundle, Role,
+    },
     sync::SyncPeers,
     Client, CE, EF,
 };
@@ -71,6 +74,7 @@ impl DaemonApiServer {
         client: Arc<Client>,
         local_addr: SocketAddr,
         afc: Arc<Mutex<WriteState<CS, Rng>>>,
+        aqc: Arc<Mutex<WriteState<CS, Rng>>>,
         eng: CE,
         store: Store,
         daemon_sock: PathBuf,
@@ -87,10 +91,12 @@ impl DaemonApiServer {
                 client,
                 local_addr,
                 afc,
+                aqc,
                 eng,
                 pk,
                 peers,
                 afc_peers: Arc::default(),
+                aqc_peers: Arc::default(),
                 handler: Arc::new(Mutex::new(Handler::new(device_id, store))),
             },
         })
@@ -150,6 +156,8 @@ struct DaemonApiHandler {
     local_addr: SocketAddr,
     /// AFC shm write.
     afc: Arc<Mutex<WriteState<CS, Rng>>>,
+    /// AQC shm write.
+    aqc: Arc<Mutex<WriteState<CS, Rng>>>,
     /// An implementation of [`Engine`][crypto::Engine].
     eng: CE,
     /// Public keys of current device.
@@ -158,6 +166,8 @@ struct DaemonApiHandler {
     peers: SyncPeers,
     /// AFC peers.
     afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
+    /// AQC peers.
+    aqc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
     /// Handles AFC effects.
     handler: Arc<Mutex<Handler<Store>>>,
 }
@@ -197,13 +207,13 @@ impl DaemonApiHandler {
                 Effect::AqcNetworkNameSet(_network_name_set) => {}
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::AfcBidiChannelCreated(v) => {
-                    debug!("received BidiChannelCreated effect");
+                    debug!("received AfcBidiChannelCreated effect");
                     if let Some(node_id) = node_id {
                         self.afc_bidi_channel_created(v, node_id).await?
                     }
                 }
                 Effect::AfcBidiChannelReceived(v) => {
-                    debug!("received BidiChannelReceived effect");
+                    debug!("received AfcBidiChannelReceived effect");
                     if let Some(node_id) = node_id {
                         self.afc_bidi_channel_received(v, node_id).await?
                     }
@@ -211,6 +221,21 @@ impl DaemonApiHandler {
                 // TODO: unidirectional channels
                 Effect::AfcUniChannelCreated(_uni_channel_created) => {}
                 Effect::AfcUniChannelReceived(_uni_channel_received) => {}
+                Effect::AqcBidiChannelCreated(v) => {
+                    debug!("received AqcBidiChannelCreated effect");
+                    if let Some(node_id) = node_id {
+                        self.aqc_bidi_channel_created(v, node_id).await?
+                    }
+                }
+                Effect::AqcBidiChannelReceived(v) => {
+                    debug!("received AqcBidiChannelReceived effect");
+                    if let Some(node_id) = node_id {
+                        self.aqc_bidi_channel_received(v, node_id).await?
+                    }
+                }
+                // TODO: unidirectional channels
+                Effect::AqcUniChannelCreated(_uni_channel_created) => {}
+                Effect::AqcUniChannelReceived(_uni_channel_received) => {}
             }
         }
         Ok(())
@@ -283,6 +308,73 @@ impl DaemonApiHandler {
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         Ok(())
     }
+    /// Reacts to a bidirectional AQC channel being created.
+    #[instrument(skip(self), fields(effect = ?v))]
+    async fn aqc_bidi_channel_created(
+        &self,
+        v: &AqcBidiChannelCreated,
+        node_id: NodeId,
+    ) -> Result<()> {
+        debug!("received BidiChannelCreated effect");
+        // NB: this shouldn't happen because the policy should
+        // ensure that label fits inside a `u32`.
+        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
+        // TODO: don't clone the eng.
+        let BidiKeys { seal, open } = self.handler.lock().await.bidi_channel_created(
+            &mut self.eng.clone(),
+            &BidiChannelCreated {
+                parent_cmd_id: v.parent_cmd_id,
+                author_id: v.author_id.into(),
+                author_enc_key_id: v.author_enc_key_id.into(),
+                peer_id: v.peer_id.into(),
+                peer_enc_pk: &v.peer_enc_pk,
+                label,
+                key_id: v.channel_key_id.into(),
+            },
+        )?;
+        let label = Label::new(v.label.try_into().expect("expected label conversion"));
+        let channel_id = ChannelId::new(node_id, label);
+        debug!(%channel_id, "created AQC bidi channel `ChannelId`");
+        self.aqc
+            .lock()
+            .await
+            .add(channel_id, Directed::Bidirectional { seal, open })
+            .map_err(|err| anyhow!("unable to add AQC channel: {err}"))?;
+        Ok(())
+    }
+
+    /// Reacts to a bidirectional AQC channel being created.
+    #[instrument(skip_all)]
+    async fn aqc_bidi_channel_received(
+        &self,
+        v: &AqcBidiChannelReceived,
+        node_id: NodeId,
+    ) -> Result<()> {
+        // NB: this shouldn't happen because the policy should
+        // ensure that label fits inside a `u32`.
+        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
+        let BidiKeys { seal, open } = self.handler.lock().await.bidi_channel_received(
+            &mut self.eng.clone(),
+            &BidiChannelReceived {
+                parent_cmd_id: v.parent_cmd_id,
+                author_id: v.author_id.into(),
+                author_enc_pk: &v.author_enc_pk,
+                peer_id: v.peer_id.into(),
+                peer_enc_key_id: v.peer_enc_key_id.into(),
+                label,
+                encap: &v.encap,
+            },
+        )?;
+        let label = Label::new(v.label.try_into().expect("expected label conversion"));
+        let channel_id = ChannelId::new(node_id, label);
+        debug!(?channel_id, "received AQC bidi channel `ChannelId`");
+        self.aqc
+            .lock()
+            .await
+            .add(channel_id, Directed::Bidirectional { seal, open })
+            .map_err(|err| anyhow!("unable to add AQC channel: {err}"))?;
+        Ok(())
+    }
 }
 
 impl DaemonApi for DaemonApiHandler {
@@ -331,9 +423,7 @@ impl DaemonApi for DaemonApiHandler {
         peer: Addr,
         team: TeamId,
     ) -> ApiResult<()> {
-        self.peers
-            .remove_peer(peer, team.into_id().into())
-            .await?;
+        self.peers.remove_peer(peer, team.into_id().into()).await?;
         Ok(())
     }
 
@@ -353,10 +443,7 @@ impl DaemonApi for DaemonApiHandler {
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
         let pk = self.get_pk()?;
-        let (graph_id, _) = self
-            .client
-            .create_team(pk, Some(nonce))
-            .await?;
+        let (graph_id, _) = self.client.create_team(pk, Some(nonce)).await?;
         debug!(?graph_id);
         Ok(graph_id.into_id().into())
     }
@@ -571,7 +658,7 @@ impl DaemonApi for DaemonApiHandler {
         let Some(Effect::AfcBidiChannelCreated(e)) =
             find_effect!(&effects, Effect::AfcBidiChannelCreated(e) if e.author_id == id.into())
         else {
-            return Err(anyhow::anyhow!("unable to find BidiChannelCreated effect").into());
+            return Err(anyhow::anyhow!("unable to find AfcBidiChannelCreated effect").into());
         };
         let afc_id: AfcId = e.channel_key_id.into();
         debug!(?afc_id, "processed afc ID");
@@ -618,6 +705,83 @@ impl DaemonApi for DaemonApiHandler {
             return Ok((afc_id, net, label));
         }
         Err(anyhow!("unable to find AfcBidiChannelReceived effect").into())
+    }
+
+    #[instrument(skip_all)]
+    async fn create_aqc_bidi_channel(
+        self,
+        _: context::Context,
+        team: TeamId,
+        peer: NetIdentifier,
+        node_id: NodeId,
+        label: Label,
+    ) -> ApiResult<(AqcId, AqcCtrl)> {
+        info!("create_aqc_bidi_channel");
+
+        let peer_id = self
+            .aqc_peers
+            .lock()
+            .await
+            .get_by_left(&peer)
+            .copied()
+            .context("unable to lookup peer")?;
+
+        let (ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .create_aqc_bidi_channel_off_graph(peer_id, label)
+            .await?;
+        let id = self.pk.ident_pk.id()?;
+
+        let Some(Effect::AqcBidiChannelCreated(e)) =
+            find_effect!(&effects, Effect::AqcBidiChannelCreated(e) if e.author_id == id.into())
+        else {
+            return Err(anyhow::anyhow!("unable to find AqcBidiChannelCreated effect").into());
+        };
+        let aqc_id: AqcId = e.channel_key_id.into();
+        debug!(?aqc_id, "processed aqc ID");
+
+        self.handle_effects(&effects, Some(node_id)).await?;
+        Ok((aqc_id, ctrl))
+    }
+
+    #[instrument(skip(self))]
+    async fn delete_aqc_channel(self, _: context::Context, chan: AqcId) -> ApiResult<AqcCtrl> {
+        // TODO: remove AQC channel from Aranya.
+        todo!();
+    }
+    #[instrument(skip_all)]
+    async fn receive_aqc_ctrl(
+        self,
+        _: context::Context,
+        team: TeamId,
+        node_id: NodeId,
+        ctrl: AqcCtrl,
+    ) -> ApiResult<(AqcId, NetIdentifier, Label)> {
+        let mut session = self.client.session_new(&team.into_id().into()).await?;
+        for cmd in ctrl {
+            let effects = self.client.session_receive(&mut session, &cmd).await?;
+            let id = self.pk.ident_pk.id()?;
+            self.handle_effects(&effects, Some(node_id)).await?;
+            let Some(Effect::AqcBidiChannelReceived(e)) =
+                find_effect!(&effects, Effect::AqcBidiChannelReceived(e) if e.peer_id == id.into())
+            else {
+                continue;
+            };
+            let encap = BidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
+            let aqc_id: AqcId = encap.id().into();
+            debug!(?aqc_id, "processed aqc ID");
+            let label = Label::new(e.label.try_into().expect("expected label conversion"));
+            let net = self
+                .aqc_peers
+                .lock()
+                .await
+                .get_by_right(&e.author_id.into())
+                .context("missing net identifier for channel author")?
+                .clone();
+            return Ok((aqc_id, net, label));
+        }
+        Err(anyhow!("unable to find AqcBidiChannelReceived effect").into())
     }
 }
 

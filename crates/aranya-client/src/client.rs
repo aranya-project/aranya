@@ -34,6 +34,7 @@ pub struct Client {
     pub(crate) daemon: DaemonApiClient,
     /// Support for Aranya Fast Channels
     pub(crate) afc: FastChannelsImpl<ReadState<CS>>,
+    // TODO: aqc
 }
 
 impl Client {
@@ -42,14 +43,18 @@ impl Client {
     /// - `daemon_socket`: The socket path to communicate with the daemon.
     /// - `afc_shm_path`: AFC's shared memory path. The daemon must also use the
     ///   same path.
+    /// - `aqc_shm_path`: AQC's shared memory path. The daemon must also use the
+    ///   same path.
     /// - `max_channels`: The maximum number of channels that AFC should support.
     ///   The daemon must also use the same number.
     /// - `afc_address`: The address that AFC listens for incoming connections
     ///   on.
-    #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, max_channels))]
+    // TODO: aqc_address
+    #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, ?aqc_shm_path, max_channels))]
     pub async fn connect<A>(
         daemon_socket: &Path,
         afc_shm_path: &Path,
+        aqc_shm_path: &Path,
         max_channels: usize,
         afc_address: A,
     ) -> Result<Self>
@@ -64,12 +69,21 @@ impl Client {
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
         debug!("connected to daemon");
 
-        let read = setup_afc_shm(afc_shm_path, max_channels)?;
-        let afc = FastChannelsImpl::new(afc::Client::new(read), afc_address).await?;
+        let afc_read = setup_afc_shm(afc_shm_path, max_channels)?;
+        let afc = FastChannelsImpl::new(afc::Client::new(afc_read), afc_address).await?;
         debug!(
             addr = ?afc.local_addr().map_err(Error::Afc)?,
             "bound AFC router",
         );
+        let _aqc_read = setup_afc_shm(aqc_shm_path, max_channels)?;
+        // TODO: initialize aqc
+        /*
+        let aqc = QuicChannelsImpl::new(aqc::Client::new(aqc_read), aqc_address).await?;
+        debug!(
+            addr = ?aqc.local_addr().map_err(Error::Aqc)?,
+            "bound AQC router",
+        );
+        */
 
         Ok(Self { daemon, afc })
     }
@@ -113,6 +127,8 @@ impl Client {
     pub fn afc(&mut self) -> FastChannels<'_> {
         FastChannels::new(self)
     }
+
+    // TODO: Get access to QUIC Fast Channels.
 }
 
 /// Represents an Aranya Team.

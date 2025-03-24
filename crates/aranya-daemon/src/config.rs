@@ -30,6 +30,9 @@ pub struct Config {
 
     /// AFC configuration.
     pub afc: AfcConfig,
+
+    /// AQC configuration.
+    pub aqc: AqcConfig,
 }
 
 // TODO: remove allow dead_code once all methods are used.
@@ -103,6 +106,31 @@ pub struct AfcConfig {
     pub max_chans: usize,
 }
 
+/// AQC configuration.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AqcConfig {
+    /// Shared memory path.
+    pub shm_path: String,
+
+    /// Unlink `shm_path` before creating the shared memory?
+    ///
+    /// Ignored if `create` is false.
+    pub unlink_on_startup: bool,
+
+    /// Unlink `shm_path` before on exit?
+    ///
+    /// If false, the shared memory will persist across daemon
+    /// restarts.
+    pub unlink_at_exit: bool,
+
+    /// Create the shared memory?
+    pub create: bool,
+
+    /// Maximum number of channels AFC should support.
+    pub max_chans: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use std::net::Ipv4Addr;
@@ -123,7 +151,14 @@ mod tests {
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
             afc: AfcConfig {
-                shm_path: "/hub".to_owned(),
+                shm_path: "/hub1".to_owned(),
+                unlink_on_startup: false,
+                unlink_at_exit: false,
+                create: true,
+                max_chans: 100,
+            },
+            aqc: AqcConfig {
+                shm_path: "/hub2".to_owned(),
                 unlink_on_startup: false,
                 unlink_at_exit: false,
                 create: true,

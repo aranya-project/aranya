@@ -129,8 +129,46 @@ impl From<Id> for AfcId {
     }
 }
 
+/// Uniquely identifies an AQC channel.
+///
+/// It is a [`BidiChannelId`] or [`UniChannelId`] truncated to
+/// 128 bits.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct AqcId([u8; 16]);
+
+impl fmt::Display for AqcId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.to_base58())
+    }
+}
+
+/// Convert from [`BidiChannelId`] to [`AqcId`]
+impl From<BidiChannelId> for AqcId {
+    fn from(value: BidiChannelId) -> Self {
+        Self(*truncate(value.as_array()))
+    }
+}
+
+/// Convert from [`UniChannelId`] to [`AqcId`]
+impl From<UniChannelId> for AqcId {
+    fn from(value: UniChannelId) -> Self {
+        Self(*truncate(value.as_array()))
+    }
+}
+
+/// Convert from [`Id`] to [`AqcId`]
+impl From<Id> for AqcId {
+    fn from(value: Id) -> Self {
+        Self(*truncate(value.as_array()))
+    }
+}
+
 // serialized command which must be passed over AFC.
 pub type AfcCtrl = Vec<Box<[u8]>>;
+
+// serialized command which must be passed over AQC.
+pub type AqcCtrl = Vec<Box<[u8]>>;
 
 #[tarpc::service]
 pub trait DaemonApi {
@@ -220,4 +258,19 @@ pub trait DaemonApi {
         node_id: NodeId,
         ctrl: AfcCtrl,
     ) -> Result<(AfcId, NetIdentifier, Label)>;
+    /// Create a QUIC channel.
+    async fn create_aqc_bidi_channel(
+        team: TeamId,
+        peer: NetIdentifier,
+        node_id: NodeId,
+        label: Label,
+    ) -> Result<(AqcId, AqcCtrl)>;
+    /// Delete a QUIC channel.
+    async fn delete_aqc_channel(chan: AqcId) -> Result<AqcCtrl>;
+    /// Receive a fast channel ctrl message.
+    async fn receive_aqc_ctrl(
+        team: TeamId,
+        node_id: NodeId,
+        ctrl: AqcCtrl,
+    ) -> Result<(AqcId, NetIdentifier, Label)>;
 }

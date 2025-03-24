@@ -57,6 +57,10 @@ pub enum Effect {
     AfcBidiChannelReceived(AfcBidiChannelReceived),
     AfcUniChannelCreated(AfcUniChannelCreated),
     AfcUniChannelReceived(AfcUniChannelReceived),
+    AqcBidiChannelCreated(AqcBidiChannelCreated),
+    AqcBidiChannelReceived(AqcBidiChannelReceived),
+    AqcUniChannelCreated(AqcUniChannelCreated),
+    AqcUniChannelReceived(AqcUniChannelReceived),
 }
 /// TeamCreated policy effect.
 #[effect]
@@ -200,6 +204,52 @@ pub struct AfcUniChannelReceived {
     pub label: i64,
     pub encap: Vec<u8>,
 }
+/// AqcBidiChannelCreated policy effect.
+#[effect]
+pub struct AqcBidiChannelCreated {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub author_enc_key_id: Id,
+    pub peer_id: Id,
+    pub peer_enc_pk: Vec<u8>,
+    pub label: i64,
+    pub channel_key_id: Id,
+}
+/// AqcBidiChannelReceived policy effect.
+#[effect]
+pub struct AqcBidiChannelReceived {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_id: Id,
+    pub peer_enc_key_id: Id,
+    pub label: i64,
+    pub encap: Vec<u8>,
+}
+/// AqcUniChannelCreated policy effect.
+#[effect]
+pub struct AqcUniChannelCreated {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub writer_id: Id,
+    pub reader_id: Id,
+    pub author_enc_key_id: Id,
+    pub peer_enc_pk: Vec<u8>,
+    pub label: i64,
+    pub channel_key_id: Id,
+}
+/// AqcUniChannelReceived policy effect.
+#[effect]
+pub struct AqcUniChannelReceived {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub writer_id: Id,
+    pub reader_id: Id,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_enc_key_id: Id,
+    pub label: i64,
+    pub encap: Vec<u8>,
+}
 /// Implements all supported policy actions.
 #[actions]
 pub trait ActorExt {
@@ -240,6 +290,17 @@ pub trait ActorExt {
         label: i64,
     ) -> Result<(), ClientError>;
     fn create_afc_uni_channel(
+        &mut self,
+        writer_id: Id,
+        reader_id: Id,
+        label: i64,
+    ) -> Result<(), ClientError>;
+    fn create_aqc_bidi_channel(
+        &mut self,
+        peer_id: Id,
+        label: i64,
+    ) -> Result<(), ClientError>;
+    fn create_aqc_uni_channel(
         &mut self,
         writer_id: Id,
         reader_id: Id,
