@@ -899,7 +899,7 @@ AranyaError aranya_afc_assign_net_identifier_ext(struct AranyaClient *client,
                                                  struct AranyaExtError *__ext_err);
 
 /**
- * Disassociate an AFC network identifier from a device.
+ * Disassociate a network identifier from a device.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -916,7 +916,7 @@ AranyaError aranya_afc_remove_net_identifier(struct AranyaClient *client,
                                              AranyaNetIdentifier net_identifier);
 
 /**
- * Disassociate an AFC network identifier from a device.
+ * Disassociate a network identifier from a device.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -934,85 +934,7 @@ AranyaError aranya_afc_remove_net_identifier_ext(struct AranyaClient *client,
                                                  struct AranyaExtError *__ext_err);
 
 /**
- * Associate a network identifier to a device for use with AQC.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * If the address already exists for this device, it is replaced with the new address. Capable
- * of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
- * OpenChannel and receiving messages. Can take either DNS name or IPV4.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_assign_net_identifier(struct AranyaClient *client,
-                                             const struct AranyaTeamId *team,
-                                             const struct AranyaDeviceId *device,
-                                             AranyaNetIdentifier net_identifier);
-
-/**
- * Associate a network identifier to a device for use with AQC.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * If the address already exists for this device, it is replaced with the new address. Capable
- * of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
- * OpenChannel and receiving messages. Can take either DNS name or IPV4.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_assign_net_identifier_ext(struct AranyaClient *client,
-                                                 const struct AranyaTeamId *team,
-                                                 const struct AranyaDeviceId *device,
-                                                 AranyaNetIdentifier net_identifier,
-                                                 struct AranyaExtError *__ext_err);
-
-/**
- * Disassociate an AQC network identifier from a device.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_remove_net_identifier(struct AranyaClient *client,
-                                             const struct AranyaTeamId *team,
-                                             const struct AranyaDeviceId *device,
-                                             AranyaNetIdentifier net_identifier);
-
-/**
- * Disassociate an AQC network identifier from a device.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_remove_net_identifier_ext(struct AranyaClient *client,
-                                                 const struct AranyaTeamId *team,
-                                                 const struct AranyaDeviceId *device,
-                                                 AranyaNetIdentifier net_identifier,
-                                                 struct AranyaExtError *__ext_err);
-
-/**
- * Create a channel label.
+ * Create an AFC label.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -1027,7 +949,7 @@ AranyaError aranya_create_label(struct AranyaClient *client,
                                 AranyaLabel label);
 
 /**
- * Create a channel label.
+ * Create an AFC label.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -1043,13 +965,13 @@ AranyaError aranya_create_label_ext(struct AranyaClient *client,
                                     struct AranyaExtError *__ext_err);
 
 /**
- * Delete a channel label.
+ * Delete an AFC label.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param label the channel label [`AranyaLabel`](@ref AranyaLabel) to delete.
+ * @param label the AFC channel label [`AranyaLabel`](@ref AranyaLabel) to delete.
  *
  * @relates AranyaClient.
  */
@@ -1058,13 +980,13 @@ AranyaError aranya_delete_label(struct AranyaClient *client,
                                 AranyaLabel label);
 
 /**
- * Delete a channel label.
+ * Delete an AFC label.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param label the channel label [`AranyaLabel`](@ref AranyaLabel) to delete.
+ * @param label the AFC channel label [`AranyaLabel`](@ref AranyaLabel) to delete.
  *
  * @relates AranyaClient.
  */
@@ -1303,134 +1225,6 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
                                      struct AranyaAfcMsgInfo *info,
                                      bool *__output,
                                      struct AranyaExtError *__ext_err);
-
-/**
- * Query device's keybundle.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's key bundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_keybundle(struct AranyaClient *client,
-                                          const struct AranyaTeamId *team,
-                                          const struct AranyaDeviceId *device,
-                                          struct AranyaKeyBundle *__output);
-
-/**
- * Query device's keybundle.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's key bundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
-                                              const struct AranyaTeamId *team,
-                                              const struct AranyaDeviceId *device,
-                                              struct AranyaKeyBundle *__output,
-                                              struct AranyaExtError *__ext_err);
-
-/**
- * Query device's AFC network identifier.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_afc_net_identifier(struct AranyaClient *client,
-                                            const struct AranyaTeamId *team,
-                                            const struct AranyaDeviceId *device,
-                                            char *ident,
-                                            size_t ident_len);
-
-/**
- * Query device's AFC network identifier.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_afc_net_identifier_ext(struct AranyaClient *client,
-                                                const struct AranyaTeamId *team,
-                                                const struct AranyaDeviceId *device,
-                                                char *ident,
-                                                size_t ident_len,
-                                                struct AranyaExtError *__ext_err);
-
-/**
- * Query device's AQC network identifier.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_aqc_net_identifier(struct AranyaClient *client,
-                                            const struct AranyaTeamId *team,
-                                            const struct AranyaDeviceId *device,
-                                            char *ident,
-                                            size_t ident_len);
-
-/**
- * Query device's AQC network identifier.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_aqc_net_identifier_ext(struct AranyaClient *client,
-                                                const struct AranyaTeamId *team,
-                                                const struct AranyaDeviceId *device,
-                                                char *ident,
-                                                size_t ident_len,
-                                                struct AranyaExtError *__ext_err);
-
-/**
- * Query device's AQC network identifier.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_label_exists(struct AranyaClient *client,
-                                      const struct AranyaTeamId *team,
-                                      const AranyaLabel *label,
-                                      bool *__output);
-
-/**
- * Query device's AQC network identifier.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_label_exists_ext(struct AranyaClient *client,
-                                          const struct AranyaTeamId *team,
-                                          const AranyaLabel *label,
-                                          bool *__output,
-                                          struct AranyaExtError *__ext_err);
 
 #ifdef __cplusplus
 }  // extern "C"
