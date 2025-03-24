@@ -1028,14 +1028,14 @@ pub unsafe fn query_afc_net_identifier(
     team: &TeamId,
     device: &DeviceId,
     ident: &mut MaybeUninit<c_char>,
-    ident_len: &mut usize, 
+    ident_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let net_identifier = client
         .rt
         .block_on(client.inner.team(team.0).query_afc_net_identifier(device.0))?;
-    let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);  
-    aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?; 
+    let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
+    aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
     Ok(())
 }
 
@@ -1052,14 +1052,14 @@ pub unsafe fn query_aqc_net_identifier(
     team: &TeamId,
     device: &DeviceId,
     ident: &mut MaybeUninit<c_char>,
-    ident_len: &mut usize, 
+    ident_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let net_identifier = client
         .rt
         .block_on(client.inner.team(team.0).query_aqc_net_identifier(device.0))?;
-    let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);  
-    aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?; 
+    let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
+    aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
     Ok(())
 }
 
