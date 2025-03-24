@@ -1,3 +1,4 @@
+//! The interface used by the Aranya client and daemon to interact.
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
 use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
