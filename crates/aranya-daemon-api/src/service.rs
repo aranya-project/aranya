@@ -65,7 +65,7 @@ pub struct KeyBundle {
 }
 
 /// A device's role on the team.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Role {
     Owner,
     Admin,
@@ -170,14 +170,27 @@ pub trait DaemonApi {
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
-    /// Assign a network identifier to a device.
+    /// Assign an AFC network identifier to a device.
     async fn assign_afc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
     ) -> Result<()>;
-    /// Remove a network identifier from a device.
+    /// Remove an AFC network identifier from a device.
     async fn remove_afc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
+
+    /// Assign an AQC network identifier to a device.
+    async fn assign_aqc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
+    /// Remove an AQC network identifier from a device.
+    async fn remove_aqc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,

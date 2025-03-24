@@ -211,7 +211,7 @@ impl Team<'_> {
             .await??)
     }
 
-    /// Disassociate a network identifier from a device.
+    /// Disassociate an AFC network identifier from a device.
     pub async fn remove_afc_net_identifier(
         &mut self,
         device: DeviceId,
@@ -221,6 +221,36 @@ impl Team<'_> {
             .client
             .daemon
             .remove_afc_net_identifier(context::current(), self.id, device, net_identifier)
+            .await??)
+    }
+
+    /// Associate a network identifier to a device for use with AQC.
+    ///
+    /// If the address already exists for this device, it is replaced with the new address. Capable
+    /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
+    /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+    pub async fn assign_aqc_net_identifier(
+        &mut self,
+        device: DeviceId,
+        net_identifier: NetIdentifier,
+    ) -> Result<()> {
+        Ok(self
+            .client
+            .daemon
+            .assign_aqc_net_identifier(context::current(), self.id, device, net_identifier)
+            .await??)
+    }
+
+    /// Disassociate an AQC network identifier from a device.
+    pub async fn remove_aqc_net_identifier(
+        &mut self,
+        device: DeviceId,
+        net_identifier: NetIdentifier,
+    ) -> Result<()> {
+        Ok(self
+            .client
+            .daemon
+            .remove_aqc_net_identifier(context::current(), self.id, device, net_identifier)
             .await??)
     }
 

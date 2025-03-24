@@ -187,13 +187,15 @@ impl DaemonApiHandler {
                 Effect::LabelUndefined(_label_undefined) => {}
                 Effect::LabelAssigned(_label_assigned) => {}
                 Effect::LabelRevoked(_label_revoked) => {}
-                Effect::NetworkNameSet(e) => {
+                Effect::AfcNetworkNameSet(e) => {
                     self.afc_peers
                         .lock()
                         .await
                         .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
                 }
-                Effect::NetworkNameUnset(_network_name_unset) => {}
+                Effect::AfcNetworkNameUnset(_network_name_unset) => {}
+                Effect::AqcNetworkNameSet(_network_name_set) => {}
+                Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::AfcBidiChannelCreated(v) => {
                     debug!("received BidiChannelCreated effect");
                     if let Some(node_id) = node_id {
@@ -291,12 +293,21 @@ impl DaemonApi for DaemonApiHandler {
 
     #[instrument(skip(self))]
     async fn get_key_bundle(self, _: context::Context) -> ApiResult<ApiKeyBundle> {
-        Ok(self.get_pk()?.into())
+        Ok(self
+            .get_pk()
+            .context("unable to get device public keys")?
+            .into())
     }
 
     #[instrument(skip(self))]
     async fn get_device_id(self, _: context::Context) -> ApiResult<ApiDeviceId> {
-        Ok(self.pk.ident_pk.id()?.into_id().into())
+        Ok(self
+            .pk
+            .ident_pk
+            .id()
+            .context("unable to get device ID")?
+            .into_id()
+            .into())
     }
 
     #[instrument(skip(self))]
@@ -320,7 +331,9 @@ impl DaemonApi for DaemonApiHandler {
         peer: Addr,
         team: TeamId,
     ) -> ApiResult<()> {
-        self.peers.remove_peer(peer, team.into_id().into()).await?;
+        self.peers
+            .remove_peer(peer, team.into_id().into())
+            .await?;
         Ok(())
     }
 
@@ -340,7 +353,10 @@ impl DaemonApi for DaemonApiHandler {
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
         let pk = self.get_pk()?;
-        let (graph_id, _) = self.client.create_team(pk, Some(nonce)).await?;
+        let (graph_id, _) = self
+            .client
+            .create_team(pk, Some(nonce))
+            .await?;
         debug!(?graph_id);
         Ok(graph_id.into_id().into())
     }
@@ -419,8 +435,9 @@ impl DaemonApi for DaemonApiHandler {
         let effects = self
             .client
             .actions(&team.into_id().into())
-            .set_network_name(device.into_id().into(), name.0)
-            .await?;
+            .set_afc_network_name(device.into_id().into(), name.0)
+            .await
+            .context("unable to assign afc network identifier")?;
         self.handle_effects(&effects, None).await?;
         Ok(())
     }
@@ -435,8 +452,43 @@ impl DaemonApi for DaemonApiHandler {
     ) -> ApiResult<()> {
         self.client
             .actions(&team.into_id().into())
-            .unset_network_name(device.into_id().into())
-            .await?;
+            .unset_afc_network_name(device.into_id().into())
+            .await
+            .context("unable to remove afc network identifier")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn assign_aqc_net_identifier(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+        name: NetIdentifier,
+    ) -> ApiResult<()> {
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .set_aqc_network_name(device.into_id().into(), name.0)
+            .await
+            .context("unable to assign aqc network identifier")?;
+        self.handle_effects(&effects, None).await?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn remove_aqc_net_identifier(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+        name: NetIdentifier,
+    ) -> ApiResult<()> {
+        self.client
+            .actions(&team.into_id().into())
+            .unset_aqc_network_name(device.into_id().into())
+            .await
+            .context("unable to remove aqc net identifier")?;
         Ok(())
     }
 

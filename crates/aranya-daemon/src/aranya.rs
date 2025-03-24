@@ -507,30 +507,59 @@ where
         .in_current_span()
     }
 
-    /// Sets a network name.
+    /// Sets an AFC network name.
     #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
-    fn set_network_name(
+    fn set_afc_network_name(
         &self,
         device_id: DeviceId,
         net_identifier: String,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, %net_identifier, "setting network name");
+        info!(%device_id, %net_identifier, "setting AFC network name");
         self.with_actor(move |actor| {
-            actor.set_network_name(device_id.into(), net_identifier)?;
+            actor.set_afc_network_name(device_id.into(), net_identifier)?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Sets a network name.
+    /// Sets an AFC network name.
     #[instrument(skip(self), fields(device_id = %device_id))]
-    fn unset_network_name(
+    fn unset_afc_network_name(
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, "unsetting network name");
+        info!(%device_id, "unsetting AFC network name");
         self.with_actor(move |actor| {
-            actor.unset_network_name(device_id.into())?;
+            actor.unset_afc_network_name(device_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Sets an AQC network name.
+    #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
+    fn set_aqc_network_name(
+        &self,
+        device_id: DeviceId,
+        net_identifier: String,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        info!(%device_id, %net_identifier, "setting AQC network name");
+        self.with_actor(move |actor| {
+            actor.set_aqc_network_name(device_id.into(), net_identifier)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Sets an AQC network name.
+    #[instrument(skip(self), fields(device_id = %device_id))]
+    fn unset_aqc_network_name(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        info!(%device_id, "unsetting AQC network name");
+        self.with_actor(move |actor| {
+            actor.unset_aqc_network_name(device_id.into())?;
             Ok(())
         })
         .in_current_span()

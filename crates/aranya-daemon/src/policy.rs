@@ -49,8 +49,10 @@ pub enum Effect {
     LabelUndefined(LabelUndefined),
     LabelAssigned(LabelAssigned),
     LabelRevoked(LabelRevoked),
-    NetworkNameSet(NetworkNameSet),
-    NetworkNameUnset(NetworkNameUnset),
+    AfcNetworkNameSet(AfcNetworkNameSet),
+    AfcNetworkNameUnset(AfcNetworkNameUnset),
+    AqcNetworkNameSet(AqcNetworkNameSet),
+    AqcNetworkNameUnset(AqcNetworkNameUnset),
     AfcBidiChannelCreated(AfcBidiChannelCreated),
     AfcBidiChannelReceived(AfcBidiChannelReceived),
     AfcUniChannelCreated(AfcUniChannelCreated),
@@ -130,15 +132,26 @@ pub struct LabelRevoked {
     pub device_id: Id,
     pub label: i64,
 }
-/// NetworkNameSet policy effect.
+/// AfcNetworkNameSet policy effect.
 #[effect]
-pub struct NetworkNameSet {
+pub struct AfcNetworkNameSet {
     pub device_id: Id,
     pub net_identifier: String,
 }
-/// NetworkNameUnset policy effect.
+/// AfcNetworkNameUnset policy effect.
 #[effect]
-pub struct NetworkNameUnset {
+pub struct AfcNetworkNameUnset {
+    pub device_id: Id,
+}
+/// AqcNetworkNameSet policy effect.
+#[effect]
+pub struct AqcNetworkNameSet {
+    pub device_id: Id,
+    pub net_identifier: String,
+}
+/// AqcNetworkNameUnset policy effect.
+#[effect]
+pub struct AqcNetworkNameUnset {
     pub device_id: Id,
 }
 /// AfcBidiChannelCreated policy effect.
@@ -209,12 +222,18 @@ pub trait ActorExt {
         op: ChanOp,
     ) -> Result<(), ClientError>;
     fn revoke_label(&mut self, device_id: Id, label: i64) -> Result<(), ClientError>;
-    fn set_network_name(
+    fn set_afc_network_name(
         &mut self,
         device_id: Id,
         net_identifier: String,
     ) -> Result<(), ClientError>;
-    fn unset_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn unset_afc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn set_aqc_network_name(
+        &mut self,
+        device_id: Id,
+        net_identifier: String,
+    ) -> Result<(), ClientError>;
+    fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn create_afc_bidi_channel(
         &mut self,
         peer_id: Id,

@@ -130,7 +130,10 @@ fact Label[label int]=>{}
 fact AssignedLabel[label int, device_id id]=>{op enum ChanOp}
 
 // Stores a Member's associated network identifier for AFC.
-fact MemberNetworkId[device_id id]=>{net_identifier string}
+fact AfcMemberNetworkId[device_id id]=>{net_identifier string}
+
+// Stores a Member's associated network identifier for AQC.
+fact AqcMemberNetworkId[device_id id]=>{net_identifier string}
 ```
 
 ### Functions
@@ -1124,23 +1127,23 @@ command RevokeLabel {
 - Only a label that was assigned can be revoked.
 
 
-## SetNetworkName
+## SetAfcNetworkName
 Associates a network name and address to a Member for use in AFC.
 
 ```policy
-action set_network_name (device_id id, net_identifier string) {
-    publish SetNetworkName {
+action set_afc_network_name (device_id id, net_identifier string) {
+    publish SetAfcNetworkName {
         device_id: device_id,
         net_identifier: net_identifier,
     }
 }
 
-effect NetworkNameSet {
+effect AfcNetworkNameSet {
     device_id id,
     net_identifier string,
 }
 
-command SetNetworkName {
+command SetAfcNetworkName {
     fields {
         device_id id,
         net_identifier string,
@@ -1159,16 +1162,16 @@ command SetNetworkName {
         check is_member(device.role)
 
         // TODO: check that the network identifier is valid.
-        let net_id_exists = query MemberNetworkId[device_id: this.device_id]
+        let net_id_exists = query AfcMemberNetworkId[device_id: this.device_id]
 
         if net_id_exists is Some {
             let net_id = unwrap net_id_exists
             finish {
-                update MemberNetworkId[device_id: this.device_id]=>{net_identifier: net_id.net_identifier} to {
+                update AfcMemberNetworkId[device_id: this.device_id]=>{net_identifier: net_id.net_identifier} to {
                     net_identifier: this.net_identifier
                 }
 
-                emit NetworkNameSet {
+                emit AfcNetworkNameSet {
                     device_id: device.device_id,
                     net_identifier: this.net_identifier,
                 }
@@ -1176,9 +1179,9 @@ command SetNetworkName {
         }
         else {
             finish {
-                create MemberNetworkId[device_id: this.device_id]=>{net_identifier: this.net_identifier}
+                create AfcMemberNetworkId[device_id: this.device_id]=>{net_identifier: this.net_identifier}
 
-                emit NetworkNameSet {
+                emit AfcNetworkNameSet {
                     device_id: device.device_id,
                     net_identifier: this.net_identifier,
                 }
@@ -1190,20 +1193,24 @@ command SetNetworkName {
 
 **Invariants**:
 
-- Only Owners and Operators can assign network names to Members.
-- Members can only be assigned to one network name.
+- Only Owners and Operators can assign AFC network names to Members.
+- Members can only be assigned to one AFC network name.
 
-## UnsetNetworkName
-Dissociates a network name and address from a Member.
+## UnsetAfcNetworkName
+Dissociates an AFC network name and address from a Member.
 
 ```policy
-action unset_network_name (device_id id) {}
+action unset_afc_network_name (device_id id) {
+    publish UnsetAfcNetworkName {
+        device_id: device_id,
+    }
+}
 
-effect NetworkNameUnset {
+effect AfcNetworkNameUnset {
     device_id id,
 }
 
-command UnsetNetworkName {
+command UnsetAfcNetworkName {
     fields {
         device_id id,
     }
@@ -1219,11 +1226,11 @@ command UnsetNetworkName {
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
         check is_member(device.role)
 
-        check exists MemberNetworkId[device_id: this.device_id]
+        check exists AfcMemberNetworkId[device_id: this.device_id]
         finish {
-            delete MemberNetworkId[device_id: this.device_id]
+            delete AfcMemberNetworkId[device_id: this.device_id]
 
-            emit NetworkNameUnset {
+            emit AfcNetworkNameUnset {
                 device_id: device.device_id,
             }
         }
@@ -1233,8 +1240,122 @@ command UnsetNetworkName {
 
 **Invariants**:
 
-- Only Owners and Operators Operators can unset network names from Members.
+- Only Owners and Operators Operators can unset AFC network names from Members.
 
+## SetAqcNetworkName
+Associates a network name and address to a Member for use in AQC.
+
+```policy
+action set_aqc_network_name (device_id id, net_identifier string) {
+    publish SetAqcNetworkName {
+        device_id: device_id,
+        net_identifier: net_identifier,
+    }
+}
+
+effect AqcNetworkNameSet {
+    device_id id,
+    net_identifier string,
+}
+
+command SetAqcNetworkName {
+    fields {
+        device_id id,
+        net_identifier string,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
+
+        // Only Owners and Operators can associate a network name.
+        check is_owner(author.role) || is_operator(author.role)
+        // Only Members can be associated a network name.
+        check is_member(device.role)
+
+        // TODO: check that the network identifier is valid.
+        let net_id_exists = query AqcMemberNetworkId[device_id: this.device_id]
+
+        if net_id_exists is Some {
+            let net_id = unwrap net_id_exists
+            finish {
+                update AqcMemberNetworkId[device_id: this.device_id]=>{net_identifier: net_id.net_identifier} to {
+                    net_identifier: this.net_identifier
+                }
+
+                emit AqcNetworkNameSet {
+                    device_id: device.device_id,
+                    net_identifier: this.net_identifier,
+                }
+            }
+        }
+        else {
+            finish {
+                create AqcMemberNetworkId[device_id: this.device_id]=>{net_identifier: this.net_identifier}
+
+                emit AqcNetworkNameSet {
+                    device_id: device.device_id,
+                    net_identifier: this.net_identifier,
+                }
+            }
+        }
+    }
+}
+```
+
+**Invariants**:
+
+- Only Owners and Operators can assign AQC network names to Members.
+- Members can only be assigned to one AQC network name.
+
+## UnsetAqcNetworkName
+Dissociates an AQC network name and address from a Member.
+
+```policy
+action unset_aqc_network_name (device_id id) {
+    publish UnsetAqcNetworkName {
+        device_id: device_id,
+    }
+}
+
+effect AqcNetworkNameUnset {
+    device_id id,
+}
+
+command UnsetAqcNetworkName {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
+
+        // Only Owners, Admins, and Operators can unset a Member's network name.
+        check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
+        check is_member(device.role)
+
+        check exists AqcMemberNetworkId[device_id: this.device_id]
+        finish {
+            delete AqcMemberNetworkId[device_id: this.device_id]
+
+            emit AqcNetworkNameUnset {
+                device_id: device.device_id,
+            }
+        }
+    }
+}
+```
+
+**Invariants**:
+
+- Only Owners and Operators Operators can unset AQC network names from Members.
 
 ## CreateChannel
 
