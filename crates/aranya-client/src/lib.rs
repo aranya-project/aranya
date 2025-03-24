@@ -18,9 +18,12 @@ pub mod error;
 
 #[doc(inline)]
 #[cfg(feature = "experimental")]
-pub use crate::afc::{AfcId, FastChannels, Label, Message, PollData};
+pub use crate::{
+    afc::{AfcId, FastChannels, Label, Message, PollData},
+    error::AfcError,
+};
 #[doc(inline)]
 pub use crate::{
     client::{Client, Team},
-    error::{AfcError, Error, Result},
+    error::{Error, Result},
 };

@@ -1,8 +1,9 @@
-use core::{ffi::c_char, ops::DerefMut, ptr, slice};
+#[cfg(feature = "experimental")]
+use core::ptr;
+use core::{ffi::c_char, ops::DerefMut, slice};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
-use libc;
 use tracing::debug;
 
 use crate::imp;
@@ -81,6 +82,7 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Connecting(_) => Self::Connecting,
                 aranya_client::Error::Rpc(_) => Self::Rpc,
                 aranya_client::Error::Daemon(_) => Self::Daemon,
+                #[cfg(feature = "experimental")]
                 aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Bug(_) => Self::Bug,
             },
@@ -181,6 +183,7 @@ pub struct DeviceId(aranya_daemon_api::DeviceId);
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
 #[aranya_capi_core::opaque(size = 16, align = 1)]
+#[cfg(feature = "experimental")]
 pub struct ChannelId(aranya_daemon_api::AfcId);
 
 /// An enum containing team roles defined in the Aranya policy.
@@ -228,8 +231,10 @@ impl Addr {
 /// E.g. "localhost:8080", "127.0.0.1:8080"
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
+#[cfg(feature = "experimental")]
 pub struct NetIdentifier(*const c_char);
 
+#[cfg(feature = "experimental")]
 impl NetIdentifier {
     unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
@@ -620,68 +625,6 @@ pub fn revoke_role(
     Ok(())
 }
 
-/// Associate a network identifier to a device for use with AFC.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// If the address already exists for this device, it is replaced with the new address. Capable
-/// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
-/// OpenChannel and receiving messages. Can take either DNS name or IPV4.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
-///
-/// @relates AranyaClient.
-#[cfg(feature = "experimental")]
-pub unsafe fn afc_assign_net_identifier(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-    net_identifier: NetIdentifier,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
-    let net_identifier = unsafe { net_identifier.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.0)
-            .assign_afc_net_identifier(device.0, net_identifier),
-    )?;
-    Ok(())
-}
-
-/// Disassociate a network identifier from a device.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
-///
-/// @relates AranyaClient.
-#[cfg(feature = "experimental")]
-pub unsafe fn afc_remove_net_identifier(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-    net_identifier: NetIdentifier,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
-    let net_identifier = unsafe { net_identifier.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.0)
-            .remove_afc_net_identifier(device.0, net_identifier),
-    )?;
-    Ok(())
-}
-
 /// Create an AFC label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
@@ -764,6 +707,68 @@ pub fn revoke_label(
             .inner
             .team(team.0)
             .revoke_label(device.0, label.into()),
+    )?;
+    Ok(())
+}
+
+/// Associate a network identifier to a device for use with AFC.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// If the address already exists for this device, it is replaced with the new address. Capable
+/// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
+/// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param net_identifier the device's network identifier [`NetIdentifier`].
+///
+/// @relates AranyaClient.
+#[cfg(feature = "experimental")]
+pub unsafe fn afc_assign_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    net_identifier: NetIdentifier,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
+    let net_identifier = unsafe { net_identifier.as_underlying() }?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .assign_afc_net_identifier(device.0, net_identifier),
+    )?;
+    Ok(())
+}
+
+/// Disassociate a network identifier from a device.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param net_identifier the device's network identifier [`NetIdentifier`].
+///
+/// @relates AranyaClient.
+#[cfg(feature = "experimental")]
+pub unsafe fn afc_remove_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    net_identifier: NetIdentifier,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
+    let net_identifier = unsafe { net_identifier.as_underlying() }?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .remove_afc_net_identifier(device.0, net_identifier),
     )?;
     Ok(())
 }
@@ -870,12 +875,14 @@ pub struct AfcMsgInfo {
 /// Network socket address.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
+#[cfg(feature = "experimental")]
 pub struct SocketAddr(
     /// libc Socket address.
     // TODO: Custom type instead?
     pub  libc::sockaddr_storage,
 );
 
+#[cfg(feature = "experimental")]
 impl From<std::net::SocketAddr> for SocketAddr {
     fn from(value: std::net::SocketAddr) -> Self {
         let mut addr_storage =

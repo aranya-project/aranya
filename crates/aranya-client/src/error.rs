@@ -1,4 +1,6 @@
+#[cfg(feature = "experimental")]
 use aranya_daemon_api::AfcId;
+#[cfg(feature = "experimental")]
 use aranya_fast_channels::Version;
 
 /// Possible errors that could happen in the Aranya client.
@@ -18,6 +20,7 @@ pub enum Error {
 
     /// An Aranya Fast Channel error happened.
     #[error("Fast Channel error: {0}")]
+    #[cfg(feature = "experimental")]
     Afc(#[from] AfcError),
 
     /// An unexpected internal error happened.
@@ -27,6 +30,7 @@ pub enum Error {
 
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
+#[cfg(feature = "experimental")]
 pub enum AfcError {
     // Connection-related errors
     /// Unable to bind a network addresss.

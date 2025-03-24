@@ -125,7 +125,7 @@ clean = true
 
 [parse.expand]
 default_features = false
-features = []
+features = ["experimental"]
 crates = ["aranya-client-capi"]
 
 [ptr]

@@ -19,7 +19,7 @@ crate-type = ["rlib", "cdylib"]
 
 [features]
 default = []
-experimental = []
+experimental = ["aranya-client/experimental"]
 
 
 [dependencies]

@@ -307,6 +307,62 @@ typedef uint64_t AranyaDuration;
  */
 typedef uint32_t AranyaLabel;
 
+#if defined(EXPERIMENTAL)
+/**
+ * A network identifier for an Aranya client.
+ *
+ * E.g. "localhost:8080", "127.0.0.1:8080"
+ */
+typedef const char *AranyaNetIdentifier;
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Channel ID for a fast channel.
+ */
+typedef struct ARANYA_ALIGNED(1) AranyaChannelId {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[16];
+} AranyaChannelId;
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Network socket address.
+ */
+typedef struct sockaddr_storage AranyaSocketAddr;
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Aranya Fast Channels (AFC) message info.
+ */
+typedef struct AranyaAfcMsgInfo {
+    /**
+     * Uniquely (globally) identifies the channel.
+     */
+    struct AranyaChannelId channel;
+    /**
+     * The label applied to the channel.
+     */
+    AranyaLabel label;
+    /**
+     * Identifies the position of the message in the channel.
+     *
+     * This can be used to sort out-of-order messages.
+     */
+    uint64_t seq;
+    /**
+     * Peer's network socket address.
+     */
+    AranyaSocketAddr addr;
+} AranyaAfcMsgInfo;
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -938,6 +994,273 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
                                     const struct AranyaDeviceId *device,
                                     AranyaLabel label,
                                     struct AranyaExtError *__ext_err);
+
+#if defined(EXPERIMENTAL)
+/**
+ * Associate a network identifier to a device for use with AFC.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * If the address already exists for this device, it is replaced with the new address. Capable
+ * of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
+ * OpenChannel and receiving messages. Can take either DNS name or IPV4.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_assign_net_identifier(struct AranyaClient *client,
+                                             const struct AranyaTeamId *team,
+                                             const struct AranyaDeviceId *device,
+                                             AranyaNetIdentifier net_identifier);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Associate a network identifier to a device for use with AFC.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * If the address already exists for this device, it is replaced with the new address. Capable
+ * of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
+ * OpenChannel and receiving messages. Can take either DNS name or IPV4.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_assign_net_identifier_ext(struct AranyaClient *client,
+                                                 const struct AranyaTeamId *team,
+                                                 const struct AranyaDeviceId *device,
+                                                 AranyaNetIdentifier net_identifier,
+                                                 struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Disassociate a network identifier from a device.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_remove_net_identifier(struct AranyaClient *client,
+                                             const struct AranyaTeamId *team,
+                                             const struct AranyaDeviceId *device,
+                                             AranyaNetIdentifier net_identifier);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Disassociate a network identifier from a device.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_remove_net_identifier_ext(struct AranyaClient *client,
+                                                 const struct AranyaTeamId *team,
+                                                 const struct AranyaDeviceId *device,
+                                                 AranyaNetIdentifier net_identifier,
+                                                 struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Create an Aranya Fast Channel (AFC).
+ *
+ * Creates a bidirectional AFC channel between the current device
+ * and another peer.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param label the AFC channel label [`AranyaLabel`](@ref AranyaLabel) to create the channel with.
+ * @param __output the channel's ID [`AranyaChannelId`](@ref AranyaChannelId)
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_create_bidi_channel(struct AranyaClient *client,
+                                           const struct AranyaTeamId *team,
+                                           AranyaNetIdentifier peer,
+                                           AranyaLabel label,
+                                           struct AranyaChannelId *__output);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Create an Aranya Fast Channel (AFC).
+ *
+ * Creates a bidirectional AFC channel between the current device
+ * and another peer.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param label the AFC channel label [`AranyaLabel`](@ref AranyaLabel) to create the channel with.
+ * @param __output the channel's ID [`AranyaChannelId`](@ref AranyaChannelId)
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_create_bidi_channel_ext(struct AranyaClient *client,
+                                               const struct AranyaTeamId *team,
+                                               AranyaNetIdentifier peer,
+                                               AranyaLabel label,
+                                               struct AranyaChannelId *__output,
+                                               struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Delete an Aranya Fast Channel (AFC).
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param chan the AFC channel ID [`AranyaChannelId`](@ref AranyaChannelId) of the channel to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_delete_channel(struct AranyaClient *client,
+                                      struct AranyaChannelId chan);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Delete an Aranya Fast Channel (AFC).
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param chan the AFC channel ID [`AranyaChannelId`](@ref AranyaChannelId) of the channel to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_delete_channel_ext(struct AranyaClient *client,
+                                          struct AranyaChannelId chan,
+                                          struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Poll for new Aranya Fast Channels (AFC) data.
+ *
+ * If the operation times out, this will return an `::ARANYA_ERROR_TIMEOUT`.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param timeout how long to wait before timing out the poll operation [`AranyaDuration`](@ref AranyaDuration).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_poll_data(struct AranyaClient *client,
+                                 AranyaDuration timeout);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Poll for new Aranya Fast Channels (AFC) data.
+ *
+ * If the operation times out, this will return an `::ARANYA_ERROR_TIMEOUT`.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param timeout how long to wait before timing out the poll operation [`AranyaDuration`](@ref AranyaDuration).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_poll_data_ext(struct AranyaClient *client,
+                                     AranyaDuration timeout,
+                                     struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Send Aranya Fast Channels (AFC) data.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param chan the AFC channel's ID [`AranyaChannelId`](@ref AranyaChannelId).
+ * @param data raw bytes of data to send.
+ * @param data_len length of data to send.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_send_data(struct AranyaClient *client,
+                                 struct AranyaChannelId chan,
+                                 const uint8_t *data,
+                                 size_t data_len);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Send Aranya Fast Channels (AFC) data.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param chan the AFC channel's ID [`AranyaChannelId`](@ref AranyaChannelId).
+ * @param data raw bytes of data to send.
+ * @param data_len length of data to send.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_send_data_ext(struct AranyaClient *client,
+                                     struct AranyaChannelId chan,
+                                     const uint8_t *data,
+                                     size_t data_len,
+                                     struct AranyaExtError *__ext_err);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Receive Aranya Fast Channels (AFC) data.
+ *
+ * @param client the Aranya Client.
+ * @param buf buffer to store message into.
+ * @param buf_len length of buffer.
+ * @param info information about the message [`AranyaAfcMsgInfo`](@ref AranyaAfcMsgInfo).
+ * @result A boolean indicating whether any data was available.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_recv_data(struct AranyaClient *client,
+                                 uint8_t *buf,
+                                 size_t *buf_len,
+                                 struct AranyaAfcMsgInfo *info,
+                                 bool *__output);
+#endif
+
+#if defined(EXPERIMENTAL)
+/**
+ * Receive Aranya Fast Channels (AFC) data.
+ *
+ * @param client the Aranya Client.
+ * @param buf buffer to store message into.
+ * @param buf_len length of buffer.
+ * @param info information about the message [`AranyaAfcMsgInfo`](@ref AranyaAfcMsgInfo).
+ * @result A boolean indicating whether any data was available.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
+                                     uint8_t *buf,
+                                     size_t *buf_len,
+                                     struct AranyaAfcMsgInfo *info,
+                                     bool *__output,
+                                     struct AranyaExtError *__ext_err);
+#endif
 
 #ifdef __cplusplus
 }  // extern "C"

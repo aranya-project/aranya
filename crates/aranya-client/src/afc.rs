@@ -30,6 +30,7 @@ use anyhow::anyhow;
 use aranya_crypto::{Random as _, Rng};
 pub use aranya_daemon_api::AfcId;
 use aranya_daemon_api::{AfcCtrl, NetIdentifier, TeamId, CS};
+//TODO(nikki): once we reuse these for AQC, move this to lib.rs? Or just duplicate it in mod aqc.
 pub use aranya_fast_channels::Label;
 use aranya_fast_channels::{
     shm::{Flag, Mode, ReadState},
@@ -39,7 +40,6 @@ use aranya_util::ShmPathBuf;
 use buggy::{bug, Bug, BugExt as _};
 use indexmap::{map, IndexMap};
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "experimental")]
 use tarpc::context;
 use tokio::{
     io::{AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, ReadBuf},
@@ -569,7 +569,6 @@ pub struct FastChannels<'a> {
     client: &'a mut crate::Client,
 }
 
-#[cfg(feature = "experimental")]
 impl<'a> FastChannels<'a> {
     pub(crate) fn new(client: &'a mut crate::Client) -> Self {
         Self { client }
