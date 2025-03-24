@@ -179,21 +179,6 @@ typedef uint8_t AranyaRole;
 #endif // __cplusplus
 
 /**
- * A type that represents when the first sync with a peer should occur.
- */
-enum AranyaSyncWhen
-#ifdef __cplusplus
-  : uint8_t
-#endif // __cplusplus
- {
-    ARANYA_SYNC_WHEN_NOW,
-    ARANYA_SYNC_WHEN_LATER,
-};
-#ifndef __cplusplus
-typedef uint8_t AranyaSyncWhen;
-#endif // __cplusplus
-
-/**
  * Extended error information.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaExtError {
@@ -216,6 +201,18 @@ typedef struct ARANYA_ALIGNED(16) AranyaClient {
      */
     uint8_t __for_size_only[2656];
 } AranyaClient;
+
+/**
+ * Builder for a Sync Peer config.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfigBuilder {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[32];
+} AranyaSyncPeerConfigBuilder;
 
 /**
  * Aranya Fast Channels (AFC) config.
@@ -311,16 +308,15 @@ typedef struct ARANYA_ALIGNED(1) AranyaTeamId {
 typedef const char *AranyaAddr;
 
 /**
- * A type to represent a span of time.
- */
-typedef uint64_t AranyaDuration;
-
-/**
  * Sync Peer config.
  */
-typedef struct ARANYA_DESIGNATED_INIT AranyaSyncPeerConfig {
-    AranyaDuration interval;
-    AranyaSyncWhen sync_when;
+typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[32];
 } AranyaSyncPeerConfig;
 
 /**
@@ -348,6 +344,16 @@ typedef struct ARANYA_ALIGNED(1) AranyaChannelId {
      */
     uint8_t __for_size_only[16];
 } AranyaChannelId;
+
+/**
+ * A type to represent a span of time.
+ */
+typedef Duration Duration;
+
+/**
+ * A type to represent a span of time.
+ */
+typedef Duration AranyaDuration;
 
 /**
  * Network socket address.
@@ -516,6 +522,46 @@ AranyaError aranya_client_cleanup_ext(struct AranyaClient *ptr,
                                       struct AranyaExtError *__ext_err);
 
 /**
+ * Initializes `AranyaSyncPeerConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaSyncPeerConfigBuilder
+ */
+AranyaError aranya_sync_peer_config_builder_init(struct AranyaSyncPeerConfigBuilder *out);
+
+/**
+ * Initializes `AranyaSyncPeerConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaSyncPeerConfigBuilder
+ */
+AranyaError aranya_sync_peer_config_builder_init_ext(struct AranyaSyncPeerConfigBuilder *out,
+                                                     struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_sync_peer_config_builder_init`.
+ *
+ * @relates AranyaSyncPeerConfigBuilder
+ */
+AranyaError aranya_sync_peer_config_builder_cleanup(struct AranyaSyncPeerConfigBuilder *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_sync_peer_config_builder_init`.
+ *
+ * @relates AranyaSyncPeerConfigBuilder
+ */
+AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerConfigBuilder *ptr,
+                                                        struct AranyaExtError *__ext_err);
+
+/**
  * Initializes a new client instance.
  *
  * @param client the uninitialized Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -670,7 +716,7 @@ AranyaError aranya_remove_team_ext(struct AranyaClient *client,
 AranyaError aranya_add_sync_peer(struct AranyaClient *client,
                                  const struct AranyaTeamId *team,
                                  AranyaAddr addr,
-                                 struct AranyaSyncPeerConfig config);
+                                 const struct AranyaSyncPeerConfig *config);
 
 /**
  * Add the peer for automatic periodic Aranya state syncing.
@@ -689,7 +735,7 @@ AranyaError aranya_add_sync_peer(struct AranyaClient *client,
 AranyaError aranya_add_sync_peer_ext(struct AranyaClient *client,
                                      const struct AranyaTeamId *team,
                                      AranyaAddr addr,
-                                     struct AranyaSyncPeerConfig config,
+                                     const struct AranyaSyncPeerConfig *config,
                                      struct AranyaExtError *__ext_err);
 
 /**
@@ -702,13 +748,13 @@ AranyaError aranya_add_sync_peer_ext(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- *
+ * @param config configuration values for syncing with a peer.
  * @relates AranyaClient.
  */
 AranyaError aranya_sync_now(struct AranyaClient *client,
                             const struct AranyaTeamId *team,
                             AranyaAddr addr,
-                            struct AranyaSyncPeerConfig config);
+                            const struct AranyaSyncPeerConfig *config);
 
 /**
  * Sync with peer immediately.
@@ -720,13 +766,13 @@ AranyaError aranya_sync_now(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- *
+ * @param config configuration values for syncing with a peer.
  * @relates AranyaClient.
  */
 AranyaError aranya_sync_now_ext(struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaAddr addr,
-                                struct AranyaSyncPeerConfig config,
+                                const struct AranyaSyncPeerConfig *config,
                                 struct AranyaExtError *__ext_err);
 
 /**

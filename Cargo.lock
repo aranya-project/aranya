@@ -136,9 +136,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-capi-codegen"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "296bd1848907a301f0fd0e736bebdb77054cc1f5f9c4600da45bbb823c443f89"
+checksum = "251a8a76ac2cef36bb41a0d7a0c738fa7d2ab142577b5780e01493d1b41b0882"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -154,9 +154,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-capi-core"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f745c5a4441ad0e879990f3f3ec816028cee4768e21ae89d0f5046d1384136fb"
+checksum = "08945571ec11b531506e95da567512181520ab00b450e6eef947a97567ad148b"
 dependencies = [
  "aranya-capi-macro",
  "aranya-libc",
@@ -1036,7 +1036,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1915,7 +1915,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2311,7 +2311,7 @@ dependencies = [
  "getrandom 0.3.1",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2732,7 +2732,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

@@ -259,12 +259,19 @@ impl From<aranya_fast_channels::Label> for Label {
     }
 }
 
+/// Sync Peer config.
+#[aranya_capi_core::opaque(size = 32, align = 8)]
+pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
+
+/// Builder for a Sync Peer config.
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 32, align = 8)]
+pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
+
 /// A type to represent a span of time.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-pub struct Duration {
-    pub nanos: u64,
-}
+pub struct Duration(imp::Duration);
 
 pub const ARANYA_DURATION_SECONDS: u64 = 1000 * ARANYA_DURATION_MILLISECONDS;
 pub const ARANYA_DURATION_MILLISECONDS: u64 = 1000 * ARANYA_DURATION_MICROSECONDS;
@@ -273,7 +280,7 @@ pub const ARANYA_DURATION_NANOSECONDS: u64 = 1;
 
 impl From<Duration> for std::time::Duration {
     fn from(value: Duration) -> Self {
-        std::time::Duration::from_nanos(value.nanos)
+        std::time::Duration::from_nanos(value.0.nanos)
     }
 }
 
@@ -355,28 +362,6 @@ pub struct AfcConfig {
 pub enum SyncWhen {
     Now,
     Later,
-}
-
-/// Sync Peer config.
-#[repr(C)]
-#[must_use]
-#[derive(Copy, Clone, Debug)]
-pub struct SyncPeerConfig {
-    pub interval: Duration,
-    pub sync_when: SyncWhen,
-}
-
-impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
-    fn from(value: SyncPeerConfig) -> Self {
-        let sync_now = match value.sync_when {
-            SyncWhen::Now => true,
-            SyncWhen::Later => false,
-        };
-        Self {
-            interval: value.interval.into(),
-            sync_now,
-        }
-    }
 }
 
 /// Initializes a new client instance.
@@ -499,14 +484,17 @@ pub unsafe fn add_sync_peer(
     client: &mut Client,
     team: &TeamId,
     addr: Addr,
-    config: SyncPeerConfig,
+    config: &SyncPeerConfig,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-    client
-        .rt
-        .block_on(client.inner.team(team.0).add_sync_peer(addr, config.into()))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .add_sync_peer(addr, (**config).into()),
+    )?;
     Ok(())
 }
 
@@ -525,7 +513,7 @@ pub unsafe fn sync_now(
     client: &mut Client,
     team: &TeamId,
     addr: Addr,
-    config: SyncPeerConfig,
+    config: Option<&SyncPeerConfig>,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `addr` is a valid C String.
@@ -534,7 +522,7 @@ pub unsafe fn sync_now(
         client
             .inner
             .team(team.0)
-            .sync_now(addr, Some(config.into())),
+            .sync_now(addr, config.map(|config| (**config).into())),
     )?;
     Ok(())
 }
