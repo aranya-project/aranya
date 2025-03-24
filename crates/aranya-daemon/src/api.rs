@@ -300,12 +300,21 @@ impl DaemonApi for DaemonApiHandler {
 
     #[instrument(skip(self))]
     async fn get_key_bundle(self, _: context::Context) -> ApiResult<ApiKeyBundle> {
-        Ok(self.get_pk()?.into())
+        Ok(self
+            .get_pk()
+            .context("unable to get device public keys")?
+            .into())
     }
 
     #[instrument(skip(self))]
     async fn get_device_id(self, _: context::Context) -> ApiResult<ApiDeviceId> {
-        Ok(self.pk.ident_pk.id()?.into_id().into())
+        Ok(self
+            .pk
+            .ident_pk
+            .id()
+            .context("unable to get device ID")?
+            .into_id()
+            .into())
     }
 
     #[instrument(skip(self))]
@@ -318,7 +327,8 @@ impl DaemonApi for DaemonApiHandler {
     ) -> ApiResult<()> {
         self.peers
             .add_peer(peer, interval, team.into_id().into())
-            .await?;
+            .await
+            .context("unable to add sync peer")?;
         Ok(())
     }
 
@@ -329,7 +339,10 @@ impl DaemonApi for DaemonApiHandler {
         peer: Addr,
         team: TeamId,
     ) -> ApiResult<()> {
-        self.peers.remove_peer(peer, team.into_id().into()).await?;
+        self.peers
+            .remove_peer(peer, team.into_id().into())
+            .await
+            .context("unable to remove sync peer")?;
         Ok(())
     }
 
@@ -349,7 +362,11 @@ impl DaemonApi for DaemonApiHandler {
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
         let pk = self.get_pk()?;
-        let (graph_id, _) = self.client.create_team(pk, Some(nonce)).await?;
+        let (graph_id, _) = self
+            .client
+            .create_team(pk, Some(nonce))
+            .await
+            .context("unable to create team")?;
         debug!(?graph_id);
         Ok(graph_id.into_id().into())
     }
@@ -369,7 +386,8 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .add_member(keys.into())
-            .await?;
+            .await
+            .context("unable to add device to team")?;
         Ok(())
     }
 
@@ -383,7 +401,8 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .remove_member(device.into_id().into())
-            .await?;
+            .await
+            .context("unable to remove device from team")?;
         Ok(())
     }
 
@@ -398,7 +417,8 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .assign_role(device.into_id().into(), role.into())
-            .await?;
+            .await
+            .context("unable to assign role")?;
         Ok(())
     }
 
@@ -413,7 +433,8 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .revoke_role(device.into_id().into(), role.into())
-            .await?;
+            .await
+            .context("unable to revoke device role")?;
         Ok(())
     }
 
@@ -429,7 +450,8 @@ impl DaemonApi for DaemonApiHandler {
             .client
             .actions(&team.into_id().into())
             .set_afc_network_name(device.into_id().into(), name.0)
-            .await?;
+            .await
+            .context("unable to assign afc network identifier")?;
         self.handle_effects(&effects, None).await?;
         Ok(())
     }
@@ -445,7 +467,8 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .unset_afc_network_name(device.into_id().into())
-            .await?;
+            .await
+            .context("unable to remove afc network identifier")?;
         Ok(())
     }
 
@@ -461,7 +484,8 @@ impl DaemonApi for DaemonApiHandler {
             .client
             .actions(&team.into_id().into())
             .set_aqc_network_name(device.into_id().into(), name.0)
-            .await?;
+            .await
+            .context("unable to assign aqc network identifier")?;
         self.handle_effects(&effects, None).await?;
         Ok(())
     }
@@ -477,7 +501,8 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .unset_aqc_network_name(device.into_id().into())
-            .await?;
+            .await
+            .context("unable to remove aqc net identifier")?;
         Ok(())
     }
 
@@ -486,7 +511,8 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .define_label(label)
-            .await?;
+            .await
+            .context("unable to create label")?;
         Ok(())
     }
 
@@ -495,7 +521,8 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .undefine_label(label)
-            .await?;
+            .await
+            .context("unable to delete label")?;
         Ok(())
     }
 
@@ -511,7 +538,8 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .assign_label(device.into_id().into(), label, ChanOp::ReadWrite)
-            .await?;
+            .await
+            .context("unable to assign label")?;
         Ok(())
     }
 
@@ -527,7 +555,8 @@ impl DaemonApi for DaemonApiHandler {
         self.client
             .actions(&team.into_id().into())
             .revoke_label(id, label)
-            .await?;
+            .await
+            .context("unable to revoke label")?;
         Ok(())
     }
 
@@ -619,7 +648,8 @@ impl DaemonApi for DaemonApiHandler {
             .client
             .actions(&team.into_id().into())
             .query_devices_on_team_off_graph()
-            .await?;
+            .await
+            .context("unable to query devices on team")?;
         let mut devices: Vec<ApiDeviceId> = Vec::new();
         for e in effects {
             if let Effect::QueryDevicesOnTeamResult(e) = e {
@@ -640,7 +670,8 @@ impl DaemonApi for DaemonApiHandler {
             .client
             .actions(&team.into_id().into())
             .query_device_role_off_graph(device.into_id().into())
-            .await?;
+            .await
+            .context("unable to query device role")?;
         if let Some(Effect::QueryDeviceRoleResult(e)) =
             find_effect!(&effects, Effect::QueryDeviceRoleResult(_e))
         {
@@ -661,7 +692,8 @@ impl DaemonApi for DaemonApiHandler {
             .client
             .actions(&team.into_id().into())
             .query_device_keybundle_off_graph(device.into_id().into())
-            .await?;
+            .await
+            .context("unable to query device keybundle")?;
         if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
             find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
         {
@@ -682,7 +714,8 @@ impl DaemonApi for DaemonApiHandler {
             .client
             .actions(&team.into_id().into())
             .query_device_label_assignments_off_graph(device.into_id().into())
-            .await?;
+            .await
+            .context("unable to query device label assignments")?;
         let mut labels = Vec::new();
         for e in effects {
             if let Effect::QueryDeviceLabelAssignmentsResult(e) = e {
@@ -709,7 +742,8 @@ impl DaemonApi for DaemonApiHandler {
             .client
             .actions(&team.into_id().into())
             .query_afc_net_identifier_off_graph(device.into_id().into())
-            .await?;
+            .await
+            .context("unable to query afc network identifier")?;
         if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
             find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
         {
@@ -730,7 +764,8 @@ impl DaemonApi for DaemonApiHandler {
             .client
             .actions(&team.into_id().into())
             .query_aqc_net_identifier_off_graph(device.into_id().into())
-            .await?;
+            .await
+            .context("unable to query aqc network identifier")?;
         if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
             find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
         {
@@ -751,7 +786,8 @@ impl DaemonApi for DaemonApiHandler {
             .client
             .actions(&team.into_id().into())
             .query_label_exists_off_graph(label)
-            .await?;
+            .await
+            .context("unable to query label")?;
         if let Some(Effect::QueryLabelExistsResult(e)) =
             find_effect!(&effects, Effect::QueryLabelExistsResult(_e))
         {
