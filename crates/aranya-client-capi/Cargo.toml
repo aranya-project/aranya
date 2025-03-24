@@ -17,6 +17,11 @@ workspace = true
 crate-type = ["rlib", "cdylib"]
 
 
+[features]
+default = []
+experimental = []
+
+
 [dependencies]
 aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }

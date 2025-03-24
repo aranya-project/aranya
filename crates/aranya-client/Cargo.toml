@@ -13,6 +13,7 @@ workspace = true
 
 [features]
 default = []
+experimental = []
 
 # Enable debugging.
 debug = []

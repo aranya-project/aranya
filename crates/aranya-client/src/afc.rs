@@ -39,6 +39,7 @@ use aranya_util::ShmPathBuf;
 use buggy::{bug, Bug, BugExt as _};
 use indexmap::{map, IndexMap};
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "experimental")]
 use tarpc::context;
 use tokio::{
     io::{AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, ReadBuf},
@@ -568,6 +569,7 @@ pub struct FastChannels<'a> {
     client: &'a mut crate::Client,
 }
 
+#[cfg(feature = "experimental")]
 impl<'a> FastChannels<'a> {
     pub(crate) fn new(client: &'a mut crate::Client) -> Self {
         Self { client }

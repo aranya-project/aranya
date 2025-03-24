@@ -1,4 +1,5 @@
 use aranya_capi_core::safe::{TypeId, Typed};
+#[cfg(feature = "experimental")]
 use aranya_client::afc;
 
 pub struct Client {
@@ -6,6 +7,7 @@ pub struct Client {
     pub rt: tokio::runtime::Runtime,
     /// Cached message in case the buffer provided to `recv_msg`
     /// is too small.
+    #[cfg(feature = "experimental")]
     pub msg: Option<afc::Message>,
 }
 

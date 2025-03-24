@@ -9,24 +9,27 @@
     rust_2018_idioms
 )]
 
-use std::{
-    fmt,
-    net::SocketAddr,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+#[cfg(feature = "experimental")]
+use std::path::Path;
+use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
-use aranya_client::{afc::Message, client::Client};
+#[cfg(feature = "experimental")]
+use aranya_client::afc::Message;
+use aranya_client::client::Client;
 use aranya_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
+#[cfg(feature = "experimental")]
+use aranya_daemon_api::NetIdentifier;
+use aranya_daemon_api::{DeviceId, KeyBundle, Role};
+#[cfg(feature = "experimental")]
 use aranya_fast_channels::{Label, Seq};
 use aranya_util::addr::Addr;
 use backon::{ExponentialBuilder, Retryable};
+#[cfg(feature = "experimental")]
 use buggy::BugExt;
 use spideroak_base58::ToBase58;
 use tempfile::tempdir;
@@ -137,6 +140,7 @@ fn trim(mut d: u128, mut width: usize) -> (u128, usize) {
 /// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the
 /// clients are pending.
 // TODO(nikki): alternative to select!{} to resolve lifetime issues
+#[cfg(feature = "experimental")]
 macro_rules! do_poll {
     ($($client:expr),*) => {
         debug!(
@@ -161,6 +165,7 @@ macro_rules! do_poll {
     };
 }
 
+#[allow(dead_code)] // memberb is unused if AFC is disabled
 struct TeamCtx {
     owner: DeviceCtx,
     admin: DeviceCtx,
@@ -243,18 +248,29 @@ impl DeviceCtx {
         sleep(Duration::from_millis(100)).await;
 
         // Initialize the user library.
-        let mut client = (|| {
-            Client::connect(
-                &uds_api_path,
-                Path::new(&shm_path),
-                max_chans,
-                "localhost:0",
-            )
-        })
-        .retry(ExponentialBuilder::default())
-        .await
-        .context("unable to init client")?;
-        client.afc().set_name(name);
+        let mut client = {
+            #[cfg(feature = "experimental")]
+            {
+                let mut client = (|| {
+                    Client::connect(
+                        &uds_api_path,
+                        Path::new(&shm_path),
+                        max_chans,
+                        "localhost:0",
+                    )
+                })
+                .retry(ExponentialBuilder::default())
+                .await
+                .context("unable to init client")?;
+                client.afc().set_name(name);
+                client
+            }
+            #[cfg(not(feature = "experimental"))]
+            (|| Client::connect(&uds_api_path))
+                .retry(ExponentialBuilder::default())
+                .await
+                .context("unable to init client")?
+        };
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");
@@ -272,6 +288,7 @@ impl DeviceCtx {
         Ok(self.client.local_addr().await?)
     }
 
+    #[cfg(feature = "experimental")]
     async fn afc_local_addr(&mut self) -> Result<SocketAddr> {
         Ok(self.client.afc().local_addr().await?)
     }
@@ -419,6 +436,7 @@ async fn integration_test() -> Result<()> {
 }
 
 #[test(tokio::test(flavor = "multi_thread"))]
+#[cfg(feature = "experimental")]
 async fn test_afc_one_way_two_chans() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
@@ -658,6 +676,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
 
 /// Tests AFC two way communication within one channel.
 #[test(tokio::test(flavor = "multi_thread"))]
+#[cfg(feature = "experimental")]
 async fn test_afc_two_way_one_chan() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
@@ -874,6 +893,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
 
 /// A positive test that sequence numbers are monotonic.
 #[test(tokio::test(flavor = "multi_thread"))]
+#[cfg(feature = "experimental")]
 async fn test_afc_monotonic_seq() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;

@@ -366,27 +366,38 @@ pub unsafe fn client_init(
         unsafe { std::ffi::CStr::from_ptr(config.daemon_sock) }.to_bytes(),
     )
     .as_ref();
+
+    #[cfg(feature = "experimental")]
     let afc_shm_path = OsStr::from_bytes(
         // SAFETY: Caller must ensure pointer is a valid C String.
         unsafe { std::ffi::CStr::from_ptr(config.afc.shm_path) }.to_bytes(),
     )
     .as_ref();
+
+    #[cfg(feature = "experimental")]
     let afc_addr =
         // SAFETY: Caller must ensure pointer is a valid C String.
         unsafe { std::ffi::CStr::from_ptr(config.afc.addr) }
         .to_str()?;
+
     let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
+
+    #[cfg(feature = "experimental")]
     let inner = rt.block_on(aranya_client::Client::connect(
         daemon_sock,
         afc_shm_path,
         config.afc.max_channels,
         afc_addr,
     ))?;
+    #[cfg(not(feature = "experimental"))]
+    let inner = rt.block_on(aranya_client::Client::connect(daemon_sock))?;
+
     Safe::init(
         client,
         imp::Client {
             rt,
             inner,
+            #[cfg(feature = "experimental")]
             msg: None,
         },
     );
@@ -623,6 +634,7 @@ pub fn revoke_role(
 /// @param net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "experimental")]
 pub unsafe fn afc_assign_net_identifier(
     client: &mut Client,
     team: &TeamId,
@@ -651,6 +663,7 @@ pub unsafe fn afc_assign_net_identifier(
 /// @param net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "experimental")]
 pub unsafe fn afc_remove_net_identifier(
     client: &mut Client,
     team: &TeamId,
@@ -769,6 +782,7 @@ pub fn revoke_label(
 /// @param __output the channel's ID [`ChannelId`]
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "experimental")]
 pub unsafe fn afc_create_bidi_channel(
     client: &mut Client,
     team: &TeamId,
@@ -792,6 +806,7 @@ pub unsafe fn afc_create_bidi_channel(
 /// @param chan the AFC channel ID [`ChannelId`] of the channel to delete.
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "experimental")]
 pub fn afc_delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
@@ -808,6 +823,7 @@ pub fn afc_delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), im
 /// @param timeout how long to wait before timing out the poll operation [`Duration`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "experimental")]
 pub fn afc_poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client.rt.block_on(async {
@@ -825,6 +841,7 @@ pub fn afc_poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::
 /// @param data_len length of data to send.
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "experimental")]
 pub fn afc_send_data(client: &mut Client, chan: ChannelId, data: &[u8]) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
@@ -836,6 +853,7 @@ pub fn afc_send_data(client: &mut Client, chan: ChannelId, data: &[u8]) -> Resul
 /// Aranya Fast Channels (AFC) message info.
 #[repr(C)]
 #[derive(Debug)]
+#[cfg(feature = "experimental")]
 pub struct AfcMsgInfo {
     /// Uniquely (globally) identifies the channel.
     pub channel: ChannelId,
@@ -899,6 +917,7 @@ impl From<std::net::SocketAddr> for SocketAddr {
 /// @result A boolean indicating whether any data was available.
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "experimental")]
 pub unsafe fn afc_recv_data(
     client: &mut Client,
     buf: Writer<u8>,
