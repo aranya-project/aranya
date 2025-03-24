@@ -2,6 +2,8 @@
 
 # Copyright (c) SpiderOak, Inc. All rights reserved.
 
+set -xeuo pipefail
+
 # Change into the example directory if needed
 SCRIPT_PATH=$(dirname "$0")
 cd $SCRIPT_PATH
