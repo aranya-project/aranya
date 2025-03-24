@@ -69,4 +69,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Rust Example Application
-        run: cargo make run-rust-example
+        run: |
+          cargo build --release
+          ARANYA_EXAMPLE=info ./target/release/aranya-example
+        working-directory: ./examples/rust
