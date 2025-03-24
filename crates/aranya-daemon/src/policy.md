@@ -1200,7 +1200,11 @@ command SetAfcNetworkName {
 Dissociates an AFC network name and address from a Member.
 
 ```policy
-action unset_afc_network_name (device_id id) {}
+action unset_afc_network_name (device_id id) {
+    publish UnsetAfcNetworkName {
+        device_id: device_id,
+    }
+}
 
 effect AfcNetworkNameUnset {
     device_id id,
@@ -1311,7 +1315,11 @@ command SetAqcNetworkName {
 Dissociates an AQC network name and address from a Member.
 
 ```policy
-action unset_aqc_network_name (device_id id) {}
+action unset_aqc_network_name (device_id id) {
+    publish UnsetAqcNetworkName {
+        device_id: device_id,
+    }
+}
 
 effect AqcNetworkNameUnset {
     device_id id,

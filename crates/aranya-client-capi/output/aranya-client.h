@@ -1349,7 +1349,7 @@ AranyaError aranya_query_afc_net_identifier(struct AranyaClient *client,
                                             const struct AranyaTeamId *team,
                                             const struct AranyaDeviceId *device,
                                             char *ident,
-                                            size_t ident_len);
+                                            size_t *ident_len);
 
 /**
  * Query device's AFC network identifier.
@@ -1365,7 +1365,7 @@ AranyaError aranya_query_afc_net_identifier_ext(struct AranyaClient *client,
                                                 const struct AranyaTeamId *team,
                                                 const struct AranyaDeviceId *device,
                                                 char *ident,
-                                                size_t ident_len,
+                                                size_t *ident_len,
                                                 struct AranyaExtError *__ext_err);
 
 /**
@@ -1382,7 +1382,7 @@ AranyaError aranya_query_aqc_net_identifier(struct AranyaClient *client,
                                             const struct AranyaTeamId *team,
                                             const struct AranyaDeviceId *device,
                                             char *ident,
-                                            size_t ident_len);
+                                            size_t *ident_len);
 
 /**
  * Query device's AQC network identifier.
@@ -1398,7 +1398,7 @@ AranyaError aranya_query_aqc_net_identifier_ext(struct AranyaClient *client,
                                                 const struct AranyaTeamId *team,
                                                 const struct AranyaDeviceId *device,
                                                 char *ident,
-                                                size_t ident_len,
+                                                size_t *ident_len,
                                                 struct AranyaExtError *__ext_err);
 
 /**

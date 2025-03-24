@@ -26,6 +26,16 @@
         }                                                                      \
     } while (0)
 
+// Macro for printing AranyaError to stderr and returning the error.
+// Does nothing if error value is ARANYA_SUCCESS.
+#define EXPECT_ERR(M, E)                                                       \
+    do {                                                                       \
+        AranyaError error = (E);                                               \
+        if (err != ARANYA_ERROR_SUCCESS) {                                     \
+            fprintf(stderr, "%s: %s\r\n", (M), aranya_error_to_str(error));    \
+        }                                                                      \
+    } while (0)
+
 // Macro for printing client AranyaError to stderr and returning the error.
 // Does nothing if error value is ARANYA_SUCCESS.
 #define CLIENT_EXPECT(M, N, E)                                                 \
@@ -332,22 +342,54 @@ AranyaError run(Team *t) {
         "\r\n",
         t->clients_arr[MEMBERB].name, memberb_keybundle.enc_key_len,
         memberb_keybundle.sign_key_len, memberb_keybundle.ident_key_len);
-    char *memberb_afc_net_identifier = malloc(BUF_LEN);
-    err = aranya_query_afc_net_identifier(&t->clients.operator.client, &t->id,
-                                          &t->clients.memberb.id,
-                                          memberb_afc_net_identifier, BUF_LEN);
+    size_t memberb_afc_net_identifier_len = BUF_LEN;
+    char *memberb_afc_net_identifier      = malloc(BUF_LEN);
+    err                                   = aranya_query_afc_net_identifier(
+        &t->clients.operator.client, &t->id, &t->clients.memberb.id,
+        memberb_afc_net_identifier, &memberb_afc_net_identifier_len);
     EXPECT("error querying memberb afc net identifier", err);
     printf("%s afc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
            memberb_afc_net_identifier);
+
+    err = aranya_afc_remove_net_identifier(&t->clients.operator.client, &t->id,
+                                           &t->clients.memberb.id,
+                                           afc_addrs[MEMBERB]);
+    EXPECT("error removing memberb afc net identifier", err);
+    printf("%s removed afc net identifier: %s \r\n",
+           t->clients_arr[MEMBERB].name, memberb_afc_net_identifier);
+    memberb_afc_net_identifier_len = BUF_LEN;
+    err                            = aranya_query_afc_net_identifier(
+        &t->clients.operator.client, &t->id, &t->clients.memberb.id,
+        memberb_afc_net_identifier, &memberb_afc_net_identifier_len);
+    EXPECT_ERR("error querying memberb afc net identifier", err);
+    printf("%s afc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
+           memberb_afc_net_identifier);
     free(memberb_afc_net_identifier);
-    char *memberb_aqc_net_identifier = malloc(BUF_LEN);
-    err = aranya_query_aqc_net_identifier(&t->clients.operator.client, &t->id,
-                                          &t->clients.memberb.id,
-                                          memberb_aqc_net_identifier, BUF_LEN);
+
+    size_t memberb_aqc_net_identifier_len = BUF_LEN;
+    char *memberb_aqc_net_identifier      = malloc(BUF_LEN);
+    err                                   = aranya_query_aqc_net_identifier(
+        &t->clients.operator.client, &t->id, &t->clients.memberb.id,
+        memberb_aqc_net_identifier, &memberb_aqc_net_identifier_len);
     EXPECT("error querying memberb aqc net identifier", err);
     printf("%s aqc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
            memberb_aqc_net_identifier);
+
+    err = aranya_aqc_remove_net_identifier(&t->clients.operator.client, &t->id,
+                                           &t->clients.memberb.id,
+                                           afc_addrs[MEMBERB]);
+    EXPECT("error removing memberb aqc net identifier", err);
+    printf("%s removed aqc net identifier: %s \r\n",
+           t->clients_arr[MEMBERB].name, memberb_aqc_net_identifier);
+    memberb_aqc_net_identifier_len = BUF_LEN;
+    err                            = aranya_query_aqc_net_identifier(
+        &t->clients.operator.client, &t->id, &t->clients.memberb.id,
+        memberb_aqc_net_identifier, &memberb_aqc_net_identifier_len);
+    EXPECT_ERR("error querying memberb aqc net identifier", err);
+    printf("%s aqc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
+           memberb_aqc_net_identifier);
     free(memberb_aqc_net_identifier);
+
     bool exists = false;
     err = aranya_query_label_exists(&t->clients.membera.client, &t->id, &label,
                                     &exists);
