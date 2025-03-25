@@ -587,36 +587,37 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     sleep(sleep_interval).await;
 
     // fact database queries
-    let devices = membera_team.query_devices_on_team().await?;
+    let mut queries = team.membera.client.queries(team_id);
+    let devices = queries.devices_on_team().await?;
     assert_eq!(devices.len(), 5);
     debug!("membera devices on team: {:?}", devices.len());
-    let role = membera_team.query_device_role(team.membera.id).await?;
+    let role = queries.device_role(team.membera.id).await?;
     assert_eq!(role, Role::Member);
     debug!("membera role: {:?}", role);
-    let keybundle = membera_team.query_device_keybundle(team.membera.id).await?;
+    let keybundle = queries.device_keybundle(team.membera.id).await?;
     debug!("membera keybundle: {:?}", keybundle);
-    let labels = membera_team
-        .query_device_label_assignments(team.membera.id)
-        .await?;
+    let labels = queries.device_label_assignments(team.membera.id).await?;
     assert_eq!(labels.len(), 2);
     debug!("membera labels: {:?}", labels);
-    let afc_net_identifier = membera_team
-        .query_afc_net_identifier(team.membera.id)
-        .await?;
+    let afc_net_identifier = queries
+        .afc_net_identifier(team.membera.id)
+        .await?
+        .expect("expected net identifier");
     assert_eq!(
         afc_net_identifier,
         NetIdentifier(membera_afc_addr.to_string())
     );
     debug!("membera afc_net_identifer: {:?}", afc_net_identifier);
-    let aqc_net_identifier = membera_team
-        .query_aqc_net_identifier(team.membera.id)
-        .await?;
+    let aqc_net_identifier = queries
+        .aqc_net_identifier(team.membera.id)
+        .await?
+        .expect("expected net identifier");
     assert_eq!(
         aqc_net_identifier,
         NetIdentifier(membera_afc_addr.to_string())
     );
     debug!("membera aqc_net_identifer: {:?}", aqc_net_identifier);
-    let label_exists = membera_team.query_label_exists(label1).await?;
+    let label_exists = queries.label_exists(label1).await?;
     assert!(label_exists);
     debug!("membera label1 exists?: {:?}", label_exists);
 

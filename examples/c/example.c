@@ -26,16 +26,6 @@
         }                                                                      \
     } while (0)
 
-// Macro for printing AranyaError to stderr and returning the error.
-// Does nothing if error value is ARANYA_SUCCESS.
-#define EXPECT_ERR(M, E)                                                       \
-    do {                                                                       \
-        AranyaError error = (E);                                               \
-        if (err != ARANYA_ERROR_SUCCESS) {                                     \
-            fprintf(stderr, "%s: %s\r\n", (M), aranya_error_to_str(error));    \
-        }                                                                      \
-    } while (0)
-
 // Macro for printing client AranyaError to stderr and returning the error.
 // Does nothing if error value is ARANYA_SUCCESS.
 #define CLIENT_EXPECT(M, N, E)                                                 \
@@ -344,10 +334,16 @@ AranyaError run(Team *t) {
         memberb_keybundle.sign_key_len, memberb_keybundle.ident_key_len);
     size_t memberb_afc_net_identifier_len = BUF_LEN;
     char *memberb_afc_net_identifier      = malloc(BUF_LEN);
+    bool afc_net_identifier_exists        = false;
     err                                   = aranya_query_afc_net_identifier(
         &t->clients.operator.client, &t->id, &t->clients.memberb.id,
-        memberb_afc_net_identifier, &memberb_afc_net_identifier_len);
+        memberb_afc_net_identifier, &memberb_afc_net_identifier_len,
+        &afc_net_identifier_exists);
     EXPECT("error querying memberb afc net identifier", err);
+    if (!afc_net_identifier_exists) {
+        fprintf(stderr, "expected AFC net identifier to be returned\r\n");
+        return ARANYA_ERROR_BUG;
+    }
     printf("%s afc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
            memberb_afc_net_identifier);
 
@@ -360,18 +356,29 @@ AranyaError run(Team *t) {
     memberb_afc_net_identifier_len = BUF_LEN;
     err                            = aranya_query_afc_net_identifier(
         &t->clients.operator.client, &t->id, &t->clients.memberb.id,
-        memberb_afc_net_identifier, &memberb_afc_net_identifier_len);
-    EXPECT_ERR("error querying memberb afc net identifier", err);
+        memberb_afc_net_identifier, &memberb_afc_net_identifier_len,
+        &afc_net_identifier_exists);
+    EXPECT("error querying memberb afc net identifier", err);
+    if (afc_net_identifier_exists) {
+        fprintf(stderr, "did not expect AFC net identifier to be returned\r\n");
+        return ARANYA_ERROR_BUG;
+    }
     printf("%s afc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
            memberb_afc_net_identifier);
     free(memberb_afc_net_identifier);
 
     size_t memberb_aqc_net_identifier_len = BUF_LEN;
     char *memberb_aqc_net_identifier      = malloc(BUF_LEN);
+    bool aqc_net_identifier_exists        = false;
     err                                   = aranya_query_aqc_net_identifier(
         &t->clients.operator.client, &t->id, &t->clients.memberb.id,
-        memberb_aqc_net_identifier, &memberb_aqc_net_identifier_len);
+        memberb_aqc_net_identifier, &memberb_aqc_net_identifier_len,
+        &aqc_net_identifier_exists);
     EXPECT("error querying memberb aqc net identifier", err);
+    if (!aqc_net_identifier_exists) {
+        fprintf(stderr, "expected AQC net identifier to be returned\r\n");
+        return ARANYA_ERROR_BUG;
+    }
     printf("%s aqc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
            memberb_aqc_net_identifier);
 
@@ -384,8 +391,13 @@ AranyaError run(Team *t) {
     memberb_aqc_net_identifier_len = BUF_LEN;
     err                            = aranya_query_aqc_net_identifier(
         &t->clients.operator.client, &t->id, &t->clients.memberb.id,
-        memberb_aqc_net_identifier, &memberb_aqc_net_identifier_len);
-    EXPECT_ERR("error querying memberb aqc net identifier", err);
+        memberb_aqc_net_identifier, &memberb_aqc_net_identifier_len,
+        &aqc_net_identifier_exists);
+    EXPECT("error querying memberb aqc net identifier", err);
+    if (aqc_net_identifier_exists) {
+        fprintf(stderr, "did not expect AQC net identifier to be returned\r\n");
+        return ARANYA_ERROR_BUG;
+    }
     printf("%s aqc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
            memberb_aqc_net_identifier);
     free(memberb_aqc_net_identifier);
@@ -476,7 +488,7 @@ int main(void) {
     // run the example.
     err = run(&team);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "application failed: %s", aranya_error_to_str(err));
+        fprintf(stderr, "application failed: %s\r\n", aranya_error_to_str(err));
         retErr = EXIT_FAILURE;
     }
 

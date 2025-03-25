@@ -340,19 +340,20 @@ async fn main() -> Result<()> {
     sleep(sleep_interval).await;
 
     // fact database queries
-    let devices = membera_team.query_devices_on_team().await?;
+    let mut queries = team.membera.client.queries(team_id);
+    let devices = queries.devices_on_team().await?;
     info!("membera devices on team: {:?}", devices.len());
-    let role = membera_team.query_device_role(team.membera.id).await?;
+    let role = queries.device_role(team.membera.id).await?;
     info!("membera role: {:?}", role);
-    let keybundle = membera_team.query_device_keybundle(team.membera.id).await?;
+    let keybundle = queries.device_keybundle(team.membera.id).await?;
     info!("membera keybundle: {:?}", keybundle);
-    let labels = membera_team.query_device_label_assignments(team.membera.id).await?;
+    let labels = queries.device_label_assignments(team.membera.id).await?;
     info!("membera labels: {:?}", labels);
-    let afc_net_identifier = membera_team.query_afc_net_identifier(team.membera.id).await?;
+    let afc_net_identifier = queries.afc_net_identifier(team.membera.id).await?;
     info!("membera afc_net_identifer: {:?}", afc_net_identifier);
-    let aqc_net_identifier = membera_team.query_aqc_net_identifier(team.membera.id).await?;
+    let aqc_net_identifier = queries.aqc_net_identifier(team.membera.id).await?;
     info!("membera aqc_net_identifer: {:?}", aqc_net_identifier);
-    let label_exists = membera_team.query_label_exists(label1).await?;
+    let label_exists = queries.label_exists(label1).await?;
     info!("membera label1 exists?: {:?}", label_exists);
 
     // membera creates bidi channel with memberb

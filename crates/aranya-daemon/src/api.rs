@@ -737,20 +737,20 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: TeamId,
         device: ApiDeviceId,
-    ) -> ApiResult<NetIdentifier> {
-        let (_ctrl, effects) = self
+    ) -> ApiResult<Option<NetIdentifier>> {
+        if let Ok((_ctrl, effects)) = self
             .client
             .actions(&team.into_id().into())
             .query_afc_net_identifier_off_graph(device.into_id().into())
             .await
-            .context("unable to query afc network identifier")?;
-        if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
-            find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
         {
-            Ok(NetIdentifier(e.net_identifier))
-        } else {
-            Err(anyhow!("unable to query afc network identifier").into())
+            if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
+                find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
+            {
+                return Ok(Some(NetIdentifier(e.net_identifier)));
+            }
         }
+        Ok(None)
     }
     /// Query AQC network ID.
     #[instrument(skip(self))]
@@ -759,20 +759,20 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: TeamId,
         device: ApiDeviceId,
-    ) -> ApiResult<NetIdentifier> {
-        let (_ctrl, effects) = self
+    ) -> ApiResult<Option<NetIdentifier>> {
+        if let Ok((_ctrl, effects)) = self
             .client
             .actions(&team.into_id().into())
             .query_aqc_net_identifier_off_graph(device.into_id().into())
             .await
-            .context("unable to query aqc network identifier")?;
-        if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
-            find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
         {
-            Ok(NetIdentifier(e.net_identifier))
-        } else {
-            Err(anyhow!("unable to query aqc network identifier").into())
+            if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
+                find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
+            {
+                return Ok(Some(NetIdentifier(e.net_identifier)));
+            }
         }
+        Ok(None)
     }
     /// Query label exists.
     #[instrument(skip(self))]

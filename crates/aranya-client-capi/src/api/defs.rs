@@ -1009,7 +1009,7 @@ pub unsafe fn query_device_keybundle(
     let client = client.deref_mut();
     let keys = client
         .rt
-        .block_on(client.inner.team(team.0).query_device_keybundle(device.0))?;
+        .block_on(client.inner.queries(team.0).device_keybundle(device.0))?;
     Ok(KeyBundle::from_underlying(keys))
 }
 
@@ -1029,14 +1029,17 @@ pub unsafe fn query_afc_net_identifier(
     device: &DeviceId,
     ident: &mut MaybeUninit<c_char>,
     ident_len: &mut usize,
-) -> Result<(), imp::Error> {
+) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
-    let net_identifier = client
+    if let Some(net_identifier) = client
         .rt
-        .block_on(client.inner.team(team.0).query_afc_net_identifier(device.0))?;
-    let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
-    aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
-    Ok(())
+        .block_on(client.inner.queries(team.0).afc_net_identifier(device.0))?
+    {
+        let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
+        aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 /// Query device's AQC network identifier.
@@ -1053,14 +1056,17 @@ pub unsafe fn query_aqc_net_identifier(
     device: &DeviceId,
     ident: &mut MaybeUninit<c_char>,
     ident_len: &mut usize,
-) -> Result<(), imp::Error> {
+) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
-    let net_identifier = client
+    if let Some(net_identifier) = client
         .rt
-        .block_on(client.inner.team(team.0).query_aqc_net_identifier(device.0))?;
-    let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
-    aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
-    Ok(())
+        .block_on(client.inner.queries(team.0).aqc_net_identifier(device.0))?
+    {
+        let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
+        aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
+        return Ok(true);
+    }
+    Ok(false)
 }
 
 /// Query device's AQC network identifier.
@@ -1079,6 +1085,6 @@ pub unsafe fn query_label_exists(
     let client = client.deref_mut();
     let exists = client
         .rt
-        .block_on(client.inner.team(team.0).query_label_exists(label.0.into()))?;
+        .block_on(client.inner.queries(team.0).label_exists(label.0.into()))?;
     Ok(exists)
 }
