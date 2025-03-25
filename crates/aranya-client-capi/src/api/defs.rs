@@ -1068,9 +1068,12 @@ pub unsafe fn query_device_label_assignments(
     device: &DeviceId,
 ) -> Result<Labels, imp::Error> {
     let client = client.deref_mut();
-    let v = client
-        .rt
-        .block_on(client.inner.queries(team.0).device_label_assignments(device.0))?;
+    let v = client.rt.block_on(
+        client
+            .inner
+            .queries(team.0)
+            .device_label_assignments(device.0),
+    )?;
     let labels = Labels {
         labels: v.into_iter().map(|l| l.into()).collect(),
     };
