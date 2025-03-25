@@ -161,6 +161,17 @@ macro_rules! do_poll {
     };
 }
 
+fn shm_path(path: String) -> String {
+    if cfg!(target_os = "macos") && path.len() > 31 {
+        // Shrink the size of the team name down to 22 bytes
+        // to work within macOS's limits.
+        let d = Sha256::hash(path.as_bytes());
+        let t: [u8; 16] = d[..16].try_into().unwrap();
+        return format!("/{}", t.to_base58());
+    };
+    path
+}
+
 struct TeamCtx {
     owner: DeviceCtx,
     admin: DeviceCtx,
@@ -201,22 +212,8 @@ impl DeviceCtx {
     pub async fn new(team_name: String, name: String, work_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(work_dir.clone()).await?;
 
-        let mut afc_shm_path = format!("/afc_{team_name}_{name}");
-        if cfg!(target_os = "macos") && afc_shm_path.len() > 31 {
-            // Shrink the size of the team name down to 22 bytes
-            // to work within macOS's limits.
-            let d = Sha256::hash(afc_shm_path.as_bytes());
-            let t: [u8; 16] = d[..16].try_into().unwrap();
-            afc_shm_path = format!("/{}", t.to_base58())
-        };
-        let mut aqc_shm_path = format!("/aqc_{team_name}_{name}");
-        if cfg!(target_os = "macos") && aqc_shm_path.len() > 31 {
-            // Shrink the size of the team name down to 22 bytes
-            // to work within macOS's limits.
-            let d = Sha256::hash(aqc_shm_path.as_bytes());
-            let t: [u8; 16] = d[..16].try_into().unwrap();
-            aqc_shm_path = format!("/{}", t.to_base58())
-        };
+        let afc_shm_path = shm_path(format!("/afc_{team_name}_{name}"));
+        let aqc_shm_path = shm_path(format!("/aqc_{team_name}_{name}"));
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
@@ -591,6 +588,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     operator_team
         .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
         .await?;
+    // TODO: move aqc methods to aqc test when it is added.
     // TODO: use aqc addr
     operator_team
         .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))

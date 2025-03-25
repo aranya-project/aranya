@@ -14,6 +14,7 @@ use tracing::{debug, info, instrument};
 
 use crate::{
     afc::{setup_afc_shm, FastChannels, FastChannelsImpl},
+    aqc::setup_aqc_shm,
     error::{Error, Result},
 };
 
@@ -75,7 +76,7 @@ impl Client {
             addr = ?afc.local_addr().map_err(Error::Afc)?,
             "bound AFC router",
         );
-        let _aqc_read = setup_afc_shm(aqc_shm_path, max_channels)?;
+        let _aqc_read = setup_aqc_shm(aqc_shm_path, max_channels)?;
         // TODO: initialize aqc
         /*
         let aqc = QuicChannelsImpl::new(aqc::Client::new(aqc_read), aqc_address).await?;
