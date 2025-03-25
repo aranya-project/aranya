@@ -218,38 +218,6 @@ impl Team<'_> {
             .await??)
     }
 
-    /// Associate a network identifier to a device for use with AFC.
-    ///
-    /// If the address already exists for this device, it is replaced with the new address. Capable
-    /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
-    /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
-    #[cfg(feature = "experimental")]
-    pub async fn assign_afc_net_identifier(
-        &mut self,
-        device: DeviceId,
-        net_identifier: NetIdentifier,
-    ) -> Result<()> {
-        Ok(self
-            .client
-            .daemon
-            .assign_afc_net_identifier(context::current(), self.id, device, net_identifier)
-            .await??)
-    }
-
-    /// Disassociate a network identifier from a device.
-    #[cfg(feature = "experimental")]
-    pub async fn remove_afc_net_identifier(
-        &mut self,
-        device: DeviceId,
-        net_identifier: NetIdentifier,
-    ) -> Result<()> {
-        Ok(self
-            .client
-            .daemon
-            .remove_afc_net_identifier(context::current(), self.id, device, net_identifier)
-            .await??)
-    }
-
     /// Create a label.
     pub async fn create_label(&mut self, label: Label) -> Result<()> {
         Ok(self
@@ -286,6 +254,38 @@ impl Team<'_> {
             .client
             .daemon
             .revoke_label(context::current(), self.id, device, label)
+            .await??)
+    }
+
+    /// Associate a network identifier to a device for use with AFC.
+    ///
+    /// If the address already exists for this device, it is replaced with the new address. Capable
+    /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
+    /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+    #[cfg(feature = "experimental")]
+    pub async fn assign_afc_net_identifier(
+        &mut self,
+        device: DeviceId,
+        net_identifier: NetIdentifier,
+    ) -> Result<()> {
+        Ok(self
+            .client
+            .daemon
+            .assign_afc_net_identifier(context::current(), self.id, device, net_identifier)
+            .await??)
+    }
+
+    /// Disassociate a network identifier from a device.
+    #[cfg(feature = "experimental")]
+    pub async fn remove_afc_net_identifier(
+        &mut self,
+        device: DeviceId,
+        net_identifier: NetIdentifier,
+    ) -> Result<()> {
+        Ok(self
+            .client
+            .daemon
+            .remove_afc_net_identifier(context::current(), self.id, device, net_identifier)
             .await??)
     }
 }
