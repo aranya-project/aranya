@@ -29,7 +29,6 @@ pub struct Config {
     pub sync_addr: Addr,
 
     /// AFC configuration.
-    #[cfg(feature = "experimental")]
     pub afc: AfcConfig,
 }
 
@@ -82,7 +81,6 @@ fn read_json<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T> {
 /// AFC configuration.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-#[cfg(feature = "experimental")]
 pub struct AfcConfig {
     /// Shared memory path.
     pub shm_path: String,
@@ -124,7 +122,6 @@ mod tests {
             uds_api_path: "/var/run/uds.sock".parse()?,
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
-            #[cfg(feature = "experimental")]
             afc: AfcConfig {
                 shm_path: "/hub".to_owned(),
                 unlink_on_startup: false,

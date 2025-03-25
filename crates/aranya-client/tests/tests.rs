@@ -18,9 +18,10 @@ use anyhow::{Context, Result};
 use aranya_client::afc::Message;
 use aranya_client::client::Client;
 use aranya_crypto::{hash::Hash, rust::Sha256};
-#[cfg(feature = "experimental")]
-use aranya_daemon::config::AfcConfig;
-use aranya_daemon::{config::Config, Daemon};
+use aranya_daemon::{
+    config::{AfcConfig, Config},
+    Daemon,
+};
 #[cfg(feature = "experimental")]
 use aranya_daemon_api::NetIdentifier;
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
@@ -221,7 +222,6 @@ impl DeviceCtx {
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
-        #[cfg(feature = "experimental")]
         let max_chans = 100;
         let cfg = Config {
             name: "daemon".into(),
@@ -229,7 +229,6 @@ impl DeviceCtx {
             uds_api_path: uds_api_path.clone(),
             pid_file: work_dir.join("pid"),
             sync_addr: Addr::new("localhost", 0)?,
-            #[cfg(feature = "experimental")]
             afc: AfcConfig {
                 shm_path: afc_shm_path.clone(),
                 unlink_on_startup: true,

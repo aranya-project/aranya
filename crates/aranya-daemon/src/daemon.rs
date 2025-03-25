@@ -310,7 +310,6 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    #[cfg(feature = "experimental")]
     use crate::config::AfcConfig;
 
     /// Tests running the daemon.
@@ -326,7 +325,6 @@ mod tests {
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
-            #[cfg(feature = "experimental")]
             afc: AfcConfig {
                 shm_path: "/test_daemon".to_owned(),
                 unlink_on_startup: true,
