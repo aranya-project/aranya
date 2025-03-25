@@ -35,23 +35,23 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
-aranya-afc-util = { version = "0.4.0", features = ["alloc"] }
+aranya-afc-util = { version = "0.5.0", features = ["alloc"] }
 aranya-capi-core = { version = "0.2.1" }
 aranya-capi-codegen = { version = "0.2.1" }
-aranya-crypto = { version = "0.3.0", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
-aranya-crypto-ffi = { version = "0.4.0" }
-aranya-device-ffi = { version = "0.4.0" }
-aranya-envelope-ffi = { version = "0.4.0" }
-aranya-fast-channels = { version = "0.4.0", features = ["posix", "std", "memory"] }
-aranya-idam-ffi = { version = "0.4.0" }
+aranya-crypto = { version = "0.4.0", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
+aranya-crypto-ffi = { version = "0.5.0" }
+aranya-device-ffi = { version = "0.5.0" }
+aranya-envelope-ffi = { version = "0.5.0" }
+aranya-fast-channels = { version = "0.5.0", features = ["posix", "std", "memory"] }
+aranya-idam-ffi = { version = "0.5.0" }
 aranya-libc = { version = "0.1.1" }
-aranya-perspective-ffi = { version = "0.4.0" }
-aranya-policy-compiler = { version = "0.4.0" }
-aranya-policy-ifgen = { version = "0.4.0", features = ["serde"] }
+aranya-perspective-ffi = { version = "0.5.0" }
+aranya-policy-compiler = { version = "0.5.0" }
+aranya-policy-ifgen = { version = "0.5.0", features = ["serde"] }
 aranya-policy-ifgen-build = { version = "0.2.0" }
 aranya-policy-lang = { version = "0.2.0" }
-aranya-policy-vm = { version = "0.4.0", features = ["std"] }
-aranya-runtime = { version = "0.4.0", features = ["std", "libc"] }
+aranya-policy-vm = { version = "0.5.0", features = ["std"] }
+aranya-runtime = { version = "0.5.0", features = ["std", "libc"] }
 
 spideroak-base58 = { version = "0.1.0" }
 buggy = { version = "0.1.0" }

@@ -95,7 +95,7 @@ typedef struct {
 
 // Aranya team.
 //
-// Contains the team ID and all Aranya clients for the users on this example's
+// Contains the team ID and all Aranya clients for the devices on this example's
 // team.
 typedef struct {
     AranyaTeamId id;
@@ -278,7 +278,7 @@ AranyaError run(Team *t) {
     // assigned, the team works together to send data using Aranya Fast
     // Channels.
     // First, a label must be created to associate a channel to its permitted
-    // users using the `aranya_create_label` function.
+    // devices using the `aranya_create_label` function.
 
     // operator creates AFC labels and assigns them to team members.
     AranyaLabel label = 42;

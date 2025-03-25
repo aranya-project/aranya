@@ -26,8 +26,8 @@ The client provides the following functionality:
 - Add and remove sync peers. The daemon will periodically attempt to sync
   Aranya state with any peers (as long as it is able to communicate with the
   peer over the network) in its configured sync peer list.
-- Add and remove users from the team as determined by the implemented policy
-- Assign and revoke user roles as determined by the implemented policy
+- Add and remove devices from the team as determined by the implemented policy
+- Assign and revoke device roles as determined by the implemented policy
 - Create, delete, assign and revoke labels used for attribute based controls
   and segmentation of data communicated between peers within Aranya Fast
   Channels as determined by the implemented policy.
@@ -51,7 +51,7 @@ This also includes explanations for the steps performed by the daemon and
 Aranya based on the client's actions.
 
 Additionally, the [test module](tests/tests.rs) includes tests that have
-multiple users joining a team, syncing, and sending encrypted messages using
+multiple devices joining a team, syncing, and sending encrypted messages using
 Aranya Fast Channels. Instructions for running these tests are below.
 
 ## Testing

@@ -4,9 +4,9 @@ This example C application shows how to use the `aranya-client-capi` C API.
 Using the `run.bash` script, it starts the daemons and clients and then runs
 through a scenario involving five team members.
 
-First, a user will create the team and add the four other team members. Then,
+First, a device will create the team and add the four other team members. Then,
 the team will setup syncing with each other to ensure consistent state. Then,
-the users work together to create an Aranya Fast Channel to send data messages
+the devices work together to create an Aranya Fast Channel to send data messages
 between two of the team members.
 
 `example.c` is the example C application.

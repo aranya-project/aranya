@@ -25,7 +25,7 @@ impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
 
 impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
     fn from(value: &SyncPeerConfig) -> Self {
-        value.clone().into()
+        (*value).into()
     }
 }
 

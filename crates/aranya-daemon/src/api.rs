@@ -12,9 +12,9 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler};
-use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, Rng, UserId};
+use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, DeviceId, Rng};
 use aranya_daemon_api::{
-    AfcCtrl, AfcId, DaemonApi, DeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
+    AfcCtrl, AfcId, DaemonApi, DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
     Result as ApiResult, Role as ApiRole, SyncPeerConfig, TeamId, CS,
 };
 use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed, Label, NodeId};
@@ -78,7 +78,7 @@ impl DaemonApiServer {
         recv_effects: mpsc::Receiver<Vec<EF>>,
     ) -> Result<Self> {
         info!("uds path: {:?}", daemon_sock);
-        let user_id = pk.ident_pk.id()?;
+        let device_id = pk.ident_pk.id()?;
         Ok(Self {
             daemon_sock,
             recv_effects,
@@ -90,7 +90,7 @@ impl DaemonApiServer {
                 pk,
                 peers,
                 afc_peers: Arc::default(),
-                handler: Arc::new(Mutex::new(Handler::new(user_id, store))),
+                handler: Arc::new(Mutex::new(Handler::new(device_id, store))),
             },
         })
     }
@@ -151,12 +151,12 @@ struct DaemonApiHandler {
     afc: Arc<Mutex<WriteState<CS, Rng>>>,
     /// An implementation of [`Engine`][crypto::Engine].
     eng: CE,
-    /// Public keys of current user.
+    /// Public keys of current device.
     pk: Arc<PublicKeys<CS>>,
     /// Aranya sync peers,
     peers: SyncPeers,
     /// AFC peers.
-    afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, UserId>>>,
+    afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
     /// Handles AFC effects.
     handler: Arc<Mutex<Handler<Store>>>,
 }
@@ -190,7 +190,7 @@ impl DaemonApiHandler {
                     self.afc_peers
                         .lock()
                         .await
-                        .insert(NetIdentifier(e.net_identifier.clone()), e.user_id.into());
+                        .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
                 }
                 Effect::NetworkNameUnset(_network_name_unset) => {}
                 Effect::AfcBidiChannelCreated(v) => {
@@ -294,7 +294,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn get_device_id(self, _: context::Context) -> ApiResult<DeviceId> {
+    async fn get_device_id(self, _: context::Context) -> ApiResult<ApiDeviceId> {
         Ok(self.pk.ident_pk.id()?.into_id().into())
     }
 
@@ -382,7 +382,7 @@ impl DaemonApi for DaemonApiHandler {
         self,
         _: context::Context,
         team: TeamId,
-        device: DeviceId,
+        device: ApiDeviceId,
     ) -> ApiResult<()> {
         self.client
             .actions(&team.into_id().into())
@@ -396,7 +396,7 @@ impl DaemonApi for DaemonApiHandler {
         self,
         _: context::Context,
         team: TeamId,
-        device: DeviceId,
+        device: ApiDeviceId,
         role: ApiRole,
     ) -> ApiResult<()> {
         self.client
@@ -411,7 +411,7 @@ impl DaemonApi for DaemonApiHandler {
         self,
         _: context::Context,
         team: TeamId,
-        device: DeviceId,
+        device: ApiDeviceId,
         role: ApiRole,
     ) -> ApiResult<()> {
         self.client
@@ -426,7 +426,7 @@ impl DaemonApi for DaemonApiHandler {
         self,
         _: context::Context,
         team: TeamId,
-        device: DeviceId,
+        device: ApiDeviceId,
         name: NetIdentifier,
     ) -> ApiResult<()> {
         let effects = self
@@ -443,7 +443,7 @@ impl DaemonApi for DaemonApiHandler {
         self,
         _: context::Context,
         team: TeamId,
-        device: DeviceId,
+        device: ApiDeviceId,
         name: NetIdentifier,
     ) -> ApiResult<()> {
         self.client
@@ -476,7 +476,7 @@ impl DaemonApi for DaemonApiHandler {
         self,
         _: context::Context,
         team: TeamId,
-        device: DeviceId,
+        device: ApiDeviceId,
         label: Label,
     ) -> ApiResult<()> {
         // TODO: support other channel permissions.
@@ -492,7 +492,7 @@ impl DaemonApi for DaemonApiHandler {
         self,
         _: context::Context,
         team: TeamId,
-        device: DeviceId,
+        device: ApiDeviceId,
         label: Label,
     ) -> ApiResult<()> {
         let id = self.pk.ident_pk.id()?;
