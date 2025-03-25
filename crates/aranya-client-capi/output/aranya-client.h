@@ -178,6 +178,10 @@ enum AranyaRole
 typedef uint8_t AranyaRole;
 #endif // __cplusplus
 
+typedef struct Vec_AranyaDeviceId Vec_AranyaDeviceId;
+
+typedef struct Vec_AranyaLabel Vec_AranyaLabel;
+
 /**
  * Extended error information.
  */
@@ -354,6 +358,26 @@ typedef struct AranyaAfcMsgInfo {
      */
     AranyaSocketAddr addr;
 } AranyaAfcMsgInfo;
+
+/**
+ * List of devices.
+ */
+typedef struct AranyaDevices {
+    /**
+     * List of device IDs.
+     */
+    struct Vec_AranyaDeviceId devices;
+} AranyaDevices;
+
+/**
+ * List of labels.
+ */
+typedef struct AranyaLabels {
+    /**
+     * List of labels.
+     */
+    struct Vec_AranyaLabel labels;
+} AranyaLabels;
 
 #ifdef __cplusplus
 extern "C" {
@@ -1305,6 +1329,33 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
+ * Query devices on team.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param __output a list of devices on the team [`AranyaDevices`](@ref AranyaDevices).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_devices_on_team(struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         struct AranyaDevices *__output);
+
+/**
+ * Query devices on team.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param __output a list of devices on the team [`AranyaDevices`](@ref AranyaDevices).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
+                                             const struct AranyaTeamId *team,
+                                             struct AranyaDevices *__output,
+                                             struct AranyaExtError *__ext_err);
+
+/**
  * Query device's keybundle.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -1334,6 +1385,37 @@ AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
                                               const struct AranyaDeviceId *device,
                                               struct AranyaKeyBundle *__output,
                                               struct AranyaExtError *__ext_err);
+
+/**
+ * Query device label assignments.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param __output a list of labels assigned to the device [`AranyaLabels`](@ref AranyaLabels).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
+                                                  const struct AranyaTeamId *team,
+                                                  const struct AranyaDeviceId *device,
+                                                  struct AranyaLabels *__output);
+
+/**
+ * Query device label assignments.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param __output a list of labels assigned to the device [`AranyaLabels`](@ref AranyaLabels).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_device_label_assignments_ext(struct AranyaClient *client,
+                                                      const struct AranyaTeamId *team,
+                                                      const struct AranyaDeviceId *device,
+                                                      struct AranyaLabels *__output,
+                                                      struct AranyaExtError *__ext_err);
 
 /**
  * Query device's AFC network identifier.

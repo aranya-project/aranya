@@ -1,5 +1,5 @@
 use core::{ffi::c_char, ops::DerefMut, ptr, slice};
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+use std::{ffi::OsStr, os::unix::ffi::OsStrExt, vec::Vec};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use libc;
@@ -989,7 +989,40 @@ pub unsafe fn afc_recv_data(
     Ok(true)
 }
 
-// TODO: query_devices_on_team
+/// List of devices.
+#[repr(C)]
+#[derive(Debug)]
+pub struct Devices {
+    /// List of device IDs.
+    pub devices: Vec<DeviceId>,
+}
+
+impl From<aranya_daemon_api::DeviceId> for DeviceId {
+    fn from(value: aranya_daemon_api::DeviceId) -> Self {
+        DeviceId(value)
+    }
+}
+
+/// Query devices on team.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param __output a list of devices on the team [`Devices`].
+///
+/// @relates AranyaClient.
+pub unsafe fn query_devices_on_team(
+    client: &mut Client,
+    team: &TeamId,
+) -> Result<Devices, imp::Error> {
+    let client = client.deref_mut();
+    let v = client
+        .rt
+        .block_on(client.inner.queries(team.0).devices_on_team())?;
+    let devices = Devices {
+        devices: v.into_iter().map(|d| d.into()).collect(),
+    };
+    Ok(devices)
+}
 
 // TODO: query_device_role
 
@@ -1013,7 +1046,36 @@ pub unsafe fn query_device_keybundle(
     Ok(KeyBundle::from_underlying(keys))
 }
 
-// TODO: query_device_label_assignments
+/// List of labels.
+#[repr(C)]
+#[derive(Debug)]
+pub struct Labels {
+    /// List of labels.
+    pub labels: Vec<Label>,
+}
+
+/// Query device label assignments.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param __output a list of labels assigned to the device [`Labels`].
+///
+/// @relates AranyaClient.
+pub unsafe fn query_device_label_assignments(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+) -> Result<Labels, imp::Error> {
+    let client = client.deref_mut();
+    let v = client
+        .rt
+        .block_on(client.inner.queries(team.0).device_label_assignments(device.0))?;
+    let labels = Labels {
+        labels: v.into_iter().map(|l| l.into()).collect(),
+    };
+    Ok(labels)
+}
 
 /// Query device's AFC network identifier.
 ///
