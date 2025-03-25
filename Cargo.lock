@@ -137,7 +137,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-codegen"
 version = "0.2.1"
-source = "git+ssh://git@github.com/aranya-project/aranya-core.git?branch=codegen-feature-flags#cab2928ba9d8574bc22859a42680896aed12c612"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=codegen-feature-flags#cab2928ba9d8574bc22859a42680896aed12c612"
 dependencies = [
  "aho-corasick",
  "anyhow",
