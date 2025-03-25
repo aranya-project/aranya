@@ -27,7 +27,7 @@ use crate::{
 #[derive(Clone)]
 enum Msg {
     SyncNow { peer: SyncPeer },
-    AddPeer { peer: SyncPeer, interval: Duration },
+    AddPeer { peer: SyncPeer, cfg: SyncPeerConfig },
     RemovePeer { peer: SyncPeer },
 }
 
@@ -68,7 +68,7 @@ impl SyncPeers {
     ) -> Result<()> {
         let peer = Msg::AddPeer {
             peer: SyncPeer { addr, graph_id },
-            interval: cfg.interval,
+            cfg,
         };
         if let Err(e) = self.send.send(peer).await.context("unable to add peer") {
             error!(?e, "error adding peer to syncer");
@@ -182,7 +182,7 @@ impl Syncer {
                         // sync with peer right now.
                         self.sync(&peer.graph_id, &peer.addr).await?;
                     },
-                    Msg::AddPeer { peer, interval } => self.add_peer(peer, interval),
+                    Msg::AddPeer { peer, cfg } => self.add_peer(peer, &cfg),
                     Msg::RemovePeer { peer } => self.remove_peer(peer),
                 }
             }
@@ -199,16 +199,19 @@ impl Syncer {
     }
 
     /// Add a peer to the delay queue, overwriting an existing one.
-    fn add_peer(&mut self, peer: SyncPeer, interval: Duration) {
-        let key = self.queue.insert(peer.clone(), interval);
+    fn add_peer(&mut self, peer: SyncPeer, cfg: &SyncPeerConfig) {
+        let key = self.queue.insert(peer.clone(), cfg.interval);
         self.peers
             .entry(peer)
             .and_modify(|info| {
                 self.queue.remove(&info.key);
-                info.interval = interval;
+                info.interval = cfg.interval;
                 info.key = key;
             })
-            .or_insert(PeerInfo { interval, key });
+            .or_insert(PeerInfo {
+                interval: cfg.interval,
+                key,
+            });
     }
 
     /// Remove a peer from the delay queue.

@@ -275,6 +275,7 @@ impl Team<'_> {
     }
 }
 
+/// Configuration values for syncing with a peer
 #[derive(Debug, Clone)]
 pub struct SyncPeerConfig {
     interval: Duration,
@@ -282,6 +283,7 @@ pub struct SyncPeerConfig {
 }
 
 impl SyncPeerConfig {
+    /// Creates a default [`SyncPeerConfigBuilder`]
     pub fn builder() -> SyncPeerConfigBuilder {
         Default::default()
     }
@@ -296,6 +298,7 @@ impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
     }
 }
 
+/// Builder for a [`SyncPeerConfig`]
 pub struct SyncPeerConfigBuilder {
     interval: Duration,
     sync_now: bool,
@@ -306,6 +309,7 @@ impl SyncPeerConfigBuilder {
         Default::default()
     }
 
+    /// Build a [`SyncPeerConfig`]
     pub fn build(self) -> SyncPeerConfig {
         SyncPeerConfig {
             interval: self.interval,
@@ -313,11 +317,14 @@ impl SyncPeerConfigBuilder {
         }
     }
 
+    /// Set the interval at which syncing occurs
     pub fn interval(mut self, duration: Duration) -> Self {
         self.interval = duration;
         self
     }
 
+    /// Set the `sync_now` field which determines whether
+    /// the initial sync should happen immediately after a peer is added
     pub fn sync_now(mut self, sync_now: bool) -> Self {
         self.sync_now = sync_now;
         self
