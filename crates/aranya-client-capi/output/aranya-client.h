@@ -744,6 +744,7 @@ AranyaError aranya_add_sync_peer_ext(struct AranyaClient *client,
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
  * @param config configuration values for syncing with a peer.
+ * Default values for a sync config will be used if `config` is `NULL`
  * @relates AranyaClient.
  */
 AranyaError aranya_sync_now(struct AranyaClient *client,
@@ -762,6 +763,7 @@ AranyaError aranya_sync_now(struct AranyaClient *client,
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
  * @param config configuration values for syncing with a peer.
+ * Default values for a sync config will be used if `config` is `NULL`
  * @relates AranyaClient.
  */
 AranyaError aranya_sync_now_ext(struct AranyaClient *client,
@@ -1328,48 +1330,70 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
- * Set the duration field on the config builder
+ * Set the interval field on the config builder
+ *
+ * @param cfg a pointer to the builder for a sync config
+ * @param interval Set the interval at which syncing occurs
  */
-AranyaError aranya_sync_peer_config_builder_set_duration(struct AranyaSyncPeerConfigBuilder *cfg,
-                                                         AranyaDuration duration);
+AranyaError aranya_sync_peer_config_builder_set_interval(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                         AranyaDuration interval);
 
 /**
- * Set the duration field on the config builder
+ * Set the interval field on the config builder
+ *
+ * @param cfg a pointer to the builder for a sync config
+ * @param interval Set the interval at which syncing occurs
  */
-AranyaError aranya_sync_peer_config_builder_set_duration_ext(struct AranyaSyncPeerConfigBuilder *cfg,
-                                                             AranyaDuration duration,
+AranyaError aranya_sync_peer_config_builder_set_interval_ext(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                             AranyaDuration interval,
                                                              struct AranyaExtError *__ext_err);
 
 /**
- * Set the sync_now field on the config builder to true
+ * Set the sync_now field on the config builder to true.
+ * When this field is set to true, syncing happens immediately after a peer is added
+ *
+ * @param cfg a pointer to the builder for a sync config
  */
 AranyaError aranya_sync_peer_config_builder_set_sync_now(struct AranyaSyncPeerConfigBuilder *cfg);
 
 /**
- * Set the sync_now field on the config builder to true
+ * Set the sync_now field on the config builder to true.
+ * When this field is set to true, syncing happens immediately after a peer is added
+ *
+ * @param cfg a pointer to the builder for a sync config
  */
 AranyaError aranya_sync_peer_config_builder_set_sync_now_ext(struct AranyaSyncPeerConfigBuilder *cfg,
                                                              struct AranyaExtError *__ext_err);
 
 /**
  * Set the sync_now field on the config builder to false
+ * When this field is set to false, syncing occurs after `duration` seconds from when the peer is added
+ *
+ * @param cfg a pointer to the builder for a sync config
  */
 AranyaError aranya_sync_peer_config_builder_set_sync_later(struct AranyaSyncPeerConfigBuilder *cfg);
 
 /**
  * Set the sync_now field on the config builder to false
+ * When this field is set to false, syncing occurs after `duration` seconds from when the peer is added
+ *
+ * @param cfg a pointer to the builder for a sync config
  */
 AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSyncPeerConfigBuilder *cfg,
                                                                struct AranyaExtError *__ext_err);
 
 /**
- * Build a config from a config builder
+ * Build a sync config from a sync config builder
+ *
+ * @param cfg a pointer to the builder for a sync config
  */
 AranyaError aranya_sync_peer_config_builder_build(const struct AranyaSyncPeerConfigBuilder *cfg,
                                                   struct AranyaSyncPeerConfig *out);
 
 /**
- * Build a config from a config builder
+ * Build a sync config from a sync config builder
+ *
+ * @param cfg a pointer to the builder for a sync config
  */
 AranyaError aranya_sync_peer_config_builder_build_ext(const struct AranyaSyncPeerConfigBuilder *cfg,
                                                       struct AranyaSyncPeerConfig *out,

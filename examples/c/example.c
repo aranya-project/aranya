@@ -242,7 +242,7 @@ AranyaError run(Team *t) {
 
     // Set duration on the config builder
     AranyaDuration interval = ARANYA_DURATION_MILLISECONDS * 100;
-    err = aranya_sync_peer_config_builder_set_duration(builder, interval);
+    err = aranya_sync_peer_config_builder_set_interval(builder, interval);
     EXPECT("error setting duration on config builder", err);
 
     // Set syncing to happen immediately on the config builder

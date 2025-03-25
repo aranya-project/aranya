@@ -502,6 +502,7 @@ pub unsafe fn add_sync_peer(
 /// @param team the team's ID [`TeamId`].
 /// @param addr the peer's Aranya network address [`Addr`].
 /// @param config configuration values for syncing with a peer.
+/// Default values for a sync config will be used if `config` is `NULL`
 /// @relates AranyaClient.
 pub unsafe fn sync_now(
     client: &mut Client,
@@ -967,22 +968,33 @@ pub unsafe fn afc_recv_data(
     Ok(true)
 }
 
-/// Set the duration field on the config builder
-pub fn sync_peer_config_builder_set_duration(cfg: &mut SyncPeerConfigBuilder, duration: Duration) {
-    cfg.deref_mut().interval(duration);
+/// Set the interval field on the config builder
+/// 
+/// @param cfg a pointer to the builder for a sync config
+/// @param interval Set the interval at which syncing occurs
+pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
+    cfg.deref_mut().interval(interval);
 }
 
-/// Set the sync_now field on the config builder to true
+/// Set the sync_now field on the config builder to true.
+/// When this field is set to true, syncing happens immediately after a peer is added
+/// 
+/// @param cfg a pointer to the builder for a sync config
 pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
     cfg.deref_mut().sync_now(true);
 }
 
 /// Set the sync_now field on the config builder to false
+/// When this field is set to false, syncing occurs after `duration` seconds from when the peer is added
+/// 
+/// @param cfg a pointer to the builder for a sync config
 pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
     cfg.deref_mut().sync_now(false);
 }
 
-/// Build a config from a config builder
+/// Build a sync config from a sync config builder
+/// 
+/// @param cfg a pointer to the builder for a sync config
 pub fn sync_peer_config_builder_build(
     cfg: &SyncPeerConfigBuilder,
     out: &mut MaybeUninit<SyncPeerConfig>,

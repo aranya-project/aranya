@@ -135,7 +135,9 @@ pub type AfcCtrl = Vec<Box<[u8]>>;
 /// Configuration values for syncing with a peer
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct SyncPeerConfig {
+    /// The interval at which syncing occurs
     pub interval: Duration,
+    /// Determines if a peer should be synced with immediately after they're added
     pub sync_now: bool,
 }
 
@@ -163,7 +165,7 @@ pub trait DaemonApi {
     async fn add_sync_peer(addr: Addr, team: TeamId, config: SyncPeerConfig) -> Result<()>;
 
     /// Sync with peer immediately.
-    async fn sync_now(addr: Addr, team: TeamId, maybe_cfg: Option<SyncPeerConfig>) -> Result<()>;
+    async fn sync_now(addr: Addr, team: TeamId, cfg: Option<SyncPeerConfig>) -> Result<()>;
 
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;

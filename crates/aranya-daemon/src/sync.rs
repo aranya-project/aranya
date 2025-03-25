@@ -107,16 +107,11 @@ impl SyncPeers {
         &self,
         addr: Addr,
         graph_id: GraphId,
-        maybe_cfg: Option<SyncPeerConfig>,
+        cfg: Option<SyncPeerConfig>,
     ) -> Result<()> {
-        let _cfg = match maybe_cfg {
-            Some(c) => c,
-            None => self
-                .cfgs
-                .get(&(addr, graph_id))
-                .cloned()
-                .unwrap_or_default(),
-        };
+        let _cfg = cfg
+            .or_else(|| self.cfgs.get(&(addr, graph_id)).cloned())
+            .unwrap_or_default();
 
         let peer = Msg::SyncNow {
             peer: SyncPeer { addr, graph_id },

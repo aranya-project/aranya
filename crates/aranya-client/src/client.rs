@@ -141,11 +141,13 @@ impl Team<'_> {
     }
 
     /// Sync with peer immediately.
-    pub async fn sync_now(&mut self, addr: Addr, maybe_cfg: Option<SyncPeerConfig>) -> Result<()> {
+    /// Default values for a sync config will be used if `config` is `None`.
+    /// Otherwise the provided config will be used for syncing.
+    pub async fn sync_now(&mut self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
         Ok(self
             .client
             .daemon
-            .sync_now(context::current(), addr, self.id, maybe_cfg.map(Into::into))
+            .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
             .await??)
     }
 
