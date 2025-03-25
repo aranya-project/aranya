@@ -969,7 +969,7 @@ pub unsafe fn afc_recv_data(
 }
 
 /// Set the interval field on the config builder
-/// 
+///
 /// @param cfg a pointer to the builder for a sync config
 /// @param interval Set the interval at which syncing occurs
 pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
@@ -978,7 +978,7 @@ pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, in
 
 /// Set the sync_now field on the config builder to true.
 /// When this field is set to true, syncing happens immediately after a peer is added
-/// 
+///
 /// @param cfg a pointer to the builder for a sync config
 pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
     cfg.deref_mut().sync_now(true);
@@ -986,14 +986,14 @@ pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
 
 /// Set the sync_now field on the config builder to false
 /// When this field is set to false, syncing occurs after `duration` seconds from when the peer is added
-/// 
+///
 /// @param cfg a pointer to the builder for a sync config
 pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
     cfg.deref_mut().sync_now(false);
 }
 
 /// Build a sync config from a sync config builder
-/// 
+///
 /// @param cfg a pointer to the builder for a sync config
 pub fn sync_peer_config_builder_build(
     cfg: &SyncPeerConfigBuilder,
