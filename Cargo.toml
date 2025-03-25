@@ -98,4 +98,4 @@ tag-message = ""
 tag-prefix = ""
 
 [patch.crates-io]
-aranya-capi-codegen = { git = "ssh://git@github.com/aranya-project/aranya-core.git", branch = "codegen-feature-flags" }
+aranya-capi-codegen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "codegen-feature-flags" }
