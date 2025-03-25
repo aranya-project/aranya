@@ -161,7 +161,7 @@ macro_rules! do_poll {
     };
 }
 
-fn shm_path(path: String) -> String {
+fn get_shm_path(path: String) -> String {
     if cfg!(target_os = "macos") && path.len() > 31 {
         // Shrink the size of the team name down to 22 bytes
         // to work within macOS's limits.
@@ -212,8 +212,8 @@ impl DeviceCtx {
     pub async fn new(team_name: String, name: String, work_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(work_dir.clone()).await?;
 
-        let afc_shm_path = shm_path(format!("/afc_{team_name}_{name}"));
-        let aqc_shm_path = shm_path(format!("/aqc_{team_name}_{name}"));
+        let afc_shm_path = get_shm_path(format!("/afc_{team_name}_{name}"));
+        let aqc_shm_path = get_shm_path(format!("/aqc_{team_name}_{name}"));
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
