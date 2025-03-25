@@ -8,10 +8,13 @@
 )]
 
 use anyhow::{Context, Result};
+#[cfg(feature = "experimental")]
+use aranya_daemon::policy::ChanOp;
 use aranya_daemon::{
     aranya::Actions,
-    policy::{ChanOp, Effect, Role},
+    policy::{Effect, Role},
 };
+#[cfg(feature = "experimental")] // TODO(nikki): remove once AQC is in
 use aranya_fast_channels::Label;
 use serial_test::serial;
 use test_log::test;
@@ -100,7 +103,8 @@ async fn test_remove_members() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-async fn test_bidirectional_channel() -> Result<()> {
+#[cfg(feature = "experimental")]
+async fn test_afc_bidirectional_channel() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 
     let clients = ctx.new_team().await?;
@@ -137,7 +141,9 @@ async fn test_bidirectional_channel() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-async fn test_revoke_label() -> Result<()> {
+#[cfg(feature = "experimental")]
+//TODO(nikki): we should add a separate test for AQC once that's in
+async fn test_revoke_afc_label() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 
     let clients = ctx.new_team().await?;
@@ -194,7 +200,8 @@ async fn test_revoke_label() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-async fn test_unidirectional_channels() -> Result<()> {
+#[cfg(feature = "experimental")]
+async fn test_afc_unidirectional_channels() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 
     let clients = ctx.new_team().await?;

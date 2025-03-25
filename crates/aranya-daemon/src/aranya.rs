@@ -1,12 +1,15 @@
 //! Aranya.
 
-use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
+#[cfg(feature = "experimental")]
+use std::borrow::Cow;
+use std::{future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
 
 use anyhow::{bail, Context, Result};
 use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_fast_channels::Label;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
+#[cfg(feature = "experimental")]
 use aranya_policy_vm::Value;
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, PeerCache, Policy, Session, Sink,
@@ -509,6 +512,7 @@ where
 
     /// Sets a network name.
     #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
+    #[cfg(feature = "experimental")]
     fn set_network_name(
         &self,
         device_id: DeviceId,
@@ -524,6 +528,7 @@ where
 
     /// Sets a network name.
     #[instrument(skip(self), fields(device_id = %device_id))]
+    #[cfg(feature = "experimental")]
     fn unset_network_name(
         &self,
         device_id: DeviceId,
@@ -538,6 +543,7 @@ where
 
     /// Creates a bidirectional AFC channel.
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
+    #[cfg(feature = "experimental")]
     fn create_afc_bidi_channel(
         &self,
         peer_id: DeviceId,
@@ -553,6 +559,7 @@ where
     /// Creates a bidirectional AFC channel off graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
+    #[cfg(feature = "experimental")]
     fn create_afc_bidi_channel_off_graph(
         &self,
         peer_id: DeviceId,
@@ -570,6 +577,7 @@ where
 
     /// Creates a unidirectional AFC channel.
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
+    #[cfg(feature = "experimental")]
     fn create_afc_uni_channel(
         &self,
         seal_id: DeviceId,
@@ -590,6 +598,7 @@ where
     /// Creates a unidirectional AFC channel.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
+    #[cfg(feature = "experimental")]
     fn create_afc_uni_channel_off_graph(
         &self,
         seal_id: DeviceId,

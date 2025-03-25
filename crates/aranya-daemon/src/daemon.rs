@@ -1,4 +1,6 @@
-use std::{io, path::Path, str::FromStr, sync::Arc};
+#[cfg(feature = "experimental")]
+use std::str::FromStr;
+use std::{io, path::Path, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use aranya_crypto::{
@@ -6,17 +8,20 @@ use aranya_crypto::{
     keys::SecretKeyBytes, keystore::fs_keystore::Store, CipherSuite, Random, Rng,
 };
 use aranya_daemon_api::CS;
+#[cfg(feature = "experimental")]
 use aranya_fast_channels::shm::{self, Flag, Mode, WriteState};
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState,
 };
-use aranya_util::{util, Addr};
+use aranya_util::Addr;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
-use tracing::{debug, error, info};
+#[cfg(feature = "experimental")]
+use tracing::debug;
+use tracing::{error, info};
 
 use crate::{
     api::DaemonApiServer,
@@ -99,19 +104,37 @@ impl Daemon {
                 }
             }
         });
-        let afc = self.setup_afc()?;
-        let api = DaemonApiServer::new(
-            client,
-            local_addr,
-            Arc::new(Mutex::new(afc)),
-            eng,
-            store,
-            self.cfg.uds_api_path.clone(),
-            Arc::new(pk),
-            peers,
-            recv_effects,
-        )
-        .context("unable to start daemon API")?;
+
+        let api = {
+            #[cfg(feature = "experimental")]
+            {
+                let afc = self.setup_afc()?;
+                DaemonApiServer::new(
+                    client,
+                    local_addr,
+                    Arc::new(Mutex::new(afc)),
+                    eng,
+                    store,
+                    self.cfg.uds_api_path.clone(),
+                    Arc::new(pk),
+                    peers,
+                    recv_effects,
+                )
+                .context("Unable to start daemon API!")?
+            }
+            #[cfg(not(feature = "experimental"))]
+            {
+                DaemonApiServer::new(
+                    client,
+                    local_addr,
+                    self.cfg.uds_api_path.clone(),
+                    Arc::new(pk),
+                    peers,
+                    recv_effects,
+                )
+                .context("Unable to start daemon API!")?
+            }
+        };
         api.serve().await?;
 
         Ok(())
@@ -168,6 +191,7 @@ impl Daemon {
     }
 
     /// Creates AFC shm.
+    #[cfg(feature = "experimental")]
     fn setup_afc(&self) -> Result<WriteState<CS, Rng>> {
         // TODO: issue stellar-tapestry#34
         // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
@@ -249,8 +273,9 @@ impl Daemon {
 
 impl Drop for Daemon {
     fn drop(&mut self) {
+        #[cfg(feature = "experimental")]
         if self.cfg.afc.unlink_at_exit {
-            if let Ok(path) = util::ShmPathBuf::from_str(&self.cfg.afc.shm_path) {
+            if let Ok(path) = aranya_util::util::ShmPathBuf::from_str(&self.cfg.afc.shm_path) {
                 let _ = shm::unlink(path);
             }
         }
@@ -285,6 +310,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
+    #[cfg(feature = "experimental")]
     use crate::config::AfcConfig;
 
     /// Tests running the daemon.
@@ -300,6 +326,7 @@ mod tests {
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
+            #[cfg(feature = "experimental")]
             afc: AfcConfig {
                 shm_path: "/test_daemon".to_owned(),
                 unlink_on_startup: true,

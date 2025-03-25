@@ -170,23 +170,23 @@ pub trait DaemonApi {
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
-    /// Assign a network identifier to a device.
+    /// Create a label.
+    async fn create_label(team: TeamId, label: Label) -> Result<()>;
+    /// Delete a label.
+    async fn delete_label(team: TeamId, label: Label) -> Result<()>;
+
+    /// Assign a fast channels network identifier to a device.
     async fn assign_afc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
     ) -> Result<()>;
-    /// Remove a network identifier from a device.
+    /// Remove a fast channels network identifier from a device.
     async fn remove_afc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
     ) -> Result<()>;
-
-    /// Create a fast channels label.
-    async fn create_label(team: TeamId, label: Label) -> Result<()>;
-    /// Delete a fast channels label.
-    async fn delete_label(team: TeamId, label: Label) -> Result<()>;
 
     /// Assign a fast channels label to a device.
     async fn assign_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;

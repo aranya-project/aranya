@@ -18,10 +18,9 @@ use anyhow::{Context, Result};
 use aranya_client::afc::Message;
 use aranya_client::client::Client;
 use aranya_crypto::{hash::Hash, rust::Sha256};
-use aranya_daemon::{
-    config::{AfcConfig, Config},
-    Daemon,
-};
+#[cfg(feature = "experimental")]
+use aranya_daemon::config::AfcConfig;
+use aranya_daemon::{config::Config, Daemon};
 #[cfg(feature = "experimental")]
 use aranya_daemon_api::NetIdentifier;
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
@@ -202,21 +201,27 @@ struct DeviceCtx {
     daemon: AbortHandle,
 }
 
+fn get_shm_path(path: String) -> String {
+    if cfg!(target_os = "macos") && path.len() > 31 {
+        // Shrink the size of the team name down to 22 bytes
+        // to work within macOS's limits.
+        let d = Sha256::hash(path.as_bytes());
+        let t: [u8; 16] = d[..16].try_into().unwrap();
+        return format!("/{}", t.to_base58());
+    };
+    path
+}
+
 impl DeviceCtx {
     pub async fn new(team_name: String, name: String, work_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(work_dir.clone()).await?;
 
-        let mut shm_path = format!("/{team_name}_{name}");
-        if cfg!(target_os = "macos") && shm_path.len() > 31 {
-            // Shrink the size of the team name down to 22 bytes
-            // to work within macOS's limits.
-            let d = Sha256::hash(shm_path.as_bytes());
-            let t: [u8; 16] = d[..16].try_into().unwrap();
-            shm_path = format!("/{}", t.to_base58())
-        };
+        #[allow(unused_variables)]
+        let afc_shm_path = get_shm_path(format!("/{team_name}_{name}"));
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
+        #[cfg(feature = "experimental")]
         let max_chans = 100;
         let cfg = Config {
             name: "daemon".into(),
@@ -224,8 +229,9 @@ impl DeviceCtx {
             uds_api_path: uds_api_path.clone(),
             pid_file: work_dir.join("pid"),
             sync_addr: Addr::new("localhost", 0)?,
+            #[cfg(feature = "experimental")]
             afc: AfcConfig {
-                shm_path: shm_path.clone(),
+                shm_path: afc_shm_path.clone(),
                 unlink_on_startup: true,
                 unlink_at_exit: true,
                 create: true,
@@ -254,7 +260,7 @@ impl DeviceCtx {
                 let mut client = (|| {
                     Client::connect(
                         &uds_api_path,
-                        Path::new(&shm_path),
+                        Path::new(&afc_shm_path),
                         max_chans,
                         "localhost:0",
                     )

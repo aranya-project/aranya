@@ -13,6 +13,11 @@ rust-version.workspace = true
 workspace = true
 
 
+[features]
+default = []
+experimental = []
+
+
 [dependencies]
 aranya-daemon-api = { workspace = true }
 aranya-keygen = { workspace = true }

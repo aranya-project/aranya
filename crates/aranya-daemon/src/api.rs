@@ -12,32 +12,47 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler};
-use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, DeviceId, Rng};
+use aranya_crypto::{Csprng, Rng};
 use aranya_daemon_api::{
     AfcCtrl, AfcId, DaemonApi, DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
     Result as ApiResult, Role as ApiRole, TeamId, CS,
 };
-use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed, Label, NodeId};
+use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
 use aranya_util::Addr;
-use bimap::BiBTreeMap;
-use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,
     server::{self, Channel},
     tokio_serde::formats::Json,
 };
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
     aranya::Actions,
-    policy::{AfcBidiChannelCreated, AfcBidiChannelReceived, ChanOp, Effect, KeyBundle, Role},
+    policy::{ChanOp, Effect, KeyBundle, Role},
     sync::SyncPeers,
-    Client, CE, EF,
+    Client, EF,
 };
+
+#[cfg(feature = "experimental")]
+mod afc_imports {
+    pub(super) use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler};
+    pub(super) use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, DeviceId};
+    pub(super) use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed};
+    pub(super) use bimap::BiBTreeMap;
+    pub(super) use buggy::BugExt;
+    pub(super) use tokio::sync::Mutex;
+
+    pub(super) use crate::{
+        policy::{AfcBidiChannelCreated, AfcBidiChannelReceived},
+        CE,
+    };
+}
+#[cfg(feature = "experimental")]
+#[allow(clippy::wildcard_imports)]
+use afc_imports::*;
 
 async fn spawn(fut: impl Future<Output = ()> + Send + 'static) {
     tokio::spawn(fut);
@@ -67,6 +82,7 @@ impl DaemonApiServer {
     /// Create new RPC server.
     #[allow(clippy::too_many_arguments)]
     #[instrument(skip_all)]
+    #[cfg(feature = "experimental")]
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
@@ -92,6 +108,30 @@ impl DaemonApiServer {
                 peers,
                 afc_peers: Arc::default(),
                 handler: Arc::new(Mutex::new(Handler::new(device_id, store))),
+            },
+        })
+    }
+
+    /// Create new RPC server.
+    #[instrument(skip_all)]
+    #[cfg(not(feature = "experimental"))]
+    pub fn new(
+        client: Arc<Client>,
+        local_addr: SocketAddr,
+        daemon_sock: PathBuf,
+        pk: Arc<PublicKeys<CS>>,
+        peers: SyncPeers,
+        recv_effects: mpsc::Receiver<Vec<EF>>,
+    ) -> Result<Self> {
+        info!("uds path: {:?}", daemon_sock);
+        Ok(Self {
+            daemon_sock,
+            recv_effects,
+            handler: DaemonApiHandler {
+                client,
+                local_addr,
+                pk,
+                peers,
             },
         })
     }
@@ -148,18 +188,22 @@ struct DaemonApiHandler {
     client: Arc<Client>,
     /// Local socket address of the API.
     local_addr: SocketAddr,
-    /// AFC shm write.
-    afc: Arc<Mutex<WriteState<CS, Rng>>>,
-    /// An implementation of [`Engine`][crypto::Engine].
-    eng: CE,
     /// Public keys of current device.
     pk: Arc<PublicKeys<CS>>,
     /// Aranya sync peers,
     peers: SyncPeers,
+    /// AFC shm write.
+    #[cfg(feature = "experimental")]
+    afc: Arc<Mutex<WriteState<CS, Rng>>>,
     /// AFC peers.
+    #[cfg(feature = "experimental")]
     afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
     /// Handles AFC effects.
+    #[cfg(feature = "experimental")]
     handler: Arc<Mutex<Handler<Store>>>,
+    /// An implementation of [`Engine`][crypto::Engine].
+    #[cfg(feature = "experimental")]
+    eng: CE,
 }
 
 impl DaemonApiHandler {
@@ -169,6 +213,7 @@ impl DaemonApiHandler {
 
     /// Handles effects resulting from invoking an Aranya action.
     #[instrument(skip_all)]
+    #[allow(unused_variables)]
     async fn handle_effects(&self, effects: &[Effect], node_id: Option<NodeId>) -> Result<()> {
         for effect in effects {
             debug!(?effect, "handling effect");
@@ -188,6 +233,7 @@ impl DaemonApiHandler {
                 Effect::LabelAssigned(_label_assigned) => {}
                 Effect::LabelRevoked(_label_revoked) => {}
                 Effect::NetworkNameSet(e) => {
+                    #[cfg(feature = "experimental")]
                     self.afc_peers
                         .lock()
                         .await
@@ -195,13 +241,15 @@ impl DaemonApiHandler {
                 }
                 Effect::NetworkNameUnset(_network_name_unset) => {}
                 Effect::AfcBidiChannelCreated(v) => {
-                    debug!("received BidiChannelCreated effect");
+                    debug!("received AfcBidiChannelCreated effect");
+                    #[cfg(feature = "experimental")]
                     if let Some(node_id) = node_id {
                         self.afc_bidi_channel_created(v, node_id).await?
                     }
                 }
                 Effect::AfcBidiChannelReceived(v) => {
-                    debug!("received BidiChannelReceived effect");
+                    debug!("received AfcBidiChannelReceived effect");
+                    #[cfg(feature = "experimental")]
                     if let Some(node_id) = node_id {
                         self.afc_bidi_channel_received(v, node_id).await?
                     }
@@ -216,6 +264,7 @@ impl DaemonApiHandler {
 
     /// Reacts to a bidirectional AFC channel being created.
     #[instrument(skip(self), fields(effect = ?v))]
+    #[cfg(feature = "experimental")]
     async fn afc_bidi_channel_created(
         &self,
         v: &AfcBidiChannelCreated,
@@ -251,6 +300,7 @@ impl DaemonApiHandler {
 
     /// Reacts to a bidirectional AFC channel being created.
     #[instrument(skip_all)]
+    #[cfg(feature = "experimental")]
     async fn afc_bidi_channel_received(
         &self,
         v: &AfcBidiChannelReceived,
@@ -285,7 +335,7 @@ impl DaemonApiHandler {
 
 impl DaemonApi for DaemonApiHandler {
     #[instrument(skip(self))]
-    async fn aranya_local_addr(self, context: ::tarpc::context::Context) -> ApiResult<SocketAddr> {
+    async fn aranya_local_addr(self, context: context::Context) -> ApiResult<SocketAddr> {
         Ok(self.local_addr)
     }
 
@@ -409,38 +459,6 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn assign_afc_net_identifier(
-        self,
-        _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        name: NetIdentifier,
-    ) -> ApiResult<()> {
-        let effects = self
-            .client
-            .actions(&team.into_id().into())
-            .set_network_name(device.into_id().into(), name.0)
-            .await?;
-        self.handle_effects(&effects, None).await?;
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
-    async fn remove_afc_net_identifier(
-        self,
-        _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        name: NetIdentifier,
-    ) -> ApiResult<()> {
-        self.client
-            .actions(&team.into_id().into())
-            .unset_network_name(device.into_id().into())
-            .await?;
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
     async fn create_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
         self.client
             .actions(&team.into_id().into())
@@ -490,7 +508,42 @@ impl DaemonApi for DaemonApiHandler {
         Ok(())
     }
 
+    #[instrument(skip(self))]
+    #[cfg(feature = "experimental")]
+    async fn assign_afc_net_identifier(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+        name: NetIdentifier,
+    ) -> ApiResult<()> {
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .set_network_name(device.into_id().into(), name.0)
+            .await?;
+        self.handle_effects(&effects, None).await?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    #[cfg(feature = "experimental")]
+    async fn remove_afc_net_identifier(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+        name: NetIdentifier,
+    ) -> ApiResult<()> {
+        self.client
+            .actions(&team.into_id().into())
+            .unset_network_name(device.into_id().into())
+            .await?;
+        Ok(())
+    }
+
     #[instrument(skip_all)]
+    #[cfg(feature = "experimental")]
     async fn create_afc_bidi_channel(
         self,
         _: context::Context,
@@ -529,12 +582,14 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
+    #[cfg(feature = "experimental")]
     async fn delete_afc_channel(self, _: context::Context, chan: AfcId) -> ApiResult<AfcCtrl> {
         // TODO: remove AFC channel from Aranya.
         todo!();
     }
 
     #[instrument(skip_all)]
+    #[cfg(feature = "experimental")]
     async fn receive_afc_ctrl(
         self,
         _: context::Context,
@@ -566,6 +621,56 @@ impl DaemonApi for DaemonApiHandler {
             return Ok((afc_id, net, label));
         }
         Err(anyhow!("unable to find AfcBidiChannelReceived effect").into())
+    }
+
+    #[cfg(not(feature = "experimental"))]
+    async fn assign_afc_net_identifier(
+        self,
+        _: context::Context,
+        _: TeamId,
+        _: ApiDeviceId,
+        _: NetIdentifier,
+    ) -> ApiResult<()> {
+        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
+    }
+
+    #[cfg(not(feature = "experimental"))]
+    async fn remove_afc_net_identifier(
+        self,
+        _: context::Context,
+        _: TeamId,
+        _: ApiDeviceId,
+        _: NetIdentifier,
+    ) -> ApiResult<()> {
+        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
+    }
+
+    #[cfg(not(feature = "experimental"))]
+    async fn create_afc_bidi_channel(
+        self,
+        _: context::Context,
+        _: TeamId,
+        _: NetIdentifier,
+        _: NodeId,
+        _: Label,
+    ) -> ApiResult<(AfcId, AfcCtrl)> {
+        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
+    }
+
+    #[cfg(not(feature = "experimental"))]
+    async fn delete_afc_channel(self, _: context::Context, _: AfcId) -> ApiResult<AfcCtrl> {
+        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
+    }
+
+    #[cfg(not(feature = "experimental"))]
+    async fn receive_afc_ctrl(
+        self,
+        _: context::Context,
+        _: TeamId,
+        _: NodeId,
+        _: AfcCtrl,
+    ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
+        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 }
 
