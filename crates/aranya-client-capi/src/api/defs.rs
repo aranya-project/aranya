@@ -271,7 +271,9 @@ pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
 /// A type to represent a span of time.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-pub struct Duration(imp::Duration);
+pub struct Duration {
+    pub nanos: u64,
+}
 
 pub const ARANYA_DURATION_SECONDS: u64 = 1000 * ARANYA_DURATION_MILLISECONDS;
 pub const ARANYA_DURATION_MILLISECONDS: u64 = 1000 * ARANYA_DURATION_MICROSECONDS;
@@ -280,7 +282,7 @@ pub const ARANYA_DURATION_NANOSECONDS: u64 = 1;
 
 impl From<Duration> for std::time::Duration {
     fn from(value: Duration) -> Self {
-        std::time::Duration::from_nanos(value.0.nanos)
+        std::time::Duration::from_nanos(value.nanos)
     }
 }
 
@@ -354,14 +356,6 @@ pub struct AfcConfig {
     pub max_channels: usize,
     /// Address to bind AFC server to.
     pub addr: *const c_char,
-}
-
-/// A type that represents when the first sync with a peer should occur.
-#[repr(u8)]
-#[derive(Copy, Clone, Debug)]
-pub enum SyncWhen {
-    Now,
-    Later,
 }
 
 /// Initializes a new client instance.
@@ -971,4 +965,27 @@ pub unsafe fn afc_recv_data(
     client.msg = None;
 
     Ok(true)
+}
+
+/// Set the duration field on the config builder
+pub fn sync_peer_config_builder_set_duration(cfg: &mut SyncPeerConfigBuilder, duration: Duration) {
+    cfg.deref_mut().interval(duration);
+}
+
+/// Set the sync_now field on the config builder to true
+pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
+    cfg.deref_mut().sync_now(true);
+}
+
+/// Set the sync_now field on the config builder to false
+pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
+    cfg.deref_mut().sync_now(false);
+}
+
+/// Build a config from a config builder
+pub fn sync_peer_config_builder_build(
+    cfg: &SyncPeerConfigBuilder,
+    out: &mut MaybeUninit<SyncPeerConfig>,
+) {
+    Safe::init(out, cfg.build());
 }

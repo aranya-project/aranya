@@ -348,12 +348,7 @@ typedef struct ARANYA_ALIGNED(1) AranyaChannelId {
 /**
  * A type to represent a span of time.
  */
-typedef Duration Duration;
-
-/**
- * A type to represent a span of time.
- */
-typedef Duration AranyaDuration;
+typedef uint64_t AranyaDuration;
 
 /**
  * Network socket address.
@@ -1331,6 +1326,54 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
                                      struct AranyaAfcMsgInfo *info,
                                      bool *__output,
                                      struct AranyaExtError *__ext_err);
+
+/**
+ * Set the duration field on the config builder
+ */
+AranyaError aranya_sync_peer_config_builder_set_duration(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                         AranyaDuration duration);
+
+/**
+ * Set the duration field on the config builder
+ */
+AranyaError aranya_sync_peer_config_builder_set_duration_ext(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                             AranyaDuration duration,
+                                                             struct AranyaExtError *__ext_err);
+
+/**
+ * Set the sync_now field on the config builder to true
+ */
+AranyaError aranya_sync_peer_config_builder_set_sync_now(struct AranyaSyncPeerConfigBuilder *cfg);
+
+/**
+ * Set the sync_now field on the config builder to true
+ */
+AranyaError aranya_sync_peer_config_builder_set_sync_now_ext(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                             struct AranyaExtError *__ext_err);
+
+/**
+ * Set the sync_now field on the config builder to false
+ */
+AranyaError aranya_sync_peer_config_builder_set_sync_later(struct AranyaSyncPeerConfigBuilder *cfg);
+
+/**
+ * Set the sync_now field on the config builder to false
+ */
+AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                               struct AranyaExtError *__ext_err);
+
+/**
+ * Build a config from a config builder
+ */
+AranyaError aranya_sync_peer_config_builder_build(const struct AranyaSyncPeerConfigBuilder *cfg,
+                                                  struct AranyaSyncPeerConfig *out);
+
+/**
+ * Build a config from a config builder
+ */
+AranyaError aranya_sync_peer_config_builder_build_ext(const struct AranyaSyncPeerConfigBuilder *cfg,
+                                                      struct AranyaSyncPeerConfig *out,
+                                                      struct AranyaExtError *__ext_err);
 
 #ifdef __cplusplus
 }  // extern "C"

@@ -1,6 +1,6 @@
 use aranya_capi_core::safe::{TypeId, Typed};
 
-use super::Duration;
+use crate::api::defs::{Duration, ARANYA_DURATION_MILLISECONDS};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -37,6 +37,23 @@ pub struct SyncPeerConfigBuilder {
     sync_now: bool,
 }
 
+impl SyncPeerConfigBuilder {
+    pub fn interval(&mut self, duration: Duration) {
+        self.interval = duration;
+    }
+
+    pub fn sync_now(&mut self, sync_now: bool) {
+        self.sync_now = sync_now;
+    }
+
+    pub fn build(&self) -> SyncPeerConfig {
+        SyncPeerConfig {
+            interval: self.interval,
+            sync_now: self.sync_now,
+        }
+    }
+}
+
 impl Typed for SyncPeerConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0x2049e683);
 }
@@ -45,7 +62,7 @@ impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
             interval: Duration {
-                nanos: 100 * super::ARANYA_DURATION_MILLISECONDS,
+                nanos: 100 * ARANYA_DURATION_MILLISECONDS,
             },
             sync_now: true,
         }

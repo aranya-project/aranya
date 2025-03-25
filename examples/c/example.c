@@ -119,7 +119,7 @@ typedef struct {
 AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
                         const char *shm_path, const char *afc_addr);
 AranyaError init_team(Team *t);
-AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig cfg);
+AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg);
 AranyaError run(Team *t);
 AranyaError cleanup_team(Team *t);
 
@@ -191,7 +191,7 @@ AranyaError cleanup_team(Team *t) {
 // Add sync peers.
 // This creates a complete graph where each Aranya client can sync with all
 // the other Aranya client peers on the network.
-AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig cfg) {
+AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg) {
     AranyaError err;
 
     for (int i = 0; i < NUM_CLIENTS; i++) {
@@ -228,11 +228,42 @@ AranyaError run(Team *t) {
     EXPECT("error initializing team", err);
 
     // add sync peers.
+
+    // Allocate memory for the config builder struct
+    struct AranyaSyncPeerConfigBuilder *builder = (struct AranyaSyncPeerConfigBuilder *)malloc(sizeof(struct AranyaSyncPeerConfigBuilder));
+    if (builder == NULL) {
+        // Handle allocation failure
+        fprintf(stderr, "Memory allocation failed\n");
+        return 1;
+    }
+
+    err = aranya_sync_peer_config_builder_init(builder);
+    EXPECT("error initializing sync peer config builder", err);
+
+    // Set duration on the config builder
     AranyaDuration interval = ARANYA_DURATION_MILLISECONDS * 100;
-    AranyaSyncPeerConfig cfg = {
-        .interval = interval,
-        .sync_when = ARANYA_SYNC_WHEN_NOW,
-    };
+    err = aranya_sync_peer_config_builder_set_duration(builder, interval);
+    EXPECT("error setting duration on config builder", err);
+
+    // Set syncing to happen immediately on the config builder
+    err = aranya_sync_peer_config_builder_set_sync_now(builder);
+    EXPECT("error setting `sync_now` on config builder", err);
+
+    // Allocate memory for the sync peer config struct
+    struct AranyaSyncPeerConfig *cfg = (struct AranyaSyncPeerConfig *)malloc(sizeof(struct AranyaSyncPeerConfig));
+
+    if (cfg == NULL) {
+        // Handle allocation failure
+        fprintf(stderr, "Memory allocation failed\n");
+        return 1;
+    }
+
+    err = aranya_sync_peer_config_builder_build(builder, cfg);
+    EXPECT("error building the sync peer config", err);
+
+    err = aranya_sync_peer_config_builder_cleanup(builder);
+    EXPECT("error running the cleanup routine for the config builder", err);
+
     err = add_sync_peers(t, cfg);
     EXPECT("error adding sync peers", err);
 
