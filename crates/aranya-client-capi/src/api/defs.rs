@@ -1159,15 +1159,12 @@ pub unsafe fn query_afc_net_identifier(
     ident_len: &mut usize,
 ) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
-    if let Some(net_identifier) = client
+    let Some(net_identifier) = client
         .rt
-        .block_on(client.inner.queries(team.0).afc_net_identifier(device.0))?
-    {
-        let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
-        aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
-        return Ok(true);
-    }
-    Ok(false)
+        .block_on(client.inner.queries(team.0).afc_net_identifier(device.0))? else { return Ok(false); };  
+       let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);  
+        aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;  
+        Ok(true)
 }
 
 /// Query device's AQC network identifier.
@@ -1186,15 +1183,12 @@ pub unsafe fn query_aqc_net_identifier(
     ident_len: &mut usize,
 ) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
-    if let Some(net_identifier) = client
+    let Some(net_identifier) = client
         .rt
-        .block_on(client.inner.queries(team.0).aqc_net_identifier(device.0))?
-    {
-        let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
-        aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
-        return Ok(true);
-    }
-    Ok(false)
+        .block_on(client.inner.queries(team.0).aqc_net_identifier(device.0))? else { return Ok(false); };  
+       let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);  
+        aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;  
+        Ok(true)
 }
 
 /// Query device's AQC network identifier.
