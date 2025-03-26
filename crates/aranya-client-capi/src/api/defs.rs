@@ -1,8 +1,5 @@
 use core::{ffi::c_char, ops::DerefMut, ptr, slice};
-use std::{
-    ffi::{CString, OsStr},
-    os::unix::ffi::OsStrExt,
-};
+use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use libc;
@@ -1045,16 +1042,19 @@ pub unsafe fn get_device_id_at_index(
 ///
 /// The resulting pointer must NOT be freed.
 ///
-/// @param device `AranyaDeviceId`.
+/// @param device ID [`DeviceId`].
+/// @param device ID string [`DeviceId`].
 ///
 /// @relates AranyaError.
 #[aranya_capi_core::no_ext_error]
-pub fn device_id_to_str(device: DeviceId) -> *const c_char {
-    // TODO: convert to string correctly.
-    if let Ok(c_string) = CString::new(device.0.to_string().as_str()) {
-        return c_string.as_c_str().as_ptr();
-    }
-    ptr::null()
+pub fn device_id_to_str(
+    device: DeviceId,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    aranya_capi_core::write_c_str(str, &device.0, str_len)?;
+    Ok(())
 }
 
 // TODO: query_device_role
@@ -1130,16 +1130,19 @@ pub unsafe fn get_label_at_index(labels: &mut Labels, index: usize) -> Result<La
 ///
 /// The resulting pointer must NOT be freed.
 ///
-/// @param label `AranyaLabel`.
+/// @param label [`Label`].
+/// @param label string [`Label`].
 ///
 /// @relates AranyaError.
 #[aranya_capi_core::no_ext_error]
-pub fn label_to_str(label: Label) -> *const c_char {
-    // TODO: convert to string correctly.
-    if let Ok(c_string) = CString::new(label.0.to_string().as_str()) {
-        return c_string.as_c_str().as_ptr();
-    }
-    ptr::null()
+pub fn label_to_str(
+    label: Label,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    aranya_capi_core::write_c_str(str, &label.0, str_len)?;
+    Ok(())
 }
 
 /// Query device's AFC network identifier.

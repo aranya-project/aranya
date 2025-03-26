@@ -1407,11 +1407,14 @@ AranyaError aranya_get_device_id_at_index_ext(struct AranyaDevices *devices,
  *
  * The resulting pointer must NOT be freed.
  *
- * @param device `AranyaDeviceId`.
+ * @param device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param device ID string [`AranyaDeviceId`](@ref AranyaDeviceId).
  *
  * @relates AranyaError.
  */
-const char *aranya_device_id_to_str(struct AranyaDeviceId device);
+AranyaError aranya_device_id_to_str(struct AranyaDeviceId device,
+                                    char *str,
+                                    size_t *str_len);
 
 /**
  * Query device's keybundle.
@@ -1526,11 +1529,12 @@ AranyaError aranya_get_label_at_index_ext(struct AranyaLabels *labels,
  *
  * The resulting pointer must NOT be freed.
  *
- * @param label `AranyaLabel`.
+ * @param label [`AranyaLabel`](@ref AranyaLabel).
+ * @param label string [`AranyaLabel`](@ref AranyaLabel).
  *
  * @relates AranyaError.
  */
-const char *aranya_label_to_str(AranyaLabel label);
+AranyaError aranya_label_to_str(AranyaLabel label, char *str, size_t *str_len);
 
 /**
  * Query device's AFC network identifier.

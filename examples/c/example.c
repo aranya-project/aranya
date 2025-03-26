@@ -329,9 +329,10 @@ AranyaError run(Team *t) {
     AranyaDeviceId device;
     err = aranya_get_device_id_at_index(&devices, 0, &device);
     EXPECT("error getting device at index", err);
-    // TODO: not working
-    printf("device id: %s at index: %d \r\n", aranya_device_id_to_str(device),
-           0);
+    size_t device_id_str_len = BUF_LEN;
+    char *device_id_str      = malloc(BUF_LEN);
+    aranya_device_id_to_str(device, device_id_str, &device_id_str_len);
+    printf("device id: %s at index: %d \r\n", device_id_str, 0);
 
     AranyaLabels labels;
     err = aranya_query_device_label_assignments(
@@ -340,8 +341,10 @@ AranyaError run(Team *t) {
     AranyaLabel label_result;
     err = aranya_get_label_at_index(&labels, 0, &label_result);
     EXPECT("error getting label at index", err);
-    // TODO: not working
-    printf("label: %s at index: %d \r\n", aranya_label_to_str(label_result), 0);
+    size_t label_str_len = BUF_LEN;
+    char *label_str      = malloc(BUF_LEN);
+    aranya_label_to_str(label_result, label_str, &label_str_len);
+    printf("label: %s at index: %d \r\n", label_str, 0);
 
     AranyaKeyBundle memberb_keybundle;
     err = aranya_query_device_keybundle(&t->clients.operator.client, &t->id,
