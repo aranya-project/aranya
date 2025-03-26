@@ -1367,7 +1367,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_now_ext(struct AranyaSyncPe
 
 /**
  * Set the sync_now field on the config builder to false
- * When this field is set to false, syncing occurs after `duration` seconds from when the peer is added
+ * When this field is set to false, syncing occurs after some specifed duration from when the peer is added
  *
  * @param cfg a pointer to the builder for a sync config
  */
@@ -1375,7 +1375,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later(struct AranyaSyncPeer
 
 /**
  * Set the sync_now field on the config builder to false
- * When this field is set to false, syncing occurs after `duration` seconds from when the peer is added
+ * When this field is set to false, syncing occurs after some specifed duration from when the peer is added
  *
  * @param cfg a pointer to the builder for a sync config
  */

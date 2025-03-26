@@ -229,42 +229,29 @@ AranyaError run(Team *t) {
 
     // add sync peers.
 
-    // Allocate memory for the config builder struct
-    struct AranyaSyncPeerConfigBuilder *builder = (struct AranyaSyncPeerConfigBuilder *)malloc(sizeof(struct AranyaSyncPeerConfigBuilder));
-    if (builder == NULL) {
-        // Handle allocation failure
-        fprintf(stderr, "Memory allocation failed\n");
-        return 1;
-    }
-
-    err = aranya_sync_peer_config_builder_init(builder);
+    // Initialize the builder
+    struct AranyaSyncPeerConfigBuilder builder;
+    err = aranya_sync_peer_config_builder_init(&builder);
     EXPECT("error initializing sync peer config builder", err);
 
     // Set duration on the config builder
     AranyaDuration interval = ARANYA_DURATION_MILLISECONDS * 100;
-    err = aranya_sync_peer_config_builder_set_interval(builder, interval);
+    err = aranya_sync_peer_config_builder_set_interval(&builder, interval);
     EXPECT("error setting duration on config builder", err);
 
     // Set syncing to happen immediately on the config builder
-    err = aranya_sync_peer_config_builder_set_sync_now(builder);
+    err = aranya_sync_peer_config_builder_set_sync_now(&builder);
     EXPECT("error setting `sync_now` on config builder", err);
 
-    // Allocate memory for the sync peer config struct
-    struct AranyaSyncPeerConfig *cfg = (struct AranyaSyncPeerConfig *)malloc(sizeof(struct AranyaSyncPeerConfig));
-
-    if (cfg == NULL) {
-        // Handle allocation failure
-        fprintf(stderr, "Memory allocation failed\n");
-        return 1;
-    }
-
-    err = aranya_sync_peer_config_builder_build(builder, cfg);
+    // Build the sync config
+    struct AranyaSyncPeerConfig cfg;
+    err = aranya_sync_peer_config_builder_build(&builder, &cfg);
     EXPECT("error building the sync peer config", err);
 
-    err = aranya_sync_peer_config_builder_cleanup(builder);
+    err = aranya_sync_peer_config_builder_cleanup(&builder);
     EXPECT("error running the cleanup routine for the config builder", err);
 
-    err = add_sync_peers(t, cfg);
+    err = add_sync_peers(t, &cfg);
     EXPECT("error adding sync peers", err);
 
     // Team members are added to the team by first calling

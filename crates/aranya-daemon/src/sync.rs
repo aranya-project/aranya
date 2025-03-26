@@ -109,6 +109,7 @@ impl SyncPeers {
         graph_id: GraphId,
         cfg: Option<SyncPeerConfig>,
     ) -> Result<()> {
+        // TODO: Use this value later
         let _cfg = cfg
             .or_else(|| self.cfgs.get(&(addr, graph_id)).cloned())
             .unwrap_or_default();
