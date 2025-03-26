@@ -144,6 +144,7 @@ enum AranyaError
      */
     ARANYA_ERROR_AFC,
     ARANYA_ERROR_RUNTIME,
+    ARANYA_ERROR_INVALID_INDEX,
 };
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
@@ -1375,6 +1376,44 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
                                              struct AranyaExtError *__ext_err);
 
 /**
+ * Get device ID at index.
+ *
+ * @param devices a list of device IDs [`AranyaDevices`](@ref AranyaDevices).
+ * @param index the index of the device to return.
+ * @param __output device ID at index in list [`AranyaDeviceId`](@ref AranyaDeviceId).
+ *
+ * @relates Devices.
+ */
+AranyaError aranya_get_device_id_at_index(struct AranyaDevices *devices,
+                                          size_t index,
+                                          struct AranyaDeviceId *__output);
+
+/**
+ * Get device ID at index.
+ *
+ * @param devices a list of device IDs [`AranyaDevices`](@ref AranyaDevices).
+ * @param index the index of the device to return.
+ * @param __output device ID at index in list [`AranyaDeviceId`](@ref AranyaDeviceId).
+ *
+ * @relates Devices.
+ */
+AranyaError aranya_get_device_id_at_index_ext(struct AranyaDevices *devices,
+                                              size_t index,
+                                              struct AranyaDeviceId *__output,
+                                              struct AranyaExtError *__ext_err);
+
+/**
+ * Returns a human-readable message for a [`AranyaDeviceId`](@ref AranyaDeviceId).
+ *
+ * The resulting pointer must NOT be freed.
+ *
+ * @param device `AranyaDeviceId`.
+ *
+ * @relates AranyaError.
+ */
+const char *aranya_device_id_to_str(struct AranyaDeviceId device);
+
+/**
  * Query device's keybundle.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -1454,6 +1493,44 @@ AranyaError aranya_query_device_label_assignments_ext(struct AranyaClient *clien
                                                       const struct AranyaDeviceId *device,
                                                       struct AranyaLabels *labels,
                                                       struct AranyaExtError *__ext_err);
+
+/**
+ * Get label at index.
+ *
+ * @param labels a list of labels [`AranyaLabels`](@ref AranyaLabels).
+ * @param index the index of the label to return.
+ * @param __output label at index in list [`AranyaLabel`](@ref AranyaLabel).
+ *
+ * @relates Labels.
+ */
+AranyaError aranya_get_label_at_index(struct AranyaLabels *labels,
+                                      size_t index,
+                                      AranyaLabel *__output);
+
+/**
+ * Get label at index.
+ *
+ * @param labels a list of labels [`AranyaLabels`](@ref AranyaLabels).
+ * @param index the index of the label to return.
+ * @param __output label at index in list [`AranyaLabel`](@ref AranyaLabel).
+ *
+ * @relates Labels.
+ */
+AranyaError aranya_get_label_at_index_ext(struct AranyaLabels *labels,
+                                          size_t index,
+                                          AranyaLabel *__output,
+                                          struct AranyaExtError *__ext_err);
+
+/**
+ * Returns a human-readable message for a [`AranyaLabel`](@ref AranyaLabel).
+ *
+ * The resulting pointer must NOT be freed.
+ *
+ * @param label `AranyaLabel`.
+ *
+ * @relates AranyaError.
+ */
+const char *aranya_label_to_str(AranyaLabel label);
 
 /**
  * Query device's AFC network identifier.

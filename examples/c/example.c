@@ -322,6 +322,27 @@ AranyaError run(Team *t) {
     sleep(1);
 
     // Queries
+    AranyaDevices devices;
+    err = aranya_query_devices_on_team(&t->clients.operator.client, &t->id,
+                                       &devices);
+    EXPECT("error querying devices on team", err);
+    AranyaDeviceId device;
+    err = aranya_get_device_id_at_index(&devices, 0, &device);
+    EXPECT("error getting device at index", err);
+    // TODO: not working
+    printf("device id: %s at index: %d \r\n", aranya_device_id_to_str(device),
+           0);
+
+    AranyaLabels labels;
+    err = aranya_query_device_label_assignments(
+        &t->clients.operator.client, &t->id, &t->clients.memberb.id, &labels);
+    EXPECT("error querying labels assigned to device", err);
+    AranyaLabel label_result;
+    err = aranya_get_label_at_index(&labels, 0, &label_result);
+    EXPECT("error getting label at index", err);
+    // TODO: not working
+    printf("label: %s at index: %d \r\n", aranya_label_to_str(label_result), 0);
+
     AranyaKeyBundle memberb_keybundle;
     err = aranya_query_device_keybundle(&t->clients.operator.client, &t->id,
                                         &t->clients.memberb.id,

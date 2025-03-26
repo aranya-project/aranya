@@ -37,6 +37,9 @@ pub enum Error {
 
     #[error("tokio runtime error: {0}")]
     Runtime(#[source] std::io::Error),
+
+    #[error("invalid index: {0}")]
+    InvalidIndex(usize),
 }
 
 impl From<WriteCStrError> for Error {

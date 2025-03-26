@@ -1,5 +1,8 @@
 use core::{ffi::c_char, ops::DerefMut, ptr, slice};
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+use std::{
+    ffi::{CString, OsStr},
+    os::unix::ffi::OsStrExt,
+};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use libc;
@@ -64,6 +67,9 @@ pub enum Error {
 
     #[capi(msg = "tokio runtime error")]
     Runtime,
+
+    #[capi(msg = "invalid index")]
+    InvalidIndex,
 }
 
 impl From<&imp::Error> for Error {
@@ -85,6 +91,7 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Bug(_) => Self::Bug,
             },
             imp::Error::Runtime(_) => Self::Runtime,
+            imp::Error::InvalidIndex(_) => Self::InvalidIndex,
         }
     }
 }
@@ -1010,18 +1017,44 @@ pub unsafe fn query_devices_on_team(
     let v = client
         .rt
         .block_on(client.inner.queries(team.0).devices_on_team())?;
-        let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
-    let inner = aranya_client::Devices{
-        devices: v,
-    };
-    Safe::init(
-        devices,
-        imp::Devices {
-            rt,
-            inner,
-        },
-    );
+    let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
+    let inner = aranya_client::Devices { devices: v };
+    Safe::init(devices, imp::Devices { rt, inner });
     Ok(())
+}
+
+/// Get device ID at index.
+///
+/// @param devices a list of device IDs [`Devices`].
+/// @param index the index of the device to return.
+/// @param __output device ID at index in list [`DeviceId`].
+///
+/// @relates Devices.
+pub unsafe fn get_device_id_at_index(
+    devices: &mut Devices,
+    index: usize,
+) -> Result<DeviceId, imp::Error> {
+    let devices = devices.deref_mut();
+    if let Some(device_id) = devices.inner.devices.get(index) {
+        return Ok(DeviceId(*device_id));
+    }
+    Err(imp::Error::InvalidIndex(index))
+}
+
+/// Returns a human-readable message for a [`DeviceId`].
+///
+/// The resulting pointer must NOT be freed.
+///
+/// @param device `AranyaDeviceId`.
+///
+/// @relates AranyaError.
+#[aranya_capi_core::no_ext_error]
+pub fn device_id_to_str(device: DeviceId) -> *const c_char {
+    // TODO: convert to string correctly.
+    if let Ok(c_string) = CString::new(device.0.to_string().as_str()) {
+        return c_string.as_c_str().as_ptr();
+    }
+    ptr::null()
 }
 
 // TODO: query_device_role
@@ -1073,17 +1106,40 @@ pub unsafe fn query_device_label_assignments(
             .device_label_assignments(device.0),
     )?;
     let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
-    let inner = aranya_client::Labels{
-        labels: v,
-    };
-    Safe::init(
-        labels,
-        imp::Labels {
-            rt,
-            inner,
-        },
-    );
+    let inner = aranya_client::Labels { labels: v };
+    Safe::init(labels, imp::Labels { rt, inner });
     Ok(())
+}
+
+/// Get label at index.
+///
+/// @param labels a list of labels [`Labels`].
+/// @param index the index of the label to return.
+/// @param __output label at index in list [`Label`].
+///
+/// @relates Labels.
+pub unsafe fn get_label_at_index(labels: &mut Labels, index: usize) -> Result<Label, imp::Error> {
+    let labels = labels.deref_mut();
+    if let Some(label) = labels.inner.labels.get(index) {
+        return Ok((*label).into());
+    }
+    Err(imp::Error::InvalidIndex(index))
+}
+
+/// Returns a human-readable message for a [`Label`].
+///
+/// The resulting pointer must NOT be freed.
+///
+/// @param label `AranyaLabel`.
+///
+/// @relates AranyaError.
+#[aranya_capi_core::no_ext_error]
+pub fn label_to_str(label: Label) -> *const c_char {
+    // TODO: convert to string correctly.
+    if let Ok(c_string) = CString::new(label.0.to_string().as_str()) {
+        return c_string.as_c_str().as_ptr();
+    }
+    ptr::null()
 }
 
 /// Query device's AFC network identifier.
