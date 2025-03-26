@@ -12,3 +12,21 @@ pub struct Client {
 impl Typed for Client {
     const TYPE_ID: TypeId = TypeId::new(0xbbafb41c);
 }
+
+pub struct Devices {
+    pub inner: aranya_client::Devices,
+    pub rt: tokio::runtime::Runtime,
+}
+
+impl Typed for Devices {
+    const TYPE_ID: TypeId = TypeId::new(0xbbafb41d);
+}
+
+pub struct Labels {
+    pub inner: aranya_client::Labels,
+    pub rt: tokio::runtime::Runtime,
+}
+
+impl Typed for Labels {
+    const TYPE_ID: TypeId = TypeId::new(0xbbafb41e);
+}

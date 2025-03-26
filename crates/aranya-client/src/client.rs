@@ -17,6 +17,18 @@ use crate::{
     error::{Error, Result},
 };
 
+/// List of device IDs.
+pub struct Devices {
+    /// List of device IDs.
+    pub devices: Vec<DeviceId>,
+}
+
+/// List of labels.
+pub struct Labels {
+    /// List of labels.
+    pub labels: Vec<Label>,
+}
+
 /// A client for invoking actions on and processing effects from
 /// the Aranya graph.
 ///

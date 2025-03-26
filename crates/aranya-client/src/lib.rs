@@ -18,6 +18,6 @@ pub mod error;
 #[doc(inline)]
 pub use crate::{
     afc::{AfcId, FastChannels, Label, Message, PollData},
-    client::{Client, Team},
+    client::{Client, Team, Devices, Labels},
     error::{AfcError, Error, Result},
 };

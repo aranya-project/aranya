@@ -1,5 +1,5 @@
 use core::{ffi::c_char, ops::DerefMut, ptr, slice};
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt, vec::Vec};
+use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use libc;
@@ -989,19 +989,10 @@ pub unsafe fn afc_recv_data(
     Ok(true)
 }
 
-/// List of devices.
-#[repr(C)]
-#[derive(Debug)]
-pub struct Devices {
-    /// List of device IDs.
-    pub devices: Vec<DeviceId>,
-}
-
-impl From<aranya_daemon_api::DeviceId> for DeviceId {
-    fn from(value: aranya_daemon_api::DeviceId) -> Self {
-        DeviceId(value)
-    }
-}
+/// A handle to a list of devices.
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 128, align = 8)]
+pub type Devices = Safe<imp::Devices>;
 
 /// Query devices on team.
 ///
@@ -1013,15 +1004,24 @@ impl From<aranya_daemon_api::DeviceId> for DeviceId {
 pub unsafe fn query_devices_on_team(
     client: &mut Client,
     team: &TeamId,
-) -> Result<Devices, imp::Error> {
+    devices: &mut MaybeUninit<Devices>,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let v = client
         .rt
         .block_on(client.inner.queries(team.0).devices_on_team())?;
-    let devices = Devices {
-        devices: v.into_iter().map(|d| d.into()).collect(),
+        let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
+    let inner = aranya_client::Devices{
+        devices: v,
     };
-    Ok(devices)
+    Safe::init(
+        devices,
+        imp::Devices {
+            rt,
+            inner,
+        },
+    );
+    Ok(())
 }
 
 // TODO: query_device_role
@@ -1046,13 +1046,10 @@ pub unsafe fn query_device_keybundle(
     Ok(KeyBundle::from_underlying(keys))
 }
 
-/// List of labels.
-#[repr(C)]
-#[derive(Debug)]
-pub struct Labels {
-    /// List of labels.
-    pub labels: Vec<Label>,
-}
+/// A handle to a list of labels.
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 128, align = 8)]
+pub type Labels = Safe<imp::Labels>;
 
 /// Query device label assignments.
 ///
@@ -1066,7 +1063,8 @@ pub unsafe fn query_device_label_assignments(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-) -> Result<Labels, imp::Error> {
+    labels: &mut MaybeUninit<Labels>,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let v = client.rt.block_on(
         client
@@ -1074,10 +1072,18 @@ pub unsafe fn query_device_label_assignments(
             .queries(team.0)
             .device_label_assignments(device.0),
     )?;
-    let labels = Labels {
-        labels: v.into_iter().map(|l| l.into()).collect(),
+    let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
+    let inner = aranya_client::Labels{
+        labels: v,
     };
-    Ok(labels)
+    Safe::init(
+        labels,
+        imp::Labels {
+            rt,
+            inner,
+        },
+    );
+    Ok(())
 }
 
 /// Query device's AFC network identifier.

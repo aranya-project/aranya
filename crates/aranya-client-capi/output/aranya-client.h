@@ -178,10 +178,6 @@ enum AranyaRole
 typedef uint8_t AranyaRole;
 #endif // __cplusplus
 
-typedef struct Vec_AranyaDeviceId Vec_AranyaDeviceId;
-
-typedef struct Vec_AranyaLabel Vec_AranyaLabel;
-
 /**
  * Extended error information.
  */
@@ -360,23 +356,27 @@ typedef struct AranyaAfcMsgInfo {
 } AranyaAfcMsgInfo;
 
 /**
- * List of devices.
+ * A handle to a list of devices.
  */
-typedef struct AranyaDevices {
+typedef struct ARANYA_ALIGNED(8) AranyaDevices {
     /**
-     * List of device IDs.
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
      */
-    struct Vec_AranyaDeviceId devices;
+    uint8_t __for_size_only[128];
 } AranyaDevices;
 
 /**
- * List of labels.
+ * A handle to a list of labels.
  */
-typedef struct AranyaLabels {
+typedef struct ARANYA_ALIGNED(8) AranyaLabels {
     /**
-     * List of labels.
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
      */
-    struct Vec_AranyaLabel labels;
+    uint8_t __for_size_only[128];
 } AranyaLabels;
 
 #ifdef __cplusplus
@@ -1329,6 +1329,25 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_devices_init`.
+ *
+ * @relates AranyaDevices
+ */
+AranyaError aranya_devices_cleanup(struct AranyaDevices *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_devices_init`.
+ *
+ * @relates AranyaDevices
+ */
+AranyaError aranya_devices_cleanup_ext(struct AranyaDevices *ptr,
+                                       struct AranyaExtError *__ext_err);
+
+/**
  * Query devices on team.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -1339,7 +1358,7 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
  */
 AranyaError aranya_query_devices_on_team(struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
-                                         struct AranyaDevices *__output);
+                                         struct AranyaDevices *devices);
 
 /**
  * Query devices on team.
@@ -1352,7 +1371,7 @@ AranyaError aranya_query_devices_on_team(struct AranyaClient *client,
  */
 AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
-                                             struct AranyaDevices *__output,
+                                             struct AranyaDevices *devices,
                                              struct AranyaExtError *__ext_err);
 
 /**
@@ -1387,6 +1406,25 @@ AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
                                               struct AranyaExtError *__ext_err);
 
 /**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_labels_init`.
+ *
+ * @relates AranyaLabels
+ */
+AranyaError aranya_labels_cleanup(struct AranyaLabels *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_labels_init`.
+ *
+ * @relates AranyaLabels
+ */
+AranyaError aranya_labels_cleanup_ext(struct AranyaLabels *ptr,
+                                      struct AranyaExtError *__ext_err);
+
+/**
  * Query device label assignments.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -1399,7 +1437,7 @@ AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
 AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
                                                   const struct AranyaTeamId *team,
                                                   const struct AranyaDeviceId *device,
-                                                  struct AranyaLabels *__output);
+                                                  struct AranyaLabels *labels);
 
 /**
  * Query device label assignments.
@@ -1414,7 +1452,7 @@ AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
 AranyaError aranya_query_device_label_assignments_ext(struct AranyaClient *client,
                                                       const struct AranyaTeamId *team,
                                                       const struct AranyaDeviceId *device,
-                                                      struct AranyaLabels *__output,
+                                                      struct AranyaLabels *labels,
                                                       struct AranyaExtError *__ext_err);
 
 /**
