@@ -89,7 +89,7 @@
  * The formula for computing the amount of characters in a base64 string from the original number of bytes is:
  * base64_str_len = (bytes*1375)/1000
  *
- * A [`DeviceId`] is 64 bytes.
+ * A DeviceId is 64 bytes.
  *
  * ARANYA_DEVICE_ID_STR_LEN is the number of characters required to hold the base64 string plus the null terminator:
  * (sizeof(AranyaDeviceId)*1375)/1000+1 = 89
@@ -1402,8 +1402,8 @@ AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param labels returns a list of labels assigned to the device [`Labels`].
- * @param labels_len returns the length of the labels list [`Labels`].
+ * @param labels returns a list of labels assigned to the device [`AranyaLabel`](@ref AranyaLabel).
+ * @param labels_len returns the length of the labels list [`AranyaLabel`](@ref AranyaLabel).
  *
  * @relates AranyaClient.
  */
@@ -1419,8 +1419,8 @@ AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param labels returns a list of labels assigned to the device [`Labels`].
- * @param labels_len returns the length of the labels list [`Labels`].
+ * @param labels returns a list of labels assigned to the device [`AranyaLabel`](@ref AranyaLabel).
+ * @param labels_len returns the length of the labels list [`AranyaLabel`](@ref AranyaLabel).
  *
  * @relates AranyaClient.
  */

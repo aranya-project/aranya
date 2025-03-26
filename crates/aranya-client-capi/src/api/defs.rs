@@ -1025,7 +1025,7 @@ pub fn query_devices_on_team(
 /// The formula for computing the amount of characters in a base64 string from the original number of bytes is:
 /// base64_str_len = (bytes*1375)/1000
 ///
-/// A [`DeviceId`] is 64 bytes.
+/// A DeviceId is 64 bytes.
 ///  
 /// ARANYA_DEVICE_ID_STR_LEN is the number of characters required to hold the base64 string plus the null terminator:
 /// (sizeof(AranyaDeviceId)*1375)/1000+1 = 89
@@ -1081,8 +1081,8 @@ pub unsafe fn query_device_keybundle(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param labels returns a list of labels assigned to the device [`Labels`].
-/// @param labels_len returns the length of the labels list [`Labels`].
+/// @param labels returns a list of labels assigned to the device [`Label`].
+/// @param labels_len returns the length of the labels list [`Label`].
 ///
 /// @relates AranyaClient.
 pub fn query_device_label_assignments(
