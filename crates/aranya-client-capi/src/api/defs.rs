@@ -1014,9 +1014,8 @@ pub unsafe fn query_devices_on_team(
     let v = client
         .rt
         .block_on(client.inner.queries(team.0).devices_on_team())?;
-    let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
     let inner = aranya_client::Devices { devices: v };
-    Safe::init(devices, imp::Devices { rt, inner });
+    Safe::init(devices, imp::Devices { inner });
     Ok(())
 }
 
@@ -1105,9 +1104,8 @@ pub unsafe fn query_device_label_assignments(
             .queries(team.0)
             .device_label_assignments(device.0),
     )?;
-    let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
     let inner = aranya_client::Labels { labels: v };
-    Safe::init(labels, imp::Labels { rt, inner });
+    Safe::init(labels, imp::Labels { inner });
     Ok(())
 }
 

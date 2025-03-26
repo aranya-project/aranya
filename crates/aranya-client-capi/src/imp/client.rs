@@ -15,7 +15,6 @@ impl Typed for Client {
 
 pub struct Devices {
     pub inner: aranya_client::Devices,
-    pub rt: tokio::runtime::Runtime,
 }
 
 impl Typed for Devices {
@@ -24,7 +23,6 @@ impl Typed for Devices {
 
 pub struct Labels {
     pub inner: aranya_client::Labels,
-    pub rt: tokio::runtime::Runtime,
 }
 
 impl Typed for Labels {
