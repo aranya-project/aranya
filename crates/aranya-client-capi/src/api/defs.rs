@@ -64,6 +64,9 @@ pub enum Error {
 
     #[capi(msg = "tokio runtime error")]
     Runtime,
+
+    #[capi(msg = "invalid index")]
+    InvalidIndex,
 }
 
 impl From<&imp::Error> for Error {
@@ -85,6 +88,7 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Bug(_) => Self::Bug,
             },
             imp::Error::Runtime(_) => Self::Runtime,
+            imp::Error::InvalidIndex(_) => Self::InvalidIndex,
         }
     }
 }
@@ -989,7 +993,65 @@ pub unsafe fn afc_recv_data(
     Ok(true)
 }
 
-// TODO: query_devices_on_team
+/// Query devices on team.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param devices returns a list of device IDs on the team [`DeviceId`].
+/// @param devices_len returns the length of the devices list [`DeviceId`].
+///
+/// @relates AranyaClient.
+pub fn query_devices_on_team(
+    client: &mut Client,
+    team: &TeamId,
+    devices: Option<&mut MaybeUninit<DeviceId>>,
+    devices_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let data = client
+        .rt
+        .block_on(client.inner.queries(team.0).devices_on_team())?;
+    *devices_len = data.len();
+    if let Some(devices) = devices {
+        let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
+        for (dst, src) in out.iter_mut().zip(&data) {
+            dst.write(DeviceId(*src));
+        }
+        return Ok(());
+    }
+    Ok(())
+}
+
+/// The formula for computing the amount of characters in a base64 string from the original number of bytes is:
+/// base64_str_len = (bytes*1375)/1000
+///
+/// A DeviceId is 64 bytes.
+///  
+/// ARANYA_DEVICE_ID_STR_LEN is the number of characters required to hold the base64 string plus the null terminator:
+/// (sizeof(AranyaDeviceId)*1375)/1000+1 = 89
+// TODO: compute size from size_of::<DeviceId>()
+pub const ARANYA_DEVICE_ID_STR_LEN: u64 = (64 * 1375) / 1000 + 1;
+
+/// Returns a human-readable message for a [`DeviceId`].
+///
+/// This method converts the DeviceId to a base64 encoded string.
+///
+/// Before calling this method, allocate a string of size ARANYA_DEVICE_ID_STR_LEN.
+///
+/// @param device ID [`DeviceId`].
+/// @param device ID string [`DeviceId`].
+///
+/// @relates AranyaError.
+#[aranya_capi_core::no_ext_error]
+pub fn device_id_to_str(
+    device: DeviceId,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    aranya_capi_core::write_c_str(str, &device.0, str_len)?;
+    Ok(())
+}
 
 // TODO: query_device_role
 
@@ -1013,7 +1075,39 @@ pub unsafe fn query_device_keybundle(
     Ok(KeyBundle::from_underlying(keys))
 }
 
-// TODO: query_device_label_assignments
+/// Query device label assignments.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param labels returns a list of labels assigned to the device [`Label`].
+/// @param labels_len returns the length of the labels list [`Label`].
+///
+/// @relates AranyaClient.
+pub fn query_device_label_assignments(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    labels: Option<&mut MaybeUninit<u32>>,
+    labels_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let data = client.rt.block_on(
+        client
+            .inner
+            .queries(team.0)
+            .device_label_assignments(device.0),
+    )?;
+    *labels_len = data.len();
+    if let Some(labels) = labels {
+        let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+        for (dst, src) in out.iter_mut().zip(&data) {
+            dst.write(src.to_u32());
+        }
+        return Ok(());
+    }
+    Ok(())
+}
 
 /// Query device's AFC network identifier.
 ///

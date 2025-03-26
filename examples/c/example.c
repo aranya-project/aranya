@@ -322,6 +322,38 @@ AranyaError run(Team *t) {
     sleep(1);
 
     // Queries
+    size_t devices_len      = BUF_LEN;
+    AranyaDeviceId *devices = malloc(devices_len * sizeof(AranyaDeviceId));
+    err = aranya_query_devices_on_team(&t->clients.operator.client, &t->id,
+                                       devices, &devices_len);
+    EXPECT("error querying devices on team", err);
+    if (devices == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+    for (size_t i = 0; i < devices_len; i++) {
+        AranyaDeviceId device_result = devices[i];
+        size_t device_str_len        = ARANYA_DEVICE_ID_STR_LEN;
+        char *device_str             = malloc(ARANYA_DEVICE_ID_STR_LEN);
+        aranya_device_id_to_str(device_result, device_str, &device_str_len);
+        printf("device_id: %s at index: %zu/%zu \r\n", device_str, i,
+               devices_len);
+        free(device_str);
+    }
+
+    size_t labels_len   = BUF_LEN;
+    AranyaLabel *labels = malloc(labels_len * sizeof(AranyaLabel));
+    err = aranya_query_device_label_assignments(&t->clients.operator.client,
+                                                &t->id, &t->clients.memberb.id,
+                                                labels, &labels_len);
+    EXPECT("error querying labels assigned to device", err);
+    if (labels == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+    for (size_t i = 0; i < labels_len; i++) {
+        AranyaLabel label_result = labels[i];
+        printf("label: %u at index: %zu/%zu \r\n", label_result, i, labels_len);
+    }
+
     AranyaKeyBundle memberb_keybundle;
     err = aranya_query_device_keybundle(&t->clients.operator.client, &t->id,
                                         &t->clients.memberb.id,
