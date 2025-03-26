@@ -94,9 +94,7 @@
  * ARANYA_DEVICE_ID_STR_LEN is the number of characters required to hold the base64 string plus the null terminator:
  * (sizeof(AranyaDeviceId)*1375)/1000+1 = 89
  */
-#define ARANYA_DEVICE_ID_LEN 64
-
-#define ARANYA_DEVICE_ID_STR_LEN (((ARANYA_DEVICE_ID_LEN * 1375) / 1000) + 1)
+#define ARANYA_DEVICE_ID_STR_LEN (((64 * 1375) / 1000) + 1)
 
 /**
  * An error code.
