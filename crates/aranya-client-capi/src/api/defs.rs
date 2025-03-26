@@ -993,54 +993,52 @@ pub unsafe fn afc_recv_data(
     Ok(true)
 }
 
-/// A handle to a list of devices.
-#[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 128, align = 8)]
-pub type Devices = Safe<imp::Devices>;
-
 /// Query devices on team.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param __output a list of devices on the team [`Devices`].
+/// @param devices returns a list of device IDs on the team [`DeviceId`].
+/// @param devices_len returns the length of the devices list [`DeviceId`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_devices_on_team(
+pub fn query_devices_on_team(
     client: &mut Client,
     team: &TeamId,
-    devices: &mut MaybeUninit<Devices>,
+    devices: Option<&mut MaybeUninit<DeviceId>>,
+    devices_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let v = client
+    let data = client
         .rt
         .block_on(client.inner.queries(team.0).devices_on_team())?;
-    let inner = aranya_client::Devices { devices: v };
-    Safe::init(devices, imp::Devices { inner });
+    *devices_len = data.len();
+    if let Some(devices) = devices {
+        let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
+        for (dst, src) in out.iter_mut().zip(&data) {
+            dst.write(DeviceId(*src));
+        }
+        return Ok(());
+    }
     Ok(())
 }
 
-/// Get device ID at index.
+/// The formula for computing the amount of characters in a base64 string from the original number of bytes is:
+/// base64_str_len = (bytes*1375)/1000
 ///
-/// @param devices a list of device IDs [`Devices`].
-/// @param index the index of the device to return.
-/// @param __output device ID at index in list [`DeviceId`].
-///
-/// @relates Devices.
-pub unsafe fn get_device_id_at_index(
-    devices: &mut Devices,
-    index: usize,
-) -> Result<DeviceId, imp::Error> {
-    let devices = devices.deref_mut();
-    if let Some(device_id) = devices.inner.devices.get(index) {
-        return Ok(DeviceId(*device_id));
-    }
-    Err(imp::Error::InvalidIndex(index))
-}
+/// A [`DeviceId`] is 64 bytes.
+///  
+/// ARANYA_DEVICE_ID_STR_LEN is the number of characters required to hold the base64 string plus the null terminator:
+/// (sizeof(AranyaDeviceId)*1375)/1000+1 = 89
+// TODO: compute DeviceID size rather than hard-coding it.
+pub const ARANYA_DEVICE_ID_LEN:u64 = 64;
+pub const ARANYA_DEVICE_ID_STR_LEN:u64 = (ARANYA_DEVICE_ID_LEN*1375)/1000 + 1;
 
 /// Returns a human-readable message for a [`DeviceId`].
 ///
-/// The resulting pointer must NOT be freed.
-///
+/// This method converts the DeviceId to a base64 encoded string.
+/// 
+/// Before calling this method, allocate a string of size ARANYA_DEVICE_ID_STR_LEN.
+/// 
 /// @param device ID [`DeviceId`].
 /// @param device ID string [`DeviceId`].
 ///
@@ -1078,68 +1076,37 @@ pub unsafe fn query_device_keybundle(
     Ok(KeyBundle::from_underlying(keys))
 }
 
-/// A handle to a list of labels.
-#[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 128, align = 8)]
-pub type Labels = Safe<imp::Labels>;
-
 /// Query device label assignments.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param __output a list of labels assigned to the device [`Labels`].
+/// @param labels returns a list of labels assigned to the device [`Labels`].
+/// @param labels_len returns the length of the labels list [`Labels`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_device_label_assignments(
+pub fn query_device_label_assignments(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    labels: &mut MaybeUninit<Labels>,
+    labels: Option<&mut MaybeUninit<u32>>,
+    labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let v = client.rt.block_on(
+    let data = client.rt.block_on(
         client
             .inner
             .queries(team.0)
             .device_label_assignments(device.0),
     )?;
-    let inner = aranya_client::Labels { labels: v };
-    Safe::init(labels, imp::Labels { inner });
-    Ok(())
-}
-
-/// Get label at index.
-///
-/// @param labels a list of labels [`Labels`].
-/// @param index the index of the label to return.
-/// @param __output label at index in list [`Label`].
-///
-/// @relates Labels.
-pub unsafe fn get_label_at_index(labels: &mut Labels, index: usize) -> Result<Label, imp::Error> {
-    let labels = labels.deref_mut();
-    if let Some(label) = labels.inner.labels.get(index) {
-        return Ok((*label).into());
+    *labels_len = data.len();
+    if let Some(labels) = labels {
+        let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+        for (dst, src) in out.iter_mut().zip(&data) {
+            dst.write(src.to_u32());
+        }
+        return Ok(());
     }
-    Err(imp::Error::InvalidIndex(index))
-}
-
-/// Returns a human-readable message for a [`Label`].
-///
-/// The resulting pointer must NOT be freed.
-///
-/// @param label [`Label`].
-/// @param label string [`Label`].
-///
-/// @relates AranyaError.
-#[aranya_capi_core::no_ext_error]
-pub fn label_to_str(
-    label: Label,
-    str: &mut MaybeUninit<c_char>,
-    str_len: &mut usize,
-) -> Result<(), imp::Error> {
-    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
-    aranya_capi_core::write_c_str(str, &label.0, str_len)?;
     Ok(())
 }
 
@@ -1161,10 +1128,13 @@ pub unsafe fn query_afc_net_identifier(
     let client = client.deref_mut();
     let Some(net_identifier) = client
         .rt
-        .block_on(client.inner.queries(team.0).afc_net_identifier(device.0))? else { return Ok(false); };  
-       let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);  
-        aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;  
-        Ok(true)
+        .block_on(client.inner.queries(team.0).afc_net_identifier(device.0))?
+    else {
+        return Ok(false);
+    };
+    let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
+    aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
+    Ok(true)
 }
 
 /// Query device's AQC network identifier.
@@ -1185,10 +1155,13 @@ pub unsafe fn query_aqc_net_identifier(
     let client = client.deref_mut();
     let Some(net_identifier) = client
         .rt
-        .block_on(client.inner.queries(team.0).aqc_net_identifier(device.0))? else { return Ok(false); };  
-       let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);  
-        aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;  
-        Ok(true)
+        .block_on(client.inner.queries(team.0).aqc_net_identifier(device.0))?
+    else {
+        return Ok(false);
+    };
+    let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
+    aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
+    Ok(true)
 }
 
 /// Query device's AQC network identifier.

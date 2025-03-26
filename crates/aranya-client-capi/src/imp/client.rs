@@ -12,19 +12,3 @@ pub struct Client {
 impl Typed for Client {
     const TYPE_ID: TypeId = TypeId::new(0xbbafb41c);
 }
-
-pub struct Devices {
-    pub inner: aranya_client::Devices,
-}
-
-impl Typed for Devices {
-    const TYPE_ID: TypeId = TypeId::new(0xbbafb41d);
-}
-
-pub struct Labels {
-    pub inner: aranya_client::Labels,
-}
-
-impl Typed for Labels {
-    const TYPE_ID: TypeId = TypeId::new(0xbbafb41e);
-}

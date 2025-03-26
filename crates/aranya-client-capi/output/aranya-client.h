@@ -86,6 +86,19 @@
 #define ARANYA_DURATION_NANOSECONDS 1
 
 /**
+ * The formula for computing the amount of characters in a base64 string from the original number of bytes is:
+ * base64_str_len = (bytes*1375)/1000
+ *
+ * A [`DeviceId`] is 64 bytes.
+ *
+ * ARANYA_DEVICE_ID_STR_LEN is the number of characters required to hold the base64 string plus the null terminator:
+ * (sizeof(AranyaDeviceId)*1375)/1000+1 = 89
+ */
+#define ARANYA_DEVICE_ID_LEN 64
+
+#define ARANYA_DEVICE_ID_STR_LEN (((ARANYA_DEVICE_ID_LEN * 1375) / 1000) + 1)
+
+/**
  * An error code.
  *
  * For extended error information, see [`AranyaExtError`](@ref AranyaExtError).
@@ -355,30 +368,6 @@ typedef struct AranyaAfcMsgInfo {
      */
     AranyaSocketAddr addr;
 } AranyaAfcMsgInfo;
-
-/**
- * A handle to a list of devices.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaDevices {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[128];
-} AranyaDevices;
-
-/**
- * A handle to a list of labels.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaLabels {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[128];
-} AranyaLabels;
 
 #ifdef __cplusplus
 extern "C" {
@@ -1330,82 +1319,42 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_devices_init`.
- *
- * @relates AranyaDevices
- */
-AranyaError aranya_devices_cleanup(struct AranyaDevices *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_devices_init`.
- *
- * @relates AranyaDevices
- */
-AranyaError aranya_devices_cleanup_ext(struct AranyaDevices *ptr,
-                                       struct AranyaExtError *__ext_err);
-
-/**
  * Query devices on team.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param __output a list of devices on the team [`AranyaDevices`](@ref AranyaDevices).
+ * @param devices returns a list of device IDs on the team [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param devices_len returns the length of the devices list [`AranyaDeviceId`](@ref AranyaDeviceId).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_query_devices_on_team(struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
-                                         struct AranyaDevices *devices);
+                                         struct AranyaDeviceId *devices,
+                                         size_t *devices_len);
 
 /**
  * Query devices on team.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param __output a list of devices on the team [`AranyaDevices`](@ref AranyaDevices).
+ * @param devices returns a list of device IDs on the team [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param devices_len returns the length of the devices list [`AranyaDeviceId`](@ref AranyaDeviceId).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
-                                             struct AranyaDevices *devices,
+                                             struct AranyaDeviceId *devices,
+                                             size_t *devices_len,
                                              struct AranyaExtError *__ext_err);
-
-/**
- * Get device ID at index.
- *
- * @param devices a list of device IDs [`AranyaDevices`](@ref AranyaDevices).
- * @param index the index of the device to return.
- * @param __output device ID at index in list [`AranyaDeviceId`](@ref AranyaDeviceId).
- *
- * @relates Devices.
- */
-AranyaError aranya_get_device_id_at_index(struct AranyaDevices *devices,
-                                          size_t index,
-                                          struct AranyaDeviceId *__output);
-
-/**
- * Get device ID at index.
- *
- * @param devices a list of device IDs [`AranyaDevices`](@ref AranyaDevices).
- * @param index the index of the device to return.
- * @param __output device ID at index in list [`AranyaDeviceId`](@ref AranyaDeviceId).
- *
- * @relates Devices.
- */
-AranyaError aranya_get_device_id_at_index_ext(struct AranyaDevices *devices,
-                                              size_t index,
-                                              struct AranyaDeviceId *__output,
-                                              struct AranyaExtError *__ext_err);
 
 /**
  * Returns a human-readable message for a [`AranyaDeviceId`](@ref AranyaDeviceId).
  *
- * The resulting pointer must NOT be freed.
+ * This method converts the DeviceId to a base64 encoded string.
+ *
+ * Before calling this method, allocate a string of size ARANYA_DEVICE_ID_STR_LEN.
  *
  * @param device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
  * @param device ID string [`AranyaDeviceId`](@ref AranyaDeviceId).
@@ -1448,38 +1397,21 @@ AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
                                               struct AranyaExtError *__ext_err);
 
 /**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_labels_init`.
- *
- * @relates AranyaLabels
- */
-AranyaError aranya_labels_cleanup(struct AranyaLabels *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_labels_init`.
- *
- * @relates AranyaLabels
- */
-AranyaError aranya_labels_cleanup_ext(struct AranyaLabels *ptr,
-                                      struct AranyaExtError *__ext_err);
-
-/**
  * Query device label assignments.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output a list of labels assigned to the device [`AranyaLabels`](@ref AranyaLabels).
+ * @param labels returns a list of labels assigned to the device [`Labels`].
+ * @param labels_len returns the length of the labels list [`Labels`].
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
                                                   const struct AranyaTeamId *team,
                                                   const struct AranyaDeviceId *device,
-                                                  struct AranyaLabels *labels);
+                                                  uint32_t *labels,
+                                                  size_t *labels_len);
 
 /**
  * Query device label assignments.
@@ -1487,54 +1419,17 @@ AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output a list of labels assigned to the device [`AranyaLabels`](@ref AranyaLabels).
+ * @param labels returns a list of labels assigned to the device [`Labels`].
+ * @param labels_len returns the length of the labels list [`Labels`].
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_query_device_label_assignments_ext(struct AranyaClient *client,
                                                       const struct AranyaTeamId *team,
                                                       const struct AranyaDeviceId *device,
-                                                      struct AranyaLabels *labels,
+                                                      uint32_t *labels,
+                                                      size_t *labels_len,
                                                       struct AranyaExtError *__ext_err);
-
-/**
- * Get label at index.
- *
- * @param labels a list of labels [`AranyaLabels`](@ref AranyaLabels).
- * @param index the index of the label to return.
- * @param __output label at index in list [`AranyaLabel`](@ref AranyaLabel).
- *
- * @relates Labels.
- */
-AranyaError aranya_get_label_at_index(struct AranyaLabels *labels,
-                                      size_t index,
-                                      AranyaLabel *__output);
-
-/**
- * Get label at index.
- *
- * @param labels a list of labels [`AranyaLabels`](@ref AranyaLabels).
- * @param index the index of the label to return.
- * @param __output label at index in list [`AranyaLabel`](@ref AranyaLabel).
- *
- * @relates Labels.
- */
-AranyaError aranya_get_label_at_index_ext(struct AranyaLabels *labels,
-                                          size_t index,
-                                          AranyaLabel *__output,
-                                          struct AranyaExtError *__ext_err);
-
-/**
- * Returns a human-readable message for a [`AranyaLabel`](@ref AranyaLabel).
- *
- * The resulting pointer must NOT be freed.
- *
- * @param label [`AranyaLabel`](@ref AranyaLabel).
- * @param label string [`AranyaLabel`](@ref AranyaLabel).
- *
- * @relates AranyaError.
- */
-AranyaError aranya_label_to_str(AranyaLabel label, char *str, size_t *str_len);
 
 /**
  * Query device's AFC network identifier.
