@@ -1030,15 +1030,15 @@ pub fn query_devices_on_team(
 /// ARANYA_DEVICE_ID_STR_LEN is the number of characters required to hold the base64 string plus the null terminator:
 /// (sizeof(AranyaDeviceId)*1375)/1000+1 = 89
 // TODO: compute DeviceID size rather than hard-coding it.
-pub const ARANYA_DEVICE_ID_LEN:u64 = 64;
-pub const ARANYA_DEVICE_ID_STR_LEN:u64 = (ARANYA_DEVICE_ID_LEN*1375)/1000 + 1;
+pub const ARANYA_DEVICE_ID_LEN: u64 = 64;
+pub const ARANYA_DEVICE_ID_STR_LEN: u64 = (ARANYA_DEVICE_ID_LEN * 1375) / 1000 + 1;
 
 /// Returns a human-readable message for a [`DeviceId`].
 ///
 /// This method converts the DeviceId to a base64 encoded string.
-/// 
+///
 /// Before calling this method, allocate a string of size ARANYA_DEVICE_ID_STR_LEN.
-/// 
+///
 /// @param device ID [`DeviceId`].
 /// @param device ID string [`DeviceId`].
 ///
