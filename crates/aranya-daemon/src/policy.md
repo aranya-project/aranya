@@ -271,6 +271,12 @@ function next_label_id() int {
     return label_id
 }
 
+/// Shorthand for retrieving the `Label` fact.
+function get_label_id(label string) int {
+    let v = check_unwrap query Label[label: label]
+    return v.label_id
+}
+
 // Returns the channel operation for a particular label.
 function get_allowed_op(device_id id, label_id int) enum ChanOp {
     let assigned_label = check_unwrap query AssignedLabel[label_id: label_id, device_id: device_id]
@@ -1323,6 +1329,7 @@ action create_afc_bidi_channel(peer_id id, label string) {
     let author_id = device::current_device_id()
     let author = get_valid_device(author_id)
     let peer_enc_pk = get_enc_pk(peer_id)
+    let label_id = get_label_id(label)
 
     let channel = afc::create_bidi_channel(
         parent_cmd_id,
@@ -1330,7 +1337,7 @@ action create_afc_bidi_channel(peer_id id, label string) {
         author_id,
         peer_enc_pk,
         peer_id,
-        label,
+        label_id,
     )
 
     publish AfcCreateBidiChannel {
@@ -1452,6 +1459,7 @@ action create_afc_uni_channel(writer_id id, reader_id id, label string) {
     let author = get_valid_device(device::current_device_id())
     let peer_id = select_peer_id(author.device_id, writer_id, reader_id)
     let peer_enc_pk = get_enc_pk(peer_id)
+    let label_id = get_label_id(label)
 
     let channel = afc::create_uni_channel(
         parent_cmd_id,
@@ -1459,7 +1467,7 @@ action create_afc_uni_channel(writer_id id, reader_id id, label string) {
         peer_enc_pk,
         writer_id,
         reader_id,
-        label,
+        label_id,
     )
 
     publish AfcCreateUniChannel {
