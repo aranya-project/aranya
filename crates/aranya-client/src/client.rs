@@ -17,6 +17,38 @@ use crate::{
     error::{Error, Result},
 };
 
+/// List of device IDs.
+pub struct Devices {
+    pub data: Vec<DeviceId>,
+}
+
+impl Devices {
+    pub fn iter(&self) -> impl Iterator<Item = &DeviceId> {
+        self.data.iter()
+    }
+
+    #[doc(hidden)]
+    pub fn __data(&self) -> &[DeviceId] {
+        self.data.as_slice()
+    }
+}
+
+/// List of labels.
+pub struct Labels {
+    pub data: Vec<Label>,
+}
+
+impl Labels {
+    pub fn iter(&self) -> impl Iterator<Item = &Label> {
+        self.data.iter()
+    }
+
+    #[doc(hidden)]
+    pub fn __data(&self) -> &[Label] {
+        self.data.as_slice()
+    }
+}
+
 /// A client for invoking actions on and processing effects from
 /// the Aranya graph.
 ///
@@ -321,12 +353,14 @@ pub struct Queries<'a> {
 
 impl Queries<'_> {
     /// Returns the list of devices on the current team.
-    pub async fn devices_on_team(&mut self) -> Result<Vec<DeviceId>> {
-        self.client
-            .daemon
-            .query_devices_on_team(context::current(), self.id)
-            .await?
-            .map_err(Into::into)
+    pub async fn devices_on_team(&mut self) -> Result<Devices> {
+        Ok(Devices {
+            data: self
+                .client
+                .daemon
+                .query_devices_on_team(context::current(), self.id)
+                .await??,
+        })
     }
 
     /// Returns the role of the current device.
@@ -348,12 +382,14 @@ impl Queries<'_> {
     }
 
     /// Returns a list of labels assiged to the current device.
-    pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<Vec<Label>> {
-        self.client
-            .daemon
-            .query_device_label_assignments(context::current(), self.id, device)
-            .await?
-            .map_err(Into::into)
+    pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
+        Ok(Labels {
+            data: self
+                .client
+                .daemon
+                .query_device_label_assignments(context::current(), self.id, device)
+                .await??,
+        })
     }
 
     /// Returns the AFC network identifier assigned to the current device.

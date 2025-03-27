@@ -1011,14 +1011,15 @@ pub fn query_devices_on_team(
     let data = client
         .rt
         .block_on(client.inner.queries(team.0).devices_on_team())?;
-    *devices_len = data.len();
     if let Some(devices) = devices {
         let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
-        for (dst, src) in out.iter_mut().zip(&data) {
+        for (dst, src) in out.iter_mut().zip(&data.data) {
             dst.write(DeviceId(*src));
         }
+        *devices_len = data.data.len();
         return Ok(());
     }
+    *devices_len = data.data.len();
     Ok(())
 }
 
@@ -1098,14 +1099,15 @@ pub fn query_device_label_assignments(
             .queries(team.0)
             .device_label_assignments(device.0),
     )?;
-    *labels_len = data.len();
     if let Some(labels) = labels {
         let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-        for (dst, src) in out.iter_mut().zip(&data) {
+        for (dst, src) in out.iter_mut().zip(&data.data) {
             dst.write(src.to_u32());
         }
+        *labels_len = data.data.len();
         return Ok(());
     }
+    *labels_len = data.data.len();
     Ok(())
 }
 
