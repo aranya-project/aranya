@@ -1028,7 +1028,7 @@ pub fn query_devices_on_team(
     Ok(())
 }
 
-/// The size in bytes of a [`DeviceId`] converted to a human-readable base64 string.
+/// The size in bytes of a `DeviceId` converted to a human-readable base64 string.
 pub const ARANYA_DEVICE_ID_STR_LEN: u64 = (64 * 1375) / 1000 + 1;
 
 /// Writes the human-readable encoding of `device` to `str`.
