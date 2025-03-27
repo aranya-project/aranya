@@ -37,7 +37,7 @@ wildcard_imports = "warn"
 [workspace.dependencies]
 aranya-afc-util = { version = "0.5.0", features = ["alloc"] }
 aranya-capi-core = { version = "0.2.1" }
-aranya-capi-codegen = { version = "0.2.1" }
+aranya-capi-codegen = { version = "0.2.2" }
 aranya-crypto = { version = "0.4.0", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
 aranya-crypto-ffi = { version = "0.5.0" }
 aranya-device-ffi = { version = "0.5.0" }
@@ -96,6 +96,3 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
-
-[patch.crates-io]
-aranya-capi-codegen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "codegen-feature-flags" }
