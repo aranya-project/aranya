@@ -224,7 +224,7 @@ impl DaemonApiHandler {
         debug!("received BidiChannelCreated effect");
         // NB: this shouldn't happen because the policy should
         // ensure that label fits inside a `u32`.
-        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
+        let label = Label::new(v.label_id.try_into().assume("`label` is out of range")?);
         // TODO: don't clone the eng.
         let BidiKeys { seal, open } = self.handler.lock().await.bidi_channel_created(
             &mut self.eng.clone(),
@@ -238,7 +238,7 @@ impl DaemonApiHandler {
                 key_id: v.channel_key_id.into(),
             },
         )?;
-        let label = Label::new(v.label.try_into().expect("expected label conversion"));
+        let label = Label::new(v.label_id.try_into().expect("expected label conversion"));
         let channel_id = ChannelId::new(node_id, label);
         debug!(%channel_id, "created AFC bidi channel `ChannelId`");
         self.afc
@@ -258,7 +258,7 @@ impl DaemonApiHandler {
     ) -> Result<()> {
         // NB: this shouldn't happen because the policy should
         // ensure that label fits inside a `u32`.
-        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
+        let label = Label::new(v.label_id.try_into().assume("`label` is out of range")?);
         let BidiKeys { seal, open } = self.handler.lock().await.bidi_channel_received(
             &mut self.eng.clone(),
             &BidiChannelReceived {
@@ -271,7 +271,7 @@ impl DaemonApiHandler {
                 encap: &v.encap,
             },
         )?;
-        let label = Label::new(v.label.try_into().expect("expected label conversion"));
+        let label = Label::new(v.label_id.try_into().expect("expected label conversion"));
         let channel_id = ChannelId::new(node_id, label);
         debug!(?channel_id, "received AFC bidi channel `ChannelId`");
         self.afc
@@ -441,21 +441,63 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn create_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
-        self.client
+    async fn create_label(
+        self,
+        _: context::Context,
+        team: TeamId,
+        label: String,
+    ) -> ApiResult<Label> {
+        let effects = self
+            .client
             .actions(&team.into_id().into())
             .define_label(label)
             .await?;
-        Ok(())
+
+        let id = self.pk.ident_pk.id()?;
+        let Some(Effect::LabelDefined(e)) =
+            find_effect!(&effects, Effect::LabelDefined(e) if e.author_id == id.into())
+        else {
+            return Err(anyhow!("unable to find `LabelDefined` effect").into());
+        };
+
+        let label = Label::new(
+            e.label_id
+                .try_into()
+                .assume("`label_id` should fit in a `u32`")?,
+        );
+
+        self.handle_effects(&effects, None).await?;
+        Ok(label)
     }
 
     #[instrument(skip(self))]
-    async fn delete_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
-        self.client
+    async fn delete_label(
+        self,
+        _: context::Context,
+        team: TeamId,
+        label: String,
+    ) -> ApiResult<Label> {
+        let effects = self
+            .client
             .actions(&team.into_id().into())
             .undefine_label(label)
             .await?;
-        Ok(())
+
+        let id = self.pk.ident_pk.id()?;
+        let Some(Effect::LabelUndefined(e)) =
+            find_effect!(&effects, Effect::LabelUndefined(e) if e.author_id == id.into())
+        else {
+            return Err(anyhow!("unable to find `LabelUndefined` effect").into());
+        };
+
+        let label = Label::new(
+            e.label_id
+                .try_into()
+                .assume("`label_id` should fit in a `u32`")?,
+        );
+
+        self.handle_effects(&effects, None).await?;
+        Ok(label)
     }
 
     #[instrument(skip(self))]
@@ -464,7 +506,7 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: TeamId,
         device: ApiDeviceId,
-        label: Label,
+        label: String,
     ) -> ApiResult<()> {
         // TODO: support other channel permissions.
         self.client
@@ -480,7 +522,7 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: TeamId,
         device: ApiDeviceId,
-        label: Label,
+        label: String,
     ) -> ApiResult<()> {
         let id = self.pk.ident_pk.id()?;
         self.client
@@ -497,8 +539,8 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
-        label: Label,
-    ) -> ApiResult<(AfcId, AfcCtrl)> {
+        label: String,
+    ) -> ApiResult<(AfcId, AfcCtrl, Label)> {
         info!("create_afc_bidi_channel");
 
         let peer_id = self
@@ -519,13 +561,19 @@ impl DaemonApi for DaemonApiHandler {
         let Some(Effect::AfcBidiChannelCreated(e)) =
             find_effect!(&effects, Effect::AfcBidiChannelCreated(e) if e.author_id == id.into())
         else {
-            return Err(anyhow::anyhow!("unable to find BidiChannelCreated effect").into());
+            return Err(anyhow!("unable to find BidiChannelCreated effect").into());
         };
         let afc_id: AfcId = e.channel_key_id.into();
         debug!(?afc_id, "processed afc ID");
 
+        let label = Label::new(
+            e.label_id
+                .try_into()
+                .assume("`label_id` should fit in a `u32`")?,
+        );
+
         self.handle_effects(&effects, Some(node_id)).await?;
-        Ok((afc_id, ctrl))
+        Ok((afc_id, ctrl, label))
     }
 
     #[instrument(skip(self))]
@@ -555,7 +603,7 @@ impl DaemonApi for DaemonApiHandler {
             let encap = BidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
             let afc_id: AfcId = encap.id().into();
             debug!(?afc_id, "processed afc ID");
-            let label = Label::new(e.label.try_into().expect("expected label conversion"));
+            let label = Label::new(e.label_id.try_into().expect("expected label conversion"));
             let net = self
                 .afc_peers
                 .lock()

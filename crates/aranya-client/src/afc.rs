@@ -30,10 +30,9 @@ use anyhow::anyhow;
 use aranya_crypto::{Random as _, Rng};
 pub use aranya_daemon_api::AfcId;
 use aranya_daemon_api::{AfcCtrl, NetIdentifier, TeamId, CS};
-pub use aranya_fast_channels::Label;
 use aranya_fast_channels::{
     shm::{Flag, Mode, ReadState},
-    AfcState, ChannelId, Client, Header, Message as InnerMsg, NodeId, Payload, Seq, Version,
+    AfcState, ChannelId, Client, Header, Label, Message as InnerMsg, NodeId, Payload, Seq, Version,
 };
 use aranya_util::ShmPathBuf;
 use buggy::{bug, Bug, BugExt as _};
@@ -47,6 +46,9 @@ use tokio::{
 use tracing::{debug, error, instrument, warn};
 
 use crate::error::AfcError;
+
+/// TODO: Docs
+pub type LabelId = Label;
 
 /// Data that can be polled from an Aranya Fast Channel.
 #[must_use]
@@ -72,7 +74,7 @@ pub struct Message {
     /// The channel from which the message was received.
     pub channel: AfcId,
     /// The Aranya Fast Channel label associated with the message.
-    pub label: Label,
+    pub label: LabelId,
     /// The order of the message in the channel.
     pub seq: Seq,
 }
@@ -381,7 +383,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
 
     /// Decrypts `data`.
     #[instrument(skip_all, fields(afc_id = %data.afc_id))]
-    fn open_data(&mut self, data: Data) -> Result<(Vec<u8>, AfcId, Label, Seq), AfcError> {
+    fn open_data(&mut self, data: Data) -> Result<(Vec<u8>, AfcId, LabelId, Seq), AfcError> {
         debug!(n = data.ciphertext.len(), "decrypting data");
 
         self.check_version(data.version)?;
@@ -591,26 +593,32 @@ impl<'a> FastChannels<'a> {
     /// # Cancellation Safety
     ///
     /// It is NOT safe to cancel the resulting future. Doing so might lose data.
-    #[instrument(skip_all, fields(self = self.client.afc.debug(), %team_id, %peer, %label))]
+    #[instrument(skip_all, fields(self = self.client.afc.debug(), %team_id, %peer, label))]
     pub async fn create_bidi_channel(
         &mut self,
         team_id: TeamId,
         peer: NetIdentifier,
-        label: Label,
+        label: &str,
     ) -> crate::Result<AfcId> {
         debug!("creating bidi channel");
 
         let node_id = self.client.afc.get_next_node_id().await?;
         debug!(%node_id, "selected node ID");
 
-        let (afc_id, ctrl) = self
+        let (afc_id, ctrl, label_id) = self
             .client
             .daemon
-            .create_afc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
+            .create_afc_bidi_channel(
+                context::current(),
+                team_id,
+                peer.clone(),
+                node_id,
+                label.to_owned(),
+            )
             .await??;
-        debug!(%afc_id, %node_id, %label, "created bidi channel");
+        debug!(%afc_id, %node_id, label, %label_id, "created bidi channel");
 
-        let chan_id = ChannelId::new(node_id, label);
+        let chan_id = ChannelId::new(node_id, label_id);
         self.client
             .afc
             .send_ctrl(peer, ctrl, team_id, afc_id, chan_id)

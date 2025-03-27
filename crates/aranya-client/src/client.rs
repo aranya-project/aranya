@@ -3,17 +3,14 @@
 use std::{net::SocketAddr, path::Path, time::Duration};
 
 use aranya_daemon_api::{DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, CS};
-use aranya_fast_channels::{
-    shm::ReadState,
-    Label, {self as afc},
-};
+use aranya_fast_channels::{self as afc, shm::ReadState};
 use aranya_util::Addr;
 use tarpc::{context, tokio_serde::formats::Json};
 use tokio::net::ToSocketAddrs;
 use tracing::{debug, info, instrument};
 
 use crate::{
-    afc::{setup_afc_shm, FastChannels, FastChannelsImpl},
+    afc::{setup_afc_shm, FastChannels, FastChannelsImpl, LabelId},
     error::{Error, Result},
 };
 
@@ -224,42 +221,61 @@ impl Team<'_> {
             .await??)
     }
 
-    /// Create an Aranya Fast Channels (AFC) label.
-    pub async fn create_label(&mut self, label: Label) -> Result<()> {
-        Ok(self
-            .client
-            .daemon
-            .create_label(context::current(), self.id, label)
-            .await??)
-    }
-
-    /// Delete an Aranya Fast Channels (AFC) label.
-    pub async fn delete_label(&mut self, label: Label) -> Result<()> {
-        Ok(self
-            .client
-            .daemon
-            .delete_label(context::current(), self.id, label)
-            .await??)
-    }
-
-    /// Assign an Aranya Fast Channels (AFC) label to a device.
+    /// Create a label for AFC and AQC.
     ///
-    /// This grants the device permission to send/receive AFC data using that label.
-    /// A channel must be created with the label in order to send data using that label.
-    pub async fn assign_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
+    /// It returns the label's unique numeric identifier.
+    ///
+    /// - It is an error if the label already exists.
+    pub async fn create_label(&mut self, label: &str) -> Result<LabelId> {
+        let label = self
+            .client
+            .daemon
+            .create_label(context::current(), self.id, label.to_owned())
+            .await??;
+        Ok(label)
+    }
+
+    /// Delete an AFC/AQC label.
+    ///
+    /// It returns the label's unique numeric identifier.
+    ///
+    /// - It is an error if the label does not exist.
+    pub async fn delete_label(&mut self, label: &str) -> Result<LabelId> {
+        let label = self
+            .client
+            .daemon
+            .delete_label(context::current(), self.id, label.to_owned())
+            .await??;
+        Ok(label)
+    }
+
+    /// Grants a device permission to use a label for AFC and
+    /// AQC.
+    ///
+    /// - It is an error if the device does not exist.
+    /// - It is an error if the label does not exist.
+    /// - It is an error if the device has already been assigned
+    ///   this label.
+    pub async fn assign_label(&mut self, device: DeviceId, label: &str) -> Result<()> {
         Ok(self
             .client
             .daemon
-            .assign_label(context::current(), self.id, device, label)
+            .assign_label(context::current(), self.id, device, label.to_owned())
             .await??)
     }
 
-    /// Revoke an Aranya Fast Channels (AFC) label from a device.
-    pub async fn revoke_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
+    /// Revokes a device's permission to use a label for AFC and
+    /// AQC.
+    ///
+    /// - It is an error if the device does not exist.
+    /// - It is an error if the label does not exist.
+    /// - It is an error if the device has not been assigned this
+    ///   label.
+    pub async fn revoke_label(&mut self, device: DeviceId, label: &str) -> Result<()> {
         Ok(self
             .client
             .daemon
-            .revoke_label(context::current(), self.id, device, label)
+            .revoke_label(context::current(), self.id, device, label.to_owned())
             .await??)
     }
 }
