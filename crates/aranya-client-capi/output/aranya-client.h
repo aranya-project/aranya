@@ -86,13 +86,7 @@
 #define ARANYA_DURATION_NANOSECONDS 1
 
 /**
- * The formula for computing the amount of characters in a base64 string from the original number of bytes is:
- * base64_str_len = (bytes*1375)/1000
- *
- * A DeviceId is 64 bytes.
- *
- * ARANYA_DEVICE_ID_STR_LEN is the number of characters required to hold the base64 string plus the null terminator:
- * (sizeof(AranyaDeviceId)*1375)/1000+1 = 89
+ * The size in bytes of a [`DeviceId`] converted to a human-readable base64 string.
  */
 #define ARANYA_DEVICE_ID_STR_LEN (((64 * 1375) / 1000) + 1)
 
@@ -1348,11 +1342,9 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
                                              struct AranyaExtError *__ext_err);
 
 /**
- * Returns a human-readable message for a [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * Writes the human-readable encoding of `device` to `str`.
  *
- * This method converts the DeviceId to a base64 encoded string.
- *
- * Before calling this method, allocate a string of size ARANYA_DEVICE_ID_STR_LEN.
+ * To always succeed, `str` must be at least `ARANYA_DEVICE_ID_STR_LEN` bytes long.
  *
  * @param device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
  * @param device ID string [`AranyaDeviceId`](@ref AranyaDeviceId).

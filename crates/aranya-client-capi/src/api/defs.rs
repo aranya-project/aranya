@@ -1012,33 +1012,28 @@ pub fn query_devices_on_team(
         .rt
         .block_on(client.inner.queries(team.0).devices_on_team())?;
     let data = data.__data();
-    if let Some(devices) = devices {
-        let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
-        for (dst, src) in out.iter_mut().zip(data) {
-            dst.write(DeviceId(*src));
-        }
+    let Some(devices) = devices else {
         *devices_len = data.len();
-        return Ok(());
+        return Err(imp::Error::BufferTooSmall);
+    };
+    let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(DeviceId(*src));
+    }
+    if *devices_len < data.len() {
+        *devices_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
     }
     *devices_len = data.len();
     Ok(())
 }
 
-/// The formula for computing the amount of characters in a base64 string from the original number of bytes is:
-/// base64_str_len = (bytes*1375)/1000
-///
-/// A DeviceId is 64 bytes.
-///  
-/// ARANYA_DEVICE_ID_STR_LEN is the number of characters required to hold the base64 string plus the null terminator:
-/// (sizeof(AranyaDeviceId)*1375)/1000+1 = 89
-// TODO: compute size from size_of::<DeviceId>()
+/// The size in bytes of a [`DeviceId`] converted to a human-readable base64 string.
 pub const ARANYA_DEVICE_ID_STR_LEN: u64 = (64 * 1375) / 1000 + 1;
 
-/// Returns a human-readable message for a [`DeviceId`].
+/// Writes the human-readable encoding of `device` to `str`.
 ///
-/// This method converts the DeviceId to a base64 encoded string.
-///
-/// Before calling this method, allocate a string of size ARANYA_DEVICE_ID_STR_LEN.
+/// To always succeed, `str` must be at least `ARANYA_DEVICE_ID_STR_LEN` bytes long.
 ///
 /// @param device ID [`DeviceId`].
 /// @param device ID string [`DeviceId`].
@@ -1101,13 +1096,17 @@ pub fn query_device_label_assignments(
             .device_label_assignments(device.0),
     )?;
     let data = data.__data();
-    if let Some(labels) = labels {
-        let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-        for (dst, src) in out.iter_mut().zip(data) {
-            dst.write(src.to_u32());
-        }
+    let Some(labels) = labels else {
         *labels_len = data.len();
-        return Ok(());
+        return Err(imp::Error::BufferTooSmall);
+    };
+    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src.to_u32());
+    }
+    if *labels_len < data.len() {
+        *labels_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
     }
     *labels_len = data.len();
     Ok(())
