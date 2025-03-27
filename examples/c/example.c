@@ -170,16 +170,18 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 
     err = aranya_client_init(&c->client, &cli_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
 #if defined(ENABLE_AFC)
+        fprintf(stderr,
                 "error initializing client %s (daemon_addr: %s, shm_path: %s, "
                 "afc_addr: %s): %s\r\n",
                 c->name, daemon_addr, shm_path, afc_addr,
+                aranya_error_to_str(err));
 #else
+        fprintf(stderr,
                 "error initializing client %s (daemon_addr: %s, shm_path: %s): %s\r\n",
                 c->name, daemon_addr, shm_path,
-#endif
                 aranya_error_to_str(err));
+#endif
         return err;
     }
     err = aranya_get_device_id(&c->client, &c->id);
