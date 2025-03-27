@@ -76,10 +76,12 @@ const AranyaAddr sync_addrs[] = {"127.0.0.1:10001", "127.0.0.1:10002",
                                  "127.0.0.1:10003", "127.0.0.1:10004",
                                  "127.0.0.1:10005"};
 
+#if defined(ENABLE_AFC)
 // List of AFC addresses.
 const AranyaNetIdentifier afc_addrs[] = {"127.0.0.1:11001", "127.0.0.1:11002",
                                          "127.0.0.1:11003", "127.0.0.1:11004",
                                          "127.0.0.1:11005"};
+#endif
 
 // Aranya client.
 typedef struct {
@@ -116,16 +118,27 @@ typedef struct {
     };
 } Team;
 
+#if defined(ENABLE_AFC)
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                         const char *shm_path, const char *afc_addr);
+#else
+
+AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
+                        const char *shm_path);
+#endif
 AranyaError init_team(Team *t);
 AranyaError add_sync_peers(Team *t);
 AranyaError run(Team *t);
 AranyaError cleanup_team(Team *t);
 
 // Initialize an Aranya client.
+#if defined(ENABLE_AFC)
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                         const char *shm_path, const char *afc_addr) {
+#else
+AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
+                        const char *shm_path) {
+#endif
     AranyaError err;
 
     c->name = name;
@@ -158,9 +171,14 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     err = aranya_client_init(&c->client, &cli_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr,
+#if defined(ENABLE_AFC)
                 "error initializing client %s (daemon_addr: %s, shm_path: %s, "
                 "afc_addr: %s): %s\r\n",
                 c->name, daemon_addr, shm_path, afc_addr,
+#else
+                "error initializing client %s (daemon_addr: %s, shm_path: %s): %s\r\n",
+                c->name, daemon_addr, shm_path,
+#endif
                 aranya_error_to_str(err));
         return err;
     }
@@ -180,8 +198,13 @@ AranyaError init_team(Team *t) {
 
     // initialize team clients.
     for (int i = 0; i < NUM_CLIENTS; i++) {
+#if defined(ENABLE_AFC)
         err = init_client(&t->clients_arr[i], client_names[i], daemon_socks[i],
                           shm_paths[i], afc_addrs[i]);
+#else
+        err = init_client(&t->clients_arr[i], client_names[i], daemon_socks[i],
+                          shm_paths[i]);
+#endif
         EXPECT("error initializing team", err);
     }
 
@@ -290,6 +313,7 @@ AranyaError run(Team *t) {
                                     &t->clients.memberb.pk);
     EXPECT("error adding memberb to team", err);
 
+#if defined(ENABLE_AFC)
     sleep(1);
 
     // Once all team members are added and the appropriate roles have been
@@ -399,6 +423,8 @@ AranyaError run(Team *t) {
     printf("%s received afc message from %s: len: %zu, label: %d \r\n",
            t->clients_arr[MEMBERB].name, t->clients_arr[MEMBERA].name, len,
            info.label);
+#endif
+
     return ARANYA_ERROR_SUCCESS;
 }
 
