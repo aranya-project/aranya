@@ -30,7 +30,8 @@ use anyhow::anyhow;
 use aranya_crypto::{Random as _, Rng};
 pub use aranya_daemon_api::AfcId;
 use aranya_daemon_api::{AfcCtrl, NetIdentifier, TeamId, CS};
-//TODO(nikki): once we reuse these for AQC, move this to lib.rs? Or just duplicate it in mod aqc.
+// TODO(nikki): once we reuse these for AQC, move this to lib.rs? Or just duplicate it in mod aqc.
+// See https://github.com/aranya-project/aranya-core/issues/101
 pub use aranya_fast_channels::Label;
 use aranya_fast_channels::{
     shm::{Flag, Mode, ReadState},

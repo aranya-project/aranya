@@ -525,7 +525,7 @@ AranyaError aranya_client_cleanup_ext(struct AranyaClient *ptr,
  * Sets the shared memory path that AFC should use for storing channel data.
  *
  * @param cfg a pointer to the afc config builder
- * @param shm_path a pointer to a string with the shared memory path
+ * @param shm_path a string with the shared memory path
  */
 AranyaError aranya_afc_config_builder_set_shm_path(struct AranyaAfcConfigBuilder *cfg,
                                                    const char *shm_path);
@@ -536,7 +536,7 @@ AranyaError aranya_afc_config_builder_set_shm_path(struct AranyaAfcConfigBuilder
  * Sets the shared memory path that AFC should use for storing channel data.
  *
  * @param cfg a pointer to the afc config builder
- * @param shm_path a pointer to a string with the shared memory path
+ * @param shm_path a string with the shared memory path
  */
 AranyaError aranya_afc_config_builder_set_shm_path_ext(struct AranyaAfcConfigBuilder *cfg,
                                                        const char *shm_path,
@@ -548,7 +548,7 @@ AranyaError aranya_afc_config_builder_set_shm_path_ext(struct AranyaAfcConfigBui
  * Sets the maximum number of channels that are stored in shared memory.
  *
  * @param cfg a pointer to the afc config builder
- * @param max_channels the maximum amount of channels allowed
+ * @param max_channels the maximum number of channels allowed
  */
 AranyaError aranya_afc_config_builder_set_max_channels(struct AranyaAfcConfigBuilder *cfg,
                                                        size_t max_channels);
@@ -559,7 +559,7 @@ AranyaError aranya_afc_config_builder_set_max_channels(struct AranyaAfcConfigBui
  * Sets the maximum number of channels that are stored in shared memory.
  *
  * @param cfg a pointer to the afc config builder
- * @param max_channels the maximum amount of channels allowed
+ * @param max_channels the maximum number of channels allowed
  */
 AranyaError aranya_afc_config_builder_set_max_channels_ext(struct AranyaAfcConfigBuilder *cfg,
                                                            size_t max_channels,
@@ -571,7 +571,7 @@ AranyaError aranya_afc_config_builder_set_max_channels_ext(struct AranyaAfcConfi
  * Sets the address that the AFC server should bind to for listening.
  *
  * @param cfg a pointer to the afc config builder
- * @param address a pointer to a string with the address to bind to
+ * @param address a string with the address to bind to
  */
 AranyaError aranya_afc_config_builder_set_address(struct AranyaAfcConfigBuilder *cfg,
                                                   const char *address);
@@ -582,7 +582,7 @@ AranyaError aranya_afc_config_builder_set_address(struct AranyaAfcConfigBuilder 
  * Sets the address that the AFC server should bind to for listening.
  *
  * @param cfg a pointer to the afc config builder
- * @param address a pointer to a string with the address to bind to
+ * @param address a string with the address to bind to
  */
 AranyaError aranya_afc_config_builder_set_address_ext(struct AranyaAfcConfigBuilder *cfg,
                                                       const char *address,
@@ -591,8 +591,8 @@ AranyaError aranya_afc_config_builder_set_address_ext(struct AranyaAfcConfigBuil
 
 #if defined(ENABLE_AFC)
 /**
- * Attempts to construct an [`AranyaAfcConfig`](@ref AranyaAfcConfig), returning an `Error::Bug` if
- * there are invalid parameters.
+ * Attempts to construct an [`AranyaAfcConfig`](@ref AranyaAfcConfig), returning an `Error::Bug`
+ * if there are invalid parameters.
  *
  * @param cfg a pointer to the afc config builder
  * @param out a pointer to write the afc config to
@@ -603,8 +603,8 @@ AranyaError aranya_afc_config_builder_build(struct AranyaAfcConfigBuilder *cfg,
 
 #if defined(ENABLE_AFC)
 /**
- * Attempts to construct an [`AranyaAfcConfig`](@ref AranyaAfcConfig), returning an `Error::Bug` if
- * there are invalid parameters.
+ * Attempts to construct an [`AranyaAfcConfig`](@ref AranyaAfcConfig), returning an `Error::Bug`
+ * if there are invalid parameters.
  *
  * @param cfg a pointer to the afc config builder
  * @param out a pointer to write the afc config to
@@ -618,7 +618,7 @@ AranyaError aranya_afc_config_builder_build_ext(struct AranyaAfcConfigBuilder *c
  * Sets the daemon address that the Client should try to connect to.
  *
  * @param cfg a pointer to the client config builder
- * @param address a pointer to a string containing the address
+ * @param address a string containing the address
  */
 AranyaError aranya_client_config_builder_set_daemon_addr(struct AranyaClientConfigBuilder *cfg,
                                                          const char *address);
@@ -627,7 +627,7 @@ AranyaError aranya_client_config_builder_set_daemon_addr(struct AranyaClientConf
  * Sets the daemon address that the Client should try to connect to.
  *
  * @param cfg a pointer to the client config builder
- * @param address a pointer to a string containing the address
+ * @param address a string containing the address
  */
 AranyaError aranya_client_config_builder_set_daemon_addr_ext(struct AranyaClientConfigBuilder *cfg,
                                                              const char *address,
@@ -657,8 +657,8 @@ AranyaError aranya_client_config_builder_set_afc_config_ext(struct AranyaClientC
 #endif
 
 /**
- * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Bug` if
- * there are invalid parameters.
+ * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Bug`
+ * if there are invalid parameters.
  *
  * @param cfg a pointer to the client config builder
  * @param out a pointer to write the client config to
@@ -667,8 +667,8 @@ AranyaError aranya_client_config_builder_build(struct AranyaClientConfigBuilder 
                                                struct AranyaClientConfig *out);
 
 /**
- * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Bug` if
- * there are invalid parameters.
+ * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Bug`
+ * if there are invalid parameters.
  *
  * @param cfg a pointer to the client config builder
  * @param out a pointer to write the client config to

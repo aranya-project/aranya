@@ -343,7 +343,7 @@ pub type AfcConfigBuilder = imp::AfcConfigBuilder;
 /// Sets the shared memory path that AFC should use for storing channel data.
 ///
 /// @param cfg a pointer to the afc config builder
-/// @param shm_path a pointer to a string with the shared memory path
+/// @param shm_path a string with the shared memory path
 #[cfg(feature = "afc")]
 pub fn afc_config_builder_set_shm_path(cfg: &mut AfcConfigBuilder, shm_path: *const c_char) {
     cfg.shm_path = shm_path;
@@ -352,7 +352,7 @@ pub fn afc_config_builder_set_shm_path(cfg: &mut AfcConfigBuilder, shm_path: *co
 /// Sets the maximum number of channels that are stored in shared memory.
 ///
 /// @param cfg a pointer to the afc config builder
-/// @param max_channels the maximum amount of channels allowed
+/// @param max_channels the maximum number of channels allowed
 #[cfg(feature = "afc")]
 pub fn afc_config_builder_set_max_channels(cfg: &mut AfcConfigBuilder, max_channels: usize) {
     cfg.max_channels = max_channels;
@@ -361,14 +361,14 @@ pub fn afc_config_builder_set_max_channels(cfg: &mut AfcConfigBuilder, max_chann
 /// Sets the address that the AFC server should bind to for listening.
 ///
 /// @param cfg a pointer to the afc config builder
-/// @param address a pointer to a string with the address to bind to
+/// @param address a string with the address to bind to
 #[cfg(feature = "afc")]
 pub fn afc_config_builder_set_address(cfg: &mut AfcConfigBuilder, address: *const c_char) {
     cfg.addr = address;
 }
 
-/// Attempts to construct an [`AfcConfig`], returning an `Error::Bug` if
-/// there are invalid parameters.
+/// Attempts to construct an [`AfcConfig`], returning an `Error::Bug`
+/// if there are invalid parameters.
 ///
 /// @param cfg a pointer to the afc config builder
 /// @param out a pointer to write the afc config to
@@ -392,7 +392,7 @@ pub type ClientConfigBuilder = imp::ClientConfigBuilder;
 /// Sets the daemon address that the Client should try to connect to.
 ///
 /// @param cfg a pointer to the client config builder
-/// @param address a pointer to a string containing the address
+/// @param address a string containing the address
 pub fn client_config_builder_set_daemon_addr(
     cfg: &mut ClientConfigBuilder,
     address: *const c_char,
@@ -412,8 +412,8 @@ pub fn client_config_builder_set_afc_config(
     cfg.afc = Some(**afc_config);
 }
 
-/// Attempts to construct a [`ClientConfig`], returning an `Error::Bug` if
-/// there are invalid parameters.
+/// Attempts to construct a [`ClientConfig`], returning an `Error::Bug`
+/// if there are invalid parameters.
 ///
 /// @param cfg a pointer to the client config builder
 /// @param out a pointer to write the client config to
