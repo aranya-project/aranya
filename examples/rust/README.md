@@ -13,8 +13,10 @@ During setup, the example application starts an instance of the [`aranya-daemon`
 ## Running the example
 We've provided a few different ways to run the Aranya example.
 
-## 1. Running the example from a script
+## 1. Running the example with cargo-make
 Install the [Rust toolchain](https://www.rust-lang.org/tools/install), this will install the toolchain manager `rustup`, the rust compiler `rustc` and package manager/build tool `cargo`.
+
+Install [cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation) (v0.37.23).
 
 ```bash
 # First, download the source code from this repository:
