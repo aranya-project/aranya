@@ -19,7 +19,7 @@ use crate::{
 
 /// List of device IDs.
 pub struct Devices {
-    pub data: Vec<DeviceId>,
+    data: Vec<DeviceId>,
 }
 
 impl Devices {
