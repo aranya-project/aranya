@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{AfcMsg, Client, Label};
+use aranya_client::{Message, Client, Label};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
@@ -117,11 +117,11 @@ impl UserCtx {
     }
 
     async fn aranya_local_addr(&self) -> Result<SocketAddr> {
-        Ok(self.client.aranya_local_addr().await?)
+        Ok(self.client.local_addr().await?)
     }
 
-    async fn afc_local_addr(&self) -> Result<SocketAddr> {
-        Ok(self.client.afc_local_addr().await?)
+    async fn afc_local_addr(&mut self) -> Result<SocketAddr> {
+        Ok(self.client.afc().local_addr().await?)
     }
 }
 
@@ -373,7 +373,7 @@ async fn main() -> Result<()> {
     sleep(Duration::from_millis(100)).await;
     do_poll!(team.membera.client, team.memberb.client);
 
-    let Some(AfcMsg { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
+    let Some(Message { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
         bail!("no message available!")
     };
     debug!(
@@ -383,7 +383,7 @@ async fn main() -> Result<()> {
         core::str::from_utf8(&data)?
     );
 
-    let Some(AfcMsg { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
+    let Some(Message { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
         bail!("no message available!")
     };
     debug!(
