@@ -1,4 +1,4 @@
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 use core::ptr;
 use core::{ffi::c_char, ops::DerefMut, slice};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
@@ -82,7 +82,7 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Connecting(_) => Self::Connecting,
                 aranya_client::Error::Rpc(_) => Self::Rpc,
                 aranya_client::Error::Daemon(_) => Self::Daemon,
-                #[cfg(feature = "experimental")]
+                #[cfg(feature = "afc")]
                 aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Bug(_) => Self::Bug,
             },
@@ -183,7 +183,7 @@ pub struct DeviceId(aranya_daemon_api::DeviceId);
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
 #[aranya_capi_core::opaque(size = 16, align = 1)]
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub struct ChannelId(aranya_daemon_api::AfcId);
 
 /// An enum containing team roles defined in the Aranya policy.
@@ -231,10 +231,10 @@ impl Addr {
 /// E.g. "localhost:8080", "127.0.0.1:8080"
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub struct NetIdentifier(*const c_char);
 
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 impl NetIdentifier {
     unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
@@ -331,12 +331,12 @@ impl KeyBundle {
 }
 
 /// Configuration info for Aranya Fast Channels.
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 #[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type AfcConfig = Safe<imp::AfcConfig>;
 
 /// Configuration info builder for Aranya Fast Channels.
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type AfcConfigBuilder = imp::AfcConfigBuilder;
 
@@ -344,7 +344,7 @@ pub type AfcConfigBuilder = imp::AfcConfigBuilder;
 ///
 /// @param cfg a pointer to the afc config builder
 /// @param shm_path a pointer to a string with the shared memory path
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub fn afc_config_builder_set_shm_path(cfg: &mut AfcConfigBuilder, shm_path: *const c_char) {
     cfg.shm_path = shm_path;
 }
@@ -353,7 +353,7 @@ pub fn afc_config_builder_set_shm_path(cfg: &mut AfcConfigBuilder, shm_path: *co
 ///
 /// @param cfg a pointer to the afc config builder
 /// @param max_channels the maximum amount of channels allowed
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub fn afc_config_builder_set_max_channels(cfg: &mut AfcConfigBuilder, max_channels: usize) {
     cfg.max_channels = max_channels;
 }
@@ -362,7 +362,7 @@ pub fn afc_config_builder_set_max_channels(cfg: &mut AfcConfigBuilder, max_chann
 ///
 /// @param cfg a pointer to the afc config builder
 /// @param address a pointer to a string with the address to bind to
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub fn afc_config_builder_set_address(cfg: &mut AfcConfigBuilder, address: *const c_char) {
     cfg.addr = address;
 }
@@ -372,7 +372,7 @@ pub fn afc_config_builder_set_address(cfg: &mut AfcConfigBuilder, address: *cons
 ///
 /// @param cfg a pointer to the afc config builder
 /// @param out a pointer to write the afc config to
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub fn afc_config_builder_build(
     cfg: &mut AfcConfigBuilder,
     out: &mut MaybeUninit<AfcConfig>,
@@ -404,7 +404,7 @@ pub fn client_config_builder_set_daemon_addr(
 ///
 /// @param cfg a pointer to the client config builder
 /// @param afc_config a pointer to a valid AFC config (see [`AfcConfigBuilder`])
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub fn client_config_builder_set_afc_config(
     cfg: &mut ClientConfigBuilder,
     afc_config: &mut AfcConfig,
@@ -442,14 +442,14 @@ pub unsafe fn client_init(
     )
     .as_ref();
 
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     let afc_shm_path = OsStr::from_bytes(
         // SAFETY: Caller must ensure pointer is a valid C String.
         unsafe { std::ffi::CStr::from_ptr(config.afc.shm_path) }.to_bytes(),
     )
     .as_ref();
 
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     let afc_addr =
         // SAFETY: Caller must ensure pointer is a valid C String.
         unsafe { std::ffi::CStr::from_ptr(config.afc.addr) }
@@ -457,14 +457,14 @@ pub unsafe fn client_init(
 
     let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
 
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     let inner = rt.block_on(aranya_client::Client::connect(
         daemon_socket,
         afc_shm_path,
         config.afc.max_channels,
         afc_addr,
     ))?;
-    #[cfg(not(feature = "experimental"))]
+    #[cfg(not(feature = "afc"))]
     let inner = rt.block_on(aranya_client::Client::connect(daemon_socket))?;
 
     Safe::init(
@@ -472,7 +472,7 @@ pub unsafe fn client_init(
         imp::Client {
             rt,
             inner,
-            #[cfg(feature = "experimental")]
+            #[cfg(feature = "afc")]
             msg: None,
         },
     );
@@ -795,7 +795,7 @@ pub fn revoke_label(
 /// @param net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub unsafe fn afc_assign_net_identifier(
     client: &mut Client,
     team: &TeamId,
@@ -824,7 +824,7 @@ pub unsafe fn afc_assign_net_identifier(
 /// @param net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub unsafe fn afc_remove_net_identifier(
     client: &mut Client,
     team: &TeamId,
@@ -857,7 +857,7 @@ pub unsafe fn afc_remove_net_identifier(
 /// @param __output the channel's ID [`ChannelId`]
 ///
 /// @relates AranyaClient.
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub unsafe fn afc_create_bidi_channel(
     client: &mut Client,
     team: &TeamId,
@@ -881,7 +881,7 @@ pub unsafe fn afc_create_bidi_channel(
 /// @param chan the AFC channel ID [`ChannelId`] of the channel to delete.
 ///
 /// @relates AranyaClient.
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub fn afc_delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
@@ -898,7 +898,7 @@ pub fn afc_delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), im
 /// @param timeout how long to wait before timing out the poll operation [`Duration`].
 ///
 /// @relates AranyaClient.
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub fn afc_poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client.rt.block_on(async {
@@ -916,7 +916,7 @@ pub fn afc_poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::
 /// @param data_len length of data to send.
 ///
 /// @relates AranyaClient.
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub fn afc_send_data(client: &mut Client, chan: ChannelId, data: &[u8]) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
@@ -928,7 +928,7 @@ pub fn afc_send_data(client: &mut Client, chan: ChannelId, data: &[u8]) -> Resul
 /// Aranya Fast Channels (AFC) message info.
 #[repr(C)]
 #[derive(Debug)]
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub struct AfcMsgInfo {
     /// Uniquely (globally) identifies the channel.
     pub channel: ChannelId,
@@ -945,14 +945,14 @@ pub struct AfcMsgInfo {
 /// Network socket address.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub struct SocketAddr(
     /// libc Socket address.
     // TODO: Custom type instead?
     pub  libc::sockaddr_storage,
 );
 
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 impl From<std::net::SocketAddr> for SocketAddr {
     fn from(value: std::net::SocketAddr) -> Self {
         let mut addr_storage =
@@ -994,7 +994,7 @@ impl From<std::net::SocketAddr> for SocketAddr {
 /// @result A boolean indicating whether any data was available.
 ///
 /// @relates AranyaClient.
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub unsafe fn afc_recv_data(
     client: &mut Client,
     buf: Writer<u8>,

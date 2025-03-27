@@ -9,7 +9,7 @@ use buggy::bug;
 /// Configuration info for Aranya
 pub struct ClientConfig {
     pub daemon_addr: *const c_char,
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     pub afc: AfcConfig,
 }
 
@@ -19,7 +19,7 @@ impl Typed for ClientConfig {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 /// Configuration info for Aranya Fast Channels
 pub struct AfcConfig {
@@ -31,7 +31,7 @@ pub struct AfcConfig {
     pub addr: *const c_char,
 }
 
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 impl Typed for AfcConfig {
     const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
 }
@@ -42,7 +42,7 @@ impl Typed for AfcConfig {
 /// Builder for a [`ClientConfig`]
 pub struct ClientConfigBuilder {
     pub daemon_addr: *const c_char,
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     pub afc: Option<AfcConfig>,
 }
 
@@ -54,7 +54,7 @@ impl ClientConfigBuilder {
             bug!("Tried to create a ClientConfig without a valid address!");
         }
 
-        #[cfg(feature = "experimental")]
+        #[cfg(feature = "afc")]
         let Some(afc) = self.afc
         else {
             bug!("Tried to create a ClientConfig without a valid AfcConfig!");
@@ -62,7 +62,7 @@ impl ClientConfigBuilder {
 
         Ok(ClientConfig {
             daemon_addr: self.daemon_addr,
-            #[cfg(feature = "experimental")]
+            #[cfg(feature = "afc")]
             afc,
         })
     }
@@ -70,7 +70,7 @@ impl ClientConfigBuilder {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 /// Builder for an [`AfcConfig`]
 pub struct AfcConfigBuilder {
@@ -82,7 +82,7 @@ pub struct AfcConfigBuilder {
     pub addr: *const c_char,
 }
 
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 impl AfcConfigBuilder {
     /// Attempts to construct an [`AfcConfig`], returning an [`Error::Bug`](super::Error::Bug) if
     /// there are invalid parameters.

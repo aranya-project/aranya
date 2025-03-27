@@ -11,13 +11,13 @@
 //! [README]: https://github.com/aranya-project/aranya/tree/main/crates/aranya-client/README.md
 //! [walkthrough]: https://github.com/aranya-project/aranya/tree/main/docs/walkthrough.md
 
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub mod afc;
 pub mod client;
 pub mod error;
 
 #[doc(inline)]
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 pub use crate::{
     afc::{AfcId, FastChannels, Label, Message, PollData},
     error::AfcError,

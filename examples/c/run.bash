@@ -41,7 +41,7 @@ trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
 rm -rf "${out}"
 
 # build the daemon.
-cargo build --bin aranya-daemon --release --features experimental
+cargo build --bin aranya-daemon --release --features afc
 
 # copy the aranya-client.h header file
 mkdir -p "${example}"/include

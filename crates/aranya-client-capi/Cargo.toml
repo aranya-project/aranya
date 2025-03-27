@@ -19,7 +19,8 @@ crate-type = ["rlib", "cdylib"]
 
 [features]
 default = []
-experimental = ["aranya-client/experimental"]
+# Aranya Fast Channels are currently an experimental opt-in feature
+afc = ["aranya-client/afc"]
 
 
 [dependencies]

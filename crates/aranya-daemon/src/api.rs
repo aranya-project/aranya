@@ -36,7 +36,7 @@ use crate::{
     Client, EF,
 };
 
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 mod afc_imports {
     pub(super) use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler};
     pub(super) use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, DeviceId};
@@ -50,7 +50,7 @@ mod afc_imports {
         CE,
     };
 }
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 #[allow(clippy::wildcard_imports)]
 use afc_imports::*;
 
@@ -82,7 +82,7 @@ impl DaemonApiServer {
     /// Create new RPC server.
     #[allow(clippy::too_many_arguments)]
     #[instrument(skip_all)]
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
@@ -114,7 +114,7 @@ impl DaemonApiServer {
 
     /// Create new RPC server.
     #[instrument(skip_all)]
-    #[cfg(not(feature = "experimental"))]
+    #[cfg(not(feature = "afc"))]
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
@@ -193,16 +193,16 @@ struct DaemonApiHandler {
     /// Aranya sync peers,
     peers: SyncPeers,
     /// AFC shm write.
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     afc: Arc<Mutex<WriteState<CS, Rng>>>,
     /// AFC peers.
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
     /// Handles AFC effects.
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     handler: Arc<Mutex<Handler<Store>>>,
     /// An implementation of [`Engine`][crypto::Engine].
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     eng: CE,
 }
 
@@ -233,7 +233,7 @@ impl DaemonApiHandler {
                 Effect::LabelAssigned(_label_assigned) => {}
                 Effect::LabelRevoked(_label_revoked) => {}
                 Effect::NetworkNameSet(e) => {
-                    #[cfg(feature = "experimental")]
+                    #[cfg(feature = "afc")]
                     self.afc_peers
                         .lock()
                         .await
@@ -242,14 +242,14 @@ impl DaemonApiHandler {
                 Effect::NetworkNameUnset(_network_name_unset) => {}
                 Effect::AfcBidiChannelCreated(v) => {
                     debug!("received AfcBidiChannelCreated effect");
-                    #[cfg(feature = "experimental")]
+                    #[cfg(feature = "afc")]
                     if let Some(node_id) = node_id {
                         self.afc_bidi_channel_created(v, node_id).await?
                     }
                 }
                 Effect::AfcBidiChannelReceived(v) => {
                     debug!("received AfcBidiChannelReceived effect");
-                    #[cfg(feature = "experimental")]
+                    #[cfg(feature = "afc")]
                     if let Some(node_id) = node_id {
                         self.afc_bidi_channel_received(v, node_id).await?
                     }
@@ -264,7 +264,7 @@ impl DaemonApiHandler {
 
     /// Reacts to a bidirectional AFC channel being created.
     #[instrument(skip(self), fields(effect = ?v))]
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     async fn afc_bidi_channel_created(
         &self,
         v: &AfcBidiChannelCreated,
@@ -300,7 +300,7 @@ impl DaemonApiHandler {
 
     /// Reacts to a bidirectional AFC channel being created.
     #[instrument(skip_all)]
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     async fn afc_bidi_channel_received(
         &self,
         v: &AfcBidiChannelReceived,
@@ -509,7 +509,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     async fn assign_afc_net_identifier(
         self,
         _: context::Context,
@@ -527,7 +527,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     async fn remove_afc_net_identifier(
         self,
         _: context::Context,
@@ -543,7 +543,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip_all)]
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     async fn create_afc_bidi_channel(
         self,
         _: context::Context,
@@ -582,14 +582,14 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     async fn delete_afc_channel(self, _: context::Context, chan: AfcId) -> ApiResult<AfcCtrl> {
         // TODO: remove AFC channel from Aranya.
         todo!();
     }
 
     #[instrument(skip_all)]
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     async fn receive_afc_ctrl(
         self,
         _: context::Context,
@@ -623,7 +623,7 @@ impl DaemonApi for DaemonApiHandler {
         Err(anyhow!("unable to find AfcBidiChannelReceived effect").into())
     }
 
-    #[cfg(not(feature = "experimental"))]
+    #[cfg(not(feature = "afc"))]
     async fn assign_afc_net_identifier(
         self,
         _: context::Context,
@@ -634,7 +634,7 @@ impl DaemonApi for DaemonApiHandler {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
-    #[cfg(not(feature = "experimental"))]
+    #[cfg(not(feature = "afc"))]
     async fn remove_afc_net_identifier(
         self,
         _: context::Context,
@@ -645,7 +645,7 @@ impl DaemonApi for DaemonApiHandler {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
-    #[cfg(not(feature = "experimental"))]
+    #[cfg(not(feature = "afc"))]
     async fn create_afc_bidi_channel(
         self,
         _: context::Context,
@@ -657,12 +657,12 @@ impl DaemonApi for DaemonApiHandler {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
-    #[cfg(not(feature = "experimental"))]
+    #[cfg(not(feature = "afc"))]
     async fn delete_afc_channel(self, _: context::Context, _: AfcId) -> ApiResult<AfcCtrl> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
-    #[cfg(not(feature = "experimental"))]
+    #[cfg(not(feature = "afc"))]
     async fn receive_afc_ctrl(
         self,
         _: context::Context,

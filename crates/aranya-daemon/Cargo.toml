@@ -15,7 +15,8 @@ workspace = true
 
 [features]
 default = []
-experimental = []
+# Aranya Fast Channels are currently an experimental opt-in feature
+afc = []
 
 
 [dependencies]

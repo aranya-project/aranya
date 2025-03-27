@@ -13,7 +13,8 @@ workspace = true
 
 [features]
 default = []
-experimental = ["aranya-daemon/experimental"]
+# Aranya Fast Channels are currently an experimental opt-in feature
+afc = ["aranya-daemon/afc"]
 
 # Enable debugging.
 debug = []

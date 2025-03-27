@@ -3,21 +3,21 @@
 use std::{net::SocketAddr, path::Path, time::Duration};
 
 use aranya_daemon_api::{DaemonApiClient, DeviceId, KeyBundle, Role, TeamId};
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 use aranya_daemon_api::{NetIdentifier, CS};
 use aranya_fast_channels::Label;
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 use aranya_fast_channels::{
     shm::ReadState,
     {self as afc},
 };
 use aranya_util::Addr;
 use tarpc::{context, tokio_serde::formats::Json};
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 use tokio::net::ToSocketAddrs;
 use tracing::{debug, info, instrument};
 
-#[cfg(feature = "experimental")]
+#[cfg(feature = "afc")]
 use crate::afc::{setup_afc_shm, FastChannels, FastChannelsImpl};
 use crate::error::{Error, Result};
 
@@ -36,7 +36,7 @@ use crate::error::{Error, Result};
 pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     /// Support for Aranya Fast Channels
     pub(crate) afc: FastChannelsImpl<ReadState<CS>>,
 }
@@ -51,7 +51,7 @@ impl Client {
     ///   The daemon must also use the same number.
     /// - `afc_address`: The address that AFC listens for incoming connections
     ///   on.
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, max_channels))]
     pub async fn connect<A>(
         daemon_socket: &Path,
@@ -83,7 +83,7 @@ impl Client {
     /// Creates a client connection to the daemon.
     ///
     /// - `daemon_socket`: The socket path to communicate with the daemon.
-    #[cfg(not(feature = "experimental"))]
+    #[cfg(not(feature = "afc"))]
     #[instrument(skip_all, fields(?daemon_socket))]
     pub async fn connect(daemon_socket: &Path) -> Result<Self> {
         info!("starting Aranya client");
@@ -132,7 +132,7 @@ impl Client {
         Team { client: self, id }
     }
 
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     /// Get access to Aranya Fast Channels.
     pub fn afc(&mut self) -> FastChannels<'_> {
         FastChannels::new(self)
@@ -262,7 +262,7 @@ impl Team<'_> {
     /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     pub async fn assign_afc_net_identifier(
         &mut self,
         device: DeviceId,
@@ -276,7 +276,7 @@ impl Team<'_> {
     }
 
     /// Disassociate a network identifier from a device.
-    #[cfg(feature = "experimental")]
+    #[cfg(feature = "afc")]
     pub async fn remove_afc_net_identifier(
         &mut self,
         device: DeviceId,

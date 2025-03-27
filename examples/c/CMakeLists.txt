@@ -29,7 +29,7 @@ add_compile_options(
     -Wno-gnu-zero-variadic-macro-arguments
 )
 
-add_compile_options(-DEXPERIMENTAL=TRUE)
+add_compile_options(-DENABLE_AFC)
 
 # Apple and Windows system linkers do not recognize these options.
 if(NOT APPLE AND NOT WIN32)

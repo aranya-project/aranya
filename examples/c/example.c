@@ -133,7 +133,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     struct AranyaClientConfigBuilder cli_build;
     struct AranyaClientConfig cli_cfg;
     aranya_client_config_builder_set_daemon_addr(&cli_build, daemon_addr);
-#if defined(EXPERIMENTAL)
+#if defined(ENABLE_AFC)
     struct AranyaAfcConfigBuilder afc_build;
     struct AranyaAfcConfig afc_cfg;
     aranya_afc_config_builder_set_shm_path(&afc_build, shm_path);
