@@ -132,18 +132,29 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 
     struct AranyaClientConfigBuilder cli_build;
     struct AranyaClientConfig cli_cfg;
-    err = aranya_client_config_builder_set_daemon_addr(&cli_build, daemon_addr);
+    aranya_client_config_builder_set_daemon_addr(&cli_build, daemon_addr);
 #if defined(EXPERIMENTAL)
     struct AranyaAfcConfigBuilder afc_build;
     struct AranyaAfcConfig afc_cfg;
-    err = aranya_afc_config_builder_set_shm_path(&afc_build, shm_path);
-    err = aranya_afc_config_builder_set_max_channels(&afc_build, MAX_CHANS);
-    err = aranya_afc_config_builder_set_address(&afc_build, afc_addr);
+    aranya_afc_config_builder_set_shm_path(&afc_build, shm_path);
+    aranya_afc_config_builder_set_max_channels(&afc_build, MAX_CHANS);
+    aranya_afc_config_builder_set_address(&afc_build, afc_addr);
     err = aranya_afc_config_builder_build(&afc_build, &afc_cfg);
+
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "error initializing afc config: %s\r\n", aranya_error_to_str(err));
+        return err;
+    }
     
-    err = aranya_client_config_builder_set_afc_config(&cli_build, &afc_cfg);
+    aranya_client_config_builder_set_afc_config(&cli_build, &afc_cfg);
 #endif
     err = aranya_client_config_builder_build(&cli_build, &cli_cfg);
+
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "error initializing client config: %s\r\n", aranya_error_to_str(err));
+        return err;
+    }
+
     err = aranya_client_init(&c->client, &cli_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr,

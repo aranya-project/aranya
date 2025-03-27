@@ -212,7 +212,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcConfigBuilder {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[40];
+    uint8_t __for_size_only[24];
 } AranyaAfcConfigBuilder;
 #endif
 
@@ -239,7 +239,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[56];
+    uint8_t __for_size_only[40];
 } AranyaClientConfigBuilder;
 
 /**

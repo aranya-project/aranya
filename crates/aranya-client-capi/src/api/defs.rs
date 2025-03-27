@@ -337,42 +337,42 @@ pub type AfcConfig = Safe<imp::AfcConfig>;
 
 /// Configuration info builder for Aranya Fast Channels.
 #[cfg(feature = "experimental")]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
-pub type AfcConfigBuilder = Safe<imp::AfcConfigBuilder>;
+#[aranya_capi_core::opaque(size = 24, align = 8)]
+pub type AfcConfigBuilder = imp::AfcConfigBuilder;
 
-#[cfg(feature = "experimental")]
 /// Sets the shared memory path that AFC should use for storing channel data.
 ///
 /// @param cfg a pointer to the afc config builder
 /// @param shm_path a pointer to a string with the shared memory path
+#[cfg(feature = "experimental")]
 pub fn afc_config_builder_set_shm_path(cfg: &mut AfcConfigBuilder, shm_path: *const c_char) {
-    cfg.deref_mut().with_shm_path(shm_path);
+    cfg.shm_path = shm_path;
 }
 
-#[cfg(feature = "experimental")]
 /// Sets the maximum number of channels that are stored in shared memory.
 ///
 /// @param cfg a pointer to the afc config builder
 /// @param max_channels the maximum amount of channels allowed
+#[cfg(feature = "experimental")]
 pub fn afc_config_builder_set_max_channels(cfg: &mut AfcConfigBuilder, max_channels: usize) {
-    cfg.deref_mut().with_max_channels(max_channels);
+    cfg.max_channels = max_channels;
 }
 
-#[cfg(feature = "experimental")]
 /// Sets the address that the AFC server should bind to for listening.
 ///
 /// @param cfg a pointer to the afc config builder
 /// @param address a pointer to a string with the address to bind to
+#[cfg(feature = "experimental")]
 pub fn afc_config_builder_set_address(cfg: &mut AfcConfigBuilder, address: *const c_char) {
-    cfg.deref_mut().with_address(address);
+    cfg.addr = address;
 }
 
-#[cfg(feature = "experimental")]
 /// Attempts to construct an [`AfcConfig`], returning an `Error::Bug` if
 /// there are invalid parameters.
 ///
 /// @param cfg a pointer to the afc config builder
 /// @param out a pointer to write the afc config to
+#[cfg(feature = "experimental")]
 pub fn afc_config_builder_build(
     cfg: &mut AfcConfigBuilder,
     out: &mut MaybeUninit<AfcConfig>,
@@ -386,8 +386,8 @@ pub fn afc_config_builder_build(
 pub type ClientConfig = Safe<imp::ClientConfig>;
 
 /// Configuration info builder for Aranya.
-#[aranya_capi_core::opaque(size = 56, align = 8)]
-pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
+#[aranya_capi_core::opaque(size = 40, align = 8)]
+pub type ClientConfigBuilder = imp::ClientConfigBuilder;
 
 /// Sets the daemon address that the Client should try to connect to.
 ///
@@ -397,7 +397,7 @@ pub fn client_config_builder_set_daemon_addr(
     cfg: &mut ClientConfigBuilder,
     address: *const c_char,
 ) {
-    cfg.deref_mut().with_daemon_addr(address);
+    cfg.daemon_addr = address;
 }
 
 /// Sets the configuration for Aranya Fast Channels.
@@ -409,7 +409,7 @@ pub fn client_config_builder_set_afc_config(
     cfg: &mut ClientConfigBuilder,
     afc_config: &mut AfcConfig,
 ) {
-    cfg.deref_mut().with_afc_config(**afc_config);
+    cfg.afc = Some(**afc_config);
 }
 
 /// Attempts to construct a [`ClientConfig`], returning an `Error::Bug` if
