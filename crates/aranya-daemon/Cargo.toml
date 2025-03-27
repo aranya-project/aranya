@@ -18,6 +18,7 @@ aranya-daemon-api = { workspace = true }
 aranya-keygen = { workspace = true }
 
 aranya-afc-util = { workspace = true }
+aranya-aqc-util = { workspace = true }
 aranya-crypto = { workspace = true }
 aranya-crypto-ffi = { workspace = true }
 aranya-device-ffi = { workspace = true }
