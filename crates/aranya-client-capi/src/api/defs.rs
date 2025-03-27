@@ -330,28 +330,99 @@ impl KeyBundle {
     }
 }
 
-/// Aranya client configuration.
-#[repr(C)]
-#[must_use]
-#[derive(Copy, Clone, Debug)]
-pub struct ClientConfig {
-    /// Daemon API unix domain socket path.
-    pub daemon_sock: *const c_char,
-    /// Aranya Fast Channels (AFC) config.
-    pub afc: AfcConfig,
+/// Configuration info for Aranya Fast Channels.
+#[cfg(feature = "experimental")]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
+pub type AfcConfig = Safe<imp::AfcConfig>;
+
+/// Configuration info builder for Aranya Fast Channels.
+#[cfg(feature = "experimental")]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
+pub type AfcConfigBuilder = Safe<imp::AfcConfigBuilder>;
+
+#[cfg(feature = "experimental")]
+/// Sets the shared memory path that AFC should use for storing channel data.
+///
+/// @param cfg a pointer to the afc config builder
+/// @param shm_path a pointer to a string with the shared memory path
+pub fn afc_config_builder_set_shm_path(cfg: &mut AfcConfigBuilder, shm_path: *const c_char) {
+    cfg.deref_mut().with_shm_path(shm_path);
 }
 
-/// Aranya Fast Channels (AFC) config.
-#[repr(C)]
-#[must_use]
-#[derive(Copy, Clone, Debug)]
-pub struct AfcConfig {
-    /// Shared memory path.
-    pub shm_path: *const c_char,
-    /// Maximum number of channels to store in shared-memory.
-    pub max_channels: usize,
-    /// Address to bind AFC server to.
-    pub addr: *const c_char,
+#[cfg(feature = "experimental")]
+/// Sets the maximum number of channels that are stored in shared memory.
+///
+/// @param cfg a pointer to the afc config builder
+/// @param max_channels the maximum amount of channels allowed
+pub fn afc_config_builder_set_max_channels(cfg: &mut AfcConfigBuilder, max_channels: usize) {
+    cfg.deref_mut().with_max_channels(max_channels);
+}
+
+#[cfg(feature = "experimental")]
+/// Sets the address that the AFC server should bind to for listening.
+///
+/// @param cfg a pointer to the afc config builder
+/// @param address a pointer to a string with the address to bind to
+pub fn afc_config_builder_set_address(cfg: &mut AfcConfigBuilder, address: *const c_char) {
+    cfg.deref_mut().with_address(address);
+}
+
+#[cfg(feature = "experimental")]
+/// Attempts to construct an [`AfcConfig`], returning an `Error::Bug` if
+/// there are invalid parameters.
+///
+/// @param cfg a pointer to the afc config builder
+/// @param out a pointer to write the afc config to
+pub fn afc_config_builder_build(
+    cfg: &mut AfcConfigBuilder,
+    out: &mut MaybeUninit<AfcConfig>,
+) -> Result<(), imp::Error> {
+    Safe::init(out, cfg.build()?);
+    Ok(())
+}
+
+/// Configuration info for Aranya.
+#[aranya_capi_core::opaque(size = 48, align = 8)]
+pub type ClientConfig = Safe<imp::ClientConfig>;
+
+/// Configuration info builder for Aranya.
+#[aranya_capi_core::opaque(size = 56, align = 8)]
+pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
+
+/// Sets the daemon address that the Client should try to connect to.
+///
+/// @param cfg a pointer to the client config builder
+/// @param address a pointer to a string containing the address
+pub fn client_config_builder_set_daemon_addr(
+    cfg: &mut ClientConfigBuilder,
+    address: *const c_char,
+) {
+    cfg.deref_mut().with_daemon_addr(address);
+}
+
+/// Sets the configuration for Aranya Fast Channels.
+///
+/// @param cfg a pointer to the client config builder
+/// @param afc_config a pointer to a valid AFC config (see [`AfcConfigBuilder`])
+#[cfg(feature = "experimental")]
+pub fn client_config_builder_set_afc_config(
+    cfg: &mut ClientConfigBuilder,
+    afc_config: &mut AfcConfig,
+) {
+    cfg.deref_mut().with_afc_config(**afc_config);
+}
+
+/// Attempts to construct a [`ClientConfig`], returning an `Error::Bug` if
+/// there are invalid parameters.
+///
+/// @param cfg a pointer to the client config builder
+/// @param out a pointer to write the client config to
+pub fn client_config_builder_build(
+    cfg: &mut ClientConfigBuilder,
+    out: &mut MaybeUninit<ClientConfig>,
+) -> Result<(), imp::Error> {
+    Safe::init(out, cfg.build()?);
+    Ok(())
 }
 
 /// Initializes a new client instance.
@@ -364,11 +435,10 @@ pub unsafe fn client_init(
     client: &mut MaybeUninit<Client>,
     config: &ClientConfig,
 ) -> Result<(), imp::Error> {
-    // TODO: builder?
     // TODO: Clean this up.
-    let daemon_sock = OsStr::from_bytes(
+    let daemon_socket = OsStr::from_bytes(
         // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.daemon_sock) }.to_bytes(),
+        unsafe { std::ffi::CStr::from_ptr(config.daemon_addr) }.to_bytes(),
     )
     .as_ref();
 
@@ -389,13 +459,13 @@ pub unsafe fn client_init(
 
     #[cfg(feature = "experimental")]
     let inner = rt.block_on(aranya_client::Client::connect(
-        daemon_sock,
+        daemon_socket,
         afc_shm_path,
         config.afc.max_channels,
         afc_addr,
     ))?;
     #[cfg(not(feature = "experimental"))]
-    let inner = rt.block_on(aranya_client::Client::connect(daemon_sock))?;
+    let inner = rt.block_on(aranya_client::Client::connect(daemon_socket))?;
 
     Safe::init(
         client,

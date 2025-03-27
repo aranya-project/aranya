@@ -116,7 +116,7 @@ typedef struct {
     };
 } Team;
 
-AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
+AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                         const char *shm_path, const char *afc_addr);
 AranyaError init_team(Team *t);
 AranyaError add_sync_peers(Team *t);
@@ -124,21 +124,32 @@ AranyaError run(Team *t);
 AranyaError cleanup_team(Team *t);
 
 // Initialize an Aranya client.
-AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
+AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                         const char *shm_path, const char *afc_addr) {
     AranyaError err;
 
     c->name = name;
-    // TODO: methods for initializing cfg types?
-    AranyaAfcConfig afc_cfg = {
-        .shm_path = shm_path, .max_channels = MAX_CHANS, .addr = afc_addr};
-    AranyaClientConfig cli_cfg = {.daemon_sock = daemon_sock, .afc = afc_cfg};
-    err                        = aranya_client_init(&c->client, &cli_cfg);
+
+    struct AranyaClientConfigBuilder cli_build;
+    struct AranyaClientConfig cli_cfg;
+    err = aranya_client_config_builder_set_daemon_addr(&cli_build, daemon_addr);
+#if defined(EXPERIMENTAL)
+    struct AranyaAfcConfigBuilder afc_build;
+    struct AranyaAfcConfig afc_cfg;
+    err = aranya_afc_config_builder_set_shm_path(&afc_build, shm_path);
+    err = aranya_afc_config_builder_set_max_channels(&afc_build, MAX_CHANS);
+    err = aranya_afc_config_builder_set_address(&afc_build, afc_addr);
+    err = aranya_afc_config_builder_build(&afc_build, &afc_cfg);
+    
+    err = aranya_client_config_builder_set_afc_config(&cli_build, &afc_cfg);
+#endif
+    err = aranya_client_config_builder_build(&cli_build, &cli_cfg);
+    err = aranya_client_init(&c->client, &cli_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr,
-                "error initializing client %s (daemon_sock: %s, shm_path: %s, "
+                "error initializing client %s (daemon_addr: %s, shm_path: %s, "
                 "afc_addr: %s): %s\r\n",
-                c->name, daemon_sock, shm_path, afc_addr,
+                c->name, daemon_addr, shm_path, afc_addr,
                 aranya_error_to_str(err));
         return err;
     }
