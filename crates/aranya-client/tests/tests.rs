@@ -24,7 +24,7 @@ use aranya_daemon::{
     Daemon,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
-use aranya_fast_channels::{Label, Seq};
+use aranya_fast_channels::Seq;
 use aranya_util::addr::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -558,13 +558,13 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     sleep(sleep_interval).await;
 
     // operator assigns labels for AFC channels.
-    let label1 = Label::new(1);
-    operator_team.create_label(label1).await?;
+    let label1 = "LABEL_2";
+    let label1_id = operator_team.create_label(label1).await?;
     operator_team.assign_label(team.membera.id, label1).await?;
     operator_team.assign_label(team.memberb.id, label1).await?;
 
-    let label2 = Label::new(2);
-    operator_team.create_label(label2).await?;
+    let label2 = "LABEL_2";
+    let label2_id = operator_team.create_label(label2).await?;
     operator_team.assign_label(team.membera.id, label2).await?;
     operator_team.assign_label(team.memberb.id, label2).await?;
 
@@ -631,7 +631,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         // assume `got.addr` is correct here.
         address: got.address,
         channel: afc_id1,
-        label: label1,
+        label: label1_id,
         seq: Seq::ZERO,
     };
     assert_eq!(got, want);
@@ -648,7 +648,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         // assume `got.addr` is correct here.
         address: got.address,
         channel: afc_id2,
-        label: label2,
+        label: label2_id,
         seq: Seq::ZERO,
     };
     assert_eq!(got, want);
@@ -792,8 +792,8 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     // ==== BASIC SETUP DONE ====
 
     // operator assigns labels for AFC channels.
-    let label1 = Label::new(1);
-    operator_team.create_label(label1).await?;
+    let label1 = "LABEL_1";
+    let label1_id = operator_team.create_label(label1).await?;
     operator_team.assign_label(team.membera.id, label1).await?;
     operator_team.assign_label(team.memberb.id, label1).await?;
 
@@ -838,7 +838,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
         // assume `got.addr` is correct here.
         address: got.address,
         channel: afc_id1,
-        label: label1,
+        label: label1_id,
         seq: Seq::ZERO,
     };
     assert_eq!(got, want, "a->b");
@@ -858,7 +858,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
         data: msg.as_bytes().to_vec(),
         address: memberb_afc_addr,
         channel: afc_id1,
-        label: label1,
+        label: label1_id,
         seq: Seq::ZERO,
     };
     let got = team
@@ -1008,8 +1008,8 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     // ==== BASIC SETUP DONE ====
 
     // operator assigns labels for AFC channels.
-    let label1 = Label::new(1);
-    operator_team.create_label(label1).await?;
+    let label1 = "LABEL_1";
+    let label1_id = operator_team.create_label(label1).await?;
     operator_team.assign_label(team.membera.id, label1).await?;
     operator_team.assign_label(team.memberb.id, label1).await?;
 
@@ -1059,7 +1059,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
             // so assume `got.addr` is correct here.
             address: got.address,
             channel: afc_id1,
-            label: label1,
+            label: label1_id,
             seq,
         };
         assert_eq!(got, want, "a->b");
@@ -1080,7 +1080,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
             data: msg.into(),
             address: memberb_afc_addr,
             channel: afc_id1,
-            label: label1,
+            label: label1_id,
             seq,
         };
         let got = team

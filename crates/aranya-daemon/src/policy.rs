@@ -110,25 +110,29 @@ pub struct OperatorRevoked {
 /// LabelDefined policy effect.
 #[effect]
 pub struct LabelDefined {
-    pub label: i64,
+    pub author_id: Id,
+    pub label: String,
+    pub label_id: i64,
 }
 /// LabelUndefined policy effect.
 #[effect]
 pub struct LabelUndefined {
-    pub label: i64,
+    pub author_id: Id,
+    pub label: String,
+    pub label_id: i64,
 }
 /// LabelAssigned policy effect.
 #[effect]
 pub struct LabelAssigned {
     pub device_id: Id,
-    pub label: i64,
+    pub label: String,
     pub op: ChanOp,
 }
 /// LabelRevoked policy effect.
 #[effect]
 pub struct LabelRevoked {
     pub device_id: Id,
-    pub label: i64,
+    pub label: String,
 }
 /// NetworkNameSet policy effect.
 #[effect]
@@ -149,7 +153,8 @@ pub struct AfcBidiChannelCreated {
     pub author_enc_key_id: Id,
     pub peer_id: Id,
     pub peer_enc_pk: Vec<u8>,
-    pub label: i64,
+    pub label: String,
+    pub label_id: i64,
     pub channel_key_id: Id,
 }
 /// AfcBidiChannelReceived policy effect.
@@ -160,7 +165,8 @@ pub struct AfcBidiChannelReceived {
     pub author_enc_pk: Vec<u8>,
     pub peer_id: Id,
     pub peer_enc_key_id: Id,
-    pub label: i64,
+    pub label: String,
+    pub label_id: i64,
     pub encap: Vec<u8>,
 }
 /// AfcUniChannelCreated policy effect.
@@ -172,7 +178,8 @@ pub struct AfcUniChannelCreated {
     pub reader_id: Id,
     pub author_enc_key_id: Id,
     pub peer_enc_pk: Vec<u8>,
-    pub label: i64,
+    pub label: String,
+    pub label_id: i64,
     pub channel_key_id: Id,
 }
 /// AfcUniChannelReceived policy effect.
@@ -184,7 +191,8 @@ pub struct AfcUniChannelReceived {
     pub reader_id: Id,
     pub author_enc_pk: Vec<u8>,
     pub peer_enc_key_id: Id,
-    pub label: i64,
+    pub label: String,
+    pub label_id: i64,
     pub encap: Vec<u8>,
 }
 /// Implements all supported policy actions.
@@ -200,15 +208,15 @@ pub trait ActorExt {
     fn remove_member(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: Id, role: Role) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: Id, role: Role) -> Result<(), ClientError>;
-    fn define_label(&mut self, label: i64) -> Result<(), ClientError>;
-    fn undefine_label(&mut self, label: i64) -> Result<(), ClientError>;
+    fn define_label(&mut self, label: String) -> Result<(), ClientError>;
+    fn undefine_label(&mut self, label: String) -> Result<(), ClientError>;
     fn assign_label(
         &mut self,
         device_id: Id,
-        label: i64,
+        label: String,
         op: ChanOp,
     ) -> Result<(), ClientError>;
-    fn revoke_label(&mut self, device_id: Id, label: i64) -> Result<(), ClientError>;
+    fn revoke_label(&mut self, device_id: Id, label: String) -> Result<(), ClientError>;
     fn set_network_name(
         &mut self,
         device_id: Id,
@@ -218,12 +226,12 @@ pub trait ActorExt {
     fn create_afc_bidi_channel(
         &mut self,
         peer_id: Id,
-        label: i64,
+        label: String,
     ) -> Result<(), ClientError>;
     fn create_afc_uni_channel(
         &mut self,
         writer_id: Id,
         reader_id: Id,
-        label: i64,
+        label: String,
     ) -> Result<(), ClientError>;
 }

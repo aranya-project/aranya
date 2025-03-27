@@ -311,6 +311,7 @@ dependencies = [
  "aranya-crypto",
  "aranya-fast-channels",
  "aranya-util",
+ "buggy",
  "postcard",
  "serde",
  "spideroak-base58",

@@ -123,11 +123,23 @@ fact DeviceEncKey[device_id id]=>{key_id id, key bytes}
 // Indicates that the team has been terminated.
 fact TeamEnd[]=>{}
 
-// Records an AFC label that has been defined for use.
-fact Label[label int]=>{}
+// Records a label that has been defined for AFC and AQC.
+//
+// Created by `DefineLabel`.
+// Deleted by `UndefineLabel`.
+fact Label[label string]=>{label_id int}
+
+// Contains the next label ID that should be used when creating
+// a `Label`.
+//
+// It is a monotonically incrementing, unsigned, 32-bit integer.
+// See `is_valid_label_id`.
+//
+// Created and updated by `DefineLabel`.
+fact NextLabelId[]=>{label_id int}
 
 // Records that A device is allowed to use an AFC label.
-fact AssignedLabel[label int, device_id id]=>{op enum ChanOp}
+fact AssignedLabel[label_id int, device_id id]=>{op enum ChanOp}
 
 // Stores a Member's associated network identifier for AFC.
 fact MemberNetworkId[device_id id]=>{net_identifier string}
@@ -235,27 +247,41 @@ function open_envelope(sealed_envelope struct Envelope) bytes {
 }
 ```
 
-#### AFC Functions
+#### AFC and AQC Functions
 
 ```policy
-// Reports whether `label` has the valid format for an AFC label, which is an unsigned, 32-bit integer.
-function is_valid_label(label int) bool {
-    return label >= 0 && label <= 4294967295
+// Reports whether `label_id` is an unsigned, 32-bit integer.
+function is_valid_label_id(label_id int) bool {
+    return label_id >= 0 && label_id <= 4294967295
+}
+
+// Returns the next label ID that should be used when creating
+// a label.
+//
+// See `fact NextLabelId`.
+function next_label_id() int {
+    let v = query NextLabelId[]
+    let label_id = if v is Some {
+        (unwrap v).label_id
+    } else {
+        0
+    }
+    check is_valid_label_id(label_id)
+
+    return label_id
 }
 
 // Returns the channel operation for a particular label.
-function get_allowed_op(device_id id, label int) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedLabel[label: label, device_id: device_id]
+function get_allowed_op(device_id id, label_id int) enum ChanOp {
+    let assigned_label = check_unwrap query AssignedLabel[label_id: label_id, device_id: device_id]
     return assigned_label.op
 }
 
 // Reports whether the devices have permission to create a bidirectional channel with each other.
-function can_create_afc_bidi_channel(device1 id, device2 id, label int) bool {
-    let device1_op = get_allowed_op(device1, label)
-    let device2_op = get_allowed_op(device2, label)
+function can_create_afc_bidi_channel(device1 id, device2 id, label_id int) bool {
+    let device1_op = get_allowed_op(device1, label_id)
+    let device2_op = get_allowed_op(device2, label_id)
 
-    // Label must be valid.
-    check is_valid_label(label)
     // Members can't create channels with themselves.
     check device1 != device2
 
@@ -284,12 +310,10 @@ function select_peer_id(device_id id, id_a id, id_b id) id {
 }
 
 // Reports whether the devices have permission to create a unidirectional channel with each other.
-function can_create_afc_uni_channel(writer_id id, reader_id id, label int) bool {
-    let writer_op = get_allowed_op(writer_id, label)
-    let reader_op = get_allowed_op(reader_id, label)
+function can_create_afc_uni_channel(writer_id id, reader_id id, label_id int) bool {
+    let writer_op = get_allowed_op(writer_id, label_id)
+    let reader_op = get_allowed_op(reader_id, label_id)
 
-     // Label must be valid.
-    check is_valid_label(label)
     // Members can't create channels with themselves.
     check writer_id != reader_id
 
@@ -889,24 +913,32 @@ command RevokeOperator{
 
 ## DefineLabel
 
-Establishes a whitelist of AFC labels that can be assigned to Members.
+Creates a label for AFC and AQC. Individual Members must be
+granted permission to use the label.
+
+It is an error if the label already exists.
 
 ```policy
-// Defines an AFC label.
-action define_label(label int) {
+// Creates an AFC and AQC label.
+action define_label(label string) {
     publish DefineLabel {
         label: label,
     }
 }
 
 effect LabelDefined {
-    label int,
+    // The ID of the device that created the label.
+    author_id id,
+    // The label that was created.
+    label string,
+    // The label's unique numeric identifier.
+    label_id int,
 }
 
 command DefineLabel {
     fields {
         // The label being added.
-        label int,
+        label string,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -915,17 +947,25 @@ command DefineLabel {
     policy {
         let author = get_valid_device(envelope::author_id(envelope))
 
-        // Owners, Admins and Operators can define AFC labels.
+        // Owners, Admins and Operators can define labels.
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
-        // It must be a valid AFC label that does not already exist.
-        check is_valid_label(this.label)
+
+        // The label must not already exist.
         check !exists Label[label: this.label]
 
+        let current = next_label_id()
+
+        let next = current + 1
+        check is_valid_label_id(next)
+
         finish {
-            create Label[label: this.label]=>{}
+            create Label[label: this.label]=>{label_id: current}
+            update NextLabelId[]=>{label_id: current} to {label_id: next}
 
             emit LabelDefined {
+                author_id: author.device_id,
                 label: this.label,
+                label_id: current,
             }
         }
     }
@@ -934,20 +974,29 @@ command DefineLabel {
 
 **Invariants**:
 
-- Only Members cannot define AFC labels.
-- Owners, Admins and Operators are allowed to define AFC labels.
-- AFC labels must be unsigned, 32-bit integers.
+- Members cannot define labels.
+- Only Owners, Admins, and Operators are allowed to define
+  labels.
 
 ## UndefineLabel
 
-Removes an AFC label from the whitelist. This operation will result in the AFC label revocation across all Members that were assigned to it.
+Deletes a label created with `define_label`. As the label no
+longer exists, this operation has the following effects:
+
+- It prevents Members from being granted permission to use the
+  label.
+- Any Members granted permission to use the label will have their
+  permission revoked.
+
+It is an error if the label does not already exist.
 
 
 ```policy
-// Undefines an AFC label.
-action undefine_label(label int) {
-    // In a single transaction, publish the command to undefine the AFC label as well as a
-    // sequence of AFC label revocation commands to revoke it from each Member role.
+// Undefines an label.
+action undefine_label(label string) {
+    // In a single transaction, publish the command to delete the
+    // the label as well as a sequence of label revocation
+    // commands to revoke it from each Member.
     publish UndefineLabel {
         label: label,
     }
@@ -959,13 +1008,18 @@ action undefine_label(label int) {
 }
 
 effect LabelUndefined {
-    label int,
+    // The ID of the device that undefined the label.
+    author_id id,
+    // The label that was undefined.
+    label string,
+    // The label's unique numeric identifier.
+    label_id int,
 }
 
 command UndefineLabel {
     fields {
         // The label being undefined.
-        label int,
+        label string,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -974,15 +1028,19 @@ command UndefineLabel {
     policy {
         let author = get_valid_device(envelope::author_id(envelope))
 
-        // Only Owners and Admins can undefine AFC labels.
+        // Only Owners and Admins can undefine labels.
         check is_owner(author.role) || is_admin(author.role)
-        check exists Label[label: this.label]
+
+        // Cannot delete a non-existent label.
+        let label = check_unwrap query Label[label: this.label]
 
         finish {
             delete Label[label: this.label]
 
             emit LabelUndefined {
+                author_id: author.device_id,
                 label: this.label,
+                label_id: label.label_id,
             }
         }
     }
@@ -991,16 +1049,22 @@ command UndefineLabel {
 
 **Invariants**:
 
-- Only Owners and Admins are allowed to undefine AFC labels.
-
+- Only Owners and Admins are allowed to delete labels.
 
 ## AssignLabel
 
-Assigns an "AFC" label to a Member.
+Grants a Member permission to use a label for certain AFC or AQC
+channel operations.
+
+This operation has the following error conditions:
+
+- It is an error if the label does not exist.
+- It is an error if the Member has already been assigned this
+  label.
 
 ```policy
-// Assigns the device a `label` to .
-action assign_label(device_id id, label int, op enum ChanOp) {
+// Assigns the device a `label`.
+action assign_label(device_id id, label string, op enum ChanOp) {
     publish AssignLabel {
         device_id: device_id,
         label: label,
@@ -1012,7 +1076,7 @@ effect LabelAssigned {
     // The device being assigned the label.
     device_id id,
     // The label being assigned.
-    label int,
+    label string,
     // The operation that can be performed with the label.
     op enum ChanOp,
 }
@@ -1022,7 +1086,7 @@ command AssignLabel {
         // The device being assigned the label.
         device_id id,
         // The label being assigned.
-        label int,
+        label string,
         // The operations that can be performed with the label.
         op enum ChanOp,
     }
@@ -1034,17 +1098,16 @@ command AssignLabel {
         let author = get_valid_device(envelope::author_id(envelope))
         let device = check_unwrap find_existing_device(this.device_id)
 
-        // Only Owners and Operators can assign AFC labels to Members.
+        // Only Owners and Operators can assign labels.
         check is_owner(author.role) || is_operator(author.role)
+
+        // Labels can only be assigned to Members.
         check is_member(device.role)
 
-        // Obviously it must be a valid label.
-        check is_valid_label(this.label)
-        // The label must exist.
-        check exists Label[label: this.label]
+        let label = check_unwrap query Label[label: this.label]
 
         finish {
-            create AssignedLabel[label: this.label, device_id: device.device_id]=>{op: this.op}
+            create AssignedLabel[label_id: label.label_id, device_id: device.device_id]=>{op: this.op}
 
             emit LabelAssigned {
                 device_id: device.device_id,
@@ -1058,19 +1121,21 @@ command AssignLabel {
 
 **Invariants**:
 
-- Labels must be unsigned, 32-bit integers.
 - Only Owners and Operators are allowed to assign labels.
-- Only Members can be assigned AFC labels.
+- Only Members can be assigned labels.
 - Only labels that are defined are allowed to be assigned.
 
 ## RevokeLabel
-Revokes an AFC label from a Member. Note that peers communicating with this Member over an AFC
-channel under the revoked label should delete their channel once the label revocation command is
-received.
+
+Revokes a Member's permission to use a label.
+
+Peers communicating with this Member over an AFC or AQC channel
+with the revoked label should delete their channel once the
+`LabelRevoked` effect is received.
 
 ```policy
-// Revokes the device's access to the AFC `label`.
-action revoke_label(device_id id, label int) {
+// Revokes the device's access to the `label`.
+action revoke_label(device_id id, label string) {
     publish RevokeLabel {
         device_id: device_id,
         label: label,
@@ -1081,7 +1146,7 @@ effect LabelRevoked {
     // The device for whom the label is being revoked.
     device_id id,
     // The label being revoked.
-    label int,
+    label string,
 }
 
 command RevokeLabel {
@@ -1089,7 +1154,7 @@ command RevokeLabel {
         // The device for whom the label is being revoked.
         device_id id,
         // The label being revoked.
-        label int,
+        label string,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -1099,15 +1164,21 @@ command RevokeLabel {
         let author = get_valid_device(envelope::author_id(envelope))
         let device = check_unwrap find_existing_device(this.device_id)
 
-        // Only Owners, Admins, and Operators are allowed to revoke a label from a Member.
+        // Only Owners, Admins, and Operators are allowed to
+        // revoke labels.
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
+
+        // Since labels can only be assigned to Members, the
+        // target device must be a Member.
         check is_member(device.role)
 
-        // Verify that AFC label has been assigned to this Member
-        check exists AssignedLabel[label: this.label, device_id: device.device_id]
+        let label = check_unwrap query Label[label: this.label]
+
+        // Verify that label has been assigned to this Member
+        check exists AssignedLabel[label_id: label.label_id, device_id: device.device_id]
 
         finish {
-            delete AssignedLabel[label: this.label, device_id: device.device_id]
+            delete AssignedLabel[label_id: label.label_id, device_id: device.device_id]
 
             emit LabelRevoked {
                 device_id: device.device_id,
@@ -1120,9 +1191,8 @@ command RevokeLabel {
 
 **Invariants**:
 
-- Only Owners and Operators can revoke labels from Members.
+- Only Owners and Operators can revoke labels.
 - Only a label that was assigned can be revoked.
-
 
 ## SetNetworkName
 Associates a network name and address to a Member for use in AFC.
@@ -1248,7 +1318,7 @@ author, and sends the encapsulations through the `AfcCreateBidiChannel` command.
 command, the device will decapsulate their keys and store them in the shared memory DB.
 
 ```policy
-action create_afc_bidi_channel(peer_id id, label int) {
+action create_afc_bidi_channel(peer_id id, label string) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
     let author = get_valid_device(author_id)
@@ -1277,7 +1347,8 @@ effect AfcBidiChannelCreated {
     author_enc_key_id id,
     peer_id id,
     peer_enc_pk bytes,
-    label int,
+    label string,
+    label_id int,
     channel_key_id id,
 }
 
@@ -1287,14 +1358,15 @@ effect AfcBidiChannelReceived {
     author_enc_pk bytes,
     peer_id id,
     peer_enc_key_id id,
-    label int,
+    label string,
+    label_id int,
     encap bytes,
 }
 
 command AfcCreateBidiChannel {
     fields {
         peer_id id,
-        label int,
+        label string,
         peer_encap bytes,
         channel_key_id id,
     }
@@ -1310,8 +1382,10 @@ command AfcCreateBidiChannel {
         check is_member(author.role)
         check is_member(peer.role)
 
+        let label = check_unwrap query Label[label: this.label]
+
         // Members must be different and both must have bidirectional permissions over valid label.
-        check can_create_afc_bidi_channel(author.device_id, peer.device_id, this.label)
+        check can_create_afc_bidi_channel(author.device_id, peer.device_id, label.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
@@ -1327,6 +1401,7 @@ command AfcCreateBidiChannel {
                     peer_id: peer.device_id,
                     peer_enc_pk: peer_enc_pk,
                     label: this.label,
+                    label_id: label.label_id,
                     channel_key_id: this.channel_key_id,
                 }
             }
@@ -1342,6 +1417,7 @@ command AfcCreateBidiChannel {
                     peer_id: peer.device_id,
                     peer_enc_key_id: peer.enc_key_id,
                     label: this.label,
+                    label_id: label.label_id,
                     encap: this.peer_encap,
                 }
             }
@@ -1371,7 +1447,7 @@ the encapsulation through the `AfcCreateUniChannel` command. When processing the
 corresponding recipient will decapsulate their key and store it in the shared memory DB.
 
 ```policy
-action create_afc_uni_channel(writer_id id, reader_id id, label int) {
+action create_afc_uni_channel(writer_id id, reader_id id, label string) {
     let parent_cmd_id = perspective::head_id()
     let author = get_valid_device(device::current_device_id())
     let peer_id = select_peer_id(author.device_id, writer_id, reader_id)
@@ -1402,7 +1478,8 @@ effect AfcUniChannelCreated {
     reader_id id,
     author_enc_key_id id,
     peer_enc_pk bytes,
-    label int,
+    label string,
+    label_id int,
     channel_key_id id,
 }
 
@@ -1413,7 +1490,8 @@ effect AfcUniChannelReceived {
     reader_id id,
     author_enc_pk bytes,
     peer_enc_key_id id,
-    label int,
+    label string,
+    label_id int,
     encap bytes,
 }
 
@@ -1424,7 +1502,7 @@ command AfcCreateUniChannel {
         // The DeviceID of the side that can decrypt data.
         reader_id id,
         // The label to use.
-        label int,
+        label string,
         // The encapsulated key for the recipient of the command.
         peer_encap bytes,
         // The ID of the AFC channel key.
@@ -1445,8 +1523,10 @@ command AfcCreateUniChannel {
         check is_member(author.role)
         check is_member(peer.role)
 
+        let label = check_unwrap query Label[label: this.label]
+
         // Both devices must have valid permissions.
-        check can_create_afc_uni_channel(this.writer_id, this.reader_id, this.label)
+        check can_create_afc_uni_channel(this.writer_id, this.reader_id, label.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
@@ -1464,6 +1544,7 @@ command AfcCreateUniChannel {
                     author_enc_key_id: author.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
                     label: this.label,
+                    label_id: label.label_id,
                     channel_key_id: this.channel_key_id,
                 }
             }
@@ -1481,6 +1562,7 @@ command AfcCreateUniChannel {
                     author_enc_pk: author_enc_pk,
                     peer_enc_key_id: peer.enc_key_id,
                     label: this.label,
+                    label_id: label.label_id,
                     encap: this.peer_encap,
                 }
             }

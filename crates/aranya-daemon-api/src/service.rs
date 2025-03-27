@@ -10,6 +10,7 @@ use aranya_crypto::{
 };
 use aranya_fast_channels::{Label, NodeId};
 use aranya_util::Addr;
+use buggy::Bug;
 use serde::{Deserialize, Serialize};
 use spideroak_base58::ToBase58;
 use tracing::error;
@@ -21,6 +22,13 @@ pub type CS = DefaultCipherSuite;
 // TODO: enum?
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Error(String);
+
+impl From<Bug> for Error {
+    fn from(err: Bug) -> Self {
+        error!(%err);
+        Self(err.to_string())
+    }
+}
 
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
@@ -183,22 +191,22 @@ pub trait DaemonApi {
         name: NetIdentifier,
     ) -> Result<()>;
 
-    /// Create a fast channels label.
-    async fn create_label(team: TeamId, label: Label) -> Result<()>;
-    /// Delete a fast channels label.
-    async fn delete_label(team: TeamId, label: Label) -> Result<()>;
+    /// Create an AFC/AQC label.
+    async fn create_label(team: TeamId, label: String) -> Result<Label>;
+    /// Delete an AFC/AQC label.
+    async fn delete_label(team: TeamId, label: String) -> Result<Label>;
 
-    /// Assign a fast channels label to a device.
-    async fn assign_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
-    /// Revoke a fast channels label from a device.
-    async fn revoke_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
+    /// Assign an AFC/AQC label.
+    async fn assign_label(team: TeamId, device: DeviceId, label: String) -> Result<()>;
+    /// Revoke an AFC/AQC label.
+    async fn revoke_label(team: TeamId, device: DeviceId, label: String) -> Result<()>;
     /// Create a fast channel.
     async fn create_afc_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
-        label: Label,
-    ) -> Result<(AfcId, AfcCtrl)>;
+        label: String,
+    ) -> Result<(AfcId, AfcCtrl, Label)>;
     /// Delete a fast channel.
     async fn delete_afc_channel(chan: AfcId) -> Result<AfcCtrl>;
     /// Receive a fast channel ctrl message.
