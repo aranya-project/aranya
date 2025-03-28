@@ -204,7 +204,7 @@ impl DaemonApiHandler {
                         .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
                 }
                 Effect::AfcNetworkNameUnset(_network_name_unset) => {}
-                Effect::AqcNetworkNameSet(e) =>  {
+                Effect::AqcNetworkNameSet(e) => {
                     self.aqc_peers
                         .lock()
                         .await
