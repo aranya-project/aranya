@@ -1,6 +1,6 @@
 [package]
 name = "aranya-daemon-api"
-description = "UDS tarpc API between the Aranya client and the daemon"
+description = "Interface between Aranya client and daemon using tarpc over Unix domain sockets, handling type conversion between internal and external types"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
