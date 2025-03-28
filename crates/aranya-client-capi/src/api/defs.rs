@@ -68,6 +68,9 @@ pub enum Error {
 
     #[capi(msg = "tokio runtime error")]
     Runtime,
+
+    #[capi(msg = "invalid index")]
+    InvalidIndex,
 }
 
 impl From<&imp::Error> for Error {
@@ -90,6 +93,7 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Bug(_) => Self::Bug,
             },
             imp::Error::Runtime(_) => Self::Runtime,
+            imp::Error::InvalidIndex(_) => Self::InvalidIndex,
         }
     }
 }
@@ -667,7 +671,7 @@ pub unsafe fn afc_assign_net_identifier(
     Ok(())
 }
 
-/// Disassociate a network identifier from a device.
+/// Disassociate an AFC network identifier from a device.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -695,7 +699,67 @@ pub unsafe fn afc_remove_net_identifier(
     Ok(())
 }
 
-/// Create an AFC label.
+/// Associate a network identifier to a device for use with AQC.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// If the address already exists for this device, it is replaced with the new address. Capable
+/// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
+/// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param net_identifier the device's network identifier [`NetIdentifier`].
+///
+/// @relates AranyaClient.
+pub unsafe fn aqc_assign_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    net_identifier: NetIdentifier,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
+    let net_identifier = unsafe { net_identifier.as_underlying() }?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .assign_aqc_net_identifier(device.0, net_identifier),
+    )?;
+    Ok(())
+}
+
+/// Disassociate an AQC network identifier from a device.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param net_identifier the device's network identifier [`NetIdentifier`].
+///
+/// @relates AranyaClient.
+pub unsafe fn aqc_remove_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    net_identifier: NetIdentifier,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
+    let net_identifier = unsafe { net_identifier.as_underlying() }?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .remove_aqc_net_identifier(device.0, net_identifier),
+    )?;
+    Ok(())
+}
+
+/// Create a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -712,13 +776,13 @@ pub fn create_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
     Ok(())
 }
 
-/// Delete an AFC label.
+/// Delete a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param label the AFC channel label [`Label`] to delete.
+/// @param label the channel label [`Label`] to delete.
 ///
 /// @relates AranyaClient.
 pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
@@ -953,4 +1017,197 @@ pub unsafe fn afc_recv_data(
     client.msg = None;
 
     Ok(true)
+}
+
+/// Query devices on team.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param devices returns a list of device IDs on the team [`DeviceId`].
+/// @param devices_len returns the length of the devices list [`DeviceId`].
+///
+/// @relates AranyaClient.
+pub fn query_devices_on_team(
+    client: &mut Client,
+    team: &TeamId,
+    devices: Option<&mut MaybeUninit<DeviceId>>,
+    devices_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let data = client
+        .rt
+        .block_on(client.inner.queries(team.0).devices_on_team())?;
+    let data = data.__data();
+    let Some(devices) = devices else {
+        *devices_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    };
+    let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(DeviceId(*src));
+    }
+    if *devices_len < data.len() {
+        *devices_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *devices_len = data.len();
+    Ok(())
+}
+
+/// The size in bytes of a `DeviceId` converted to a human-readable base64 string.
+pub const ARANYA_DEVICE_ID_STR_LEN: u64 = (64 * 1375) / 1000 + 1;
+
+/// Writes the human-readable encoding of `device` to `str`.
+///
+/// To always succeed, `str` must be at least `ARANYA_DEVICE_ID_STR_LEN` bytes long.
+///
+/// @param device ID [`DeviceId`].
+/// @param device ID string [`DeviceId`].
+///
+/// @relates AranyaError.
+#[aranya_capi_core::no_ext_error]
+pub fn device_id_to_str(
+    device: DeviceId,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    aranya_capi_core::write_c_str(str, &device.0, str_len)?;
+    Ok(())
+}
+
+// TODO: query_device_role
+
+/// Query device's keybundle.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param __output the device's key bundle [`KeyBundle`].
+///
+/// @relates AranyaClient.
+pub unsafe fn query_device_keybundle(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+) -> Result<KeyBundle, imp::Error> {
+    let client = client.deref_mut();
+    let keys = client
+        .rt
+        .block_on(client.inner.queries(team.0).device_keybundle(device.0))?;
+    Ok(KeyBundle::from_underlying(keys))
+}
+
+/// Query device label assignments.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param labels returns a list of labels assigned to the device [`Label`].
+/// @param labels_len returns the length of the labels list [`Label`].
+///
+/// @relates AranyaClient.
+pub fn query_device_label_assignments(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    labels: Option<&mut MaybeUninit<u32>>,
+    labels_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let data = client.rt.block_on(
+        client
+            .inner
+            .queries(team.0)
+            .device_label_assignments(device.0),
+    )?;
+    let data = data.__data();
+    let Some(labels) = labels else {
+        *labels_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    };
+    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src.to_u32());
+    }
+    if *labels_len < data.len() {
+        *labels_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *labels_len = data.len();
+    Ok(())
+}
+
+/// Query device's AFC network identifier.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param network identifier string [`NetIdentifier`].
+///
+/// @relates AranyaClient.
+pub unsafe fn query_afc_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    ident: &mut MaybeUninit<c_char>,
+    ident_len: &mut usize,
+) -> Result<bool, imp::Error> {
+    let client = client.deref_mut();
+    let Some(net_identifier) = client
+        .rt
+        .block_on(client.inner.queries(team.0).afc_net_identifier(device.0))?
+    else {
+        return Ok(false);
+    };
+    let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
+    aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
+    Ok(true)
+}
+
+/// Query device's AQC network identifier.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param network identifier string [`NetIdentifier`].
+///
+/// @relates AranyaClient.
+pub unsafe fn query_aqc_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    ident: &mut MaybeUninit<c_char>,
+    ident_len: &mut usize,
+) -> Result<bool, imp::Error> {
+    let client = client.deref_mut();
+    let Some(net_identifier) = client
+        .rt
+        .block_on(client.inner.queries(team.0).aqc_net_identifier(device.0))?
+    else {
+        return Ok(false);
+    };
+    let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
+    aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
+    Ok(true)
+}
+
+/// Query device's AQC network identifier.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param __output the device's network identifier [`NetIdentifier`].
+///
+/// @relates AranyaClient.
+pub unsafe fn query_label_exists(
+    client: &mut Client,
+    team: &TeamId,
+    label: &Label,
+) -> Result<bool, imp::Error> {
+    let client = client.deref_mut();
+    let exists = client
+        .rt
+        .block_on(client.inner.queries(team.0).label_exists(label.0.into()))?;
+    Ok(exists)
 }

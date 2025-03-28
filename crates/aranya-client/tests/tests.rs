@@ -465,7 +465,42 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // membera creates afc bidi channel with memberb
+    // fact database queries
+    let mut queries = team.membera.client.queries(team_id);
+    let devices = queries.devices_on_team().await?;
+    assert_eq!(devices.iter().count(), 5);
+    debug!("membera devices on team: {:?}", devices.iter().count());
+    let role = queries.device_role(team.membera.id).await?;
+    assert_eq!(role, Role::Member);
+    debug!("membera role: {:?}", role);
+    let keybundle = queries.device_keybundle(team.membera.id).await?;
+    debug!("membera keybundle: {:?}", keybundle);
+    let labels = queries.device_label_assignments(team.membera.id).await?;
+    assert_eq!(labels.iter().count(), 2);
+    debug!("membera labels: {:?}", labels.__data());
+    let afc_net_identifier = queries
+        .afc_net_identifier(team.membera.id)
+        .await?
+        .expect("expected net identifier");
+    assert_eq!(
+        afc_net_identifier,
+        NetIdentifier(membera_afc_addr.to_string())
+    );
+    debug!("membera afc_net_identifer: {:?}", afc_net_identifier);
+    let aqc_net_identifier = queries
+        .aqc_net_identifier(team.membera.id)
+        .await?
+        .expect("expected net identifier");
+    assert_eq!(
+        aqc_net_identifier,
+        NetIdentifier(membera_afc_addr.to_string())
+    );
+    debug!("membera aqc_net_identifer: {:?}", aqc_net_identifier);
+    let label_exists = queries.label_exists(label1).await?;
+    assert!(label_exists);
+    debug!("membera label1 exists?: {:?}", label_exists);
+
+    // membera creates bidi channel with memberb
     let afc_id1 = team
         .membera
         .client

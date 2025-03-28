@@ -253,7 +253,7 @@ function is_valid_label(label int) bool {
 
 // Returns the channel operation for a particular label.
 function get_allowed_op(device_id id, label int) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedLabel[label: label, device_id: device_id]
+    let assigned_label = check_unwrap query AssignedLabel[device_id: device_id, label: label]
     return assigned_label.op
 }
 
@@ -1097,7 +1097,7 @@ command AssignLabel {
         check exists Label[label: this.label]
 
         finish {
-            create AssignedLabel[label: this.label, device_id: device.device_id]=>{op: this.op}
+            create AssignedLabel[device_id: device.device_id, label: this.label]=>{op: this.op}
 
             emit LabelAssigned {
                 device_id: device.device_id,
@@ -1160,7 +1160,7 @@ command RevokeLabel {
         check exists AssignedLabel[label: this.label, device_id: device.device_id]
 
         finish {
-            delete AssignedLabel[label: this.label, device_id: device.device_id]
+            delete AssignedLabel[device_id: device.device_id, label: this.label]
 
             emit LabelRevoked {
                 device_id: device.device_id,
@@ -1933,6 +1933,287 @@ command AqcCreateUniChannel {
 - Members can only create unidirectional channels when the writer side has either
   `ChanOp::ReadWrite` or `ChanOp::WriteOnly` permissions for the label and the reader side has
   either `ChanOp::ReadWrite` or `ChanOp::ReadOnly` permissions for the label.
+
+### QueryDevicesOnTeam
+Queries devices on team.
+
+```policy
+action query_devices_on_team() {
+    map Device[device_id:?] as f {
+        publish QueryDevicesOnTeam { device_id: f.device_id }
+    }
+}
+
+effect QueryDevicesOnTeamResult {
+    device_id id,
+}
+
+command QueryDevicesOnTeam {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        finish {
+            emit QueryDevicesOnTeamResult {
+                device_id: this.device_id,
+            }
+        }
+    }
+}
+```
+
+### QueryDeviceRole
+Queries device role.
+
+```policy
+action query_device_role(device_id id) {
+    publish QueryDeviceRole {
+        device_id: device_id,
+    }
+}
+
+effect QueryDeviceRoleResult {
+    role enum Role,
+}
+
+command QueryDeviceRole {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // Check that the team is active and return the author's info if they exist in the team.
+        let author = get_valid_device(this.device_id)
+
+        finish {
+            emit QueryDeviceRoleResult {
+                role: author.role,
+            }
+        }
+    }
+}
+```
+
+### QueryDeviceKeyBundle
+Queries device KeyBundle.
+
+```policy
+
+// Returns the device's key bundle.
+function get_device_keybundle(device_id id) struct KeyBundle {
+    let ident_key = check_unwrap query DeviceIdentKey[device_id: device_id]
+    let sign_key = check_unwrap query DeviceSignKey[device_id: device_id]
+    let enc_key = check_unwrap query DeviceEncKey[device_id: device_id]
+
+    return KeyBundle {
+        ident_key: ident_key.key,
+        sign_key: sign_key.key,
+        enc_key: enc_key.key,
+    }
+}
+
+action query_device_keybundle(device_id id) {
+    publish QueryDeviceKeyBundle {
+        device_id: device_id,
+    }
+}
+
+effect QueryDeviceKeyBundleResult {
+    device_keys struct KeyBundle,
+}
+
+command QueryDeviceKeyBundle {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // Check that the team is active and return the author's info if they exist in the team.
+        let author = get_valid_device(this.device_id)
+        let device_keys = get_device_keybundle(author.device_id)
+
+        finish {
+            emit QueryDeviceKeyBundleResult {
+                device_keys: device_keys,
+            }
+        }
+    }
+}
+```
+
+### QueryDeviceLabelAssignment
+Queries device label assignments.
+
+```policy
+action query_device_label_assignments(device_id id) {
+    map AssignedLabel[device_id: device_id, label:?] as f {
+        publish QueryDeviceLabelAssignments { label: f.label }
+    }
+}
+
+effect QueryDeviceLabelAssignmentsResult {
+    label int,
+}
+
+command QueryDeviceLabelAssignments {
+    fields {
+        label int,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        finish {
+            emit QueryDeviceLabelAssignmentsResult {
+                label: this.label
+            }
+        }
+    }
+}
+```
+
+### QueryAfcNetIdentifier
+Queries AFC network identifier.
+
+```policy
+
+// Returns the device's AFC network identifier.
+function get_afc_net_identifier(device_id id) string {
+    let net_identifier = check_unwrap query AfcMemberNetworkId[device_id: device_id]
+
+    return net_identifier.net_identifier
+}
+
+action query_afc_net_identifier(device_id id) {
+    publish QueryAfcNetIdentifier {
+        device_id: device_id,
+    }
+}
+
+effect QueryAfcNetIdentifierResult {
+    net_identifier string,
+}
+
+command QueryAfcNetIdentifier {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // Check that the team is active and return the author's info if they exist in the team.
+        let author = get_valid_device(this.device_id)
+        let net_identifier = get_afc_net_identifier(author.device_id)
+
+        finish {
+            emit QueryAfcNetIdentifierResult {
+                net_identifier: net_identifier,
+            }
+        }
+    }
+}
+```
+
+### QueryAqcNetIdentifier
+Queries AQC network identifier.
+
+```policy
+
+// Returns the device's AQC network identifier.
+function get_aqc_net_identifier(device_id id) string {
+    let net_identifier = check_unwrap query AqcMemberNetworkId[device_id: device_id]
+
+    return net_identifier.net_identifier
+}
+
+action query_aqc_net_identifier(device_id id) {
+    publish QueryAqcNetIdentifier {
+        device_id: device_id,
+    }
+}
+
+effect QueryAqcNetIdentifierResult {
+    net_identifier string,
+}
+
+command QueryAqcNetIdentifier {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // Check that the team is active and return the author's info if they exist in the team.
+        let author = get_valid_device(this.device_id)
+        let net_identifier = get_aqc_net_identifier(author.device_id)
+
+        finish {
+            emit QueryAqcNetIdentifierResult {
+                net_identifier: net_identifier,
+            }
+        }
+    }
+}
+```
+
+### QueryLabelExists
+Queries whether a label exists.
+
+```policy
+
+// Returns whether a label exists.
+function check_label_exists(label int) bool {
+    let label_exists = exists Label[label: label]
+
+    return label_exists
+}
+
+action query_label_exists(label int) {
+    publish QueryLabelExists {
+        label: label,
+    }
+}
+
+effect QueryLabelExistsResult {
+    label_exists bool,
+}
+
+command QueryLabelExists {
+    fields {
+        label int,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // It must be a valid label that does not already exist.
+        check is_valid_label(this.label)
+        let label_exists = check_label_exists(this.label)
+
+        finish {
+            emit QueryLabelExistsResult {
+                label_exists: label_exists,
+            }
+        }
+    }
+}
+```
 
 <!-- TODO: add delete channel commands? -->
 

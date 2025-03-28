@@ -706,6 +706,103 @@ where
         })
         .in_current_span()
     }
+
+    /// Query devices on team off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_devices_on_team_off_graph(
+        &self,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_devices_on_team",
+            args: Cow::Owned(vec![]),
+        })
+        .in_current_span()
+    }
+
+    /// Query device role off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_device_role_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_device_role",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query device keybundle off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_device_keybundle_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_device_keybundle",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query device label assignments off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_device_label_assignments_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_device_label_assignments",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query AFC net identifier off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_afc_net_identifier_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_afc_net_identifier",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query AQC net identifier off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_aqc_net_identifier_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_aqc_net_identifier",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query label exists off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_label_exists_off_graph(
+        &self,
+        label: Label,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_label_exists",
+            args: Cow::Owned(vec![Value::from(i64::from(label.to_u32()))]),
+        })
+        .in_current_span()
+    }
 }
 
 /// An implementation of [`Actor`].
