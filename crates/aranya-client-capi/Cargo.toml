@@ -17,6 +17,12 @@ workspace = true
 crate-type = ["rlib", "cdylib"]
 
 
+[features]
+default = []
+# Aranya Fast Channels are currently an experimental opt-in feature
+afc = ["aranya-client/afc"]
+
+
 [dependencies]
 aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }

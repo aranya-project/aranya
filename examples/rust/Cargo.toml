@@ -29,10 +29,9 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [dependencies]
-aranya-client = { path = "../../crates/aranya-client" }
-aranya-daemon = { path = "../../crates/aranya-daemon" }
+aranya-client = { path = "../../crates/aranya-client", features = ["afc"] }
+aranya-daemon = { path = "../../crates/aranya-daemon", features = ["afc"] }
 aranya-daemon-api = { path = "../../crates/aranya-daemon-api" }
-aranya-fast-channels = { version = "0.5.0", features = ["posix", "std", "memory"] }
 aranya-util = { path = "../../crates/aranya-util" }
 
 anyhow = { version = "1.0.94" }

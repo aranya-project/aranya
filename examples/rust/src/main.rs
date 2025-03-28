@@ -5,13 +5,12 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{afc::Message, client::Client};
+use aranya_client::{Message, Client, Label};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
-use aranya_fast_channels::Label;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
