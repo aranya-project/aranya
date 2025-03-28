@@ -600,7 +600,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // membera creates bidi channel with memberb
+    // membera creates afc bidi channel with memberb
     let afc_id1 = team
         .membera
         .client
@@ -608,7 +608,15 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
-    // membera creates bidi channel with memberb
+    // membera creates aqc bidi channel with memberb
+    let _aqc_id1 = team
+        .membera
+        .client
+        .aqc()
+        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .await?;
+
+    // membera creates afc bidi channel with memberb
     let afc_id2 = team
         .membera
         .client

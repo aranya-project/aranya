@@ -68,7 +68,6 @@ higher role back down to `Member`.
 
 ```policy
 use afc
-// TODO: aqc module doesn't exist yet
 use aqc
 use crypto
 use device

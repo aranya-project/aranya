@@ -204,7 +204,12 @@ impl DaemonApiHandler {
                         .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
                 }
                 Effect::AfcNetworkNameUnset(_network_name_unset) => {}
-                Effect::AqcNetworkNameSet(_network_name_set) => {}
+                Effect::AqcNetworkNameSet(e) =>  {
+                    self.aqc_peers
+                        .lock()
+                        .await
+                        .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
+                }
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::AfcBidiChannelCreated(v) => {
                     debug!("received AfcBidiChannelCreated effect");

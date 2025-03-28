@@ -14,7 +14,7 @@ use tracing::{debug, info, instrument};
 
 use crate::{
     afc::{setup_afc_shm, FastChannels, FastChannelsImpl},
-    aqc::setup_aqc_shm,
+    aqc::{AqcChannels, AqcChannelsImpl},
     error::{Error, Result},
 };
 
@@ -35,7 +35,6 @@ pub struct Client {
     pub(crate) daemon: DaemonApiClient,
     /// Support for Aranya Fast Channels
     pub(crate) afc: FastChannelsImpl<ReadState<CS>>,
-    // TODO: aqc
 }
 
 impl Client {
@@ -76,15 +75,9 @@ impl Client {
             addr = ?afc.local_addr().map_err(Error::Afc)?,
             "bound AFC router",
         );
-        let _aqc_read = setup_aqc_shm(aqc_shm_path, max_channels)?;
-        // TODO: initialize aqc
-        /*
-        let aqc = QuicChannelsImpl::new(aqc::Client::new(aqc_read), aqc_address).await?;
-        debug!(
-            addr = ?aqc.local_addr().map_err(Error::Aqc)?,
-            "bound AQC router",
-        );
-        */
+        // TODO: aqc shm
+        //let aqc_read = setup_aqc_shm(aqc_shm_path, max_channels)?;
+        let _aqc = AqcChannelsImpl::new().await?;
 
         Ok(Self { daemon, afc })
     }
@@ -129,7 +122,9 @@ impl Client {
         FastChannels::new(self)
     }
 
-    // TODO: Get access to QUIC Fast Channels.
+    pub fn aqc(&mut self) -> AqcChannels<'_> {
+        AqcChannels::new(self)
+    }
 }
 
 /// Represents an Aranya Team.
