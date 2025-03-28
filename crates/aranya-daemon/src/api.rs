@@ -11,6 +11,7 @@ use std::{
     time::Duration,
 };
 
+use buggy::BugExt;
 use anyhow::{anyhow, Context, Result};
 use aranya_crypto::{Csprng, Rng};
 use aranya_daemon_api::{
@@ -42,7 +43,6 @@ mod afc_imports {
     pub(super) use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, DeviceId};
     pub(super) use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed};
     pub(super) use bimap::BiBTreeMap;
-    pub(super) use buggy::BugExt;
     pub(super) use tokio::sync::Mutex;
 
     pub(super) use crate::{

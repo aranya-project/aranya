@@ -8,7 +8,10 @@
     clippy::unwrap_used,
     rust_2018_idioms
 )]
-
+#[cfg(feature = "afc")]
+use tracing::info;
+#[cfg(feature = "afc")]
+use tempfile::tempdir;
 #[cfg(feature = "afc")]
 use std::path::Path;
 #[cfg(feature = "afc")]
@@ -48,8 +51,11 @@ use tokio::{
     time::{self, Sleep},
 };
 #[cfg(feature = "afc")]
+use test_log::test;
+#[cfg(feature = "afc")]
 use tracing::{debug, instrument};
-
+#[cfg(feature = "afc")]
+use aranya_daemon_api::Role;
 #[cfg(feature = "afc")]
 #[instrument(skip_all, fields(%duration = FmtDuration(d)))]
 fn sleep(d: Duration) -> Sleep {
@@ -324,8 +330,8 @@ impl Drop for DeviceCtx {
     }
 }
 
-#[test(tokio::test(flavor = "multi_thread"))]
 #[cfg(feature = "afc")]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_one_way_two_chans() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
@@ -606,8 +612,8 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
 }
 
 /// Tests AFC two way communication within one channel.
-#[test(tokio::test(flavor = "multi_thread"))]
 #[cfg(feature = "afc")]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_two_way_one_chan() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
@@ -823,8 +829,8 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
 }
 
 /// A positive test that sequence numbers are monotonic.
-#[test(tokio::test(flavor = "multi_thread"))]
 #[cfg(feature = "afc")]
+#[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_monotonic_seq() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
