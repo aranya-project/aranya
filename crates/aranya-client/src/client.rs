@@ -184,10 +184,21 @@ pub struct Team<'a> {
 
 impl Team<'_> {
     /// Adds a peer for automatic periodic Aranya state syncing.
-    pub async fn add_sync_peer(&mut self, addr: Addr, interval: Duration) -> Result<()> {
+    pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
             .daemon
-            .add_sync_peer(context::current(), addr, self.id, interval)
+            .add_sync_peer(context::current(), addr, self.id, config.into())
+            .await?
+            .map_err(Into::into)
+    }
+
+    /// Sync with peer immediately.
+    /// Default values for a sync config will be used if `config` is `None`.
+    /// Otherwise the provided config will be used for syncing.
+    pub async fn sync_now(&mut self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
+        self.client
+            .daemon
+            .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
             .await?
             .map_err(Into::into)
     }
@@ -417,5 +428,70 @@ impl Queries<'_> {
             .query_label_exists(context::current(), self.id, label)
             .await?
             .map_err(Into::into)
+    }
+}
+
+/// Configuration values for syncing with a peer
+#[derive(Debug, Clone)]
+pub struct SyncPeerConfig {
+    interval: Duration,
+    sync_now: bool,
+}
+
+impl SyncPeerConfig {
+    /// Creates a default [`SyncPeerConfigBuilder`]
+    pub fn builder() -> SyncPeerConfigBuilder {
+        Default::default()
+    }
+}
+
+impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
+    fn from(value: SyncPeerConfig) -> Self {
+        Self {
+            interval: value.interval,
+            sync_now: value.sync_now,
+        }
+    }
+}
+
+/// Builder for a [`SyncPeerConfig`]
+pub struct SyncPeerConfigBuilder {
+    interval: Duration,
+    sync_now: bool,
+}
+
+impl SyncPeerConfigBuilder {
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Build a [`SyncPeerConfig`]
+    pub fn build(self) -> SyncPeerConfig {
+        SyncPeerConfig {
+            interval: self.interval,
+            sync_now: self.sync_now,
+        }
+    }
+
+    /// Set the interval at which syncing occurs
+    pub fn interval(mut self, duration: Duration) -> Self {
+        self.interval = duration;
+        self
+    }
+
+    /// Set the `sync_now` field which determines whether
+    /// the initial sync should happen immediately after a peer is added
+    pub fn sync_now(mut self, sync_now: bool) -> Self {
+        self.sync_now = sync_now;
+        self
+    }
+}
+
+impl Default for SyncPeerConfigBuilder {
+    fn default() -> Self {
+        Self {
+            interval: Duration::from_millis(100),
+            sync_now: true,
+        }
     }
 }

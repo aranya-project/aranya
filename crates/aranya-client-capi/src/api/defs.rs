@@ -263,6 +263,15 @@ impl From<aranya_fast_channels::Label> for Label {
     }
 }
 
+/// Sync Peer config.
+#[aranya_capi_core::opaque(size = 32, align = 8)]
+pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
+
+/// Builder for a Sync Peer config.
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 32, align = 8)]
+pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
+
 /// A type to represent a span of time.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
@@ -466,14 +475,14 @@ pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error>
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param addr the peer's Aranya network address [`Addr`].
-/// @param interval the time [`Duration`] to wait between syncs with peer.
+/// @param config configuration values for syncing with a peer.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_sync_peer(
     client: &mut Client,
     team: &TeamId,
     addr: Addr,
-    interval: Duration,
+    config: &SyncPeerConfig,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `addr` is a valid C String.
@@ -482,7 +491,37 @@ pub unsafe fn add_sync_peer(
         client
             .inner
             .team(team.0)
-            .add_sync_peer(addr, interval.into()),
+            .add_sync_peer(addr, (**config).into()),
+    )?;
+    Ok(())
+}
+
+/// Sync with peer immediately.
+///
+/// If a peer is not reachable on the network, sync errors
+/// will appear in the tracing logs and
+/// Aranya will be unable to sync state with that peer.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param addr the peer's Aranya network address [`Addr`].
+/// @param config configuration values for syncing with a peer.
+/// Default values for a sync config will be used if `config` is `NULL`
+/// @relates AranyaClient.
+pub unsafe fn sync_now(
+    client: &mut Client,
+    team: &TeamId,
+    addr: Addr,
+    config: Option<&SyncPeerConfig>,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { addr.as_underlying() }?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .sync_now(addr, config.map(|config| (**config).into())),
     )?;
     Ok(())
 }
@@ -993,6 +1032,39 @@ pub unsafe fn afc_recv_data(
     Ok(true)
 }
 
+/// Set the interval field on the config builder
+///
+/// @param cfg a pointer to the builder for a sync config
+/// @param interval Set the interval at which syncing occurs
+pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
+    cfg.deref_mut().interval(interval);
+}
+
+/// Set the sync_now field on the config builder to true.
+/// When this field is set to true, syncing happens immediately after a peer is added
+///
+/// @param cfg a pointer to the builder for a sync config
+pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
+    cfg.deref_mut().sync_now(true);
+}
+
+/// Set the sync_now field on the config builder to false
+/// When this field is set to false, syncing occurs after some specifed duration from when the peer is added
+///
+/// @param cfg a pointer to the builder for a sync config
+pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
+    cfg.deref_mut().sync_now(false);
+}
+
+/// Build a sync config from a sync config builder
+///
+/// @param cfg a pointer to the builder for a sync config
+pub fn sync_peer_config_builder_build(
+    cfg: &SyncPeerConfigBuilder,
+    out: &mut MaybeUninit<SyncPeerConfig>,
+) {
+    Safe::init(out, cfg.build());
+}
 /// Query devices on team.
 ///
 /// @param client the Aranya Client [`Client`].

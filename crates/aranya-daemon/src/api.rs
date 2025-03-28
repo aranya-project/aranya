@@ -8,7 +8,6 @@ use std::{
     net::SocketAddr,
     path::PathBuf,
     sync::Arc,
-    time::Duration,
 };
 
 use anyhow::{anyhow, Context, Result};
@@ -16,7 +15,7 @@ use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler
 use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, DeviceId, Rng};
 use aranya_daemon_api::{
     AfcCtrl, AfcId, DaemonApi, DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
-    Result as ApiResult, Role as ApiRole, TeamId, CS,
+    Result as ApiResult, Role as ApiRole, SyncPeerConfig, TeamId, CS,
 };
 use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed, Label, NodeId};
 use aranya_keygen::PublicKeys;
@@ -319,22 +318,35 @@ impl DaemonApi for DaemonApiHandler {
 
     #[instrument(skip(self))]
     async fn add_sync_peer(
+        mut self,
+        _: context::Context,
+        peer: Addr,
+        team: TeamId,
+        cfg: SyncPeerConfig,
+    ) -> ApiResult<()> {
+        self.peers
+            .add_peer(peer, team.into_id().into(), cfg)
+            .await?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn sync_now(
         self,
         _: context::Context,
         peer: Addr,
         team: TeamId,
-        interval: Duration,
+        cfg: Option<SyncPeerConfig>,
     ) -> ApiResult<()> {
         self.peers
-            .add_peer(peer, interval, team.into_id().into())
-            .await
-            .context("unable to add sync peer")?;
+            .sync_now(peer, team.into_id().into(), cfg)
+            .await?;
         Ok(())
     }
 
     #[instrument(skip(self))]
     async fn remove_sync_peer(
-        self,
+        mut self,
         _: context::Context,
         peer: Addr,
         team: TeamId,
