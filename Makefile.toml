@@ -250,3 +250,10 @@ description = "Run C example application"
 cwd = "examples/c"
 script = "./run.bash"
 dependencies = ["build-capi-header", "build-capi-lib"]
+
+# Rust Example
+[tasks.run-rust-example]
+category = "examples"
+description = "Run Rust example application"
+cwd = "examples/rust"
+script = "./run.bash"

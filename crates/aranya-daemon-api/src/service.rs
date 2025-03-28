@@ -65,7 +65,7 @@ pub struct KeyBundle {
 }
 
 /// A device's role on the team.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Role {
     Owner,
     Admin,
@@ -188,6 +188,19 @@ pub trait DaemonApi {
         name: NetIdentifier,
     ) -> Result<()>;
 
+    /// Assign a QUIC channels network identifier to a device.
+    async fn assign_aqc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
+    /// Remove a QUIC channels network identifier from a device.
+    async fn remove_aqc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
+
     /// Assign a fast channels label to a device.
     async fn assign_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
     /// Revoke a fast channels label from a device.
@@ -207,4 +220,24 @@ pub trait DaemonApi {
         node_id: NodeId,
         ctrl: AfcCtrl,
     ) -> Result<(AfcId, NetIdentifier, Label)>;
+    /// Query devices on team.
+    async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
+    /// Query device role.
+    async fn query_device_role(team: TeamId, device: DeviceId) -> Result<Role>;
+    /// Query device keybundle.
+    async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
+    /// Query device label assignments.
+    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
+    /// Query AFC network ID.
+    async fn query_afc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+    ) -> Result<Option<NetIdentifier>>;
+    /// Query AQC network ID.
+    async fn query_aqc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+    ) -> Result<Option<NetIdentifier>>;
+    /// Query label exists.
+    async fn query_label_exists(team: TeamId, label: Label) -> Result<bool>;
 }

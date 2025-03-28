@@ -11,36 +11,46 @@
 
 #[cfg(feature = "afc")]
 use std::path::Path;
+#[cfg(feature = "afc")]
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
+#[cfg(feature = "afc")]
 use anyhow::{Context, Result};
 #[cfg(feature = "afc")]
 use aranya_client::afc::Message;
+#[cfg(feature = "afc")]
 use aranya_client::client::Client;
+#[cfg(feature = "afc")]
 use aranya_crypto::{hash::Hash, rust::Sha256};
+#[cfg(feature = "afc")]
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
 #[cfg(feature = "afc")]
 use aranya_daemon_api::NetIdentifier;
-use aranya_daemon_api::{DeviceId, KeyBundle, Role};
+#[cfg(feature = "afc")]
+use aranya_daemon_api::{DeviceId, KeyBundle};
 #[cfg(feature = "afc")]
 use aranya_fast_channels::{Label, Seq};
+#[cfg(feature = "afc")]
 use aranya_util::addr::Addr;
+#[cfg(feature = "afc")]
 use backon::{ExponentialBuilder, Retryable};
 #[cfg(feature = "afc")]
 use buggy::BugExt;
+#[cfg(feature = "afc")]
 use spideroak_base58::ToBase58;
-use tempfile::tempdir;
-use test_log::test;
+#[cfg(feature = "afc")]
 use tokio::{
     fs,
     task::{self, AbortHandle},
     time::{self, Sleep},
 };
-use tracing::{debug, info, instrument};
+#[cfg(feature = "afc")]
+use tracing::{debug, instrument};
 
+#[cfg(feature = "afc")]
 #[instrument(skip_all, fields(%duration = FmtDuration(d)))]
 fn sleep(d: Duration) -> Sleep {
     debug!("sleeping");
@@ -51,8 +61,10 @@ fn sleep(d: Duration) -> Sleep {
 /// Formats a [`Duration`].
 ///
 /// It uses the same syntax as Go's `time.Duration`.
+#[cfg(feature = "afc")]
 pub struct FmtDuration(Duration);
 
+#[cfg(feature = "afc")]
 impl fmt::Display for FmtDuration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.0 < Duration::ZERO {
@@ -126,6 +138,7 @@ impl fmt::Display for FmtDuration {
 }
 
 /// Trim up to `width` trailing zeros from `d`.
+#[cfg(feature = "afc")]
 fn trim(mut d: u128, mut width: usize) -> (u128, usize) {
     while width > 0 {
         if d % 10 != 0 {
@@ -165,6 +178,7 @@ macro_rules! do_poll {
     };
 }
 
+#[cfg(feature = "afc")]
 #[allow(dead_code)] // memberb is unused if AFC is disabled
 struct TeamCtx {
     owner: DeviceCtx,
@@ -174,6 +188,7 @@ struct TeamCtx {
     memberb: DeviceCtx,
 }
 
+#[cfg(feature = "afc")]
 impl TeamCtx {
     pub async fn new(name: String, work_dir: PathBuf) -> Result<Self> {
         let owner = DeviceCtx::new(name.clone(), "owner".into(), work_dir.join("owner")).await?;
@@ -195,6 +210,7 @@ impl TeamCtx {
     }
 }
 
+#[cfg(feature = "afc")]
 struct DeviceCtx {
     client: Client,
     pk: KeyBundle,
@@ -202,6 +218,7 @@ struct DeviceCtx {
     daemon: AbortHandle,
 }
 
+#[cfg(feature = "afc")]
 fn get_shm_path(path: String) -> String {
     if cfg!(target_os = "macos") && path.len() > 31 {
         // Shrink the size of the team name down to 22 bytes
@@ -213,6 +230,7 @@ fn get_shm_path(path: String) -> String {
     path
 }
 
+#[cfg(feature = "afc")]
 impl DeviceCtx {
     pub async fn new(team_name: String, name: String, work_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(work_dir.clone()).await?;
@@ -299,145 +317,11 @@ impl DeviceCtx {
     }
 }
 
+#[cfg(feature = "afc")]
 impl Drop for DeviceCtx {
     fn drop(&mut self) {
         self.daemon.abort();
     }
-}
-
-/// Integration test for the user library and daemon.
-/// Tests creating a team with the user library.
-/// More extensive integration testing is conducted inside the daemon crate.
-/// The goal of this integration test is to validate the user library's end-to-end functionality.
-/// This includes exercising the user library's idiomatic Rust API as well as the daemon's `tarpc` API.
-///
-/// Example of debugging test with tracing:
-/// `RUST_LOG="debug" cargo test integration_test -- --show-output --nocapture`
-/// `RUST_LOG="aranya_client::afc=debug" cargo test integration_test -- --show-output --nocapture`
-/// `RUST_LOG="aranya_client=debug,aranya_daemon=info" cargo test integration_test -- --show-output --nocapture`
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn integration_test() -> Result<()> {
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
-
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut team = TeamCtx::new("integration_test".into(), work_dir).await?;
-
-    // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team()
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
-    // TODO: implement add_team.
-    /*
-    team.admin.client.add_team(team_id).await?;
-    team.operator.client.add_team(team_id).await?;
-    team.membera.client.add_team(team_id).await?;
-    */
-
-    // get sync addresses.
-    let owner_addr = team.owner.aranya_local_addr().await?;
-    let admin_addr = team.admin.aranya_local_addr().await?;
-    let operator_addr = team.operator.aranya_local_addr().await?;
-    let membera_addr = team.membera.aranya_local_addr().await?;
-
-    // setup sync peers.
-    let mut owner_team = team.owner.client.team(team_id);
-    let mut admin_team = team.admin.client.team(team_id);
-    let mut operator_team = team.operator.client.team(team_id);
-    let mut member_team = team.membera.client.team(team_id);
-
-    owner_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
-        .await?;
-    owner_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
-        .await?;
-    owner_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
-        .await?;
-
-    admin_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
-        .await?;
-    admin_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
-        .await?;
-    admin_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
-        .await?;
-
-    operator_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
-        .await?;
-    operator_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
-        .await?;
-    operator_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
-        .await?;
-
-    member_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
-        .await?;
-    member_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
-        .await?;
-    member_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
-        .await?;
-
-    // add admin to team.
-    info!("adding admin to team");
-    owner_team.add_device_to_team(team.admin.pk.clone()).await?;
-    owner_team.assign_role(team.admin.id, Role::Admin).await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // add operator to team.
-    info!("adding operator to team");
-    owner_team
-        .add_device_to_team(team.operator.pk.clone())
-        .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    admin_team
-        .assign_role(team.operator.id, Role::Operator)
-        .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // add member to team.
-    info!("adding member to team");
-    operator_team
-        .add_device_to_team(team.membera.pk.clone())
-        .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // remove devices from team.
-    info!("removing member");
-    owner_team.remove_device_from_team(team.membera.id).await?;
-    info!("removing operator");
-    owner_team
-        .revoke_role(team.operator.id, Role::Operator)
-        .await?;
-    owner_team.remove_device_from_team(team.operator.id).await?;
-    info!("removing admin");
-    owner_team.revoke_role(team.admin.id, Role::Admin).await?;
-    owner_team.remove_device_from_team(team.admin.id).await?;
-
-    Ok(())
 }
 
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -598,9 +482,51 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     operator_team
         .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
         .await?;
+    // TODO: use aqc addr
+    operator_team
+        .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
+        .await?;
+    operator_team
+        .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
+        .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
+
+    // fact database queries
+    let mut queries = team.membera.client.queries(team_id);
+    let devices = queries.devices_on_team().await?;
+    assert_eq!(devices.iter().count(), 5);
+    debug!("membera devices on team: {:?}", devices.iter().count());
+    let role = queries.device_role(team.membera.id).await?;
+    assert_eq!(role, Role::Member);
+    debug!("membera role: {:?}", role);
+    let keybundle = queries.device_keybundle(team.membera.id).await?;
+    debug!("membera keybundle: {:?}", keybundle);
+    let labels = queries.device_label_assignments(team.membera.id).await?;
+    assert_eq!(labels.iter().count(), 2);
+    debug!("membera labels: {:?}", labels.__data());
+    let afc_net_identifier = queries
+        .afc_net_identifier(team.membera.id)
+        .await?
+        .expect("expected net identifier");
+    assert_eq!(
+        afc_net_identifier,
+        NetIdentifier(membera_afc_addr.to_string())
+    );
+    debug!("membera afc_net_identifer: {:?}", afc_net_identifier);
+    let aqc_net_identifier = queries
+        .aqc_net_identifier(team.membera.id)
+        .await?
+        .expect("expected net identifier");
+    assert_eq!(
+        aqc_net_identifier,
+        NetIdentifier(membera_afc_addr.to_string())
+    );
+    debug!("membera aqc_net_identifer: {:?}", aqc_net_identifier);
+    let label_exists = queries.label_exists(label1).await?;
+    assert!(label_exists);
+    debug!("membera label1 exists?: {:?}", label_exists);
 
     // membera creates bidi channel with memberb
     let afc_id1 = team
