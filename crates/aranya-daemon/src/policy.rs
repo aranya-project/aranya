@@ -49,12 +49,21 @@ pub enum Effect {
     LabelUndefined(LabelUndefined),
     LabelAssigned(LabelAssigned),
     LabelRevoked(LabelRevoked),
-    NetworkNameSet(NetworkNameSet),
-    NetworkNameUnset(NetworkNameUnset),
+    AfcNetworkNameSet(AfcNetworkNameSet),
+    AfcNetworkNameUnset(AfcNetworkNameUnset),
+    AqcNetworkNameSet(AqcNetworkNameSet),
+    AqcNetworkNameUnset(AqcNetworkNameUnset),
     AfcBidiChannelCreated(AfcBidiChannelCreated),
     AfcBidiChannelReceived(AfcBidiChannelReceived),
     AfcUniChannelCreated(AfcUniChannelCreated),
     AfcUniChannelReceived(AfcUniChannelReceived),
+    QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
+    QueryDeviceRoleResult(QueryDeviceRoleResult),
+    QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
+    QueryDeviceLabelAssignmentsResult(QueryDeviceLabelAssignmentsResult),
+    QueryAfcNetIdentifierResult(QueryAfcNetIdentifierResult),
+    QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
+    QueryLabelExistsResult(QueryLabelExistsResult),
 }
 /// TeamCreated policy effect.
 #[effect]
@@ -130,15 +139,26 @@ pub struct LabelRevoked {
     pub device_id: Id,
     pub label: i64,
 }
-/// NetworkNameSet policy effect.
+/// AfcNetworkNameSet policy effect.
 #[effect]
-pub struct NetworkNameSet {
+pub struct AfcNetworkNameSet {
     pub device_id: Id,
     pub net_identifier: String,
 }
-/// NetworkNameUnset policy effect.
+/// AfcNetworkNameUnset policy effect.
 #[effect]
-pub struct NetworkNameUnset {
+pub struct AfcNetworkNameUnset {
+    pub device_id: Id,
+}
+/// AqcNetworkNameSet policy effect.
+#[effect]
+pub struct AqcNetworkNameSet {
+    pub device_id: Id,
+    pub net_identifier: String,
+}
+/// AqcNetworkNameUnset policy effect.
+#[effect]
+pub struct AqcNetworkNameUnset {
     pub device_id: Id,
 }
 /// AfcBidiChannelCreated policy effect.
@@ -187,6 +207,41 @@ pub struct AfcUniChannelReceived {
     pub label: i64,
     pub encap: Vec<u8>,
 }
+/// QueryDevicesOnTeamResult policy effect.
+#[effect]
+pub struct QueryDevicesOnTeamResult {
+    pub device_id: Id,
+}
+/// QueryDeviceRoleResult policy effect.
+#[effect]
+pub struct QueryDeviceRoleResult {
+    pub role: Role,
+}
+/// QueryDeviceKeyBundleResult policy effect.
+#[effect]
+pub struct QueryDeviceKeyBundleResult {
+    pub device_keys: KeyBundle,
+}
+/// QueryDeviceLabelAssignmentsResult policy effect.
+#[effect]
+pub struct QueryDeviceLabelAssignmentsResult {
+    pub label: i64,
+}
+/// QueryAfcNetIdentifierResult policy effect.
+#[effect]
+pub struct QueryAfcNetIdentifierResult {
+    pub net_identifier: String,
+}
+/// QueryAqcNetIdentifierResult policy effect.
+#[effect]
+pub struct QueryAqcNetIdentifierResult {
+    pub net_identifier: String,
+}
+/// QueryLabelExistsResult policy effect.
+#[effect]
+pub struct QueryLabelExistsResult {
+    pub label_exists: bool,
+}
 /// Implements all supported policy actions.
 #[actions]
 pub trait ActorExt {
@@ -209,12 +264,18 @@ pub trait ActorExt {
         op: ChanOp,
     ) -> Result<(), ClientError>;
     fn revoke_label(&mut self, device_id: Id, label: i64) -> Result<(), ClientError>;
-    fn set_network_name(
+    fn set_afc_network_name(
         &mut self,
         device_id: Id,
         net_identifier: String,
     ) -> Result<(), ClientError>;
-    fn unset_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn unset_afc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn set_aqc_network_name(
+        &mut self,
+        device_id: Id,
+        net_identifier: String,
+    ) -> Result<(), ClientError>;
+    fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn create_afc_bidi_channel(
         &mut self,
         peer_id: Id,
@@ -226,4 +287,14 @@ pub trait ActorExt {
         reader_id: Id,
         label: i64,
     ) -> Result<(), ClientError>;
+    fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
+    fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_device_label_assignments(
+        &mut self,
+        device_id: Id,
+    ) -> Result<(), ClientError>;
+    fn query_afc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_label_exists(&mut self, label: i64) -> Result<(), ClientError>;
 }
