@@ -271,7 +271,6 @@ dependencies = [
  "aranya-client",
  "aranya-daemon",
  "aranya-daemon-api",
- "aranya-fast-channels",
  "aranya-util",
  "backon",
  "buggy",
