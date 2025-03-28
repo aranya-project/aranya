@@ -1104,6 +1104,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     Ok(())
 }
 
+/// Tests sync_now() by demonstrating that an admin cannot assign a role to a device until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_sync_now() -> Result<()> {
     let tmp = tempdir()?;
@@ -1130,7 +1131,6 @@ async fn test_sync_now() -> Result<()> {
     // add admin to team.
     info!("adding admin to team");
     owner_team.add_device_to_team(team.admin.pk.clone()).await?;
-    // owner_team.assign_role(team.admin.id, Role::Admin).await?;
 
     // add operator to team.
     info!("adding operator to team");
@@ -1140,7 +1140,6 @@ async fn test_sync_now() -> Result<()> {
 
     // Assign role to Admin
     owner_team.assign_role(team.admin.id, Role::Admin).await?;
-    sleep(Duration::from_secs(1)).await;
 
     // Admin tries to assign a role
     match admin_team
