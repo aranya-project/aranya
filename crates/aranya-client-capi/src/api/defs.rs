@@ -264,6 +264,7 @@ impl From<aranya_fast_channels::Label> for Label {
 pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
 
 /// Builder for a Sync Peer config.
+#[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 32, align = 8)]
 pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
 
@@ -965,15 +966,6 @@ pub unsafe fn afc_recv_data(
     client.msg = None;
 
     Ok(true)
-}
-
-/// Initializes a new sync peer config builder instance with default values.
-///
-/// @param cfg the uninitialized SyncPeerConfigBuilder [`SyncPeerConfigBuilder`].
-///
-/// @relates AranyaSyncPeerConfigBuilder.
-pub fn sync_peer_config_builder_init(cfg: &mut MaybeUninit<SyncPeerConfigBuilder>) {
-    Safe::init(cfg, imp::SyncPeerConfigBuilder::default());
 }
 
 /// Set the interval field on the config builder
