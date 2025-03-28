@@ -79,6 +79,7 @@ where
         // select which FFI moddules to use.
         let ffis: Vec<Box<dyn FfiCallable<E> + Send + 'static>> = vec![
             Box::from(AfcFfi::new(store.try_clone()?)),
+            Box::from(AqcFfi::new(store.try_clone()?)),
             Box::from(CryptoFfi::new(store.try_clone()?)),
             Box::from(DeviceFfi::new(device_id)),
             Box::from(EnvelopeFfi),

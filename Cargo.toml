@@ -42,19 +42,19 @@ aranya-capi-core = { version = "0.2.0" }
 aranya-capi-codegen = { version = "0.2.0" }
 # TODO: use released crate
 aranya-crypto = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
-aranya-crypto-ffi = { version = "0.5.0" }
-aranya-device-ffi = { version = "0.5.0" }
-aranya-envelope-ffi = { version = "0.5.0" }
-aranya-fast-channels = { version = "0.5.0", features = ["posix", "std", "memory"] }
-aranya-idam-ffi = { version = "0.5.0" }
-aranya-libc = { version = "0.1.1" }
-aranya-perspective-ffi = { version = "0.5.0" }
-aranya-policy-compiler = { version = "0.5.0" }
-aranya-policy-ifgen = { version = "0.5.0", features = ["serde"] }
-aranya-policy-ifgen-build = { version = "0.2.0" }
-aranya-policy-lang = { version = "0.2.0" }
-aranya-policy-vm = { version = "0.5.0", features = ["std"] }
-aranya-runtime = { version = "0.5.0", features = ["std", "libc"] }
+aranya-crypto-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183" }
+aranya-device-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183" }
+aranya-envelope-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183" }
+aranya-fast-channels = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183", features = ["posix", "std", "memory"] }
+aranya-idam-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183" }
+aranya-libc = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183" }
+aranya-perspective-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183" }
+aranya-policy-compiler = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183" }
+aranya-policy-ifgen = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183", features = ["serde"] }
+aranya-policy-ifgen-build = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183" }
+aranya-policy-lang = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183" }
+aranya-policy-vm = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183", features = ["std"] }
+aranya-runtime = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183", features = ["std", "libc"] }
 
 spideroak-base58 = { version = "0.1.0" }
 buggy = { version = "0.1.0" }

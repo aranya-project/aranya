@@ -151,14 +151,14 @@ mod tests {
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
             afc: AfcConfig {
-                shm_path: "/hub1".to_owned(),
+                shm_path: "/afc".to_owned(),
                 unlink_on_startup: false,
                 unlink_at_exit: false,
                 create: true,
                 max_chans: 100,
             },
             aqc: AqcConfig {
-                shm_path: "/hub2".to_owned(),
+                shm_path: "/aqc".to_owned(),
                 unlink_on_startup: false,
                 unlink_at_exit: false,
                 create: true,
