@@ -1,6 +1,6 @@
 [package]
 name = "aranya-daemon-api"
-description = "API Interface between Aranya client and daemon using tarpc over Unix domain sockets, handling type conversion between internal and external types"
+description = "API Interface between Aranya client and daemon, handling type conversion between internal and external types"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
