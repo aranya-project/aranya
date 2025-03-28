@@ -1,6 +1,8 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-//! Defines the API service interface between the Aranya client and daemon.
+//! Defines the common API service interface between the Aranya client and daemon.
+//! The API is defined using a rust trait to ensure the client and daemon
+//! implement the same methods.
 //!
 //! This module contains the types and RPC methods that compose the daemon API interface.
 //! The daemon acts as the server, and the client consumes this API.
@@ -30,7 +32,7 @@ pub type CS = DefaultCipherSuite;
 /// This error type encapsulates various error conditions that can occur when
 /// interacting with the daemon API. It provides a string representation of the error.
 ///
-/// TODO: enum for errors?
+// TODO: enum for errors?
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Error(String);
 
@@ -84,13 +86,13 @@ custom_id! {
 ///
 /// This structure contains the public keys needed for cryptographic operations
 /// when communicating with a device, including identity verification, signature
-/// verification, and message encryption.
+/// verification, message encryption, and data integrity.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeyBundle {
     /// The identity public key used to verify the device's identity
     pub identity: Vec<u8>,
 
-    /// The signing public key used to verify signatures
+    /// The signing public key used to verify the device's signature
     pub signing: Vec<u8>,
 
     /// The encryption public key used for message encryption
@@ -101,7 +103,7 @@ pub struct KeyBundle {
 ///
 /// Roles determine what permissions a device has within a team.
 /// Different roles have different capabilities regarding team management
-/// and access control.
+/// and access control. For a more detailed permissions breakdown, see policy.md.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Role {
     /// Owner role has full control over the team and can perform all operations
@@ -110,10 +112,10 @@ pub enum Role {
     /// Admin role can manage devices and their permissions
     Admin,
 
-    /// Operator role can perform certain administrative functions
+    /// Operator role is more privileged and can manage members
     Operator,
 
-    /// Member role has basic access to team resources
+    /// Member role has basic access to team resources like using AFC channels
     Member,
 }
 
@@ -151,10 +153,10 @@ impl fmt::Display for AfcId {
     }
 }
 
-/// Helper function to truncate a larger array to a smaller one.
-///
-/// This function is used internally to convert between different ID types
-/// when creating an [`AfcId`] from other ID types.
+// Helper function to truncate a larger array to a smaller one.
+//
+// This function is used internally to convert between different ID types
+// when creating an [`AfcId`] from other ID types.
 fn truncate<const BIG: usize, const SMALL: usize>(arr: &[u8; BIG]) -> &[u8; SMALL] {
     const { assert!(BIG >= SMALL) };
     arr[..SMALL].try_into().expect("array must fit")
@@ -361,7 +363,7 @@ pub trait DaemonApi {
         name: NetIdentifier,
     ) -> Result<()>;
 
-    /// Creates a fast channels label.
+    /// Creates an Aranya Fast Channels label.
     ///
     /// Labels are used to categorize and control access to channels.
     ///
@@ -385,7 +387,8 @@ pub trait DaemonApi {
 
     /// Assigns a fast channels label to a device.
     ///
-    /// Gives a device access to channels with the specified label.
+    /// Gives a device access to create or participate in channels with
+    /// the specified label.
     ///
     /// # Parameters
     /// - `team` - The ID of the team.
@@ -418,7 +421,7 @@ pub trait DaemonApi {
     /// # Parameters
     /// - `team` - The ID of the team.
     /// - `peer` - The network identifier of the peer to create the channel with.
-    /// - `node_id` - The node ID to use for this channel.
+    /// - `node_id` - The node ID associated with the peer for this channel.
     /// - `label` - The label to associate with this channel.
     ///
     /// # Returns
@@ -447,7 +450,7 @@ pub trait DaemonApi {
     ///
     /// # Parameters
     /// - `team` - The ID of the team.
-    /// - `node_id` - The node ID associated with the message.
+    /// - `node_id` - The node ID associated with the peer that authored message.
     /// - `ctrl` - The control message to process.
     ///
     /// # Returns
