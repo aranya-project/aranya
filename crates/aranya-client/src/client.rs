@@ -419,6 +419,7 @@ impl Queries<'_> {
     }
 
     /// Returns the AFC network identifier assigned to the current device.
+    #[cfg(feature = "afc")]
     pub async fn afc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
         self.client
             .daemon

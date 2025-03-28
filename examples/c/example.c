@@ -77,7 +77,7 @@ const AranyaAddr sync_addrs[] = {"127.0.0.1:10001", "127.0.0.1:10002",
                                  "127.0.0.1:10005"};
 
 // List of AFC addresses.
-const char* afc_addrs[] = {"127.0.0.1:11001", "127.0.0.1:11002",
+const char *afc_addrs[] = {"127.0.0.1:11001", "127.0.0.1:11002",
                            "127.0.0.1:11003", "127.0.0.1:11004",
                            "127.0.0.1:11005"};
 
@@ -142,16 +142,18 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     err = aranya_afc_config_builder_build(&afc_build, &afc_cfg);
 
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "error initializing afc config: %s\r\n", aranya_error_to_str(err));
+        fprintf(stderr, "error initializing afc config: %s\r\n",
+                aranya_error_to_str(err));
         return err;
     }
-    
+
     aranya_client_config_builder_set_afc_config(&cli_build, &afc_cfg);
 #endif
     err = aranya_client_config_builder_build(&cli_build, &cli_cfg);
 
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "error initializing client config: %s\r\n", aranya_error_to_str(err));
+        fprintf(stderr, "error initializing client config: %s\r\n",
+                aranya_error_to_str(err));
         return err;
     }
 
@@ -165,9 +167,9 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                 aranya_error_to_str(err));
 #else
         fprintf(stderr,
-                "error initializing client %s (daemon_addr: %s, shm_path: %s): %s\r\n",
-                c->name, daemon_addr, shm_path,
-                aranya_error_to_str(err));
+                "error initializing client %s (daemon_addr: %s, shm_path: %s): "
+                "%s\r\n",
+                c->name, daemon_addr, shm_path, aranya_error_to_str(err));
 #endif
         return err;
     }
@@ -297,7 +299,6 @@ AranyaError run(Team *t) {
                                     &t->clients.memberb.pk);
     EXPECT("error adding memberb to team", err);
 
-#if defined(ENABLE_AFC)
     sleep(1);
 
     // Once all team members are added and the appropriate roles have been
@@ -322,6 +323,8 @@ AranyaError run(Team *t) {
                               &t->clients.memberb.id, label);
     EXPECT("error assigning afc label to memberb", err);
 
+#if defined(ENABLE_AFC)
+
     // Once the label is created and assigned, the devices that will
     // communicate via Aranya Fast Channels must be assigned a network
     // identifier. This is used by Fast Channels to properly translate
@@ -338,6 +341,8 @@ AranyaError run(Team *t) {
                                            &t->clients.memberb.id,
                                            afc_addrs[MEMBERB]);
     EXPECT("error assigning afc net name to memberb", err);
+#endif
+
     // assign AQC network addresses.
     err = aranya_aqc_assign_net_identifier(&t->clients.operator.client, &t->id,
                                            &t->clients.membera.id,
@@ -394,6 +399,8 @@ AranyaError run(Team *t) {
         "\r\n",
         t->clients_arr[MEMBERB].name, memberb_keybundle.enc_key_len,
         memberb_keybundle.sign_key_len, memberb_keybundle.ident_key_len);
+
+#if defined(ENABLE_AFC)
     size_t memberb_afc_net_identifier_len = BUF_LEN;
     char *memberb_afc_net_identifier      = malloc(BUF_LEN);
     bool afc_net_identifier_exists        = false;
@@ -428,6 +435,7 @@ AranyaError run(Team *t) {
     printf("%s afc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
            memberb_afc_net_identifier);
     free(memberb_afc_net_identifier);
+#endif
 
     size_t memberb_aqc_net_identifier_len = BUF_LEN;
     char *memberb_aqc_net_identifier      = malloc(BUF_LEN);
@@ -471,6 +479,7 @@ AranyaError run(Team *t) {
     printf("%s label exists: %s \r\n", t->clients_arr[MEMBERB].name,
            exists ? "true" : "false");
 
+#if defined(ENABLE_AFC)
     // Once membera and memberb have been assigned the label and their network
     // identifiers, a Fast Channel can be created. In this example, membera
     // will create the channel using `aranya_afc_create_bidi_channel`. This will
