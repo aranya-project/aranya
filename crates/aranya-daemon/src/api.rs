@@ -11,7 +11,6 @@ use std::{
     time::Duration,
 };
 
-use buggy::BugExt;
 use anyhow::{anyhow, Context, Result};
 use aranya_crypto::{Csprng, Rng};
 use aranya_daemon_api::{
@@ -21,6 +20,7 @@ use aranya_daemon_api::{
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
 use aranya_util::Addr;
+use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,

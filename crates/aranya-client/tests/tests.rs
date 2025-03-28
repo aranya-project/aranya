@@ -9,10 +9,6 @@
     rust_2018_idioms
 )]
 #[cfg(feature = "afc")]
-use tracing::info;
-#[cfg(feature = "afc")]
-use tempfile::tempdir;
-#[cfg(feature = "afc")]
 use std::path::Path;
 #[cfg(feature = "afc")]
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
@@ -33,6 +29,8 @@ use aranya_daemon::{
 #[cfg(feature = "afc")]
 use aranya_daemon_api::NetIdentifier;
 #[cfg(feature = "afc")]
+use aranya_daemon_api::Role;
+#[cfg(feature = "afc")]
 use aranya_daemon_api::{DeviceId, KeyBundle};
 #[cfg(feature = "afc")]
 use aranya_fast_channels::{Label, Seq};
@@ -45,17 +43,19 @@ use buggy::BugExt;
 #[cfg(feature = "afc")]
 use spideroak_base58::ToBase58;
 #[cfg(feature = "afc")]
+use tempfile::tempdir;
+#[cfg(feature = "afc")]
+use test_log::test;
+#[cfg(feature = "afc")]
 use tokio::{
     fs,
     task::{self, AbortHandle},
     time::{self, Sleep},
 };
 #[cfg(feature = "afc")]
-use test_log::test;
+use tracing::info;
 #[cfg(feature = "afc")]
 use tracing::{debug, instrument};
-#[cfg(feature = "afc")]
-use aranya_daemon_api::Role;
 #[cfg(feature = "afc")]
 #[instrument(skip_all, fields(%duration = FmtDuration(d)))]
 fn sleep(d: Duration) -> Sleep {
