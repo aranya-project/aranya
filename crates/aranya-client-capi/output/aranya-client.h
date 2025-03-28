@@ -203,18 +203,6 @@ typedef struct ARANYA_ALIGNED(16) AranyaClient {
 } AranyaClient;
 
 /**
- * Builder for a Sync Peer config.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfigBuilder {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[32];
-} AranyaSyncPeerConfigBuilder;
-
-/**
  * Aranya Fast Channels (AFC) config.
  */
 typedef struct ARANYA_DESIGNATED_INIT AranyaAfcConfig {
@@ -379,6 +367,18 @@ typedef struct AranyaAfcMsgInfo {
     AranyaSocketAddr addr;
 } AranyaAfcMsgInfo;
 
+/**
+ * Builder for a Sync Peer config.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfigBuilder {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[32];
+} AranyaSyncPeerConfigBuilder;
+
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -515,46 +515,6 @@ AranyaError aranya_client_cleanup(struct AranyaClient *ptr);
  */
 AranyaError aranya_client_cleanup_ext(struct AranyaClient *ptr,
                                       struct AranyaExtError *__ext_err);
-
-/**
- * Initializes `AranyaSyncPeerConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaSyncPeerConfigBuilder
- */
-AranyaError aranya_sync_peer_config_builder_init(struct AranyaSyncPeerConfigBuilder *out);
-
-/**
- * Initializes `AranyaSyncPeerConfigBuilder`.
- *
- * When no longer needed, `out`'s resources must be released
- * with its cleanup routine.
- *
- * @relates AranyaSyncPeerConfigBuilder
- */
-AranyaError aranya_sync_peer_config_builder_init_ext(struct AranyaSyncPeerConfigBuilder *out,
-                                                     struct AranyaExtError *__ext_err);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_sync_peer_config_builder_init`.
- *
- * @relates AranyaSyncPeerConfigBuilder
- */
-AranyaError aranya_sync_peer_config_builder_cleanup(struct AranyaSyncPeerConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_sync_peer_config_builder_init`.
- *
- * @relates AranyaSyncPeerConfigBuilder
- */
-AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerConfigBuilder *ptr,
-                                                        struct AranyaExtError *__ext_err);
 
 /**
  * Initializes a new client instance.
@@ -1328,6 +1288,25 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
                                      struct AranyaAfcMsgInfo *info,
                                      bool *__output,
                                      struct AranyaExtError *__ext_err);
+
+/**
+ * Initializes a new sync peer config builder instance with default values.
+ *
+ * @param cfg the uninitialized SyncPeerConfigBuilder [`AranyaSyncPeerConfigBuilder`](@ref AranyaSyncPeerConfigBuilder).
+ *
+ * @relates AranyaSyncPeerConfigBuilder.
+ */
+AranyaError aranya_sync_peer_config_builder_init(struct AranyaSyncPeerConfigBuilder *cfg);
+
+/**
+ * Initializes a new sync peer config builder instance with default values.
+ *
+ * @param cfg the uninitialized SyncPeerConfigBuilder [`AranyaSyncPeerConfigBuilder`](@ref AranyaSyncPeerConfigBuilder).
+ *
+ * @relates AranyaSyncPeerConfigBuilder.
+ */
+AranyaError aranya_sync_peer_config_builder_init_ext(struct AranyaSyncPeerConfigBuilder *cfg,
+                                                     struct AranyaExtError *__ext_err);
 
 /**
  * Set the interval field on the config builder

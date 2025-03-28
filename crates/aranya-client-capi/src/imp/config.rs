@@ -4,7 +4,6 @@ use crate::api::defs::{Duration, ARANYA_DURATION_MILLISECONDS};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[aranya_capi_core::opaque(size = 16, align = 8)]
 /// Configuration values for syncing with a peer
 pub struct SyncPeerConfig {
     interval: Duration,
@@ -32,7 +31,6 @@ impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-#[aranya_capi_core::opaque(size = 16, align = 8)]
 /// Builder for a [`SyncPeerConfig`]
 pub struct SyncPeerConfigBuilder {
     interval: Duration,

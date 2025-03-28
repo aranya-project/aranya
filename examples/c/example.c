@@ -248,9 +248,6 @@ AranyaError run(Team *t) {
     err = aranya_sync_peer_config_builder_build(&builder, &cfg);
     EXPECT("error building the sync peer config", err);
 
-    err = aranya_sync_peer_config_builder_cleanup(&builder);
-    EXPECT("error running the cleanup routine for the config builder", err);
-
     err = add_sync_peers(t, &cfg);
     EXPECT("error adding sync peers", err);
 
