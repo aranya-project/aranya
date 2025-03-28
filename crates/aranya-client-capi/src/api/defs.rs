@@ -304,7 +304,7 @@ impl KeyBundle {
             aranya_daemon_api::KeyBundle {
                 identity: slice::from_raw_parts(self.ident_key, self.ident_key_len).to_vec(),
                 signing: slice::from_raw_parts(self.sign_key, self.sign_key_len).to_vec(),
-                encoding: slice::from_raw_parts(self.enc_key, self.enc_key_len).to_vec(),
+                encryption: slice::from_raw_parts(self.enc_key, self.enc_key_len).to_vec(),
             }
         }
     }
@@ -313,7 +313,7 @@ impl KeyBundle {
         // TODO: Don't leak
         let identity = keys.identity.leak();
         let signing = keys.signing.leak();
-        let encoding = keys.encoding.leak();
+        let encoding = keys.encryption.leak();
         KeyBundle {
             ident_key: identity.as_mut_ptr(),
             ident_key_len: identity.len(),
