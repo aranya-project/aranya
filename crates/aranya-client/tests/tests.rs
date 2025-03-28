@@ -16,7 +16,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use aranya_client::{
     afc::Message,
     client::{Client, SyncPeerConfig},
@@ -1100,6 +1100,65 @@ async fn test_afc_monotonic_seq() -> Result<()> {
             .expect("should have a message");
         assert_eq!(got, want, "b->a");
     }
+
+    Ok(())
+}
+
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_sync_now() -> Result<()> {
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
+    let mut team = TeamCtx::new("test_sync_now".into(), work_dir).await?;
+
+    // create team.
+    let team_id = team
+        .owner
+        .client
+        .create_team()
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // get sync addresses.
+    let owner_addr = team.owner.aranya_local_addr().await?;
+
+    // setup team handles.
+    let mut owner_team = team.owner.client.team(team_id);
+    let mut admin_team = team.admin.client.team(team_id);
+
+    // add admin to team.
+    info!("adding admin to team");
+    owner_team.add_device_to_team(team.admin.pk.clone()).await?;
+    // owner_team.assign_role(team.admin.id, Role::Admin).await?;
+
+    // add operator to team.
+    info!("adding operator to team");
+    owner_team
+        .add_device_to_team(team.operator.pk.clone())
+        .await?;
+
+    // Assign role to Admin
+    owner_team.assign_role(team.admin.id, Role::Admin).await?;
+    sleep(Duration::from_secs(1)).await;
+
+    // Admin tries to assign a role
+    match admin_team
+        .assign_role(team.operator.id, Role::Operator)
+        .await
+    {
+        Ok(_) => bail!("Expected role assignment to fail"),
+        Err(aranya_client::Error::Daemon(_)) => {}
+        Err(_) => bail!("Unexpected error"),
+    }
+
+    // Admin syncs with the Owner peer and retries the role
+    // assignment command
+    admin_team.sync_now(owner_addr.into(), None).await?;
+    sleep(Duration::from_secs(1)).await;
+    admin_team
+        .assign_role(team.operator.id, Role::Operator)
+        .await?;
 
     Ok(())
 }

@@ -233,9 +233,9 @@ async fn main() -> Result<()> {
         .add_sync_peer(membera_addr.into(), sync_cfg.clone())
         .await?;
 
-    admin_team
-        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
-        .await?;
+    // admin_team
+    //     .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+    //     .await?;
     admin_team
         .add_sync_peer(operator_addr.into(), sync_cfg.clone())
         .await?;
@@ -294,6 +294,20 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
+    // Admin tries to assign a role
+    match admin_team
+        .assign_role(team.operator.id, Role::Operator)
+        .await
+    {
+        Ok(_) => bail!("Expected role assignment to fail"),
+        Err(aranya_client::Error::Daemon(_)) => {}
+        Err(_) => bail!("Unexpected error"),
+    }
+
+    // Admin syncs with the Owner peer and retries the role
+    // assignment command
+    admin_team.sync_now(owner_addr.into(), None).await?;
+    sleep(sleep_interval).await;
     admin_team
         .assign_role(team.operator.id, Role::Operator)
         .await?;
