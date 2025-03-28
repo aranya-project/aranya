@@ -1,11 +1,10 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
 //! Defines the common API service interface between the Aranya client and daemon.
-//! The API is defined using a rust trait to ensure the client and daemon
-//! implement the same methods.
 //!
-//! This module contains the types and RPC methods that compose the daemon API interface.
-//! The daemon acts as the server, and the client consumes this API.
+//! This module contains the types and methods that compose the daemon API interface.
+//! The daemon acts as the server, and the client consumes this API. RPC calls are defined
+//! using a Rust trait to ensure the client and daemon implement the same methods.
 
 use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
 
