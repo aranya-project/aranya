@@ -90,10 +90,6 @@ aranya-client = { version = ... }
 See the [`aranya-client` crate](https://crates.io/crates/aranya-client) on
 `crates.io` for the latest version.
 
-Alternatively, we provide a way to generate a new workspace with a Rust example
-app that includes the Aranya client as a dependency. See the Rust example
-[README](/templates/aranya-example/README.md) for more information.
-
 #### Build
 
 If the source code has been downloaded, navigate to the Aranya project
@@ -134,7 +130,7 @@ info!(?team_id);
 ```
 
 This snippet can be found in the
-[Rust example](templates/aranya-example/src/main.rs#L140).
+[Rust example](examples/rust/src/main.rs#L198).
 
 Before starting your application, run the daemon by providing the path to a
 [configuration file](crates/aranya-daemon/example.json). Find more details on
@@ -224,7 +220,7 @@ configuring and running the daemon in the `aranya-daemon`
 ## <a name="example-applications"></a>Example Applications
 
 We have provided runnable example applications in both
-[Rust](templates/aranya-example/) and [C](examples/c/). These examples will
+[Rust](examples/rust) and [C](examples/c/). These examples will
 use the default policy that's contained in this repo to configure and run the
 daemon automatically. The examples follow five devices who are referred to by
 their device role, `Owner`, `Admin`, `Operator`, `Member A` and `Member B`.
