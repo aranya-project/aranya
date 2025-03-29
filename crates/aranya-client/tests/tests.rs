@@ -20,7 +20,7 @@ use anyhow::{Context, Result};
 use aranya_client::{afc::Message, client::Client};
 use aranya_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
-    config::{AfcConfig, Config},
+    config::{AfcConfig, AqcConfig, Config},
     Daemon,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
@@ -161,6 +161,17 @@ macro_rules! do_poll {
     };
 }
 
+fn get_shm_path(path: String) -> String {
+    if cfg!(target_os = "macos") && path.len() > 31 {
+        // Shrink the size of the team name down to 22 bytes
+        // to work within macOS's limits.
+        let d = Sha256::hash(path.as_bytes());
+        let t: [u8; 16] = d[..16].try_into().unwrap();
+        return format!("/{}", t.to_base58());
+    };
+    path
+}
+
 struct TeamCtx {
     owner: DeviceCtx,
     admin: DeviceCtx,
@@ -201,14 +212,8 @@ impl DeviceCtx {
     pub async fn new(team_name: String, name: String, work_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(work_dir.clone()).await?;
 
-        let mut shm_path = format!("/{team_name}_{name}");
-        if cfg!(target_os = "macos") && shm_path.len() > 31 {
-            // Shrink the size of the team name down to 22 bytes
-            // to work within macOS's limits.
-            let d = Sha256::hash(shm_path.as_bytes());
-            let t: [u8; 16] = d[..16].try_into().unwrap();
-            shm_path = format!("/{}", t.to_base58())
-        };
+        let afc_shm_path = get_shm_path(format!("/afc_{team_name}_{name}"));
+        let aqc_shm_path = get_shm_path(format!("/aqc_{team_name}_{name}"));
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
@@ -220,7 +225,14 @@ impl DeviceCtx {
             pid_file: work_dir.join("pid"),
             sync_addr: Addr::new("localhost", 0)?,
             afc: AfcConfig {
-                shm_path: shm_path.clone(),
+                shm_path: afc_shm_path.clone(),
+                unlink_on_startup: true,
+                unlink_at_exit: true,
+                create: true,
+                max_chans,
+            },
+            aqc: AqcConfig {
+                shm_path: aqc_shm_path.clone(),
                 unlink_on_startup: true,
                 unlink_at_exit: true,
                 create: true,
@@ -246,7 +258,8 @@ impl DeviceCtx {
         let mut client = (|| {
             Client::connect(
                 &uds_api_path,
-                Path::new(&shm_path),
+                Path::new(&afc_shm_path),
+                Path::new(&aqc_shm_path),
                 max_chans,
                 "localhost:0",
             )
@@ -440,6 +453,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     operator_team
         .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
         .await?;
+    // TODO: move aqc methods to aqc test when it is added.
     // TODO: use aqc addr
     operator_team
         .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
@@ -494,7 +508,15 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
-    // membera creates bidi channel with memberb
+    // membera creates aqc bidi channel with memberb
+    let _aqc_id1 = team
+        .membera
+        .client
+        .aqc()
+        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .await?;
+
+    // membera creates afc bidi channel with memberb
     let afc_id2 = team
         .membera
         .client

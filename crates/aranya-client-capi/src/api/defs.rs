@@ -62,6 +62,10 @@ pub enum Error {
     #[capi(msg = "AFC library error")]
     Afc,
 
+    /// AQC library error.
+    #[capi(msg = "AQC library error")]
+    Aqc,
+
     #[capi(msg = "tokio runtime error")]
     Runtime,
 
@@ -85,6 +89,7 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Rpc(_) => Self::Rpc,
                 aranya_client::Error::Daemon(_) => Self::Daemon,
                 aranya_client::Error::Afc(_) => Self::Afc,
+                aranya_client::Error::Aqc(_) => Self::Aqc,
                 aranya_client::Error::Bug(_) => Self::Bug,
             },
             imp::Error::Runtime(_) => Self::Runtime,
@@ -122,7 +127,7 @@ pub fn error_to_str(err: u32) -> *const c_char {
 
 /// Extended error information.
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 80, align = 8)]
+#[aranya_capi_core::opaque(size = 88, align = 8)]
 pub type ExtError = Safe<imp::ExtError>;
 
 /// Copies the extended error's message into `msg`.
@@ -338,6 +343,8 @@ pub struct ClientConfig {
     pub daemon_sock: *const c_char,
     /// Aranya Fast Channels (AFC) config.
     pub afc: AfcConfig,
+    /// Aranya QUIC Channels (AQC) config.
+    pub aqc: AqcConfig,
 }
 
 /// Aranya Fast Channels (AFC) config.
@@ -345,6 +352,19 @@ pub struct ClientConfig {
 #[must_use]
 #[derive(Copy, Clone, Debug)]
 pub struct AfcConfig {
+    /// Shared memory path.
+    pub shm_path: *const c_char,
+    /// Maximum number of channels to store in shared-memory.
+    pub max_channels: usize,
+    /// Address to bind AFC server to.
+    pub addr: *const c_char,
+}
+
+/// Aranya QUIC Channels (AQC) config.
+#[repr(C)]
+#[must_use]
+#[derive(Copy, Clone, Debug)]
+pub struct AqcConfig {
     /// Shared memory path.
     pub shm_path: *const c_char,
     /// Maximum number of channels to store in shared-memory.
@@ -379,10 +399,16 @@ pub unsafe fn client_init(
         // SAFETY: Caller must ensure pointer is a valid C String.
         unsafe { std::ffi::CStr::from_ptr(config.afc.addr) }
         .to_str()?;
+    let aqc_shm_path = OsStr::from_bytes(
+        // SAFETY: Caller must ensure pointer is a valid C String.
+        unsafe { std::ffi::CStr::from_ptr(config.aqc.shm_path) }.to_bytes(),
+    )
+    .as_ref();
     let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
     let inner = rt.block_on(aranya_client::Client::connect(
         daemon_sock,
         afc_shm_path,
+        aqc_shm_path,
         config.afc.max_channels,
         afc_addr,
     ))?;

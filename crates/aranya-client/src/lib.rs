@@ -12,6 +12,7 @@
 //! [walkthrough]: https://github.com/aranya-project/aranya/tree/main/docs/walkthrough.md
 
 pub mod afc;
+pub mod aqc;
 pub mod client;
 pub mod error;
 

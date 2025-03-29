@@ -579,6 +579,77 @@ where
         .in_current_span()
     }
 
+    /// Creates a bidirectional AQC channel off graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
+    fn create_aqc_bidi_channel_off_graph(
+        &self,
+        peer_id: DeviceId,
+        label: Label,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "create_aqc_bidi_channel",
+            args: Cow::Owned(vec![
+                Value::from(peer_id),
+                Value::from(i64::from(label.to_u32())),
+            ]),
+        })
+        .in_current_span()
+    }
+
+    /// Creates a unidirectional AQC channel.
+    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
+    fn create_aqc_uni_channel(
+        &self,
+        seal_id: DeviceId,
+        open_id: DeviceId,
+        label: Label,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.create_aqc_uni_channel(
+                seal_id.into(),
+                open_id.into(),
+                i64::from(label.to_u32()),
+            )?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Creates a unidirectional AQC channel.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
+    fn create_aqc_uni_channel_off_graph(
+        &self,
+        seal_id: DeviceId,
+        open_id: DeviceId,
+        label: Label,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "create_aqc_uni_channel",
+            args: Cow::Owned(vec![
+                Value::from(seal_id),
+                Value::from(open_id),
+                Value::from(i64::from(label.to_u32())),
+            ]),
+        })
+        .in_current_span()
+    }
+
+    /// Creates a bidirectional AQC channel.
+    #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
+    fn create_aqc_bidi_channel(
+        &self,
+        peer_id: DeviceId,
+        label: Label,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.create_aqc_bidi_channel(peer_id.into(), i64::from(label.to_u32()))?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
     /// Creates a bidirectional AFC channel off graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]

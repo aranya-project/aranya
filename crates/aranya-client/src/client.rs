@@ -14,6 +14,7 @@ use tracing::{debug, info, instrument};
 
 use crate::{
     afc::{setup_afc_shm, FastChannels, FastChannelsImpl},
+    aqc::{AqcChannels, AqcChannelsImpl},
     error::{Error, Result},
 };
 
@@ -74,14 +75,18 @@ impl Client {
     /// - `daemon_socket`: The socket path to communicate with the daemon.
     /// - `afc_shm_path`: AFC's shared memory path. The daemon must also use the
     ///   same path.
+    /// - `aqc_shm_path`: AQC's shared memory path. The daemon must also use the
+    ///   same path.
     /// - `max_channels`: The maximum number of channels that AFC should support.
     ///   The daemon must also use the same number.
     /// - `afc_address`: The address that AFC listens for incoming connections
     ///   on.
-    #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, max_channels))]
+    // TODO: aqc_address
+    #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, ?aqc_shm_path, max_channels))]
     pub async fn connect<A>(
         daemon_socket: &Path,
         afc_shm_path: &Path,
+        aqc_shm_path: &Path,
         max_channels: usize,
         afc_address: A,
     ) -> Result<Self>
@@ -96,12 +101,15 @@ impl Client {
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
         debug!("connected to daemon");
 
-        let read = setup_afc_shm(afc_shm_path, max_channels)?;
-        let afc = FastChannelsImpl::new(afc::Client::new(read), afc_address).await?;
+        let afc_read = setup_afc_shm(afc_shm_path, max_channels)?;
+        let afc = FastChannelsImpl::new(afc::Client::new(afc_read), afc_address).await?;
         debug!(
             addr = ?afc.local_addr().map_err(Error::Afc)?,
             "bound AFC router",
         );
+        // TODO: aqc shm
+        //let aqc_read = setup_aqc_shm(aqc_shm_path, max_channels)?;
+        let _aqc = AqcChannelsImpl::new().await?;
 
         Ok(Self { daemon, afc })
     }
@@ -159,6 +167,11 @@ impl Client {
     /// Get access to Aranya Fast Channels.
     pub fn afc(&mut self) -> FastChannels<'_> {
         FastChannels::new(self)
+    }
+
+    /// Get access to Aranya QUIC Channels.
+    pub fn aqc(&mut self) -> AqcChannels<'_> {
+        AqcChannels::new(self)
     }
 
     /// Get access to fact database queries.
