@@ -39,7 +39,8 @@
 
 		// Maximum number of channels AFC should support.
 		"max_chans": 100,
-	}
+	},
+
 	// AQC configuration.
 	"aqc": {
 		// Shared memory path.

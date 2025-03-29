@@ -148,6 +148,10 @@ enum AranyaError
      * AFC library error.
      */
     ARANYA_ERROR_AFC,
+    /**
+     * AQC library error.
+     */
+    ARANYA_ERROR_AQC,
     ARANYA_ERROR_RUNTIME,
     ARANYA_ERROR_INVALID_INDEX,
 };
@@ -193,7 +197,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaExtError {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[80];
+    uint8_t __for_size_only[88];
 } AranyaExtError;
 
 /**
@@ -227,6 +231,24 @@ typedef struct ARANYA_DESIGNATED_INIT AranyaAfcConfig {
 } AranyaAfcConfig;
 
 /**
+ * Aranya QUIC Channels (AQC) config.
+ */
+typedef struct ARANYA_DESIGNATED_INIT AranyaAqcConfig {
+    /**
+     * Shared memory path.
+     */
+    const char *shm_path;
+    /**
+     * Maximum number of channels to store in shared-memory.
+     */
+    size_t max_channels;
+    /**
+     * Address to bind AFC server to.
+     */
+    const char *addr;
+} AranyaAqcConfig;
+
+/**
  * Aranya client configuration.
  */
 typedef struct ARANYA_DESIGNATED_INIT AranyaClientConfig {
@@ -238,6 +260,10 @@ typedef struct ARANYA_DESIGNATED_INIT AranyaClientConfig {
      * Aranya Fast Channels (AFC) config.
      */
     struct AranyaAfcConfig afc;
+    /**
+     * Aranya QUIC Channels (AQC) config.
+     */
+    struct AranyaAqcConfig aqc;
 } AranyaClientConfig;
 
 /**

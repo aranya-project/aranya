@@ -132,7 +132,7 @@ fact TeamEnd[]=>{}
 fact Label[label int]=>{}
 
 // Records that A device is allowed to use a channel label.
-fact AssignedLabel[label int, device_id id]=>{op enum ChanOp}
+fact AssignedLabel[device_id id, label int]=>{op enum ChanOp}
 
 // Stores a Member's associated network identifier for AFC.
 fact AfcMemberNetworkId[device_id id]=>{net_identifier string}
@@ -1157,7 +1157,7 @@ command RevokeLabel {
         check is_member(device.role)
 
         // Verify that channel label has been assigned to this Member
-        check exists AssignedLabel[label: this.label, device_id: device.device_id]
+        check exists AssignedLabel[device_id: device.device_id, label: this.label]
 
         finish {
             delete AssignedLabel[device_id: device.device_id, label: this.label]

@@ -810,6 +810,8 @@ impl DaemonApi for DaemonApiHandler {
             return Ok((aqc_id, net, label));
         }
         Err(anyhow!("unable to find AqcBidiChannelReceived effect").into())
+    }
+
     /// Query devices on team.
     #[instrument(skip(self))]
     async fn query_devices_on_team(
