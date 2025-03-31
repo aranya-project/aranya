@@ -216,9 +216,10 @@ impl Team<'_> {
             .map_err(Into::into)
     }
 
-    /// Sync with peer immediately.
-    /// Default values for a sync config will be used if `config` is `None`.
-    /// Otherwise the provided config will be used for syncing.
+    /// Immediately syncs with the peer.
+    ///
+    /// If `config` is `None`, default values (including those from the daemon) will
+    /// be used.
     pub async fn sync_now(&mut self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
         self.client
             .daemon
@@ -488,6 +489,7 @@ pub struct SyncPeerConfigBuilder {
 }
 
 impl SyncPeerConfigBuilder {
+    /// Creates a `SyncPeerConfigBuilder`.
     pub fn new() -> Self {
         Default::default()
     }
@@ -501,6 +503,9 @@ impl SyncPeerConfigBuilder {
     }
 
     /// Set the interval at which syncing occurs
+    ///
+    /// /// By default, the peer is synced with every 5 seconds and once immediately
+    /// if [`sync_now`][Self::sync_now] is enabled.
     pub fn interval(mut self, duration: Duration) -> Self {
         self.interval = duration;
         self
@@ -517,7 +522,7 @@ impl SyncPeerConfigBuilder {
 impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
-            interval: Duration::from_millis(100),
+            interval: Duration::from_secs(5),
             sync_now: true,
         }
     }

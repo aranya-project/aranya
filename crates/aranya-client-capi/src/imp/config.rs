@@ -3,7 +3,7 @@ use std::ffi::c_char;
 use aranya_capi_core::safe::{TypeId, Typed};
 use buggy::bug;
 
-use crate::api::defs::{Duration, ARANYA_DURATION_MILLISECONDS};
+use crate::api::defs::{Duration, ARANYA_DURATION_SECONDS};
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -92,8 +92,9 @@ impl SyncPeerConfigBuilder {
         self.interval = duration;
     }
 
-    /// Set the `sync_now` field which determines whether
-    /// the initial sync should happen immediately after a peer is added
+    /// Configures whether the peer will be immediately synced with after being added.
+    ///
+    /// By default, the peer is immediately synced with.
     pub fn sync_now(&mut self, sync_now: bool) {
         self.sync_now = sync_now;
     }
@@ -115,7 +116,7 @@ impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
             interval: Duration {
-                nanos: 100 * ARANYA_DURATION_MILLISECONDS,
+                nanos: 5 * ARANYA_DURATION_SECONDS,
             },
             sync_now: true,
         }

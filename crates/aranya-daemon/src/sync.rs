@@ -68,14 +68,14 @@ impl SyncPeers {
     ) -> Result<()> {
         let peer = Msg::AddPeer {
             peer: SyncPeer { addr, graph_id },
-            cfg,
+            cfg: cfg.clone(),
         };
         if let Err(e) = self.send.send(peer).await.context("unable to add peer") {
             error!(?e, "error adding peer to syncer");
             return Err(e);
         }
         if cfg.sync_now {
-            self.sync_now(addr, graph_id, Some(cfg)).await?
+            self.sync_now(addr, graph_id, Some(cfg.clone())).await?
         }
 
         self.cfgs.insert((addr, graph_id), cfg);

@@ -133,7 +133,7 @@ impl From<Id> for AfcId {
 pub type AfcCtrl = Vec<Box<[u8]>>;
 
 /// Configuration values for syncing with a peer
-#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SyncPeerConfig {
     /// The interval at which syncing occurs
     pub interval: Duration,

@@ -929,6 +929,10 @@ AranyaError aranya_add_sync_peer_ext(struct AranyaClient *client,
  * will appear in the tracing logs and
  * Aranya will be unable to sync state with that peer.
  *
+ *
+ * This function ignores [`aranya_sync_peer_config_builder_set_interval`](@ref aranya_sync_peer_config_builder_set_interval) and
+ * [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later), if set.
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
@@ -947,6 +951,10 @@ AranyaError aranya_sync_now(struct AranyaClient *client,
  * If a peer is not reachable on the network, sync errors
  * will appear in the tracing logs and
  * Aranya will be unable to sync state with that peer.
+ *
+ *
+ * This function ignores [`aranya_sync_peer_config_builder_set_interval`](@ref aranya_sync_peer_config_builder_set_interval) and
+ * [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later), if set.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -1627,6 +1635,10 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
 /**
  * Configures how often the peer will be synced with.
  *
+ * By default, the peer will be synced with every 5 seconds, including
+ * once immediately if [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now)
+ * is specified.
+ *
  * @param cfg a pointer to the builder for a sync config
  * @param interval Set the interval at which syncing occurs
  */
@@ -1636,6 +1648,10 @@ AranyaError aranya_sync_peer_config_builder_set_interval(struct AranyaSyncPeerCo
 /**
  * Configures how often the peer will be synced with.
  *
+ * By default, the peer will be synced with every 5 seconds, including
+ * once immediately if [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now)
+ * is specified.
+ *
  * @param cfg a pointer to the builder for a sync config
  * @param interval Set the interval at which syncing occurs
  */
@@ -1644,14 +1660,22 @@ AranyaError aranya_sync_peer_config_builder_set_interval_ext(struct AranyaSyncPe
                                                              struct AranyaExtError *__ext_err);
 
 /**
- * Updates the config to immediately sync with the peer.
+ * Updates the config to enable immediate syncing with the peer.
+ *
+ * Overrides [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later) if invoked afterward.
+ *
+ * By default, the peer is synced with immediately.
  *
  * @param cfg a pointer to the builder for a sync config
  */
 AranyaError aranya_sync_peer_config_builder_set_sync_now(struct AranyaSyncPeerConfigBuilder *cfg);
 
 /**
- * Updates the config to immediately sync with the peer.
+ * Updates the config to enable immediate syncing with the peer.
+ *
+ * Overrides [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later) if invoked afterward.
+ *
+ * By default, the peer is synced with immediately.
  *
  * @param cfg a pointer to the builder for a sync config
  */
@@ -1659,17 +1683,21 @@ AranyaError aranya_sync_peer_config_builder_set_sync_now_ext(struct AranyaSyncPe
                                                              struct AranyaExtError *__ext_err);
 
 /**
- * Updates the config to *not* immediately sync with the peer.
+ * Updates the config to disable immediate syncing with the peer.
  *
  * Overrides [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now) if invoked afterward.
+ *
+ * By default, the peer is synced with immediately.
  * @param cfg a pointer to the builder for a sync config
  */
 AranyaError aranya_sync_peer_config_builder_set_sync_later(struct AranyaSyncPeerConfigBuilder *cfg);
 
 /**
- * Updates the config to *not* immediately sync with the peer.
+ * Updates the config to disable immediate syncing with the peer.
  *
  * Overrides [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now) if invoked afterward.
+ *
+ * By default, the peer is synced with immediately.
  * @param cfg a pointer to the builder for a sync config
  */
 AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSyncPeerConfigBuilder *cfg,
