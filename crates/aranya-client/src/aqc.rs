@@ -79,23 +79,23 @@ impl<'a> AqcChannels<'a> {
         peer: NetIdentifier,
         label: Label,
     ) -> crate::Result<AqcId> {
-        debug!("creating bidi channel");
+        debug!("creating aqc uni channel");
 
         // TODO: use correct node ID.
         let node_id: NodeId = 0.into();
         debug!(%node_id, "selected node ID");
 
-        let (afc_id, ctrl) = self
+        let (aqc_id, _ctrl) = self
             .client
             .daemon
             .create_aqc_uni_channel(context::current(), team_id, peer.clone(), node_id, label)
             .await??;
-        debug!(%afc_id, %node_id, %label, "created bidi channel");
+        debug!(%aqc_id, %node_id, %label, "created aqc uni channel");
 
         // TODO: send ctrl message.
         debug!("sent control message");
 
-        Ok(afc_id)
+        Ok(aqc_id)
     }
 
     /// Deletes an AQC channel.

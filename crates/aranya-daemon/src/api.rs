@@ -772,6 +772,44 @@ impl DaemonApi for DaemonApiHandler {
         self.handle_effects(&effects, Some(node_id)).await?;
         Ok((aqc_id, ctrl))
     }
+    #[instrument(skip_all)]
+    // TODO: handle uni channel other direction.
+    async fn create_aqc_uni_channel(
+        self,
+        _: context::Context,
+        team: TeamId,
+        peer: NetIdentifier,
+        node_id: NodeId,
+        label: Label,
+    ) -> ApiResult<(AqcId, AqcCtrl)> {
+        info!("create_aqc_uni_channel");
+
+        let peer_id = self
+            .aqc_peers
+            .lock()
+            .await
+            .get_by_left(&peer)
+            .copied()
+            .context("unable to lookup peer")?;
+
+        let id = self.pk.ident_pk.id()?;
+        let (ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .create_aqc_uni_channel_off_graph(id, peer_id, label)
+            .await?;
+
+        let Some(Effect::AqcUniChannelCreated(e)) =
+            find_effect!(&effects, Effect::AqcUniChannelCreated(e) if e.author_id == id.into())
+        else {
+            return Err(anyhow::anyhow!("unable to find AqcUniChannelCreated effect").into());
+        };
+        let aqc_id: AqcId = e.channel_key_id.into();
+        debug!(?aqc_id, "processed aqc ID");
+
+        self.handle_effects(&effects, Some(node_id)).await?;
+        Ok((aqc_id, ctrl))
+    }
 
     #[instrument(skip(self))]
     async fn delete_aqc_channel(self, _: context::Context, chan: AqcId) -> ApiResult<AqcCtrl> {
