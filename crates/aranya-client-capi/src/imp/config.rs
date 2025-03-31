@@ -83,14 +83,14 @@ impl ClientConfigBuilder {
 #[derive(Debug, Copy, Clone)]
 /// Builder for a [`SyncPeerConfig`]
 pub struct SyncPeerConfigBuilder {
-    interval: *const Duration,
+    interval: Option<Duration>,
     sync_now: bool,
 }
 
 impl SyncPeerConfigBuilder {
     /// Set the interval at which syncing occurs
-    pub fn interval(&mut self, duration: &Duration) {
-        self.interval = duration;
+    pub fn interval(&mut self, duration: Duration) {
+        self.interval = Some(duration);
     }
 
     /// Configures whether the peer will be immediately synced with after being added.
@@ -102,17 +102,14 @@ impl SyncPeerConfigBuilder {
 
     /// Build a [`SyncPeerConfig`]
     pub fn build(&self) -> Result<SyncPeerConfig, super::Error> {
-        // SAFETY: Trusts that the caller invoked [`Self::interval`] and provided a pointer to a valid `Duration`.
-        unsafe {
-            let Some(interval) = self.interval.as_ref() else {
-                bug!("Tried to create a `SyncPeerConfig` without setting the interval!");
-            };
+        let Some(interval) = self.interval else {
+            bug!("Tried to create a `SyncPeerConfig` without setting the interval!");
+        };
 
-            Ok(SyncPeerConfig {
-                interval: *interval,
-                sync_now: self.sync_now,
-            })
-        }
+        Ok(SyncPeerConfig {
+            interval,
+            sync_now: self.sync_now,
+        })
     }
 }
 
@@ -123,7 +120,7 @@ impl Typed for SyncPeerConfigBuilder {
 impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
-            interval: std::ptr::null(),
+            interval: None,
             sync_now: true,
         }
     }

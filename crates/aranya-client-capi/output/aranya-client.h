@@ -217,7 +217,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfigBuilder {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[32];
+    uint8_t __for_size_only[40];
 } AranyaSyncPeerConfigBuilder;
 
 #if defined(ENABLE_AFC)
@@ -1643,7 +1643,7 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
  * @param interval Set the interval at which syncing occurs
  */
 AranyaError aranya_sync_peer_config_builder_set_interval(struct AranyaSyncPeerConfigBuilder *cfg,
-                                                         const AranyaDuration *interval);
+                                                         AranyaDuration interval);
 
 /**
  * Configures how often the peer will be synced with.
@@ -1656,7 +1656,7 @@ AranyaError aranya_sync_peer_config_builder_set_interval(struct AranyaSyncPeerCo
  * @param interval Set the interval at which syncing occurs
  */
 AranyaError aranya_sync_peer_config_builder_set_interval_ext(struct AranyaSyncPeerConfigBuilder *cfg,
-                                                             const AranyaDuration *interval,
+                                                             AranyaDuration interval,
                                                              struct AranyaExtError *__ext_err);
 
 /**

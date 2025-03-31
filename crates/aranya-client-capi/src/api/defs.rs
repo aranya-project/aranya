@@ -272,7 +272,7 @@ pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
 
 /// Builder for a Sync Peer config.
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 32, align = 8)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
 
 /// A type to represent a span of time in nanoseconds.
@@ -1138,7 +1138,7 @@ pub unsafe fn afc_recv_data(
 ///
 /// @param cfg a pointer to the builder for a sync config
 /// @param interval Set the interval at which syncing occurs
-pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: &Duration) {
+pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
     cfg.deref_mut().interval(interval);
 }
 
