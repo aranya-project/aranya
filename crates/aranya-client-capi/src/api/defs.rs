@@ -185,7 +185,7 @@ pub struct DeviceId(aranya_daemon_api::DeviceId);
 
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 0, align = 1)]
+#[aranya_capi_core::opaque(size = 4, align = 4)]
 pub struct TeamConfig(aranya_daemon_api::TeamConfig);
 
 /// Channel ID for a fast channel.
@@ -513,6 +513,7 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
 /// Create a new graph/team with the current device as the owner.
 ///
 /// @param client the Aranya Client [`Client`].
+/// @param cfg the Team Configuration [`TeamConfig`].
 /// @param __output the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
@@ -526,6 +527,7 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
+/// @param cfg the Team Configuration [`TeamConfig`].
 ///
 /// @relates AranyaClient.
 pub fn add_team(

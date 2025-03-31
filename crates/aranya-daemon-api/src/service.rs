@@ -73,9 +73,42 @@ pub enum Role {
     Member,
 }
 
+#[derive(Debug, thiserror::Error)]
+pub enum ConfigError {
+    #[error("Unsupported version of the configuration: Expected v{expected}, got v{expected}")]
+    UnsupportedVersion { expected: u32, got: u32 },
+}
+
 /// A configuration for creating or adding a team to a daemon.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub struct TeamConfig {}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TeamConfig {
+    version: u32,
+}
+
+impl TeamConfig {
+    /// The minimum version of the config supported for reading
+    const MINIMUM_VERSION: u32 = 1;
+
+    /// The latest version of the [`TeamConfig`]
+    pub const CURRENT_VERSION: u32 = 1;
+
+    pub fn new() -> Self {
+        Self {
+            version: Self::CURRENT_VERSION,
+        }
+    }
+
+    pub fn with_version(mut self, version: u32) -> Result<Self, ConfigError> {
+        if version < Self::MINIMUM_VERSION {
+            return Err(ConfigError::UnsupportedVersion {
+                expected: Self::MINIMUM_VERSION,
+                got: version,
+            });
+        }
+        self.version = version;
+        Ok(self)
+    }
+}
 
 /// A device's network identifier.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
