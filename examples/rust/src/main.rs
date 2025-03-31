@@ -22,6 +22,7 @@ use tracing_subscriber::{
     prelude::*,
     EnvFilter,
 };
+use aranya_client::Label;
 
 struct TeamCtx {
     owner: UserCtx,
