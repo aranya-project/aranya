@@ -270,27 +270,25 @@ AranyaError run(Team *t) {
 
     // upgrade role to admin.
     err = aranya_assign_role(&t->clients.owner.client, &t->id,
-        &t->clients.admin.id, ARANYA_ROLE_ADMIN);
+                             &t->clients.admin.id, ARANYA_ROLE_ADMIN);
     EXPECT("error assigning admin role", err);
-
 
     // upgrade role to operator.
     err = aranya_assign_role(&t->clients.admin.client, &t->id,
-            &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
+                             &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
 
     if (err == ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "application failed: expected role assignment to fail");
         return EXIT_FAILURE;
     }
 
-
-
-    err = aranya_sync_now(&t->clients.admin.client, &t->id, sync_addrs[OWNER], NULL);
+    err = aranya_sync_now(&t->clients.admin.client, &t->id, sync_addrs[OWNER],
+                          NULL);
     EXPECT("error calling `sync_now` to sync with peer", err);
 
     sleep(1);
     err = aranya_assign_role(&t->clients.admin.client, &t->id,
-        &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
+                             &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
     EXPECT("error assigning operator role", err);
 
     // add sync peers.
@@ -316,7 +314,6 @@ AranyaError run(Team *t) {
 
     err = aranya_sync_peer_config_builder_cleanup(&builder);
     EXPECT("error running the cleanup routine for the config builder", err);
-
 
     err = add_sync_peers(t, &cfg);
     EXPECT("error adding sync peers", err);
