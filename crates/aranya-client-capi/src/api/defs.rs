@@ -518,7 +518,7 @@ pub type TeamConfig = Safe<imp::TeamConfig>;
 pub type TeamConfigBuilder = imp::TeamConfigBuilder;
 
 // Keep in sync with TeamConfig::CURRENT_VERSION!
-/// The current version of [`TeamConfig`].
+/// The current version of `TeamConfig`.
 pub const TEAM_CONFIG_VERSION: u32 = 1;
 
 /// Sets the version of the [`TeamConfig`] to be used.
