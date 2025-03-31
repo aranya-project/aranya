@@ -362,7 +362,7 @@ pub trait DaemonApi {
         name: NetIdentifier,
     ) -> Result<()>;
 
-    /// Assign an AQC network identifier to a device.
+    /// Assign a QUIC channels network identifier to a device.
     ///
     /// # Parameters
     /// - `team` - The ID of the team.
@@ -377,7 +377,7 @@ pub trait DaemonApi {
         name: NetIdentifier,
     ) -> Result<()>;
 
-    /// Remove an AQC network identifier from a device.
+    /// Remove a QUIC channels network identifier from a device.
     ///
     /// # Parameters
     /// - `team` - The ID of the team.
@@ -414,7 +414,7 @@ pub trait DaemonApi {
     /// - `Result<()>` - Success or an error if the label cannot be deleted.
     async fn delete_label(team: TeamId, label: Label) -> Result<()>;
 
-    /// Assigns a fast channels label to a device.
+    /// Assigns a label to a device.
     ///
     /// Gives a device access to create or participate in channels with
     /// the specified label.
@@ -428,7 +428,7 @@ pub trait DaemonApi {
     /// - `Result<()>` - Success or an error if the label cannot be assigned.
     async fn assign_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
 
-    /// Revokes a fast channels label from a device.
+    /// Revokes a label from a device.
     ///
     /// Removes a device's access to channels with the specified label. When a
     /// user has their permissions revoked to use a label, all channels
