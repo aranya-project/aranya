@@ -302,14 +302,14 @@ typedef struct ARANYA_ALIGNED(1) AranyaDeviceId {
     uint8_t __for_size_only[64];
 } AranyaDeviceId;
 
-typedef struct ARANYA_ALIGNED(1) AranyaTeamOperationConfig {
+typedef struct ARANYA_ALIGNED(1) AranyaTeamConfig {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
     uint8_t __for_size_only[0];
-} AranyaTeamOperationConfig;
+} AranyaTeamConfig;
 
 /**
  * Team ID.
@@ -768,7 +768,7 @@ AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team(struct AranyaClient *client,
-                               const struct AranyaTeamOperationConfig *cfg,
+                               const struct AranyaTeamConfig *cfg,
                                struct AranyaTeamId *__output);
 
 /**
@@ -780,7 +780,7 @@ AranyaError aranya_create_team(struct AranyaClient *client,
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team_ext(struct AranyaClient *client,
-                                   const struct AranyaTeamOperationConfig *cfg,
+                                   const struct AranyaTeamConfig *cfg,
                                    struct AranyaTeamId *__output,
                                    struct AranyaExtError *__ext_err);
 
@@ -794,7 +794,7 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
  */
 AranyaError aranya_add_team(struct AranyaClient *client,
                             const struct AranyaTeamId *team,
-                            const struct AranyaTeamOperationConfig *cfg);
+                            const struct AranyaTeamConfig *cfg);
 
 /**
  * Add a team to the local device store.
@@ -806,7 +806,7 @@ AranyaError aranya_add_team(struct AranyaClient *client,
  */
 AranyaError aranya_add_team_ext(struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
-                                const struct AranyaTeamOperationConfig *cfg,
+                                const struct AranyaTeamConfig *cfg,
                                 struct AranyaExtError *__ext_err);
 
 /**

@@ -197,7 +197,7 @@ AranyaError init_team(Team *t) {
     // have owner create the team.
     // The `aranya_create_team` method is used to create a new graph for the
     // team to operate on.
-    AranyaTeamOperationConfig cfg;
+    AranyaTeamConfig cfg;
     err = aranya_create_team(&t->clients.owner.client, &cfg, &t->id);
     EXPECT("error creating team", err);
 

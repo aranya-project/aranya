@@ -31,7 +31,7 @@ use aranya_daemon_api::NetIdentifier;
 #[cfg(feature = "afc")]
 use aranya_daemon_api::Role;
 #[cfg(feature = "afc")]
-use aranya_daemon_api::TeamOperationConfig;
+use aranya_daemon_api::TeamConfig;
 #[cfg(feature = "afc")]
 use aranya_daemon_api::{DeviceId, KeyBundle};
 #[cfg(feature = "afc")]
@@ -348,7 +348,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team(TeamOperationConfig {})
+        .create_team(TeamConfig {})
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -630,7 +630,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team(TeamOperationConfig {})
+        .create_team(TeamConfig {})
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -847,7 +847,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team(TeamOperationConfig {})
+        .create_team(TeamConfig {})
         .await
         .expect("expected to create team");
     info!(?team_id);

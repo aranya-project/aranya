@@ -5,7 +5,7 @@ use std::{net::SocketAddr, path::Path, time::Duration};
 #[cfg(feature = "afc")]
 use aranya_daemon_api::CS;
 use aranya_daemon_api::{
-    DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, TeamOperationConfig,
+    DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, TeamConfig,
 };
 use aranya_fast_channels::Label;
 #[cfg(feature = "afc")]
@@ -156,12 +156,12 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self, cfg: TeamOperationConfig) -> Result<TeamId> {
+    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
         Ok(self.daemon.create_team(context::current(), cfg).await??)
     }
 
     /// Add a team to the local device store.
-    pub async fn add_team(&mut self, team: TeamId, cfg: TeamOperationConfig) -> Result<()> {
+    pub async fn add_team(&mut self, team: TeamId, cfg: TeamConfig) -> Result<()> {
         Ok(self
             .daemon
             .add_team(context::current(), team, cfg)
