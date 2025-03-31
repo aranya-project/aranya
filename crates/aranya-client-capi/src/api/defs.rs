@@ -518,6 +518,7 @@ pub type TeamConfig = Safe<imp::TeamConfig>;
 pub type TeamConfigBuilder = imp::TeamConfigBuilder;
 
 // Keep in sync with TeamConfig::CURRENT_VERSION!
+// TODO(nikki): aranya-capi-codegen doesn't seem to like @ref in constants
 /// The current version of `TeamConfig`.
 pub const TEAM_CONFIG_VERSION: u32 = 1;
 
