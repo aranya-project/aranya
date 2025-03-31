@@ -46,7 +46,7 @@ impl From<aranya_daemon_api::ConfigError> for Error {
             aranya_daemon_api::ConfigError::UnsupportedVersion { expected, got } => {
                 Self::Config(ConfigError::UnsupportedVersion { expected, got })
             }
-            _ => todo!()
+            _ => todo!(),
         }
     }
 }

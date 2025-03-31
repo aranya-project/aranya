@@ -150,6 +150,7 @@ enum AranyaError
     ARANYA_ERROR_AFC,
     ARANYA_ERROR_RUNTIME,
     ARANYA_ERROR_INVALID_INDEX,
+    ARANYA_ERROR_CONFIG,
 };
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
@@ -302,13 +303,22 @@ typedef struct ARANYA_ALIGNED(1) AranyaDeviceId {
     uint8_t __for_size_only[64];
 } AranyaDeviceId;
 
-typedef struct ARANYA_ALIGNED(4) AranyaTeamConfig {
+typedef struct ARANYA_ALIGNED(4) AranyaTeamConfigBuilder {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
     uint8_t __for_size_only[4];
+} AranyaTeamConfigBuilder;
+
+typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[24];
 } AranyaTeamConfig;
 
 /**
@@ -760,6 +770,46 @@ AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
+ * Sets the version of the [`AranyaTeamConfig`](@ref AranyaTeamConfig) to be used.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param version the version of the [`AranyaTeamConfig`](@ref AranyaTeamConfig) to be used
+ */
+AranyaError aranya_team_config_builder_set_version(struct AranyaTeamConfigBuilder *cfg,
+                                                   uint32_t version);
+
+/**
+ * Sets the version of the [`AranyaTeamConfig`](@ref AranyaTeamConfig) to be used.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param version the version of the [`AranyaTeamConfig`](@ref AranyaTeamConfig) to be used
+ */
+AranyaError aranya_team_config_builder_set_version_ext(struct AranyaTeamConfigBuilder *cfg,
+                                                       uint32_t version,
+                                                       struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Bug`
+ * if there are invalid parameters.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_team_config_builder_build(struct AranyaTeamConfigBuilder *cfg,
+                                             struct AranyaTeamConfig *out);
+
+/**
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Bug`
+ * if there are invalid parameters.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_team_config_builder_build_ext(struct AranyaTeamConfigBuilder *cfg,
+                                                 struct AranyaTeamConfig *out,
+                                                 struct AranyaExtError *__ext_err);
+
+/**
  * Create a new graph/team with the current device as the owner.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -769,7 +819,7 @@ AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team(struct AranyaClient *client,
-                               struct AranyaTeamConfig cfg,
+                               const struct AranyaTeamConfig *cfg,
                                struct AranyaTeamId *__output);
 
 /**
@@ -782,12 +832,14 @@ AranyaError aranya_create_team(struct AranyaClient *client,
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team_ext(struct AranyaClient *client,
-                                   struct AranyaTeamConfig cfg,
+                                   const struct AranyaTeamConfig *cfg,
                                    struct AranyaTeamId *__output,
                                    struct AranyaExtError *__ext_err);
 
 /**
  * Add a team to the local device store.
+ *
+ * NOTE: this function is unfinished and will panic if called.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -797,10 +849,12 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
  */
 AranyaError aranya_add_team(struct AranyaClient *client,
                             const struct AranyaTeamId *team,
-                            struct AranyaTeamConfig cfg);
+                            const struct AranyaTeamConfig *cfg);
 
 /**
  * Add a team to the local device store.
+ *
+ * NOTE: this function is unfinished and will panic if called.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -810,7 +864,7 @@ AranyaError aranya_add_team(struct AranyaClient *client,
  */
 AranyaError aranya_add_team_ext(struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
-                                struct AranyaTeamConfig cfg,
+                                const struct AranyaTeamConfig *cfg,
                                 struct AranyaExtError *__ext_err);
 
 /**
