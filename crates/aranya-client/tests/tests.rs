@@ -8,28 +8,29 @@
     clippy::unwrap_used,
     rust_2018_idioms
 )]
-
-use std::{
-    fmt,
-    net::SocketAddr,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+#[cfg(feature = "afc")]
+use std::path::Path;
+use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
-use aranya_client::{
-    afc::Message,
-    client::{Client, SyncPeerConfig},
-};
+#[cfg(feature = "afc")]
+use aranya_client::afc::Message;
+use aranya_client::client::Client;
+#[cfg(feature = "afc")]
+use aranya_client::SyncPeerConfig;
 use aranya_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
+#[cfg(feature = "afc")]
+use aranya_daemon_api::NetIdentifier;
+use aranya_daemon_api::{DeviceId, KeyBundle, Role};
+#[cfg(feature = "afc")]
 use aranya_fast_channels::{Label, Seq};
 use aranya_util::addr::Addr;
 use backon::{ExponentialBuilder, Retryable};
+#[cfg(feature = "afc")]
 use buggy::BugExt;
 use spideroak_base58::ToBase58;
 use tempfile::tempdir;
@@ -140,6 +141,7 @@ fn trim(mut d: u128, mut width: usize) -> (u128, usize) {
 /// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the
 /// clients are pending.
 // TODO(nikki): alternative to select!{} to resolve lifetime issues
+#[cfg(feature = "afc")]
 macro_rules! do_poll {
     ($($client:expr),*) => {
         debug!(
@@ -164,6 +166,7 @@ macro_rules! do_poll {
     };
 }
 
+#[allow(dead_code)] // memberb is unused if AFC is disabled
 struct TeamCtx {
     owner: DeviceCtx,
     admin: DeviceCtx,
@@ -200,18 +203,23 @@ struct DeviceCtx {
     daemon: AbortHandle,
 }
 
+fn get_shm_path(path: String) -> String {
+    if cfg!(target_os = "macos") && path.len() > 31 {
+        // Shrink the size of the team name down to 22 bytes
+        // to work within macOS's limits.
+        let d = Sha256::hash(path.as_bytes());
+        let t: [u8; 16] = d[..16].try_into().unwrap();
+        return format!("/{}", t.to_base58());
+    };
+    path
+}
+
 impl DeviceCtx {
     pub async fn new(team_name: String, name: String, work_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(work_dir.clone()).await?;
 
-        let mut shm_path = format!("/{team_name}_{name}");
-        if cfg!(target_os = "macos") && shm_path.len() > 31 {
-            // Shrink the size of the team name down to 22 bytes
-            // to work within macOS's limits.
-            let d = Sha256::hash(shm_path.as_bytes());
-            let t: [u8; 16] = d[..16].try_into().unwrap();
-            shm_path = format!("/{}", t.to_base58())
-        };
+        #[allow(unused_variables)]
+        let afc_shm_path = get_shm_path(format!("/{team_name}_{name}"));
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
@@ -223,7 +231,7 @@ impl DeviceCtx {
             pid_file: work_dir.join("pid"),
             sync_addr: Addr::new("localhost", 0)?,
             afc: AfcConfig {
-                shm_path: shm_path.clone(),
+                shm_path: afc_shm_path.clone(),
                 unlink_on_startup: true,
                 unlink_at_exit: true,
                 create: true,
@@ -246,18 +254,29 @@ impl DeviceCtx {
         sleep(Duration::from_millis(100)).await;
 
         // Initialize the user library.
-        let mut client = (|| {
-            Client::connect(
-                &uds_api_path,
-                Path::new(&shm_path),
-                max_chans,
-                "localhost:0",
-            )
-        })
-        .retry(ExponentialBuilder::default())
-        .await
-        .context("unable to init client")?;
-        client.afc().set_name(name);
+        let mut client = {
+            #[cfg(feature = "afc")]
+            {
+                let mut client = (|| {
+                    Client::connect(
+                        &uds_api_path,
+                        Path::new(&afc_shm_path),
+                        max_chans,
+                        "localhost:0",
+                    )
+                })
+                .retry(ExponentialBuilder::default())
+                .await
+                .context("unable to init client")?;
+                client.afc().set_name(name);
+                client
+            }
+            #[cfg(not(feature = "afc"))]
+            (|| Client::connect(&uds_api_path))
+                .retry(ExponentialBuilder::default())
+                .await
+                .context("unable to init client")?
+        };
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");
@@ -275,6 +294,7 @@ impl DeviceCtx {
         Ok(self.client.local_addr().await?)
     }
 
+    #[cfg(feature = "afc")]
     async fn afc_local_addr(&mut self) -> Result<SocketAddr> {
         Ok(self.client.afc().local_addr().await?)
     }
@@ -286,6 +306,65 @@ impl Drop for DeviceCtx {
     }
 }
 
+/// Tests sync_now() by demonstrating that an admin cannot assign a role to a device until it syncs with the owner.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_sync_now() -> Result<()> {
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
+    let mut team = TeamCtx::new("test_sync_now".into(), work_dir).await?;
+
+    // create team.
+    let team_id = team
+        .owner
+        .client
+        .create_team()
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // get sync addresses.
+    let owner_addr = team.owner.aranya_local_addr().await?;
+
+    // setup team handles.
+    let mut owner_team = team.owner.client.team(team_id);
+    let mut admin_team = team.admin.client.team(team_id);
+
+    // add admin to team.
+    info!("adding admin to team");
+    owner_team.add_device_to_team(team.admin.pk.clone()).await?;
+
+    // add operator to team.
+    info!("adding operator to team");
+    owner_team
+        .add_device_to_team(team.operator.pk.clone())
+        .await?;
+
+    // Assign role to Admin
+    owner_team.assign_role(team.admin.id, Role::Admin).await?;
+
+    // Admin tries to assign a role
+    match admin_team
+        .assign_role(team.operator.id, Role::Operator)
+        .await
+    {
+        Ok(_) => bail!("Expected role assignment to fail"),
+        Err(aranya_client::Error::Daemon(_)) => {}
+        Err(_) => bail!("Unexpected error"),
+    }
+
+    // Admin syncs with the Owner peer and retries the role
+    // assignment command
+    admin_team.sync_now(owner_addr.into(), None).await?;
+    sleep(Duration::from_secs(1)).await;
+    admin_team
+        .assign_role(team.operator.id, Role::Operator)
+        .await?;
+
+    Ok(())
+}
+
+#[cfg(feature = "afc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_one_way_two_chans() -> Result<()> {
     let interval = Duration::from_millis(100);
@@ -568,6 +647,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
 }
 
 /// Tests AFC two way communication within one channel.
+#[cfg(feature = "afc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_two_way_one_chan() -> Result<()> {
     let interval = Duration::from_millis(100);
@@ -785,6 +865,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
 }
 
 /// A positive test that sequence numbers are monotonic.
+#[cfg(feature = "afc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_monotonic_seq() -> Result<()> {
     let interval = Duration::from_millis(100);
@@ -1004,64 +1085,6 @@ async fn test_afc_monotonic_seq() -> Result<()> {
             .expect("should have a message");
         assert_eq!(got, want, "b->a");
     }
-
-    Ok(())
-}
-
-/// Tests sync_now() by demonstrating that an admin cannot assign a role to a device until it syncs with the owner.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_sync_now() -> Result<()> {
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut team = TeamCtx::new("test_sync_now".into(), work_dir).await?;
-
-    // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team()
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
-
-    // get sync addresses.
-    let owner_addr = team.owner.aranya_local_addr().await?;
-
-    // setup team handles.
-    let mut owner_team = team.owner.client.team(team_id);
-    let mut admin_team = team.admin.client.team(team_id);
-
-    // add admin to team.
-    info!("adding admin to team");
-    owner_team.add_device_to_team(team.admin.pk.clone()).await?;
-
-    // add operator to team.
-    info!("adding operator to team");
-    owner_team
-        .add_device_to_team(team.operator.pk.clone())
-        .await?;
-
-    // Assign role to Admin
-    owner_team.assign_role(team.admin.id, Role::Admin).await?;
-
-    // Admin tries to assign a role
-    match admin_team
-        .assign_role(team.operator.id, Role::Operator)
-        .await
-    {
-        Ok(_) => bail!("Expected role assignment to fail"),
-        Err(aranya_client::Error::Daemon(_)) => {}
-        Err(_) => bail!("Unexpected error"),
-    }
-
-    // Admin syncs with the Owner peer and retries the role
-    // assignment command
-    admin_team.sync_now(owner_addr.into(), None).await?;
-    sleep(Duration::from_secs(1)).await;
-    admin_team
-        .assign_role(team.operator.id, Role::Operator)
-        .await?;
 
     Ok(())
 }

@@ -2,20 +2,24 @@
 
 use std::{net::SocketAddr, path::Path, time::Duration};
 
-use aranya_daemon_api::{DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, CS};
+#[cfg(feature = "afc")]
+use aranya_daemon_api::CS;
+use aranya_daemon_api::{DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId};
+use aranya_fast_channels::Label;
+#[cfg(feature = "afc")]
 use aranya_fast_channels::{
     shm::ReadState,
-    Label, {self as afc},
+    {self as afc},
 };
 use aranya_util::Addr;
 use tarpc::{context, tokio_serde::formats::Json};
+#[cfg(feature = "afc")]
 use tokio::net::ToSocketAddrs;
 use tracing::{debug, info, instrument};
 
-use crate::{
-    afc::{setup_afc_shm, FastChannels, FastChannelsImpl},
-    error::{Error, Result},
-};
+#[cfg(feature = "afc")]
+use crate::afc::{setup_afc_shm, FastChannels, FastChannelsImpl};
+use crate::error::{Error, Result};
 
 /// List of device IDs.
 pub struct Devices {
@@ -64,6 +68,7 @@ impl Labels {
 pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
+    #[cfg(feature = "afc")]
     /// Support for Aranya Fast Channels
     pub(crate) afc: FastChannelsImpl<ReadState<CS>>,
 }
@@ -78,6 +83,7 @@ impl Client {
     ///   The daemon must also use the same number.
     /// - `afc_address`: The address that AFC listens for incoming connections
     ///   on.
+    #[cfg(feature = "afc")]
     #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, max_channels))]
     pub async fn connect<A>(
         daemon_socket: &Path,
@@ -104,6 +110,23 @@ impl Client {
         );
 
         Ok(Self { daemon, afc })
+    }
+
+    /// Creates a client connection to the daemon.
+    ///
+    /// - `daemon_socket`: The socket path to communicate with the daemon.
+    #[cfg(not(feature = "afc"))]
+    #[instrument(skip_all, fields(?daemon_socket))]
+    pub async fn connect(daemon_socket: &Path) -> Result<Self> {
+        info!("starting Aranya client");
+
+        let transport = tarpc::serde_transport::unix::connect(daemon_socket, Json::default)
+            .await
+            .map_err(Error::Connecting)?;
+        let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
+        debug!("connected to daemon");
+
+        Ok(Self { daemon })
     }
 
     /// Returns the address that the Aranya sync server is bound to.
@@ -156,6 +179,7 @@ impl Client {
         Team { client: self, id }
     }
 
+    #[cfg(feature = "afc")]
     /// Get access to Aranya Fast Channels.
     pub fn afc(&mut self) -> FastChannels<'_> {
         FastChannels::new(self)
@@ -262,6 +286,7 @@ impl Team<'_> {
     /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+    #[cfg(feature = "afc")]
     pub async fn assign_afc_net_identifier(
         &mut self,
         device: DeviceId,
@@ -275,6 +300,7 @@ impl Team<'_> {
     }
 
     /// Disassociate an AFC network identifier from a device.
+    #[cfg(feature = "afc")]
     pub async fn remove_afc_net_identifier(
         &mut self,
         device: DeviceId,
@@ -404,6 +430,7 @@ impl Queries<'_> {
     }
 
     /// Returns the AFC network identifier assigned to the current device.
+    #[cfg(feature = "afc")]
     pub async fn afc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
         self.client
             .daemon
