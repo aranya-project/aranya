@@ -1,6 +1,9 @@
 use std::ffi::c_char;
 
-use aranya_capi_core::safe::{TypeId, Typed};
+use aranya_capi_core::{
+    safe::{TypeId, Typed},
+    InvalidArg,
+};
 use buggy::bug;
 
 use crate::api::defs::Duration;
@@ -103,7 +106,11 @@ impl SyncPeerConfigBuilder {
     /// Build a [`SyncPeerConfig`]
     pub fn build(&self) -> Result<SyncPeerConfig, super::Error> {
         let Some(interval) = self.interval else {
-            bug!("Tried to create a `SyncPeerConfig` without setting the interval!");
+            let e = Into::into(InvalidArg::new(
+                "interval",
+                "Tried to create a `SyncPeerConfig` without setting the interval!",
+            ));
+            return Err(e);
         };
 
         Ok(SyncPeerConfig {
