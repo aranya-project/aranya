@@ -517,6 +517,10 @@ pub type TeamConfig = Safe<imp::TeamConfig>;
 #[aranya_capi_core::opaque(size = 4, align = 4)]
 pub type TeamConfigBuilder = imp::TeamConfigBuilder;
 
+// Keep in sync with TeamConfig::CURRENT_VERSION!
+/// The current version of [`TeamConfig`].
+pub const TEAM_CONFIG_VERSION: u32 = 1;
+
 /// Sets the version of the [`TeamConfig`] to be used.
 ///
 /// @param cfg a pointer to the team config builder
