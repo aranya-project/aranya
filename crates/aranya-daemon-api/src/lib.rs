@@ -7,7 +7,7 @@
 //!
 //! [`tarpc`]: https://crates.io/crates/tarpc
 //!
-//! For more information, refer to: https://docs.rs/aranya-client/latest/aranya_client/
+//! For more information, refer to: <https://docs.rs/aranya-client/latest/aranya_client/>
 
 mod service;
 
