@@ -275,7 +275,7 @@ pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
 #[aranya_capi_core::opaque(size = 32, align = 8)]
 pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
 
-/// A type to represent a span of time.
+/// A type to represent a span of time in nanoseconds.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
 pub struct Duration {
@@ -1126,7 +1126,7 @@ pub unsafe fn afc_recv_data(
     Ok(true)
 }
 
-/// Set the interval field on the config builder
+/// Configures how often the peer will be synced with.
 ///
 /// @param cfg a pointer to the builder for a sync config
 /// @param interval Set the interval at which syncing occurs
@@ -1134,7 +1134,7 @@ pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, in
     cfg.deref_mut().interval(interval);
 }
 
-/// Set the sync_now field on the config builder to true.
+/// Updates the config to immediately sync with the peer.
 ///
 /// @param cfg a pointer to the builder for a sync config
 // TODO: aranya-core#129
@@ -1142,8 +1142,9 @@ pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
     cfg.deref_mut().sync_now(true);
 }
 
-/// Set the sync_now field on the config builder to false
+/// Updates the config to *not* immediately sync with the peer.
 ///
+/// Overrides [`sync_peer_config_builder_set_sync_now`] if invoked afterward.
 /// @param cfg a pointer to the builder for a sync config
 // TODO: aranya-core#129
 pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
