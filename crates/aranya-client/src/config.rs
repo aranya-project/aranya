@@ -18,7 +18,7 @@ impl TeamConfig {
         Self::default()
     }
 
-    /// Sets the version of the current `TeamConfig`
+    /// Sets the version of the `TeamConfig`
     pub fn with_version(mut self, version: u32) -> Result<Self, ConfigError> {
         if version < Self::MINIMUM_VERSION {
             return Err(ConfigError::UnsupportedVersion {
