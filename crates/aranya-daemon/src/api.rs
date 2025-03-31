@@ -15,7 +15,7 @@ use anyhow::{anyhow, Context, Result};
 use aranya_crypto::{Csprng, Rng};
 use aranya_daemon_api::{
     AfcCtrl, AfcId, DaemonApi, DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, NetIdentifier,
-    Result as ApiResult, Role as ApiRole, TeamId, TeamConfig, CS,
+    Result as ApiResult, Role as ApiRole, TeamConfig, TeamId, CS,
 };
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
@@ -397,12 +397,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn add_team(
-        self,
-        _: context::Context,
-        team: TeamId,
-        cfg: TeamConfig,
-    ) -> ApiResult<()> {
+    async fn add_team(self, _: context::Context, team: TeamId, cfg: TeamConfig) -> ApiResult<()> {
         todo!()
     }
 

@@ -302,13 +302,13 @@ typedef struct ARANYA_ALIGNED(1) AranyaDeviceId {
     uint8_t __for_size_only[64];
 } AranyaDeviceId;
 
-typedef struct ARANYA_ALIGNED(1) AranyaTeamConfig {
+typedef struct ARANYA_ALIGNED(4) AranyaTeamConfig {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[0];
+    uint8_t __for_size_only[4];
 } AranyaTeamConfig;
 
 /**
@@ -763,24 +763,26 @@ AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
  * Create a new graph/team with the current device as the owner.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  * @param __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team(struct AranyaClient *client,
-                               const struct AranyaTeamConfig *cfg,
+                               struct AranyaTeamConfig cfg,
                                struct AranyaTeamId *__output);
 
 /**
  * Create a new graph/team with the current device as the owner.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  * @param __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team_ext(struct AranyaClient *client,
-                                   const struct AranyaTeamConfig *cfg,
+                                   struct AranyaTeamConfig cfg,
                                    struct AranyaTeamId *__output,
                                    struct AranyaExtError *__ext_err);
 
@@ -789,24 +791,26 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_team(struct AranyaClient *client,
                             const struct AranyaTeamId *team,
-                            const struct AranyaTeamConfig *cfg);
+                            struct AranyaTeamConfig cfg);
 
 /**
  * Add a team to the local device store.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_team_ext(struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
-                                const struct AranyaTeamConfig *cfg,
+                                struct AranyaTeamConfig cfg,
                                 struct AranyaExtError *__ext_err);
 
 /**

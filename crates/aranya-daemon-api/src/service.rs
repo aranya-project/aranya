@@ -80,24 +80,24 @@ pub enum ConfigError {
 }
 
 /// A configuration for creating or adding a team to a daemon.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TeamConfig {
     version: u32,
 }
 
 impl TeamConfig {
     /// The minimum version of the config supported for reading
-    const MINIMUM_VERSION: u32 = 1;
+    pub const MINIMUM_VERSION: u32 = 1;
 
-    /// The latest version of the [`TeamConfig`]
+    /// The latest version of the `TeamConfig`
     pub const CURRENT_VERSION: u32 = 1;
 
+    /// Creates a new `TeamConfig`
     pub fn new() -> Self {
-        Self {
-            version: Self::CURRENT_VERSION,
-        }
+        Self::default()
     }
 
+    /// Sets the version of the current `TeamConfig`
     pub fn with_version(mut self, version: u32) -> Result<Self, ConfigError> {
         if version < Self::MINIMUM_VERSION {
             return Err(ConfigError::UnsupportedVersion {
@@ -107,6 +107,14 @@ impl TeamConfig {
         }
         self.version = version;
         Ok(self)
+    }
+}
+
+impl Default for TeamConfig {
+    fn default() -> Self {
+        Self {
+            version: Self::CURRENT_VERSION,
+        }
     }
 }
 

@@ -5,7 +5,7 @@ use std::{net::SocketAddr, path::Path, time::Duration};
 #[cfg(feature = "afc")]
 use aranya_daemon_api::CS;
 use aranya_daemon_api::{
-    DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, TeamConfig,
+    DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamConfig, TeamId,
 };
 use aranya_fast_channels::Label;
 #[cfg(feature = "afc")]

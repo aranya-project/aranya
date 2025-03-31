@@ -68,6 +68,9 @@ pub enum Error {
 
     #[capi(msg = "invalid index")]
     InvalidIndex,
+
+    #[capi(msg = "invalid config")]
+    Config,
 }
 
 impl From<&imp::Error> for Error {
@@ -91,6 +94,7 @@ impl From<&imp::Error> for Error {
             },
             imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::InvalidIndex(_) => Self::InvalidIndex,
+            imp::Error::Config(_) => Self::Config,
         }
     }
 }
@@ -182,11 +186,6 @@ pub struct TeamId(aranya_daemon_api::TeamId);
 #[derive(Copy, Clone, Debug)]
 #[aranya_capi_core::opaque(size = 64, align = 1)]
 pub struct DeviceId(aranya_daemon_api::DeviceId);
-
-#[repr(transparent)]
-#[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 4, align = 4)]
-pub struct TeamConfig(aranya_daemon_api::TeamConfig);
 
 /// Channel ID for a fast channel.
 #[repr(transparent)]
@@ -510,6 +509,33 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
     Ok(DeviceId(id))
 }
 
+#[aranya_capi_core::opaque(size = 24, align = 8)]
+pub type TeamConfig = Safe<imp::TeamConfig>;
+
+#[aranya_capi_core::opaque(size = 4, align = 4)]
+pub type TeamConfigBuilder = imp::TeamConfigBuilder;
+
+/// Sets the version of the [`TeamConfig`] to be used.
+///
+/// @param cfg a pointer to the team config builder
+/// @param version the version of the [`TeamConfig`] to be used
+pub fn team_config_builder_set_version(cfg: &mut TeamConfigBuilder, version: u32) {
+    cfg.version = version;
+}
+
+/// Attempts to construct a [`TeamConfig`], returning an `Error::Bug`
+/// if there are invalid parameters.
+///
+/// @param cfg a pointer to the team config builder
+/// @param out a pointer to write the team config to
+pub fn team_config_builder_build(
+    cfg: &mut TeamConfigBuilder,
+    out: &mut MaybeUninit<TeamConfig>,
+) -> Result<(), imp::Error> {
+    Safe::init(out, cfg.build()?);
+    Ok(())
+}
+
 /// Create a new graph/team with the current device as the owner.
 ///
 /// @param client the Aranya Client [`Client`].
@@ -519,7 +545,8 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
 /// @relates AranyaClient.
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.deref_mut();
-    let id = client.rt.block_on(client.inner.create_team(cfg.0))?;
+    let cfg = aranya_daemon_api::TeamConfig::new().with_version(cfg.version)?;
+    let id = client.rt.block_on(client.inner.create_team(cfg))?;
     Ok(TeamId(id))
 }
 
@@ -530,13 +557,10 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 /// @param cfg the Team Configuration [`TeamConfig`].
 ///
 /// @relates AranyaClient.
-pub fn add_team(
-    client: &mut Client,
-    team: &TeamId,
-    cfg: &TeamConfig,
-) -> Result<(), imp::Error> {
+pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(client.inner.add_team(team.0, cfg.0))?;
+    let cfg = aranya_daemon_api::TeamConfig::new().with_version(cfg.version)?;
+    client.rt.block_on(client.inner.add_team(team.0, cfg))?;
     Ok(())
 }
 
