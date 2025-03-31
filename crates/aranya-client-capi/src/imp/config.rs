@@ -116,7 +116,7 @@ impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
             interval: Duration {
-                nanos: 5 * ARANYA_DURATION_SECONDS,
+                nanos: 1 * ARANYA_DURATION_SECONDS,
             },
             sync_now: true,
         }

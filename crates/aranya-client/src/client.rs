@@ -504,7 +504,7 @@ impl SyncPeerConfigBuilder {
 
     /// Set the interval at which syncing occurs
     ///
-    /// /// By default, the peer is synced with every 5 seconds and once immediately
+    /// By default, the peer is synced with every 5 seconds and once immediately
     /// if [`sync_now`][Self::sync_now] is enabled.
     pub fn interval(mut self, duration: Duration) -> Self {
         self.interval = duration;
@@ -523,7 +523,7 @@ impl SyncPeerConfigBuilder {
 impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
-            interval: Duration::from_secs(5),
+            interval: Duration::from_secs(1),
             sync_now: true,
         }
     }

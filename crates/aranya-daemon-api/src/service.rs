@@ -144,7 +144,7 @@ pub struct SyncPeerConfig {
 impl Default for SyncPeerConfig {
     fn default() -> Self {
         Self {
-            interval: Duration::from_millis(100),
+            interval: Duration::from_secs(1),
             sync_now: false,
         }
     }

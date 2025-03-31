@@ -1132,7 +1132,7 @@ pub unsafe fn afc_recv_data(
 
 /// Configures how often the peer will be synced with.
 ///
-/// By default, the peer will be synced with every 5 seconds, including
+/// By default, the peer will be synced with every second, including
 /// once immediately if [`sync_peer_config_builder_set_sync_now`]
 /// is specified.
 ///
