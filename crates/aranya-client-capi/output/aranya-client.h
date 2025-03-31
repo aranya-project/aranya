@@ -1635,28 +1635,28 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
 /**
  * Configures how often the peer will be synced with.
  *
- * By default, the peer will be synced with every second, including
- * once immediately if [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now)
- * is specified.
+ * By default, the interval is not set. It is an error to call
+ * [`aranya_sync_peer_config_builder_build`](@ref aranya_sync_peer_config_builder_build) before setting the interval with
+ * this function
  *
  * @param cfg a pointer to the builder for a sync config
  * @param interval Set the interval at which syncing occurs
  */
 AranyaError aranya_sync_peer_config_builder_set_interval(struct AranyaSyncPeerConfigBuilder *cfg,
-                                                         AranyaDuration interval);
+                                                         const AranyaDuration *interval);
 
 /**
  * Configures how often the peer will be synced with.
  *
- * By default, the peer will be synced with every second, including
- * once immediately if [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now)
- * is specified.
+ * By default, the interval is not set. It is an error to call
+ * [`aranya_sync_peer_config_builder_build`](@ref aranya_sync_peer_config_builder_build) before setting the interval with
+ * this function
  *
  * @param cfg a pointer to the builder for a sync config
  * @param interval Set the interval at which syncing occurs
  */
 AranyaError aranya_sync_peer_config_builder_set_interval_ext(struct AranyaSyncPeerConfigBuilder *cfg,
-                                                             AranyaDuration interval,
+                                                             const AranyaDuration *interval,
                                                              struct AranyaExtError *__ext_err);
 
 /**

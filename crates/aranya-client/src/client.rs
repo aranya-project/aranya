@@ -12,6 +12,7 @@ use aranya_fast_channels::{
     {self as afc},
 };
 use aranya_util::Addr;
+use buggy::bug;
 use tarpc::{context, tokio_serde::formats::Json};
 #[cfg(feature = "afc")]
 use tokio::net::ToSocketAddrs;
@@ -484,7 +485,7 @@ impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
 
 /// Builder for a [`SyncPeerConfig`]
 pub struct SyncPeerConfigBuilder {
-    interval: Duration,
+    interval: Option<Duration>,
     sync_now: bool,
 }
 
@@ -495,19 +496,24 @@ impl SyncPeerConfigBuilder {
     }
 
     /// Build a [`SyncPeerConfig`]
-    pub fn build(self) -> SyncPeerConfig {
-        SyncPeerConfig {
-            interval: self.interval,
+    pub fn build(self) -> Result<SyncPeerConfig> {
+        let Some(interval) = self.interval else {
+            bug!("Tried to create a `SyncPeerConfig` without setting the interval!");
+        };
+
+        Ok(SyncPeerConfig {
+            interval,
             sync_now: self.sync_now,
-        }
+        })
     }
 
     /// Set the interval at which syncing occurs
     ///
-    /// By default, the peer is synced with every 5 seconds and once immediately
-    /// if [`sync_now`][Self::sync_now] is enabled.
+    /// By default, the interval is not set. It is an error to call
+    /// [`build`][Self::build] before setting the interval with
+    /// this method
     pub fn interval(mut self, duration: Duration) -> Self {
-        self.interval = duration;
+        self.interval = Some(duration);
         self
     }
 
@@ -523,7 +529,7 @@ impl SyncPeerConfigBuilder {
 impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
-            interval: Duration::from_secs(1),
+            interval: None,
             sync_now: true,
         }
     }

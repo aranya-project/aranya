@@ -3,7 +3,7 @@ use std::ffi::c_char;
 use aranya_capi_core::safe::{TypeId, Typed};
 use buggy::bug;
 
-use crate::api::defs::{Duration, ARANYA_DURATION_SECONDS};
+use crate::api::defs::Duration;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -23,6 +23,7 @@ impl From<SyncPeerConfig> for aranya_client::client::SyncPeerConfig {
             .interval(value.interval.into())
             .sync_now(value.sync_now)
             .build()
+            .expect("All values are set")
     }
 }
 
@@ -82,13 +83,13 @@ impl ClientConfigBuilder {
 #[derive(Debug, Copy, Clone)]
 /// Builder for a [`SyncPeerConfig`]
 pub struct SyncPeerConfigBuilder {
-    interval: Duration,
+    interval: *const Duration,
     sync_now: bool,
 }
 
 impl SyncPeerConfigBuilder {
     /// Set the interval at which syncing occurs
-    pub fn interval(&mut self, duration: Duration) {
+    pub fn interval(&mut self, duration: &Duration) {
         self.interval = duration;
     }
 
@@ -100,10 +101,17 @@ impl SyncPeerConfigBuilder {
     }
 
     /// Build a [`SyncPeerConfig`]
-    pub fn build(&self) -> SyncPeerConfig {
-        SyncPeerConfig {
-            interval: self.interval,
-            sync_now: self.sync_now,
+    pub fn build(&self) -> Result<SyncPeerConfig, super::Error> {
+        // SAFETY: Trusts that the caller invoked [`Self::interval`] and provided a pointer to a valid `Duration`.
+        unsafe {
+            let Some(interval) = self.interval.as_ref() else {
+                bug!("Tried to create a `SyncPeerConfig` without setting the interval!");
+            };
+
+            Ok(SyncPeerConfig {
+                interval: *interval,
+                sync_now: self.sync_now,
+            })
         }
     }
 }
@@ -115,9 +123,7 @@ impl Typed for SyncPeerConfigBuilder {
 impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
-            interval: Duration {
-                nanos: 1 * ARANYA_DURATION_SECONDS,
-            },
+            interval: std::ptr::null(),
             sync_now: true,
         }
     }

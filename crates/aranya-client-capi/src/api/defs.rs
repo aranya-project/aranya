@@ -1132,13 +1132,13 @@ pub unsafe fn afc_recv_data(
 
 /// Configures how often the peer will be synced with.
 ///
-/// By default, the peer will be synced with every second, including
-/// once immediately if [`sync_peer_config_builder_set_sync_now`]
-/// is specified.
+/// By default, the interval is not set. It is an error to call
+/// [`sync_peer_config_builder_build`] before setting the interval with
+/// this function
 ///
 /// @param cfg a pointer to the builder for a sync config
 /// @param interval Set the interval at which syncing occurs
-pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
+pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: &Duration) {
     cfg.deref_mut().interval(interval);
 }
 
@@ -1171,8 +1171,9 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 pub fn sync_peer_config_builder_build(
     cfg: &SyncPeerConfigBuilder,
     out: &mut MaybeUninit<SyncPeerConfig>,
-) {
-    Safe::init(out, cfg.build());
+) -> Result<(), imp::Error> {
+    Safe::init(out, cfg.build()?);
+    Ok(())
 }
 /// Query devices on team.
 ///

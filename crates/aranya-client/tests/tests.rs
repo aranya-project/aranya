@@ -368,7 +368,7 @@ async fn test_sync_now() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_one_way_two_chans() -> Result<()> {
     let interval = Duration::from_millis(100);
-    let sync_config = SyncPeerConfig::builder().interval(interval).build();
+    let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
     let sleep_interval = interval * 6;
 
     let tmp = tempdir()?;
@@ -651,7 +651,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_two_way_one_chan() -> Result<()> {
     let interval = Duration::from_millis(100);
-    let sync_config = SyncPeerConfig::builder().interval(interval).build();
+    let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
     let sleep_interval = interval * 6;
 
     let tmp = tempdir()?;
@@ -869,7 +869,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_monotonic_seq() -> Result<()> {
     let interval = Duration::from_millis(100);
-    let sync_config = SyncPeerConfig::builder().interval(interval).build();
+    let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
     let sleep_interval = interval * 6;
 
     let tmp = tempdir()?;
