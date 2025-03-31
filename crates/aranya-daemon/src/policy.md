@@ -126,11 +126,14 @@ fact TeamEnd[]=>{}
 // Records an AFC label that has been defined for use.
 fact Label[label int]=>{}
 
-// Records that A device is allowed to use an AFC label.
-fact AssignedLabel[label int, device_id id]=>{op enum ChanOp}
+// Records that a device is allowed to use an AFC label.
+fact AssignedLabel[device_id id, label int]=>{op enum ChanOp}
 
 // Stores a Member's associated network identifier for AFC.
-fact MemberNetworkId[device_id id]=>{net_identifier string}
+fact AfcMemberNetworkId[device_id id]=>{net_identifier string}
+
+// Stores a Member's associated network identifier for AQC.
+fact AqcMemberNetworkId[device_id id]=>{net_identifier string}
 ```
 
 ### Functions
@@ -245,7 +248,7 @@ function is_valid_label(label int) bool {
 
 // Returns the channel operation for a particular label.
 function get_allowed_op(device_id id, label int) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedLabel[label: label, device_id: device_id]
+    let assigned_label = check_unwrap query AssignedLabel[device_id: device_id, label: label]
     return assigned_label.op
 }
 
@@ -1044,7 +1047,7 @@ command AssignLabel {
         check exists Label[label: this.label]
 
         finish {
-            create AssignedLabel[label: this.label, device_id: device.device_id]=>{op: this.op}
+            create AssignedLabel[device_id: device.device_id, label: this.label]=>{op: this.op}
 
             emit LabelAssigned {
                 device_id: device.device_id,
@@ -1104,10 +1107,10 @@ command RevokeLabel {
         check is_member(device.role)
 
         // Verify that AFC label has been assigned to this Member
-        check exists AssignedLabel[label: this.label, device_id: device.device_id]
+        check exists AssignedLabel[device_id: device.device_id, label: this.label]
 
         finish {
-            delete AssignedLabel[label: this.label, device_id: device.device_id]
+            delete AssignedLabel[device_id: device.device_id, label: this.label]
 
             emit LabelRevoked {
                 device_id: device.device_id,
@@ -1124,23 +1127,23 @@ command RevokeLabel {
 - Only a label that was assigned can be revoked.
 
 
-## SetNetworkName
+## SetAfcNetworkName
 Associates a network name and address to a Member for use in AFC.
 
 ```policy
-action set_network_name (device_id id, net_identifier string) {
-    publish SetNetworkName {
+action set_afc_network_name (device_id id, net_identifier string) {
+    publish SetAfcNetworkName {
         device_id: device_id,
         net_identifier: net_identifier,
     }
 }
 
-effect NetworkNameSet {
+effect AfcNetworkNameSet {
     device_id id,
     net_identifier string,
 }
 
-command SetNetworkName {
+command SetAfcNetworkName {
     fields {
         device_id id,
         net_identifier string,
@@ -1159,16 +1162,16 @@ command SetNetworkName {
         check is_member(device.role)
 
         // TODO: check that the network identifier is valid.
-        let net_id_exists = query MemberNetworkId[device_id: this.device_id]
+        let net_id_exists = query AfcMemberNetworkId[device_id: this.device_id]
 
         if net_id_exists is Some {
             let net_id = unwrap net_id_exists
             finish {
-                update MemberNetworkId[device_id: this.device_id]=>{net_identifier: net_id.net_identifier} to {
+                update AfcMemberNetworkId[device_id: this.device_id]=>{net_identifier: net_id.net_identifier} to {
                     net_identifier: this.net_identifier
                 }
 
-                emit NetworkNameSet {
+                emit AfcNetworkNameSet {
                     device_id: device.device_id,
                     net_identifier: this.net_identifier,
                 }
@@ -1176,9 +1179,9 @@ command SetNetworkName {
         }
         else {
             finish {
-                create MemberNetworkId[device_id: this.device_id]=>{net_identifier: this.net_identifier}
+                create AfcMemberNetworkId[device_id: this.device_id]=>{net_identifier: this.net_identifier}
 
-                emit NetworkNameSet {
+                emit AfcNetworkNameSet {
                     device_id: device.device_id,
                     net_identifier: this.net_identifier,
                 }
@@ -1190,20 +1193,24 @@ command SetNetworkName {
 
 **Invariants**:
 
-- Only Owners and Operators can assign network names to Members.
-- Members can only be assigned to one network name.
+- Only Owners and Operators can assign AFC network names to Members.
+- Members can only be assigned to one AFC network name.
 
-## UnsetNetworkName
-Dissociates a network name and address from a Member.
+## UnsetAfcNetworkName
+Dissociates an AFC network name and address from a Member.
 
 ```policy
-action unset_network_name (device_id id) {}
+action unset_afc_network_name (device_id id) {
+    publish UnsetAfcNetworkName {
+        device_id: device_id,
+    }
+}
 
-effect NetworkNameUnset {
+effect AfcNetworkNameUnset {
     device_id id,
 }
 
-command UnsetNetworkName {
+command UnsetAfcNetworkName {
     fields {
         device_id id,
     }
@@ -1219,11 +1226,11 @@ command UnsetNetworkName {
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
         check is_member(device.role)
 
-        check exists MemberNetworkId[device_id: this.device_id]
+        check exists AfcMemberNetworkId[device_id: this.device_id]
         finish {
-            delete MemberNetworkId[device_id: this.device_id]
+            delete AfcMemberNetworkId[device_id: this.device_id]
 
-            emit NetworkNameUnset {
+            emit AfcNetworkNameUnset {
                 device_id: device.device_id,
             }
         }
@@ -1233,8 +1240,122 @@ command UnsetNetworkName {
 
 **Invariants**:
 
-- Only Owners and Operators Operators can unset network names from Members.
+- Only Owners and Operators Operators can unset AFC network names from Members.
 
+## SetAqcNetworkName
+Associates a network name and address to a Member for use in AQC.
+
+```policy
+action set_aqc_network_name (device_id id, net_identifier string) {
+    publish SetAqcNetworkName {
+        device_id: device_id,
+        net_identifier: net_identifier,
+    }
+}
+
+effect AqcNetworkNameSet {
+    device_id id,
+    net_identifier string,
+}
+
+command SetAqcNetworkName {
+    fields {
+        device_id id,
+        net_identifier string,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
+
+        // Only Owners and Operators can associate a network name.
+        check is_owner(author.role) || is_operator(author.role)
+        // Only Members can be associated a network name.
+        check is_member(device.role)
+
+        // TODO: check that the network identifier is valid.
+        let net_id_exists = query AqcMemberNetworkId[device_id: this.device_id]
+
+        if net_id_exists is Some {
+            let net_id = unwrap net_id_exists
+            finish {
+                update AqcMemberNetworkId[device_id: this.device_id]=>{net_identifier: net_id.net_identifier} to {
+                    net_identifier: this.net_identifier
+                }
+
+                emit AqcNetworkNameSet {
+                    device_id: device.device_id,
+                    net_identifier: this.net_identifier,
+                }
+            }
+        }
+        else {
+            finish {
+                create AqcMemberNetworkId[device_id: this.device_id]=>{net_identifier: this.net_identifier}
+
+                emit AqcNetworkNameSet {
+                    device_id: device.device_id,
+                    net_identifier: this.net_identifier,
+                }
+            }
+        }
+    }
+}
+```
+
+**Invariants**:
+
+- Only Owners and Operators can assign AQC network names to Members.
+- Members can only be assigned to one AQC network name.
+
+## UnsetAqcNetworkName
+Dissociates an AQC network name and address from a Member.
+
+```policy
+action unset_aqc_network_name (device_id id) {
+    publish UnsetAqcNetworkName {
+        device_id: device_id,
+    }
+}
+
+effect AqcNetworkNameUnset {
+    device_id id,
+}
+
+command UnsetAqcNetworkName {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = check_unwrap find_existing_device(this.device_id)
+
+        // Only Owners, Admins, and Operators can unset a Member's network name.
+        check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
+        check is_member(device.role)
+
+        check exists AqcMemberNetworkId[device_id: this.device_id]
+        finish {
+            delete AqcMemberNetworkId[device_id: this.device_id]
+
+            emit AqcNetworkNameUnset {
+                device_id: device.device_id,
+            }
+        }
+    }
+}
+```
+
+**Invariants**:
+
+- Only Owners and Operators Operators can unset AQC network names from Members.
 
 ## CreateChannel
 
@@ -1498,6 +1619,287 @@ command AfcCreateUniChannel {
   `ChanOp::ReadWrite` or `ChanOp::WriteOnly` permissions for the label and the reader side has
   either `ChanOp::ReadWrite` or `ChanOp::ReadOnly` permissions for the label.
 
+
+### QueryDevicesOnTeam
+Queries devices on team.
+
+```policy
+action query_devices_on_team() {
+    map Device[device_id:?] as f {
+        publish QueryDevicesOnTeam { device_id: f.device_id }
+    }
+}
+
+effect QueryDevicesOnTeamResult {
+    device_id id,
+}
+
+command QueryDevicesOnTeam {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        finish {
+            emit QueryDevicesOnTeamResult {
+                device_id: this.device_id,
+            }
+        }
+    }
+}
+```
+
+### QueryDeviceRole
+Queries device role.
+
+```policy
+action query_device_role(device_id id) {
+    publish QueryDeviceRole {
+        device_id: device_id,
+    }
+}
+
+effect QueryDeviceRoleResult {
+    role enum Role,
+}
+
+command QueryDeviceRole {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // Check that the team is active and return the author's info if they exist in the team.
+        let author = get_valid_device(this.device_id)
+
+        finish {
+            emit QueryDeviceRoleResult {
+                role: author.role,
+            }
+        }
+    }
+}
+```
+
+### QueryDeviceKeyBundle
+Queries device KeyBundle.
+
+```policy
+
+// Returns the device's key bundle.
+function get_device_keybundle(device_id id) struct KeyBundle {
+    let ident_key = check_unwrap query DeviceIdentKey[device_id: device_id]
+    let sign_key = check_unwrap query DeviceSignKey[device_id: device_id]
+    let enc_key = check_unwrap query DeviceEncKey[device_id: device_id]
+
+    return KeyBundle {
+        ident_key: ident_key.key,
+        sign_key: sign_key.key,
+        enc_key: enc_key.key,
+    }
+}
+
+action query_device_keybundle(device_id id) {
+    publish QueryDeviceKeyBundle {
+        device_id: device_id,
+    }
+}
+
+effect QueryDeviceKeyBundleResult {
+    device_keys struct KeyBundle,
+}
+
+command QueryDeviceKeyBundle {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // Check that the team is active and return the author's info if they exist in the team.
+        let author = get_valid_device(this.device_id)
+        let device_keys = get_device_keybundle(author.device_id)
+
+        finish {
+            emit QueryDeviceKeyBundleResult {
+                device_keys: device_keys,
+            }
+        }
+    }
+}
+```
+
+### QueryDeviceLabelAssignment
+Queries device label assignments.
+
+```policy
+action query_device_label_assignments(device_id id) {
+    map AssignedLabel[device_id: device_id, label:?] as f {
+        publish QueryDeviceLabelAssignments { label: f.label }
+    }
+}
+
+effect QueryDeviceLabelAssignmentsResult {
+    label int,
+}
+
+command QueryDeviceLabelAssignments {
+    fields {
+        label int,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        finish {
+            emit QueryDeviceLabelAssignmentsResult {
+                label: this.label
+            }
+        }
+    }
+}
+```
+
+### QueryAfcNetIdentifier
+Queries AFC network identifier.
+
+```policy
+
+// Returns the device's AFC network identifier.
+function get_afc_net_identifier(device_id id) string {
+    let net_identifier = check_unwrap query AfcMemberNetworkId[device_id: device_id]
+
+    return net_identifier.net_identifier
+}
+
+action query_afc_net_identifier(device_id id) {
+    publish QueryAfcNetIdentifier {
+        device_id: device_id,
+    }
+}
+
+effect QueryAfcNetIdentifierResult {
+    net_identifier string,
+}
+
+command QueryAfcNetIdentifier {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // Check that the team is active and return the author's info if they exist in the team.
+        let author = get_valid_device(this.device_id)
+        let net_identifier = get_afc_net_identifier(author.device_id)
+
+        finish {
+            emit QueryAfcNetIdentifierResult {
+                net_identifier: net_identifier,
+            }
+        }
+    }
+}
+```
+
+### QueryAqcNetIdentifier
+Queries AQC network identifier.
+
+```policy
+
+// Returns the device's AQC network identifier.
+function get_aqc_net_identifier(device_id id) string {
+    let net_identifier = check_unwrap query AqcMemberNetworkId[device_id: device_id]
+
+    return net_identifier.net_identifier
+}
+
+action query_aqc_net_identifier(device_id id) {
+    publish QueryAqcNetIdentifier {
+        device_id: device_id,
+    }
+}
+
+effect QueryAqcNetIdentifierResult {
+    net_identifier string,
+}
+
+command QueryAqcNetIdentifier {
+    fields {
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // Check that the team is active and return the author's info if they exist in the team.
+        let author = get_valid_device(this.device_id)
+        let net_identifier = get_aqc_net_identifier(author.device_id)
+
+        finish {
+            emit QueryAqcNetIdentifierResult {
+                net_identifier: net_identifier,
+            }
+        }
+    }
+}
+```
+
+### QueryLabelExists
+Queries whether a label exists.
+
+```policy
+
+// Returns whether a label exists.
+function check_label_exists(label int) bool {
+    let label_exists = exists Label[label: label]
+
+    return label_exists
+}
+
+action query_label_exists(label int) {
+    publish QueryLabelExists {
+        label: label,
+    }
+}
+
+effect QueryLabelExistsResult {
+    label_exists bool,
+}
+
+command QueryLabelExists {
+    fields {
+        label int,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // It must be a valid label that does not already exist.
+        check is_valid_label(this.label)
+        let label_exists = check_label_exists(this.label)
+
+        finish {
+            emit QueryLabelExistsResult {
+                label_exists: label_exists,
+            }
+        }
+    }
+}
+```
 
 <!-- TODO: add delete channel commands? -->
 

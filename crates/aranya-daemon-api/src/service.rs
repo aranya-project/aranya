@@ -103,7 +103,7 @@ pub struct KeyBundle {
 /// Roles determine what permissions a device has within a team.
 /// Different roles have different capabilities regarding team management
 /// and access control. For a more detailed permissions breakdown, see policy.md.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Role {
     /// Owner role has full control over the team and can perform all operations
     Owner,
@@ -332,7 +332,7 @@ pub trait DaemonApi {
     /// - `Result<()>` - Success or an error if the role cannot be revoked.
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
-    /// Assigns a network identifier to a device.
+    /// Assign an AFC network identifier to a device.
     ///
     /// # Parameters
     /// - `team` - The ID of the team.
@@ -347,7 +347,7 @@ pub trait DaemonApi {
         name: NetIdentifier,
     ) -> Result<()>;
 
-    /// Removes a network identifier from a device.
+    /// Remove an AFC network identifier from a device.
     ///
     /// # Parameters
     /// - `team` - The ID of the team.
@@ -357,6 +357,36 @@ pub trait DaemonApi {
     /// # Returns
     /// - `Result<()>` - Success or an error if the identifier cannot be removed.
     async fn remove_afc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
+
+    /// Assign an AQC network identifier to a device.
+    ///
+    /// # Parameters
+    /// - `team` - The ID of the team.
+    /// - `device` - The ID of the device to assign the identifier to.
+    /// - `name` - The network identifier to assign.
+    ///
+    /// # Returns
+    /// - `Result<()>` - Success or an error if the identifier cannot be assigned.
+    async fn assign_aqc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+        name: NetIdentifier,
+    ) -> Result<()>;
+
+    /// Remove an AQC network identifier from a device.
+    ///
+    /// # Parameters
+    /// - `team` - The ID of the team.
+    /// - `device` - The ID of the device to remove the identifier from.
+    /// - `name` - The network identifier to remove.
+    ///
+    /// # Returns
+    /// - `Result<()>` - Success or an error if the identifier cannot be removed.
+    async fn remove_aqc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
@@ -460,4 +490,24 @@ pub trait DaemonApi {
         node_id: NodeId,
         ctrl: AfcCtrl,
     ) -> Result<(AfcId, NetIdentifier, Label)>;
+    /// Query devices on team.
+    async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
+    /// Query device role.
+    async fn query_device_role(team: TeamId, device: DeviceId) -> Result<Role>;
+    /// Query device keybundle.
+    async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
+    /// Query device label assignments.
+    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
+    /// Query AFC network ID.
+    async fn query_afc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+    ) -> Result<Option<NetIdentifier>>;
+    /// Query AQC network ID.
+    async fn query_aqc_net_identifier(
+        team: TeamId,
+        device: DeviceId,
+    ) -> Result<Option<NetIdentifier>>;
+    /// Query label exists.
+    async fn query_label_exists(team: TeamId, label: Label) -> Result<bool>;
 }
