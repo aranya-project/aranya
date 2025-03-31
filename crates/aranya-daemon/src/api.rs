@@ -12,7 +12,15 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use aranya_afc_util::{BidiChannelCreated, BidiChannelReceived, BidiKeys, Handler};
+use aranya_afc_util::{
+    BidiChannelCreated as AfcBidiChannelCreated, BidiChannelReceived as AfcBidiChannelReceived,
+    BidiKeys as AfcBidiKeys, Handler as AfcHandler,
+};
+use aranya_aqc_util::{
+    BidiChannelCreated as AqcBidiChannelCreated, BidiChannelReceived as AqcBidiChannelReceived,
+    Handler as AqcHandler, Label as AqcLabel, UniChannelCreated as AqcUniChannelCreated,
+    UniChannelReceived as AqcUniChannelReceived,
+};
 use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, Csprng, DeviceId, Rng};
 use aranya_daemon_api::{
     AfcCtrl, AfcId, AqcCtrl, AqcId, DaemonApi, DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle,
@@ -35,8 +43,12 @@ use tracing::{debug, error, info, instrument, warn};
 use crate::{
     aranya::Actions,
     policy::{
-        AfcBidiChannelCreated, AfcBidiChannelReceived, AqcBidiChannelCreated,
-        AqcBidiChannelReceived, ChanOp, Effect, KeyBundle, Role,
+        AfcBidiChannelCreated as AfcBidiChannelCreatedEffect,
+        AfcBidiChannelReceived as AfcBidiChannelReceivedEffect,
+        AqcBidiChannelCreated as AqcBidiChannelCreatedEffect,
+        AqcBidiChannelReceived as AqcBidiChannelReceivedEffect,
+        AqcUniChannelCreated as AqcUniChannelCreatedEffect,
+        AqcUniChannelReceived as AqcUniChannelReceivedEffect, ChanOp, Effect, KeyBundle, Role,
     },
     sync::SyncPeers,
     Client, CE, EF,
@@ -91,13 +103,17 @@ impl DaemonApiServer {
                 client,
                 local_addr,
                 afc,
-                aqc,
+                _aqc: aqc,
                 eng,
                 pk,
                 peers,
                 afc_peers: Arc::default(),
+                afc_handler: Arc::new(Mutex::new(AfcHandler::new(
+                    device_id,
+                    store.try_clone().context("unable to clone keystore")?,
+                ))),
                 aqc_peers: Arc::default(),
-                handler: Arc::new(Mutex::new(Handler::new(device_id, store))),
+                aqc_handler: Arc::new(Mutex::new(AqcHandler::new(device_id, store))),
             },
         })
     }
@@ -157,7 +173,7 @@ struct DaemonApiHandler {
     /// AFC shm write.
     afc: Arc<Mutex<WriteState<CS, Rng>>>,
     /// AQC shm write.
-    aqc: Arc<Mutex<WriteState<CS, Rng>>>,
+    _aqc: Arc<Mutex<WriteState<CS, Rng>>>,
     /// An implementation of [`Engine`][crypto::Engine].
     eng: CE,
     /// Public keys of current device.
@@ -166,10 +182,12 @@ struct DaemonApiHandler {
     peers: SyncPeers,
     /// AFC peers.
     afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
+    /// Handles AFC effects.
+    afc_handler: Arc<Mutex<AfcHandler<Store>>>,
     /// AQC peers.
     aqc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
-    /// Handles AFC effects.
-    handler: Arc<Mutex<Handler<Store>>>,
+    /// Handles AQC effects.
+    aqc_handler: Arc<Mutex<AqcHandler<Store>>>,
 }
 
 impl DaemonApiHandler {
@@ -239,8 +257,18 @@ impl DaemonApiHandler {
                     }
                 }
                 // TODO: unidirectional channels
-                Effect::AqcUniChannelCreated(_uni_channel_created) => {}
-                Effect::AqcUniChannelReceived(_uni_channel_received) => {}
+                Effect::AqcUniChannelCreated(v) => {
+                    debug!("received AqcUniChannelCreated effect");
+                    if let Some(node_id) = node_id {
+                        self.aqc_uni_channel_created(v, node_id).await?
+                    }
+                }
+                Effect::AqcUniChannelReceived(v) => {
+                    debug!("received AqcUniChannelReceived effect");
+                    if let Some(node_id) = node_id {
+                        self.aqc_uni_channel_received(v, node_id).await?
+                    }
+                }
                 Effect::QueryDevicesOnTeamResult(_) => {}
                 Effect::QueryDeviceRoleResult(_) => {}
                 Effect::QueryDeviceKeyBundleResult(_) => {}
@@ -257,7 +285,7 @@ impl DaemonApiHandler {
     #[instrument(skip(self), fields(effect = ?v))]
     async fn afc_bidi_channel_created(
         &self,
-        v: &AfcBidiChannelCreated,
+        v: &AfcBidiChannelCreatedEffect,
         node_id: NodeId,
     ) -> Result<()> {
         debug!("received BidiChannelCreated effect");
@@ -265,9 +293,9 @@ impl DaemonApiHandler {
         // ensure that label fits inside a `u32`.
         let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
         // TODO: don't clone the eng.
-        let BidiKeys { seal, open } = self.handler.lock().await.bidi_channel_created(
+        let AfcBidiKeys { seal, open } = self.afc_handler.lock().await.bidi_channel_created(
             &mut self.eng.clone(),
-            &BidiChannelCreated {
+            &AfcBidiChannelCreated {
                 parent_cmd_id: v.parent_cmd_id,
                 author_id: v.author_id.into(),
                 author_enc_key_id: v.author_enc_key_id.into(),
@@ -292,15 +320,15 @@ impl DaemonApiHandler {
     #[instrument(skip_all)]
     async fn afc_bidi_channel_received(
         &self,
-        v: &AfcBidiChannelReceived,
+        v: &AfcBidiChannelReceivedEffect,
         node_id: NodeId,
     ) -> Result<()> {
         // NB: this shouldn't happen because the policy should
         // ensure that label fits inside a `u32`.
         let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
-        let BidiKeys { seal, open } = self.handler.lock().await.bidi_channel_received(
+        let AfcBidiKeys { seal, open } = self.afc_handler.lock().await.bidi_channel_received(
             &mut self.eng.clone(),
-            &BidiChannelReceived {
+            &AfcBidiChannelReceived {
                 parent_cmd_id: v.parent_cmd_id,
                 author_id: v.author_id.into(),
                 author_enc_pk: &v.author_enc_pk,
@@ -324,17 +352,17 @@ impl DaemonApiHandler {
     #[instrument(skip(self), fields(effect = ?v))]
     async fn aqc_bidi_channel_created(
         &self,
-        v: &AqcBidiChannelCreated,
+        v: &AqcBidiChannelCreatedEffect,
         node_id: NodeId,
     ) -> Result<()> {
         debug!("received BidiChannelCreated effect");
         // NB: this shouldn't happen because the policy should
         // ensure that label fits inside a `u32`.
-        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
+        let label = AqcLabel::new(u32::try_from(v.label).assume("`label` is out of range")?);
         // TODO: don't clone the eng.
-        let BidiKeys { seal, open } = self.handler.lock().await.bidi_channel_created(
+        let _psk = self.aqc_handler.lock().await.bidi_channel_created(
             &mut self.eng.clone(),
-            &BidiChannelCreated {
+            &AqcBidiChannelCreated {
                 parent_cmd_id: v.parent_cmd_id,
                 author_id: v.author_id.into(),
                 author_enc_key_id: v.author_enc_key_id.into(),
@@ -347,11 +375,7 @@ impl DaemonApiHandler {
         let label = Label::new(v.label.try_into().expect("expected label conversion"));
         let channel_id = ChannelId::new(node_id, label);
         debug!(%channel_id, "created AQC bidi channel `ChannelId`");
-        self.aqc
-            .lock()
-            .await
-            .add(channel_id, Directed::Bidirectional { seal, open })
-            .map_err(|err| anyhow!("unable to add AQC channel: {err}"))?;
+        // TODO: insert PSK into shared memory.
         Ok(())
     }
 
@@ -359,15 +383,15 @@ impl DaemonApiHandler {
     #[instrument(skip_all)]
     async fn aqc_bidi_channel_received(
         &self,
-        v: &AqcBidiChannelReceived,
+        v: &AqcBidiChannelReceivedEffect,
         node_id: NodeId,
     ) -> Result<()> {
         // NB: this shouldn't happen because the policy should
         // ensure that label fits inside a `u32`.
-        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
-        let BidiKeys { seal, open } = self.handler.lock().await.bidi_channel_received(
+        let label = AqcLabel::new(u32::try_from(v.label).assume("`label` is out of range")?);
+        let _psk = self.aqc_handler.lock().await.bidi_channel_received(
             &mut self.eng.clone(),
-            &BidiChannelReceived {
+            &AqcBidiChannelReceived {
                 parent_cmd_id: v.parent_cmd_id,
                 author_id: v.author_id.into(),
                 author_enc_pk: &v.author_enc_pk,
@@ -380,11 +404,69 @@ impl DaemonApiHandler {
         let label = Label::new(v.label.try_into().expect("expected label conversion"));
         let channel_id = ChannelId::new(node_id, label);
         debug!(?channel_id, "received AQC bidi channel `ChannelId`");
-        self.aqc
-            .lock()
-            .await
-            .add(channel_id, Directed::Bidirectional { seal, open })
-            .map_err(|err| anyhow!("unable to add AQC channel: {err}"))?;
+        // TODO: insert PSK into shared memory.
+        Ok(())
+    }
+
+    /// Reacts to a unidirectional AQC channel being created.
+    #[instrument(skip(self), fields(effect = ?v))]
+    async fn aqc_uni_channel_created(
+        &self,
+        v: &AqcUniChannelCreatedEffect,
+        node_id: NodeId,
+    ) -> Result<()> {
+        debug!("received UniChannelCreated effect");
+        // NB: this shouldn't happen because the policy should
+        // ensure that label fits inside a `u32`.
+        let label = AqcLabel::new(u32::try_from(v.label).assume("`label` is out of range")?);
+        // TODO: don't clone the eng.
+        let _psk = self.aqc_handler.lock().await.uni_channel_created(
+            &mut self.eng.clone(),
+            &AqcUniChannelCreated {
+                parent_cmd_id: v.parent_cmd_id,
+                author_id: v.author_id.into(),
+                author_enc_key_id: v.author_enc_key_id.into(),
+                send_id: v.writer_id.into(),
+                recv_id: v.reader_id.into(),
+                peer_enc_pk: &v.peer_enc_pk,
+                label,
+                key_id: v.channel_key_id.into(),
+            },
+        )?;
+        let label = Label::new(v.label.try_into().expect("expected label conversion"));
+        let channel_id = ChannelId::new(node_id, label);
+        debug!(%channel_id, "created AQC bidi channel `ChannelId`");
+        // TODO: insert PSK into shared memory.
+        Ok(())
+    }
+
+    /// Reacts to a unidirectional AQC channel being created.
+    #[instrument(skip_all)]
+    async fn aqc_uni_channel_received(
+        &self,
+        v: &AqcUniChannelReceivedEffect,
+        node_id: NodeId,
+    ) -> Result<()> {
+        // NB: this shouldn't happen because the policy should
+        // ensure that label fits inside a `u32`.
+        let label = AqcLabel::new(u32::try_from(v.label).assume("`label` is out of range")?);
+        let _psk = self.aqc_handler.lock().await.uni_channel_received(
+            &mut self.eng.clone(),
+            &AqcUniChannelReceived {
+                parent_cmd_id: v.parent_cmd_id,
+                author_id: v.author_id.into(),
+                author_enc_pk: &v.author_enc_pk,
+                send_id: v.writer_id.into(),
+                recv_id: v.reader_id.into(),
+                peer_enc_key_id: v.peer_enc_key_id.into(),
+                label,
+                encap: &v.encap,
+            },
+        )?;
+        let label = Label::new(v.label.try_into().expect("expected label conversion"));
+        let channel_id = ChannelId::new(node_id, label);
+        debug!(?channel_id, "received AQC uni channel `ChannelId`");
+        // TODO: insert PSK into shared memory.
         Ok(())
     }
 }
