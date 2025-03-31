@@ -5,12 +5,13 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{AfcMsg, Client, Label};
+use aranya_client::{afc::Message, client::Client};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_fast_channels::Label;
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -117,11 +118,11 @@ impl UserCtx {
     }
 
     async fn aranya_local_addr(&self) -> Result<SocketAddr> {
-        Ok(self.client.aranya_local_addr().await?)
+        Ok(self.client.local_addr().await?)
     }
 
-    async fn afc_local_addr(&self) -> Result<SocketAddr> {
-        Ok(self.client.afc_local_addr().await?)
+    async fn afc_local_addr(&mut self) -> Result<SocketAddr> {
+        Ok(self.client.afc().local_addr().await?)
     }
 }
 
@@ -329,9 +330,32 @@ async fn main() -> Result<()> {
     operator_team
         .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
         .await?;
+    operator_team
+        .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
+        .await?;
+    operator_team
+        .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
+        .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
+
+    // fact database queries
+    let mut queries = team.membera.client.queries(team_id);
+    let devices = queries.devices_on_team().await?;
+    info!("membera devices on team: {:?}", devices.iter().count());
+    let role = queries.device_role(team.membera.id).await?;
+    info!("membera role: {:?}", role);
+    let keybundle = queries.device_keybundle(team.membera.id).await?;
+    info!("membera keybundle: {:?}", keybundle);
+    let labels = queries.device_label_assignments(team.membera.id).await?;
+    info!("membera labels: {:?}", labels.__data());
+    let afc_net_identifier = queries.afc_net_identifier(team.membera.id).await?;
+    info!("membera afc_net_identifer: {:?}", afc_net_identifier);
+    let aqc_net_identifier = queries.aqc_net_identifier(team.membera.id).await?;
+    info!("membera aqc_net_identifer: {:?}", aqc_net_identifier);
+    let label_exists = queries.label_exists(label1).await?;
+    info!("membera label1 exists?: {:?}", label_exists);
 
     // membera creates bidi channel with memberb
     let afc_id1 = team
@@ -373,7 +397,7 @@ async fn main() -> Result<()> {
     sleep(Duration::from_millis(100)).await;
     do_poll!(team.membera.client, team.memberb.client);
 
-    let Some(AfcMsg { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
+    let Some(Message { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
         bail!("no message available!")
     };
     debug!(
@@ -383,7 +407,7 @@ async fn main() -> Result<()> {
         core::str::from_utf8(&data)?
     );
 
-    let Some(AfcMsg { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
+    let Some(Message { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
         bail!("no message available!")
     };
     debug!(
