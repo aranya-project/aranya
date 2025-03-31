@@ -141,15 +141,6 @@ pub struct SyncPeerConfig {
     pub sync_now: bool,
 }
 
-impl Default for SyncPeerConfig {
-    fn default() -> Self {
-        Self {
-            interval: Duration::from_secs(1),
-            sync_now: false,
-        }
-    }
-}
-
 #[tarpc::service]
 pub trait DaemonApi {
     /// Gets local address the Aranya sync server is bound to.
