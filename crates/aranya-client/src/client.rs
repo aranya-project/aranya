@@ -4,9 +4,7 @@ use std::{net::SocketAddr, path::Path, time::Duration};
 
 #[cfg(feature = "afc")]
 use aranya_daemon_api::CS;
-use aranya_daemon_api::{
-    DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamConfig, TeamId,
-};
+use aranya_daemon_api::{DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId};
 use aranya_fast_channels::Label;
 #[cfg(feature = "afc")]
 use aranya_fast_channels::{
@@ -21,7 +19,10 @@ use tracing::{debug, info, instrument};
 
 #[cfg(feature = "afc")]
 use crate::afc::{setup_afc_shm, FastChannels, FastChannelsImpl};
-use crate::error::{Error, Result};
+use crate::{
+    config::TeamConfig,
+    error::{Error, Result},
+};
 
 /// List of device IDs.
 pub struct Devices {
@@ -157,11 +158,13 @@ impl Client {
 
     /// Create a new graph/team with the current device as the owner.
     pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
+        let cfg = aranya_daemon_api::TeamConfig::new().with_version(cfg.version())?;
         Ok(self.daemon.create_team(context::current(), cfg).await??)
     }
 
     /// Add a team to the local device store.
     pub async fn add_team(&mut self, team: TeamId, cfg: TeamConfig) -> Result<()> {
+        let cfg = aranya_daemon_api::TeamConfig::new().with_version(cfg.version())?;
         Ok(self
             .daemon
             .add_team(context::current(), team, cfg)

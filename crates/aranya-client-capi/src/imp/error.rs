@@ -42,7 +42,7 @@ pub enum Error {
     InvalidIndex(usize),
 
     #[error("config error: {0}")]
-    Config(#[from] aranya_daemon_api::ConfigError),
+    Config(#[from] aranya_client::ConfigError),
 }
 
 impl From<WriteCStrError> for Error {

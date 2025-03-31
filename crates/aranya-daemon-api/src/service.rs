@@ -74,6 +74,7 @@ pub enum Role {
 }
 
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum ConfigError {
     #[error("Unsupported version of the configuration: Expected v{expected}, got v{expected}")]
     UnsupportedVersion { expected: u32, got: u32 },

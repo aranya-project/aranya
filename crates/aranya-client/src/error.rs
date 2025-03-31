@@ -5,6 +5,7 @@ use aranya_fast_channels::Version;
 
 /// Possible errors that could happen in the Aranya client.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// Unable to connect to the daemon.
     #[error("Unable to connect to the daemon: {0}")]
@@ -18,6 +19,10 @@ pub enum Error {
     #[error("Daemon reported error: {0}")]
     Daemon(#[from] aranya_daemon_api::Error),
 
+    /// A configuration error happened.
+    #[error("Configuration error: {0}")]
+    Config(#[from] ConfigError),
+
     /// An Aranya Fast Channel error happened.
     #[error("Fast Channel error: {0}")]
     #[cfg(feature = "afc")]
@@ -28,9 +33,28 @@ pub enum Error {
     Bug(#[from] buggy::Bug),
 }
 
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ConfigError {
+    #[error("Unsupported version of the configuration: Expected v{expected}, got v{expected}")]
+    UnsupportedVersion { expected: u32, got: u32 },
+}
+
+impl From<aranya_daemon_api::ConfigError> for Error {
+    fn from(error: aranya_daemon_api::ConfigError) -> Self {
+        match error {
+            aranya_daemon_api::ConfigError::UnsupportedVersion { expected, got } => {
+                Self::Config(ConfigError::UnsupportedVersion { expected, got })
+            }
+            _ => todo!()
+        }
+    }
+}
+
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
 #[cfg(feature = "afc")]
+#[non_exhaustive]
 pub enum AfcError {
     // Connection-related errors
     /// Unable to bind a network addresss.

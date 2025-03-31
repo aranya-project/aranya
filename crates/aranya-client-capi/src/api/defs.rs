@@ -88,9 +88,11 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Connecting(_) => Self::Connecting,
                 aranya_client::Error::Rpc(_) => Self::Rpc,
                 aranya_client::Error::Daemon(_) => Self::Daemon,
+                aranya_client::Error::Config(_) => Self::Config,
                 #[cfg(feature = "afc")]
                 aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Bug(_) => Self::Bug,
+                _ => todo!(),
             },
             imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::InvalidIndex(_) => Self::InvalidIndex,
@@ -545,12 +547,14 @@ pub fn team_config_builder_build(
 /// @relates AranyaClient.
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.deref_mut();
-    let cfg = aranya_daemon_api::TeamConfig::new().with_version(cfg.version)?;
+    let cfg = aranya_client::TeamConfig::new().with_version(cfg.version)?;
     let id = client.rt.block_on(client.inner.create_team(cfg))?;
     Ok(TeamId(id))
 }
 
 /// Add a team to the local device store.
+///
+/// NOTE: this function is unfinished and will panic if called.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
@@ -559,7 +563,7 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 /// @relates AranyaClient.
 pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let cfg = aranya_daemon_api::TeamConfig::new().with_version(cfg.version)?;
+    let cfg = aranya_client::TeamConfig::new().with_version(cfg.version)?;
     client.rt.block_on(client.inner.add_team(team.0, cfg))?;
     Ok(())
 }

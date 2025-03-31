@@ -20,6 +20,8 @@ use aranya_client::afc::Message;
 #[cfg(feature = "afc")]
 use aranya_client::client::Client;
 #[cfg(feature = "afc")]
+use aranya_client::TeamConfig;
+#[cfg(feature = "afc")]
 use aranya_crypto::{hash::Hash, rust::Sha256};
 #[cfg(feature = "afc")]
 use aranya_daemon::{
@@ -30,8 +32,6 @@ use aranya_daemon::{
 use aranya_daemon_api::NetIdentifier;
 #[cfg(feature = "afc")]
 use aranya_daemon_api::Role;
-#[cfg(feature = "afc")]
-use aranya_daemon_api::TeamConfig;
 #[cfg(feature = "afc")]
 use aranya_daemon_api::{DeviceId, KeyBundle};
 #[cfg(feature = "afc")]
