@@ -31,6 +31,8 @@ use aranya_daemon_api::NetIdentifier;
 #[cfg(feature = "afc")]
 use aranya_daemon_api::Role;
 #[cfg(feature = "afc")]
+use aranya_daemon_api::TeamOperationConfig;
+#[cfg(feature = "afc")]
 use aranya_daemon_api::{DeviceId, KeyBundle};
 #[cfg(feature = "afc")]
 use aranya_fast_channels::{Label, Seq};
@@ -56,6 +58,7 @@ use tokio::{
 use tracing::info;
 #[cfg(feature = "afc")]
 use tracing::{debug, instrument};
+
 #[cfg(feature = "afc")]
 #[instrument(skip_all, fields(%duration = FmtDuration(d)))]
 fn sleep(d: Duration) -> Sleep {
@@ -330,6 +333,7 @@ impl Drop for DeviceCtx {
     }
 }
 
+#[cfg(feature = "afc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_one_way_two_chans() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
