@@ -64,6 +64,40 @@ impl<'a> AqcChannels<'a> {
         Ok(aqc_id)
     }
 
+    /// Creates a unidirectional AQC channel with a peer.
+    ///
+    /// `label` associates the channel with a set of policy rules that govern
+    /// the channel. Both peers must already have permission to use the label.
+    ///
+    /// # Cancellation Safety
+    ///
+    /// It is NOT safe to cancel the resulting future. Doing so might lose data.
+    #[instrument(skip_all, fields(%team_id, %peer, %label))]
+    pub async fn create_uni_channel(
+        &mut self,
+        team_id: TeamId,
+        peer: NetIdentifier,
+        label: Label,
+    ) -> crate::Result<AqcId> {
+        debug!("creating bidi channel");
+
+        // TODO: use correct node ID.
+        let node_id: NodeId = 0.into();
+        debug!(%node_id, "selected node ID");
+
+        let (afc_id, ctrl) = self
+            .client
+            .daemon
+            .create_aqc_uni_channel(context::current(), team_id, peer.clone(), node_id, label)
+            .await??;
+        debug!(%afc_id, %node_id, %label, "created bidi channel");
+
+        // TODO: send ctrl message.
+        debug!("sent control message");
+
+        Ok(afc_id)
+    }
+
     /// Deletes an AQC channel.
     // TODO(eric): Is it an error if the channel does not exist?
     #[instrument(skip_all, fields(aqc_id = %id))]

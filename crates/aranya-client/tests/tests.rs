@@ -516,6 +516,14 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
+    // membera creates aqc uni channel with memberb
+    let _aqc_id1 = team
+        .membera
+        .client
+        .aqc()
+        .create_uni_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .await?;
+
     // membera creates afc bidi channel with memberb
     let afc_id2 = team
         .membera

@@ -258,8 +258,15 @@ pub trait DaemonApi {
         node_id: NodeId,
         ctrl: AfcCtrl,
     ) -> Result<(AfcId, NetIdentifier, Label)>;
-    /// Create a QUIC channel.
+    /// Create a bidirectional QUIC channel.
     async fn create_aqc_bidi_channel(
+        team: TeamId,
+        peer: NetIdentifier,
+        node_id: NodeId,
+        label: Label,
+    ) -> Result<(AqcId, AqcCtrl)>;
+    /// Create a unidirectional QUIC channel.
+    async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
