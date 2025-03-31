@@ -23,7 +23,7 @@ if ! command -v cmake &>/dev/null; then
 	exit 1
 fi
 
-declare -a users=("owner" "admin" "operator" "membera" "memberb")
+declare -a devices=("owner" "admin" "operator" "membera" "memberb")
 
 proj="$(cargo locate-project --workspace --message-format plain)"
 proj="$(dirname "${proj}")"
@@ -41,7 +41,7 @@ trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
 rm -rf "${out}"
 
 # build the daemon.
-cargo build --bin aranya-daemon --release
+cargo build --bin aranya-daemon --release --features afc
 
 # copy the aranya-client.h header file
 mkdir -p "${example}"/include
@@ -58,11 +58,11 @@ Aranya_DIR=. CMAKE_LIBRARY_PATH=. CMAKE_INCLUDE_PATH=. cmake -S "${example}" -B 
 cmake --build build
 
 # start the daemons
-for user in "${users[@]}"; do
-	mkdir -p "${out}"/"${user}"
+for device in "${devices[@]}"; do
+	mkdir -p "${out}"/"${device}"
 	# TODO: autogenerate these config files
 	# Note: set ARANYA_DAEMON=debug to debug daemons.
-	"${release}"/aranya-daemon "${example}"/configs/"${user}"-config.json &
+	"${release}"/aranya-daemon "${example}"/configs/"${device}"-config.json &
 done
 # give the daemons time to startup
 sleep 1

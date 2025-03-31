@@ -1,5 +1,5 @@
 [package]
-name = "{{project-name}}"
+name = "aranya-example"
 description = "Example Rust program using the Aranya client library"
 version = "0.1.0"
 authors = ["SpiderOak, Inc."]
@@ -29,20 +29,15 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [dependencies]
-# To allow `cargo-generate` to work, explicitly define dependency versions rather than importing the repo's workspace `Cargo.toml`.
-aranya-client = { version = "0.5.1" }
-aranya-daemon = { version = "0.5.1" }
-aranya-daemon-api = { version = "0.5.1" }
-aranya-util = { version = "0.5.1" }
+aranya-client = { path = "../../crates/aranya-client", features = ["afc"] }
+aranya-daemon = { path = "../../crates/aranya-daemon", features = ["afc"] }
+aranya-daemon-api = { path = "../../crates/aranya-daemon-api" }
+aranya-util = { path = "../../crates/aranya-util" }
 
 anyhow = { version = "1.0.94" }
 backon = { version = "1.3.0" }
+buggy = { version = "0.1.0" }
 tempfile = { version = "3.14.0" }
 tokio = { version = "1.42.0", features = ["io-util", "macros", "net", "sync"] }
 tracing = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
-
-[[bin]]
-name = "aranya-example"
-path = "src/main.rs"
-test = false

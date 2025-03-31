@@ -77,9 +77,9 @@ const AranyaAddr sync_addrs[] = {"127.0.0.1:10001", "127.0.0.1:10002",
                                  "127.0.0.1:10005"};
 
 // List of AFC addresses.
-const AranyaNetIdentifier afc_addrs[] = {"127.0.0.1:11001", "127.0.0.1:11002",
-                                         "127.0.0.1:11003", "127.0.0.1:11004",
-                                         "127.0.0.1:11005"};
+const char *afc_addrs[] = {"127.0.0.1:11001", "127.0.0.1:11002",
+                           "127.0.0.1:11003", "127.0.0.1:11004",
+                           "127.0.0.1:11005"};
 
 // Aranya client.
 typedef struct {
@@ -95,7 +95,7 @@ typedef struct {
 
 // Aranya team.
 //
-// Contains the team ID and all Aranya clients for the users on this example's
+// Contains the team ID and all Aranya clients for the devices on this example's
 // team.
 typedef struct {
     AranyaTeamId id;
@@ -116,7 +116,7 @@ typedef struct {
     };
 } Team;
 
-AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
+AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                         const char *shm_path, const char *afc_addr);
 AranyaError init_team(Team *t);
 AranyaError add_sync_peers(Team *t);
@@ -124,22 +124,53 @@ AranyaError run(Team *t);
 AranyaError cleanup_team(Team *t);
 
 // Initialize an Aranya client.
-AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
+AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                         const char *shm_path, const char *afc_addr) {
     AranyaError err;
 
     c->name = name;
-    // TODO: methods for initializing cfg types?
-    AranyaAfcConfig afc_cfg = {
-        .shm_path = shm_path, .max_channels = MAX_CHANS, .addr = afc_addr};
-    AranyaClientConfig cli_cfg = {.daemon_sock = daemon_sock, .afc = afc_cfg};
-    err                        = aranya_client_init(&c->client, &cli_cfg);
+
+    struct AranyaClientConfigBuilder cli_build;
+    struct AranyaClientConfig cli_cfg;
+    aranya_client_config_builder_set_daemon_addr(&cli_build, daemon_addr);
+#if defined(ENABLE_AFC)
+    struct AranyaAfcConfigBuilder afc_build;
+    struct AranyaAfcConfig afc_cfg;
+    aranya_afc_config_builder_set_shm_path(&afc_build, shm_path);
+    aranya_afc_config_builder_set_max_channels(&afc_build, MAX_CHANS);
+    aranya_afc_config_builder_set_address(&afc_build, afc_addr);
+    err = aranya_afc_config_builder_build(&afc_build, &afc_cfg);
+
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
-                "error initializing client %s (daemon_sock: %s, shm_path: %s, "
-                "afc_addr: %s): %s\r\n",
-                c->name, daemon_sock, shm_path, afc_addr,
+        fprintf(stderr, "error initializing afc config: %s\r\n",
                 aranya_error_to_str(err));
+        return err;
+    }
+
+    aranya_client_config_builder_set_afc_config(&cli_build, &afc_cfg);
+#endif
+    err = aranya_client_config_builder_build(&cli_build, &cli_cfg);
+
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "error initializing client config: %s\r\n",
+                aranya_error_to_str(err));
+        return err;
+    }
+
+    err = aranya_client_init(&c->client, &cli_cfg);
+    if (err != ARANYA_ERROR_SUCCESS) {
+#if defined(ENABLE_AFC)
+        fprintf(stderr,
+                "error initializing client %s (daemon_addr: %s, shm_path: %s, "
+                "afc_addr: %s): %s\r\n",
+                c->name, daemon_addr, shm_path, afc_addr,
+                aranya_error_to_str(err));
+#else
+        fprintf(stderr,
+                "error initializing client %s (daemon_addr: %s, shm_path: %s): "
+                "%s\r\n",
+                c->name, daemon_addr, shm_path, aranya_error_to_str(err));
+#endif
         return err;
     }
     err = aranya_get_device_id(&c->client, &c->id);
@@ -275,7 +306,7 @@ AranyaError run(Team *t) {
     // assigned, the team works together to send data using Aranya Fast
     // Channels.
     // First, a label must be created to associate a channel to its permitted
-    // users using the `aranya_create_label` function.
+    // devices using the `aranya_create_label` function.
 
     // operator creates AFC labels and assigns them to team members.
     AranyaLabel label = 42;
@@ -293,6 +324,8 @@ AranyaError run(Team *t) {
                               &t->clients.memberb.id, label);
     EXPECT("error assigning afc label to memberb", err);
 
+#if defined(ENABLE_AFC)
+
     // Once the label is created and assigned, the devices that will
     // communicate via Aranya Fast Channels must be assigned a network
     // identifier. This is used by Fast Channels to properly translate
@@ -301,17 +334,153 @@ AranyaError run(Team *t) {
 
     // assign AFC network addresses.
     err = aranya_afc_assign_net_identifier(&t->clients.operator.client, &t->id,
-                                       &t->clients.membera.id,
-                                       afc_addrs[MEMBERA]);
-    EXPECT("error assigning net name to membera", err);
+                                           &t->clients.membera.id,
+                                           afc_addrs[MEMBERA]);
+    EXPECT("error assigning afc net name to membera", err);
 
     err = aranya_afc_assign_net_identifier(&t->clients.operator.client, &t->id,
-                                       &t->clients.memberb.id,
-                                       afc_addrs[MEMBERB]);
-    EXPECT("error assigning net name to memberb", err);
+                                           &t->clients.memberb.id,
+                                           afc_addrs[MEMBERB]);
+    EXPECT("error assigning afc net name to memberb", err);
+#endif
+
+    // assign AQC network addresses.
+    err = aranya_aqc_assign_net_identifier(&t->clients.operator.client, &t->id,
+                                           &t->clients.membera.id,
+                                           afc_addrs[MEMBERA]);
+    EXPECT("error assigning aqc net name to membera", err);
+
+    err = aranya_aqc_assign_net_identifier(&t->clients.operator.client, &t->id,
+                                           &t->clients.memberb.id,
+                                           afc_addrs[MEMBERB]);
+    EXPECT("error assigning aqc net name to memberb", err);
 
     sleep(1);
 
+    // Queries
+    size_t devices_len      = BUF_LEN;
+    AranyaDeviceId *devices = malloc(devices_len * sizeof(AranyaDeviceId));
+    err = aranya_query_devices_on_team(&t->clients.operator.client, &t->id,
+                                       devices, &devices_len);
+    EXPECT("error querying devices on team", err);
+    if (devices == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+    for (size_t i = 0; i < devices_len; i++) {
+        AranyaDeviceId device_result = devices[i];
+        size_t device_str_len        = ARANYA_DEVICE_ID_STR_LEN;
+        char *device_str             = malloc(ARANYA_DEVICE_ID_STR_LEN);
+        aranya_device_id_to_str(device_result, device_str, &device_str_len);
+        printf("device_id: %s at index: %zu/%zu \r\n", device_str, i,
+               devices_len);
+        free(device_str);
+    }
+
+    size_t labels_len   = BUF_LEN;
+    AranyaLabel *labels = malloc(labels_len * sizeof(AranyaLabel));
+    err = aranya_query_device_label_assignments(&t->clients.operator.client,
+                                                &t->id, &t->clients.memberb.id,
+                                                labels, &labels_len);
+    EXPECT("error querying labels assigned to device", err);
+    if (labels == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+    for (size_t i = 0; i < labels_len; i++) {
+        AranyaLabel label_result = labels[i];
+        printf("label: %u at index: %zu/%zu \r\n", label_result, i, labels_len);
+    }
+
+    AranyaKeyBundle memberb_keybundle;
+    err = aranya_query_device_keybundle(&t->clients.operator.client, &t->id,
+                                        &t->clients.memberb.id,
+                                        &memberb_keybundle);
+    EXPECT("error querying memberb key bundle", err);
+    printf(
+        "%s key bundle enc_key_len %lu, sign_key_len %lu, ident_key_len %lu "
+        "\r\n",
+        t->clients_arr[MEMBERB].name, memberb_keybundle.enc_key_len,
+        memberb_keybundle.sign_key_len, memberb_keybundle.ident_key_len);
+
+#if defined(ENABLE_AFC)
+    size_t memberb_afc_net_identifier_len = BUF_LEN;
+    char *memberb_afc_net_identifier      = malloc(BUF_LEN);
+    bool afc_net_identifier_exists        = false;
+    err                                   = aranya_query_afc_net_identifier(
+        &t->clients.operator.client, &t->id, &t->clients.memberb.id,
+        memberb_afc_net_identifier, &memberb_afc_net_identifier_len,
+        &afc_net_identifier_exists);
+    EXPECT("error querying memberb afc net identifier", err);
+    if (!afc_net_identifier_exists) {
+        fprintf(stderr, "expected AFC net identifier to be returned\r\n");
+        return ARANYA_ERROR_BUG;
+    }
+    printf("%s afc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
+           memberb_afc_net_identifier);
+
+    err = aranya_afc_remove_net_identifier(&t->clients.operator.client, &t->id,
+                                           &t->clients.memberb.id,
+                                           afc_addrs[MEMBERB]);
+    EXPECT("error removing memberb afc net identifier", err);
+    printf("%s removed afc net identifier: %s \r\n",
+           t->clients_arr[MEMBERB].name, memberb_afc_net_identifier);
+    memberb_afc_net_identifier_len = BUF_LEN;
+    err                            = aranya_query_afc_net_identifier(
+        &t->clients.operator.client, &t->id, &t->clients.memberb.id,
+        memberb_afc_net_identifier, &memberb_afc_net_identifier_len,
+        &afc_net_identifier_exists);
+    EXPECT("error querying memberb afc net identifier", err);
+    if (afc_net_identifier_exists) {
+        fprintf(stderr, "did not expect AFC net identifier to be returned\r\n");
+        return ARANYA_ERROR_BUG;
+    }
+    printf("%s afc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
+           memberb_afc_net_identifier);
+    free(memberb_afc_net_identifier);
+#endif
+
+    size_t memberb_aqc_net_identifier_len = BUF_LEN;
+    char *memberb_aqc_net_identifier      = malloc(BUF_LEN);
+    bool aqc_net_identifier_exists        = false;
+    err                                   = aranya_query_aqc_net_identifier(
+        &t->clients.operator.client, &t->id, &t->clients.memberb.id,
+        memberb_aqc_net_identifier, &memberb_aqc_net_identifier_len,
+        &aqc_net_identifier_exists);
+    EXPECT("error querying memberb aqc net identifier", err);
+    if (!aqc_net_identifier_exists) {
+        fprintf(stderr, "expected AQC net identifier to be returned\r\n");
+        return ARANYA_ERROR_BUG;
+    }
+    printf("%s aqc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
+           memberb_aqc_net_identifier);
+
+    err = aranya_aqc_remove_net_identifier(&t->clients.operator.client, &t->id,
+                                           &t->clients.memberb.id,
+                                           afc_addrs[MEMBERB]);
+    EXPECT("error removing memberb aqc net identifier", err);
+    printf("%s removed aqc net identifier: %s \r\n",
+           t->clients_arr[MEMBERB].name, memberb_aqc_net_identifier);
+    memberb_aqc_net_identifier_len = BUF_LEN;
+    err                            = aranya_query_aqc_net_identifier(
+        &t->clients.operator.client, &t->id, &t->clients.memberb.id,
+        memberb_aqc_net_identifier, &memberb_aqc_net_identifier_len,
+        &aqc_net_identifier_exists);
+    EXPECT("error querying memberb aqc net identifier", err);
+    if (aqc_net_identifier_exists) {
+        fprintf(stderr, "did not expect AQC net identifier to be returned\r\n");
+        return ARANYA_ERROR_BUG;
+    }
+    printf("%s aqc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
+           memberb_aqc_net_identifier);
+    free(memberb_aqc_net_identifier);
+
+    bool exists = false;
+    err = aranya_query_label_exists(&t->clients.membera.client, &t->id, &label,
+                                    &exists);
+    EXPECT("error querying label exists", err);
+    printf("%s label exists: %s \r\n", t->clients_arr[MEMBERB].name,
+           exists ? "true" : "false");
+
+#if defined(ENABLE_AFC)
     // Once membera and memberb have been assigned the label and their network
     // identifiers, a Fast Channel can be created. In this example, membera
     // will create the channel using `aranya_afc_create_bidi_channel`. This will
@@ -378,6 +547,8 @@ AranyaError run(Team *t) {
     printf("%s received afc message from %s: len: %zu, label: %d \r\n",
            t->clients_arr[MEMBERB].name, t->clients_arr[MEMBERA].name, len,
            info.label);
+#endif
+
     return ARANYA_ERROR_SUCCESS;
 }
 
@@ -391,7 +562,7 @@ int main(void) {
     // run the example.
     err = run(&team);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "application failed: %s", aranya_error_to_str(err));
+        fprintf(stderr, "application failed: %s\r\n", aranya_error_to_str(err));
         retErr = EXIT_FAILURE;
     }
 
