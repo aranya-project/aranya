@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 /// A bundle of cryptographic keys for secure communication in Aranya.
 ///
 /// A KeyBundle contains identifiers for three types of keys:
-/// - Device identity key: Used to identify a device in the Aranya network
+/// - Device identity key: Used to identify a device in an Aranya team
 /// - Encryption key: Used for secure data encryption and decryption
 /// - Signing key: Used for creating and verifying cryptographic signatures
 ///
@@ -37,14 +37,15 @@ use serde::{Deserialize, Serialize};
 pub struct KeyBundle {
     /// Device identifier derived from the identity key.
     ///
-    /// This ID uniquely identifies the device in the Aranya network.
+    /// This ID uniquely identifies the device in the Aranya team.
     ///
     /// See [`IdentityKey`].
     pub device_id: DeviceId,
 
     /// Identifier for the encryption key.
     ///
-    /// The encryption key is used for secure data encryption and decryption.
+    /// The encryption key is a public key used to encrypt
+    /// data to this device.
     ///
     /// See [`EncryptionKey`].
     pub enc_id: EncryptionKeyId,
@@ -147,7 +148,7 @@ impl KeyBundle {
         })
     }
 
-    /// Retrieves the public keys associated with this key bundle.
+    /// Loads the public keys associated with this key bundle.
     ///
     /// This method loads the keys referenced by this KeyBundle from the provided key store,
     /// extracts their public portions, and returns them in a PublicKeys structure.

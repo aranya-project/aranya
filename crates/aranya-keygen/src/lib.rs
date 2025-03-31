@@ -26,10 +26,10 @@
 //! # {
 //! // Generate a new key bundle
 //! let key_bundle = KeyBundle::generate(engine, store)?;
-//! 
+//!
 //! // Load the public keys from the bundle
 //! let public_keys = key_bundle.public_keys(engine, store)?;
-//! 
+//!
 //! // Use the public keys for operations like encryption or verification
 //! # Ok(())
 //! # }
