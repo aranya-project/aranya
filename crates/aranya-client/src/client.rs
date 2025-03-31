@@ -511,8 +511,9 @@ impl SyncPeerConfigBuilder {
         self
     }
 
-    /// Set the `sync_now` field which determines whether
-    /// the initial sync should happen immediately after a peer is added
+    /// Configures whether the peer will be immediately synced with after being added.
+    ///
+    /// By default, the peer is immediately synced with.
     pub fn sync_now(mut self, sync_now: bool) -> Self {
         self.sync_now = sync_now;
         self
