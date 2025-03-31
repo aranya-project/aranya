@@ -86,7 +86,7 @@
 #define ARANYA_DURATION_NANOSECONDS 1
 
 /**
- * The current version of [`TeamConfig`].
+ * The current version of `TeamConfig`.
  */
 #define TEAM_CONFIG_VERSION 1
 
