@@ -92,6 +92,7 @@ impl From<&imp::Error> for Error {
                 #[cfg(feature = "afc")]
                 aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Bug(_) => Self::Bug,
+                aranya_client::Error::InvalidArg { .. } => Self::InvalidArgument,
                 _ => todo!(),
             },
             imp::Error::Runtime(_) => Self::Runtime,
@@ -272,7 +273,16 @@ impl From<aranya_fast_channels::Label> for Label {
     }
 }
 
-/// A type to represent a span of time.
+/// Sync Peer config.
+#[aranya_capi_core::opaque(size = 32, align = 8)]
+pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
+
+/// Builder for a Sync Peer config.
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
+pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
+
+/// A type to represent a span of time in nanoseconds.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
 pub struct Duration {
@@ -583,14 +593,14 @@ pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error>
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param addr the peer's Aranya network address [`Addr`].
-/// @param interval the time [`Duration`] to wait between syncs with peer.
+/// @param config configuration values for syncing with a peer.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_sync_peer(
     client: &mut Client,
     team: &TeamId,
     addr: Addr,
-    interval: Duration,
+    config: &SyncPeerConfig,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `addr` is a valid C String.
@@ -599,7 +609,41 @@ pub unsafe fn add_sync_peer(
         client
             .inner
             .team(team.0)
-            .add_sync_peer(addr, interval.into()),
+            .add_sync_peer(addr, (**config).into()),
+    )?;
+    Ok(())
+}
+
+/// Sync with peer immediately.
+///
+/// If a peer is not reachable on the network, sync errors
+/// will appear in the tracing logs and
+/// Aranya will be unable to sync state with that peer.
+///
+///
+/// This function ignores [`sync_peer_config_builder_set_interval`] and
+/// [`sync_peer_config_builder_set_sync_later`], if set.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param addr the peer's Aranya network address [`Addr`].
+/// @param config configuration values for syncing with a peer.
+/// Default values for a sync config will be used if `config` is `NULL`
+/// @relates AranyaClient.
+pub unsafe fn sync_now(
+    client: &mut Client,
+    team: &TeamId,
+    addr: Addr,
+    config: Option<&SyncPeerConfig>,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { addr.as_underlying() }?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .sync_now(addr, config.map(|config| (**config).into())),
     )?;
     Ok(())
 }
@@ -1120,6 +1164,51 @@ pub unsafe fn afc_recv_data(
     Ok(true)
 }
 
+/// Configures how often the peer will be synced with.
+///
+/// By default, the interval is not set. It is an error to call
+/// [`sync_peer_config_builder_build`] before setting the interval with
+/// this function
+///
+/// @param cfg a pointer to the builder for a sync config
+/// @param interval Set the interval at which syncing occurs
+pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
+    cfg.deref_mut().interval(interval);
+}
+
+/// Updates the config to enable immediate syncing with the peer.
+///
+/// Overrides [`sync_peer_config_builder_set_sync_later`] if invoked afterward.
+///
+/// By default, the peer is synced with immediately.
+///
+/// @param cfg a pointer to the builder for a sync config
+// TODO: aranya-core#129
+pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
+    cfg.deref_mut().sync_now(true);
+}
+
+/// Updates the config to disable immediate syncing with the peer.
+///
+/// Overrides [`sync_peer_config_builder_set_sync_now`] if invoked afterward.
+///
+/// By default, the peer is synced with immediately.
+/// @param cfg a pointer to the builder for a sync config
+// TODO: aranya-core#129
+pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
+    cfg.deref_mut().sync_now(false);
+}
+
+/// Build a sync config from a sync config builder
+///
+/// @param cfg a pointer to the builder for a sync config
+pub fn sync_peer_config_builder_build(
+    cfg: &SyncPeerConfigBuilder,
+    out: &mut MaybeUninit<SyncPeerConfig>,
+) -> Result<(), imp::Error> {
+    Safe::init(out, cfg.build()?);
+    Ok(())
+}
 /// Query devices on team.
 ///
 /// @param client the Aranya Client [`Client`].

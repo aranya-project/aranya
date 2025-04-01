@@ -25,7 +25,7 @@ pub use crate::{
 };
 #[doc(inline)]
 pub use crate::{
-    client::{Client, Team},
+    client::{Client, SyncPeerConfig, SyncPeerConfigBuilder, Team},
     config::TeamConfigBuilder,
     error::{ConfigError, Error, Result},
 };

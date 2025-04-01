@@ -31,6 +31,13 @@ pub enum Error {
     /// An unexpected internal error happened.
     #[error("Unexpected internal error: {0}")]
     Bug(#[from] buggy::Bug),
+
+    /// An invalid argument was provided.
+    #[error("Invalid argument `{arg}`: {reason}")]
+    InvalidArg {
+        arg: &'static str,
+        reason: &'static str,
+    },
 }
 
 #[derive(Debug, thiserror::Error)]

@@ -10,45 +10,34 @@
 )]
 #[cfg(feature = "afc")]
 use std::path::Path;
-#[cfg(feature = "afc")]
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
-#[cfg(feature = "afc")]
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 #[cfg(feature = "afc")]
 use aranya_client::afc::Message;
-#[cfg(feature = "afc")]
 use aranya_client::client::Client;
 #[cfg(feature = "afc")]
 use aranya_client::TeamConfigBuilder;
 #[cfg(feature = "afc")]
-use aranya_crypto::{hash::Hash, rust::Sha256};
+use aranya_client::SyncPeerConfig;
 #[cfg(feature = "afc")]
+use aranya_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
 #[cfg(feature = "afc")]
 use aranya_daemon_api::NetIdentifier;
-#[cfg(feature = "afc")]
-use aranya_daemon_api::Role;
-#[cfg(feature = "afc")]
-use aranya_daemon_api::{DeviceId, KeyBundle};
+use aranya_daemon_api::{DeviceId, KeyBundle, Role};
 #[cfg(feature = "afc")]
 use aranya_fast_channels::{Label, Seq};
-#[cfg(feature = "afc")]
 use aranya_util::addr::Addr;
-#[cfg(feature = "afc")]
 use backon::{ExponentialBuilder, Retryable};
 #[cfg(feature = "afc")]
 use buggy::BugExt;
-#[cfg(feature = "afc")]
 use spideroak_base58::ToBase58;
-#[cfg(feature = "afc")]
 use tempfile::tempdir;
-#[cfg(feature = "afc")]
 use test_log::test;
-#[cfg(feature = "afc")]
 use tokio::{
     fs,
     task::{self, AbortHandle},
@@ -70,10 +59,8 @@ fn sleep(d: Duration) -> Sleep {
 /// Formats a [`Duration`].
 ///
 /// It uses the same syntax as Go's `time.Duration`.
-#[cfg(feature = "afc")]
 pub struct FmtDuration(Duration);
 
-#[cfg(feature = "afc")]
 impl fmt::Display for FmtDuration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.0 < Duration::ZERO {
@@ -147,7 +134,6 @@ impl fmt::Display for FmtDuration {
 }
 
 /// Trim up to `width` trailing zeros from `d`.
-#[cfg(feature = "afc")]
 fn trim(mut d: u128, mut width: usize) -> (u128, usize) {
     while width > 0 {
         if d % 10 != 0 {
@@ -187,7 +173,6 @@ macro_rules! do_poll {
     };
 }
 
-#[cfg(feature = "afc")]
 #[allow(dead_code)] // memberb is unused if AFC is disabled
 struct TeamCtx {
     owner: DeviceCtx,
@@ -197,7 +182,6 @@ struct TeamCtx {
     memberb: DeviceCtx,
 }
 
-#[cfg(feature = "afc")]
 impl TeamCtx {
     pub async fn new(name: String, work_dir: PathBuf) -> Result<Self> {
         let owner = DeviceCtx::new(name.clone(), "owner".into(), work_dir.join("owner")).await?;
@@ -219,7 +203,6 @@ impl TeamCtx {
     }
 }
 
-#[cfg(feature = "afc")]
 struct DeviceCtx {
     client: Client,
     pk: KeyBundle,
@@ -227,7 +210,6 @@ struct DeviceCtx {
     daemon: AbortHandle,
 }
 
-#[cfg(feature = "afc")]
 fn get_shm_path(path: String) -> String {
     if cfg!(target_os = "macos") && path.len() > 31 {
         // Shrink the size of the team name down to 22 bytes
@@ -239,7 +221,6 @@ fn get_shm_path(path: String) -> String {
     path
 }
 
-#[cfg(feature = "afc")]
 impl DeviceCtx {
     pub async fn new(team_name: String, name: String, work_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(work_dir.clone()).await?;
@@ -326,18 +307,76 @@ impl DeviceCtx {
     }
 }
 
-#[cfg(feature = "afc")]
 impl Drop for DeviceCtx {
     fn drop(&mut self) {
         self.daemon.abort();
     }
 }
 
+/// Tests sync_now() by demonstrating that an admin cannot assign a role to a device until it syncs with the owner.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_sync_now() -> Result<()> {
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
+    let mut team = TeamCtx::new("test_sync_now".into(), work_dir).await?;
+
+    // create team.
+    let team_id = team
+        .owner
+        .client
+        .create_team()
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // get sync addresses.
+    let owner_addr = team.owner.aranya_local_addr().await?;
+
+    // setup team handles.
+    let mut owner_team = team.owner.client.team(team_id);
+    let mut admin_team = team.admin.client.team(team_id);
+
+    // add admin to team.
+    info!("adding admin to team");
+    owner_team.add_device_to_team(team.admin.pk.clone()).await?;
+
+    // add operator to team.
+    info!("adding operator to team");
+    owner_team
+        .add_device_to_team(team.operator.pk.clone())
+        .await?;
+
+    // Assign role to Admin
+    owner_team.assign_role(team.admin.id, Role::Admin).await?;
+
+    // Admin tries to assign a role
+    match admin_team
+        .assign_role(team.operator.id, Role::Operator)
+        .await
+    {
+        Ok(_) => bail!("Expected role assignment to fail"),
+        Err(aranya_client::Error::Daemon(_)) => {}
+        Err(_) => bail!("Unexpected error"),
+    }
+
+    // Admin syncs with the Owner peer and retries the role
+    // assignment command
+    admin_team.sync_now(owner_addr.into(), None).await?;
+    sleep(Duration::from_secs(1)).await;
+    admin_team
+        .assign_role(team.operator.id, Role::Operator)
+        .await?;
+
+    Ok(())
+}
+
 #[cfg(feature = "afc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_one_way_two_chans() -> Result<()> {
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
+    let interval = Duration::from_millis(100);
+    let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
+    let sleep_interval = interval * 6;
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
@@ -379,59 +418,59 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let mut memberb_team = team.memberb.client.team(team_id);
 
     owner_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
         .await?;
 
     membera_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     membera_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     membera_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     membera_team
-        .add_sync_peer(memberb_addr.into(), sync_interval)
+        .add_sync_peer(memberb_addr.into(), sync_config.clone())
         .await?;
 
     memberb_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     memberb_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     memberb_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     memberb_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     // add admin to team.
@@ -618,8 +657,9 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
 #[cfg(feature = "afc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_two_way_one_chan() -> Result<()> {
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
+    let interval = Duration::from_millis(100);
+    let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
+    let sleep_interval = interval * 6;
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
@@ -654,59 +694,59 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let mut memberb_team = team.memberb.client.team(team_id);
 
     owner_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
         .await?;
 
     membera_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     membera_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     membera_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     membera_team
-        .add_sync_peer(memberb_addr.into(), sync_interval)
+        .add_sync_peer(memberb_addr.into(), sync_config.clone())
         .await?;
 
     memberb_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     memberb_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     memberb_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     memberb_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     // add admin to team.
@@ -835,8 +875,9 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
 #[cfg(feature = "afc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_monotonic_seq() -> Result<()> {
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
+    let interval = Duration::from_millis(100);
+    let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
+    let sleep_interval = interval * 6;
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
@@ -871,59 +912,59 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     let mut memberb_team = team.memberb.client.team(team_id);
 
     owner_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     owner_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     owner_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
         .await?;
 
     admin_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     admin_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     admin_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
         .await?;
 
     operator_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     operator_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     operator_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
         .await?;
 
     membera_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     membera_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     membera_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     membera_team
-        .add_sync_peer(memberb_addr.into(), sync_interval)
+        .add_sync_peer(memberb_addr.into(), sync_config.clone())
         .await?;
 
     memberb_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
         .await?;
     memberb_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
         .await?;
     memberb_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
         .await?;
     memberb_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
+        .add_sync_peer(membera_addr.into(), sync_config)
         .await?;
 
     // add admin to team.
