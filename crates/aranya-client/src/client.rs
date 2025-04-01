@@ -12,7 +12,6 @@ use aranya_fast_channels::{
     {self as afc},
 };
 use aranya_util::Addr;
-use buggy::bug;
 use tarpc::{context, tokio_serde::formats::Json};
 #[cfg(feature = "afc")]
 use tokio::net::ToSocketAddrs;
@@ -498,7 +497,11 @@ impl SyncPeerConfigBuilder {
     /// Build a [`SyncPeerConfig`]
     pub fn build(self) -> Result<SyncPeerConfig> {
         let Some(interval) = self.interval else {
-            bug!("Tried to create a `SyncPeerConfig` without setting the interval!");
+            let e = Error::InvalidArg {
+                arg: "interval",
+                reason: "Tried to create a `SyncPeerConfig` without setting the interval!",
+            };
+            return Err(e);
         };
 
         Ok(SyncPeerConfig {

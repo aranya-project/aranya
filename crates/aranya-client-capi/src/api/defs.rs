@@ -88,6 +88,7 @@ impl From<&imp::Error> for Error {
                 #[cfg(feature = "afc")]
                 aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Bug(_) => Self::Bug,
+                aranya_client::Error::InvalidArg { .. } => Self::InvalidArgument,
             },
             imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::InvalidIndex(_) => Self::InvalidIndex,
