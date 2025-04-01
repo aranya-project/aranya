@@ -199,7 +199,6 @@ AranyaError init_team(Team *t) {
     // team to operate on.
     AranyaTeamConfigBuilder build;
     AranyaTeamConfig cfg;
-    aranya_team_config_builder_set_version(&build, TEAM_CONFIG_VERSION);
     aranya_team_config_builder_build(&build, &cfg);
     err = aranya_create_team(&t->clients.owner.client, &cfg, &t->id);
     EXPECT("error creating team", err);

@@ -86,11 +86,6 @@
 #define ARANYA_DURATION_NANOSECONDS 1
 
 /**
- * The current version of `TeamConfig`.
- */
-#define TEAM_CONFIG_VERSION 1
-
-/**
  * The size in bytes of a `DeviceId` converted to a human-readable base64 string.
  */
 #define ARANYA_DEVICE_ID_STR_LEN (((64 * 1375) / 1000) + 1)
@@ -773,25 +768,6 @@ AranyaError aranya_get_device_id(struct AranyaClient *client,
 AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
                                      struct AranyaDeviceId *__output,
                                      struct AranyaExtError *__ext_err);
-
-/**
- * Sets the version of the [`AranyaTeamConfig`](@ref AranyaTeamConfig) to be used.
- *
- * @param cfg a pointer to the team config builder
- * @param version the version of the [`AranyaTeamConfig`](@ref AranyaTeamConfig) to be used
- */
-AranyaError aranya_team_config_builder_set_version(struct AranyaTeamConfigBuilder *cfg,
-                                                   uint32_t version);
-
-/**
- * Sets the version of the [`AranyaTeamConfig`](@ref AranyaTeamConfig) to be used.
- *
- * @param cfg a pointer to the team config builder
- * @param version the version of the [`AranyaTeamConfig`](@ref AranyaTeamConfig) to be used
- */
-AranyaError aranya_team_config_builder_set_version_ext(struct AranyaTeamConfigBuilder *cfg,
-                                                       uint32_t version,
-                                                       struct AranyaExtError *__ext_err);
 
 /**
  * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Bug`

@@ -35,17 +35,11 @@ pub enum Error {
 
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
-pub enum ConfigError {
-    #[error("Unsupported version of the configuration: Expected v{expected}, got v{expected}")]
-    UnsupportedVersion { expected: u32, got: u32 },
-}
+pub enum ConfigError {}
 
 impl From<aranya_daemon_api::ConfigError> for Error {
     fn from(error: aranya_daemon_api::ConfigError) -> Self {
         match error {
-            aranya_daemon_api::ConfigError::UnsupportedVersion { expected, got } => {
-                Self::Config(ConfigError::UnsupportedVersion { expected, got })
-            }
             _ => todo!(),
         }
     }

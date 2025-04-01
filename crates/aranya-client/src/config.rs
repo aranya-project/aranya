@@ -1,45 +1,26 @@
 use crate::error::ConfigError;
 
-/// A configuration for creating or adding a team to a daemon.
+/// A builder for adding parameters when adding or creating teams.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TeamConfig {
-    version: u32,
-}
+pub struct TeamConfigBuilder {}
 
-impl TeamConfig {
-    /// The minimum version of the config supported for reading
-    pub const MINIMUM_VERSION: u32 = 1;
-
-    /// The latest version of the `TeamConfig`
-    pub const CURRENT_VERSION: u32 = 1;
-
-    /// Creates a new `TeamConfig`
+impl TeamConfigBuilder {
+    /// Creates a new builder for [`TeamConfig`]
     pub fn new() -> Self {
-        Self::default()
+        Self {}
     }
 
-    /// Sets the version of the `TeamConfig`
-    pub fn with_version(mut self, version: u32) -> Result<Self, ConfigError> {
-        if version < Self::MINIMUM_VERSION {
-            return Err(ConfigError::UnsupportedVersion {
-                expected: Self::MINIMUM_VERSION,
-                got: version,
-            });
-        }
-        self.version = version;
-        Ok(self)
-    }
-
-    /// Gets the version of the `TeamConfig`.
-    pub const fn version(&self) -> u32 {
-        self.version
+    /// Creates a [`TeamConfig`] using the provided parameters
+    pub fn build(self) -> Result<TeamConfig, ConfigError> {
+        Ok(TeamConfig {})
     }
 }
 
-impl Default for TeamConfig {
-    fn default() -> Self {
-        Self {
-            version: Self::CURRENT_VERSION,
-        }
+/// Configuration info for adding and creating teams.
+pub struct TeamConfig {}
+
+impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
+    fn from(_value: TeamConfig) -> Self {
+        Self {}
     }
 }

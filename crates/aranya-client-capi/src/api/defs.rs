@@ -517,19 +517,6 @@ pub type TeamConfig = Safe<imp::TeamConfig>;
 #[aranya_capi_core::opaque(size = 4, align = 4)]
 pub type TeamConfigBuilder = imp::TeamConfigBuilder;
 
-// Keep in sync with TeamConfig::CURRENT_VERSION!
-// TODO(nikki): aranya-capi-codegen doesn't seem to like @ref in constants
-/// The current version of `TeamConfig`.
-pub const TEAM_CONFIG_VERSION: u32 = 1;
-
-/// Sets the version of the [`TeamConfig`] to be used.
-///
-/// @param cfg a pointer to the team config builder
-/// @param version the version of the [`TeamConfig`] to be used
-pub fn team_config_builder_set_version(cfg: &mut TeamConfigBuilder, version: u32) {
-    cfg.version = version;
-}
-
 /// Attempts to construct a [`TeamConfig`], returning an `Error::Bug`
 /// if there are invalid parameters.
 ///
@@ -550,9 +537,10 @@ pub fn team_config_builder_build(
 /// @param __output the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
+#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.deref_mut();
-    let cfg = aranya_client::TeamConfig::new().with_version(cfg.version)?;
+    let cfg = aranya_client::TeamConfigBuilder::new().build()?;
     let id = client.rt.block_on(client.inner.create_team(cfg))?;
     Ok(TeamId(id))
 }
@@ -566,9 +554,10 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 /// @param cfg the Team Configuration [`TeamConfig`].
 ///
 /// @relates AranyaClient.
+#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let cfg = aranya_client::TeamConfig::new().with_version(cfg.version)?;
+    let cfg = aranya_client::TeamConfigBuilder::new().build()?;
     client.rt.block_on(client.inner.add_team(team.0, cfg))?;
     Ok(())
 }

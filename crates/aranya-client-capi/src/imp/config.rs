@@ -105,11 +105,9 @@ impl AfcConfigBuilder {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 4, align = 4)]
+#[aranya_capi_core::opaque(size = 0, align = 1)]
 /// Configuration info for Aranya
-pub struct TeamConfig {
-    pub version: u32,
-}
+pub struct TeamConfig {}
 
 impl Typed for TeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0x227DFC9E);
@@ -117,22 +115,14 @@ impl Typed for TeamConfig {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 4, align = 4)]
+#[aranya_capi_core::opaque(size = 0, align = 1)]
 /// Builder for a [`TeamConfig`]
-pub struct TeamConfigBuilder {
-    pub version: u32,
-}
+pub struct TeamConfigBuilder {}
 
 impl TeamConfigBuilder {
-    /// Attempts to construct a [`TeamConfig`], returning an [`Error::Bug`](super::Error::Bug) if
-    /// there are invalid parameters.
+    /// Attempts to construct a [`TeamConfig`], returning an
+    /// [`Error::InvalidArg`](super::Error::InvalidArg) if there are invalid parameters.
     pub fn build(self) -> Result<TeamConfig, super::Error> {
-        if self.version < aranya_daemon_api::TeamConfig::MINIMUM_VERSION {
-            bug!("Tried to create a TeamConfig with an unsupported version!");
-        }
-
-        Ok(TeamConfig {
-            version: self.version,
-        })
+        Ok(TeamConfig {})
     }
 }

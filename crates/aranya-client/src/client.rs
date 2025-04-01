@@ -158,16 +158,17 @@ impl Client {
 
     /// Create a new graph/team with the current device as the owner.
     pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
-        let cfg = aranya_daemon_api::TeamConfig::new().with_version(cfg.version())?;
-        Ok(self.daemon.create_team(context::current(), cfg).await??)
+        Ok(self
+            .daemon
+            .create_team(context::current(), cfg.into())
+            .await??)
     }
 
     /// Add a team to the local device store.
     pub async fn add_team(&mut self, team: TeamId, cfg: TeamConfig) -> Result<()> {
-        let cfg = aranya_daemon_api::TeamConfig::new().with_version(cfg.version())?;
         Ok(self
             .daemon
-            .add_team(context::current(), team, cfg)
+            .add_team(context::current(), team, cfg.into())
             .await??)
     }
 

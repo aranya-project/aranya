@@ -20,7 +20,7 @@ use aranya_client::afc::Message;
 #[cfg(feature = "afc")]
 use aranya_client::client::Client;
 #[cfg(feature = "afc")]
-use aranya_client::TeamConfig;
+use aranya_client::TeamConfigBuilder;
 #[cfg(feature = "afc")]
 use aranya_crypto::{hash::Hash, rust::Sha256};
 #[cfg(feature = "afc")]
@@ -348,7 +348,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team(TeamConfig::new().with_version(TeamConfig::CURRENT_VERSION)?)
+        .create_team(TeamConfigBuilder::new().build()?)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -630,7 +630,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team(TeamConfig::new().with_version(TeamConfig::CURRENT_VERSION)?)
+        .create_team(TeamConfigBuilder::new().build()?)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -847,7 +847,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team(TeamConfig::new().with_version(TeamConfig::CURRENT_VERSION)?)
+        .create_team(TeamConfigBuilder::new().build()?)
         .await
         .expect("expected to create team");
     info!(?team_id);
