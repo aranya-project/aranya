@@ -73,13 +73,6 @@ pub enum Role {
     Member,
 }
 
-#[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
-pub enum ConfigError {
-    #[error("Unsupported version of the configuration: Expected v{expected}, got v{expected}")]
-    UnsupportedVersion { expected: u32, got: u32 },
-}
-
 /// A configuration for creating or adding a team to a daemon.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TeamConfig {

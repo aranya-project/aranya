@@ -315,7 +315,6 @@ dependencies = [
  "serde",
  "spideroak-base58",
  "tarpc",
- "thiserror 2.0.12",
  "tracing",
 ]
 

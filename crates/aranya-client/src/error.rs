@@ -44,14 +44,6 @@ pub enum Error {
 #[non_exhaustive]
 pub enum ConfigError {}
 
-impl From<aranya_daemon_api::ConfigError> for Error {
-    fn from(error: aranya_daemon_api::ConfigError) -> Self {
-        match error {
-            _ => todo!(),
-        }
-    }
-}
-
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
 #[cfg(feature = "afc")]

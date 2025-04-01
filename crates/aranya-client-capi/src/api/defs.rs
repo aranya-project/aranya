@@ -430,7 +430,7 @@ pub fn client_config_builder_set_afc_config(
     cfg.afc = Some(**afc_config);
 }
 
-/// Attempts to construct a [`ClientConfig`], returning an `Error::Bug`
+/// Attempts to construct a [`ClientConfig`], returning an `Error::InvalidArgument`
 /// if there are invalid parameters.
 ///
 /// @param cfg a pointer to the client config builder

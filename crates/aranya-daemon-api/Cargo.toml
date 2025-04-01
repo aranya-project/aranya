@@ -23,7 +23,6 @@ anyhow = { workspace = true }
 postcard = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }
 
 
