@@ -1,13 +1,13 @@
 use crate::error::ConfigError;
 
 /// A builder for adding parameters when adding or creating teams.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TeamConfigBuilder {}
 
 impl TeamConfigBuilder {
     /// Creates a new builder for [`TeamConfig`]
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
 
     /// Creates a [`TeamConfig`] using the provided parameters

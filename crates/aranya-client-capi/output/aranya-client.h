@@ -744,7 +744,7 @@ AranyaError aranya_client_config_builder_set_afc_config_ext(struct AranyaClientC
 #endif
 
 /**
- * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Bug`
+ * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::InvalidArgument`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the client config builder
@@ -754,7 +754,7 @@ AranyaError aranya_client_config_builder_build(struct AranyaClientConfigBuilder 
                                                struct AranyaClientConfig *out);
 
 /**
- * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Bug`
+ * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::InvalidArgument`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the client config builder
