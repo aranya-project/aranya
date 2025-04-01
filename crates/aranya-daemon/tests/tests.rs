@@ -8,10 +8,15 @@
 )]
 
 use anyhow::{Context, Result};
+#[cfg(feature = "afc")]
+use aranya_daemon::policy::ChanOp;
 use aranya_daemon::{
     aranya::Actions,
-    policy::{ChanOp, Effect, Role},
+    policy::{Effect, Role},
 };
+#[cfg(feature = "afc")]
+// TODO(nikki): remove cfg flag once AQC is in
+// See https://github.com/aranya-project/aranya-core/issues/101
 use aranya_fast_channels::Label;
 use serial_test::serial;
 use test_log::test;
@@ -100,7 +105,10 @@ async fn test_remove_members() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-async fn test_bidirectional_channel() -> Result<()> {
+#[cfg(feature = "afc")]
+// TODO(nikki): we should add separate tests for AQC once that's in
+// See https://github.com/aranya-project/aranya-core/issues/101
+async fn test_afc_bidirectional_channel() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 
     let clients = ctx.new_team().await?;
@@ -137,7 +145,8 @@ async fn test_bidirectional_channel() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-async fn test_revoke_label() -> Result<()> {
+#[cfg(feature = "afc")]
+async fn test_revoke_afc_label() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 
     let clients = ctx.new_team().await?;
@@ -194,7 +203,8 @@ async fn test_revoke_label() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-async fn test_unidirectional_channels() -> Result<()> {
+#[cfg(feature = "afc")]
+async fn test_afc_unidirectional_channels() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 
     let clients = ctx.new_team().await?;
