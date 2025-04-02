@@ -339,6 +339,43 @@ impl DaemonApiHandler {
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         Ok(())
     }
+
+    async fn query_devices_on_team_inner(&self, team: TeamId) -> Result<Vec<ApiDeviceId>> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_devices_on_team_off_graph()
+            .await
+            .context("unable to query devices on team")?;
+        let mut devices: Vec<ApiDeviceId> = Vec::new();
+        for e in effects {
+            if let Effect::QueryDevicesOnTeamResult(e) = e {
+                devices.push(e.device_id.into());
+            }
+        }
+        Ok(devices)
+    }
+
+    #[cfg(feature = "afc")]
+    async fn query_afc_net_identifier_inner(
+        &self,
+        team: TeamId,
+        device: ApiDeviceId,
+    ) -> Result<Option<NetIdentifier>> {
+        if let Ok((_ctrl, effects)) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_afc_net_identifier_off_graph(device.into_id().into())
+            .await
+        {
+            if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
+                find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
+            {
+                return Ok(Some(NetIdentifier(e.net_identifier)));
+            }
+        }
+        Ok(None)
+    }
 }
 
 impl DaemonApi for DaemonApiHandler {
@@ -429,8 +466,31 @@ impl DaemonApi for DaemonApiHandler {
             .create_team(pk, Some(nonce))
             .await
             .context("unable to create team")?;
+        let team_id = graph_id.into_id().into();
         debug!(?graph_id);
-        Ok(graph_id.into_id().into())
+
+        #[cfg(feature = "afc")]
+        {
+            // If the daemon gets killed at some point, all network identifiers on the current
+            // object are lost. To fix this, we query the fact database and re-register them.
+
+            // Query all devices on the current graph from the factDB
+            let devices = self.query_devices_on_team_inner(team_id).await?;
+
+            // For each device, let's see if they have a network identifier and register it.
+            for device in devices {
+                if let Some(net_identifier) =
+                    self.query_afc_net_identifier_inner(team_id, device).await?
+                {
+                    self.afc_peers
+                        .lock()
+                        .await
+                        .insert(net_identifier, device.into_id().into());
+                }
+            }
+        }
+
+        Ok(team_id)
     }
 
     #[instrument(skip(self))]
@@ -762,20 +822,10 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: TeamId,
     ) -> ApiResult<Vec<ApiDeviceId>> {
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_devices_on_team_off_graph()
-            .await
-            .context("unable to query devices on team")?;
-        let mut devices: Vec<ApiDeviceId> = Vec::new();
-        for e in effects {
-            if let Effect::QueryDevicesOnTeamResult(e) = e {
-                devices.push(e.device_id.into());
-            }
-        }
-        return Ok(devices);
+        let devices = self.query_devices_on_team_inner(team).await?;
+        Ok(devices)
     }
+
     /// Query device role.
     #[instrument(skip(self))]
     async fn query_device_role(
@@ -858,19 +908,8 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         device: ApiDeviceId,
     ) -> ApiResult<Option<NetIdentifier>> {
-        if let Ok((_ctrl, effects)) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_afc_net_identifier_off_graph(device.into_id().into())
-            .await
-        {
-            if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
-                find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
-            {
-                return Ok(Some(NetIdentifier(e.net_identifier)));
-            }
-        }
-        Ok(None)
+        let net_identifier = self.query_afc_net_identifier_inner(team, device).await?;
+        Ok(net_identifier)
     }
 
     /// Query AFC network ID.
