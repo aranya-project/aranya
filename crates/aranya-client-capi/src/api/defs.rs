@@ -398,12 +398,53 @@ pub fn afc_config_builder_build(
     Ok(())
 }
 
+/// Sets the configuration for Aranya Fast Channels.
+///
+/// @param cfg a pointer to the client config builder
+/// @param afc_config a pointer to a valid AFC config (see [`AfcConfigBuilder`])
+#[cfg(feature = "afc")]
+pub fn client_config_builder_set_afc_config(
+    cfg: &mut ClientConfigBuilder,
+    afc_config: &mut AfcConfig,
+) {
+    cfg.afc = Some(**afc_config);
+}
+
+/// Configuration info for Aranya QUIC Channels.
+#[aranya_capi_core::opaque(size = 40, align = 8)]
+pub type AqcConfig = Safe<imp::AqcConfig>;
+
+/// Configuration info builder for Aranya QUIC Channels.
+#[aranya_capi_core::opaque(size = 24, align = 8)]
+pub type AqcConfigBuilder = imp::AqcConfigBuilder;
+
+/// Sets the address that the AQC server should bind to for listening.
+///
+/// @param cfg a pointer to the aqc config builder
+/// @param address a string with the address to bind to
+pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *const c_char) {
+    cfg.addr = address;
+}
+
+/// Attempts to construct an [`AqcConfig`], returning an `Error::Bug`
+/// if there are invalid parameters.
+///
+/// @param cfg a pointer to the aqc config builder
+/// @param out a pointer to write the aqc config to
+pub fn aqc_config_builder_build(
+    cfg: &mut AqcConfigBuilder,
+    out: &mut MaybeUninit<AqcConfig>,
+) -> Result<(), imp::Error> {
+    Safe::init(out, cfg.build()?);
+    Ok(())
+}
+
 /// Configuration info for Aranya.
-#[aranya_capi_core::opaque(size = 48, align = 8)]
+#[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type ClientConfig = Safe<imp::ClientConfig>;
 
 /// Configuration info builder for Aranya.
-#[aranya_capi_core::opaque(size = 40, align = 8)]
+#[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type ClientConfigBuilder = imp::ClientConfigBuilder;
 
 /// Sets the daemon address that the Client should try to connect to.
@@ -417,18 +458,6 @@ pub fn client_config_builder_set_daemon_addr(
     cfg.daemon_addr = address;
 }
 
-/// Sets the configuration for Aranya Fast Channels.
-///
-/// @param cfg a pointer to the client config builder
-/// @param afc_config a pointer to a valid AFC config (see [`AfcConfigBuilder`])
-#[cfg(feature = "afc")]
-pub fn client_config_builder_set_afc_config(
-    cfg: &mut ClientConfigBuilder,
-    afc_config: &mut AfcConfig,
-) {
-    cfg.afc = Some(**afc_config);
-}
-
 /// Attempts to construct a [`ClientConfig`], returning an `Error::Bug`
 /// if there are invalid parameters.
 ///
@@ -440,6 +469,17 @@ pub fn client_config_builder_build(
 ) -> Result<(), imp::Error> {
     Safe::init(out, cfg.build()?);
     Ok(())
+}
+
+/// Sets the configuration for Aranya QUIC Channels.
+///
+/// @param cfg a pointer to the client config builder
+/// @param aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
+pub fn client_config_builder_set_aqc_config(
+    cfg: &mut ClientConfigBuilder,
+    aqc_config: &mut AqcConfig,
+) {
+    cfg.aqc = Some(**aqc_config);
 }
 
 /// Initializes a new client instance.

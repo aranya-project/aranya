@@ -38,12 +38,13 @@ impl From<&SyncPeerConfig> for aranya_client::client::SyncPeerConfig {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 32, align = 8)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
 /// Configuration info for Aranya
 pub struct ClientConfig {
     pub daemon_addr: *const c_char,
     #[cfg(feature = "afc")]
     pub afc: AfcConfig,
+    pub aqc: AqcConfig,
 }
 
 impl Typed for ClientConfig {
@@ -52,12 +53,13 @@ impl Typed for ClientConfig {
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
+#[aranya_capi_core::opaque(size = 56, align = 8)]
 /// Builder for a [`ClientConfig`]
 pub struct ClientConfigBuilder {
     pub daemon_addr: *const c_char,
     #[cfg(feature = "afc")]
     pub afc: Option<AfcConfig>,
+    pub aqc: Option<AqcConfig>,
 }
 
 impl ClientConfigBuilder {
@@ -74,10 +76,15 @@ impl ClientConfigBuilder {
             bug!("Tried to create a ClientConfig without a valid AfcConfig!");
         };
 
+        let Some(aqc) = self.aqc else {
+            bug!("Tried to create a ClientConfig without a valid AqcConfig!");
+        };
+
         Ok(ClientConfig {
             daemon_addr: self.daemon_addr,
             #[cfg(feature = "afc")]
             afc,
+            aqc,
         })
     }
 }
@@ -183,5 +190,38 @@ impl AfcConfigBuilder {
             max_channels: self.max_channels,
             addr: self.addr,
         })
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+#[aranya_capi_core::opaque(size = 24, align = 8)]
+/// Configuration info for Aranya Fast Channels
+pub struct AqcConfig {
+    /// Address to bind AQC server to.
+    pub addr: *const c_char,
+}
+
+impl Typed for AqcConfig {
+    const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
+}
+
+#[derive(Copy, Clone, Debug)]
+#[aranya_capi_core::opaque(size = 24, align = 8)]
+/// Builder for an [`AqcConfig`]
+pub struct AqcConfigBuilder {
+    /// Address to bind AQC server to.
+    pub addr: *const c_char,
+}
+
+impl AqcConfigBuilder {
+    /// Attempts to construct an [`AqcConfig`], returning an [`Error::Bug`](super::Error::Bug) if
+    /// there are invalid parameters.
+    pub fn build(self) -> Result<AqcConfig, super::Error> {
+        if self.addr.is_null() {
+            bug!("Tried to create an AqcConfig without a valid address!");
+        }
+
+        Ok(AqcConfig { addr: self.addr })
     }
 }

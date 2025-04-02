@@ -209,7 +209,7 @@ typedef struct ARANYA_ALIGNED(16) AranyaClient {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[2656];
+    uint8_t __for_size_only[3656];
 } AranyaClient;
 
 /**
@@ -261,8 +261,32 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[40];
+    uint8_t __for_size_only[56];
 } AranyaClientConfigBuilder;
+
+/**
+ * Configuration info builder for Aranya QUIC Channels.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaAqcConfigBuilder {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[24];
+} AranyaAqcConfigBuilder;
+
+/**
+ * Configuration info for Aranya QUIC Channels.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[40];
+} AranyaAqcConfig;
 
 /**
  * Configuration info for Aranya.
@@ -273,7 +297,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfig {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[48];
+    uint8_t __for_size_only[56];
 } AranyaClientConfig;
 
 /**
@@ -686,25 +710,6 @@ AranyaError aranya_afc_config_builder_build_ext(struct AranyaAfcConfigBuilder *c
                                                 struct AranyaExtError *__ext_err);
 #endif
 
-/**
- * Sets the daemon address that the Client should try to connect to.
- *
- * @param cfg a pointer to the client config builder
- * @param address a string containing the address
- */
-AranyaError aranya_client_config_builder_set_daemon_addr(struct AranyaClientConfigBuilder *cfg,
-                                                         const char *address);
-
-/**
- * Sets the daemon address that the Client should try to connect to.
- *
- * @param cfg a pointer to the client config builder
- * @param address a string containing the address
- */
-AranyaError aranya_client_config_builder_set_daemon_addr_ext(struct AranyaClientConfigBuilder *cfg,
-                                                             const char *address,
-                                                             struct AranyaExtError *__ext_err);
-
 #if defined(ENABLE_AFC)
 /**
  * Sets the configuration for Aranya Fast Channels.
@@ -729,6 +734,65 @@ AranyaError aranya_client_config_builder_set_afc_config_ext(struct AranyaClientC
 #endif
 
 /**
+ * Sets the address that the AQC server should bind to for listening.
+ *
+ * @param cfg a pointer to the aqc config builder
+ * @param address a string with the address to bind to
+ */
+AranyaError aranya_aqc_config_builder_set_address(struct AranyaAqcConfigBuilder *cfg,
+                                                  const char *address);
+
+/**
+ * Sets the address that the AQC server should bind to for listening.
+ *
+ * @param cfg a pointer to the aqc config builder
+ * @param address a string with the address to bind to
+ */
+AranyaError aranya_aqc_config_builder_set_address_ext(struct AranyaAqcConfigBuilder *cfg,
+                                                      const char *address,
+                                                      struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Bug`
+ * if there are invalid parameters.
+ *
+ * @param cfg a pointer to the aqc config builder
+ * @param out a pointer to write the aqc config to
+ */
+AranyaError aranya_aqc_config_builder_build(struct AranyaAqcConfigBuilder *cfg,
+                                            struct AranyaAqcConfig *out);
+
+/**
+ * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Bug`
+ * if there are invalid parameters.
+ *
+ * @param cfg a pointer to the aqc config builder
+ * @param out a pointer to write the aqc config to
+ */
+AranyaError aranya_aqc_config_builder_build_ext(struct AranyaAqcConfigBuilder *cfg,
+                                                struct AranyaAqcConfig *out,
+                                                struct AranyaExtError *__ext_err);
+
+/**
+ * Sets the daemon address that the Client should try to connect to.
+ *
+ * @param cfg a pointer to the client config builder
+ * @param address a string containing the address
+ */
+AranyaError aranya_client_config_builder_set_daemon_addr(struct AranyaClientConfigBuilder *cfg,
+                                                         const char *address);
+
+/**
+ * Sets the daemon address that the Client should try to connect to.
+ *
+ * @param cfg a pointer to the client config builder
+ * @param address a string containing the address
+ */
+AranyaError aranya_client_config_builder_set_daemon_addr_ext(struct AranyaClientConfigBuilder *cfg,
+                                                             const char *address,
+                                                             struct AranyaExtError *__ext_err);
+
+/**
  * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Bug`
  * if there are invalid parameters.
  *
@@ -748,6 +812,25 @@ AranyaError aranya_client_config_builder_build(struct AranyaClientConfigBuilder 
 AranyaError aranya_client_config_builder_build_ext(struct AranyaClientConfigBuilder *cfg,
                                                    struct AranyaClientConfig *out,
                                                    struct AranyaExtError *__ext_err);
+
+/**
+ * Sets the configuration for Aranya QUIC Channels.
+ *
+ * @param cfg a pointer to the client config builder
+ * @param aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
+ */
+AranyaError aranya_client_config_builder_set_aqc_config(struct AranyaClientConfigBuilder *cfg,
+                                                        struct AranyaAqcConfig *aqc_config);
+
+/**
+ * Sets the configuration for Aranya QUIC Channels.
+ *
+ * @param cfg a pointer to the client config builder
+ * @param aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
+ */
+AranyaError aranya_client_config_builder_set_aqc_config_ext(struct AranyaClientConfigBuilder *cfg,
+                                                            struct AranyaAqcConfig *aqc_config,
+                                                            struct AranyaExtError *__ext_err);
 
 /**
  * Initializes a new client instance.

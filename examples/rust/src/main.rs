@@ -3,7 +3,6 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-use aranya_client::Label;
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{afc::Message, client::Client, SyncPeerConfig};

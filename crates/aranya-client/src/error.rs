@@ -1,6 +1,7 @@
-use aranya_daemon_api::AqcId;
+use aranya_crypto::apq::Version as AqcVersion;
 #[cfg(feature = "afc")]
 use aranya_daemon_api::AfcId;
+use aranya_daemon_api::AqcId;
 #[cfg(feature = "afc")]
 use aranya_fast_channels::Version;
 
@@ -252,7 +253,10 @@ pub enum AqcError {
 
     /// AQC version mismatch.
     #[error("AQC version mismatch: got {actual:?}, expected {expected:?}")]
-    VersionMismatch { expected: Version, actual: Version },
+    VersionMismatch {
+        expected: AqcVersion,
+        actual: AqcVersion,
+    },
 
     // General errors
     /// The channel was not found.
