@@ -385,7 +385,7 @@ pub fn afc_config_builder_set_address(cfg: &mut AfcConfigBuilder, address: *cons
     cfg.addr = address;
 }
 
-/// Attempts to construct an [`AfcConfig`], returning an `Error::Bug`
+/// Attempts to construct an [`AfcConfig`], returning an `Error::InvalidArgument`
 /// if there are invalid parameters.
 ///
 /// @param cfg a pointer to the afc config builder
@@ -527,7 +527,7 @@ pub type TeamConfig = Safe<imp::TeamConfig>;
 #[aranya_capi_core::opaque(size = 4, align = 4)]
 pub type TeamConfigBuilder = imp::TeamConfigBuilder;
 
-/// Attempts to construct a [`TeamConfig`], returning an `Error::Bug`
+/// Attempts to construct a [`TeamConfig`], returning an `Error::InvalidArgument`
 /// if there are invalid parameters.
 ///
 /// @param cfg a pointer to the team config builder

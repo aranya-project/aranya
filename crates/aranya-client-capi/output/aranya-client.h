@@ -678,7 +678,7 @@ AranyaError aranya_afc_config_builder_set_address_ext(struct AranyaAfcConfigBuil
 
 #if defined(ENABLE_AFC)
 /**
- * Attempts to construct an [`AranyaAfcConfig`](@ref AranyaAfcConfig), returning an `Error::Bug`
+ * Attempts to construct an [`AranyaAfcConfig`](@ref AranyaAfcConfig), returning an `Error::InvalidArgument`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the afc config builder
@@ -690,7 +690,7 @@ AranyaError aranya_afc_config_builder_build(struct AranyaAfcConfigBuilder *cfg,
 
 #if defined(ENABLE_AFC)
 /**
- * Attempts to construct an [`AranyaAfcConfig`](@ref AranyaAfcConfig), returning an `Error::Bug`
+ * Attempts to construct an [`AranyaAfcConfig`](@ref AranyaAfcConfig), returning an `Error::InvalidArgument`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the afc config builder
@@ -834,7 +834,7 @@ AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Bug`
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::InvalidArgument`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the team config builder
@@ -844,7 +844,7 @@ AranyaError aranya_team_config_builder_build(struct AranyaTeamConfigBuilder *cfg
                                              struct AranyaTeamConfig *out);
 
 /**
- * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Bug`
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::InvalidArgument`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the team config builder

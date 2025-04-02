@@ -40,6 +40,7 @@ pub enum Error {
     },
 }
 
+/// Possible errors that could happen when creating configuration info.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum ConfigError {}
