@@ -500,19 +500,35 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .await?;
 
     // membera creates aqc bidi channel with memberb
-    let _aqc_id1 = team
+    let (_aqc_id1, aqc_bidi_ctrl) = team
         .membera
         .client
         .aqc()
         .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
+    // memberb received aqc bidi channel ctrl message
+    // TODO: receiving AQC ctrl messages will happen via the network.
+    team.memberb
+        .client
+        .aqc()
+        .receive_aqc_ctrl(team_id, aqc_bidi_ctrl)
+        .await?;
+
     // membera creates aqc uni channel with memberb
-    let _aqc_id1 = team
+    let (_aqc_id1, aqc_uni_ctrl) = team
         .membera
         .client
         .aqc()
         .create_uni_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .await?;
+
+    // memberb received aqc uni channel ctrl message
+    // TODO: receiving AQC ctrl messages will happen via the network.
+    team.memberb
+        .client
+        .aqc()
+        .receive_aqc_ctrl(team_id, aqc_uni_ctrl)
         .await?;
 
     // membera creates afc bidi channel with memberb

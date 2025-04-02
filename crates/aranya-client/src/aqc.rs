@@ -3,13 +3,17 @@
 use std::{io, path::PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
-use aranya_aqc_util::{BidiChannelCreated, Handler, Label as AqcLabel};
+use aranya_aqc_util::{
+    BidiChannelCreated, BidiChannelReceived, Handler, Label as AqcLabel, UniChannelReceived,
+};
 use aranya_crypto::{
     aead::Aead, default::DefaultEngine, generic_array::GenericArray, import::Import,
     keys::SecretKeyBytes, keystore::fs_keystore::Store, CipherSuite, Random, Rng,
 };
 pub use aranya_daemon_api::AqcId;
-use aranya_daemon_api::{AqcChannelInfo, DeviceId, KeyStoreInfo, NetIdentifier, TeamId, CS};
+use aranya_daemon_api::{
+    AqcChannelInfo::*, AqcCtrl, DeviceId, KeyStoreInfo, NetIdentifier, TeamId, CS,
+};
 use aranya_fast_channels::{Label, NodeId};
 use tarpc::context;
 use tokio::fs;
@@ -78,21 +82,21 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label: Label,
-    ) -> Result<AqcId> {
+    ) -> Result<(AqcId, AqcCtrl)> {
         debug!("creating bidi channel");
 
         let node_id: NodeId = 0.into();
         //let node_id = self.client.aqc.get_next_node_id().await?;
         debug!(%node_id, "selected node ID");
 
-        let (aqc_id, _ctrl, aqc_info) = self
+        let (aqc_id, aqc_ctrl, aqc_info) = self
             .client
             .daemon
             .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
             .await??;
         debug!(%aqc_id, %node_id, %label, "created bidi channel");
 
-        if let AqcChannelInfo::BidiCreated(v) = aqc_info {
+        if let BidiCreated(v) = aqc_info {
             let psk = self.client.aqc.handler.bidi_channel_created(
                 &mut self.client.aqc.eng.clone(),
                 &BidiChannelCreated {
@@ -106,9 +110,12 @@ impl<'a> AqcChannels<'a> {
                 },
             )?;
             debug!("psk id: {:?}", psk.identity());
+
+            // TODO: send ctrl msg via network.
         }
 
-        Ok(aqc_id)
+        // TODO: for testing only. Send ctrl via network instead of returning.
+        Ok((aqc_id, aqc_ctrl))
     }
 
     /// Creates a unidirectional AQC channel with a peer.
@@ -125,14 +132,14 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label: Label,
-    ) -> crate::Result<AqcId> {
+    ) -> Result<(AqcId, AqcCtrl)> {
         debug!("creating aqc uni channel");
 
         // TODO: use correct node ID.
         let node_id: NodeId = 0.into();
         debug!(%node_id, "selected node ID");
 
-        let (aqc_id, _ctrl, _aqc_info) = self
+        let (aqc_id, aqc_ctrl, _aqc_info) = self
             .client
             .daemon
             .create_aqc_uni_channel(context::current(), team_id, peer.clone(), node_id, label)
@@ -141,10 +148,11 @@ impl<'a> AqcChannels<'a> {
 
         // TODO: decode PSK from keystore.
 
-        // TODO: send ctrl message.
+        // TODO: send ctrl message via network.
         debug!("sent control message");
 
-        Ok(aqc_id)
+        // TODO: for testing only. Send ctrl via network instead of returning.
+        Ok((aqc_id, aqc_ctrl))
     }
 
     /// Deletes an AQC channel.
@@ -157,6 +165,57 @@ impl<'a> AqcChannels<'a> {
             .delete_aqc_channel(context::current(), id)
             .await??;
         //self.client.aqc.remove_channel(id).await;
+        Ok(())
+    }
+
+    /// Receives an AQC ctrl message.
+    // TODO: this method is pub for testing.
+    // In final AQC implementation, it will only be invoked when a ctrl msg is received via the network.
+    pub async fn receive_aqc_ctrl(&mut self, team: TeamId, ctrl: AqcCtrl) -> Result<()> {
+        // TODO: use correct node ID
+        let node_id: NodeId = 0.into();
+
+        let (_aqc_id, _peer, aqc_info) = self
+            .client
+            .daemon
+            .receive_aqc_ctrl(context::current(), team, node_id, ctrl)
+            .await??;
+
+        match aqc_info {
+            BidiReceived(v) => {
+                let psk = self.client.aqc.handler.bidi_channel_received(
+                    &mut self.client.aqc.eng.clone(),
+                    &BidiChannelReceived {
+                        parent_cmd_id: v.parent_cmd_id,
+                        author_id: v.author_id.into_id().into(),
+                        author_enc_pk: &v.author_enc_pk,
+                        peer_id: v.peer_id.into_id().into(),
+                        peer_enc_key_id: v.peer_enc_key_id,
+                        label: AqcLabel::new(v.label.to_u32()),
+                        encap: &v.encap,
+                    },
+                )?;
+                debug!("psk id: {:?}", psk.identity());
+            }
+            UniReceived(v) => {
+                let psk = self.client.aqc.handler.uni_channel_received(
+                    &mut self.client.aqc.eng.clone(),
+                    &UniChannelReceived {
+                        parent_cmd_id: v.parent_cmd_id,
+                        author_id: v.author_id.into_id().into(),
+                        author_enc_pk: &v.author_enc_pk,
+                        send_id: v.send_id.into_id().into(),
+                        recv_id: v.recv_id.into_id().into(),
+                        peer_enc_key_id: v.peer_enc_key_id,
+                        label: AqcLabel::new(v.label.to_u32()),
+                        encap: &v.encap,
+                    },
+                )?;
+                debug!("psk id: {:?}", psk.identity());
+            }
+            _ => {}
+        }
+
         Ok(())
     }
 }

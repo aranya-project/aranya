@@ -177,6 +177,9 @@ pub type AfcCtrl = Vec<Box<[u8]>>;
 pub type AqcCtrl = Vec<Box<[u8]>>;
 
 /// AQC channel info.
+/// This includes information that can be used to:
+/// - Lookup the AQC PSK secret from the key store.
+/// - Decode the PSK encap to derive the PSK.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum AqcChannelInfo {
     BidiCreated(AqcBidiChannelCreatedInfo),
@@ -314,6 +317,7 @@ pub struct KeyStoreInfo {
 #[tarpc::service]
 pub trait DaemonApi {
     /// Gets the key store info.
+    /// The keystore can be used to pass private keys and secrets between the client and daemon.
     async fn get_keystore_info() -> Result<KeyStoreInfo>;
 
     /// Gets local address the Aranya sync server is bound to.
