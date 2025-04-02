@@ -19,9 +19,12 @@ use aranya_afc_util::{
 use aranya_aqc_util::{
     BidiChannelCreated as AqcBidiChannelCreated, BidiChannelReceived as AqcBidiChannelReceived,
     Label as AqcLabel, UniChannelCreated as AqcUniChannelCreated,
+    UniChannelReceived as AqcUniChannelReceived,
 };
 use aranya_crypto::{
-    afc::BidiPeerEncap, aqc::BidiPeerEncap as AqcBidiPeerEncap, keystore::fs_keystore::Store,
+    afc::BidiPeerEncap,
+    aqc::{BidiPeerEncap as AqcBidiPeerEncap, UniPeerEncap as AqcUniPeerEncap},
+    keystore::fs_keystore::Store,
     Csprng, DeviceId, Rng,
 };
 use aranya_daemon_api::{
@@ -797,38 +800,65 @@ impl DaemonApi for DaemonApiHandler {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
             let id = self.pk.ident_pk.id()?;
             self.handle_effects(&effects, Some(node_id)).await?;
-            // TODO: uni channel
-            let Some(Effect::AqcBidiChannelReceived(e)) =
+            if let Some(Effect::AqcBidiChannelReceived(e)) =
                 find_effect!(&effects, Effect::AqcBidiChannelReceived(e) if e.peer_id == id.into())
-            else {
-                continue;
+            {
+                // NB: this shouldn't happen because the policy should
+                // ensure that label fits inside a `u32`.
+                let label = AqcLabel::new(u32::try_from(e.label).expect("`label` is out of range"));
+                let aqc_info = AqcBidiChannelReceived {
+                    parent_cmd_id: e.parent_cmd_id,
+                    author_id: e.author_id.into(),
+                    author_enc_pk: &e.author_enc_pk,
+                    peer_id: e.peer_id.into(),
+                    peer_enc_key_id: e.peer_enc_key_id.into(),
+                    label,
+                    encap: &e.encap,
+                };
+
+                let encap =
+                    AqcBidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
+                let aqc_id: AqcId = encap.id().into();
+                debug!(?aqc_id, "processed aqc ID");
+                let net = self
+                    .aqc_peers
+                    .lock()
+                    .await
+                    .get_by_right(&e.author_id.into())
+                    .context("missing net identifier for channel author")?
+                    .clone();
+                return Ok((aqc_id, net, aqc_info.into()));
             };
 
-            // NB: this shouldn't happen because the policy should
-            // ensure that label fits inside a `u32`.
-            let label = AqcLabel::new(u32::try_from(e.label).expect("`label` is out of range"));
-            let aqc_info = AqcBidiChannelReceived {
-                parent_cmd_id: e.parent_cmd_id,
-                author_id: e.author_id.into(),
-                author_enc_pk: &e.author_enc_pk,
-                peer_id: e.peer_id.into(),
-                peer_enc_key_id: e.peer_enc_key_id.into(),
-                label,
-                encap: &e.encap,
-            };
+            if let Some(Effect::AqcUniChannelReceived(e)) = find_effect!(&effects, Effect::AqcUniChannelReceived(e) if (e.writer_id == id.into() || e.reader_id == id.into()))
+            {
+                // NB: this shouldn't happen because the policy should
+                // ensure that label fits inside a `u32`.
+                let label = AqcLabel::new(u32::try_from(e.label).expect("`label` is out of range"));
+                let aqc_info = AqcUniChannelReceived {
+                    parent_cmd_id: e.parent_cmd_id,
+                    send_id: e.writer_id.into(),
+                    recv_id: e.reader_id.into(),
+                    author_id: e.author_id.into(),
+                    author_enc_pk: &e.author_enc_pk,
+                    peer_enc_key_id: e.peer_enc_key_id.into(),
+                    label,
+                    encap: &e.encap,
+                };
 
-            let encap =
-                AqcBidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
-            let aqc_id: AqcId = encap.id().into();
-            debug!(?aqc_id, "processed aqc ID");
-            let net = self
-                .aqc_peers
-                .lock()
-                .await
-                .get_by_right(&e.author_id.into())
-                .context("missing net identifier for channel author")?
-                .clone();
-            return Ok((aqc_id, net, aqc_info.into()));
+                let encap =
+                    AqcUniPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
+                let aqc_id: AqcId = encap.id().into();
+                debug!(?aqc_id, "processed aqc ID");
+                let net = self
+                    .aqc_peers
+                    .lock()
+                    .await
+                    .get_by_right(&e.author_id.into())
+                    .context("missing net identifier for channel author")?
+                    .clone();
+                return Ok((aqc_id, net, aqc_info.into()));
+            };
         }
         Err(anyhow!("unable to find AqcBidiChannelReceived effect").into())
     }
