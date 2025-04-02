@@ -102,7 +102,7 @@ pub struct KeyBundle {
 ///
 /// Roles determine what permissions a device has within a team.
 /// Different roles have different capabilities regarding team management
-/// and access control. For a more detailed permissions breakdown, see policy.md.
+/// and access control. For a more detailed permissions breakdown, see `aranya-daemon/src/policy.md`.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub enum Role {
     /// Owner role has full control over the team and can perform all operations
