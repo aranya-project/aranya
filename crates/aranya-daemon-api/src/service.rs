@@ -140,7 +140,7 @@ impl fmt::Display for NetIdentifier {
 /// Uniquely identifies an AFC channel.
 ///
 /// It is a [`BidiChannelId`] or [`UniChannelId`] truncated to
-/// 128 bits. This identifier is used to reference specific Aranya Fast Channels
+/// 128 bits. This identifier is used to reference specific AFC channels
 /// when performing operations such as sending messages or managing channel state.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -184,7 +184,7 @@ impl From<Id> for AfcId {
 
 /// Serialized command which must be passed over AFC.
 ///
-/// This type represents control messages sent through Aranya Fast Channels
+/// This type represents control messages sent through AFC.
 /// to manage channel state and operations.
 pub type AfcCtrl = Vec<Box<[u8]>>;
 
@@ -392,7 +392,7 @@ pub trait DaemonApi {
         name: NetIdentifier,
     ) -> Result<()>;
 
-    /// Creates an Aranya Fast Channels label.
+    /// Creates an AFC label.
     ///
     /// Labels are used to categorize and control access to channels.
     ///
@@ -404,7 +404,7 @@ pub trait DaemonApi {
     /// - `Result<()>` - Success or an error if the label cannot be created.
     async fn create_label(team: TeamId, label: Label) -> Result<()>;
 
-    /// Deletes a fast channels label.
+    /// Deletes an AFC label.
     ///
     /// # Parameters
     /// - `team` - The ID of the team.
@@ -443,7 +443,7 @@ pub trait DaemonApi {
     /// - `Result<()>` - Success or an error if the label cannot be revoked.
     async fn revoke_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
 
-    /// Creates a fast channel.
+    /// Creates an AFC channel.
     ///
     /// Establishes a bidirectional communication channel with a peer.
     ///
@@ -462,7 +462,7 @@ pub trait DaemonApi {
         label: Label,
     ) -> Result<(AfcId, AfcCtrl)>;
 
-    /// Deletes a fast channel.
+    /// Deletes an AFC channel.
     ///
     /// Tears down an existing communication channel.
     ///
@@ -473,9 +473,9 @@ pub trait DaemonApi {
     /// - `Result<AfcCtrl>` - The control message to send on success, or an error if the channel cannot be deleted.
     async fn delete_afc_channel(chan: AfcId) -> Result<AfcCtrl>;
 
-    /// Receives a fast channel control message.
+    /// Receives an AFC control message.
     ///
-    /// Processes an incoming control message related to a fast channel.
+    /// Processes an incoming control message related to an AFC channel.
     ///
     /// # Parameters
     /// - `team` - The ID of the team.
