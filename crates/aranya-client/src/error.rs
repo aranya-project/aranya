@@ -1,4 +1,7 @@
-use aranya_daemon_api::{AfcId, AqcId};
+use aranya_daemon_api::AqcId;
+#[cfg(feature = "afc")]
+use aranya_daemon_api::AfcId;
+#[cfg(feature = "afc")]
 use aranya_fast_channels::Version;
 
 /// Possible errors that could happen in the Aranya client.
@@ -18,6 +21,7 @@ pub enum Error {
 
     /// An Aranya Fast Channel error happened.
     #[error("Fast Channel error: {0}")]
+    #[cfg(feature = "afc")]
     Afc(#[from] AfcError),
 
     /// An Aranya QUIC Channel error happened.
@@ -27,10 +31,18 @@ pub enum Error {
     /// An unexpected internal error happened.
     #[error("Unexpected internal error: {0}")]
     Bug(#[from] buggy::Bug),
+
+    /// An invalid argument was provided.
+    #[error("Invalid argument `{arg}`: {reason}")]
+    InvalidArg {
+        arg: &'static str,
+        reason: &'static str,
+    },
 }
 
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
+#[cfg(feature = "afc")]
 pub enum AfcError {
     // Connection-related errors
     /// Unable to bind a network addresss.

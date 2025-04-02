@@ -77,9 +77,9 @@ const AranyaAddr sync_addrs[] = {"127.0.0.1:10001", "127.0.0.1:10002",
                                  "127.0.0.1:10005"};
 
 // List of AFC addresses.
-const AranyaNetIdentifier afc_addrs[] = {"127.0.0.1:11001", "127.0.0.1:11002",
-                                         "127.0.0.1:11003", "127.0.0.1:11004",
-                                         "127.0.0.1:11005"};
+const char *afc_addrs[] = {"127.0.0.1:11001", "127.0.0.1:11002",
+                           "127.0.0.1:11003", "127.0.0.1:11004",
+                           "127.0.0.1:11005"};
 
 // Aranya client.
 typedef struct {
@@ -116,34 +116,75 @@ typedef struct {
     };
 } Team;
 
-AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
-                        const char *afc_shm_path, const char *afc_addr,
+AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
+                        const char *shm_path, const char *afc_addr,
                         const char *aqc_addr);
 AranyaError init_team(Team *t);
-AranyaError add_sync_peers(Team *t);
+AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg);
 AranyaError run(Team *t);
 AranyaError cleanup_team(Team *t);
 
 // Initialize an Aranya client.
-AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
-                        const char *afc_shm_path, const char *afc_addr,
+AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
+                        const char *shm_path, const char *afc_addr,
                         const char *aqc_addr) {
     AranyaError err;
 
     c->name = name;
-    // TODO: methods for initializing cfg types?
-    AranyaAfcConfig afc_cfg = {
-        .shm_path = afc_shm_path, .max_channels = MAX_CHANS, .addr = afc_addr};
-    AranyaClientConfig cli_cfg = {.daemon_sock = daemon_sock, .afc = afc_cfg};
-    err                        = aranya_client_init(&c->client, &cli_cfg);
+
+    struct AranyaClientConfigBuilder cli_build;
+    struct AranyaClientConfig cli_cfg;
+    aranya_client_config_builder_set_daemon_addr(&cli_build, daemon_addr);
+#if defined(ENABLE_AFC)
+    struct AranyaAfcConfigBuilder afc_build;
+    struct AranyaAfcConfig afc_cfg;
+    aranya_afc_config_builder_set_shm_path(&afc_build, shm_path);
+    aranya_afc_config_builder_set_max_channels(&afc_build, MAX_CHANS);
+    aranya_afc_config_builder_set_address(&afc_build, afc_addr);
+    err = aranya_afc_config_builder_build(&afc_build, &afc_cfg);
+
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(
-            stderr,
-            "error initializing client %s (daemon_sock: %s, afc_shm_path: %s, "
-            "afc_addr: %s, "
-            "aqc_addr: %s): %s\r\n",
-            c->name, daemon_sock, afc_shm_path, aqc_addr, aqc_addr,
-            aranya_error_to_str(err));
+        fprintf(stderr, "error initializing afc config: %s\r\n",
+                aranya_error_to_str(err));
+        return err;
+    }
+
+    aranya_client_config_builder_set_afc_config(&cli_build, &afc_cfg);
+#endif
+    struct AranyaAqcConfigBuilder aqc_build;
+    struct AranyaAqcConfig aqc_cfg;
+    aranya_aqc_config_builder_set_address(&aqc_build, aqc_addr);
+    err = aranya_aqc_config_builder_build(&aqc_build, &aqc_cfg);
+
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "error initializing afc config: %s\r\n",
+                aranya_error_to_str(err));
+        return err;
+    }
+    aranya_client_config_builder_set_aqc_config(&cli_build, &aqc_cfg);
+
+    err = aranya_client_config_builder_build(&cli_build, &cli_cfg);
+
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "error initializing client config: %s\r\n",
+                aranya_error_to_str(err));
+        return err;
+    }
+
+    err = aranya_client_init(&c->client, &cli_cfg);
+    if (err != ARANYA_ERROR_SUCCESS) {
+#if defined(ENABLE_AFC)
+        fprintf(stderr,
+                "error initializing client %s (daemon_addr: %s, shm_path: %s, "
+                "afc_addr: %s): %s\r\n",
+                c->name, daemon_addr, shm_path, afc_addr,
+                aranya_error_to_str(err));
+#else
+        fprintf(stderr,
+                "error initializing client %s (daemon_addr: %s, shm_path: %s): "
+                "%s\r\n",
+                c->name, daemon_addr, shm_path, aranya_error_to_str(err));
+#endif
         return err;
     }
     err = aranya_get_device_id(&c->client, &c->id);
@@ -196,9 +237,8 @@ AranyaError cleanup_team(Team *t) {
 // Add sync peers.
 // This creates a complete graph where each Aranya client can sync with all
 // the other Aranya client peers on the network.
-AranyaError add_sync_peers(Team *t) {
+AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg) {
     AranyaError err;
-    AranyaDuration interval = ARANYA_DURATION_MILLISECONDS * 100;
 
     for (int i = 0; i < NUM_CLIENTS; i++) {
         for (int j = 0; j < NUM_CLIENTS; j++) {
@@ -208,7 +248,7 @@ AranyaError add_sync_peers(Team *t) {
             printf("adding sync peer %s to %s\r\n", t->clients_arr[j].name,
                    t->clients_arr[i].name);
             err = aranya_add_sync_peer(&t->clients_arr[i].client, &t->id,
-                                       sync_addrs[j], interval);
+                                       sync_addrs[j], cfg);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr, "error adding sync peer %s to %s: %s\r\n",
                         t->clients_arr[j].name, t->clients_arr[i].name,
@@ -235,37 +275,71 @@ AranyaError run(Team *t) {
     err = init_team(t);
     EXPECT("error initializing team", err);
 
-    // add sync peers.
-    printf("adding sync peers\r\n");
-    err = add_sync_peers(t);
-    EXPECT("error adding sync peers", err);
-
-    // Team members are added to the team by first calling
-    // `aranya_add_device_to_team`, passing in the submitter's client, the
-    // team ID and the public key of the device to be added. In a real world
-    // scenario, the keys would be exchanged outside of Aranya using something
-    // like `scp`.
-
-    printf("adding devices to team\r\n");
     // add admin to team.
     err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
                                     &t->clients.admin.pk);
     EXPECT("error adding admin to team", err);
-
-    // upgrade role to admin.
-    err = aranya_assign_role(&t->clients.owner.client, &t->id,
-                             &t->clients.admin.id, ARANYA_ROLE_ADMIN);
-    EXPECT("error assigning admin role", err);
 
     // add operator to team.
     err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
                                     &t->clients.operator.pk);
     EXPECT("error adding operator to team", err);
 
-    // upgrade role to operator.
+    // upgrade role to admin.
     err = aranya_assign_role(&t->clients.owner.client, &t->id,
+                             &t->clients.admin.id, ARANYA_ROLE_ADMIN);
+    EXPECT("error assigning admin role", err);
+
+    // upgrade role to operator.
+    err = aranya_assign_role(&t->clients.admin.client, &t->id,
+                             &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
+
+    if (err == ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "application failed: expected role assignment to fail");
+        return EXIT_FAILURE;
+    }
+
+    err = aranya_sync_now(&t->clients.admin.client, &t->id, sync_addrs[OWNER],
+                          NULL);
+    EXPECT("error calling `sync_now` to sync with peer", err);
+
+    sleep(1);
+    err = aranya_assign_role(&t->clients.admin.client, &t->id,
                              &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
     EXPECT("error assigning operator role", err);
+
+    // Initialize the builder
+    struct AranyaSyncPeerConfigBuilder builder;
+    err = aranya_sync_peer_config_builder_init(&builder);
+    EXPECT("error initializing sync peer config builder", err);
+
+    // Set duration on the config builder
+    AranyaDuration interval = ARANYA_DURATION_MILLISECONDS * 100;
+    err = aranya_sync_peer_config_builder_set_interval(&builder, interval);
+    EXPECT("error setting duration on config builder", err);
+
+    // Set syncing to happen immediately on the config builder
+    err = aranya_sync_peer_config_builder_set_sync_now(&builder);
+    EXPECT("error setting `sync_now` on config builder", err);
+
+    // Build the sync config
+    struct AranyaSyncPeerConfig cfg;
+    err = aranya_sync_peer_config_builder_build(&builder, &cfg);
+    EXPECT("error building the sync peer config", err);
+
+    err = aranya_sync_peer_config_builder_cleanup(&builder);
+    EXPECT("error running the cleanup routine for the config builder", err);
+
+    // add sync peers.
+    printf("adding sync peers\r\n");
+    err = add_sync_peers(t, &cfg);
+    EXPECT("error adding sync peers", err);
+
+    // Team members are added to the team by first calling
+    // `aranya_add_device_to_team`, passing in the submitter's client, the
+    // team ID and the public key of the device to be added. In a real world
+    // scenario, the keys would be exchanged outside of Aranya using
+    // something like `scp`.
 
     // add membera to team.
     err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
@@ -282,8 +356,8 @@ AranyaError run(Team *t) {
     // Once all team members are added and the appropriate roles have been
     // assigned, the team works together to send data using Aranya Fast
     // Channels.
-    // First, a label must be created to associate a channel to its permitted
-    // devices using the `aranya_create_label` function.
+    // First, a label must be created to associate a channel to its
+    // permitted devices using the `aranya_create_label` function.
 
     // operator creates AFC labels and assigns them to team members.
     AranyaLabel label = 42;
@@ -301,6 +375,8 @@ AranyaError run(Team *t) {
                               &t->clients.memberb.id, label);
     EXPECT("error assigning afc label to memberb", err);
 
+#if defined(ENABLE_AFC)
+
     // Once the label is created and assigned, the devices that will
     // communicate via Aranya Fast Channels must be assigned a network
     // identifier. This is used by Fast Channels to properly translate
@@ -317,6 +393,8 @@ AranyaError run(Team *t) {
                                            &t->clients.memberb.id,
                                            afc_addrs[MEMBERB]);
     EXPECT("error assigning afc net name to memberb", err);
+#endif
+
     // assign AQC network addresses.
     err = aranya_aqc_assign_net_identifier(&t->clients.operator.client, &t->id,
                                            &t->clients.membera.id,
@@ -370,10 +448,13 @@ AranyaError run(Team *t) {
                                         &memberb_keybundle);
     EXPECT("error querying memberb key bundle", err);
     printf(
-        "%s key bundle enc_key_len %lu, sign_key_len %lu, ident_key_len %lu "
+        "%s key bundle enc_key_len %lu, sign_key_len %lu, ident_key_len "
+        "%lu "
         "\r\n",
         t->clients_arr[MEMBERB].name, memberb_keybundle.enc_key_len,
         memberb_keybundle.sign_key_len, memberb_keybundle.ident_key_len);
+
+#if defined(ENABLE_AFC)
     size_t memberb_afc_net_identifier_len = BUF_LEN;
     char *memberb_afc_net_identifier      = malloc(BUF_LEN);
     bool afc_net_identifier_exists        = false;
@@ -408,6 +489,7 @@ AranyaError run(Team *t) {
     printf("%s afc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
            memberb_afc_net_identifier);
     free(memberb_afc_net_identifier);
+#endif
 
     size_t memberb_aqc_net_identifier_len = BUF_LEN;
     char *memberb_aqc_net_identifier      = malloc(BUF_LEN);
@@ -451,10 +533,12 @@ AranyaError run(Team *t) {
     printf("%s label exists: %s \r\n", t->clients_arr[MEMBERB].name,
            exists ? "true" : "false");
 
-    // Once membera and memberb have been assigned the label and their network
-    // identifiers, a Fast Channel can be created. In this example, membera
-    // will create the channel using `aranya_afc_create_bidi_channel`. This will
-    // create a bidirectional Aranya Fast Channel.
+#if defined(ENABLE_AFC)
+    // Once membera and memberb have been assigned the label and their
+    // network identifiers, a Fast Channel can be created. In this example,
+    // membera will create the channel using
+    // `aranya_afc_create_bidi_channel`. This will create a bidirectional
+    // Aranya Fast Channel.
 
     // create AFC channel between membera and memberb.
     AranyaChannelId chan_id;
@@ -518,6 +602,8 @@ AranyaError run(Team *t) {
     printf("%s received afc message from %s: len: %zu, label: %d \r\n",
            t->clients_arr[MEMBERB].name, t->clients_arr[MEMBERA].name, len,
            info.label);
+#endif
+
     return ARANYA_ERROR_SUCCESS;
 }
 

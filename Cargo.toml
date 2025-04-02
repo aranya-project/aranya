@@ -38,8 +38,8 @@ wildcard_imports = "warn"
 aranya-afc-util = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183", features = ["alloc"] }
 # TODO: use released crate
 aranya-aqc-util = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183", features = ["alloc"] }
-aranya-capi-core = { version = "0.2.0" }
-aranya-capi-codegen = { version = "0.2.0" }
+aranya-capi-core = { version = "0.2.1" }
+aranya-capi-codegen = { version = "0.2.1" }
 # TODO: use released crate
 aranya-crypto = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
 aranya-crypto-ffi = { git = "https://github.com/aranya-project/aranya-core.git", branch = "issue/183" }

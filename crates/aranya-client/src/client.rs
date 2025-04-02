@@ -2,20 +2,26 @@
 
 use std::{net::SocketAddr, path::Path, time::Duration};
 
+#[cfg(feature = "afc")]
+use aranya_daemon_api::CS;
 use aranya_daemon_api::{
-    DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, NetIdentifier, Role, TeamId, CS,
+    DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, NetIdentifier, Role, TeamId,
 };
+use aranya_fast_channels::Label;
+#[cfg(feature = "afc")]
 use aranya_fast_channels::{
     shm::ReadState,
-    Label, {self as afc},
+    {self as afc},
 };
 use aranya_util::Addr;
 use tarpc::{context, tokio_serde::formats::Json};
+#[cfg(feature = "afc")]
 use tokio::net::ToSocketAddrs;
 use tracing::{debug, info, instrument};
 
+#[cfg(feature = "afc")]
+use crate::afc::{setup_afc_shm, FastChannels, FastChannelsImpl};
 use crate::{
-    afc::{setup_afc_shm, FastChannels, FastChannelsImpl},
     aqc::{AqcChannels, AqcChannelsImpl},
     error::{Error, Result},
 };
@@ -66,6 +72,7 @@ impl Labels {
 pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
+    #[cfg(feature = "afc")]
     /// Support for Aranya Fast Channels
     pub(crate) afc: FastChannelsImpl<ReadState<CS>>,
     /// Support for AQC
@@ -83,6 +90,7 @@ impl Client {
     /// - `afc_address`: The address that AFC listens for incoming connections
     ///   on.
     // TODO: aqc_address
+    #[cfg(feature = "afc")]
     #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, max_channels))]
     pub async fn connect<A>(
         daemon_socket: &Path,
@@ -122,6 +130,29 @@ impl Client {
             .get_keystore_info(context::current())
             .await?
             .map_err(Into::into)
+    }
+
+    /// Creates a client connection to the daemon.
+    ///
+    /// - `daemon_socket`: The socket path to communicate with the daemon.
+    #[cfg(not(feature = "afc"))]
+    #[instrument(skip_all, fields(?daemon_socket))]
+    pub async fn connect(daemon_socket: &Path) -> Result<Self> {
+        info!("starting Aranya client");
+
+        let transport = tarpc::serde_transport::unix::connect(daemon_socket, Json::default)
+            .await
+            .map_err(Error::Connecting)?;
+        let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
+        debug!("connected to daemon");
+
+        debug!("getting key store info");
+        let keystore_info = daemon.get_keystore_info(context::current()).await??;
+        debug!("getting device id");
+        let device_id = daemon.get_device_id(context::current()).await??;
+        let aqc = AqcChannelsImpl::new(device_id, keystore_info).await?;
+
+        Ok(Self { daemon, aqc })
     }
 
     /// Returns the address that the Aranya sync server is bound to.
@@ -174,6 +205,7 @@ impl Client {
         Team { client: self, id }
     }
 
+    #[cfg(feature = "afc")]
     /// Get access to Aranya Fast Channels.
     pub fn afc(&mut self) -> FastChannels<'_> {
         FastChannels::new(self)
@@ -207,10 +239,22 @@ pub struct Team<'a> {
 
 impl Team<'_> {
     /// Adds a peer for automatic periodic Aranya state syncing.
-    pub async fn add_sync_peer(&mut self, addr: Addr, interval: Duration) -> Result<()> {
+    pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
             .daemon
-            .add_sync_peer(context::current(), addr, self.id, interval)
+            .add_sync_peer(context::current(), addr, self.id, config.into())
+            .await?
+            .map_err(Into::into)
+    }
+
+    /// Immediately syncs with the peer.
+    ///
+    /// If `config` is `None`, default values (including those from the daemon) will
+    /// be used.
+    pub async fn sync_now(&mut self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
+        self.client
+            .daemon
+            .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
             .await?
             .map_err(Into::into)
     }
@@ -274,6 +318,7 @@ impl Team<'_> {
     /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+    #[cfg(feature = "afc")]
     pub async fn assign_afc_net_identifier(
         &mut self,
         device: DeviceId,
@@ -287,6 +332,7 @@ impl Team<'_> {
     }
 
     /// Disassociate an AFC network identifier from a device.
+    #[cfg(feature = "afc")]
     pub async fn remove_afc_net_identifier(
         &mut self,
         device: DeviceId,
@@ -416,6 +462,7 @@ impl Queries<'_> {
     }
 
     /// Returns the AFC network identifier assigned to the current device.
+    #[cfg(feature = "afc")]
     pub async fn afc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
         self.client
             .daemon
@@ -440,5 +487,84 @@ impl Queries<'_> {
             .query_label_exists(context::current(), self.id, label)
             .await?
             .map_err(Into::into)
+    }
+}
+
+/// Configuration values for syncing with a peer
+#[derive(Debug, Clone)]
+pub struct SyncPeerConfig {
+    interval: Duration,
+    sync_now: bool,
+}
+
+impl SyncPeerConfig {
+    /// Creates a default [`SyncPeerConfigBuilder`]
+    pub fn builder() -> SyncPeerConfigBuilder {
+        Default::default()
+    }
+}
+
+impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
+    fn from(value: SyncPeerConfig) -> Self {
+        Self {
+            interval: value.interval,
+            sync_now: value.sync_now,
+        }
+    }
+}
+
+/// Builder for a [`SyncPeerConfig`]
+pub struct SyncPeerConfigBuilder {
+    interval: Option<Duration>,
+    sync_now: bool,
+}
+
+impl SyncPeerConfigBuilder {
+    /// Creates a `SyncPeerConfigBuilder`.
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    /// Build a [`SyncPeerConfig`]
+    pub fn build(self) -> Result<SyncPeerConfig> {
+        let Some(interval) = self.interval else {
+            let e = Error::InvalidArg {
+                arg: "interval",
+                reason: "Tried to create a `SyncPeerConfig` without setting the interval!",
+            };
+            return Err(e);
+        };
+
+        Ok(SyncPeerConfig {
+            interval,
+            sync_now: self.sync_now,
+        })
+    }
+
+    /// Set the interval at which syncing occurs
+    ///
+    /// By default, the interval is not set. It is an error to call
+    /// [`build`][Self::build] before setting the interval with
+    /// this method
+    pub fn interval(mut self, duration: Duration) -> Self {
+        self.interval = Some(duration);
+        self
+    }
+
+    /// Configures whether the peer will be immediately synced with after being added.
+    ///
+    /// By default, the peer is immediately synced with.
+    pub fn sync_now(mut self, sync_now: bool) -> Self {
+        self.sync_now = sync_now;
+        self
+    }
+}
+
+impl Default for SyncPeerConfigBuilder {
+    fn default() -> Self {
+        Self {
+            interval: None,
+            sync_now: true,
+        }
     }
 }

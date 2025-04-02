@@ -314,6 +314,15 @@ pub struct KeyStoreInfo {
     pub wrapped_key: PathBuf,
 }
 
+/// Configuration values for syncing with a peer
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SyncPeerConfig {
+    /// The interval at which syncing occurs
+    pub interval: Duration,
+    /// Determines if a peer should be synced with immediately after they're added
+    pub sync_now: bool,
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
     /// Gets the key store info.
@@ -330,7 +339,10 @@ pub trait DaemonApi {
     async fn get_device_id() -> Result<DeviceId>;
 
     /// Adds the peer for automatic periodic syncing.
-    async fn add_sync_peer(addr: Addr, team: TeamId, interval: Duration) -> Result<()>;
+    async fn add_sync_peer(addr: Addr, team: TeamId, config: SyncPeerConfig) -> Result<()>;
+
+    /// Sync with peer immediately.
+    async fn sync_now(addr: Addr, team: TeamId, cfg: Option<SyncPeerConfig>) -> Result<()>;
 
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
@@ -356,26 +368,26 @@ pub trait DaemonApi {
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
-    /// Assign an AFC network identifier to a device.
+    /// Assign a fast channels network identifier to a device.
     async fn assign_afc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
     ) -> Result<()>;
-    /// Remove an AFC network identifier from a device.
+    /// Remove a fast channels network identifier from a device.
     async fn remove_afc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
     ) -> Result<()>;
 
-    /// Assign an AQC network identifier to a device.
+    /// Assign a QUIC channels network identifier to a device.
     async fn assign_aqc_net_identifier(
         team: TeamId,
         device: DeviceId,
         name: NetIdentifier,
     ) -> Result<()>;
-    /// Remove an AQC network identifier from a device.
+    /// Remove a QUIC channels network identifier from a device.
     async fn remove_aqc_net_identifier(
         team: TeamId,
         device: DeviceId,

@@ -509,6 +509,7 @@ where
 
     /// Sets an AFC network name.
     #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
+    #[cfg(feature = "afc")]
     fn set_afc_network_name(
         &self,
         device_id: DeviceId,
@@ -524,6 +525,7 @@ where
 
     /// Sets an AFC network name.
     #[instrument(skip(self), fields(device_id = %device_id))]
+    #[cfg(feature = "afc")]
     fn unset_afc_network_name(
         &self,
         device_id: DeviceId,
@@ -567,6 +569,7 @@ where
 
     /// Creates a bidirectional AFC channel.
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
+    #[cfg(feature = "afc")]
     fn create_afc_bidi_channel(
         &self,
         peer_id: DeviceId,
@@ -653,6 +656,7 @@ where
     /// Creates a bidirectional AFC channel off graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
+    #[cfg(feature = "afc")]
     fn create_afc_bidi_channel_off_graph(
         &self,
         peer_id: DeviceId,
@@ -670,6 +674,7 @@ where
 
     /// Creates a unidirectional AFC channel.
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
+    #[cfg(feature = "afc")]
     fn create_afc_uni_channel(
         &self,
         seal_id: DeviceId,
@@ -690,6 +695,7 @@ where
     /// Creates a unidirectional AFC channel.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
+    #[cfg(feature = "afc")]
     fn create_afc_uni_channel_off_graph(
         &self,
         seal_id: DeviceId,
