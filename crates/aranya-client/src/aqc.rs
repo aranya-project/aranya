@@ -61,6 +61,8 @@ impl<'a> AqcChannels<'a> {
             .await??;
         debug!(%aqc_id, %node_id, %label, "created bidi channel");
 
+        // TODO: decode PSK
+
         Ok(aqc_id)
     }
 
@@ -92,6 +94,8 @@ impl<'a> AqcChannels<'a> {
             .await??;
         debug!(%aqc_id, %node_id, %label, "created aqc uni channel");
 
+        // TODO: decode PSK
+
         // TODO: send ctrl message.
         debug!("sent control message");
 
@@ -111,20 +115,3 @@ impl<'a> AqcChannels<'a> {
         Ok(())
     }
 }
-
-// TODO: AQC shm.
-// /// Setup the Aranya Client's read side of the AQC channel keys shared memory.
-/*
-pub(crate) fn setup_aqc_shm(shm_path: &Path, max_chans: usize) -> Result<ReadState<CS>, AqcError> {
-    debug!(?shm_path, "setting up aqc shm read side");
-
-    let Some(path) = shm_path.to_str() else {
-        return Err(anyhow!("unable to convert shm path to string").into());
-    };
-    let path = ShmPathBuf::from_str(path).map_err(AqcError::ShmPathParse)?;
-    let read = ReadState::open(&path, Flag::OpenOnly, Mode::ReadWrite, max_chans)
-        .map_err(Into::into)
-        .map_err(AqcError::ShmReadState)?;
-    Ok(read)
-}
-*/
