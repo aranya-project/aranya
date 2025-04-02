@@ -308,6 +308,9 @@ impl DaemonApiHandler {
                 Effect::QueryAqcNetIdentifierResult(_) => {}
                 Effect::QueryLabelExistsResult(_) => {}
                 Effect::QueryDeviceLabelAssignmentsResult(_) => {}
+                Effect::AqcLabelCreated(_) => {}
+                Effect::AqcLabelDeleted(_) => {}
+                Effect::QueriedAqcLabel(_) => {}
             }
         }
         Ok(())
@@ -787,7 +790,7 @@ impl DaemonApi for DaemonApiHandler {
         else {
             return Err(anyhow::anyhow!("unable to find AqcBidiChannelCreated effect").into());
         };
-        let aqc_id: AqcId = e.channel_key_id.into();
+        let aqc_id: AqcId = e.channel_id.into();
         debug!(?aqc_id, "processed aqc ID");
 
         self.handle_effects(&effects, Some(node_id)).await?;
@@ -802,7 +805,7 @@ impl DaemonApi for DaemonApiHandler {
             peer_id: e.peer_id.into(),
             peer_enc_pk: &e.peer_enc_pk,
             label,
-            key_id: e.channel_key_id.into(),
+            key_id: e.channel_id.into(),
         };
 
         Ok((aqc_id, ctrl, aqc_info.into()))
@@ -838,7 +841,7 @@ impl DaemonApi for DaemonApiHandler {
         else {
             return Err(anyhow::anyhow!("unable to find AqcUniChannelCreated effect").into());
         };
-        let aqc_id: AqcId = e.channel_key_id.into();
+        let aqc_id: AqcId = e.channel_id.into();
         debug!(?aqc_id, "processed aqc ID");
 
         self.handle_effects(&effects, Some(node_id)).await?;
@@ -854,7 +857,7 @@ impl DaemonApi for DaemonApiHandler {
             recv_id: e.reader_id.into(),
             peer_enc_pk: &e.peer_enc_pk,
             label,
-            key_id: e.channel_key_id.into(),
+            key_id: e.channel_id.into(),
         };
 
         Ok((aqc_id, ctrl, aqc_info.into()))

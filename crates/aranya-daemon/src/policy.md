@@ -79,6 +79,7 @@ use perspective
 ### Enums & Structs
 
 ```policy
+
 // Defines the roles a team member may have.
 enum Role {
     Owner,
@@ -87,10 +88,16 @@ enum Role {
     Member,
 }
 
-// Valid channel operations that a Member can get assigned to.
+// Valid channel operations for a label assignment.
 enum ChanOp {
+    // The device can only receive data in channels with this
+    // label.
     ReadOnly,
+    // The device can only send data in channels with this
+    // label.
     WriteOnly,
+    // The device can send and receive data in channels with this
+    // label.
     ReadWrite,
 }
 
@@ -131,7 +138,8 @@ fact TeamEnd[]=>{}
 // Records a channel label that has been defined for use.
 fact Label[label int]=>{}
 
-// Records that A device is allowed to use a channel label.
+// Records that a device was granted permission to use a label
+// for certain channel operations.
 fact AssignedLabel[device_id id, label int]=>{op enum ChanOp}
 
 // Stores a Member's associated network identifier for AFC.
@@ -144,8 +152,7 @@ fact AqcMemberNetworkId[device_id id]=>{net_identifier string}
 ### Functions
 
 ```policy
-// Check if there is an existing device.
-// Returns the device struct if so, otherwise returns `None`.
+// Returns a device if one exists.
 function find_existing_device(device_id id) optional struct Device {
     let device = query Device[device_id: device_id]
     let has_ident = exists DeviceIdentKey[device_id: device_id]
@@ -166,7 +173,7 @@ function find_existing_device(device_id id) optional struct Device {
     return device
 }
 
-// Sanity checks the device per the stated invariants.
+// Returns a valid Device after performing sanity checks per the stated invariants.
 function get_valid_device(device_id id) struct Device {
     // Check to see if team is active.
     check !exists TeamEnd[]=> {}
@@ -226,8 +233,9 @@ function seal_command(payload bytes) struct Envelope {
     )
 }
 
-// Opens an envelope with the author's public SigningKey, and returns the contained serialized
-// basic command once its been verified.
+// Opens an envelope using the author's public device signing
+// key, and if verification succeeds, returns the serialized
+// basic command data .
 function open_envelope(sealed_envelope struct Envelope) bytes {
     let author_id = envelope::author_id(sealed_envelope)
     let author_sign_pk = check_unwrap query DeviceSignKey[device_id: author_id]
@@ -246,9 +254,18 @@ function open_envelope(sealed_envelope struct Envelope) bytes {
 #### Channel Functions
 
 ```policy
-// Reports whether `label` has the valid format for a channel label, which is an unsigned, 32-bit integer.
+// Reports whether `label` is a valid label.
+//
+// A valid label must be an unsigned, 32-bit integer.
 function is_valid_label(label int) bool {
     return label >= 0 && label <= 4294967295
+}
+
+// Reports whether `size` is a valid PSK length (in bytes).
+//
+// Per the AQC specification, PSKs must be in the range [32, 2^16).
+function is_valid_psk_length(size int) bool {
+    return size >= 32 && size < 65536
 }
 
 // Returns the channel operation for a particular label.
@@ -257,7 +274,7 @@ function get_allowed_op(device_id id, label int) enum ChanOp {
     return assigned_label.op
 }
 
-// Returns the device's public EncryptionKey.
+// Returns the device's encoded public EncryptionKey.
 function get_enc_pk(device_id id) bytes {
     let device_enc_pk = check_unwrap query DeviceEncKey[device_id: device_id]
     return device_enc_pk.key
@@ -319,40 +336,51 @@ function can_create_afc_uni_channel(writer_id id, reader_id id, label int) bool 
 ##### AQC Channel Functions
 
 ```policy
-// Reports whether the devices have permission to create a bidirectional AQC channel with each other.
+// Reports whether the devices have permission to create
+// a bidirectional AQC channel with each other.
 function can_create_aqc_bidi_channel(device1 id, device2 id, label int) bool {
-    let device1_op = get_allowed_op(device1, label)
-    let device2_op = get_allowed_op(device2, label)
-
-    // Label must be valid.
     check is_valid_label(label)
-    // Members can't create channels with themselves.
+    // Devices cannot create channels with themselves.
+    //
+    // This should have been caught by the AQC FFI, so check
+    // instead of just returning false.
     check device1 != device2
-
-    // Both devices must have permissions to encrypt and decrypt data.
-    check device1_op == device2_op
-    check device1_op == ChanOp::ReadWrite
-
+    // Both devices must have permissions to read (recev) and
+    // write (send) data.
+    let device1_op = get_allowed_op(device1, label)
+    if device1_op != ChanOp::ReadWrite {
+        return false
+    }
+    let device2_op = get_allowed_op(device2, label)
+    if device2_op != ChanOp::ReadWrite {
+        return false
+    }
     return true
 }
 
-// Reports whether the devices have permission to create a unidirectional AQC channel with each other.
+// Reports whether the devices have permission to create
+// a unidirectional AQC channel with each other.
 function can_create_aqc_uni_channel(writer_id id, reader_id id, label int) bool {
-    let writer_op = get_allowed_op(writer_id, label)
-    let reader_op = get_allowed_op(reader_id, label)
-
-     // Label must be valid.
     check is_valid_label(label)
-    // Members can't create channels with themselves.
+    // Devices cannot create channels with themselves.
+    //
+    // This should have been caught by the AQC FFI, so check
+    // instead of just returning false.
     check writer_id != reader_id
-
-    // Writer must have permissions to encrypt data.
-    check writer_op == ChanOp::WriteOnly ||
-        writer_op == ChanOp::ReadWrite
-    // Reader must have permission to decrypt data.
-    check reader_op == ChanOp::ReadOnly ||
-        reader_op == ChanOp::ReadWrite
-
+    // The writer must have permissions to write (send) data.
+    let writer_op = get_allowed_op(writer_id, label)
+    match writer_op {
+        ChanOp::ReadOnly => {return false}
+        ChanOp::WriteOnly => {}
+        ChanOp::ReadWrite => {}
+    }
+    // The reader must have permission to read (receive) data.
+    let reader_op = get_allowed_op(reader_id, label)
+    match reader_op {
+        ChanOp::ReadOnly => {}
+        ChanOp::WriteOnly => {return false}
+        ChanOp::ReadWrite => {}
+    }
     return true
 }
 ```
@@ -1666,17 +1694,20 @@ command AfcCreateUniChannel {
 
 **Invariants**:
 
-- Members can only create channels for the labels they've been assigned.
-- Members can only create unidirectional channels when the writer side has either
-  `ChanOp::ReadWrite` or `ChanOp::WriteOnly` permissions for the label and the reader side has
-  either `ChanOp::ReadWrite` or `ChanOp::ReadOnly` permissions for the label.
+- Devices can only create channels for the labels they've been
+  assigned.
+- A device can only use a bidi channel if it has been granted
+  `ChanOp::ReadWrite` permission for the label assigned to the
+  channel.
 
 ### AqcCreateChannel
 
 #### AqcCreateBidiChannel
-Creates a bidirectional "AQC" channel for off-graph messaging. This is an ephemeral command, which
-means that it can only be emitted within an ephemeral session so that it is not added to the graph
-of commands. Furthermore, it cannot persist any changes to the factDB.
+Creates a bidirectional AQC channel for off-graph messaging.
+This is an ephemeral command, which means that it can only be
+emitted within an ephemeral session so that it is not added to
+the graph of commands. Furthermore, it cannot persist any changes
+to the fact database.
 
 The `create_aqc_bidi_channel` action creates the `ChannelKeys`, encapsulates them for the peer and the
 author, and sends the encapsulations through the `AqcCreateBidiChannel` command. When processing the
@@ -1688,9 +1719,7 @@ action create_aqc_bidi_channel(peer_id id, label int) {
     let author_id = device::current_device_id()
     let author = get_valid_device(author_id)
     let peer_enc_pk = get_enc_pk(peer_id)
-
-    // TODO: aqc::create_bidi_channel doesn't exist yet
-    let channel = aqc::create_bidi_channel(
+    let ch = aqc::create_bidi_channel(
         parent_cmd_id,
         author.enc_key_id,
         author_id,
@@ -1698,62 +1727,75 @@ action create_aqc_bidi_channel(peer_id id, label int) {
         peer_id,
         label,
     )
-
     publish AqcCreateBidiChannel {
         peer_id: peer_id,
         label: label,
-        peer_encap: channel.peer_encap,
-        channel_key_id: channel.key_id,
+        peer_encap: ch.peer_encap,
+        channel_id: ch.key_id,
     }
 }
-
+// The effect that is emitted when the author of a bidirectional
+// AQC channel successfully processes the `AqcCreateBidiChannel`
+// command.
 effect AqcBidiChannelCreated {
+    // The unique ID of the previous command.
     parent_cmd_id id,
+    // The channel author's device ID.
     author_id id,
+    // The channel author's encryption key ID.
     author_enc_key_id id,
+    // The channel peer's device Id.
     peer_id id,
+    // The channel peer's encoded public encryption key.
     peer_enc_pk bytes,
+    // The channel label.
     label int,
-    channel_key_id id,
+    // The channel's unique identifier.
+    channel_id id,
 }
-
+// The effect that is emitted when the peer of a bidirectional
+// AQC channel successfully processes the `AqcCreateBidiChannel`
+// command.
 effect AqcBidiChannelReceived {
+    // The unique ID of the previous command.
     parent_cmd_id id,
+    // The channel author's device ID.
     author_id id,
+    // The channel author's encoded public encryption key.
     author_enc_pk bytes,
+    // The channel peer's device Id.
     peer_id id,
+    // The channel peer's encryption key ID.
     peer_enc_key_id id,
+    // The channel label.
     label int,
+    // The channel peer's encapsulated KEM shared secret.
     encap bytes,
 }
-
 command AqcCreateBidiChannel {
     fields {
+        // The channel peer's device Id.
         peer_id id,
+        // The label applied to the channel.
         label int,
+        // The channel peer's encapsulated KEM shared secret.
         peer_encap bytes,
-        channel_key_id id,
+        // The channel's unique identifier.
+        channel_id id,
     }
-
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
-
     policy {
         let author = get_valid_device(envelope::author_id(envelope))
         let peer = check_unwrap find_existing_device(this.peer_id)
-
-        // Only Members can create AQC channels with other peer Members
-        check is_member(author.role)
-        check is_member(peer.role)
-
-        // Members must be different and both must have bidirectional permissions over valid label.
+        // Check that both devices are allowed to participate in
+        // this bidirectional channel.
         check can_create_aqc_bidi_channel(author.device_id, peer.device_id, this.label)
-
+        // NB: Check roles, other ACLs here.
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
-
-        // We authored this command.
         if current_device_id == author.device_id {
+            // We're the channel author.
             let peer_enc_pk = get_enc_pk(peer.device_id)
             finish {
                 emit AqcBidiChannelCreated {
@@ -1763,12 +1805,11 @@ command AqcCreateBidiChannel {
                     peer_id: peer.device_id,
                     peer_enc_pk: peer_enc_pk,
                     label: this.label,
-                    channel_key_id: this.channel_key_id,
+                    channel_id: this.channel_id,
                 }
             }
-        }
-        // We're the intended recipient of this command.
-        else if current_device_id == peer.device_id {
+        } else if current_device_id == peer.device_id {
+            // We're the channel peer.
             let author_enc_pk = get_enc_pk(author.device_id)
             finish {
                 emit AqcBidiChannelReceived {
@@ -1781,9 +1822,9 @@ command AqcCreateBidiChannel {
                     encap: this.peer_encap,
                 }
             }
-        }
-        // Only the communicating peers should process this command.
-        else {
+        } else {
+            // This is an off-graph session command, so only the
+            // communicating peers should process this command.
             check false
         }
     }
@@ -1792,14 +1833,22 @@ command AqcCreateBidiChannel {
 
 **Invariants**:
 
-- Only Members can create and communicate over AQC channels.
-- Members can only create channels for the labels they've been assigned.
-- Members can only communicate over a bidi channel when they have `ChanOp::ReadWrite` permission.
+- Devices can only create channels for the labels they've been
+  assigned.
+- A device can only write data to a uni channel if it has been
+  granted either the `ChanOp::WriteOnly` or `ChanOp::ReadWrite`
+  permission for the label assigned to the channel.
+- A device can only read data from a uni channel if it has been
+  granted either the `ChanOp::ReadOnly` or `ChanOp::ReadWrite`
+  permission for the label assigned to the channel.
 
 #### AqcCreateUniChannel
-Creates a unidirectional "AQC" channel. This is an ephemeral command, which means that it can only
-be emitted within an ephemeral session and is not added to the graph of commands. Furthermore, it
-does not persist any changes to the factDB.
+
+Creates a bidirectional AQC channel for off-graph messaging.
+This is an ephemeral command, which means that it can only be
+emitted within an ephemeral session so that it is not added to
+the graph of commands. Furthermore, it cannot persist any changes
+to the fact database.
 
 The `create_aqc_uni_channel` action creates the `ChannelKey`, encapsulates it for the peer, and sends
 the encapsulation through the `AqcCreateUniChannel` command. When processing the command, the
@@ -1811,9 +1860,7 @@ action create_aqc_uni_channel(writer_id id, reader_id id, label int) {
     let author = get_valid_device(device::current_device_id())
     let peer_id = select_peer_id(author.device_id, writer_id, reader_id)
     let peer_enc_pk = get_enc_pk(peer_id)
-
-    // TODO: aqc::create_uni_channel doesn't exist yet
-    let channel = aqc::create_uni_channel(
+    let ch = aqc::create_uni_channel(
         parent_cmd_id,
         author.enc_key_id,
         peer_enc_pk,
@@ -1821,76 +1868,92 @@ action create_aqc_uni_channel(writer_id id, reader_id id, label int) {
         reader_id,
         label,
     )
-
     publish AqcCreateUniChannel {
         writer_id: writer_id,
         reader_id: reader_id,
         label: label,
-        peer_encap: channel.peer_encap,
-        channel_key_id: channel.key_id,
+        peer_encap: ch.peer_encap,
+        channel_id: ch.key_id,
     }
 }
-
+// The effect that is emitted when the author of a unidirectional
+// AQC channel successfully processes the `AqcCreateUniChannel`
+// command.
 effect AqcUniChannelCreated {
+    // The unique ID of the previous command.
     parent_cmd_id id,
+    // The channel author's device ID.
     author_id id,
+    // The device ID of the participant that can write data.
     writer_id id,
+    // The device ID of the participant that can read data.
     reader_id id,
+    // The channel author's encryption key ID.
     author_enc_key_id id,
+    // The channel peer's encoded public encryption key.
     peer_enc_pk bytes,
+    // The channel label.
     label int,
-    channel_key_id id,
+    // The channel's unique identifier.
+    channel_id id,
 }
-
+// The effect that is emitted when the peer of a unidirectional
+// AQC channel successfully processes the `AqcCreateUniChannel`
+// command.
 effect AqcUniChannelReceived {
+    // The unique ID of the previous command.
     parent_cmd_id id,
+    // The channel author's device ID.
     author_id id,
+    // The device ID of the participant that can write data.
     writer_id id,
+    // The device ID of the participant that can read data.
     reader_id id,
+    // The channel author's encryption key ID.
     author_enc_pk bytes,
+    // The channel peer's encryption key ID.
     peer_enc_key_id id,
+    // The channel label.
     label int,
+    // The channel peer's encapsulated KEM shared secret.
     encap bytes,
 }
-
 command AqcCreateUniChannel {
     fields {
-        // The DeviceID of the side that can encrypt data.
+        // The device ID of the participant that can write data.
         writer_id id,
-        // The DeviceID of the side that can decrypt data.
+        // The device ID of the participant that can read data.
         reader_id id,
-        // The label to use.
+        // The label applied to the channel.
         label int,
-        // The encapsulated key for the recipient of the command.
+        // The channel peer's encapsulated KEM shared secret.
         peer_encap bytes,
         // The ID of the AQC channel key.
-        channel_key_id id,
+        channel_id id,
     }
-
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
-
     policy {
         let author = get_valid_device(envelope::author_id(envelope))
-
-        // Ensure that the author is half the channel and return the peer's info.
-        let peer_id = select_peer_id(author.device_id, this.writer_id, this.reader_id)
+        // Ensure that the author is one of the channel
+        // participants.
+        check author.device_id == this.writer_id ||
+              author.device_id == this.reader_id
+        let peer_id = if author.device_id == this.writer_id {
+            this.reader_id
+        } else {
+            this.writer_id
+        }
         let peer = check_unwrap find_existing_device(peer_id)
-
-        // Only Members can create AQC channels with other peer Members
-        check is_member(author.role)
-        check is_member(peer.role)
-
-        // Both devices must have valid permissions.
+        // Check that both devices are allowed to participate in
+        // this unidirectional channel.
         check can_create_aqc_uni_channel(this.writer_id, this.reader_id, this.label)
-
+        // NB: Check roles, other ACLs here.
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
-
         // We authored this command.
         if current_device_id == author.device_id {
             let peer_enc_pk = get_enc_pk(peer_id)
-
             finish {
                 emit AqcUniChannelCreated {
                     parent_cmd_id: parent_cmd_id,
@@ -1900,14 +1963,12 @@ command AqcCreateUniChannel {
                     author_enc_key_id: author.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
                     label: this.label,
-                    channel_key_id: this.channel_key_id,
+                    channel_id: this.channel_id,
                 }
             }
-        }
-        // We're the intended recipient of this command.
-        else if current_device_id == peer.device_id {
+        } else if current_device_id == peer.device_id {
+            // We're the intended recipient of this command.
             let author_enc_pk = get_enc_pk(author.device_id)
-
             finish {
                 emit AqcUniChannelReceived {
                     parent_cmd_id: parent_cmd_id,
@@ -1920,9 +1981,11 @@ command AqcCreateUniChannel {
                     encap: this.peer_encap,
                 }
             }
+        } else {
+            // This is an off-graph session command, so only the
+            // communicating peers should process this command.
+            check false
         }
-        // Only the communicating peers should process this command.
-        else { check false}
     }
 }
 ```
@@ -1933,6 +1996,139 @@ command AqcCreateUniChannel {
 - Members can only create unidirectional channels when the writer side has either
   `ChanOp::ReadWrite` or `ChanOp::WriteOnly` permissions for the label and the reader side has
   either `ChanOp::ReadWrite` or `ChanOp::ReadOnly` permissions for the label.
+
+#### AQC Labels
+
+```policy
+// Records an AQC label.
+//
+// `author_id` is the ID of the device that created the label.
+fact AqcLabel[name string, label_author_id id]=>{label_id id}
+action create_aqc_label(name string) {
+    publish CreateAqcLabel {
+        name: name,
+    }
+}
+command CreateAqcLabel {
+    fields {
+        // The label name.
+        name string,
+    }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+    policy {
+        let author = get_valid_device(envelope::author_id(envelope))
+        let label_id = envelope::command_id(envelope)
+        // Verify that the label does not already exist.
+        //
+        // This will happen in the `finish` block if we try to
+        // create an already true label, but checking first
+        // results in a nicer error (I think?).
+        check !exists AqcLabel[name: this.name, label_author_id: author.device_id]
+        finish {
+            create AqcLabel[name: this.name, label_author_id: author.device_id]=>{label_id: label_id}
+            emit AqcLabelCreated {
+                name: this.name,
+                label_author_id: author.device_id,
+                label_id: label_id,
+            }
+        }
+    }
+}
+// The effect emitted when the `CreateAqcLabel` command is
+// successfully processed.
+effect AqcLabelCreated {
+    // The label name.
+    name string,
+    // The ID of the device that created the label.
+    label_author_id id,
+    // Uniquely identifies the label.
+    label_id id,
+}
+action delete_aqc_label_by_name(name string, label_author_id id) {
+    publish DeleteAqcLabel {
+        name: name,
+        label_author_id: label_author_id,
+    }
+}
+// TODO(eric): add `delete_aqc_label_by_id`?
+command DeleteAqcLabel {
+    fields {
+        // The label name.
+        name string,
+        // The device ID of the author of the label.
+        label_author_id id,
+    }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+    policy {
+        let author = get_valid_device(envelope::author_id(envelope))
+        // NB: Check roles, other ACLs here.
+        // Verify that the label exists.
+        //
+        // This will happen in the `finish` block if we try to
+        // create an already true label, but checking first
+        // results in a nicer error (I think?).
+        let label = check_unwrap query AqcLabel[name: this.name, label_author_id: this.label_author_id]
+        finish {
+            delete AqcLabel[name: this.name, label_author_id: this.label_author_id]
+            emit AqcLabelCreated {
+                name: this.name,
+                label_author_id: this.label_author_id,
+                label_id: label.label_id,
+            }
+        }
+    }
+}
+// The effect emitted when the `DeleteAqcLabel` command is
+// successfully processed.
+effect AqcLabelDeleted {
+    // The label name.
+    name string,
+    // The label author's device ID.
+    label_author_id id,
+    // Uniquely identifies the label.
+    label_id id,
+    // The ID of the device that deleted the label.
+    author_id id,
+}
+// Emits `QueriedAfcLabel` for each label with the same name.
+action query_aqc_label(name string) {
+    map AqcLabel[name: name, label_author_id: ?] as f {
+        publish QueryAqcLabel {
+            name: f.name,
+            label_author_id: f.label_author_id,
+            label_id: f.label_id,
+        }
+    }
+}
+command QueryAqcLabel {
+    fields {
+        name string,
+        label_author_id id,
+        label_id id,
+    }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+    policy {
+        finish {
+            emit QueriedAqcLabel {
+                name: this.name,
+                label_author_id: this.label_author_id,
+                label_id: this.label_id,
+            }
+        }
+    }
+}
+effect QueriedAqcLabel {
+    // The label name.
+    name string,
+    // The ID of the device that created the label.
+    label_author_id id,
+    // The label's unique ID.
+    label_id id,
+}
+```
 
 ### QueryDevicesOnTeam
 Queries devices on team.

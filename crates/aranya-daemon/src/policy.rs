@@ -61,6 +61,9 @@ pub enum Effect {
     AqcBidiChannelReceived(AqcBidiChannelReceived),
     AqcUniChannelCreated(AqcUniChannelCreated),
     AqcUniChannelReceived(AqcUniChannelReceived),
+    AqcLabelCreated(AqcLabelCreated),
+    AqcLabelDeleted(AqcLabelDeleted),
+    QueriedAqcLabel(QueriedAqcLabel),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
@@ -220,7 +223,7 @@ pub struct AqcBidiChannelCreated {
     pub peer_id: Id,
     pub peer_enc_pk: Vec<u8>,
     pub label: i64,
-    pub channel_key_id: Id,
+    pub channel_id: Id,
 }
 /// AqcBidiChannelReceived policy effect.
 #[effect]
@@ -243,7 +246,7 @@ pub struct AqcUniChannelCreated {
     pub author_enc_key_id: Id,
     pub peer_enc_pk: Vec<u8>,
     pub label: i64,
-    pub channel_key_id: Id,
+    pub channel_id: Id,
 }
 /// AqcUniChannelReceived policy effect.
 #[effect]
@@ -256,6 +259,28 @@ pub struct AqcUniChannelReceived {
     pub peer_enc_key_id: Id,
     pub label: i64,
     pub encap: Vec<u8>,
+}
+/// AqcLabelCreated policy effect.
+#[effect]
+pub struct AqcLabelCreated {
+    pub name: String,
+    pub label_author_id: Id,
+    pub label_id: Id,
+}
+/// AqcLabelDeleted policy effect.
+#[effect]
+pub struct AqcLabelDeleted {
+    pub name: String,
+    pub label_author_id: Id,
+    pub label_id: Id,
+    pub author_id: Id,
+}
+/// QueriedAqcLabel policy effect.
+#[effect]
+pub struct QueriedAqcLabel {
+    pub name: String,
+    pub label_author_id: Id,
+    pub label_id: Id,
 }
 /// QueryDevicesOnTeamResult policy effect.
 #[effect]
@@ -348,6 +373,13 @@ pub trait ActorExt {
         reader_id: Id,
         label: i64,
     ) -> Result<(), ClientError>;
+    fn create_aqc_label(&mut self, name: String) -> Result<(), ClientError>;
+    fn delete_aqc_label_by_name(
+        &mut self,
+        name: String,
+        label_author_id: Id,
+    ) -> Result<(), ClientError>;
+    fn query_aqc_label(&mut self, name: String) -> Result<(), ClientError>;
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
     fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
