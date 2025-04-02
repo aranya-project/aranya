@@ -188,6 +188,15 @@ impl From<Id> for AfcId {
 /// to manage channel state and operations.
 pub type AfcCtrl = Vec<Box<[u8]>>;
 
+/// Configuration values for syncing with a peer
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct SyncPeerConfig {
+    /// The interval at which syncing occurs
+    pub interval: Duration,
+    /// Determines if a peer should be synced with immediately after they're added
+    pub sync_now: bool,
+}
+
 /// The Daemon API trait defining the RPC interface.
 ///
 /// This trait defines all the methods that can be called remotely by the Aranya client
@@ -228,11 +237,22 @@ pub trait DaemonApi {
     /// # Parameters
     /// - `addr` - The network address of the peer to sync with.
     /// - `team` - The team ID that this syncing relationship belongs to.
-    /// - `interval` - How frequently to attempt synchronization with the peer.
+    /// - `config` - The [`SyncPeerConfig`] used to configure the sync peer.
     ///
     /// # Returns
     /// - `Result<()>` - Success or an error if the peer cannot be added.
-    async fn add_sync_peer(addr: Addr, team: TeamId, interval: Duration) -> Result<()>;
+    async fn add_sync_peer(addr: Addr, team: TeamId, config: SyncPeerConfig) -> Result<()>;
+
+    /// Sync with peer immediately.
+    ///
+    /// # Parameters
+    /// - `addr` - The network address of the peer to sync with.
+    /// - `team` - The team ID that this syncing relationship belongs to.
+    /// - `config` - An optional [`SyncPeerConfig`] used to configure the sync peer.
+    ///
+    /// # Returns
+    /// - `Result<()>` - Success or an error if the sync fails.
+    async fn sync_now(addr: Addr, team: TeamId, cfg: Option<SyncPeerConfig>) -> Result<()>;
 
     /// Removes the peer from automatic syncing.
     ///
