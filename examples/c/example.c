@@ -62,10 +62,6 @@ typedef enum {
 const char *afc_shm_paths[] = {"/afc_owner", "/afc_admin", "/afc_operator",
                                "/afc_membera", "/afc_memberb"};
 
-// List of shared memory paths for the Aranya clients.
-const char *aqc_shm_paths[] = {"/aqc_owner", "/aqc_admin", "/aqc_operator",
-                               "/aqc_membera", "/aqc_memberb"};
-
 // List of Unix domain socket paths for the Aranya clients.
 const char *daemon_socks[] = {"out/owner/uds.sock", "out/admin/uds.sock",
                               "out/operator/uds.sock", "out/membera/uds.sock",
@@ -122,7 +118,7 @@ typedef struct {
 
 AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
                         const char *afc_shm_path, const char *afc_addr,
-                        const char *aqc_shm_path, const char *aqc_addr);
+                        const char *aqc_addr);
 AranyaError init_team(Team *t);
 AranyaError add_sync_peers(Team *t);
 AranyaError run(Team *t);
@@ -131,26 +127,23 @@ AranyaError cleanup_team(Team *t);
 // Initialize an Aranya client.
 AranyaError init_client(Client *c, const char *name, const char *daemon_sock,
                         const char *afc_shm_path, const char *afc_addr,
-                        const char *aqc_shm_path, const char *aqc_addr) {
+                        const char *aqc_addr) {
     AranyaError err;
 
     c->name = name;
     // TODO: methods for initializing cfg types?
     AranyaAfcConfig afc_cfg = {
         .shm_path = afc_shm_path, .max_channels = MAX_CHANS, .addr = afc_addr};
-    AranyaAqcConfig aqc_cfg = {
-        .shm_path = aqc_shm_path, .max_channels = MAX_CHANS, .addr = aqc_addr};
-    AranyaClientConfig cli_cfg = {
-        .daemon_sock = daemon_sock, .afc = afc_cfg, .aqc = aqc_cfg};
-    err = aranya_client_init(&c->client, &cli_cfg);
+    AranyaClientConfig cli_cfg = {.daemon_sock = daemon_sock, .afc = afc_cfg};
+    err                        = aranya_client_init(&c->client, &cli_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(
             stderr,
             "error initializing client %s (daemon_sock: %s, afc_shm_path: %s, "
-            "afc_addr: %s aqc_shm_path: %s, "
+            "afc_addr: %s, "
             "aqc_addr: %s): %s\r\n",
-            c->name, daemon_sock, afc_shm_path, aqc_addr, aqc_shm_path,
-            aqc_addr, aranya_error_to_str(err));
+            c->name, daemon_sock, afc_shm_path, aqc_addr, aqc_addr,
+            aranya_error_to_str(err));
         return err;
     }
     err = aranya_get_device_id(&c->client, &c->id);
@@ -171,8 +164,7 @@ AranyaError init_team(Team *t) {
     for (int i = 0; i < NUM_CLIENTS; i++) {
         printf("initializing client: %s\r\n", client_names[i]);
         err = init_client(&t->clients_arr[i], client_names[i], daemon_socks[i],
-                          afc_shm_paths[i], afc_addrs[i], aqc_shm_paths[i],
-                          afc_addrs[i]);
+                          afc_shm_paths[i], afc_addrs[i], afc_addrs[i]);
         EXPECT("error initializing team", err);
     }
 

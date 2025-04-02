@@ -100,13 +100,12 @@ impl Daemon {
             }
         });
         let afc = self.setup_afc()?;
-        let aqc = self.setup_aqc()?;
         let api = DaemonApiServer::new(
             client,
             local_addr,
             Arc::new(Mutex::new(afc)),
-            Arc::new(Mutex::new(aqc)),
             eng,
+            self.cfg.key_bundle_path(),
             store,
             self.cfg.uds_api_path.clone(),
             Arc::new(pk),
@@ -181,33 +180,6 @@ impl Daemon {
             let path = aranya_util::ShmPathBuf::from_str(&self.cfg.afc.shm_path)
                 .context("unable to parse AFC shared memory path")?;
             if self.cfg.afc.unlink_on_startup && self.cfg.afc.create {
-                let _ = shm::unlink(&path);
-            }
-            WriteState::open(
-                &path,
-                Flag::Create,
-                Mode::ReadWrite,
-                self.cfg.afc.max_chans,
-                Rng,
-            )
-            .context("unable to open `WriteState`")?
-        };
-
-        Ok(write)
-    }
-
-    /// Creates AQC shm.
-    fn setup_aqc(&self) -> Result<WriteState<CS, Rng>> {
-        // TODO: issue stellar-tapestry#34
-        // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
-        debug!(
-            shm_path = self.cfg.aqc.shm_path,
-            "setting up aqc shm write side"
-        );
-        let write = {
-            let path = aranya_util::ShmPathBuf::from_str(&self.cfg.aqc.shm_path)
-                .context("unable to parse AQC shared memory path")?;
-            if self.cfg.afc.unlink_on_startup && self.cfg.aqc.create {
                 let _ = shm::unlink(&path);
             }
             WriteState::open(
@@ -314,7 +286,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::{AfcConfig, AqcConfig};
+    use crate::config::AfcConfig;
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -331,13 +303,6 @@ mod tests {
             sync_addr: any,
             afc: AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
-                unlink_on_startup: true,
-                unlink_at_exit: true,
-                create: true,
-                max_chans: 100,
-            },
-            aqc: AqcConfig {
-                shm_path: "/test_daemon2".to_owned(),
                 unlink_on_startup: true,
                 unlink_at_exit: true,
                 create: true,

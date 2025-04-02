@@ -20,7 +20,7 @@ use anyhow::{Context, Result};
 use aranya_client::{afc::Message, client::Client};
 use aranya_crypto::{hash::Hash, rust::Sha256};
 use aranya_daemon::{
-    config::{AfcConfig, AqcConfig, Config},
+    config::{AfcConfig, Config},
     Daemon,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
@@ -213,7 +213,6 @@ impl DeviceCtx {
         fs::create_dir_all(work_dir.clone()).await?;
 
         let afc_shm_path = get_shm_path(format!("/afc_{team_name}_{name}"));
-        let aqc_shm_path = get_shm_path(format!("/aqc_{team_name}_{name}"));
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
@@ -226,13 +225,6 @@ impl DeviceCtx {
             sync_addr: Addr::new("localhost", 0)?,
             afc: AfcConfig {
                 shm_path: afc_shm_path.clone(),
-                unlink_on_startup: true,
-                unlink_at_exit: true,
-                create: true,
-                max_chans,
-            },
-            aqc: AqcConfig {
-                shm_path: aqc_shm_path.clone(),
                 unlink_on_startup: true,
                 unlink_at_exit: true,
                 create: true,
@@ -259,7 +251,6 @@ impl DeviceCtx {
             Client::connect(
                 &uds_api_path,
                 Path::new(&afc_shm_path),
-                Path::new(&aqc_shm_path),
                 max_chans,
                 "localhost:0",
             )

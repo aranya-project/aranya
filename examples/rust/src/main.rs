@@ -4,7 +4,6 @@ use std::{
     time::Duration,
 };
 use aranya_client::Label;
-use aranya_daemon::config::AqcConfig;
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{afc::Message, client::Client};
@@ -68,7 +67,6 @@ impl UserCtx {
         let uds_api_path = work_dir.join("uds.sock");
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let afc_shm_path = format!("/afc_{}_{}", team_name, name).to_string();
-        let aqc_shm_path = format!("/aqc_{}_{}", team_name, name).to_string();
         let max_chans = 100;
         let cfg = Config {
             name: "daemon".into(),
@@ -78,13 +76,6 @@ impl UserCtx {
             sync_addr: any,
             afc: AfcConfig {
                 shm_path: afc_shm_path.clone(),
-                unlink_on_startup: true,
-                unlink_at_exit: true,
-                create: true,
-                max_chans,
-            },
-            aqc: AqcConfig {
-                shm_path: aqc_shm_path.clone(),
                 unlink_on_startup: true,
                 unlink_at_exit: true,
                 create: true,
@@ -111,7 +102,6 @@ impl UserCtx {
             Client::connect(
                 &cfg.uds_api_path,
                 Path::new(&cfg.afc.shm_path),
-                Path::new(&cfg.aqc.shm_path),
                 cfg.afc.max_chans,
                 cfg.sync_addr.to_socket_addrs(),
             )

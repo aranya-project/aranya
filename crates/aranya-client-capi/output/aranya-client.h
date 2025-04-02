@@ -231,24 +231,6 @@ typedef struct ARANYA_DESIGNATED_INIT AranyaAfcConfig {
 } AranyaAfcConfig;
 
 /**
- * Aranya QUIC Channels (AQC) config.
- */
-typedef struct ARANYA_DESIGNATED_INIT AranyaAqcConfig {
-    /**
-     * Shared memory path.
-     */
-    const char *shm_path;
-    /**
-     * Maximum number of channels to store in shared-memory.
-     */
-    size_t max_channels;
-    /**
-     * Address to bind AFC server to.
-     */
-    const char *addr;
-} AranyaAqcConfig;
-
-/**
  * Aranya client configuration.
  */
 typedef struct ARANYA_DESIGNATED_INIT AranyaClientConfig {
@@ -260,10 +242,6 @@ typedef struct ARANYA_DESIGNATED_INIT AranyaClientConfig {
      * Aranya Fast Channels (AFC) config.
      */
     struct AranyaAfcConfig afc;
-    /**
-     * Aranya QUIC Channels (AQC) config.
-     */
-    struct AranyaAqcConfig aqc;
 } AranyaClientConfig;
 
 /**

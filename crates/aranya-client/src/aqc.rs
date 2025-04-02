@@ -54,7 +54,7 @@ impl<'a> AqcChannels<'a> {
         //let node_id = self.client.aqc.get_next_node_id().await?;
         debug!(%node_id, "selected node ID");
 
-        let (aqc_id, _ctrl) = self
+        let (aqc_id, _ctrl, _aqc_info) = self
             .client
             .daemon
             .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
@@ -85,7 +85,7 @@ impl<'a> AqcChannels<'a> {
         let node_id: NodeId = 0.into();
         debug!(%node_id, "selected node ID");
 
-        let (aqc_id, _ctrl) = self
+        let (aqc_id, _ctrl, _aqc_info) = self
             .client
             .daemon
             .create_aqc_uni_channel(context::current(), team_id, peer.clone(), node_id, label)

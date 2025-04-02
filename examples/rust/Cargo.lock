@@ -122,8 +122,8 @@ name = "aranya-afc-util"
 version = "0.5.0"
 source = "git+https://github.com/aranya-project/aranya-core.git?branch=issue/183#4ddf983e03befd1efcfd0eeb2393b1b61255d647"
 dependencies = [
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
- "aranya-fast-channels 0.5.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
+ "aranya-fast-channels",
  "aranya-policy-vm",
  "buggy",
  "postcard",
@@ -138,7 +138,7 @@ name = "aranya-aqc-util"
 version = "0.1.0"
 source = "git+https://github.com/aranya-project/aranya-core.git?branch=issue/183#4ddf983e03befd1efcfd0eeb2393b1b61255d647"
 dependencies = [
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "aranya-policy-vm",
  "buggy",
  "postcard",
@@ -153,9 +153,9 @@ name = "aranya-client"
 version = "0.5.1"
 dependencies = [
  "anyhow",
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "aranya-daemon-api",
- "aranya-fast-channels 0.5.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-fast-channels",
  "aranya-util",
  "buggy",
  "indexmap",
@@ -167,27 +167,6 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "aranya-crypto"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74ae6c36b9b4af1a141ddb91b4cb96dd31543f145390275c2fe8773cc1f5d30b"
-dependencies = [
- "buggy",
- "byteorder",
- "cfg-if",
- "ciborium",
- "ciborium-io",
- "postcard",
- "proptest",
- "rustix 0.38.44",
- "serde",
- "siphasher",
- "spideroak-base58",
- "spideroak-crypto",
- "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -215,7 +194,7 @@ name = "aranya-crypto-ffi"
 version = "0.5.0"
 source = "git+https://github.com/aranya-project/aranya-core.git?branch=issue/183#4ddf983e03befd1efcfd0eeb2393b1b61255d647"
 dependencies = [
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "aranya-policy-vm",
  "postcard",
  "thiserror 2.0.12",
@@ -229,12 +208,12 @@ dependencies = [
  "anyhow",
  "aranya-afc-util",
  "aranya-aqc-util",
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "aranya-crypto-ffi",
  "aranya-daemon-api",
  "aranya-device-ffi",
  "aranya-envelope-ffi",
- "aranya-fast-channels 0.5.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-fast-channels",
  "aranya-idam-ffi",
  "aranya-keygen",
  "aranya-perspective-ffi",
@@ -265,8 +244,9 @@ name = "aranya-daemon-api"
 version = "0.5.1"
 dependencies = [
  "anyhow",
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
- "aranya-fast-channels 0.5.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-aqc-util",
+ "aranya-crypto",
+ "aranya-fast-channels",
  "aranya-util",
  "postcard",
  "serde",
@@ -280,7 +260,7 @@ name = "aranya-device-ffi"
 version = "0.5.0"
 source = "git+https://github.com/aranya-project/aranya-core.git?branch=issue/183#4ddf983e03befd1efcfd0eeb2393b1b61255d647"
 dependencies = [
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "aranya-policy-vm",
 ]
 
@@ -289,7 +269,7 @@ name = "aranya-envelope-ffi"
 version = "0.5.0"
 source = "git+https://github.com/aranya-project/aranya-core.git?branch=issue/183#4ddf983e03befd1efcfd0eeb2393b1b61255d647"
 dependencies = [
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "aranya-policy-vm",
  "thiserror 2.0.12",
  "tracing",
@@ -303,7 +283,6 @@ dependencies = [
  "aranya-client",
  "aranya-daemon",
  "aranya-daemon-api",
- "aranya-fast-channels 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "aranya-util",
  "backon",
  "buggy",
@@ -316,26 +295,9 @@ dependencies = [
 [[package]]
 name = "aranya-fast-channels"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72162ccd54603d1d89c0d2f0a46120b924dbef33e19f139f7136bdf31ce8328d"
-dependencies = [
- "aranya-crypto 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "buggy",
- "byteorder",
- "cfg-if",
- "const_format",
- "heapless 0.7.17",
- "libc",
- "serde",
- "thiserror 2.0.12",
-]
-
-[[package]]
-name = "aranya-fast-channels"
-version = "0.5.0"
 source = "git+https://github.com/aranya-project/aranya-core.git?branch=issue/183#4ddf983e03befd1efcfd0eeb2393b1b61255d647"
 dependencies = [
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "buggy",
  "byteorder",
  "cfg-if",
@@ -351,7 +313,7 @@ name = "aranya-idam-ffi"
 version = "0.5.0"
 source = "git+https://github.com/aranya-project/aranya-core.git?branch=issue/183#4ddf983e03befd1efcfd0eeb2393b1b61255d647"
 dependencies = [
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "aranya-policy-vm",
  "postcard",
  "thiserror 2.0.12",
@@ -363,7 +325,7 @@ name = "aranya-keygen"
 version = "0.5.1"
 dependencies = [
  "anyhow",
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "serde",
 ]
 
@@ -384,7 +346,7 @@ name = "aranya-perspective-ffi"
 version = "0.5.0"
 source = "git+https://github.com/aranya-project/aranya-core.git?branch=issue/183#4ddf983e03befd1efcfd0eeb2393b1b61255d647"
 dependencies = [
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "aranya-policy-vm",
 ]
 
@@ -480,7 +442,7 @@ name = "aranya-policy-module"
 version = "0.5.0"
 source = "git+https://github.com/aranya-project/aranya-core.git?branch=issue/183#4ddf983e03befd1efcfd0eeb2393b1b61255d647"
 dependencies = [
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "aranya-policy-ast",
  "serde",
  "thiserror 2.0.12",
@@ -491,7 +453,7 @@ name = "aranya-policy-vm"
 version = "0.5.0"
 source = "git+https://github.com/aranya-project/aranya-core.git?branch=issue/183#4ddf983e03befd1efcfd0eeb2393b1b61255d647"
 dependencies = [
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "aranya-policy-ast",
  "aranya-policy-derive",
  "aranya-policy-module",
@@ -506,7 +468,7 @@ name = "aranya-runtime"
 version = "0.5.0"
 source = "git+https://github.com/aranya-project/aranya-core.git?branch=issue/183#4ddf983e03befd1efcfd0eeb2393b1b61255d647"
 dependencies = [
- "aranya-crypto 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-crypto",
  "aranya-libc",
  "aranya-policy-vm",
  "buggy",
@@ -525,7 +487,7 @@ name = "aranya-util"
 version = "0.5.1"
 dependencies = [
  "anyhow",
- "aranya-fast-channels 0.5.0 (git+https://github.com/aranya-project/aranya-core.git?branch=issue/183)",
+ "aranya-fast-channels",
  "buggy",
  "serde",
  "tokio",

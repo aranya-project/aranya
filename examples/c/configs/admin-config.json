@@ -39,30 +39,5 @@
 
 		// Maximum number of channels AFC should support.
 		"max_chans": 256,
-	},
-
-	// AQC configuration.
-	"aqc": {
-		// Shared memory path.
-		"shm_path": "/aqc_admin",
-
-		// Unlink `shm_path` before creating the shared memory?
-		//
-		// Ignored if `aqc.create` is false.
-		"unlink_on_startup": true,
-
-		// Unlink `shm_path` when the daemon exits?
-		//
-		// If false, the shared memory will persist across daemon
-		// restarts.
-		"unlink_at_exit": true,
-
-		// Create the shared memory?
-		//
-		// If true, the shared memory must not already exist.
-		"create": true,
-
-		// Maximum number of channels AFC should support.
-		"max_chans": 256,
 	}
 }

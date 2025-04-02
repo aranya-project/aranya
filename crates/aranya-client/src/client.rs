@@ -75,18 +75,15 @@ impl Client {
     /// - `daemon_socket`: The socket path to communicate with the daemon.
     /// - `afc_shm_path`: AFC's shared memory path. The daemon must also use the
     ///   same path.
-    /// - `aqc_shm_path`: AQC's shared memory path. The daemon must also use the
-    ///   same path.
     /// - `max_channels`: The maximum number of channels that AFC should support.
     ///   The daemon must also use the same number.
     /// - `afc_address`: The address that AFC listens for incoming connections
     ///   on.
     // TODO: aqc_address
-    #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, ?aqc_shm_path, max_channels))]
+    #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, max_channels))]
     pub async fn connect<A>(
         daemon_socket: &Path,
         afc_shm_path: &Path,
-        aqc_shm_path: &Path,
         max_channels: usize,
         afc_address: A,
     ) -> Result<Self>
@@ -107,8 +104,6 @@ impl Client {
             addr = ?afc.local_addr().map_err(Error::Afc)?,
             "bound AFC router",
         );
-        // TODO: aqc shm
-        //let aqc_read = setup_aqc_shm(aqc_shm_path, max_channels)?;
         let _aqc = AqcChannelsImpl::new().await?;
 
         Ok(Self { daemon, afc })

@@ -1,12 +1,18 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
 use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
+use std::path::PathBuf;
 
+use aranya_aqc_util::{
+    BidiChannelCreated, BidiChannelReceived, BidiKeyId, UniChannelCreated, UniChannelReceived,
+    UniKeyId,
+};
 use aranya_crypto::{
-    afc::{BidiChannelId, UniChannelId},
+    afc::{BidiChannelId as AfcBidiChannelId, UniChannelId as AfcUniChannelId},
+    aqc::{BidiChannelId as AqcBidiChannelId, UniChannelId as AqcUniChannelId},
     custom_id,
     default::DefaultCipherSuite,
-    Id,
+    EncryptionKeyId, Id,
 };
 use aranya_fast_channels::{Label, NodeId};
 use aranya_util::Addr;
@@ -91,7 +97,7 @@ impl fmt::Display for NetIdentifier {
 
 /// Uniquely identifies an AFC channel.
 ///
-/// It is a [`BidiChannelId`] or [`UniChannelId`] truncated to
+/// It is a [`AfcBidiChannelId`] or [`AfcUniChannelId`] truncated to
 /// 128 bits.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -108,16 +114,16 @@ fn truncate<const BIG: usize, const SMALL: usize>(arr: &[u8; BIG]) -> &[u8; SMAL
     arr[..SMALL].try_into().expect("array must fit")
 }
 
-/// Convert from [`BidiChannelId`] to [`AfcId`]
-impl From<BidiChannelId> for AfcId {
-    fn from(value: BidiChannelId) -> Self {
+/// Convert from [`AfcBidiChannelId`] to [`AfcId`]
+impl From<AfcBidiChannelId> for AfcId {
+    fn from(value: AfcBidiChannelId) -> Self {
         Self(*truncate(value.as_array()))
     }
 }
 
-/// Convert from [`UniChannelId`] to [`AfcId`]
-impl From<UniChannelId> for AfcId {
-    fn from(value: UniChannelId) -> Self {
+/// Convert from [`AfcUniChannelId`] to [`AfcId`]
+impl From<AfcUniChannelId> for AfcId {
+    fn from(value: AfcUniChannelId) -> Self {
         Self(*truncate(value.as_array()))
     }
 }
@@ -131,7 +137,7 @@ impl From<Id> for AfcId {
 
 /// Uniquely identifies an AQC channel.
 ///
-/// It is a [`BidiChannelId`] or [`UniChannelId`] truncated to
+/// It is a [`AqcBidiChannelId`] or [`AqcUniChannelId`] truncated to
 /// 128 bits.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -144,15 +150,15 @@ impl fmt::Display for AqcId {
 }
 
 /// Convert from [`BidiChannelId`] to [`AqcId`]
-impl From<BidiChannelId> for AqcId {
-    fn from(value: BidiChannelId) -> Self {
+impl From<AqcBidiChannelId> for AqcId {
+    fn from(value: AqcBidiChannelId) -> Self {
         Self(*truncate(value.as_array()))
     }
 }
 
 /// Convert from [`UniChannelId`] to [`AqcId`]
-impl From<UniChannelId> for AqcId {
-    fn from(value: UniChannelId) -> Self {
+impl From<AqcUniChannelId> for AqcId {
+    fn from(value: AqcUniChannelId) -> Self {
         Self(*truncate(value.as_array()))
     }
 }
@@ -170,8 +176,136 @@ pub type AfcCtrl = Vec<Box<[u8]>>;
 // serialized command which must be passed over AQC.
 pub type AqcCtrl = Vec<Box<[u8]>>;
 
+/// AQC channel info.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub enum AqcChannelInfo {
+    BidiCreated(AqcBidiChannelCreatedInfo),
+    BidiReceived(AqcBidiChannelReceivedInfo),
+    UniCreated(AqcUniChannelCreatedInfo),
+    UniReceived(AqcUniChannelReceivedInfo),
+}
+
+/// Bidirectional AQC channel info.
+// TODO: move AqcId into this type
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct AqcBidiChannelCreatedInfo {
+    parent_cmd_id: Id,
+    author_id: DeviceId,
+    author_enc_key_id: EncryptionKeyId,
+    peer_id: DeviceId,
+    peer_enc_pk: Vec<u8>,
+    label: Label,
+    key_id: BidiKeyId,
+}
+
+/// Convert from [`AqcBidiChannelCreated`] to [`AqcChannelCreatedInfo`]
+impl From<BidiChannelCreated<'_>> for AqcChannelInfo {
+    fn from(e: BidiChannelCreated<'_>) -> Self {
+        Self::BidiCreated(AqcBidiChannelCreatedInfo {
+            parent_cmd_id: e.parent_cmd_id,
+            author_id: DeviceId(e.author_id.into()),
+            author_enc_key_id: e.author_enc_key_id,
+            peer_id: DeviceId(e.peer_id.into()),
+            peer_enc_pk: e.peer_enc_pk.into(),
+            label: Label::new(e.label.into()),
+            key_id: e.key_id,
+        })
+    }
+}
+
+/// Bidirectional AQC channel info.
+// TODO: move AqcId into this type
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct AqcBidiChannelReceivedInfo {
+    parent_cmd_id: Id,
+    author_id: DeviceId,
+    peer_enc_key_id: EncryptionKeyId,
+    peer_id: DeviceId,
+    author_enc_pk: Vec<u8>,
+    label: Label,
+    encap: Vec<u8>,
+}
+
+/// Convert from [`AqcBidiChannelReceived`] to [`AqcChannelReceivedInfo`]
+impl From<BidiChannelReceived<'_>> for AqcChannelInfo {
+    fn from(e: BidiChannelReceived<'_>) -> Self {
+        Self::BidiReceived(AqcBidiChannelReceivedInfo {
+            parent_cmd_id: e.parent_cmd_id,
+            author_id: DeviceId(e.author_id.into()),
+            peer_enc_key_id: e.peer_enc_key_id,
+            peer_id: DeviceId(e.peer_id.into()),
+            author_enc_pk: e.author_enc_pk.into(),
+            label: Label::new(e.label.into()),
+            encap: e.encap.to_vec(),
+        })
+    }
+}
+
+/// Unidirectional AQC channel info.
+// TODO: move AqcId into this type
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct AqcUniChannelCreatedInfo {
+    parent_cmd_id: Id,
+    author_id: DeviceId,
+    send_id: DeviceId,
+    recv_id: DeviceId,
+    author_enc_key_id: EncryptionKeyId,
+    peer_enc_pk: Vec<u8>,
+    label: Label,
+    key_id: UniKeyId,
+}
+
+/// Convert from [`AqcUniChannelCreated`] to [`AqcChannelInfo`]
+impl From<UniChannelCreated<'_>> for AqcChannelInfo {
+    fn from(e: UniChannelCreated<'_>) -> Self {
+        Self::UniCreated(AqcUniChannelCreatedInfo {
+            parent_cmd_id: e.parent_cmd_id,
+            author_id: DeviceId(e.author_id.into()),
+            send_id: DeviceId(e.send_id.into()),
+            recv_id: DeviceId(e.recv_id.into()),
+            author_enc_key_id: e.author_enc_key_id,
+            peer_enc_pk: e.peer_enc_pk.into(),
+            label: Label::new(e.label.into()),
+            key_id: e.key_id,
+        })
+    }
+}
+
+/// Unidirectional AQC channel info.
+// TODO: move AqcId into this type
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct AqcUniChannelReceivedInfo {
+    parent_cmd_id: Id,
+    author_id: DeviceId,
+    send_id: DeviceId,
+    recv_id: DeviceId,
+    author_enc_pk: Vec<u8>,
+    peer_enc_key_id: EncryptionKeyId,
+    label: Label,
+    encap: Vec<u8>,
+}
+
+/// Convert from [`AqcUniChannelReceived`] to [`AqcChannelInfo`]
+impl From<UniChannelReceived<'_>> for AqcChannelInfo {
+    fn from(e: UniChannelReceived<'_>) -> Self {
+        Self::UniReceived(AqcUniChannelReceivedInfo {
+            parent_cmd_id: e.parent_cmd_id,
+            author_id: DeviceId(e.author_id.into()),
+            send_id: DeviceId(e.send_id.into()),
+            recv_id: DeviceId(e.recv_id.into()),
+            author_enc_pk: e.author_enc_pk.into(),
+            peer_enc_key_id: e.peer_enc_key_id,
+            label: Label::new(e.label.into()),
+            encap: e.encap.to_vec(),
+        })
+    }
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
+    /// Gets the key store path.
+    async fn get_keystore_path() -> Result<PathBuf>;
+
     /// Gets local address the Aranya sync server is bound to.
     async fn aranya_local_addr() -> Result<SocketAddr>;
 
@@ -264,22 +398,22 @@ pub trait DaemonApi {
         peer: NetIdentifier,
         node_id: NodeId,
         label: Label,
-    ) -> Result<(AqcId, AqcCtrl)>;
+    ) -> Result<(AqcId, AqcCtrl, AqcChannelInfo)>;
     /// Create a unidirectional QUIC channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
         label: Label,
-    ) -> Result<(AqcId, AqcCtrl)>;
+    ) -> Result<(AqcId, AqcCtrl, AqcChannelInfo)>;
     /// Delete a QUIC channel.
     async fn delete_aqc_channel(chan: AqcId) -> Result<AqcCtrl>;
-    /// Receive a fast channel ctrl message.
+    /// Receive AQC ctrl message.
     async fn receive_aqc_ctrl(
         team: TeamId,
         node_id: NodeId,
         ctrl: AqcCtrl,
-    ) -> Result<(AqcId, NetIdentifier, Label)>;
+    ) -> Result<(AqcId, NetIdentifier, AqcChannelInfo)>;
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
     /// Query device role.

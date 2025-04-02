@@ -321,6 +321,7 @@ name = "aranya-daemon-api"
 version = "0.5.1"
 dependencies = [
  "anyhow",
+ "aranya-aqc-util",
  "aranya-crypto",
  "aranya-fast-channels",
  "aranya-util",
