@@ -119,7 +119,7 @@ typedef struct {
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                         const char *shm_path, const char *afc_addr);
 AranyaError init_team(Team *t);
-AranyaError add_sync_peers(Team *t);
+AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg);
 AranyaError run(Team *t);
 AranyaError cleanup_team(Team *t);
 
@@ -222,9 +222,8 @@ AranyaError cleanup_team(Team *t) {
 // Add sync peers.
 // This creates a complete graph where each Aranya client can sync with all
 // the other Aranya client peers on the network.
-AranyaError add_sync_peers(Team *t) {
+AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg) {
     AranyaError err;
-    AranyaDuration interval = ARANYA_DURATION_MILLISECONDS * 100;
 
     for (int i = 0; i < NUM_CLIENTS; i++) {
         for (int j = 0; j < NUM_CLIENTS; j++) {
@@ -234,7 +233,7 @@ AranyaError add_sync_peers(Team *t) {
             printf("adding sync peer %s to %s\r\n", t->clients_arr[j].name,
                    t->clients_arr[i].name);
             err = aranya_add_sync_peer(&t->clients_arr[i].client, &t->id,
-                                       sync_addrs[j], interval);
+                                       sync_addrs[j], cfg);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr, "error adding sync peer %s to %s: %s\r\n",
                         t->clients_arr[j].name, t->clients_arr[i].name,
@@ -259,8 +258,64 @@ AranyaError run(Team *t) {
     err = init_team(t);
     EXPECT("error initializing team", err);
 
+    // add admin to team.
+    err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
+                                    &t->clients.admin.pk);
+    EXPECT("error adding admin to team", err);
+
+    // add operator to team.
+    err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
+                                    &t->clients.operator.pk);
+    EXPECT("error adding operator to team", err);
+
+    // upgrade role to admin.
+    err = aranya_assign_role(&t->clients.owner.client, &t->id,
+                             &t->clients.admin.id, ARANYA_ROLE_ADMIN);
+    EXPECT("error assigning admin role", err);
+
+    // upgrade role to operator.
+    err = aranya_assign_role(&t->clients.admin.client, &t->id,
+                             &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
+
+    if (err == ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "application failed: expected role assignment to fail");
+        return EXIT_FAILURE;
+    }
+
+    err = aranya_sync_now(&t->clients.admin.client, &t->id, sync_addrs[OWNER],
+                          NULL);
+    EXPECT("error calling `sync_now` to sync with peer", err);
+
+    sleep(1);
+    err = aranya_assign_role(&t->clients.admin.client, &t->id,
+                             &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
+    EXPECT("error assigning operator role", err);
+
     // add sync peers.
-    err = add_sync_peers(t);
+
+    // Initialize the builder
+    struct AranyaSyncPeerConfigBuilder builder;
+    err = aranya_sync_peer_config_builder_init(&builder);
+    EXPECT("error initializing sync peer config builder", err);
+
+    // Set duration on the config builder
+    AranyaDuration interval = ARANYA_DURATION_MILLISECONDS * 100;
+    err = aranya_sync_peer_config_builder_set_interval(&builder, interval);
+    EXPECT("error setting duration on config builder", err);
+
+    // Set syncing to happen immediately on the config builder
+    err = aranya_sync_peer_config_builder_set_sync_now(&builder);
+    EXPECT("error setting `sync_now` on config builder", err);
+
+    // Build the sync config
+    struct AranyaSyncPeerConfig cfg;
+    err = aranya_sync_peer_config_builder_build(&builder, &cfg);
+    EXPECT("error building the sync peer config", err);
+
+    err = aranya_sync_peer_config_builder_cleanup(&builder);
+    EXPECT("error running the cleanup routine for the config builder", err);
+
+    err = add_sync_peers(t, &cfg);
     EXPECT("error adding sync peers", err);
 
     // Team members are added to the team by first calling
@@ -268,26 +323,6 @@ AranyaError run(Team *t) {
     // team ID and the public key of the device to be added. In a real world
     // scenario, the keys would be exchanged outside of Aranya using something
     // like `scp`.
-
-    // add admin to team.
-    err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
-                                    &t->clients.admin.pk);
-    EXPECT("error adding admin to team", err);
-
-    // upgrade role to admin.
-    err = aranya_assign_role(&t->clients.owner.client, &t->id,
-                             &t->clients.admin.id, ARANYA_ROLE_ADMIN);
-    EXPECT("error assigning admin role", err);
-
-    // add operator to team.
-    err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
-                                    &t->clients.operator.pk);
-    EXPECT("error adding operator to team", err);
-
-    // upgrade role to operator.
-    err = aranya_assign_role(&t->clients.owner.client, &t->id,
-                             &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
-    EXPECT("error assigning operator role", err);
 
     // add membera to team.
     err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
