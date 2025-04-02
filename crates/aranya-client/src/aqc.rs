@@ -1,24 +1,55 @@
 //! AQC support.
 
+use std::{io, path::PathBuf};
+
+use anyhow::{anyhow, bail, Context, Result};
+use aranya_aqc_util::{BidiChannelCreated, Handler, Label as AqcLabel};
+use aranya_crypto::{
+    aead::Aead, default::DefaultEngine, generic_array::GenericArray, import::Import,
+    keys::SecretKeyBytes, keystore::fs_keystore::Store, CipherSuite, Random, Rng,
+};
 pub use aranya_daemon_api::AqcId;
-use aranya_daemon_api::{NetIdentifier, TeamId};
-pub use aranya_fast_channels::Label;
-use aranya_fast_channels::NodeId;
+use aranya_daemon_api::{AqcChannelInfo, DeviceId, KeyStoreInfo, NetIdentifier, TeamId, CS};
+use aranya_fast_channels::{Label, NodeId};
 use tarpc::context;
-use tracing::{debug, instrument};
+use tokio::fs;
+use tracing::{debug, info, instrument};
 
 use crate::error::AqcError;
 
+// TODO: use same generics as daemon.
+/// CE = Crypto Engine
+pub(crate) type CE = DefaultEngine;
+/// KS = Key Store
+pub(crate) type KS = Store;
+
 /// Sends and receives AQC messages.
-#[derive(Debug)]
 pub(crate) struct AqcChannelsImpl {
     // TODO: add Aqc fields.
+    handler: Handler<Store>,
+    eng: CE,
 }
 
 impl AqcChannelsImpl {
     /// Creates a new `FastChannelsImpl` listening for connections on `address`.
-    pub(crate) async fn new() -> Result<Self, AqcError> {
-        Ok(Self {})
+    pub(crate) async fn new(
+        device_id: DeviceId,
+        keystore_info: KeyStoreInfo,
+    ) -> Result<Self, AqcError> {
+        debug!("device ID: {:?}", device_id);
+        debug!("keystore path: {:?}", keystore_info.path);
+        debug!("keystore wrapped key path: {:?}", keystore_info.wrapped_key);
+        let store = KS::open(keystore_info.path).context("unable to open keystore")?;
+        let handler = Handler::new(
+            device_id.into_id().into(),
+            store.try_clone().context("unable to clone keystore")?,
+        );
+        let eng = {
+            let key = load_or_gen_key_wrap_key(keystore_info.wrapped_key).await?;
+            CE::new(&key, Rng)
+        };
+
+        Ok(Self { handler, eng })
     }
 }
 
@@ -47,21 +78,35 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label: Label,
-    ) -> crate::Result<AqcId> {
+    ) -> Result<AqcId> {
         debug!("creating bidi channel");
 
         let node_id: NodeId = 0.into();
         //let node_id = self.client.aqc.get_next_node_id().await?;
         debug!(%node_id, "selected node ID");
 
-        let (aqc_id, _ctrl, _aqc_info) = self
+        let (aqc_id, _ctrl, aqc_info) = self
             .client
             .daemon
             .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
             .await??;
         debug!(%aqc_id, %node_id, %label, "created bidi channel");
 
-        // TODO: decode PSK
+        if let AqcChannelInfo::BidiCreated(v) = aqc_info {
+            let psk = self.client.aqc.handler.bidi_channel_created(
+                &mut self.client.aqc.eng.clone(),
+                &BidiChannelCreated {
+                    parent_cmd_id: v.parent_cmd_id,
+                    author_id: v.author_id.into_id().into(),
+                    author_enc_key_id: v.author_enc_key_id,
+                    peer_id: v.peer_id.into_id().into(),
+                    peer_enc_pk: &v.peer_enc_pk,
+                    label: AqcLabel::new(label.to_u32()),
+                    key_id: v.key_id,
+                },
+            )?;
+            debug!("psk id: {:?}", psk.identity());
+        }
 
         Ok(aqc_id)
     }
@@ -94,7 +139,7 @@ impl<'a> AqcChannels<'a> {
             .await??;
         debug!(%aqc_id, %node_id, %label, "created aqc uni channel");
 
-        // TODO: decode PSK
+        // TODO: decode PSK from keystore.
 
         // TODO: send ctrl message.
         debug!("sent control message");
@@ -114,4 +159,38 @@ impl<'a> AqcChannels<'a> {
         //self.client.aqc.remove_channel(id).await;
         Ok(())
     }
+}
+
+// TODO: borrowed from daemon.
+type KeyWrapKeyBytes = SecretKeyBytes<<<CS as CipherSuite>::Aead as Aead>::KeySize>;
+type KeyWrapKey = <<CS as CipherSuite>::Aead as Aead>::Key;
+
+// TODO: this was borrowed from daemon.rs. Move to util crate for reuse.
+/// Loads the key wrapping key used by [`CryptoEngine`].
+async fn load_or_gen_key_wrap_key(path: PathBuf) -> Result<KeyWrapKey> {
+    let (bytes, loaded) = match fs::read(&path).await {
+        Ok(buf) => {
+            info!("loaded key wrap key");
+            let bytes = KeyWrapKeyBytes::new(
+                *GenericArray::try_from_slice(&buf)
+                    .map_err(|_| anyhow!("invalid key wrap key length"))?,
+            );
+            (bytes, true)
+        }
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            info!("generating key wrap key");
+            let bytes = KeyWrapKeyBytes::random(&mut Rng);
+            (bytes, false)
+        }
+        Err(err) => bail!("unable to read key wrap key: {err}"),
+    };
+
+    // Import before writing in case importing fails.
+    let key = Import::import(bytes.as_bytes()).context("unable to import new key wrap key")?;
+    if !loaded {
+        aranya_util::write_file(&path, bytes.as_bytes())
+            .await
+            .context("unable to write key wrap key")?;
+    }
+    Ok(key)
 }

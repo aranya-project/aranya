@@ -29,7 +29,8 @@ use aranya_crypto::{
 };
 use aranya_daemon_api::{
     AfcCtrl, AfcId, AqcChannelInfo, AqcCtrl, AqcId, DaemonApi, DeviceId as ApiDeviceId,
-    KeyBundle as ApiKeyBundle, NetIdentifier, Result as ApiResult, Role as ApiRole, TeamId, CS,
+    KeyBundle as ApiKeyBundle, KeyStoreInfo, NetIdentifier, Result as ApiResult, Role as ApiRole,
+    TeamId, CS,
 };
 use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed, Label, NodeId};
 use aranya_keygen::PublicKeys;
@@ -89,6 +90,7 @@ impl DaemonApiServer {
         afc: Arc<Mutex<WriteState<CS, Rng>>>,
         eng: CE,
         keystore_path: PathBuf,
+        wrapped_key_path: PathBuf,
         store: Store,
         daemon_sock: PathBuf,
         pk: Arc<PublicKeys<CS>>,
@@ -108,6 +110,7 @@ impl DaemonApiServer {
                 pk,
                 peers,
                 keystore_path,
+                wrapped_key_path,
                 afc_peers: Arc::default(),
                 afc_handler: Arc::new(Mutex::new(AfcHandler::new(
                     device_id,
@@ -180,6 +183,8 @@ struct DaemonApiHandler {
     peers: SyncPeers,
     /// Key store path.
     keystore_path: PathBuf,
+    /// Key store wrapped key path.
+    wrapped_key_path: PathBuf,
     /// AFC peers.
     afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
     /// Handles AFC effects.
@@ -329,8 +334,14 @@ impl DaemonApiHandler {
 
 impl DaemonApi for DaemonApiHandler {
     #[instrument(skip(self))]
-    async fn get_keystore_path(self, context: ::tarpc::context::Context) -> ApiResult<PathBuf> {
-        Ok(self.keystore_path)
+    async fn get_keystore_info(
+        self,
+        context: ::tarpc::context::Context,
+    ) -> ApiResult<KeyStoreInfo> {
+        Ok(KeyStoreInfo {
+            path: self.keystore_path,
+            wrapped_key: self.wrapped_key_path,
+        })
     }
 
     #[instrument(skip(self))]

@@ -1,4 +1,4 @@
-use aranya_daemon_api::AfcId;
+use aranya_daemon_api::{AfcId, AqcId};
 use aranya_fast_channels::Version;
 
 /// Possible errors that could happen in the Aranya client.
@@ -245,7 +245,7 @@ pub enum AqcError {
     // General errors
     /// The channel was not found.
     #[error("channel not found: {0}")]
-    ChannelNotFound(AfcId),
+    ChannelNotFound(AqcId),
 
     /// Some other error.
     #[error("{0}")]

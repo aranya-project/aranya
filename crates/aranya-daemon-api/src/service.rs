@@ -4,8 +4,8 @@ use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
 use std::path::PathBuf;
 
 use aranya_aqc_util::{
-    BidiChannelCreated, BidiChannelReceived, BidiKeyId, UniChannelCreated, UniChannelReceived,
-    UniKeyId,
+    BidiChannelCreated, BidiChannelReceived, BidiKeyId, Label as AqcLabel, UniChannelCreated,
+    UniChannelReceived, UniKeyId,
 };
 use aranya_crypto::{
     afc::{BidiChannelId as AfcBidiChannelId, UniChannelId as AfcUniChannelId},
@@ -14,7 +14,7 @@ use aranya_crypto::{
     default::DefaultCipherSuite,
     EncryptionKeyId, Id,
 };
-use aranya_fast_channels::{Label, NodeId};
+use aranya_fast_channels::{Label as AfcLabel, NodeId};
 use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
 use spideroak_base58::ToBase58;
@@ -189,13 +189,13 @@ pub enum AqcChannelInfo {
 // TODO: move AqcId into this type
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct AqcBidiChannelCreatedInfo {
-    parent_cmd_id: Id,
-    author_id: DeviceId,
-    author_enc_key_id: EncryptionKeyId,
-    peer_id: DeviceId,
-    peer_enc_pk: Vec<u8>,
-    label: Label,
-    key_id: BidiKeyId,
+    pub parent_cmd_id: Id,
+    pub author_id: DeviceId,
+    pub author_enc_key_id: EncryptionKeyId,
+    pub peer_id: DeviceId,
+    pub peer_enc_pk: Vec<u8>,
+    pub label: AqcLabel,
+    pub key_id: BidiKeyId,
 }
 
 /// Convert from [`AqcBidiChannelCreated`] to [`AqcChannelCreatedInfo`]
@@ -207,7 +207,7 @@ impl From<BidiChannelCreated<'_>> for AqcChannelInfo {
             author_enc_key_id: e.author_enc_key_id,
             peer_id: DeviceId(e.peer_id.into()),
             peer_enc_pk: e.peer_enc_pk.into(),
-            label: Label::new(e.label.into()),
+            label: AqcLabel::new(e.label.into()),
             key_id: e.key_id,
         })
     }
@@ -217,13 +217,13 @@ impl From<BidiChannelCreated<'_>> for AqcChannelInfo {
 // TODO: move AqcId into this type
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct AqcBidiChannelReceivedInfo {
-    parent_cmd_id: Id,
-    author_id: DeviceId,
-    peer_enc_key_id: EncryptionKeyId,
-    peer_id: DeviceId,
-    author_enc_pk: Vec<u8>,
-    label: Label,
-    encap: Vec<u8>,
+    pub parent_cmd_id: Id,
+    pub author_id: DeviceId,
+    pub peer_enc_key_id: EncryptionKeyId,
+    pub peer_id: DeviceId,
+    pub author_enc_pk: Vec<u8>,
+    pub label: AqcLabel,
+    pub encap: Vec<u8>,
 }
 
 /// Convert from [`AqcBidiChannelReceived`] to [`AqcChannelReceivedInfo`]
@@ -235,7 +235,7 @@ impl From<BidiChannelReceived<'_>> for AqcChannelInfo {
             peer_enc_key_id: e.peer_enc_key_id,
             peer_id: DeviceId(e.peer_id.into()),
             author_enc_pk: e.author_enc_pk.into(),
-            label: Label::new(e.label.into()),
+            label: AqcLabel::new(e.label.into()),
             encap: e.encap.to_vec(),
         })
     }
@@ -245,14 +245,14 @@ impl From<BidiChannelReceived<'_>> for AqcChannelInfo {
 // TODO: move AqcId into this type
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct AqcUniChannelCreatedInfo {
-    parent_cmd_id: Id,
-    author_id: DeviceId,
-    send_id: DeviceId,
-    recv_id: DeviceId,
-    author_enc_key_id: EncryptionKeyId,
-    peer_enc_pk: Vec<u8>,
-    label: Label,
-    key_id: UniKeyId,
+    pub parent_cmd_id: Id,
+    pub author_id: DeviceId,
+    pub send_id: DeviceId,
+    pub recv_id: DeviceId,
+    pub author_enc_key_id: EncryptionKeyId,
+    pub peer_enc_pk: Vec<u8>,
+    pub label: AqcLabel,
+    pub key_id: UniKeyId,
 }
 
 /// Convert from [`AqcUniChannelCreated`] to [`AqcChannelInfo`]
@@ -265,7 +265,7 @@ impl From<UniChannelCreated<'_>> for AqcChannelInfo {
             recv_id: DeviceId(e.recv_id.into()),
             author_enc_key_id: e.author_enc_key_id,
             peer_enc_pk: e.peer_enc_pk.into(),
-            label: Label::new(e.label.into()),
+            label: AqcLabel::new(e.label.into()),
             key_id: e.key_id,
         })
     }
@@ -275,14 +275,14 @@ impl From<UniChannelCreated<'_>> for AqcChannelInfo {
 // TODO: move AqcId into this type
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct AqcUniChannelReceivedInfo {
-    parent_cmd_id: Id,
-    author_id: DeviceId,
-    send_id: DeviceId,
-    recv_id: DeviceId,
-    author_enc_pk: Vec<u8>,
-    peer_enc_key_id: EncryptionKeyId,
-    label: Label,
-    encap: Vec<u8>,
+    pub parent_cmd_id: Id,
+    pub author_id: DeviceId,
+    pub send_id: DeviceId,
+    pub recv_id: DeviceId,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_enc_key_id: EncryptionKeyId,
+    pub label: AqcLabel,
+    pub encap: Vec<u8>,
 }
 
 /// Convert from [`AqcUniChannelReceived`] to [`AqcChannelInfo`]
@@ -295,16 +295,26 @@ impl From<UniChannelReceived<'_>> for AqcChannelInfo {
             recv_id: DeviceId(e.recv_id.into()),
             author_enc_pk: e.author_enc_pk.into(),
             peer_enc_key_id: e.peer_enc_key_id,
-            label: Label::new(e.label.into()),
+            label: AqcLabel::new(e.label.into()),
             encap: e.encap.to_vec(),
         })
     }
 }
 
+/// Information needed to use the key store.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+
+pub struct KeyStoreInfo {
+    /// Path of the key store.
+    pub path: PathBuf,
+    /// Path of the wrapped key.
+    pub wrapped_key: PathBuf,
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
-    /// Gets the key store path.
-    async fn get_keystore_path() -> Result<PathBuf>;
+    /// Gets the key store info.
+    async fn get_keystore_info() -> Result<KeyStoreInfo>;
 
     /// Gets local address the Aranya sync server is bound to.
     async fn aranya_local_addr() -> Result<SocketAddr>;
@@ -369,20 +379,20 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     /// Create a fast channels label.
-    async fn create_label(team: TeamId, label: Label) -> Result<()>;
+    async fn create_label(team: TeamId, label: AfcLabel) -> Result<()>;
     /// Delete a fast channels label.
-    async fn delete_label(team: TeamId, label: Label) -> Result<()>;
+    async fn delete_label(team: TeamId, label: AfcLabel) -> Result<()>;
 
     /// Assign a fast channels label to a device.
-    async fn assign_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
+    async fn assign_label(team: TeamId, device: DeviceId, label: AfcLabel) -> Result<()>;
     /// Revoke a fast channels label from a device.
-    async fn revoke_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
+    async fn revoke_label(team: TeamId, device: DeviceId, label: AfcLabel) -> Result<()>;
     /// Create a fast channel.
     async fn create_afc_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
-        label: Label,
+        label: AfcLabel,
     ) -> Result<(AfcId, AfcCtrl)>;
     /// Delete a fast channel.
     async fn delete_afc_channel(chan: AfcId) -> Result<AfcCtrl>;
@@ -391,20 +401,20 @@ pub trait DaemonApi {
         team: TeamId,
         node_id: NodeId,
         ctrl: AfcCtrl,
-    ) -> Result<(AfcId, NetIdentifier, Label)>;
+    ) -> Result<(AfcId, NetIdentifier, AfcLabel)>;
     /// Create a bidirectional QUIC channel.
     async fn create_aqc_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
-        label: Label,
+        label: AfcLabel,
     ) -> Result<(AqcId, AqcCtrl, AqcChannelInfo)>;
     /// Create a unidirectional QUIC channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
-        label: Label,
+        label: AfcLabel,
     ) -> Result<(AqcId, AqcCtrl, AqcChannelInfo)>;
     /// Delete a QUIC channel.
     async fn delete_aqc_channel(chan: AqcId) -> Result<AqcCtrl>;
@@ -421,7 +431,10 @@ pub trait DaemonApi {
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device label assignments.
-    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
+    async fn query_device_label_assignments(
+        team: TeamId,
+        device: DeviceId,
+    ) -> Result<Vec<AfcLabel>>;
     /// Query AFC network ID.
     async fn query_afc_net_identifier(
         team: TeamId,
@@ -433,5 +446,5 @@ pub trait DaemonApi {
         device: DeviceId,
     ) -> Result<Option<NetIdentifier>>;
     /// Query label exists.
-    async fn query_label_exists(team: TeamId, label: Label) -> Result<bool>;
+    async fn query_label_exists(team: TeamId, label: AfcLabel) -> Result<bool>;
 }

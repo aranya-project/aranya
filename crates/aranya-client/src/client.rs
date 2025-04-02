@@ -2,7 +2,9 @@
 
 use std::{net::SocketAddr, path::Path, time::Duration};
 
-use aranya_daemon_api::{DaemonApiClient, DeviceId, KeyBundle, NetIdentifier, Role, TeamId, CS};
+use aranya_daemon_api::{
+    DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, NetIdentifier, Role, TeamId, CS,
+};
 use aranya_fast_channels::{
     shm::ReadState,
     Label, {self as afc},
@@ -61,12 +63,13 @@ impl Labels {
 /// [Aranya daemon]: https://crates.io/crates/aranya-daemon
 /// [`aranya-daemon-api`]: https://crates.io/crates/aranya-daemon-api
 /// [`tarpc`]: https://crates.io/crates/tarpc
-#[derive(Debug)]
 pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
     /// Support for Aranya Fast Channels
     pub(crate) afc: FastChannelsImpl<ReadState<CS>>,
+    /// Support for AQC
+    pub(crate) aqc: AqcChannelsImpl,
 }
 
 impl Client {
@@ -104,9 +107,21 @@ impl Client {
             addr = ?afc.local_addr().map_err(Error::Afc)?,
             "bound AFC router",
         );
-        let _aqc = AqcChannelsImpl::new().await?;
+        debug!("getting key store info");
+        let keystore_info = daemon.get_keystore_info(context::current()).await??;
+        debug!("getting device id");
+        let device_id = daemon.get_device_id(context::current()).await??;
+        let aqc = AqcChannelsImpl::new(device_id, keystore_info).await?;
 
-        Ok(Self { daemon, afc })
+        Ok(Self { daemon, afc, aqc })
+    }
+
+    /// Returns key store info.
+    pub async fn get_keystore_info(&self) -> Result<KeyStoreInfo> {
+        self.daemon
+            .get_keystore_info(context::current())
+            .await?
+            .map_err(Into::into)
     }
 
     /// Returns the address that the Aranya sync server is bound to.
