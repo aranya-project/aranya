@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{Message, Client, Label};
+use aranya_client::{afc::Message, client::Client, SyncPeerConfig};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
@@ -22,6 +22,7 @@ use tracing_subscriber::{
     prelude::*,
     EnvFilter,
 };
+use aranya_client::Label;
 
 struct TeamCtx {
     owner: UserCtx,
@@ -187,6 +188,7 @@ async fn main() -> Result<()> {
 
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
+    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
@@ -221,63 +223,6 @@ async fn main() -> Result<()> {
     let mut membera_team = team.membera.client.team(team_id);
     let mut memberb_team = team.memberb.client.team(team_id);
 
-    info!("adding sync peers");
-    owner_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
-        .await?;
-    owner_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
-        .await?;
-    owner_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
-        .await?;
-
-    admin_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
-        .await?;
-    admin_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
-        .await?;
-    admin_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
-        .await?;
-
-    operator_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
-        .await?;
-    operator_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
-        .await?;
-    operator_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
-        .await?;
-
-    membera_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
-        .await?;
-    membera_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
-        .await?;
-    membera_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
-        .await?;
-    membera_team
-        .add_sync_peer(memberb_addr.into(), sync_interval)
-        .await?;
-
-    memberb_team
-        .add_sync_peer(owner_addr.into(), sync_interval)
-        .await?;
-    memberb_team
-        .add_sync_peer(admin_addr.into(), sync_interval)
-        .await?;
-    memberb_team
-        .add_sync_peer(operator_addr.into(), sync_interval)
-        .await?;
-    memberb_team
-        .add_sync_peer(membera_addr.into(), sync_interval)
-        .await?;
-
     // add admin to team.
     info!("adding admin to team");
     owner_team.add_device_to_team(team.admin.pk).await?;
@@ -293,8 +238,79 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
+    // Admin tries to assign a role
+    match admin_team
+        .assign_role(team.operator.id, Role::Operator)
+        .await
+    {
+        Ok(_) => bail!("Expected role assignment to fail"),
+        Err(aranya_client::Error::Daemon(_)) => {}
+        Err(_) => bail!("Unexpected error"),
+    }
+
+    // Admin syncs with the Owner peer and retries the role
+    // assignment command
+    admin_team.sync_now(owner_addr.into(), None).await?;
+    sleep(sleep_interval).await;
     admin_team
         .assign_role(team.operator.id, Role::Operator)
+        .await?;
+
+    info!("adding sync peers");
+    owner_team
+        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .await?;
+    owner_team
+        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .await?;
+    owner_team
+        .add_sync_peer(membera_addr.into(), sync_cfg.clone())
+        .await?;
+
+    admin_team
+         .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+         .await?;
+    admin_team
+        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .await?;
+    admin_team
+        .add_sync_peer(membera_addr.into(), sync_cfg.clone())
+        .await?;
+
+    operator_team
+        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .await?;
+    operator_team
+        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .await?;
+    operator_team
+        .add_sync_peer(membera_addr.into(), sync_cfg.clone())
+        .await?;
+
+    membera_team
+        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .await?;
+    membera_team
+        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .await?;
+    membera_team
+        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .await?;
+    membera_team
+        .add_sync_peer(memberb_addr.into(), sync_cfg.clone())
+        .await?;
+
+    memberb_team
+        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .await?;
+    memberb_team
+        .add_sync_peer(admin_addr.into(), sync_cfg.clone())
+        .await?;
+    memberb_team
+        .add_sync_peer(operator_addr.into(), sync_cfg.clone())
+        .await?;
+    memberb_team
+        .add_sync_peer(membera_addr.into(), sync_cfg)
         .await?;
 
     // wait for syncing.
