@@ -4,7 +4,7 @@ use std::{io, path::PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
 use aranya_aqc_util::{
-    BidiChannelCreated, BidiChannelReceived, Handler, Label as AqcLabel, UniChannelReceived,
+    BidiChannelCreated, BidiChannelReceived, Handler, UniChannelCreated, UniChannelReceived,
 };
 use aranya_crypto::{
     aead::Aead, default::DefaultEngine, generic_array::GenericArray, import::Import,
@@ -105,8 +105,9 @@ impl<'a> AqcChannels<'a> {
                     author_enc_key_id: v.author_enc_key_id,
                     peer_id: v.peer_id.into_id().into(),
                     peer_enc_pk: &v.peer_enc_pk,
-                    label: AqcLabel::new(label.to_u32()),
-                    key_id: v.key_id,
+                    label_id: v.label_id,
+                    channel_id: v.channel_id,
+                    psk_length_in_bytes: 32, // TODO: don't hard-code
                 },
             )?;
             debug!("psk id: {:?}", psk.identity());
@@ -139,17 +140,32 @@ impl<'a> AqcChannels<'a> {
         let node_id: NodeId = 0.into();
         debug!(%node_id, "selected node ID");
 
-        let (aqc_id, aqc_ctrl, _aqc_info) = self
+        let (aqc_id, aqc_ctrl, aqc_info) = self
             .client
             .daemon
             .create_aqc_uni_channel(context::current(), team_id, peer.clone(), node_id, label)
             .await??;
         debug!(%aqc_id, %node_id, %label, "created aqc uni channel");
 
-        // TODO: decode PSK from keystore.
+        if let UniCreated(v) = aqc_info {
+            let psk = self.client.aqc.handler.uni_channel_created(
+                &mut self.client.aqc.eng.clone(),
+                &UniChannelCreated {
+                    parent_cmd_id: v.parent_cmd_id,
+                    author_id: v.author_id.into_id().into(),
+                    author_enc_key_id: v.author_enc_key_id,
+                    send_id: v.send_id.into_id().into(),
+                    recv_id: v.recv_id.into_id().into(),
+                    peer_enc_pk: &v.peer_enc_pk,
+                    label_id: v.label_id,
+                    channel_id: v.channel_id,
+                    psk_length_in_bytes: 32, // TODO: don't hard-code
+                },
+            )?;
+            debug!("psk id: {:?}", psk.identity());
 
-        // TODO: send ctrl message via network.
-        debug!("sent control message");
+            // TODO: send ctrl msg via network.
+        }
 
         // TODO: for testing only. Send ctrl via network instead of returning.
         Ok((aqc_id, aqc_ctrl))
@@ -191,8 +207,10 @@ impl<'a> AqcChannels<'a> {
                         author_enc_pk: &v.author_enc_pk,
                         peer_id: v.peer_id.into_id().into(),
                         peer_enc_key_id: v.peer_enc_key_id,
-                        label: AqcLabel::new(v.label.to_u32()),
+                        label_id: v.label_id,
                         encap: &v.encap,
+                        channel_id: v.channel_id,
+                        psk_length_in_bytes: 32, // TODO: don't hard-code this value
                     },
                 )?;
                 debug!("psk id: {:?}", psk.identity());
@@ -207,8 +225,10 @@ impl<'a> AqcChannels<'a> {
                         send_id: v.send_id.into_id().into(),
                         recv_id: v.recv_id.into_id().into(),
                         peer_enc_key_id: v.peer_enc_key_id,
-                        label: AqcLabel::new(v.label.to_u32()),
+                        label_id: v.label_id,
                         encap: &v.encap,
+                        channel_id: v.channel_id,
+                        psk_length_in_bytes: 32, // TODO: don't hard-code this value
                     },
                 )?;
                 debug!("psk id: {:?}", psk.identity());

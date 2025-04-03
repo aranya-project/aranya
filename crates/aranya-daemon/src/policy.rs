@@ -64,6 +64,9 @@ pub enum Effect {
     AqcLabelCreated(AqcLabelCreated),
     AqcLabelDeleted(AqcLabelDeleted),
     QueriedAqcLabel(QueriedAqcLabel),
+    AqcLabelAssigned(AqcLabelAssigned),
+    AqcLabelRevoked(AqcLabelRevoked),
+    QueriedAqcLabelAssignment(QueriedAqcLabelAssignment),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
@@ -222,7 +225,7 @@ pub struct AqcBidiChannelCreated {
     pub author_enc_key_id: Id,
     pub peer_id: Id,
     pub peer_enc_pk: Vec<u8>,
-    pub label: i64,
+    pub label_id: Id,
     pub channel_id: Id,
 }
 /// AqcBidiChannelReceived policy effect.
@@ -233,7 +236,7 @@ pub struct AqcBidiChannelReceived {
     pub author_enc_pk: Vec<u8>,
     pub peer_id: Id,
     pub peer_enc_key_id: Id,
-    pub label: i64,
+    pub label_id: Id,
     pub encap: Vec<u8>,
 }
 /// AqcUniChannelCreated policy effect.
@@ -245,7 +248,7 @@ pub struct AqcUniChannelCreated {
     pub reader_id: Id,
     pub author_enc_key_id: Id,
     pub peer_enc_pk: Vec<u8>,
-    pub label: i64,
+    pub label_id: Id,
     pub channel_id: Id,
 }
 /// AqcUniChannelReceived policy effect.
@@ -257,20 +260,20 @@ pub struct AqcUniChannelReceived {
     pub reader_id: Id,
     pub author_enc_pk: Vec<u8>,
     pub peer_enc_key_id: Id,
-    pub label: i64,
+    pub label_id: Id,
     pub encap: Vec<u8>,
 }
 /// AqcLabelCreated policy effect.
 #[effect]
 pub struct AqcLabelCreated {
-    pub name: String,
-    pub label_author_id: Id,
     pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
 }
 /// AqcLabelDeleted policy effect.
 #[effect]
 pub struct AqcLabelDeleted {
-    pub name: String,
+    pub label_name: String,
     pub label_author_id: Id,
     pub label_id: Id,
     pub author_id: Id,
@@ -278,9 +281,33 @@ pub struct AqcLabelDeleted {
 /// QueriedAqcLabel policy effect.
 #[effect]
 pub struct QueriedAqcLabel {
-    pub name: String,
-    pub label_author_id: Id,
     pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+}
+/// AqcLabelAssigned policy effect.
+#[effect]
+pub struct AqcLabelAssigned {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+    pub author_id: Id,
+}
+/// AqcLabelRevoked policy effect.
+#[effect]
+pub struct AqcLabelRevoked {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+    pub author_id: Id,
+}
+/// QueriedAqcLabelAssignment policy effect.
+#[effect]
+pub struct QueriedAqcLabelAssignment {
+    pub device_id: Id,
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
 }
 /// QueryDevicesOnTeamResult policy effect.
 #[effect]
@@ -365,21 +392,29 @@ pub trait ActorExt {
     fn create_aqc_bidi_channel(
         &mut self,
         peer_id: Id,
-        label: i64,
+        label_id: Id,
     ) -> Result<(), ClientError>;
     fn create_aqc_uni_channel(
         &mut self,
         writer_id: Id,
         reader_id: Id,
-        label: i64,
+        label_id: Id,
     ) -> Result<(), ClientError>;
     fn create_aqc_label(&mut self, name: String) -> Result<(), ClientError>;
-    fn delete_aqc_label_by_name(
+    fn delete_aqc_label(&mut self, label_id: Id) -> Result<(), ClientError>;
+    fn query_aqc_labels(&mut self) -> Result<(), ClientError>;
+    fn assign_aqc_label(
         &mut self,
-        name: String,
-        label_author_id: Id,
+        device_id: Id,
+        label_id: Id,
+        op: ChanOp,
     ) -> Result<(), ClientError>;
-    fn query_aqc_label(&mut self, name: String) -> Result<(), ClientError>;
+    fn revoke_aqc_label(
+        &mut self,
+        device_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn query_aqc_label_assignments(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
     fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;

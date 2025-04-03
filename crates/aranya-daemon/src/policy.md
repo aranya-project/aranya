@@ -338,49 +338,53 @@ function can_create_afc_uni_channel(writer_id id, reader_id id, label int) bool 
 ```policy
 // Reports whether the devices have permission to create
 // a bidirectional AQC channel with each other.
-function can_create_aqc_bidi_channel(device1 id, device2 id, label int) bool {
-    check is_valid_label(label)
+function can_create_aqc_bidi_channel(device1 id, device2 id, label_id id) bool {
     // Devices cannot create channels with themselves.
     //
     // This should have been caught by the AQC FFI, so check
     // instead of just returning false.
     check device1 != device2
+
     // Both devices must have permissions to read (recev) and
     // write (send) data.
-    let device1_op = get_allowed_op(device1, label)
+    let device1_op = get_allowed_op(device1, label_id)
     if device1_op != ChanOp::ReadWrite {
         return false
     }
-    let device2_op = get_allowed_op(device2, label)
+
+    let device2_op = get_allowed_op(device2, label_id)
     if device2_op != ChanOp::ReadWrite {
         return false
     }
+
     return true
 }
 
 // Reports whether the devices have permission to create
 // a unidirectional AQC channel with each other.
-function can_create_aqc_uni_channel(writer_id id, reader_id id, label int) bool {
-    check is_valid_label(label)
+function can_create_aqc_uni_channel(writer_id id, reader_id id, label_id id) bool {
     // Devices cannot create channels with themselves.
     //
     // This should have been caught by the AQC FFI, so check
     // instead of just returning false.
     check writer_id != reader_id
+
     // The writer must have permissions to write (send) data.
-    let writer_op = get_allowed_op(writer_id, label)
+    let writer_op = get_allowed_op(writer_id, label_id)
     match writer_op {
-        ChanOp::ReadOnly => {return false}
+        ChanOp::ReadOnly => { return false }
         ChanOp::WriteOnly => {}
         ChanOp::ReadWrite => {}
     }
+
     // The reader must have permission to read (receive) data.
-    let reader_op = get_allowed_op(reader_id, label)
+    let reader_op = get_allowed_op(reader_id, label_id)
     match reader_op {
         ChanOp::ReadOnly => {}
-        ChanOp::WriteOnly => {return false}
+        ChanOp::WriteOnly => { return false }
         ChanOp::ReadWrite => {}
     }
+
     return true
 }
 ```
@@ -1714,26 +1718,29 @@ author, and sends the encapsulations through the `AqcCreateBidiChannel` command.
 command, the device will decapsulate their keys and store them in the shared memory DB.
 
 ```policy
-action create_aqc_bidi_channel(peer_id id, label int) {
+action create_aqc_bidi_channel(peer_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
     let author = get_valid_device(author_id)
     let peer_enc_pk = get_enc_pk(peer_id)
+
     let ch = aqc::create_bidi_channel(
         parent_cmd_id,
         author.enc_key_id,
         author_id,
         peer_enc_pk,
         peer_id,
-        label,
+        label_id,
     )
+
     publish AqcCreateBidiChannel {
         peer_id: peer_id,
-        label: label,
+        label_id: label_id,
         peer_encap: ch.peer_encap,
-        channel_id: ch.key_id,
+        channel_id: ch.channel_id,
     }
 }
+
 // The effect that is emitted when the author of a bidirectional
 // AQC channel successfully processes the `AqcCreateBidiChannel`
 // command.
@@ -1749,10 +1756,11 @@ effect AqcBidiChannelCreated {
     // The channel peer's encoded public encryption key.
     peer_enc_pk bytes,
     // The channel label.
-    label int,
+    label_id id,
     // The channel's unique identifier.
     channel_id id,
 }
+
 // The effect that is emitted when the peer of a bidirectional
 // AQC channel successfully processes the `AqcCreateBidiChannel`
 // command.
@@ -1768,35 +1776,46 @@ effect AqcBidiChannelReceived {
     // The channel peer's encryption key ID.
     peer_enc_key_id id,
     // The channel label.
-    label int,
+    label_id id,
     // The channel peer's encapsulated KEM shared secret.
     encap bytes,
 }
+
 command AqcCreateBidiChannel {
     fields {
         // The channel peer's device Id.
         peer_id id,
         // The label applied to the channel.
-        label int,
+        label_id id,
         // The channel peer's encapsulated KEM shared secret.
         peer_encap bytes,
         // The channel's unique identifier.
         channel_id id,
     }
+
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
+
     policy {
         let author = get_valid_device(envelope::author_id(envelope))
         let peer = check_unwrap find_existing_device(this.peer_id)
+
+        // The label must exist.
+        let label = check_unwrap query Label[label_id: label_id]
+
         // Check that both devices are allowed to participate in
         // this bidirectional channel.
-        check can_create_aqc_bidi_channel(author.device_id, peer.device_id, this.label)
+        check can_create_aqc_bidi_channel(author.device_id, peer.device_id, label.label_id)
+
         // NB: Check roles, other ACLs here.
+
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
+
         if current_device_id == author.device_id {
             // We're the channel author.
             let peer_enc_pk = get_enc_pk(peer.device_id)
+
             finish {
                 emit AqcBidiChannelCreated {
                     parent_cmd_id: parent_cmd_id,
@@ -1804,13 +1823,14 @@ command AqcCreateBidiChannel {
                     author_enc_key_id: author.enc_key_id,
                     peer_id: peer.device_id,
                     peer_enc_pk: peer_enc_pk,
-                    label: this.label,
+                    label_id: label.label_id,
                     channel_id: this.channel_id,
                 }
             }
         } else if current_device_id == peer.device_id {
             // We're the channel peer.
             let author_enc_pk = get_enc_pk(author.device_id)
+
             finish {
                 emit AqcBidiChannelReceived {
                     parent_cmd_id: parent_cmd_id,
@@ -1818,7 +1838,7 @@ command AqcCreateBidiChannel {
                     author_enc_pk: author_enc_pk,
                     peer_id: peer.device_id,
                     peer_enc_key_id: peer.enc_key_id,
-                    label: this.label,
+                    label_id: label.label_id,
                     encap: this.peer_encap,
                 }
             }
@@ -1855,27 +1875,30 @@ the encapsulation through the `AqcCreateUniChannel` command. When processing the
 corresponding recipient will decapsulate their key and store it in the shared memory DB.
 
 ```policy
-action create_aqc_uni_channel(writer_id id, reader_id id, label int) {
+action create_aqc_uni_channel(writer_id id, reader_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author = get_valid_device(device::current_device_id())
     let peer_id = select_peer_id(author.device_id, writer_id, reader_id)
     let peer_enc_pk = get_enc_pk(peer_id)
+
     let ch = aqc::create_uni_channel(
         parent_cmd_id,
         author.enc_key_id,
         peer_enc_pk,
         writer_id,
         reader_id,
-        label,
+        label_id,
     )
+
     publish AqcCreateUniChannel {
         writer_id: writer_id,
         reader_id: reader_id,
-        label: label,
+        label_id: label_id,
         peer_encap: ch.peer_encap,
-        channel_id: ch.key_id,
+        channel_id: ch.channel_id,
     }
 }
+
 // The effect that is emitted when the author of a unidirectional
 // AQC channel successfully processes the `AqcCreateUniChannel`
 // command.
@@ -1893,10 +1916,11 @@ effect AqcUniChannelCreated {
     // The channel peer's encoded public encryption key.
     peer_enc_pk bytes,
     // The channel label.
-    label int,
+    label_id id,
     // The channel's unique identifier.
     channel_id id,
 }
+
 // The effect that is emitted when the peer of a unidirectional
 // AQC channel successfully processes the `AqcCreateUniChannel`
 // command.
@@ -1914,10 +1938,11 @@ effect AqcUniChannelReceived {
     // The channel peer's encryption key ID.
     peer_enc_key_id id,
     // The channel label.
-    label int,
+    label_id id,
     // The channel peer's encapsulated KEM shared secret.
     encap bytes,
 }
+
 command AqcCreateUniChannel {
     fields {
         // The device ID of the participant that can write data.
@@ -1925,35 +1950,47 @@ command AqcCreateUniChannel {
         // The device ID of the participant that can read data.
         reader_id id,
         // The label applied to the channel.
-        label int,
+        label_id id,
         // The channel peer's encapsulated KEM shared secret.
         peer_encap bytes,
         // The ID of the AQC channel key.
         channel_id id,
     }
+
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
+
     policy {
         let author = get_valid_device(envelope::author_id(envelope))
+
         // Ensure that the author is one of the channel
         // participants.
         check author.device_id == this.writer_id ||
               author.device_id == this.reader_id
-        let peer_id = if author.device_id == this.writer_id {
-            this.reader_id
+
+        if author.device_id == this.writer_id {
+            let peer_id = this.reader_id
         } else {
-            this.writer_id
+            let peer_id = this.writer_id
         }
         let peer = check_unwrap find_existing_device(peer_id)
+
+        // The label must exist.
+        let label = check_unwrap query Label[label_id: label_id]
+
         // Check that both devices are allowed to participate in
         // this unidirectional channel.
-        check can_create_aqc_uni_channel(this.writer_id, this.reader_id, this.label)
+        check can_create_aqc_uni_channel(this.writer_id, this.reader_id, label.label_id)
+
         // NB: Check roles, other ACLs here.
+
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
-        // We authored this command.
+
         if current_device_id == author.device_id {
+            // We authored this command.
             let peer_enc_pk = get_enc_pk(peer_id)
+
             finish {
                 emit AqcUniChannelCreated {
                     parent_cmd_id: parent_cmd_id,
@@ -1962,13 +1999,14 @@ command AqcCreateUniChannel {
                     reader_id: this.reader_id,
                     author_enc_key_id: author.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
-                    label: this.label,
+                    label_id: label.label_id,
                     channel_id: this.channel_id,
                 }
             }
         } else if current_device_id == peer.device_id {
             // We're the intended recipient of this command.
             let author_enc_pk = get_enc_pk(author.device_id)
+
             finish {
                 emit AqcUniChannelReceived {
                     parent_cmd_id: parent_cmd_id,
@@ -1977,7 +2015,7 @@ command AqcCreateUniChannel {
                     reader_id: this.reader_id,
                     author_enc_pk: author_enc_pk,
                     peer_enc_key_id: peer.enc_key_id,
-                    label: this.label,
+                    label_id: label.label_id,
                     encap: this.peer_encap,
                 }
             }
@@ -2000,91 +2038,111 @@ command AqcCreateUniChannel {
 #### AQC Labels
 
 ```policy
-// Records an AQC label.
+// Records a label for AQC and AFC.
 //
-// `author_id` is the ID of the device that created the label.
-fact AqcLabel[name string, label_author_id id]=>{label_id id}
+// `name` is a short description of the label. E.g., "TELEMETRY".
+// TODO: use same labels for AQC and AFC.
+fact AqcLabel[label_id id]=>{name string, author_id id}
+
+// Creates a label for AQC.
 action create_aqc_label(name string) {
     publish CreateAqcLabel {
-        name: name,
+        label_name: name,
     }
 }
+
 command CreateAqcLabel {
     fields {
         // The label name.
-        name string,
+        label_name string,
     }
+
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
+
     policy {
         let author = get_valid_device(envelope::author_id(envelope))
+
+        // A label's ID is the ID of the command that created it.
         let label_id = envelope::command_id(envelope)
+
+        // NB: Check roles, other ACLs here.
+
         // Verify that the label does not already exist.
         //
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        check !exists AqcLabel[name: this.name, label_author_id: author.device_id]
+        check !exists Label[name: this.label_name, author_id: author.device_id]
+
         finish {
-            create AqcLabel[name: this.name, label_author_id: author.device_id]=>{label_id: label_id}
-            emit AqcLabelCreated {
-                name: this.name,
-                label_author_id: author.device_id,
+            create Label[label_id: this.label_id]=>{name: this.label_name, author_id: author.device_id}
+
+            emit LabelCreated {
                 label_id: label_id,
+                label_name: this.label_name,
+                label_author_id: author.device_id,
             }
         }
     }
 }
+
 // The effect emitted when the `CreateAqcLabel` command is
 // successfully processed.
 effect AqcLabelCreated {
-    // The label name.
-    name string,
-    // The ID of the device that created the label.
-    label_author_id id,
     // Uniquely identifies the label.
     label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
 }
-action delete_aqc_label_by_name(name string, label_author_id id) {
+
+action delete_aqc_label(label_id id) {
     publish DeleteAqcLabel {
-        name: name,
-        label_author_id: label_author_id,
+        label_id: label_id,
     }
 }
-// TODO(eric): add `delete_aqc_label_by_id`?
+
 command DeleteAqcLabel {
     fields {
-        // The label name.
-        name string,
-        // The device ID of the author of the label.
-        label_author_id id,
+        // The unique ID of the label being deleted.
+        label_id id,
     }
+
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
+
     policy {
         let author = get_valid_device(envelope::author_id(envelope))
+
         // NB: Check roles, other ACLs here.
+
         // Verify that the label exists.
         //
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        let label = check_unwrap query AqcLabel[name: this.name, label_author_id: this.label_author_id]
+        let label = check_unwrap query Label[label_id: this.label_id]
+
         finish {
-            delete AqcLabel[name: this.name, label_author_id: this.label_author_id]
-            emit AqcLabelCreated {
-                name: this.name,
-                label_author_id: this.label_author_id,
-                label_id: label.label_id,
+            // Cascade deleting the label assignments.
+            delete AssignedAqcLabel[device_id: ?, label_id: label.label_id]
+
+            emit AqcLabelDeleted {
+                label_name: label.name,
+                label_id: this.label_id,
+                author_id: label.author_id,
             }
         }
     }
 }
+
 // The effect emitted when the `DeleteAqcLabel` command is
 // successfully processed.
 effect AqcLabelDeleted {
     // The label name.
-    name string,
+    label_name string,
     // The label author's device ID.
     label_author_id id,
     // Uniquely identifies the label.
@@ -2092,41 +2150,233 @@ effect AqcLabelDeleted {
     // The ID of the device that deleted the label.
     author_id id,
 }
-// Emits `QueriedAfcLabel` for each label with the same name.
-action query_aqc_label(name string) {
-    map AqcLabel[name: name, label_author_id: ?] as f {
+
+// Emits `QueriedAqcLabel` for all labels.
+action query_aqc_labels() {
+    map AqcLabel[label_id: ?] as f {
         publish QueryAqcLabel {
-            name: f.name,
-            label_author_id: f.label_author_id,
             label_id: f.label_id,
+            label_name: f.name,
+            label_author_id: f.author_id,
         }
     }
 }
+
 command QueryAqcLabel {
     fields {
-        name string,
-        label_author_id id,
         label_id id,
+        label_name string,
+        label_author_id id,
     }
+
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
+
     policy {
         finish {
             emit QueriedAqcLabel {
-                name: this.name,
-                label_author_id: this.label_author_id,
                 label_id: this.label_id,
+                label_name: this.label_name,
+                label_author_id: this.label_author_id,
             }
         }
     }
 }
+
 effect QueriedAqcLabel {
-    // The label name.
-    name string,
-    // The ID of the device that created the label.
-    label_author_id id,
     // The label's unique ID.
     label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
+}
+
+// Records that a device was granted permission to use a label
+// for certain channel operations.
+fact AssignedAqcLabel[device_id id, label_id id]=>{op enum ChanOp}
+
+// Grants the device permission to use the label.
+//
+// - It is an error if the device does not exist.
+// - It is an error if the label does not exist.
+// - It is an error if the device has already been granted
+//   permission to use this label.
+action assign_aqc_label(device_id id, label_id id, op enum ChanOp) {
+    publish AssignAqcLabel {
+        device_id: device_id,
+        label_id: label_id,
+        op: op,
+    }
+}
+
+command AssignAqcLabel {
+    fields {
+        // The target device.
+        device_id id,
+        // The label being assigned to the target device.
+        label_id id,
+        // The channel operations the device is allowed to used
+        // the label for.
+        op enum ChanOp,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let author = get_valid_device(envelope::author_id(envelope))
+        let target = get_valid_device(this.device_id)
+
+        // NB: Check roles, other ACLs here.
+
+        let label = check_unwrap query Label[label_id: this.label_id]
+
+        // Verify that the device has not already been granted
+        // permission to use the label.
+        //
+        // This will happen in the `finish` block if we try to
+        // create an already true label, but checking first
+        // results in a nicer error (I think?).
+        check !exists AssignedLabel[device_id: target.device_id, label_id: label.label_id]
+
+        finish {
+            create AssignedAqcLabel[device_id: target.device_id, label_id: label.label_id]=>{op: this.op}
+
+            emit AqcLabelAssigned {
+                label_id: label.label_id,
+                label_name: label.name,
+                label_author_id: label.author_id,
+                author_id: author.device_id,
+            }
+        }
+    }
+}
+
+// The effect emitted when the `AssignAqcLabel` command is
+// successfully processed.
+effect AqcLabelAssigned {
+    // The ID of the label that was assigned.
+    label_id id,
+    // The name of the label that was assigned.
+    label_name string,
+    // The ID of the author of the label.
+    label_author_id id,
+    // The ID of the device that assigned the label.
+    author_id id,
+}
+
+// Revokes permission to use a label from a device.
+//
+// - It is an error if the device does not exist.
+// - It is an error if the label does not exist.
+// - It is an error if the device has not been granted permission
+//   to use this label.
+action revoke_aqc_label(device_id id, label_id id) {
+    publish RevokeAqcLabel {
+        device_id: device_id,
+        label_id: label_id,
+    }
+}
+
+command RevokeAqcLabel {
+    fields {
+        // The target device.
+        device_id id,
+        // The label being assigned to the target device.
+        label_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let author = get_valid_device(envelope::author_id(envelope))
+        let target = get_valid_device(this.device_id)
+
+        // NB: Check roles, other ACLs here.
+
+        let label = check_unwrap query Label[label_id: this.label_id]
+
+        // Verify that the device has been granted permission to
+        // use the label.
+        //
+        // This will happen in the `finish` block if we try to
+        // create an already true label, but checking first
+        // results in a nicer error (I think?).
+        check exists AssignedLabel[device_id: target.device_id, label_id: label.label_id]
+
+        finish {
+            delete AssignedAqcLabel[device_id: target.device_id, label_id: label.label_id]
+
+            emit AqcLabelRevoked {
+                label_id: label.label_id,
+                label_name: label.name,
+                label_author_id: label.author_id,
+                author_id: author.device_id,
+            }
+        }
+    }
+}
+
+// The effect emitted when the `RevokeAqcLabel` command is
+// successfully processed.
+effect AqcLabelRevoked {
+    // The ID of the label that was revoked.
+    label_id id,
+    // The name of the label that was revoked.
+    label_name string,
+    // The ID of the author of the label.
+    label_author_id id,
+    // The ID of the device that revoked the label.
+    author_id id,
+}
+
+// Emits `QueriedLabelAssignment` for all labels the device has
+// been granted permission to use.
+action query_aqc_label_assignments(device_id id) {
+    map AssignedAqcLabel[device_id: id, label_id: ?] as f {
+        publish QueryAqcLabelAssignment {
+            device_id: device_id,
+            label_id: f.label_id,
+            label_name: f.name,
+            label_author_id: f.author_id,
+        }
+    }
+}
+
+command QueryAqcLabelAssignment {
+    fields {
+        device_id id,
+        label_id id,
+        label_name string,
+        label_author_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        finish {
+            emit QueriedAqcLabelAssignment {
+                device_id: this.device_id,
+                label_id: this.label_id,
+                label_name: this.label_name,
+                label_author_id: this.label_author_id,
+            }
+        }
+    }
+}
+
+effect QueriedAqcLabelAssignment {
+    // The device's unique ID.
+    device_id id,
+    // The label's unique ID.
+    label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
 }
 ```
 

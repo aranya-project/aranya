@@ -3,6 +3,7 @@
 use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
 
 use anyhow::{bail, Context, Result};
+use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_fast_channels::Label;
 use aranya_keygen::PublicKeys;
@@ -601,19 +602,15 @@ where
     }
 
     /// Creates a unidirectional AQC channel.
-    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
+    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
     fn create_aqc_uni_channel(
         &self,
         seal_id: DeviceId,
         open_id: DeviceId,
-        label: Label,
+        label_id: LabelId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_aqc_uni_channel(
-                seal_id.into(),
-                open_id.into(),
-                i64::from(label.to_u32()),
-            )?;
+            actor.create_aqc_uni_channel(seal_id.into(), open_id.into(), label_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -640,14 +637,14 @@ where
     }
 
     /// Creates a bidirectional AQC channel.
-    #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
+    #[instrument(skip(self), fields(peer_id = %peer_id, label_id = %label_id))]
     fn create_aqc_bidi_channel(
         &self,
         peer_id: DeviceId,
-        label: Label,
+        label_id: LabelId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_aqc_bidi_channel(peer_id.into(), i64::from(label.to_u32()))?;
+            actor.create_aqc_bidi_channel(peer_id.into(), label_id.into())?;
             Ok(())
         })
         .in_current_span()

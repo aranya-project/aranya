@@ -2,6 +2,7 @@
 
 use std::{net::SocketAddr, path::Path, time::Duration};
 
+use aranya_aqc_util::LabelId;
 #[cfg(feature = "afc")]
 use aranya_daemon_api::CS;
 use aranya_daemon_api::{
@@ -410,6 +411,15 @@ impl Team<'_> {
         self.client
             .daemon
             .revoke_label(context::current(), self.id, device, label)
+            .await?
+            .map_err(Into::into)
+    }
+
+    /// Create an AQC label.
+    pub async fn create_aqc_label(&mut self, label_name: String) -> Result<LabelId> {
+        self.client
+            .daemon
+            .create_aqc_label(context::current(), self.id, label_name)
             .await?
             .map_err(Into::into)
     }

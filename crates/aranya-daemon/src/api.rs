@@ -11,17 +11,14 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use aranya_aqc_util::{
-    BidiChannelCreated as AqcBidiChannelCreated, BidiChannelReceived as AqcBidiChannelReceived,
-    Label as AqcLabel, UniChannelCreated as AqcUniChannelCreated,
-    UniChannelReceived as AqcUniChannelReceived,
-};
+use aranya_aqc_util::LabelId;
 use aranya_crypto::{
     aqc::{BidiPeerEncap as AqcBidiPeerEncap, UniPeerEncap as AqcUniPeerEncap},
     Csprng, DeviceId, Rng,
 };
 use aranya_daemon_api::{
-    AfcCtrl, AfcId, AqcChannelInfo, AqcCtrl, AqcId, DaemonApi, DeviceId as ApiDeviceId,
+    AfcCtrl, AfcId, AqcBidiChannelCreatedInfo, AqcBidiChannelReceivedInfo, AqcChannelInfo, AqcCtrl,
+    AqcId, AqcUniChannelCreatedInfo, AqcUniChannelReceivedInfo, DaemonApi, DeviceId as ApiDeviceId,
     KeyBundle as ApiKeyBundle, KeyStoreInfo, NetIdentifier, Result as ApiResult, Role as ApiRole,
     SyncPeerConfig, TeamId, CS,
 };
@@ -280,6 +277,11 @@ impl DaemonApiHandler {
                         .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
                 }
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
+                Effect::AqcLabelCreated(_) => {}
+                Effect::AqcLabelDeleted(_) => {}
+                Effect::AqcLabelAssigned(_) => {}
+                Effect::AqcLabelRevoked(_) => {}
+                Effect::QueriedAqcLabel(_) => {}
                 Effect::AfcBidiChannelCreated(v) => {
                     debug!("received AfcBidiChannelCreated effect");
                     #[cfg(feature = "afc")]
@@ -308,9 +310,7 @@ impl DaemonApiHandler {
                 Effect::QueryAqcNetIdentifierResult(_) => {}
                 Effect::QueryLabelExistsResult(_) => {}
                 Effect::QueryDeviceLabelAssignmentsResult(_) => {}
-                Effect::AqcLabelCreated(_) => {}
-                Effect::AqcLabelDeleted(_) => {}
-                Effect::QueriedAqcLabel(_) => {}
+                Effect::QueriedAqcLabelAssignment(_) => {}
             }
         }
         Ok(())
@@ -795,20 +795,17 @@ impl DaemonApi for DaemonApiHandler {
 
         self.handle_effects(&effects, Some(node_id)).await?;
 
-        // NB: this shouldn't happen because the policy should
-        // ensure that label fits inside a `u32`.
-        let label = AqcLabel::new(u32::try_from(e.label).expect("`label` is out of range"));
-        let aqc_info = AqcBidiChannelCreated {
+        let aqc_info = AqcChannelInfo::BidiCreated(AqcBidiChannelCreatedInfo {
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
             peer_id: e.peer_id.into(),
-            peer_enc_pk: &e.peer_enc_pk,
-            label,
-            key_id: e.channel_id.into(),
-        };
+            peer_enc_pk: e.peer_enc_pk.clone(),
+            label_id: e.label_id.into(),
+            channel_id: e.channel_id.into(),
+        });
 
-        Ok((aqc_id, ctrl, aqc_info.into()))
+        Ok((aqc_id, ctrl, aqc_info))
     }
     #[instrument(skip_all)]
     async fn create_aqc_uni_channel(
@@ -846,21 +843,18 @@ impl DaemonApi for DaemonApiHandler {
 
         self.handle_effects(&effects, Some(node_id)).await?;
 
-        // NB: this shouldn't happen because the policy should
-        // ensure that label fits inside a `u32`.
-        let label = AqcLabel::new(u32::try_from(e.label).expect("`label` is out of range"));
-        let aqc_info = AqcUniChannelCreated {
+        let aqc_info = AqcChannelInfo::UniCreated(AqcUniChannelCreatedInfo {
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
             send_id: e.writer_id.into(),
             recv_id: e.reader_id.into(),
-            peer_enc_pk: &e.peer_enc_pk,
-            label,
-            key_id: e.channel_id.into(),
-        };
+            peer_enc_pk: e.peer_enc_pk.clone(),
+            label_id: e.label_id.into(),
+            channel_id: e.channel_id.into(),
+        });
 
-        Ok((aqc_id, ctrl, aqc_info.into()))
+        Ok((aqc_id, ctrl, aqc_info))
     }
 
     #[instrument(skip(self))]
@@ -884,18 +878,16 @@ impl DaemonApi for DaemonApiHandler {
             if let Some(Effect::AqcBidiChannelReceived(e)) =
                 find_effect!(&effects, Effect::AqcBidiChannelReceived(e) if e.peer_id == id.into())
             {
-                // NB: this shouldn't happen because the policy should
-                // ensure that label fits inside a `u32`.
-                let label = AqcLabel::new(u32::try_from(e.label).expect("`label` is out of range"));
-                let aqc_info = AqcBidiChannelReceived {
+                let aqc_info = AqcChannelInfo::BidiReceived(AqcBidiChannelReceivedInfo {
                     parent_cmd_id: e.parent_cmd_id,
                     author_id: e.author_id.into(),
-                    author_enc_pk: &e.author_enc_pk,
+                    author_enc_pk: e.author_enc_pk.clone(),
                     peer_id: e.peer_id.into(),
                     peer_enc_key_id: e.peer_enc_key_id.into(),
-                    label,
-                    encap: &e.encap,
-                };
+                    label_id: e.label_id.into(),
+                    encap: e.encap.clone(),
+                    channel_id: e.channel_id,
+                });
 
                 let encap =
                     AqcBidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
@@ -913,19 +905,17 @@ impl DaemonApi for DaemonApiHandler {
 
             if let Some(Effect::AqcUniChannelReceived(e)) = find_effect!(&effects, Effect::AqcUniChannelReceived(e) if (e.writer_id == id.into() || e.reader_id == id.into()))
             {
-                // NB: this shouldn't happen because the policy should
-                // ensure that label fits inside a `u32`.
-                let label = AqcLabel::new(u32::try_from(e.label).expect("`label` is out of range"));
-                let aqc_info = AqcUniChannelReceived {
+                let aqc_info = AqcChannelInfo::UniReceived(AqcUniChannelReceivedInfo {
                     parent_cmd_id: e.parent_cmd_id,
                     send_id: e.writer_id.into(),
                     recv_id: e.reader_id.into(),
                     author_id: e.author_id.into(),
-                    author_enc_pk: &e.author_enc_pk,
+                    author_enc_pk: e.author_enc_pk.clone(),
                     peer_enc_key_id: e.peer_enc_key_id.into(),
-                    label,
-                    encap: &e.encap,
-                };
+                    label_id: e.label_id.into(),
+                    encap: e.encap.clone(),
+                    channel_id: e.channel_id,
+                });
 
                 let encap =
                     AqcUniPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
@@ -1167,6 +1157,49 @@ impl DaemonApi for DaemonApiHandler {
         } else {
             Err(anyhow!("unable to query aqc network identifier").into())
         }
+    }
+
+    /// Create an AQC label.
+    async fn create_aqc_label(
+        self,
+        _: context::Context,
+        _team: TeamId,
+        _name: String,
+    ) -> ApiResult<LabelId> {
+        todo!()
+    }
+
+    /// Delete an AQC label.
+    async fn delete_aqc_label(
+        self,
+        _: context::Context,
+        _team: TeamId,
+        _label_id: LabelId,
+    ) -> ApiResult<()> {
+        todo!()
+    }
+
+    /// Assign an AQC label.
+    async fn assign_aqc_label(
+        self,
+        _: context::Context,
+        _team: TeamId,
+        _device: ApiDeviceId,
+        _label_id: LabelId,
+    ) -> ApiResult<()> {
+        todo!()
+    }
+
+    /// Query an AQC label.
+    async fn query_aqc_label(
+        self,
+        _: context::Context,
+        _team: TeamId,
+        _name: String,
+        _label_author_id: ApiDeviceId,
+        _label_id: LabelId,
+    ) -> ApiResult<LabelId> {
+        todo!()
     }
 }
 
