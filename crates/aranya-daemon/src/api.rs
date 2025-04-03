@@ -3,6 +3,8 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
+#[cfg(feature = "afc")]
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     future::{self, Future},
     net::SocketAddr,
@@ -106,6 +108,7 @@ impl DaemonApiServer {
                 pk,
                 peers,
                 afc_peers: Arc::default(),
+                afc_peers_dirty: Arc::new(true.into()),
                 handler: Arc::new(Mutex::new(Handler::new(device_id, store))),
             },
         })
@@ -197,6 +200,8 @@ struct DaemonApiHandler {
     /// AFC peers.
     #[cfg(feature = "afc")]
     afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
+    #[cfg(feature = "afc")]
+    afc_peers_dirty: Arc<AtomicBool>,
     /// Handles AFC effects.
     #[cfg(feature = "afc")]
     handler: Arc<Mutex<Handler<Store>>>,
@@ -691,7 +696,10 @@ impl DaemonApi for DaemonApiHandler {
     ) -> ApiResult<(AfcId, AfcCtrl)> {
         info!("create_afc_bidi_channel");
 
-        self.update_afc_peers_inner(team).await?;
+        if self.afc_peers_dirty.load(Ordering::Relaxed) {
+            self.update_afc_peers_inner(team).await?;
+            self.afc_peers_dirty.store(false, Ordering::Relaxed);
+        }
 
         let peer_id = self
             .afc_peers
@@ -736,7 +744,10 @@ impl DaemonApi for DaemonApiHandler {
         node_id: NodeId,
         ctrl: AfcCtrl,
     ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
-        self.update_afc_peers_inner(team).await?;
+        if self.afc_peers_dirty.load(Ordering::Relaxed) {
+            self.update_afc_peers_inner(team).await?;
+            self.afc_peers_dirty.store(false, Ordering::Relaxed);
+        }
 
         let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
