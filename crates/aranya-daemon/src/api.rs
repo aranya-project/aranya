@@ -376,6 +376,30 @@ impl DaemonApiHandler {
         }
         Ok(None)
     }
+
+    #[cfg(feature = "afc")]
+    async fn update_afc_peers_inner(&self, team: TeamId) -> Result<()> {
+        return Ok(());
+        // If the daemon gets killed at some point, all network identifiers on the current
+        // object are lost. To fix this, we query the fact database and re-register them.
+
+        // Query all devices on the current graph from the factDB
+        let devices = self.query_devices_on_team_inner(team).await?;
+
+        // For each device, let's see if they have a network identifier and register it.
+        for device in devices {
+            if let Some(net_identifier) =
+                self.query_afc_net_identifier_inner(team, device).await?
+            {
+                self.afc_peers
+                    .lock()
+                    .await
+                    .insert(net_identifier, device.into_id().into());
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl DaemonApi for DaemonApiHandler {
@@ -466,31 +490,9 @@ impl DaemonApi for DaemonApiHandler {
             .create_team(pk, Some(nonce))
             .await
             .context("unable to create team")?;
-        let team_id = graph_id.into_id().into();
         debug!(?graph_id);
 
-        #[cfg(feature = "afc")]
-        {
-            // If the daemon gets killed at some point, all network identifiers on the current
-            // object are lost. To fix this, we query the fact database and re-register them.
-
-            // Query all devices on the current graph from the factDB
-            let devices = self.query_devices_on_team_inner(team_id).await?;
-
-            // For each device, let's see if they have a network identifier and register it.
-            for device in devices {
-                if let Some(net_identifier) =
-                    self.query_afc_net_identifier_inner(team_id, device).await?
-                {
-                    self.afc_peers
-                        .lock()
-                        .await
-                        .insert(net_identifier, device.into_id().into());
-                }
-            }
-        }
-
-        Ok(team_id)
+        Ok(graph_id.into_id().into())
     }
 
     #[instrument(skip(self))]
@@ -696,6 +698,8 @@ impl DaemonApi for DaemonApiHandler {
     ) -> ApiResult<(AfcId, AfcCtrl)> {
         info!("create_afc_bidi_channel");
 
+        self.update_afc_peers_inner(team).await?;
+
         let peer_id = self
             .afc_peers
             .lock()
@@ -739,6 +743,8 @@ impl DaemonApi for DaemonApiHandler {
         node_id: NodeId,
         ctrl: AfcCtrl,
     ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
+        self.update_afc_peers_inner(team).await?;
+
         let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;

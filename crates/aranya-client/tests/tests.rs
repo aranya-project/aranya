@@ -196,11 +196,13 @@ impl TeamCtx {
     }
 }
 
+#[allow(dead_code)]
 struct DeviceCtx {
     client: Client,
     pk: KeyBundle,
     id: DeviceId,
     daemon: AbortHandle,
+    cfg: Config,
 }
 
 fn get_shm_path(path: String) -> String {
@@ -287,6 +289,7 @@ impl DeviceCtx {
             pk,
             id,
             daemon: handle,
+            cfg,
         })
     }
 
@@ -1085,6 +1088,189 @@ async fn test_afc_monotonic_seq() -> Result<()> {
             .expect("should have a message");
         assert_eq!(got, want, "b->a");
     }
+
+    Ok(())
+}
+
+/// This tests a bug where if the daemon is killed after registering net identifiers, they're not
+/// reloaded upon reboot, which causes create_bidi_channel to fail with "unable to lookup peer".
+#[cfg(feature = "afc")]
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_afc_persist_net_identifier() -> Result<()> {
+    let interval = Duration::from_millis(100);
+    let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
+    let sleep_interval = interval * 6;
+
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
+    let mut team = TeamCtx::new("test_afc_persist_net_identifier".into(), work_dir.clone()).await?;
+
+    // create team.
+    let team_id = team
+        .owner
+        .client
+        .create_team()
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+    // TODO: implement add_team.
+    /*
+    team.admin.client.add_team(team_id).await?;
+    team.operator.client.add_team(team_id).await?;
+    team.membera.client.add_team(team_id).await?;
+    team.memberb.client.add_team(team_id).await?;
+    */
+
+    // get sync addresses.
+    let owner_addr = team.owner.aranya_local_addr().await?;
+    let admin_addr = team.admin.aranya_local_addr().await?;
+    let operator_addr = team.operator.aranya_local_addr().await?;
+    let membera_addr = team.membera.aranya_local_addr().await?;
+    let memberb_addr = team.memberb.aranya_local_addr().await?;
+
+    // get afc addresses.
+    let membera_afc_addr = team.membera.afc_local_addr().await?;
+    let memberb_afc_addr = team.memberb.afc_local_addr().await?;
+
+    // setup sync peers.
+    let mut owner_team = team.owner.client.team(team_id);
+    let mut admin_team = team.admin.client.team(team_id);
+    let mut operator_team = team.operator.client.team(team_id);
+    let mut membera_team = team.membera.client.team(team_id);
+    let mut memberb_team = team.memberb.client.team(team_id);
+
+    owner_team
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
+        .await?;
+    owner_team
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
+        .await?;
+    owner_team
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
+        .await?;
+
+    admin_team
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
+        .await?;
+    admin_team
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
+        .await?;
+    admin_team
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
+        .await?;
+
+    operator_team
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
+        .await?;
+    operator_team
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
+        .await?;
+    operator_team
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
+        .await?;
+
+    membera_team
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
+        .await?;
+    membera_team
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
+        .await?;
+    membera_team
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
+        .await?;
+    membera_team
+        .add_sync_peer(memberb_addr.into(), sync_config.clone())
+        .await?;
+
+    memberb_team
+        .add_sync_peer(owner_addr.into(), sync_config.clone())
+        .await?;
+    memberb_team
+        .add_sync_peer(admin_addr.into(), sync_config.clone())
+        .await?;
+    memberb_team
+        .add_sync_peer(operator_addr.into(), sync_config.clone())
+        .await?;
+    memberb_team
+        .add_sync_peer(membera_addr.into(), sync_config.clone())
+        .await?;
+
+    // add admin to team.
+    info!("adding admin to team");
+    owner_team.add_device_to_team(team.admin.pk.clone()).await?;
+    owner_team.assign_role(team.admin.id, Role::Admin).await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // add operator to team.
+    info!("adding operator to team");
+    owner_team
+        .add_device_to_team(team.operator.pk.clone())
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    admin_team
+        .assign_role(team.operator.id, Role::Operator)
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // add membera to team.
+    info!("adding membera to team");
+    operator_team
+        .add_device_to_team(team.membera.pk.clone())
+        .await?;
+
+    // add memberb to team.
+    info!("adding memberb to team");
+    operator_team
+        .add_device_to_team(team.memberb.pk.clone())
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // operator assigns labels for AFC channels.
+    let label = Label::new(1);
+    operator_team.create_label(label).await?;
+    operator_team.assign_label(team.membera.id, label).await?;
+    operator_team.assign_label(team.memberb.id, label).await?;
+
+    // assign network addresses.
+    operator_team
+        .assign_afc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
+        .await?;
+    operator_team
+        .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // Kill the team, and reload it, to simulate the bug.
+    drop(team.membera);
+    team.membera = DeviceCtx::new(
+        "test_afc_persist_net_identifier".into(),
+        "membera".into(),
+        work_dir.join("membera"),
+    )
+    .await?;
+
+    // Create a new channel, which should fail to lookup peer if we haven't re-populated afc_peers.
+    let _ = team
+        .membera
+        .client
+        .afc()
+        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label)
+        .await?;
+
+    // wait for ctrl message to be sent.
+    sleep(Duration::from_millis(100)).await;
 
     Ok(())
 }
