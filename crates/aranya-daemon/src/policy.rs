@@ -50,6 +50,7 @@ pub enum Effect {
     LabelAssigned(LabelAssigned),
     LabelRevoked(LabelRevoked),
     AfcNetworkNameSet(AfcNetworkNameSet),
+    QueryAfcNetworkNamesOutput(QueryAfcNetworkNamesOutput),
     AfcNetworkNameUnset(AfcNetworkNameUnset),
     AqcNetworkNameSet(AqcNetworkNameSet),
     AqcNetworkNameUnset(AqcNetworkNameUnset),
@@ -144,6 +145,12 @@ pub struct LabelRevoked {
 pub struct AfcNetworkNameSet {
     pub device_id: Id,
     pub net_identifier: String,
+}
+/// QueryAfcNetworkNamesOutput policy effect.
+#[effect]
+pub struct QueryAfcNetworkNamesOutput {
+    pub net_identifier: String,
+    pub device_id: Id,
 }
 /// AfcNetworkNameUnset policy effect.
 #[effect]
@@ -269,6 +276,7 @@ pub trait ActorExt {
         device_id: Id,
         net_identifier: String,
     ) -> Result<(), ClientError>;
+    fn query_afc_network_names(&mut self) -> Result<(), ClientError>;
     fn unset_afc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn set_aqc_network_name(
         &mut self,

@@ -4,6 +4,8 @@ use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, syn
 
 use anyhow::{bail, Context, Result};
 use aranya_crypto::{Csprng, DeviceId, Rng};
+#[cfg(feature = "afc")]
+use aranya_daemon_api::NetIdentifier;
 use aranya_fast_channels::Label;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
@@ -14,6 +16,8 @@ use aranya_runtime::{
 };
 use aranya_util::Addr;
 use buggy::bug;
+#[cfg(feature = "afc")]
+use futures_util::TryFutureExt as _;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -700,6 +704,7 @@ where
     /// Query AFC net identifier off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
+    #[cfg(feature = "afc")]
     fn query_afc_net_identifier_off_graph(
         &self,
         device_id: DeviceId,
@@ -735,6 +740,36 @@ where
         self.session_action(move || VmAction {
             name: "query_label_exists",
             args: Cow::Owned(vec![Value::from(i64::from(label.to_u32()))]),
+        })
+        .in_current_span()
+    }
+
+    /// Query assigned network identifiers.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip_all)]
+    #[cfg(feature = "afc")]
+    fn query_afc_network_names(
+        &self,
+    ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_afc_network_names",
+            args: Cow::Owned(vec![]),
+        })
+        .and_then(|(_, effects)| {
+            std::future::ready(
+                effects
+                    .into_iter()
+                    .map(|eff| {
+                        let Effect::QueryAfcNetworkNamesOutput(eff) = eff else {
+                            anyhow::bail!("bad effect in query_network_names");
+                        };
+                        Ok((
+                            NetIdentifier(eff.net_identifier),
+                            DeviceId::from(eff.device_id),
+                        ))
+                    })
+                    .collect(),
+            )
         })
         .in_current_span()
     }

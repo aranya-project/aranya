@@ -265,6 +265,7 @@ impl DaemonApiHandler {
                 Effect::QueryAqcNetIdentifierResult(_) => {}
                 Effect::QueryLabelExistsResult(_) => {}
                 Effect::QueryDeviceLabelAssignmentsResult(_) => {}
+                Effect::QueryAfcNetworkNamesOutput(_) => {}
             }
         }
         Ok(())
@@ -379,24 +380,16 @@ impl DaemonApiHandler {
 
     #[cfg(feature = "afc")]
     async fn update_afc_peers_inner(&self, team: TeamId) -> Result<()> {
-        return Ok(());
-        // If the daemon gets killed at some point, all network identifiers on the current
-        // object are lost. To fix this, we query the fact database and re-register them.
+        // If the daemon gets killed at some point, all network identifiers on the current object
+        // are lost. To fix this, let's query the fact database and re-register them.
+        let results = self
+            .client
+            .actions(&team.into_id().into())
+            .query_afc_network_names()
+            .await?;
 
-        // Query all devices on the current graph from the factDB
-        let devices = self.query_devices_on_team_inner(team).await?;
-
-        // For each device, let's see if they have a network identifier and register it.
-        for device in devices {
-            if let Some(net_identifier) =
-                self.query_afc_net_identifier_inner(team, device).await?
-            {
-                self.afc_peers
-                    .lock()
-                    .await
-                    .insert(net_identifier, device.into_id().into());
-            }
-        }
+        let mut afc_peers = self.afc_peers.lock().await;
+        afc_peers.extend(results);
 
         Ok(())
     }
