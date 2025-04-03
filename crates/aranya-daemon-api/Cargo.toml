@@ -1,6 +1,6 @@
 [package]
 name = "aranya-daemon-api"
-description = "API Interface between Aranya client and daemon, handling type conversion between internal and external types"
+description = "API Interface between Aranya client and daemon, enabling team operations, secure channel creation, and sync configurations. Handles type conversions between internal and external types"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
