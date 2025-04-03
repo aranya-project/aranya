@@ -15,7 +15,9 @@
 
 The Aranya Daemon API is the interface between the Aranya
 [client](../aranya-client/) and [daemon](../aranya-daemon/), which communicate
-using [`tarpc`](https://crates.io/crates/tarpc) over Unix domain sockets.
+using [`tarpc`](https://crates.io/crates/tarpc) over Unix domain sockets. This API
+provides an interface to carry out team operations, manage channels,
+and sync state.
 
 This API also provides type conversions when translating from internal types
 used by the daemon and external types used by the client.
