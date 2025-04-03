@@ -37,6 +37,9 @@ runs:
         echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
         echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
         echo "CARGO_INCREMENTAL=0" >> $GITHUB_ENV
+        # sccache changed $ACTIONS_CACHE_URL -> $ACTIONS_RESULTS_URL
+        # This can be removed once `cargo` has been updated to use the new env var.
+        echo "ACTIONS_CACHE_URL=${ACTIONS_RESULTS_URL}" >> $GITHUB_ENV
       shell: bash
 
     - name: Install cargo-make
