@@ -937,7 +937,7 @@ impl From<ApiKeyBundle> for KeyBundle {
         KeyBundle {
             ident_key: value.identity,
             sign_key: value.signing,
-            enc_key: value.encoding,
+            enc_key: value.encryption,
         }
     }
 }
@@ -947,7 +947,7 @@ impl From<KeyBundle> for ApiKeyBundle {
         ApiKeyBundle {
             identity: value.ident_key,
             signing: value.sign_key,
-            encoding: value.enc_key,
+            encryption: value.enc_key,
         }
     }
 }
