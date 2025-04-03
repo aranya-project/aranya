@@ -14,6 +14,7 @@
 #[cfg(feature = "afc")]
 pub mod afc;
 pub mod client;
+pub mod config;
 pub mod error;
 
 #[doc(inline)]
@@ -24,6 +25,7 @@ pub use crate::{
 };
 #[doc(inline)]
 pub use crate::{
-    client::{Client, SyncPeerConfig, SyncPeerConfigBuilder, Team},
-    error::{Error, Result},
+    client::{Client, Team},
+    config::{SyncPeerConfig, SyncPeerConfigBuilder, TeamConfig, TeamConfigBuilder},
+    error::{ConfigError, Error, Result},
 };

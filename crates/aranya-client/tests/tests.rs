@@ -8,17 +8,16 @@
     clippy::unwrap_used,
     rust_2018_idioms
 )]
+
 #[cfg(feature = "afc")]
 use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Context as _, Result};
+use aranya_client::{Client, TeamConfigBuilder};
 #[cfg(feature = "afc")]
-use aranya_client::afc::Message;
-use aranya_client::client::Client;
-#[cfg(feature = "afc")]
-use aranya_client::SyncPeerConfig;
-use aranya_crypto::{hash::Hash, rust::Sha256};
+use aranya_client::{Message, SyncPeerConfig};
+use aranya_crypto::{hash::Hash as _, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
@@ -28,11 +27,11 @@ use aranya_daemon_api::NetIdentifier;
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
 #[cfg(feature = "afc")]
 use aranya_fast_channels::{Label, Seq};
-use aranya_util::addr::Addr;
-use backon::{ExponentialBuilder, Retryable};
+use aranya_util::Addr;
+use backon::{ExponentialBuilder, Retryable as _};
 #[cfg(feature = "afc")]
-use buggy::BugExt;
-use spideroak_base58::ToBase58;
+use buggy::BugExt as _;
+use spideroak_base58::ToBase58 as _;
 use tempfile::tempdir;
 use test_log::test;
 use tokio::{
@@ -318,7 +317,7 @@ async fn test_sync_now() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(TeamConfigBuilder::new().build()?)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -380,7 +379,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(TeamConfigBuilder::new().build()?)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -663,7 +662,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(TeamConfigBuilder::new().build()?)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -881,7 +880,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(TeamConfigBuilder::new().build()?)
         .await
         .expect("expected to create team");
     info!(?team_id);

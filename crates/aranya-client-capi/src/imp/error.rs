@@ -40,6 +40,9 @@ pub enum Error {
 
     #[error("invalid index: {0}")]
     InvalidIndex(usize),
+
+    #[error("config error: {0}")]
+    Config(#[from] aranya_client::ConfigError),
 }
 
 impl From<WriteCStrError> for Error {

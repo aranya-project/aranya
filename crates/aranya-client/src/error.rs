@@ -5,6 +5,7 @@ use aranya_fast_channels::Version;
 
 /// Possible errors that could happen in the Aranya client.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum Error {
     /// Unable to connect to the daemon.
     #[error("Unable to connect to the daemon: {0}")]
@@ -17,6 +18,10 @@ pub enum Error {
     /// The daemon returned an error.
     #[error("Daemon reported error: {0}")]
     Daemon(#[from] aranya_daemon_api::Error),
+
+    /// A configuration error happened.
+    #[error("Configuration error: {0}")]
+    Config(#[from] ConfigError),
 
     /// An Aranya Fast Channel error happened.
     #[error("Fast Channel error: {0}")]
@@ -35,9 +40,15 @@ pub enum Error {
     },
 }
 
+/// Possible errors that could happen when creating configuration info.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ConfigError {}
+
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
 #[cfg(feature = "afc")]
+#[non_exhaustive]
 pub enum AfcError {
     // Connection-related errors
     /// Unable to bind a network addresss.
