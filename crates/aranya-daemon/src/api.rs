@@ -42,7 +42,8 @@ mod afc_imports {
     pub(super) use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, DeviceId};
     pub(super) use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed};
     pub(super) use bimap::BiBTreeMap;
-    pub(super) use tokio::sync::Mutex;
+    pub(super) use std::ops::DerefMut as _;
+    pub(super) use tokio::sync::{Mutex, MutexGuard};
 
     pub(super) use crate::{
         policy::{AfcBidiChannelCreated, AfcBidiChannelReceived},
@@ -181,6 +182,9 @@ impl DaemonApiServer {
     }
 }
 
+#[cfg(feature = "afc")]
+type NetIdentifierMap = BiBTreeMap<NetIdentifier, DeviceId>;
+
 #[derive(Clone)]
 struct DaemonApiHandler {
     /// Aranya client for
@@ -196,7 +200,7 @@ struct DaemonApiHandler {
     afc: Arc<Mutex<WriteState<CS, Rng>>>,
     /// AFC peers.
     #[cfg(feature = "afc")]
-    afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
+    afc_peers: Arc<Mutex<Option<NetIdentifierMap>>>,
     /// Handles AFC effects.
     #[cfg(feature = "afc")]
     handler: Arc<Mutex<Handler<Store>>>,
@@ -232,10 +236,14 @@ impl DaemonApiHandler {
                 Effect::LabelAssigned(_label_assigned) => {}
                 Effect::LabelRevoked(_label_revoked) => {}
                 Effect::AfcNetworkNameSet(e) => {
+                    // SAFETY: it's safe to unwrap here since we ensure it's the Some() variant in
+                    // assign_afc_net_identifier.
                     #[cfg(feature = "afc")]
                     self.afc_peers
                         .lock()
                         .await
+                        .as_mut()
+                        .unwrap()
                         .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
                 }
                 Effect::AfcNetworkNameUnset(_network_name_unset) => {}
@@ -265,6 +273,7 @@ impl DaemonApiHandler {
                 Effect::QueryAqcNetIdentifierResult(_) => {}
                 Effect::QueryLabelExistsResult(_) => {}
                 Effect::QueryDeviceLabelAssignmentsResult(_) => {}
+                Effect::QueryAfcNetworkNamesOutput(_) => {}
             }
         }
         Ok(())
@@ -338,6 +347,65 @@ impl DaemonApiHandler {
             .add(channel_id, Directed::Bidirectional { seal, open })
             .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         Ok(())
+    }
+
+    async fn query_devices_on_team_inner(&self, team: TeamId) -> Result<Vec<ApiDeviceId>> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_devices_on_team_off_graph()
+            .await
+            .context("unable to query devices on team")?;
+        let mut devices: Vec<ApiDeviceId> = Vec::new();
+        for e in effects {
+            if let Effect::QueryDevicesOnTeamResult(e) = e {
+                devices.push(e.device_id.into());
+            }
+        }
+        Ok(devices)
+    }
+
+    #[cfg(feature = "afc")]
+    async fn query_afc_net_identifier_inner(
+        &self,
+        team: TeamId,
+        device: ApiDeviceId,
+    ) -> Result<Option<NetIdentifier>> {
+        if let Ok((_ctrl, effects)) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_afc_net_identifier_off_graph(device.into_id().into())
+            .await
+        {
+            if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
+                find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
+            {
+                return Ok(Some(NetIdentifier(e.net_identifier)));
+            }
+        }
+        Ok(None)
+    }
+
+    #[cfg(feature = "afc")]
+    async fn update_or_create_afc_peers(
+        &self,
+        team: TeamId,
+    ) -> Result<MutexGuard<'_, Option<NetIdentifierMap>>> {
+        let mut handle = self.afc_peers.lock().await;
+        if handle.deref_mut().is_none() {
+            // If the daemon gets killed at some point, all network identifiers on the current object
+            // are lost. To fix this, let's query the fact database and re-register them.
+            let results = self
+                .client
+                .actions(&team.into_id().into())
+                .query_afc_network_names()
+                .await?;
+
+            let mut afc_peers = BiBTreeMap::new();
+            afc_peers.extend(results);
+            *handle = Some(afc_peers);
+        }
+        Ok(handle)
     }
 }
 
@@ -430,6 +498,7 @@ impl DaemonApi for DaemonApiHandler {
             .await
             .context("unable to create team")?;
         debug!(?graph_id);
+
         Ok(graph_id.into_id().into())
     }
 
@@ -509,6 +578,7 @@ impl DaemonApi for DaemonApiHandler {
         device: ApiDeviceId,
         name: NetIdentifier,
     ) -> ApiResult<()> {
+        let _ = self.update_or_create_afc_peers(team).await?;
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -636,10 +706,11 @@ impl DaemonApi for DaemonApiHandler {
     ) -> ApiResult<(AfcId, AfcCtrl)> {
         info!("create_afc_bidi_channel");
 
-        let peer_id = self
-            .afc_peers
-            .lock()
-            .await
+        // SAFETY: It's safe to unwrap here as we verify that it's the Some() variant.
+        let handle = self.update_or_create_afc_peers(team).await?;
+        let peer_id = handle
+            .as_ref()
+            .unwrap()
             .get_by_left(&peer)
             .copied()
             .context("unable to lookup peer")?;
@@ -679,6 +750,8 @@ impl DaemonApi for DaemonApiHandler {
         node_id: NodeId,
         ctrl: AfcCtrl,
     ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
+        let _ = self.update_or_create_afc_peers(team).await?;
+
         let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
@@ -693,10 +766,13 @@ impl DaemonApi for DaemonApiHandler {
             let afc_id: AfcId = encap.id().into();
             debug!(?afc_id, "processed afc ID");
             let label = Label::new(e.label.try_into().expect("expected label conversion"));
+            // SAFETY: It's safe to unwrap here as we check that it's the Some() variant above
             let net = self
                 .afc_peers
                 .lock()
                 .await
+                .as_ref()
+                .unwrap()
                 .get_by_right(&e.author_id.into())
                 .context("missing net identifier for channel author")?
                 .clone();
@@ -762,20 +838,10 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: TeamId,
     ) -> ApiResult<Vec<ApiDeviceId>> {
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_devices_on_team_off_graph()
-            .await
-            .context("unable to query devices on team")?;
-        let mut devices: Vec<ApiDeviceId> = Vec::new();
-        for e in effects {
-            if let Effect::QueryDevicesOnTeamResult(e) = e {
-                devices.push(e.device_id.into());
-            }
-        }
-        return Ok(devices);
+        let devices = self.query_devices_on_team_inner(team).await?;
+        Ok(devices)
     }
+
     /// Query device role.
     #[instrument(skip(self))]
     async fn query_device_role(
@@ -858,19 +924,8 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         device: ApiDeviceId,
     ) -> ApiResult<Option<NetIdentifier>> {
-        if let Ok((_ctrl, effects)) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_afc_net_identifier_off_graph(device.into_id().into())
-            .await
-        {
-            if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
-                find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
-            {
-                return Ok(Some(NetIdentifier(e.net_identifier)));
-            }
-        }
-        Ok(None)
+        let net_identifier = self.query_afc_net_identifier_inner(team, device).await?;
+        Ok(net_identifier)
     }
 
     /// Query AFC network ID.

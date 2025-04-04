@@ -1189,6 +1189,35 @@ command SetAfcNetworkName {
         }
     }
 }
+
+action query_afc_network_names() {
+    map AfcMemberNetworkId[device_id: ?] as f {
+        publish QueryAfcNetworkNamesCommand {
+            net_identifier: f.net_identifier,
+            device_id: f.device_id,
+        }
+    }
+}
+effect QueryAfcNetworkNamesOutput {
+    net_identifier string,
+    device_id id,
+}
+command QueryAfcNetworkNamesCommand {
+    fields {
+        net_identifier string,
+        device_id id,
+    }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+    policy {
+        finish {
+            emit QueryAfcNetworkNamesOutput {
+                net_identifier: this.net_identifier,
+                device_id: this.device_id,
+            }
+        }
+    }
+}
 ```
 
 **Invariants**:
