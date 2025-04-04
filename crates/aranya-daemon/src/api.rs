@@ -3,8 +3,6 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-#[cfg(feature = "afc")]
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::{
     future::{self, Future},
     net::SocketAddr,
@@ -44,7 +42,8 @@ mod afc_imports {
     pub(super) use aranya_crypto::{afc::BidiPeerEncap, keystore::fs_keystore::Store, DeviceId};
     pub(super) use aranya_fast_channels::{shm::WriteState, AranyaState, ChannelId, Directed};
     pub(super) use bimap::BiBTreeMap;
-    pub(super) use tokio::sync::Mutex;
+    pub(super) use std::ops::DerefMut as _;
+    pub(super) use tokio::sync::{Mutex, MutexGuard};
 
     pub(super) use crate::{
         policy::{AfcBidiChannelCreated, AfcBidiChannelReceived},
@@ -108,7 +107,6 @@ impl DaemonApiServer {
                 pk,
                 peers,
                 afc_peers: Arc::default(),
-                afc_peers_dirty: Arc::new(true.into()),
                 handler: Arc::new(Mutex::new(Handler::new(device_id, store))),
             },
         })
@@ -184,6 +182,9 @@ impl DaemonApiServer {
     }
 }
 
+#[cfg(feature = "afc")]
+type NetIdentifierMap = BiBTreeMap<NetIdentifier, DeviceId>;
+
 #[derive(Clone)]
 struct DaemonApiHandler {
     /// Aranya client for
@@ -199,9 +200,7 @@ struct DaemonApiHandler {
     afc: Arc<Mutex<WriteState<CS, Rng>>>,
     /// AFC peers.
     #[cfg(feature = "afc")]
-    afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
-    #[cfg(feature = "afc")]
-    afc_peers_dirty: Arc<AtomicBool>,
+    afc_peers: Arc<Mutex<Option<NetIdentifierMap>>>,
     /// Handles AFC effects.
     #[cfg(feature = "afc")]
     handler: Arc<Mutex<Handler<Store>>>,
@@ -237,10 +236,14 @@ impl DaemonApiHandler {
                 Effect::LabelAssigned(_label_assigned) => {}
                 Effect::LabelRevoked(_label_revoked) => {}
                 Effect::AfcNetworkNameSet(e) => {
+                    // SAFETY: it's safe to unwrap here since we ensure it's the Some() variant in
+                    // assign_afc_net_identifier.
                     #[cfg(feature = "afc")]
                     self.afc_peers
                         .lock()
                         .await
+                        .as_mut()
+                        .unwrap()
                         .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
                 }
                 Effect::AfcNetworkNameUnset(_network_name_unset) => {}
@@ -384,19 +387,25 @@ impl DaemonApiHandler {
     }
 
     #[cfg(feature = "afc")]
-    async fn update_afc_peers_inner(&self, team: TeamId) -> Result<()> {
-        // If the daemon gets killed at some point, all network identifiers on the current object
-        // are lost. To fix this, let's query the fact database and re-register them.
-        let results = self
-            .client
-            .actions(&team.into_id().into())
-            .query_afc_network_names()
-            .await?;
+    async fn update_or_create_afc_peers(
+        &self,
+        team: TeamId,
+    ) -> Result<MutexGuard<'_, Option<NetIdentifierMap>>> {
+        let mut handle = self.afc_peers.lock().await;
+        if handle.deref_mut().is_none() {
+            // If the daemon gets killed at some point, all network identifiers on the current object
+            // are lost. To fix this, let's query the fact database and re-register them.
+            let results = self
+                .client
+                .actions(&team.into_id().into())
+                .query_afc_network_names()
+                .await?;
 
-        let mut afc_peers = self.afc_peers.lock().await;
-        afc_peers.extend(results);
-
-        Ok(())
+            let mut afc_peers = BiBTreeMap::new();
+            afc_peers.extend(results);
+            *handle = Some(afc_peers);
+        }
+        Ok(handle)
     }
 }
 
@@ -569,6 +578,7 @@ impl DaemonApi for DaemonApiHandler {
         device: ApiDeviceId,
         name: NetIdentifier,
     ) -> ApiResult<()> {
+        let _ = self.update_or_create_afc_peers(team).await?;
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -696,15 +706,11 @@ impl DaemonApi for DaemonApiHandler {
     ) -> ApiResult<(AfcId, AfcCtrl)> {
         info!("create_afc_bidi_channel");
 
-        if self.afc_peers_dirty.load(Ordering::Relaxed) {
-            self.update_afc_peers_inner(team).await?;
-            self.afc_peers_dirty.store(false, Ordering::Relaxed);
-        }
-
-        let peer_id = self
-            .afc_peers
-            .lock()
-            .await
+        // SAFETY: It's safe to unwrap here as we verify that it's the Some() variant.
+        let handle = self.update_or_create_afc_peers(team).await?;
+        let peer_id = handle
+            .as_ref()
+            .unwrap()
             .get_by_left(&peer)
             .copied()
             .context("unable to lookup peer")?;
@@ -744,10 +750,7 @@ impl DaemonApi for DaemonApiHandler {
         node_id: NodeId,
         ctrl: AfcCtrl,
     ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
-        if self.afc_peers_dirty.load(Ordering::Relaxed) {
-            self.update_afc_peers_inner(team).await?;
-            self.afc_peers_dirty.store(false, Ordering::Relaxed);
-        }
+        let _ = self.update_or_create_afc_peers(team).await?;
 
         let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
@@ -763,10 +766,13 @@ impl DaemonApi for DaemonApiHandler {
             let afc_id: AfcId = encap.id().into();
             debug!(?afc_id, "processed afc ID");
             let label = Label::new(e.label.try_into().expect("expected label conversion"));
+            // SAFETY: It's safe to unwrap here as we check that it's the Some() variant above
             let net = self
                 .afc_peers
                 .lock()
                 .await
+                .as_ref()
+                .unwrap()
                 .get_by_right(&e.author_id.into())
                 .context("missing net identifier for channel author")?
                 .clone();
