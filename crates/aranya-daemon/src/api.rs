@@ -885,7 +885,7 @@ impl DaemonApi for DaemonApiHandler {
                     peer_enc_key_id: e.peer_enc_key_id.into(),
                     label_id: e.label_id.into(),
                     encap: e.encap.clone(),
-                    channel_id: e.channel_id,
+                    channel_id: e.channel_id, // TODO: missing channel_id field
                 });
 
                 let encap =
@@ -913,7 +913,7 @@ impl DaemonApi for DaemonApiHandler {
                     peer_enc_key_id: e.peer_enc_key_id.into(),
                     label_id: e.label_id.into(),
                     encap: e.encap.clone(),
-                    channel_id: e.channel_id,
+                    channel_id: e.channel_id, // TODO: missing channel_id field
                 });
 
                 let encap =

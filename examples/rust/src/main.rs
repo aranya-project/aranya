@@ -372,6 +372,7 @@ async fn main() -> Result<()> {
     let label_exists = queries.label_exists(label1).await?;
     info!("membera label1 exists?: {:?}", label_exists);
 
+    info!("demo afc functionality");
     // membera creates bidi channel with memberb
     let afc_id1 = team
         .membera
@@ -431,6 +432,27 @@ async fn main() -> Result<()> {
         "received message: {:?}",
         core::str::from_utf8(&data)?
     );
+
+    info!("completed afc demo")
+
+    info!("demo aqc functionality")
+    let label3 = operator_team.create_aqc_label("label3".into_string()).await?;
+    let op = ChanOp::ReadWrite;
+    operator_team.assign_aqc_label(label3, team.membera.id, op).await?;
+    operator_team.assign_aqc_label(label3, team.memberb.id, op).await?;
+    
+    // TODO: send AQC ctrl via network
+    
+    let (_aqc_id1, aqc_bidi_ctrl) = team.membera.client.aqc().create_bidi_channel(NetIdentifier(memberb_afc_addr.to_string()), label3).await?;
+    team.memberb.client.aqc().receive_aqc_ctrl(aqc_bidi_ctrl).await?;
+    
+    // TODO: send AQC data.
+
+    operator_team.revoke_aqc_label(team.membera.id, label3).await?;
+    operator_team.revoke_aqc_label(team.memberb.id, label3).await?;
+    operator_team.delete_aqc_label(label3).await?;
+
+    info!("completed aqc demo")
 
     info!("completed example Aranya application");
 
