@@ -189,6 +189,18 @@ pub struct TeamId(aranya_daemon_api::TeamId);
 #[aranya_capi_core::opaque(size = 64, align = 1)]
 pub struct DeviceId(aranya_daemon_api::DeviceId);
 
+/// Label ID.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+#[aranya_capi_core::opaque(size = 64, align = 1)]
+pub struct LabelId(aranya_daemon_api::LabelId);
+
+/// Channel ID for AQC channel.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+#[aranya_capi_core::opaque(size = 16, align = 1)]
+pub struct AqcChannelId(aranya_daemon_api::AqcId);
+
 /// Channel ID for a fast channel.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
@@ -217,6 +229,31 @@ impl From<Role> for aranya_daemon_api::Role {
             Role::Admin => Self::Admin,
             Role::Operator => Self::Operator,
             Role::Member => Self::Member,
+        }
+    }
+}
+
+/// Valid channel operations for a label assignment.
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+pub enum ChanOp {
+    /// The device can only receive data in channels with this
+    /// label.
+    ReadOnly,
+    /// The device can only send data in channels with this
+    /// label.
+    WriteOnly,
+    /// The device can send and receive data in channels with this
+    /// label.
+    ReadWrite,
+}
+
+impl From<ChanOp> for aranya_daemon_api::ChanOp {
+    fn from(value: ChanOp) -> Self {
+        match value {
+            ChanOp::ReadOnly => Self::ReadOnly,
+            ChanOp::WriteOnly => Self::WriteOnly,
+            ChanOp::ReadWrite => Self::ReadWrite,
         }
     }
 }
@@ -250,6 +287,21 @@ impl NetIdentifier {
         Ok(aranya_daemon_api::NetIdentifier(String::from(
             cstr.to_str()?,
         )))
+    }
+}
+
+/// An AQC label name.
+///
+/// E.g. "TELEMETRY_LABEL"
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct LabelName(*const c_char);
+
+impl LabelName {
+    unsafe fn as_underlying(self) -> Result<String, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
+        Ok(String::from(cstr.to_str()?))
     }
 }
 
@@ -1174,6 +1226,151 @@ pub unsafe fn afc_recv_data(
     client.msg = None;
 
     Ok(true)
+}
+
+/// Create an AQC channel label.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param name label name string [`LabelName`].
+///
+/// @relates AranyaClient.
+pub fn create_aqc_label(
+    client: &mut Client,
+    team: &TeamId,
+    name: LabelName,
+) -> Result<LabelId, imp::Error> {
+    let client = client.deref_mut();
+    // SAFETY: Caller must ensure `name` is a valid C String.
+    let name = unsafe { name.as_underlying() }?;
+    let label_id = client
+        .rt
+        .block_on(client.inner.team(team.0).create_aqc_label(name))?;
+    Ok(LabelId(label_id))
+}
+
+/// Delete an AQC channel label.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param label_id the channel label ID [`LabelId`] to delete.
+///
+/// @relates AranyaClient.
+pub fn delete_aqc_label(
+    client: &mut Client,
+    team: &TeamId,
+    label_id: LabelId,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client
+        .rt
+        .block_on(client.inner.team(team.0).delete_aqc_label(label_id.0))?;
+    Ok(())
+}
+
+/// Assign an AQC label to a device so that it can be used for an AQC channel.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device ID [`DeviceId`] of the device to assign the label to.
+/// @param label_id the AQC channel label ID [`LabelId`].
+///
+/// @relates AranyaClient.
+pub fn assign_aqc_label(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    label_id: LabelId,
+    op: ChanOp,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client
+        .rt
+        .block_on(
+            client
+                .inner
+                .team(team.0)
+                .assign_aqc_label(device.0, label_id.0, op.into()),
+        )?;
+    Ok(())
+}
+
+/// Revoke an AQC label from a device.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device ID [`DeviceId`] of the device to revoke the label from.
+/// @param label_id the AQC channel label ID [`LabelId`].
+///
+/// @relates AranyaClient.
+pub fn revoke_aqc_label(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    label_id: &LabelId,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .revoke_aqc_label(device.0, label_id.0),
+    )?;
+    Ok(())
+}
+
+/// Create an AQC channel.
+///
+/// Creates a bidirectional AQC channel between the current device
+/// and another peer.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param peer the peer's network identifier [`NetIdentifier`].
+/// @param label_id the AQC channel label ID [`LabelId`] to create the channel with.
+/// @param __output the AQC channel's ID [`ChannelId`]
+///
+/// @relates AranyaClient.
+pub unsafe fn aqc_create_bidi_channel(
+    client: &mut Client,
+    team: &TeamId,
+    peer: NetIdentifier,
+    label_id: LabelId,
+) -> Result<AqcChannelId, imp::Error> {
+    let client = client.deref_mut();
+    // SAFETY: Caller must ensure `peer` is a valid C String.
+    let peer = unsafe { peer.as_underlying() }?;
+    let result = client.rt.block_on(
+        client
+            .inner
+            .aqc()
+            .create_bidi_channel(team.0, peer, label_id.0),
+    )?;
+    Ok(AqcChannelId(result.0))
+}
+
+/// Delete an AQC channel.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param chan the AQC channel ID [`ChannelId`] of the channel to delete.
+///
+/// @relates AranyaClient.
+pub fn aqc_delete_channel(client: &mut Client, chan: AqcChannelId) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client
+        .rt
+        .block_on(client.inner.aqc().delete_channel(chan.0))?;
+    Ok(())
 }
 
 /// Configures how often the peer will be synced with.

@@ -2,7 +2,7 @@
 
 use std::{io, path::PathBuf};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, bail, Context};
 use aranya_aqc_util::{
     BidiChannelCreated, BidiChannelReceived, Handler, UniChannelCreated, UniChannelReceived,
 };
@@ -12,9 +12,9 @@ use aranya_crypto::{
 };
 pub use aranya_daemon_api::AqcId;
 use aranya_daemon_api::{
-    AqcChannelInfo::*, AqcCtrl, DeviceId, KeyStoreInfo, NetIdentifier, TeamId, CS,
+    AqcChannelInfo::*, AqcCtrl, DeviceId, KeyStoreInfo, LabelId, NetIdentifier, TeamId, CS,
 };
-use aranya_fast_channels::{Label, NodeId};
+use aranya_fast_channels::NodeId;
 use tarpc::context;
 use tokio::fs;
 use tracing::{debug, info, instrument};
@@ -79,13 +79,13 @@ impl<'a> AqcChannels<'a> {
     /// # Cancellation Safety
     ///
     /// It is NOT safe to cancel the resulting future. Doing so might lose data.
-    #[instrument(skip_all, fields(%team_id, %peer, %label))]
+    #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
     pub async fn create_bidi_channel(
         &mut self,
         team_id: TeamId,
         peer: NetIdentifier,
-        label: Label,
-    ) -> Result<(AqcId, AqcCtrl)> {
+        label_id: LabelId,
+    ) -> crate::Result<(AqcId, AqcCtrl)> {
         debug!("creating bidi channel");
 
         let node_id: NodeId = 0.into();
@@ -95,24 +95,29 @@ impl<'a> AqcChannels<'a> {
         let (aqc_id, aqc_ctrl, aqc_info) = self
             .client
             .daemon
-            .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
+            .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label_id)
             .await??;
-        debug!(%aqc_id, %node_id, %label, "created bidi channel");
+        debug!(%aqc_id, %node_id, %label_id, "created bidi channel");
 
         if let BidiCreated(v) = aqc_info {
-            let psk = self.client.aqc.handler.bidi_channel_created(
-                &mut self.client.aqc.eng.clone(),
-                &BidiChannelCreated {
-                    parent_cmd_id: v.parent_cmd_id,
-                    author_id: v.author_id.into_id().into(),
-                    author_enc_key_id: v.author_enc_key_id,
-                    peer_id: v.peer_id.into_id().into(),
-                    peer_enc_pk: &v.peer_enc_pk,
-                    label_id: v.label_id,
-                    channel_id: v.channel_id,
-                    psk_length_in_bytes: 32, // TODO: don't hard-code
-                },
-            )?;
+            let psk = self
+                .client
+                .aqc
+                .handler
+                .bidi_channel_created(
+                    &mut self.client.aqc.eng.clone(),
+                    &BidiChannelCreated {
+                        parent_cmd_id: v.parent_cmd_id,
+                        author_id: v.author_id.into_id().into(),
+                        author_enc_key_id: v.author_enc_key_id,
+                        peer_id: v.peer_id.into_id().into(),
+                        peer_enc_pk: &v.peer_enc_pk,
+                        label_id: v.label_id.into_id().into(),
+                        channel_id: v.channel_id,
+                        psk_length_in_bytes: 32, // TODO: don't hard-code
+                    },
+                )
+                .map_err(AqcError::ChannelCreation)?;
             debug!("psk id: {:?}", psk.identity());
 
             // TODO: send ctrl msg via network.
@@ -130,13 +135,13 @@ impl<'a> AqcChannels<'a> {
     /// # Cancellation Safety
     ///
     /// It is NOT safe to cancel the resulting future. Doing so might lose data.
-    #[instrument(skip_all, fields(%team_id, %peer, %label))]
+    #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
     pub async fn create_uni_channel(
         &mut self,
         team_id: TeamId,
         peer: NetIdentifier,
-        label: Label,
-    ) -> Result<(AqcId, AqcCtrl)> {
+        label_id: LabelId,
+    ) -> crate::Result<(AqcId, AqcCtrl)> {
         debug!("creating aqc uni channel");
 
         // TODO: use correct node ID.
@@ -146,25 +151,30 @@ impl<'a> AqcChannels<'a> {
         let (aqc_id, aqc_ctrl, aqc_info) = self
             .client
             .daemon
-            .create_aqc_uni_channel(context::current(), team_id, peer.clone(), node_id, label)
+            .create_aqc_uni_channel(context::current(), team_id, peer.clone(), node_id, label_id)
             .await??;
-        debug!(%aqc_id, %node_id, %label, "created aqc uni channel");
+        debug!(%aqc_id, %node_id, %label_id, "created aqc uni channel");
 
         if let UniCreated(v) = aqc_info {
-            let psk = self.client.aqc.handler.uni_channel_created(
-                &mut self.client.aqc.eng.clone(),
-                &UniChannelCreated {
-                    parent_cmd_id: v.parent_cmd_id,
-                    author_id: v.author_id.into_id().into(),
-                    author_enc_key_id: v.author_enc_key_id,
-                    send_id: v.send_id.into_id().into(),
-                    recv_id: v.recv_id.into_id().into(),
-                    peer_enc_pk: &v.peer_enc_pk,
-                    label_id: v.label_id,
-                    channel_id: v.channel_id,
-                    psk_length_in_bytes: 32, // TODO: don't hard-code
-                },
-            )?;
+            let psk = self
+                .client
+                .aqc
+                .handler
+                .uni_channel_created(
+                    &mut self.client.aqc.eng.clone(),
+                    &UniChannelCreated {
+                        parent_cmd_id: v.parent_cmd_id,
+                        author_id: v.author_id.into_id().into(),
+                        author_enc_key_id: v.author_enc_key_id,
+                        send_id: v.send_id.into_id().into(),
+                        recv_id: v.recv_id.into_id().into(),
+                        peer_enc_pk: &v.peer_enc_pk,
+                        label_id: v.label_id.into_id().into(),
+                        channel_id: v.channel_id,
+                        psk_length_in_bytes: 32, // TODO: don't hard-code
+                    },
+                )
+                .map_err(AqcError::ChannelCreation)?;
             debug!("psk id: {:?}", psk.identity());
 
             // TODO: send ctrl msg via network.
@@ -190,7 +200,7 @@ impl<'a> AqcChannels<'a> {
     /// Receives an AQC ctrl message.
     // TODO: this method is pub for testing.
     // In final AQC implementation, it will only be invoked when a ctrl msg is received via the network.
-    pub async fn receive_aqc_ctrl(&mut self, team: TeamId, ctrl: AqcCtrl) -> Result<()> {
+    pub async fn receive_aqc_ctrl(&mut self, team: TeamId, ctrl: AqcCtrl) -> crate::Result<()> {
         // TODO: use correct node ID
         let node_id: NodeId = 0.into();
 
@@ -202,38 +212,48 @@ impl<'a> AqcChannels<'a> {
 
         match aqc_info {
             BidiReceived(v) => {
-                let psk = self.client.aqc.handler.bidi_channel_received(
-                    &mut self.client.aqc.eng.clone(),
-                    &BidiChannelReceived {
-                        parent_cmd_id: v.parent_cmd_id,
-                        author_id: v.author_id.into_id().into(),
-                        author_enc_pk: &v.author_enc_pk,
-                        peer_id: v.peer_id.into_id().into(),
-                        peer_enc_key_id: v.peer_enc_key_id,
-                        label_id: v.label_id,
-                        encap: &v.encap,
-                        channel_id: v.channel_id,
-                        psk_length_in_bytes: PSK_KEY_LEN,
-                    },
-                )?;
+                let psk = self
+                    .client
+                    .aqc
+                    .handler
+                    .bidi_channel_received(
+                        &mut self.client.aqc.eng.clone(),
+                        &BidiChannelReceived {
+                            parent_cmd_id: v.parent_cmd_id,
+                            author_id: v.author_id.into_id().into(),
+                            author_enc_pk: &v.author_enc_pk,
+                            peer_id: v.peer_id.into_id().into(),
+                            peer_enc_key_id: v.peer_enc_key_id,
+                            label_id: v.label_id.into_id().into(),
+                            encap: &v.encap,
+                            channel_id: v.channel_id,
+                            psk_length_in_bytes: PSK_KEY_LEN,
+                        },
+                    )
+                    .map_err(AqcError::ChannelCreation)?;
                 debug!("psk id: {:?}", psk.identity());
             }
             UniReceived(v) => {
-                let psk = self.client.aqc.handler.uni_channel_received(
-                    &mut self.client.aqc.eng.clone(),
-                    &UniChannelReceived {
-                        parent_cmd_id: v.parent_cmd_id,
-                        author_id: v.author_id.into_id().into(),
-                        author_enc_pk: &v.author_enc_pk,
-                        send_id: v.send_id.into_id().into(),
-                        recv_id: v.recv_id.into_id().into(),
-                        peer_enc_key_id: v.peer_enc_key_id,
-                        label_id: v.label_id,
-                        encap: &v.encap,
-                        channel_id: v.channel_id,
-                        psk_length_in_bytes: PSK_KEY_LEN,
-                    },
-                )?;
+                let psk = self
+                    .client
+                    .aqc
+                    .handler
+                    .uni_channel_received(
+                        &mut self.client.aqc.eng.clone(),
+                        &UniChannelReceived {
+                            parent_cmd_id: v.parent_cmd_id,
+                            author_id: v.author_id.into_id().into(),
+                            author_enc_pk: &v.author_enc_pk,
+                            send_id: v.send_id.into_id().into(),
+                            recv_id: v.recv_id.into_id().into(),
+                            peer_enc_key_id: v.peer_enc_key_id,
+                            label_id: v.label_id.into_id().into(),
+                            encap: &v.encap,
+                            channel_id: v.channel_id,
+                            psk_length_in_bytes: PSK_KEY_LEN,
+                        },
+                    )
+                    .map_err(AqcError::ChannelCreation)?;
                 debug!("psk id: {:?}", psk.identity());
             }
             _ => {}
@@ -249,7 +269,7 @@ type KeyWrapKey = <<CS as CipherSuite>::Aead as Aead>::Key;
 
 // TODO: this was borrowed from daemon.rs. Move to util crate for reuse.
 /// Loads the key wrapping key used by [`CryptoEngine`].
-async fn load_or_gen_key_wrap_key(path: PathBuf) -> Result<KeyWrapKey> {
+async fn load_or_gen_key_wrap_key(path: PathBuf) -> anyhow::Result<KeyWrapKey> {
     let (bytes, loaded) = match fs::read(&path).await {
         Ok(buf) => {
             info!("loaded key wrap key");

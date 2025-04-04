@@ -3,7 +3,6 @@
 use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
 use std::path::PathBuf;
 
-use aranya_aqc_util::LabelId;
 use aranya_crypto::{
     afc::{BidiChannelId as AfcBidiChannelId, UniChannelId as AfcUniChannelId},
     aqc::{BidiChannelId as AqcBidiChannelId, UniChannelId as AqcUniChannelId},
@@ -57,6 +56,16 @@ custom_id! {
 custom_id! {
     /// The Team ID (a.k.a Graph ID).
     pub struct TeamId;
+}
+
+custom_id! {
+    /// An AQC label ID.
+    pub struct LabelId;
+}
+
+custom_id! {
+    /// An AQC channel ID.
+    pub struct ChannelId;
 }
 
 /// A device's public key bundle.
@@ -389,14 +398,14 @@ pub trait DaemonApi {
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
-        label_id: AfcLabel,
+        label_id: LabelId,
     ) -> Result<(AqcId, AqcCtrl, AqcChannelInfo)>;
     /// Create a unidirectional QUIC channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
-        label_id: AfcLabel,
+        label_id: LabelId,
     ) -> Result<(AqcId, AqcCtrl, AqcChannelInfo)>;
     /// Delete a QUIC channel.
     async fn delete_aqc_channel(chan: AqcId) -> Result<AqcCtrl>;

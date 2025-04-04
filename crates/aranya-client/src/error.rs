@@ -163,6 +163,9 @@ pub enum AfcError {
 /// Possible errors that could happen when using Aranya QUIC Channels.
 #[derive(Debug, thiserror::Error)]
 pub enum AqcError {
+    #[error("unable to create channel")]
+    ChannelCreation(aranya_aqc_util::Error),
+
     // Connection-related errors
     /// Unable to bind a network addresss.
     #[error("unable to bind address: {0}")]
