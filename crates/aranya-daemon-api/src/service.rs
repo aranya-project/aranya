@@ -260,6 +260,20 @@ pub struct SyncPeerConfig {
     pub sync_now: bool,
 }
 
+/// Valid channel operations for a label assignment.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum ChanOp {
+    /// The device can only receive data in channels with this
+    /// label.
+    ReadOnly,
+    /// The device can only send data in channels with this
+    /// label.
+    WriteOnly,
+    /// The device can send and receive data in channels with this
+    /// label.
+    ReadWrite,
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
     /// Gets the key store info.
@@ -361,7 +375,14 @@ pub trait DaemonApi {
     // Delete an AQC label.
     async fn delete_aqc_label(team: TeamId, label_id: LabelId) -> Result<()>;
     // Assign an AQC label.
-    async fn assign_aqc_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
+    async fn assign_aqc_label(
+        team: TeamId,
+        device: DeviceId,
+        label_id: LabelId,
+        op: ChanOp,
+    ) -> Result<()>;
+    // Revoke an AQC label.
+    async fn revoke_aqc_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
 
     /// Create a bidirectional QUIC channel.
     async fn create_aqc_bidi_channel(
@@ -409,11 +430,6 @@ pub trait DaemonApi {
     ) -> Result<Option<NetIdentifier>>;
     /// Query label exists.
     async fn query_label_exists(team: TeamId, label: AfcLabel) -> Result<bool>;
-    // Query AQC label.
-    async fn query_aqc_label(
-        team: TeamId,
-        name: String,
-        label_author_id: DeviceId,
-        label_id: LabelId,
-    ) -> Result<LabelId>;
+    // Query AQC labels.
+    async fn query_aqc_labels(team: TeamId) -> Result<Vec<LabelId>>;
 }

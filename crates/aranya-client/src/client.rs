@@ -6,7 +6,7 @@ use aranya_aqc_util::LabelId;
 #[cfg(feature = "afc")]
 use aranya_daemon_api::CS;
 use aranya_daemon_api::{
-    DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, NetIdentifier, Role, TeamId,
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, NetIdentifier, Role, TeamId,
 };
 use aranya_fast_channels::Label;
 #[cfg(feature = "afc")]
@@ -420,6 +420,38 @@ impl Team<'_> {
         self.client
             .daemon
             .create_aqc_label(context::current(), self.id, label_name)
+            .await?
+            .map_err(Into::into)
+    }
+
+    /// Delete an AQC label.
+    pub async fn delete_aqc_label(&mut self, label_id: LabelId) -> Result<()> {
+        self.client
+            .daemon
+            .delete_aqc_label(context::current(), self.id, label_id)
+            .await?
+            .map_err(Into::into)
+    }
+
+    /// Assign an AQC label to a device.
+    pub async fn assign_aqc_label(
+        &mut self,
+        device: DeviceId,
+        label_id: LabelId,
+        op: ChanOp,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .assign_aqc_label(context::current(), self.id, device, label_id, op)
+            .await?
+            .map_err(Into::into)
+    }
+
+    /// Revoke an AQC label from a device.
+    pub async fn revoke_aqc_label(&mut self, device: DeviceId, label_id: LabelId) -> Result<()> {
+        self.client
+            .daemon
+            .revoke_aqc_label(context::current(), self.id, device, label_id)
             .await?
             .map_err(Into::into)
     }

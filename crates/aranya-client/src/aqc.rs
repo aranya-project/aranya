@@ -27,6 +27,9 @@ pub(crate) type CE = DefaultEngine;
 /// KS = Key Store
 pub(crate) type KS = Store;
 
+/// Length of a PSK key.
+const PSK_KEY_LEN: u16 = 32;
+
 /// Sends and receives AQC messages.
 pub(crate) struct AqcChannelsImpl {
     // TODO: add Aqc fields.
@@ -210,7 +213,7 @@ impl<'a> AqcChannels<'a> {
                         label_id: v.label_id,
                         encap: &v.encap,
                         channel_id: v.channel_id,
-                        psk_length_in_bytes: 32, // TODO: don't hard-code this value
+                        psk_length_in_bytes: PSK_KEY_LEN,
                     },
                 )?;
                 debug!("psk id: {:?}", psk.identity());
@@ -228,7 +231,7 @@ impl<'a> AqcChannels<'a> {
                         label_id: v.label_id,
                         encap: &v.encap,
                         channel_id: v.channel_id,
-                        psk_length_in_bytes: 32, // TODO: don't hard-code this value
+                        psk_length_in_bytes: PSK_KEY_LEN,
                     },
                 )?;
                 debug!("psk id: {:?}", psk.identity());

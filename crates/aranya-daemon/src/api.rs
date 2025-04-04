@@ -18,9 +18,9 @@ use aranya_crypto::{
 };
 use aranya_daemon_api::{
     AfcCtrl, AfcId, AqcBidiChannelCreatedInfo, AqcBidiChannelReceivedInfo, AqcChannelInfo, AqcCtrl,
-    AqcId, AqcUniChannelCreatedInfo, AqcUniChannelReceivedInfo, DaemonApi, DeviceId as ApiDeviceId,
-    KeyBundle as ApiKeyBundle, KeyStoreInfo, NetIdentifier, Result as ApiResult, Role as ApiRole,
-    SyncPeerConfig, TeamId, CS,
+    AqcId, AqcUniChannelCreatedInfo, AqcUniChannelReceivedInfo, ChanOp as ApiChanOp, DaemonApi,
+    DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, KeyStoreInfo, NetIdentifier,
+    Result as ApiResult, Role as ApiRole, SyncPeerConfig, TeamId, CS,
 };
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
@@ -983,6 +983,97 @@ impl DaemonApi for DaemonApiHandler {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
+    /// Create an AQC label.
+    async fn create_aqc_label(
+        self,
+        _: context::Context,
+        team: TeamId,
+        label_name: String,
+    ) -> ApiResult<LabelId> {
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .create_aqc_label(label_name)
+            .await
+            .context("unable to create AQC label")?;
+        if let Some(Effect::AqcLabelCreated(e)) =
+            find_effect!(&effects, Effect::AqcLabelCreated(_e))
+        {
+            Ok(e.label_id.into())
+        } else {
+            Err(anyhow!("unable to create AQC label").into())
+        }
+    }
+
+    /// Delete an AQC label.
+    async fn delete_aqc_label(
+        self,
+        _: context::Context,
+        team: TeamId,
+        label_id: LabelId,
+    ) -> ApiResult<()> {
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .delete_aqc_label(label_id)
+            .await
+            .context("unable to delete AQC label")?;
+        if let Some(Effect::AqcLabelDeleted(_e)) =
+            find_effect!(&effects, Effect::AqcLabelDeleted(_e))
+        {
+            Ok(())
+        } else {
+            Err(anyhow!("unable to delete AQC label").into())
+        }
+    }
+
+    /// Assign an AQC label.
+    async fn assign_aqc_label(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+        label_id: LabelId,
+        op: ApiChanOp,
+    ) -> ApiResult<()> {
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .assign_aqc_label(device.into_id().into(), label_id, op.into())
+            .await
+            .context("unable to assign AQC label")?;
+        if let Some(Effect::AqcLabelDeleted(_e)) =
+            find_effect!(&effects, Effect::AqcLabelDeleted(_e))
+        {
+            Ok(())
+        } else {
+            Err(anyhow!("unable to assign AQC label").into())
+        }
+    }
+
+    /// Revoke an AQC label.
+    async fn revoke_aqc_label(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+        label_id: LabelId,
+    ) -> ApiResult<()> {
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .revoke_aqc_label(device.into_id().into(), label_id)
+            .await
+            .context("unable to revoke AQC label")?;
+        if let Some(Effect::AqcLabelRevoked(_e)) =
+            find_effect!(&effects, Effect::AqcLabelRevoked(_e))
+        {
+            Ok(())
+        } else {
+            Err(anyhow!("unable to revoke AQC label").into())
+        }
+    }
+
     /// Query devices on team.
     #[instrument(skip(self))]
     async fn query_devices_on_team(
@@ -1159,47 +1250,22 @@ impl DaemonApi for DaemonApiHandler {
         }
     }
 
-    /// Create an AQC label.
-    async fn create_aqc_label(
-        self,
-        _: context::Context,
-        _team: TeamId,
-        _name: String,
-    ) -> ApiResult<LabelId> {
-        todo!()
-    }
-
-    /// Delete an AQC label.
-    async fn delete_aqc_label(
-        self,
-        _: context::Context,
-        _team: TeamId,
-        _label_id: LabelId,
-    ) -> ApiResult<()> {
-        todo!()
-    }
-
-    /// Assign an AQC label.
-    async fn assign_aqc_label(
-        self,
-        _: context::Context,
-        _team: TeamId,
-        _device: ApiDeviceId,
-        _label_id: LabelId,
-    ) -> ApiResult<()> {
-        todo!()
-    }
-
-    /// Query an AQC label.
-    async fn query_aqc_label(
-        self,
-        _: context::Context,
-        _team: TeamId,
-        _name: String,
-        _label_author_id: ApiDeviceId,
-        _label_id: LabelId,
-    ) -> ApiResult<LabelId> {
-        todo!()
+    /// Query an AQC labels.
+    async fn query_aqc_labels(self, _: context::Context, team: TeamId) -> ApiResult<Vec<LabelId>> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_aqc_labels_off_graph()
+            .await
+            .context("unable to query aqc labels")?;
+        let mut labels: Vec<LabelId> = Vec::new();
+        for e in effects {
+            if let Effect::QueriedAqcLabel(e) = e {
+                debug!("found label: {}", e.label_id);
+                labels.push(e.label_id.into());
+            }
+        }
+        Ok(labels)
     }
 }
 
@@ -1241,6 +1307,26 @@ impl From<Role> for ApiRole {
             Role::Admin => ApiRole::Admin,
             Role::Operator => ApiRole::Operator,
             Role::Member => ApiRole::Member,
+        }
+    }
+}
+
+impl From<ApiChanOp> for ChanOp {
+    fn from(value: ApiChanOp) -> Self {
+        match value {
+            ApiChanOp::ReadWrite => ChanOp::ReadWrite,
+            ApiChanOp::ReadOnly => ChanOp::ReadOnly,
+            ApiChanOp::WriteOnly => ChanOp::WriteOnly,
+        }
+    }
+}
+
+impl From<ChanOp> for ApiChanOp {
+    fn from(value: ChanOp) -> Self {
+        match value {
+            ChanOp::ReadWrite => ApiChanOp::ReadWrite,
+            ChanOp::ReadOnly => ApiChanOp::ReadOnly,
+            ChanOp::WriteOnly => ApiChanOp::WriteOnly,
         }
     }
 }

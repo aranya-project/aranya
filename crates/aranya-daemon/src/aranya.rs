@@ -539,6 +539,59 @@ where
         .in_current_span()
     }
 
+    /// Create an AQC label.
+    #[instrument(skip(self), fields(name = %name))]
+    fn create_aqc_label(&self, name: String) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.create_aqc_label(name)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Delete an AQC label.
+    #[instrument(skip(self), fields(label_id = %label_id))]
+    fn delete_aqc_label(
+        &self,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.delete_aqc_label(label_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Assigns an AQC label to a device.
+    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id, op = %op))]
+    fn assign_aqc_label(
+        &self,
+        device_id: DeviceId,
+        label_id: LabelId,
+        op: ChanOp,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.assign_aqc_label(device_id.into(), label_id.into(), op)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Revokes an AQC label.
+    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id))]
+    fn revoke_aqc_label(
+        &self,
+        device_id: DeviceId,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        info!(%device_id, %label_id, "revoking AQC label");
+        self.with_actor(move |actor| {
+            actor.revoke_aqc_label(device_id.into(), label_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
     /// Sets an AQC network name.
     #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
     fn set_aqc_network_name(
@@ -803,6 +856,19 @@ where
         self.session_action(move || VmAction {
             name: "query_label_exists",
             args: Cow::Owned(vec![Value::from(i64::from(label.to_u32()))]),
+        })
+        .in_current_span()
+    }
+
+    /// Query AQC labels off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_aqc_labels_off_graph(
+        &self,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_aqc_labels",
+            args: Cow::Owned(vec![]),
         })
         .in_current_span()
     }
