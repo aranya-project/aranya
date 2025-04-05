@@ -12,8 +12,6 @@
 use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
-#[cfg(feature = "afc")]
-use aranya_daemon_api::ChanOp;
 use anyhow::{bail, Context, Result};
 #[cfg(feature = "afc")]
 use aranya_client::afc::Message;
@@ -25,6 +23,8 @@ use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
+#[cfg(feature = "afc")]
+use aranya_daemon_api::ChanOp;
 #[cfg(feature = "afc")]
 use aranya_daemon_api::NetIdentifier;
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
@@ -582,9 +582,13 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
 
     let label3 = operator_team.create_aqc_label("label3".to_string()).await?;
     let op = ChanOp::ReadWrite;
-    operator_team.assign_aqc_label(team.membera.id, label3, op).await?;
-    operator_team.assign_aqc_label(team.memberb.id, label3, op).await?;
-    
+    operator_team
+        .assign_aqc_label(team.membera.id, label3, op)
+        .await?;
+    operator_team
+        .assign_aqc_label(team.memberb.id, label3, op)
+        .await?;
+
     // wait for syncing.
     sleep(sleep_interval).await;
 
@@ -621,8 +625,12 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .await?;
 
     // TODO: send AQC data.
-    operator_team.revoke_aqc_label(team.membera.id, label3).await?;
-    operator_team.revoke_aqc_label(team.memberb.id, label3).await?;
+    operator_team
+        .revoke_aqc_label(team.membera.id, label3)
+        .await?;
+    operator_team
+        .revoke_aqc_label(team.memberb.id, label3)
+        .await?;
     operator_team.delete_aqc_label(label3).await?;
 
     // membera creates afc bidi channel with memberb
