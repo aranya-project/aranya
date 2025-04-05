@@ -12,7 +12,10 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 use aranya_crypto::{
-    aqc::{BidiPeerEncap as AqcBidiPeerEncap, UniPeerEncap as AqcUniPeerEncap},
+    aqc::{
+        BidiChannelId, BidiPeerEncap as AqcBidiPeerEncap, UniChannelId,
+        UniPeerEncap as AqcUniPeerEncap,
+    },
     Csprng, DeviceId, Rng,
 };
 use aranya_daemon_api::{
@@ -885,7 +888,7 @@ impl DaemonApi for DaemonApiHandler {
                     peer_enc_key_id: e.peer_enc_key_id.into(),
                     label_id: e.label_id.into(),
                     encap: e.encap.clone(),
-                    channel_id: e.channel_id, // TODO: missing channel_id field
+                    channel_id: BidiChannelId::default(), // TODO: missing channel_id field
                 });
 
                 let encap =
@@ -899,7 +902,7 @@ impl DaemonApi for DaemonApiHandler {
                     .get_by_right(&e.author_id.into())
                     .context("missing net identifier for channel author")?
                     .clone();
-                return Ok((aqc_id, net, aqc_info.into()));
+                return Ok((aqc_id, net, aqc_info));
             };
 
             if let Some(Effect::AqcUniChannelReceived(e)) = find_effect!(&effects, Effect::AqcUniChannelReceived(e) if (e.writer_id == id.into() || e.reader_id == id.into()))
@@ -913,7 +916,7 @@ impl DaemonApi for DaemonApiHandler {
                     peer_enc_key_id: e.peer_enc_key_id.into(),
                     label_id: e.label_id.into(),
                     encap: e.encap.clone(),
-                    channel_id: e.channel_id, // TODO: missing channel_id field
+                    channel_id: UniChannelId::default(), // TODO: missing channel_id field
                 });
 
                 let encap =
@@ -927,7 +930,7 @@ impl DaemonApi for DaemonApiHandler {
                     .get_by_right(&e.author_id.into())
                     .context("missing net identifier for channel author")?
                     .clone();
-                return Ok((aqc_id, net, aqc_info.into()));
+                return Ok((aqc_id, net, aqc_info));
             };
         }
         Err(anyhow!("unable to find AqcBidiChannelReceived effect").into())
@@ -1045,8 +1048,8 @@ impl DaemonApi for DaemonApiHandler {
             )
             .await
             .context("unable to assign AQC label")?;
-        if let Some(Effect::AqcLabelDeleted(_e)) =
-            find_effect!(&effects, Effect::AqcLabelDeleted(_e))
+        if let Some(Effect::AqcLabelAssigned(_e)) =
+            find_effect!(&effects, Effect::AqcLabelAssigned(_e))
         {
             Ok(())
         } else {

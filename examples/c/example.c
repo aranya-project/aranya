@@ -122,6 +122,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 AranyaError init_team(Team *t);
 AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg);
 AranyaError run(Team *t);
+AranyaError run_aqc_example(Team *t);
 AranyaError cleanup_team(Team *t);
 
 // Initialize an Aranya client.
@@ -604,7 +605,58 @@ AranyaError run(Team *t) {
            info.label);
 #endif
 
+    err = run_aqc_example(t);
+    EXPECT("error running aqc example", err);
+
     return ARANYA_ERROR_SUCCESS;
+}
+
+// Run the AQC example.
+AranyaError run_aqc_example(Team *t) {
+    AranyaError err;
+
+    printf("running AQC demo \r\n");
+
+    // Create AQC label and assign it to members
+    printf("creating AQC label \r\n");
+    const char *label_name = "label3";
+    AranyaLabelId label_id;
+    err = aranya_aqc_create_label(&t->clients.operator.client, &t->id,
+                                  label_name, &label_id);
+    EXPECT("error creating label", err);
+    printf("assigning AQC label to members \r\n");
+    AranyaChanOp op = ARANYA_CHAN_OP_READ_WRITE;
+    err = aranya_aqc_assign_label(&t->clients.operator.client, &t->id,
+                                  &t->clients.membera.id, &label_id, op);
+    EXPECT("error assigning label to membera", err);
+    err = aranya_aqc_assign_label(&t->clients.operator.client, &t->id,
+                                  &t->clients.memberb.id, &label_id, op);
+    EXPECT("error assigning label to memberb", err);
+    sleep(1);
+
+    // Create channel
+    printf("creating AQC channel \r\n");
+    AranyaAqcChannelId chan_id;
+    err =
+        aranya_aqc_create_bidi_channel(&t->clients.membera.client, &t->id,
+                                       afc_addrs[MEMBERB], &label_id, &chan_id);
+    EXPECT("error creating aqc bidi channel", err);
+
+    // TODO: send AQC data
+
+    // Revoke/delete label
+    printf("revoke/delete AQC label \r\n");
+    err = aranya_aqc_revoke_label(&t->clients.operator.client, &t->id,
+                                  &t->clients.membera.id, &label_id);
+    EXPECT("error revoking aqc label from membera", err);
+    err = aranya_aqc_revoke_label(&t->clients.operator.client, &t->id,
+                                  &t->clients.memberb.id, &label_id);
+    EXPECT("error revoking aqc label from memberb", err);
+    err =
+        aranya_aqc_delete_label(&t->clients.operator.client, &t->id, &label_id);
+    EXPECT("error deleting aqc label", err);
+
+    return err;
 }
 
 int main(void) {

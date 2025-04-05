@@ -1237,7 +1237,7 @@ pub unsafe fn afc_recv_data(
 /// @param name label name string [`LabelName`].
 ///
 /// @relates AranyaClient.
-pub fn create_aqc_label(
+pub fn aqc_create_label(
     client: &mut Client,
     team: &TeamId,
     name: LabelName,
@@ -1260,10 +1260,10 @@ pub fn create_aqc_label(
 /// @param label_id the channel label ID [`LabelId`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn delete_aqc_label(
+pub fn aqc_delete_label(
     client: &mut Client,
     team: &TeamId,
-    label_id: LabelId,
+    label_id: &LabelId,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
@@ -1282,11 +1282,11 @@ pub fn delete_aqc_label(
 /// @param label_id the AQC channel label ID [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn assign_aqc_label(
+pub fn aqc_assign_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    label_id: LabelId,
+    label_id: &LabelId,
     op: ChanOp,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
@@ -1311,7 +1311,7 @@ pub fn assign_aqc_label(
 /// @param label_id the AQC channel label ID [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn revoke_aqc_label(
+pub fn aqc_revoke_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -1345,18 +1345,18 @@ pub unsafe fn aqc_create_bidi_channel(
     client: &mut Client,
     team: &TeamId,
     peer: NetIdentifier,
-    label_id: LabelId,
+    label_id: &LabelId,
 ) -> Result<AqcChannelId, imp::Error> {
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
-    let result = client.rt.block_on(
+    let (aqc_id, _) = client.rt.block_on(
         client
             .inner
             .aqc()
             .create_bidi_channel(team.0, peer, label_id.0),
     )?;
-    Ok(AqcChannelId(result.0))
+    Ok(AqcChannelId(aqc_id))
 }
 
 /// Delete an AQC channel.

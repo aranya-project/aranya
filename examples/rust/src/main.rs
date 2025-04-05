@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-
+use aranya_daemon_api::ChanOp;
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{afc::Message, client::Client, SyncPeerConfig};
 use aranya_daemon::{
@@ -433,26 +433,35 @@ async fn main() -> Result<()> {
         core::str::from_utf8(&data)?
     );
 
-    info!("completed afc demo")
+    info!("completed afc demo");
 
-    info!("demo aqc functionality")
-    let label3 = operator_team.create_aqc_label("label3".into_string()).await?;
+    info!("demo aqc functionality");
+    info!("creating aqc label");
+    let label3 = operator_team.create_aqc_label("label3".to_string()).await?;
     let op = ChanOp::ReadWrite;
-    operator_team.assign_aqc_label(label3, team.membera.id, op).await?;
-    operator_team.assign_aqc_label(label3, team.memberb.id, op).await?;
+    info!("assigning aqc label to membera");
+    operator_team.assign_aqc_label(team.membera.id, label3, op).await?;
+    info!("assigning aqc label to memberb");
+    operator_team.assign_aqc_label(team.memberb.id, label3, op).await?;
     
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
     // TODO: send AQC ctrl via network
-    
-    let (_aqc_id1, aqc_bidi_ctrl) = team.membera.client.aqc().create_bidi_channel(NetIdentifier(memberb_afc_addr.to_string()), label3).await?;
-    team.memberb.client.aqc().receive_aqc_ctrl(aqc_bidi_ctrl).await?;
+    info!("creating acq bidi channel");
+    let (_aqc_id1, aqc_bidi_ctrl) = team.membera.client.aqc().create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label3).await?;
+    info!("receiving acq bidi channel");
+    team.memberb.client.aqc().receive_aqc_ctrl(team_id, aqc_bidi_ctrl).await?;
     
     // TODO: send AQC data.
-
+    info!("revoking aqc label from membera");
     operator_team.revoke_aqc_label(team.membera.id, label3).await?;
+    info!("revoking aqc label from memberb");
     operator_team.revoke_aqc_label(team.memberb.id, label3).await?;
+    info!("deleting aqc label");
     operator_team.delete_aqc_label(label3).await?;
 
-    info!("completed aqc demo")
+    info!("completed aqc demo");
 
     info!("completed example Aranya application");
 

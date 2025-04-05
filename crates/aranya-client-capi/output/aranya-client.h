@@ -1789,7 +1789,7 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_create_aqc_label(struct AranyaClient *client,
+AranyaError aranya_aqc_create_label(struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     AranyaLabelName name,
                                     struct AranyaLabelId *__output);
@@ -1805,7 +1805,7 @@ AranyaError aranya_create_aqc_label(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_create_aqc_label_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_create_label_ext(struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
                                         AranyaLabelName name,
                                         struct AranyaLabelId *__output,
@@ -1822,9 +1822,9 @@ AranyaError aranya_create_aqc_label_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_delete_aqc_label(struct AranyaClient *client,
+AranyaError aranya_aqc_delete_label(struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
-                                    struct AranyaLabelId label_id);
+                                    const struct AranyaLabelId *label_id);
 
 /**
  * Delete an AQC channel label.
@@ -1837,9 +1837,9 @@ AranyaError aranya_delete_aqc_label(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_delete_aqc_label_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_delete_label_ext(struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
-                                        struct AranyaLabelId label_id,
+                                        const struct AranyaLabelId *label_id,
                                         struct AranyaExtError *__ext_err);
 
 /**
@@ -1854,10 +1854,10 @@ AranyaError aranya_delete_aqc_label_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_aqc_label(struct AranyaClient *client,
+AranyaError aranya_aqc_assign_label(struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     const struct AranyaDeviceId *device,
-                                    struct AranyaLabelId label_id,
+                                    const struct AranyaLabelId *label_id,
                                     AranyaChanOp op);
 
 /**
@@ -1872,10 +1872,10 @@ AranyaError aranya_assign_aqc_label(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_aqc_label_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_assign_label_ext(struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
                                         const struct AranyaDeviceId *device,
-                                        struct AranyaLabelId label_id,
+                                        const struct AranyaLabelId *label_id,
                                         AranyaChanOp op,
                                         struct AranyaExtError *__ext_err);
 
@@ -1891,7 +1891,7 @@ AranyaError aranya_assign_aqc_label_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_revoke_aqc_label(struct AranyaClient *client,
+AranyaError aranya_aqc_revoke_label(struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     const struct AranyaDeviceId *device,
                                     const struct AranyaLabelId *label_id);
@@ -1908,7 +1908,7 @@ AranyaError aranya_revoke_aqc_label(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_revoke_aqc_label_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_revoke_label_ext(struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
                                         const struct AranyaDeviceId *device,
                                         const struct AranyaLabelId *label_id,
@@ -1933,7 +1933,7 @@ AranyaError aranya_revoke_aqc_label_ext(struct AranyaClient *client,
 AranyaError aranya_aqc_create_bidi_channel(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
                                            AranyaNetIdentifier peer,
-                                           struct AranyaLabelId label_id,
+                                           const struct AranyaLabelId *label_id,
                                            struct AranyaAqcChannelId *__output);
 
 /**
@@ -1955,7 +1955,7 @@ AranyaError aranya_aqc_create_bidi_channel(struct AranyaClient *client,
 AranyaError aranya_aqc_create_bidi_channel_ext(struct AranyaClient *client,
                                                const struct AranyaTeamId *team,
                                                AranyaNetIdentifier peer,
-                                               struct AranyaLabelId label_id,
+                                               const struct AranyaLabelId *label_id,
                                                struct AranyaAqcChannelId *__output,
                                                struct AranyaExtError *__ext_err);
 

@@ -276,7 +276,6 @@ pub struct AqcLabelDeleted {
     pub label_name: String,
     pub label_author_id: Id,
     pub label_id: Id,
-    pub author_id: Id,
 }
 /// QueriedAqcLabel policy effect.
 #[effect]

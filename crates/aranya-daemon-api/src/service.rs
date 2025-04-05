@@ -270,7 +270,7 @@ pub struct SyncPeerConfig {
 }
 
 /// Valid channel operations for a label assignment.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum ChanOp {
     /// The device can only receive data in channels with this
     /// label.

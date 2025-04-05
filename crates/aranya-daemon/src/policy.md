@@ -268,9 +268,16 @@ function is_valid_psk_length(size int) bool {
     return size >= 32 && size < 65536
 }
 
-// Returns the channel operation for a particular label.
+// Returns the AQC channel operation for a particular label.
 function get_allowed_op(device_id id, label int) enum ChanOp {
     let assigned_label = check_unwrap query AssignedLabel[device_id: device_id, label: label]
+    return assigned_label.op
+}
+
+
+// Returns the channel operation for a particular label.
+function aqc_get_allowed_op(device_id id, label_id id) enum ChanOp {
+    let assigned_label = check_unwrap query AssignedAqcLabel[device_id: device_id, label_id: label_id]
     return assigned_label.op
 }
 
@@ -345,14 +352,14 @@ function can_create_aqc_bidi_channel(device1 id, device2 id, label_id id) bool {
     // instead of just returning false.
     check device1 != device2
 
-    // Both devices must have permissions to read (recev) and
+    // Both devices must have permissions to read (recv) and
     // write (send) data.
-    let device1_op = get_allowed_op(device1, label_id)
+    let device1_op = aqc_get_allowed_op(device1, label_id)
     if device1_op != ChanOp::ReadWrite {
         return false
     }
 
-    let device2_op = get_allowed_op(device2, label_id)
+    let device2_op = aqc_get_allowed_op(device2, label_id)
     if device2_op != ChanOp::ReadWrite {
         return false
     }
@@ -370,7 +377,7 @@ function can_create_aqc_uni_channel(writer_id id, reader_id id, label_id id) boo
     check writer_id != reader_id
 
     // The writer must have permissions to write (send) data.
-    let writer_op = get_allowed_op(writer_id, label_id)
+    let writer_op = aqc_get_allowed_op(writer_id, label_id)
     match writer_op {
         ChanOp::ReadOnly => { return false }
         ChanOp::WriteOnly => {}
@@ -378,7 +385,7 @@ function can_create_aqc_uni_channel(writer_id id, reader_id id, label_id id) boo
     }
 
     // The reader must have permission to read (receive) data.
-    let reader_op = get_allowed_op(reader_id, label_id)
+    let reader_op = aqc_get_allowed_op(reader_id, label_id)
     match reader_op {
         ChanOp::ReadOnly => {}
         ChanOp::WriteOnly => { return false }
@@ -1801,7 +1808,7 @@ command AqcCreateBidiChannel {
         let peer = check_unwrap find_existing_device(this.peer_id)
 
         // The label must exist.
-        let label = check_unwrap query Label[label_id: label_id]
+        let label = check_unwrap query AqcLabel[label_id: this.label_id]
 
         // Check that both devices are allowed to participate in
         // this bidirectional channel.
@@ -1968,15 +1975,11 @@ command AqcCreateUniChannel {
         check author.device_id == this.writer_id ||
               author.device_id == this.reader_id
 
-        if author.device_id == this.writer_id {
-            let peer_id = this.reader_id
-        } else {
-            let peer_id = this.writer_id
-        }
+        let peer_id = select_peer_id(author.device_id, this.writer_id, this.reader_id)
         let peer = check_unwrap find_existing_device(peer_id)
 
         // The label must exist.
-        let label = check_unwrap query Label[label_id: label_id]
+        let label = check_unwrap query AqcLabel[label_id: this.label_id]
 
         // Check that both devices are allowed to participate in
         // this unidirectional channel.
@@ -2068,17 +2071,10 @@ command CreateAqcLabel {
 
         // NB: Check roles, other ACLs here.
 
-        // Verify that the label does not already exist.
-        //
-        // This will happen in the `finish` block if we try to
-        // create an already true label, but checking first
-        // results in a nicer error (I think?).
-        check !exists Label[name: this.label_name, author_id: author.device_id]
-
         finish {
-            create Label[label_id: this.label_id]=>{name: this.label_name, author_id: author.device_id}
+            create AqcLabel[label_id: label_id]=>{name: this.label_name, author_id: author.device_id}
 
-            emit LabelCreated {
+            emit AqcLabelCreated {
                 label_id: label_id,
                 label_name: this.label_name,
                 label_author_id: author.device_id,
@@ -2123,16 +2119,18 @@ command DeleteAqcLabel {
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        let label = check_unwrap query Label[label_id: this.label_id]
+        let label = check_unwrap query AqcLabel[label_id: this.label_id]
 
         finish {
             // Cascade deleting the label assignments.
-            delete AssignedAqcLabel[device_id: ?, label_id: label.label_id]
+            //delete AssignedAqcLabel[device_id: ?, label_id: label.label_id]
+
+            delete AqcLabel[label_id: label.label_id]
 
             emit AqcLabelDeleted {
                 label_name: label.name,
+                label_author_id: label.author_id,
                 label_id: this.label_id,
-                author_id: label.author_id,
             }
         }
     }
@@ -2147,8 +2145,6 @@ effect AqcLabelDeleted {
     label_author_id id,
     // Uniquely identifies the label.
     label_id id,
-    // The ID of the device that deleted the label.
-    author_id id,
 }
 
 // Emits `QueriedAqcLabel` for all labels.
@@ -2230,7 +2226,7 @@ command AssignAqcLabel {
 
         // NB: Check roles, other ACLs here.
 
-        let label = check_unwrap query Label[label_id: this.label_id]
+        let label = check_unwrap query AqcLabel[label_id: this.label_id]
 
         // Verify that the device has not already been granted
         // permission to use the label.
@@ -2238,7 +2234,7 @@ command AssignAqcLabel {
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        check !exists AssignedLabel[device_id: target.device_id, label_id: label.label_id]
+        check !exists AssignedAqcLabel[device_id: target.device_id, label_id: label.label_id]
 
         finish {
             create AssignedAqcLabel[device_id: target.device_id, label_id: label.label_id]=>{op: this.op}
@@ -2296,7 +2292,7 @@ command RevokeAqcLabel {
 
         // NB: Check roles, other ACLs here.
 
-        let label = check_unwrap query Label[label_id: this.label_id]
+        let label = check_unwrap query AqcLabel[label_id: this.label_id]
 
         // Verify that the device has been granted permission to
         // use the label.
@@ -2304,7 +2300,7 @@ command RevokeAqcLabel {
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        check exists AssignedLabel[device_id: target.device_id, label_id: label.label_id]
+        check exists AssignedAqcLabel[device_id: target.device_id, label_id: label.label_id]
 
         finish {
             delete AssignedAqcLabel[device_id: target.device_id, label_id: label.label_id]
@@ -2335,12 +2331,13 @@ effect AqcLabelRevoked {
 // Emits `QueriedLabelAssignment` for all labels the device has
 // been granted permission to use.
 action query_aqc_label_assignments(device_id id) {
-    map AssignedAqcLabel[device_id: id, label_id: ?] as f {
+    map AssignedAqcLabel[device_id: device_id, label_id: ?] as f {
+        let label = check_unwrap query AqcLabel[label_id: f.label_id]
         publish QueryAqcLabelAssignment {
-            device_id: device_id,
-            label_id: f.label_id,
-            label_name: f.name,
-            label_author_id: f.author_id,
+            device_id: f.device_id,
+            label_id: label.label_id,
+            label_name: label.name,
+            label_author_id: label.author_id,
         }
     }
 }
