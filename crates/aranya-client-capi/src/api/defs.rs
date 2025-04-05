@@ -174,7 +174,7 @@ pub fn init_logging() -> Result<(), imp::Error> {
 
 /// A handle to an Aranya Client.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 3656, align = 16)]
+#[aranya_capi_core::opaque(size = 3728, align = 16)]
 pub type Client = Safe<imp::Client>;
 
 /// Team ID.

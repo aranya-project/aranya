@@ -237,7 +237,7 @@ typedef struct ARANYA_ALIGNED(16) AranyaClient {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[3656];
+    uint8_t __for_size_only[3728];
 } AranyaClient;
 
 /**
