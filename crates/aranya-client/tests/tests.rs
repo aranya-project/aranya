@@ -12,6 +12,8 @@
 use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
+#[cfg(feature = "afc")]
+use aranya_daemon_api::ChanOp;
 use anyhow::{bail, Context, Result};
 #[cfg(feature = "afc")]
 use aranya_client::afc::Message;
@@ -578,12 +580,20 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
+    let label3 = operator_team.create_aqc_label("label3".to_string()).await?;
+    let op = ChanOp::ReadWrite;
+    operator_team.assign_aqc_label(team.membera.id, label3, op).await?;
+    operator_team.assign_aqc_label(team.memberb.id, label3, op).await?;
+    
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
     // membera creates aqc bidi channel with memberb
     let (_aqc_id1, aqc_bidi_ctrl) = team
         .membera
         .client
         .aqc()
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label3)
         .await?;
 
     // memberb received aqc bidi channel ctrl message
@@ -599,7 +609,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .membera
         .client
         .aqc()
-        .create_uni_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+        .create_uni_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label3)
         .await?;
 
     // memberb received aqc uni channel ctrl message
@@ -609,6 +619,11 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .aqc()
         .receive_aqc_ctrl(team_id, aqc_uni_ctrl)
         .await?;
+
+    // TODO: send AQC data.
+    operator_team.revoke_aqc_label(team.membera.id, label3).await?;
+    operator_team.revoke_aqc_label(team.memberb.id, label3).await?;
+    operator_team.delete_aqc_label(label3).await?;
 
     // membera creates afc bidi channel with memberb
     let afc_id2 = team
