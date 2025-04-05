@@ -52,7 +52,7 @@ impl Config {
     }
 
     /// Path to the [`DefaultEngine`]'s key wrapping key.
-    pub(crate) fn key_wrap_key_path(&self) -> PathBuf {
+    pub fn key_wrap_key_path(&self) -> PathBuf {
         self.work_dir.join("key_wrap_key")
     }
 
@@ -123,7 +123,7 @@ mod tests {
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
             afc: AfcConfig {
-                shm_path: "/hub".to_owned(),
+                shm_path: "/afc".to_owned(),
                 unlink_on_startup: false,
                 unlink_at_exit: false,
                 create: true,

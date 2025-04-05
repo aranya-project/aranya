@@ -1,14 +1,16 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
 use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
+use std::path::PathBuf;
 
 use aranya_crypto::{
-    afc::{BidiChannelId, UniChannelId},
+    afc::{BidiChannelId as AfcBidiChannelId, UniChannelId as AfcUniChannelId},
+    aqc::{BidiChannelId as AqcBidiChannelId, UniChannelId as AqcUniChannelId},
     custom_id,
     default::DefaultCipherSuite,
-    Id,
+    EncryptionKeyId, Id,
 };
-use aranya_fast_channels::{Label, NodeId};
+use aranya_fast_channels::{Label as AfcLabel, NodeId};
 use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
 use spideroak_base58::ToBase58;
@@ -56,6 +58,16 @@ custom_id! {
     pub struct TeamId;
 }
 
+custom_id! {
+    /// An AQC label ID.
+    pub struct LabelId;
+}
+
+custom_id! {
+    /// An AQC channel ID.
+    pub struct ChannelId;
+}
+
 /// A device's public key bundle.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct KeyBundle {
@@ -91,7 +103,7 @@ impl fmt::Display for NetIdentifier {
 
 /// Uniquely identifies an AFC channel.
 ///
-/// It is a [`BidiChannelId`] or [`UniChannelId`] truncated to
+/// It is a [`AfcBidiChannelId`] or [`AfcUniChannelId`] truncated to
 /// 128 bits.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -108,16 +120,16 @@ fn truncate<const BIG: usize, const SMALL: usize>(arr: &[u8; BIG]) -> &[u8; SMAL
     arr[..SMALL].try_into().expect("array must fit")
 }
 
-/// Convert from [`BidiChannelId`] to [`AfcId`]
-impl From<BidiChannelId> for AfcId {
-    fn from(value: BidiChannelId) -> Self {
+/// Convert from [`AfcBidiChannelId`] to [`AfcId`]
+impl From<AfcBidiChannelId> for AfcId {
+    fn from(value: AfcBidiChannelId) -> Self {
         Self(*truncate(value.as_array()))
     }
 }
 
-/// Convert from [`UniChannelId`] to [`AfcId`]
-impl From<UniChannelId> for AfcId {
-    fn from(value: UniChannelId) -> Self {
+/// Convert from [`AfcUniChannelId`] to [`AfcId`]
+impl From<AfcUniChannelId> for AfcId {
+    fn from(value: AfcUniChannelId) -> Self {
         Self(*truncate(value.as_array()))
     }
 }
@@ -129,8 +141,124 @@ impl From<Id> for AfcId {
     }
 }
 
+/// Uniquely identifies an AQC channel.
+///
+/// It is a [`AqcBidiChannelId`] or [`AqcUniChannelId`] truncated to
+/// 128 bits.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct AqcId([u8; 16]);
+
+impl fmt::Display for AqcId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0.to_base58())
+    }
+}
+
+/// Convert from [`BidiChannelId`] to [`AqcId`]
+impl From<AqcBidiChannelId> for AqcId {
+    fn from(value: AqcBidiChannelId) -> Self {
+        Self(*truncate(value.as_array()))
+    }
+}
+
+/// Convert from [`UniChannelId`] to [`AqcId`]
+impl From<AqcUniChannelId> for AqcId {
+    fn from(value: AqcUniChannelId) -> Self {
+        Self(*truncate(value.as_array()))
+    }
+}
+
+/// Convert from [`Id`] to [`AqcId`]
+impl From<Id> for AqcId {
+    fn from(value: Id) -> Self {
+        Self(*truncate(value.as_array()))
+    }
+}
+
 // serialized command which must be passed over AFC.
 pub type AfcCtrl = Vec<Box<[u8]>>;
+
+// serialized command which must be passed over AQC.
+pub type AqcCtrl = Vec<Box<[u8]>>;
+
+/// AQC channel info.
+/// This includes information that can be used to:
+/// - Lookup the AQC PSK secret from the key store.
+/// - Decode the PSK encap to derive the PSK.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub enum AqcChannelInfo {
+    BidiCreated(AqcBidiChannelCreatedInfo),
+    BidiReceived(AqcBidiChannelReceivedInfo),
+    UniCreated(AqcUniChannelCreatedInfo),
+    UniReceived(AqcUniChannelReceivedInfo),
+}
+
+/// Bidirectional AQC channel info.
+// TODO: move AqcId into this type
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct AqcBidiChannelCreatedInfo {
+    pub parent_cmd_id: Id,
+    pub author_id: DeviceId,
+    pub author_enc_key_id: EncryptionKeyId,
+    pub peer_id: DeviceId,
+    pub peer_enc_pk: Vec<u8>,
+    pub label_id: LabelId,
+    pub channel_id: AqcBidiChannelId,
+}
+
+/// Bidirectional AQC channel info.
+// TODO: move AqcId into this type
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct AqcBidiChannelReceivedInfo {
+    pub parent_cmd_id: Id,
+    pub author_id: DeviceId,
+    pub peer_enc_key_id: EncryptionKeyId,
+    pub peer_id: DeviceId,
+    pub author_enc_pk: Vec<u8>,
+    pub label_id: LabelId,
+    pub encap: Vec<u8>,
+    pub channel_id: AqcBidiChannelId,
+}
+
+/// Unidirectional AQC channel info.
+// TODO: move AqcId into this type
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct AqcUniChannelCreatedInfo {
+    pub parent_cmd_id: Id,
+    pub author_id: DeviceId,
+    pub send_id: DeviceId,
+    pub recv_id: DeviceId,
+    pub author_enc_key_id: EncryptionKeyId,
+    pub peer_enc_pk: Vec<u8>,
+    pub label_id: LabelId,
+    pub channel_id: AqcUniChannelId,
+}
+
+/// Unidirectional AQC channel info.
+// TODO: move AqcId into this type
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct AqcUniChannelReceivedInfo {
+    pub parent_cmd_id: Id,
+    pub author_id: DeviceId,
+    pub send_id: DeviceId,
+    pub recv_id: DeviceId,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_enc_key_id: EncryptionKeyId,
+    pub label_id: LabelId,
+    pub encap: Vec<u8>,
+    pub channel_id: AqcUniChannelId,
+}
+
+/// Information needed to use the key store.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+
+pub struct KeyStoreInfo {
+    /// Path of the key store.
+    pub path: PathBuf,
+    /// Path of the wrapped key.
+    pub wrapped_key: PathBuf,
+}
 
 /// Configuration values for syncing with a peer
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -141,8 +269,26 @@ pub struct SyncPeerConfig {
     pub sync_now: bool,
 }
 
+/// Valid channel operations for a label assignment.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum ChanOp {
+    /// The device can only receive data in channels with this
+    /// label.
+    ReadOnly,
+    /// The device can only send data in channels with this
+    /// label.
+    WriteOnly,
+    /// The device can send and receive data in channels with this
+    /// label.
+    ReadWrite,
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
+    /// Gets the key store info.
+    /// The keystore can be used to pass private keys and secrets between the client and daemon.
+    async fn get_keystore_info() -> Result<KeyStoreInfo>;
+
     /// Gets local address the Aranya sync server is bound to.
     async fn aranya_local_addr() -> Result<SocketAddr>;
 
@@ -182,11 +328,6 @@ pub trait DaemonApi {
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
-    /// Create a label.
-    async fn create_label(team: TeamId, label: Label) -> Result<()>;
-    /// Delete a label.
-    async fn delete_label(team: TeamId, label: Label) -> Result<()>;
-
     /// Assign a fast channels network identifier to a device.
     async fn assign_afc_net_identifier(
         team: TeamId,
@@ -213,16 +354,21 @@ pub trait DaemonApi {
         name: NetIdentifier,
     ) -> Result<()>;
 
+    /// Create a fast channels label.
+    async fn create_label(team: TeamId, label: AfcLabel) -> Result<()>;
+    /// Delete a fast channels label.
+    async fn delete_label(team: TeamId, label: AfcLabel) -> Result<()>;
+
     /// Assign a fast channels label to a device.
-    async fn assign_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
+    async fn assign_label(team: TeamId, device: DeviceId, label: AfcLabel) -> Result<()>;
     /// Revoke a fast channels label from a device.
-    async fn revoke_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
+    async fn revoke_label(team: TeamId, device: DeviceId, label: AfcLabel) -> Result<()>;
     /// Create a fast channel.
     async fn create_afc_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
-        label: Label,
+        label: AfcLabel,
     ) -> Result<(AfcId, AfcCtrl)>;
     /// Delete a fast channel.
     async fn delete_afc_channel(chan: AfcId) -> Result<AfcCtrl>;
@@ -231,7 +377,45 @@ pub trait DaemonApi {
         team: TeamId,
         node_id: NodeId,
         ctrl: AfcCtrl,
-    ) -> Result<(AfcId, NetIdentifier, Label)>;
+    ) -> Result<(AfcId, NetIdentifier, AfcLabel)>;
+
+    // Create an AQC label.
+    async fn create_aqc_label(team: TeamId, name: String) -> Result<LabelId>;
+    // Delete an AQC label.
+    async fn delete_aqc_label(team: TeamId, label_id: LabelId) -> Result<()>;
+    // Assign an AQC label.
+    async fn assign_aqc_label(
+        team: TeamId,
+        device: DeviceId,
+        label_id: LabelId,
+        op: ChanOp,
+    ) -> Result<()>;
+    // Revoke an AQC label.
+    async fn revoke_aqc_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
+
+    /// Create a bidirectional QUIC channel.
+    async fn create_aqc_bidi_channel(
+        team: TeamId,
+        peer: NetIdentifier,
+        node_id: NodeId,
+        label_id: LabelId,
+    ) -> Result<(AqcId, AqcCtrl, AqcChannelInfo)>;
+    /// Create a unidirectional QUIC channel.
+    async fn create_aqc_uni_channel(
+        team: TeamId,
+        peer: NetIdentifier,
+        node_id: NodeId,
+        label_id: LabelId,
+    ) -> Result<(AqcId, AqcCtrl, AqcChannelInfo)>;
+    /// Delete a QUIC channel.
+    async fn delete_aqc_channel(chan: AqcId) -> Result<AqcCtrl>;
+    /// Receive AQC ctrl message.
+    async fn receive_aqc_ctrl(
+        team: TeamId,
+        node_id: NodeId,
+        ctrl: AqcCtrl,
+    ) -> Result<(AqcId, NetIdentifier, AqcChannelInfo)>;
+
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
     /// Query device role.
@@ -239,7 +423,10 @@ pub trait DaemonApi {
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device label assignments.
-    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
+    async fn query_device_label_assignments(
+        team: TeamId,
+        device: DeviceId,
+    ) -> Result<Vec<AfcLabel>>;
     /// Query AFC network ID.
     async fn query_afc_net_identifier(
         team: TeamId,
@@ -251,5 +438,7 @@ pub trait DaemonApi {
         device: DeviceId,
     ) -> Result<Option<NetIdentifier>>;
     /// Query label exists.
-    async fn query_label_exists(team: TeamId, label: Label) -> Result<bool>;
+    async fn query_label_exists(team: TeamId, label: AfcLabel) -> Result<bool>;
+    // Query AQC labels.
+    async fn query_aqc_labels(team: TeamId) -> Result<Vec<LabelId>>;
 }

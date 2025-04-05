@@ -57,6 +57,16 @@ pub enum Effect {
     AfcBidiChannelReceived(AfcBidiChannelReceived),
     AfcUniChannelCreated(AfcUniChannelCreated),
     AfcUniChannelReceived(AfcUniChannelReceived),
+    AqcBidiChannelCreated(AqcBidiChannelCreated),
+    AqcBidiChannelReceived(AqcBidiChannelReceived),
+    AqcUniChannelCreated(AqcUniChannelCreated),
+    AqcUniChannelReceived(AqcUniChannelReceived),
+    AqcLabelCreated(AqcLabelCreated),
+    AqcLabelDeleted(AqcLabelDeleted),
+    QueriedAqcLabel(QueriedAqcLabel),
+    AqcLabelAssigned(AqcLabelAssigned),
+    AqcLabelRevoked(AqcLabelRevoked),
+    QueriedAqcLabelAssignment(QueriedAqcLabelAssignment),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
@@ -207,6 +217,97 @@ pub struct AfcUniChannelReceived {
     pub label: i64,
     pub encap: Vec<u8>,
 }
+/// AqcBidiChannelCreated policy effect.
+#[effect]
+pub struct AqcBidiChannelCreated {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub author_enc_key_id: Id,
+    pub peer_id: Id,
+    pub peer_enc_pk: Vec<u8>,
+    pub label_id: Id,
+    pub channel_id: Id,
+}
+/// AqcBidiChannelReceived policy effect.
+#[effect]
+pub struct AqcBidiChannelReceived {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_id: Id,
+    pub peer_enc_key_id: Id,
+    pub label_id: Id,
+    pub encap: Vec<u8>,
+}
+/// AqcUniChannelCreated policy effect.
+#[effect]
+pub struct AqcUniChannelCreated {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub writer_id: Id,
+    pub reader_id: Id,
+    pub author_enc_key_id: Id,
+    pub peer_enc_pk: Vec<u8>,
+    pub label_id: Id,
+    pub channel_id: Id,
+}
+/// AqcUniChannelReceived policy effect.
+#[effect]
+pub struct AqcUniChannelReceived {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub writer_id: Id,
+    pub reader_id: Id,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_enc_key_id: Id,
+    pub label_id: Id,
+    pub encap: Vec<u8>,
+}
+/// AqcLabelCreated policy effect.
+#[effect]
+pub struct AqcLabelCreated {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+}
+/// AqcLabelDeleted policy effect.
+#[effect]
+pub struct AqcLabelDeleted {
+    pub label_name: String,
+    pub label_author_id: Id,
+    pub label_id: Id,
+}
+/// QueriedAqcLabel policy effect.
+#[effect]
+pub struct QueriedAqcLabel {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+}
+/// AqcLabelAssigned policy effect.
+#[effect]
+pub struct AqcLabelAssigned {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+    pub author_id: Id,
+}
+/// AqcLabelRevoked policy effect.
+#[effect]
+pub struct AqcLabelRevoked {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+    pub author_id: Id,
+}
+/// QueriedAqcLabelAssignment policy effect.
+#[effect]
+pub struct QueriedAqcLabelAssignment {
+    pub device_id: Id,
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+}
 /// QueryDevicesOnTeamResult policy effect.
 #[effect]
 pub struct QueryDevicesOnTeamResult {
@@ -287,6 +388,32 @@ pub trait ActorExt {
         reader_id: Id,
         label: i64,
     ) -> Result<(), ClientError>;
+    fn create_aqc_bidi_channel(
+        &mut self,
+        peer_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn create_aqc_uni_channel(
+        &mut self,
+        writer_id: Id,
+        reader_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn create_aqc_label(&mut self, name: String) -> Result<(), ClientError>;
+    fn delete_aqc_label(&mut self, label_id: Id) -> Result<(), ClientError>;
+    fn query_aqc_labels(&mut self) -> Result<(), ClientError>;
+    fn assign_aqc_label(
+        &mut self,
+        device_id: Id,
+        label_id: Id,
+        op: ChanOp,
+    ) -> Result<(), ClientError>;
+    fn revoke_aqc_label(
+        &mut self,
+        device_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn query_aqc_label_assignments(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
     fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;

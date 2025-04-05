@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
-
+use aranya_daemon_api::ChanOp;
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{afc::Message, client::Client, SyncPeerConfig};
 use aranya_daemon::{
@@ -66,7 +66,7 @@ impl UserCtx {
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
-        let shm_path = format!("/shm_{}_{}", team_name, name).to_string();
+        let afc_shm_path = format!("/afc_{}_{}", team_name, name).to_string();
         let max_chans = 100;
         let cfg = Config {
             name: "daemon".into(),
@@ -75,7 +75,7 @@ impl UserCtx {
             pid_file: work_dir.join("pid"),
             sync_addr: any,
             afc: AfcConfig {
-                shm_path: shm_path.clone(),
+                shm_path: afc_shm_path.clone(),
                 unlink_on_startup: true,
                 unlink_at_exit: true,
                 create: true,
@@ -372,6 +372,7 @@ async fn main() -> Result<()> {
     let label_exists = queries.label_exists(label1).await?;
     info!("membera label1 exists?: {:?}", label_exists);
 
+    info!("demo afc functionality");
     // membera creates bidi channel with memberb
     let afc_id1 = team
         .membera
@@ -431,6 +432,36 @@ async fn main() -> Result<()> {
         "received message: {:?}",
         core::str::from_utf8(&data)?
     );
+
+    info!("completed afc demo");
+
+    info!("demo aqc functionality");
+    info!("creating aqc label");
+    let label3 = operator_team.create_aqc_label("label3".to_string()).await?;
+    let op = ChanOp::ReadWrite;
+    info!("assigning aqc label to membera");
+    operator_team.assign_aqc_label(team.membera.id, label3, op).await?;
+    info!("assigning aqc label to memberb");
+    operator_team.assign_aqc_label(team.memberb.id, label3, op).await?;
+    
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // TODO: send AQC ctrl via network
+    info!("creating acq bidi channel");
+    let (_aqc_id1, aqc_bidi_ctrl) = team.membera.client.aqc().create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label3).await?;
+    info!("receiving acq bidi channel");
+    team.memberb.client.aqc().receive_aqc_ctrl(team_id, aqc_bidi_ctrl).await?;
+    
+    // TODO: send AQC data.
+    info!("revoking aqc label from membera");
+    operator_team.revoke_aqc_label(team.membera.id, label3).await?;
+    info!("revoking aqc label from memberb");
+    operator_team.revoke_aqc_label(team.memberb.id, label3).await?;
+    info!("deleting aqc label");
+    operator_team.delete_aqc_label(label3).await?;
+
+    info!("completed aqc demo");
 
     info!("completed example Aranya application");
 

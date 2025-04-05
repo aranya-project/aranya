@@ -24,6 +24,8 @@ use aranya_daemon::{
     Daemon,
 };
 #[cfg(feature = "afc")]
+use aranya_daemon_api::ChanOp;
+#[cfg(feature = "afc")]
 use aranya_daemon_api::NetIdentifier;
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
 #[cfg(feature = "afc")]
@@ -523,6 +525,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     operator_team
         .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
         .await?;
+    // TODO: move aqc methods to aqc test when it is added.
     // TODO: use aqc addr
     operator_team
         .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
@@ -577,7 +580,60 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
         .await?;
 
-    // membera creates bidi channel with memberb
+    let label3 = operator_team.create_aqc_label("label3".to_string()).await?;
+    let op = ChanOp::ReadWrite;
+    operator_team
+        .assign_aqc_label(team.membera.id, label3, op)
+        .await?;
+    operator_team
+        .assign_aqc_label(team.memberb.id, label3, op)
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // membera creates aqc bidi channel with memberb
+    let (_aqc_id1, aqc_bidi_ctrl) = team
+        .membera
+        .client
+        .aqc()
+        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label3)
+        .await?;
+
+    // memberb received aqc bidi channel ctrl message
+    // TODO: receiving AQC ctrl messages will happen via the network.
+    team.memberb
+        .client
+        .aqc()
+        .receive_aqc_ctrl(team_id, aqc_bidi_ctrl)
+        .await?;
+
+    // membera creates aqc uni channel with memberb
+    let (_aqc_id1, aqc_uni_ctrl) = team
+        .membera
+        .client
+        .aqc()
+        .create_uni_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label3)
+        .await?;
+
+    // memberb received aqc uni channel ctrl message
+    // TODO: receiving AQC ctrl messages will happen via the network.
+    team.memberb
+        .client
+        .aqc()
+        .receive_aqc_ctrl(team_id, aqc_uni_ctrl)
+        .await?;
+
+    // TODO: send AQC data.
+    operator_team
+        .revoke_aqc_label(team.membera.id, label3)
+        .await?;
+    operator_team
+        .revoke_aqc_label(team.memberb.id, label3)
+        .await?;
+    operator_team.delete_aqc_label(label3).await?;
+
+    // membera creates afc bidi channel with memberb
     let afc_id2 = team
         .membera
         .client

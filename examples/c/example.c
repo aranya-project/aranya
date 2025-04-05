@@ -59,8 +59,8 @@ typedef enum {
 } Members;
 
 // List of shared memory paths for the Aranya clients.
-const char *shm_paths[] = {"/owner", "/admin", "/operator", "/membera",
-                           "/memberb"};
+const char *afc_shm_paths[] = {"/afc_owner", "/afc_admin", "/afc_operator",
+                               "/afc_membera", "/afc_memberb"};
 
 // List of Unix domain socket paths for the Aranya clients.
 const char *daemon_socks[] = {"out/owner/uds.sock", "out/admin/uds.sock",
@@ -117,15 +117,18 @@ typedef struct {
 } Team;
 
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
-                        const char *shm_path, const char *afc_addr);
+                        const char *shm_path, const char *afc_addr,
+                        const char *aqc_addr);
 AranyaError init_team(Team *t);
 AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg);
 AranyaError run(Team *t);
+AranyaError run_aqc_example(Team *t);
 AranyaError cleanup_team(Team *t);
 
 // Initialize an Aranya client.
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
-                        const char *shm_path, const char *afc_addr) {
+                        const char *shm_path, const char *afc_addr,
+                        const char *aqc_addr) {
     AranyaError err;
 
     c->name = name;
@@ -149,6 +152,18 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 
     aranya_client_config_builder_set_afc_config(&cli_build, &afc_cfg);
 #endif
+    struct AranyaAqcConfigBuilder aqc_build;
+    struct AranyaAqcConfig aqc_cfg;
+    aranya_aqc_config_builder_set_address(&aqc_build, aqc_addr);
+    err = aranya_aqc_config_builder_build(&aqc_build, &aqc_cfg);
+
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "error initializing afc config: %s\r\n",
+                aranya_error_to_str(err));
+        return err;
+    }
+    aranya_client_config_builder_set_aqc_config(&cli_build, &aqc_cfg);
+
     err = aranya_client_config_builder_build(&cli_build, &cli_cfg);
 
     if (err != ARANYA_ERROR_SUCCESS) {
@@ -189,8 +204,9 @@ AranyaError init_team(Team *t) {
 
     // initialize team clients.
     for (int i = 0; i < NUM_CLIENTS; i++) {
+        printf("initializing client: %s\r\n", client_names[i]);
         err = init_client(&t->clients_arr[i], client_names[i], daemon_socks[i],
-                          shm_paths[i], afc_addrs[i]);
+                          afc_shm_paths[i], afc_addrs[i], afc_addrs[i]);
         EXPECT("error initializing team", err);
     }
 
@@ -251,10 +267,12 @@ AranyaError run(Team *t) {
     AranyaError err;
 
     // initialize logging.
+    printf("initializing logging\r\n");
     err = aranya_init_logging();
     EXPECT("error initializing logging", err);
 
     // initialize the Aranya team.
+    printf("initializing team\r\n");
     err = init_team(t);
     EXPECT("error initializing team", err);
 
@@ -291,8 +309,6 @@ AranyaError run(Team *t) {
                              &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
     EXPECT("error assigning operator role", err);
 
-    // add sync peers.
-
     // Initialize the builder
     struct AranyaSyncPeerConfigBuilder builder;
     err = aranya_sync_peer_config_builder_init(&builder);
@@ -315,14 +331,16 @@ AranyaError run(Team *t) {
     err = aranya_sync_peer_config_builder_cleanup(&builder);
     EXPECT("error running the cleanup routine for the config builder", err);
 
+    // add sync peers.
+    printf("adding sync peers\r\n");
     err = add_sync_peers(t, &cfg);
     EXPECT("error adding sync peers", err);
 
     // Team members are added to the team by first calling
     // `aranya_add_device_to_team`, passing in the submitter's client, the
     // team ID and the public key of the device to be added. In a real world
-    // scenario, the keys would be exchanged outside of Aranya using something
-    // like `scp`.
+    // scenario, the keys would be exchanged outside of Aranya using
+    // something like `scp`.
 
     // add membera to team.
     err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
@@ -339,8 +357,8 @@ AranyaError run(Team *t) {
     // Once all team members are added and the appropriate roles have been
     // assigned, the team works together to send data using Aranya Fast
     // Channels.
-    // First, a label must be created to associate a channel to its permitted
-    // devices using the `aranya_create_label` function.
+    // First, a label must be created to associate a channel to its
+    // permitted devices using the `aranya_create_label` function.
 
     // operator creates AFC labels and assigns them to team members.
     AranyaLabel label = 42;
@@ -392,6 +410,7 @@ AranyaError run(Team *t) {
     sleep(1);
 
     // Queries
+    printf("running factdb queries\r\n");
     size_t devices_len      = BUF_LEN;
     AranyaDeviceId *devices = malloc(devices_len * sizeof(AranyaDeviceId));
     err = aranya_query_devices_on_team(&t->clients.operator.client, &t->id,
@@ -430,7 +449,8 @@ AranyaError run(Team *t) {
                                         &memberb_keybundle);
     EXPECT("error querying memberb key bundle", err);
     printf(
-        "%s key bundle enc_key_len %lu, sign_key_len %lu, ident_key_len %lu "
+        "%s key bundle enc_key_len %lu, sign_key_len %lu, ident_key_len "
+        "%lu "
         "\r\n",
         t->clients_arr[MEMBERB].name, memberb_keybundle.enc_key_len,
         memberb_keybundle.sign_key_len, memberb_keybundle.ident_key_len);
@@ -515,10 +535,11 @@ AranyaError run(Team *t) {
            exists ? "true" : "false");
 
 #if defined(ENABLE_AFC)
-    // Once membera and memberb have been assigned the label and their network
-    // identifiers, a Fast Channel can be created. In this example, membera
-    // will create the channel using `aranya_afc_create_bidi_channel`. This will
-    // create a bidirectional Aranya Fast Channel.
+    // Once membera and memberb have been assigned the label and their
+    // network identifiers, a Fast Channel can be created. In this example,
+    // membera will create the channel using
+    // `aranya_afc_create_bidi_channel`. This will create a bidirectional
+    // Aranya Fast Channel.
 
     // create AFC channel between membera and memberb.
     AranyaChannelId chan_id;
@@ -544,6 +565,7 @@ AranyaError run(Team *t) {
     // `aranya_afc_send_data`.
 
     // send AFC data.
+    printf("sending afc data\r\n");
     const char *send = "hello world";
     err              = aranya_afc_send_data(&t->clients.membera.client, chan_id,
                                             (const uint8_t *)send, (int)strlen(send));
@@ -583,7 +605,58 @@ AranyaError run(Team *t) {
            info.label);
 #endif
 
+    err = run_aqc_example(t);
+    EXPECT("error running aqc example", err);
+
     return ARANYA_ERROR_SUCCESS;
+}
+
+// Run the AQC example.
+AranyaError run_aqc_example(Team *t) {
+    AranyaError err;
+
+    printf("running AQC demo \r\n");
+
+    // Create AQC label and assign it to members
+    printf("creating AQC label \r\n");
+    const char *label_name = "label3";
+    AranyaLabelId label_id;
+    err = aranya_aqc_create_label(&t->clients.operator.client, &t->id,
+                                  label_name, &label_id);
+    EXPECT("error creating label", err);
+    printf("assigning AQC label to members \r\n");
+    AranyaChanOp op = ARANYA_CHAN_OP_READ_WRITE;
+    err = aranya_aqc_assign_label(&t->clients.operator.client, &t->id,
+                                  &t->clients.membera.id, &label_id, op);
+    EXPECT("error assigning label to membera", err);
+    err = aranya_aqc_assign_label(&t->clients.operator.client, &t->id,
+                                  &t->clients.memberb.id, &label_id, op);
+    EXPECT("error assigning label to memberb", err);
+    sleep(1);
+
+    // Create channel
+    printf("creating AQC channel \r\n");
+    AranyaAqcChannelId chan_id;
+    err =
+        aranya_aqc_create_bidi_channel(&t->clients.membera.client, &t->id,
+                                       afc_addrs[MEMBERB], &label_id, &chan_id);
+    EXPECT("error creating aqc bidi channel", err);
+
+    // TODO: send AQC data
+
+    // Revoke/delete label
+    printf("revoke/delete AQC label \r\n");
+    err = aranya_aqc_revoke_label(&t->clients.operator.client, &t->id,
+                                  &t->clients.membera.id, &label_id);
+    EXPECT("error revoking aqc label from membera", err);
+    err = aranya_aqc_revoke_label(&t->clients.operator.client, &t->id,
+                                  &t->clients.memberb.id, &label_id);
+    EXPECT("error revoking aqc label from memberb", err);
+    err =
+        aranya_aqc_delete_label(&t->clients.operator.client, &t->id, &label_id);
+    EXPECT("error deleting aqc label", err);
+
+    return err;
 }
 
 int main(void) {
