@@ -8,7 +8,6 @@ use aranya_daemon_api::{
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, LabelId, NetIdentifier, Role,
     TeamId,
 };
-use aranya_fast_channels::Label;
 #[cfg(feature = "afc")]
 use aranya_fast_channels::{
     shm::ReadState,
@@ -484,10 +483,10 @@ impl Queries<'_> {
     }
 
     /// Returns whether a label exists.
-    pub async fn label_exists(&mut self, label: Label) -> Result<bool> {
+    pub async fn label_exists(&mut self, label_id: LabelId) -> Result<bool> {
         self.client
             .daemon
-            .query_label_exists(context::current(), self.id, label)
+            .query_label_exists(context::current(), self.id, label_id)
             .await?
             .map_err(Into::into)
     }

@@ -28,11 +28,8 @@ use std::{
 
 use anyhow::anyhow;
 use aranya_crypto::{Random as _, Rng};
-pub use aranya_daemon_api::AfcId;
 use aranya_daemon_api::{AfcCtrl, NetIdentifier, TeamId, CS};
-// TODO(nikki): once we reuse these for AQC, move this to lib.rs? Or just duplicate it in mod aqc.
-// See https://github.com/aranya-project/aranya-core/issues/101
-pub use aranya_fast_channels::Label;
+pub use aranya_daemon_api::{AfcId, LabelId};
 use aranya_fast_channels::{
     shm::{Flag, Mode, ReadState},
     AfcState, ChannelId, Client, Header, Message as InnerMsg, NodeId, Payload, Seq, Version,
@@ -384,7 +381,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
 
     /// Decrypts `data`.
     #[instrument(skip_all, fields(afc_id = %data.afc_id))]
-    fn open_data(&mut self, data: Data) -> Result<(Vec<u8>, AfcId, Label, Seq), AfcError> {
+    fn open_data(&mut self, data: Data) -> Result<(Vec<u8>, AfcId, LabelId, Seq), AfcError> {
         debug!(n = data.ciphertext.len(), "decrypting data");
 
         self.check_version(data.version)?;
@@ -415,14 +412,14 @@ impl<S: AfcState> FastChannelsImpl<S> {
             .ok_or(AfcError::PayloadTooSmall)?;
         let mut plaintext = vec![0; plaintext_len];
         // TODO: return LabelId
-        let (label, seq) = self
+        let (label_id, seq) = self
             .afc
             .open(chan_id.node_id(), &mut plaintext, ciphertext)
             .map_err(AfcError::Decryption)?;
-        debug!(%label, %seq, "decrypted data");
+        debug!(%label_id, %seq, "decrypted data");
 
-        if chan_id.label() != label {
-            error!(got = %label, expected = %chan_id.label(), "mismatched labels");
+        if chan_id.label() != label_id {
+            error!(got = %label_id, expected = %chan_id.label(), "mismatched labels");
             bug!("decrypted data with mismatched labels");
         }
 
@@ -433,7 +430,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
         chan.next_min_seq = seq.to_u64().checked_add(1).map(Seq::new);
         debug!(next = %FmtOr(chan.next_min_seq, "expired"), "min next seq number");
 
-        Ok((plaintext, data.afc_id, label, seq))
+        Ok((plaintext, data.afc_id, label_id, seq))
     }
 
     /// Get the next Node ID in the sequence.
@@ -597,7 +594,7 @@ impl<'a> FastChannels<'a> {
     /// # Cancellation Safety
     ///
     /// It is NOT safe to cancel the resulting future. Doing so might lose data.
-    #[instrument(skip_all, fields(self = self.client.afc.debug(), %team_id, %peer, %label))]
+    #[instrument(skip_all, fields(self = self.client.afc.debug(), %team_id, %peer, %label_id))]
     pub async fn create_bidi_channel(
         &mut self,
         team_id: TeamId,
@@ -612,12 +609,12 @@ impl<'a> FastChannels<'a> {
         let (afc_id, ctrl) = self
             .client
             .daemon
-            .create_afc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label)
+            .create_afc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label_id)
             .await??;
-        debug!(%afc_id, %node_id, %label, "created bidi channel");
+        debug!(%afc_id, %node_id, %label_id, "created bidi channel");
 
         // TODO: update ChannelId to use LabelId
-        let chan_id = ChannelId::new(node_id, label);
+        let chan_id = ChannelId::new(node_id, label_id);
         self.client
             .afc
             .send_ctrl(peer, ctrl, team_id, afc_id, chan_id)
@@ -712,12 +709,13 @@ impl<'a> FastChannels<'a> {
                 StreamMsg::Data(data) => {
                     debug!(%addr, "read data message");
 
-                    let (data, channel, label, seq) = afc.open_data(data)?;
+                    // TODO: return LabelId
+                    let (data, channel, label_id, seq) = afc.open_data(data)?;
                     afc.msgs.push_back(Message {
                         data,
                         address: addr,
                         channel,
-                        label,
+                        label_id,
                         seq,
                     });
                     debug!(n = afc.msgs.len(), "stored msg");
@@ -728,15 +726,15 @@ impl<'a> FastChannels<'a> {
                     let node_id = afc.get_next_node_id().await?;
                     debug!(%node_id, "selected node ID");
 
-                    let (afc_id, peer, label) = self
+                    let (afc_id, peer, label_id) = self
                         .client
                         .daemon
                         .receive_afc_ctrl(context::current(), ctrl.team_id, node_id, ctrl.cmd)
                         .await??;
-                    debug!(%node_id, %label, "applied AFC control msg");
+                    debug!(%node_id, %label_id, "applied AFC control msg");
 
                     // TODO: update ChannelId to use LabelId
-                    let chan_id = ChannelId::new(node_id, label);
+                    let chan_id = ChannelId::new(node_id, label_id);
                     afc.add_channel(afc_id, peer, ctrl.team_id, chan_id, addr)
                         .await?;
                 }

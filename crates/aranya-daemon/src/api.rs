@@ -21,7 +21,7 @@ use aranya_daemon_api::{
     DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, KeyStoreInfo, LabelId as ApiLabelId,
     NetIdentifier, Result as ApiResult, Role as ApiRole, SyncPeerConfig, TeamId, CS,
 };
-use aranya_fast_channels::{Label, NodeId};
+use aranya_fast_channels::NodeId;
 use aranya_keygen::PublicKeys;
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
@@ -319,9 +319,6 @@ impl DaemonApiHandler {
         node_id: NodeId,
     ) -> Result<()> {
         debug!("received BidiChannelCreated effect");
-        // NB: this shouldn't happen because the policy should
-        // ensure that label fits inside a `u32`.
-        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
         // TODO: don't clone the eng.
         let AfcBidiKeys { seal, open } = self.afc_handler.lock().await.bidi_channel_created(
             &mut self.eng.clone(),
@@ -331,12 +328,11 @@ impl DaemonApiHandler {
                 author_enc_key_id: v.author_enc_key_id.into(),
                 peer_id: v.peer_id.into(),
                 peer_enc_pk: &v.peer_enc_pk,
-                label,
+                label_id: v.label_id, // TODO: requires afc label id ffi updates
                 key_id: v.channel_key_id.into(),
             },
         )?;
-        let label = Label::new(v.label.try_into().expect("expected label conversion"));
-        let channel_id = ChannelId::new(node_id, label);
+        let channel_id = ChannelId::new(node_id, v.label_id);
         debug!(%channel_id, "created AFC bidi channel `ChannelId`");
         self.afc
             .lock()
@@ -354,9 +350,6 @@ impl DaemonApiHandler {
         v: &AfcBidiChannelReceivedEffect,
         node_id: NodeId,
     ) -> Result<()> {
-        // NB: this shouldn't happen because the policy should
-        // ensure that label fits inside a `u32`.
-        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
         let AfcBidiKeys { seal, open } = self.afc_handler.lock().await.bidi_channel_received(
             &mut self.eng.clone(),
             &AfcBidiChannelReceived {
@@ -365,12 +358,11 @@ impl DaemonApiHandler {
                 author_enc_pk: &v.author_enc_pk,
                 peer_id: v.peer_id.into(),
                 peer_enc_key_id: v.peer_enc_key_id.into(),
-                label,
+                label_id: v.label_id, // TODO: requires afc label id ffi updates
                 encap: &v.encap,
             },
         )?;
-        let label = Label::new(v.label.try_into().expect("expected label conversion"));
-        let channel_id = ChannelId::new(node_id, label);
+        let channel_id = ChannelId::new(node_id, label_id);
         debug!(?channel_id, "received AFC bidi channel `ChannelId`");
         self.afc
             .lock()
@@ -672,7 +664,7 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         node_id: NodeId,
         ctrl: AfcCtrl,
-    ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
+    ) -> ApiResult<(AfcId, NetIdentifier, ApiLabelId)> {
         let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
@@ -686,7 +678,6 @@ impl DaemonApi for DaemonApiHandler {
             let encap = BidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
             let afc_id: AfcId = encap.id().into();
             debug!(?afc_id, "processed afc ID");
-            let label = Label::new(e.label.try_into().expect("expected label conversion"));
             let net = self
                 .afc_peers
                 .lock()
@@ -694,7 +685,7 @@ impl DaemonApi for DaemonApiHandler {
                 .get_by_right(&e.author_id.into())
                 .context("missing net identifier for channel author")?
                 .clone();
-            return Ok((afc_id, net, label));
+            return Ok((afc_id, net, e.label_id.into()));
         }
         Err(anyhow!("unable to find AfcBidiChannelReceived effect").into())
     }
@@ -902,7 +893,7 @@ impl DaemonApi for DaemonApiHandler {
         _: TeamId,
         _: NetIdentifier,
         _: NodeId,
-        _: Label,
+        _: ApiLabelId,
     ) -> ApiResult<(AfcId, AfcCtrl)> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
@@ -919,7 +910,7 @@ impl DaemonApi for DaemonApiHandler {
         _: TeamId,
         _: NodeId,
         _: AfcCtrl,
-    ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
+    ) -> ApiResult<(AfcId, NetIdentifier, ApiLabelId)> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
@@ -1105,12 +1096,12 @@ impl DaemonApi for DaemonApiHandler {
         self,
         _: context::Context,
         team: TeamId,
-        label: Label,
+        label_id: ApiLabelId,
     ) -> ApiResult<bool> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
-            .query_label_exists_off_graph(label)
+            .query_label_exists_off_graph(label_id.into_id().into())
             .await
             .context("unable to query label")?;
         if let Some(Effect::QueryLabelExistsResult(e)) =

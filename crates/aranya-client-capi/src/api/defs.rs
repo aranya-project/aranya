@@ -305,25 +305,6 @@ impl LabelName {
     }
 }
 
-/// An AFC label.
-///
-/// It identifies the policy rules that govern the AFC channel.
-#[repr(transparent)]
-#[derive(Copy, Clone, Debug)]
-pub struct Label(u32);
-
-impl From<Label> for aranya_fast_channels::Label {
-    fn from(value: Label) -> Self {
-        Self::new(value.0)
-    }
-}
-
-impl From<aranya_fast_channels::Label> for Label {
-    fn from(value: aranya_fast_channels::Label) -> Self {
-        Self(value.to_u32())
-    }
-}
-
 /// Sync Peer config.
 #[aranya_capi_core::opaque(size = 32, align = 8)]
 pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;

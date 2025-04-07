@@ -13,7 +13,7 @@ use aranya_crypto::{
     default::DefaultCipherSuite,
     EncryptionKeyId, Id,
 };
-use aranya_fast_channels::{Label as AfcLabel, NodeId};
+use aranya_fast_channels::NodeId;
 use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
 use spideroak_base58::ToBase58;
@@ -361,7 +361,7 @@ pub trait DaemonApi {
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
-        label: AfcLabel,
+        label: LabelId,
     ) -> Result<(AfcId, AfcCtrl)>;
     /// Delete a fast channel.
     async fn delete_afc_channel(chan: AfcId) -> Result<AfcCtrl>;
@@ -370,7 +370,7 @@ pub trait DaemonApi {
         team: TeamId,
         node_id: NodeId,
         ctrl: AfcCtrl,
-    ) -> Result<(AfcId, NetIdentifier, AfcLabel)>;
+    ) -> Result<(AfcId, NetIdentifier, LabelId)>;
 
     // Create a label.
     async fn create_label(team: TeamId, name: String) -> Result<LabelId>;
@@ -419,7 +419,7 @@ pub trait DaemonApi {
     async fn query_device_label_assignments(team: TeamId, device: DeviceId)
         -> Result<Vec<LabelId>>;
     /// Query label exists.
-    async fn query_label_exists(team: TeamId, label: AfcLabel) -> Result<bool>;
+    async fn query_label_exists(team: TeamId, label_id: LabelId) -> Result<bool>;
     // Query labels.
     async fn query_labels(team: TeamId) -> Result<Vec<LabelId>>;
     /// Query AFC network ID.
