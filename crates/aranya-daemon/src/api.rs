@@ -618,7 +618,7 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
-        label: Label,
+        label_id: ApiLabelId,
     ) -> ApiResult<(AfcId, AfcCtrl)> {
         info!("create_afc_bidi_channel");
 
@@ -633,7 +633,7 @@ impl DaemonApi for DaemonApiHandler {
         let (ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
-            .create_afc_bidi_channel_off_graph(peer_id, label)
+            .create_afc_bidi_channel_off_graph(peer_id, label_id.into_id().into())
             .await?;
         let id = self.pk.ident_pk.id()?;
 
