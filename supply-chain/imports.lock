@@ -8,14 +8,14 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-codegen]]
-version = "0.2.0"
-when = "2025-03-12"
+version = "0.2.2"
+when = "2025-03-27"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-core]]
-version = "0.2.0"
-when = "2025-03-12"
+version = "0.2.1"
+when = "2025-03-21"
 user-id = 293722
 user-login = "aranya-project-bot"
 
