@@ -646,10 +646,7 @@ where
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
             name: "create_aqc_bidi_channel",
-            args: Cow::Owned(vec![
-                Value::from(peer_id),
-                Value::from(label_id.into_id()), // TODO: LabelId -> Value conversion
-            ]),
+            args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
         })
         .in_current_span()
     }
@@ -683,7 +680,7 @@ where
             args: Cow::Owned(vec![
                 Value::from(seal_id),
                 Value::from(open_id),
-                Value::from(label.into_id()), // TODO: LabelId -> Value conversion
+                Value::from(label),
             ]),
         })
         .in_current_span()
