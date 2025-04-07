@@ -1,7 +1,7 @@
 #[cfg(feature = "afc")]
 use core::ptr;
 use core::{ffi::c_char, ops::DerefMut, slice};
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+use std::{ffi::OsStr, fmt, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use tracing::debug;
@@ -213,6 +213,23 @@ impl From<Role> for aranya_daemon_api::Role {
             Role::Operator => Self::Operator,
             Role::Member => Self::Member,
         }
+    }
+}
+
+impl From<aranya_daemon_api::Role> for Role {
+    fn from(value: aranya_daemon_api::Role) -> Self {
+        match value {
+            aranya_daemon_api::Role::Owner => Self::Owner,
+            aranya_daemon_api::Role::Admin => Self::Admin,
+            aranya_daemon_api::Role::Operator => Self::Operator,
+            aranya_daemon_api::Role::Member => Self::Member,
+        }
+    }
+}
+
+impl fmt::Display for Role {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
@@ -1176,6 +1193,7 @@ pub fn sync_peer_config_builder_build(
     Safe::init(out, cfg.build()?);
     Ok(())
 }
+
 /// Query devices on team.
 ///
 /// @param client the Aranya Client [`Client`].
@@ -1233,7 +1251,47 @@ pub fn device_id_to_str(
     Ok(())
 }
 
-// TODO: query_device_role
+/// Query device role on team.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param __output the device's role [`Role`].
+///
+/// @relates AranyaClient.
+pub fn query_device_role(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+) -> Result<Role, imp::Error> {
+    let client = client.deref_mut();
+    let role = client
+        .rt
+        .block_on(client.inner.queries(team.0).device_role(device.0))?;
+    Ok(role.into())
+}
+
+/// The size in bytes of a `DeviceId` converted to a human-readable base64 string.
+pub const ARANYA_ROLE_STR_LEN: u64 = 256;
+
+/// Writes the human-readable encoding of `role` to `str`.
+///
+/// To always succeed, `str` must be at least `ARANYA_ROLE_STR_LEN` bytes long.
+///
+/// @param role [`Role`].
+/// @param role string [`Role`].
+///
+/// @relates AranyaError.
+#[aranya_capi_core::no_ext_error]
+pub fn role_to_str(
+    role: Role,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    aranya_capi_core::write_c_str(str, &role.to_string(), str_len)?;
+    Ok(())
+}
 
 /// Query device's keybundle.
 ///

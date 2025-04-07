@@ -91,6 +91,11 @@
 #define ARANYA_DEVICE_ID_STR_LEN (((64 * 1375) / 1000) + 1)
 
 /**
+ * The size in bytes of a `DeviceId` converted to a human-readable base64 string.
+ */
+#define ARANYA_ROLE_STR_LEN 256
+
+/**
  * An error code.
  *
  * For extended error information, see [`AranyaExtError`](@ref AranyaExtError).
@@ -1764,6 +1769,49 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
 AranyaError aranya_device_id_to_str(struct AranyaDeviceId device,
                                     char *str,
                                     size_t *str_len);
+
+/**
+ * Query device role on team.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param __output the device's role [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_device_role(struct AranyaClient *client,
+                                     const struct AranyaTeamId *team,
+                                     const struct AranyaDeviceId *device,
+                                     AranyaRole *__output);
+
+/**
+ * Query device role on team.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param __output the device's role [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_device_role_ext(struct AranyaClient *client,
+                                         const struct AranyaTeamId *team,
+                                         const struct AranyaDeviceId *device,
+                                         AranyaRole *__output,
+                                         struct AranyaExtError *__ext_err);
+
+/**
+ * Writes the human-readable encoding of `role` to `str`.
+ *
+ * To always succeed, `str` must be at least `ARANYA_ROLE_STR_LEN` bytes long.
+ *
+ * @param role [`AranyaRole`](@ref AranyaRole).
+ * @param role string [`AranyaRole`](@ref AranyaRole).
+ *
+ * @relates AranyaError.
+ */
+AranyaError aranya_role_to_str(AranyaRole role, char *str, size_t *str_len);
 
 /**
  * Query device's keybundle.
