@@ -438,7 +438,7 @@ async fn main() -> Result<()> {
     info!("demo aqc functionality");
     info!("creating aqc label");
     let label3 = operator_team.create_aqc_label("label3".to_string()).await?;
-    let op = ChanOp::ReadWrite;
+    let op = ChanOp::SendRecv;
     info!("assigning aqc label to membera");
     operator_team.assign_aqc_label(team.membera.id, label3, op).await?;
     info!("assigning aqc label to memberb");

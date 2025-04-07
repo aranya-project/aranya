@@ -12,10 +12,7 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 use aranya_crypto::{
-    aqc::{
-        BidiChannelId, BidiPeerEncap as AqcBidiPeerEncap, UniChannelId,
-        UniPeerEncap as AqcUniPeerEncap,
-    },
+    aqc::{BidiPeerEncap as AqcBidiPeerEncap, UniPeerEncap as AqcUniPeerEncap},
     Csprng, DeviceId, Rng,
 };
 use aranya_daemon_api::{
@@ -657,7 +654,7 @@ impl DaemonApi for DaemonApiHandler {
         // TODO: support other channel permissions.
         self.client
             .actions(&team.into_id().into())
-            .assign_label(device.into_id().into(), label, ChanOp::ReadWrite)
+            .assign_label(device.into_id().into(), label, ChanOp::SendRecv)
             .await
             .context("unable to assign label")?;
         Ok(())
@@ -805,6 +802,7 @@ impl DaemonApi for DaemonApiHandler {
             peer_enc_pk: e.peer_enc_pk.clone(),
             label_id: e.label_id.into(),
             channel_id: e.channel_id.into(),
+            author_secrets_id: e.author_secrets_id.into(),
         });
 
         Ok((aqc_id, ctrl, aqc_info))
@@ -849,11 +847,12 @@ impl DaemonApi for DaemonApiHandler {
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
-            send_id: e.writer_id.into(),
-            recv_id: e.reader_id.into(),
+            send_id: e.sender_id.into(),
+            recv_id: e.receiver_id.into(),
             peer_enc_pk: e.peer_enc_pk.clone(),
             label_id: e.label_id.into(),
             channel_id: e.channel_id.into(),
+            author_secrets_id: e.author_secrets_id.into(),
         });
 
         Ok((aqc_id, ctrl, aqc_info))
@@ -888,7 +887,6 @@ impl DaemonApi for DaemonApiHandler {
                     peer_enc_key_id: e.peer_enc_key_id.into(),
                     label_id: e.label_id.into(),
                     encap: e.encap.clone(),
-                    channel_id: BidiChannelId::default(), // TODO: missing channel_id field
                 });
 
                 let encap =
@@ -905,18 +903,17 @@ impl DaemonApi for DaemonApiHandler {
                 return Ok((aqc_id, net, aqc_info));
             };
 
-            if let Some(Effect::AqcUniChannelReceived(e)) = find_effect!(&effects, Effect::AqcUniChannelReceived(e) if (e.writer_id == id.into() || e.reader_id == id.into()))
+            if let Some(Effect::AqcUniChannelReceived(e)) = find_effect!(&effects, Effect::AqcUniChannelReceived(e) if (e.sender_id == id.into() || e.receiver_id == id.into()))
             {
                 let aqc_info = AqcChannelInfo::UniReceived(AqcUniChannelReceivedInfo {
                     parent_cmd_id: e.parent_cmd_id,
-                    send_id: e.writer_id.into(),
-                    recv_id: e.reader_id.into(),
+                    send_id: e.sender_id.into(),
+                    recv_id: e.receiver_id.into(),
                     author_id: e.author_id.into(),
                     author_enc_pk: e.author_enc_pk.clone(),
                     peer_enc_key_id: e.peer_enc_key_id.into(),
                     label_id: e.label_id.into(),
                     encap: e.encap.clone(),
-                    channel_id: UniChannelId::default(), // TODO: missing channel_id field
                 });
 
                 let encap =
@@ -1324,9 +1321,9 @@ impl From<Role> for ApiRole {
 impl From<ApiChanOp> for ChanOp {
     fn from(value: ApiChanOp) -> Self {
         match value {
-            ApiChanOp::ReadWrite => ChanOp::ReadWrite,
-            ApiChanOp::ReadOnly => ChanOp::ReadOnly,
-            ApiChanOp::WriteOnly => ChanOp::WriteOnly,
+            ApiChanOp::SendRecv => ChanOp::SendRecv,
+            ApiChanOp::RecvOnly => ChanOp::RecvOnly,
+            ApiChanOp::SendOnly => ChanOp::SendOnly,
         }
     }
 }
@@ -1334,9 +1331,9 @@ impl From<ApiChanOp> for ChanOp {
 impl From<ChanOp> for ApiChanOp {
     fn from(value: ChanOp) -> Self {
         match value {
-            ChanOp::ReadWrite => ApiChanOp::ReadWrite,
-            ChanOp::ReadOnly => ApiChanOp::ReadOnly,
-            ChanOp::WriteOnly => ApiChanOp::WriteOnly,
+            ChanOp::SendRecv => ApiChanOp::SendRecv,
+            ChanOp::RecvOnly => ApiChanOp::RecvOnly,
+            ChanOp::SendOnly => ApiChanOp::SendOnly,
         }
     }
 }

@@ -581,7 +581,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .await?;
 
     let label3 = operator_team.create_aqc_label("label3".to_string()).await?;
-    let op = ChanOp::ReadWrite;
+    let op = ChanOp::SendRecv;
     operator_team
         .assign_aqc_label(team.membera.id, label3, op)
         .await?;

@@ -166,6 +166,9 @@ pub enum AqcError {
     #[error("unable to create channel")]
     ChannelCreation(aranya_aqc_util::Error),
 
+    #[error("unable to parse encap")]
+    Encap(anyhow::Error),
+
     // Connection-related errors
     /// Unable to bind a network addresss.
     #[error("unable to bind address: {0}")]

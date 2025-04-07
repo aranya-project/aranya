@@ -31,9 +31,9 @@ impl FromStr for ChanOp {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "ChanOp::ReadOnly" => Ok(Self::ReadOnly),
-            "ChanOp::WriteOnly" => Ok(Self::WriteOnly),
-            "ChanOp::ReadWrite" => Ok(Self::ReadWrite),
+            "ChanOp::RecvOnly" => Ok(Self::RecvOnly),
+            "ChanOp::SendOnly" => Ok(Self::SendOnly),
+            "ChanOp::SendRecv" => Ok(Self::SendRecv),
             _ => Err(anyhow!("unknown `ChanOp`: {s}")),
         }
     }

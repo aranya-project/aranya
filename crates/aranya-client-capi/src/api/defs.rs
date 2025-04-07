@@ -239,21 +239,21 @@ impl From<Role> for aranya_daemon_api::Role {
 pub enum ChanOp {
     /// The device can only receive data in channels with this
     /// label.
-    ReadOnly,
+    RecvOnly,
     /// The device can only send data in channels with this
     /// label.
-    WriteOnly,
+    SendOnly,
     /// The device can send and receive data in channels with this
     /// label.
-    ReadWrite,
+    SendRecv,
 }
 
 impl From<ChanOp> for aranya_daemon_api::ChanOp {
     fn from(value: ChanOp) -> Self {
         match value {
-            ChanOp::ReadOnly => Self::ReadOnly,
-            ChanOp::WriteOnly => Self::WriteOnly,
-            ChanOp::ReadWrite => Self::ReadWrite,
+            ChanOp::RecvOnly => Self::RecvOnly,
+            ChanOp::SendOnly => Self::SendOnly,
+            ChanOp::SendRecv => Self::SendRecv,
         }
     }
 }

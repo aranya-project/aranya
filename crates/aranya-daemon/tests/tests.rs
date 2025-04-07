@@ -124,12 +124,12 @@ async fn test_afc_bidirectional_channel() -> Result<()> {
         .context("unable to define label")?;
     team.operator
         .actions()
-        .assign_label(team.membera.pk.ident_pk.id()?, label, ChanOp::ReadWrite)
+        .assign_label(team.membera.pk.ident_pk.id()?, label, ChanOp::SendRecv)
         .await
         .context("unable to assign label to membera")?;
     team.operator
         .actions()
-        .assign_label(team.memberb.pk.ident_pk.id()?, label, ChanOp::ReadWrite)
+        .assign_label(team.memberb.pk.ident_pk.id()?, label, ChanOp::SendRecv)
         .await
         .context("unable to assign label to memberb")?;
     team.membera.sync(team.operator).await?;
@@ -161,12 +161,12 @@ async fn test_revoke_afc_label() -> Result<()> {
         .context("unable to define label")?;
     team.operator
         .actions()
-        .assign_label(team.membera.pk.ident_pk.id()?, label, ChanOp::ReadWrite)
+        .assign_label(team.membera.pk.ident_pk.id()?, label, ChanOp::SendRecv)
         .await
         .context("unable to assign label to membera")?;
     team.operator
         .actions()
-        .assign_label(team.memberb.pk.ident_pk.id()?, label, ChanOp::ReadWrite)
+        .assign_label(team.memberb.pk.ident_pk.id()?, label, ChanOp::SendRecv)
         .await
         .context("unable to assign label to memberb")?;
     team.membera.sync(team.operator).await?;
@@ -220,12 +220,12 @@ async fn test_afc_unidirectional_channels() -> Result<()> {
 
     team.operator
         .actions()
-        .assign_label(team.membera.pk.ident_pk.id()?, label1, ChanOp::ReadOnly)
+        .assign_label(team.membera.pk.ident_pk.id()?, label1, ChanOp::RecvOnly)
         .await
         .context("unable to assign label1 membera")?;
     team.operator
         .actions()
-        .assign_label(team.memberb.pk.ident_pk.id()?, label1, ChanOp::WriteOnly)
+        .assign_label(team.memberb.pk.ident_pk.id()?, label1, ChanOp::SendOnly)
         .await
         .context("unable to assign label1 memberb")?;
     team.membera.sync(team.operator).await?;
@@ -251,12 +251,12 @@ async fn test_afc_unidirectional_channels() -> Result<()> {
 
     team.operator
         .actions()
-        .assign_label(team.membera.pk.ident_pk.id()?, label2, ChanOp::WriteOnly)
+        .assign_label(team.membera.pk.ident_pk.id()?, label2, ChanOp::SendOnly)
         .await
         .context("unable to assign label2 to membera")?;
     team.operator
         .actions()
-        .assign_label(team.memberb.pk.ident_pk.id()?, label2, ChanOp::ReadOnly)
+        .assign_label(team.memberb.pk.ident_pk.id()?, label2, ChanOp::RecvOnly)
         .await
         .context("unable to assign label2 to memberb")?;
     team.membera.sync(team.operator).await?;

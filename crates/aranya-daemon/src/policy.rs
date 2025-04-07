@@ -28,9 +28,9 @@ pub enum Role {
 /// ChanOp policy enum.
 #[value]
 pub enum ChanOp {
-    ReadOnly,
-    WriteOnly,
-    ReadWrite,
+    RecvOnly,
+    SendOnly,
+    SendRecv,
 }
 /// Enum of policy effects that can occur in response to a policy action.
 #[effects]
@@ -198,8 +198,8 @@ pub struct AfcBidiChannelReceived {
 pub struct AfcUniChannelCreated {
     pub parent_cmd_id: Id,
     pub author_id: Id,
-    pub writer_id: Id,
-    pub reader_id: Id,
+    pub sender_id: Id,
+    pub receiver_id: Id,
     pub author_enc_key_id: Id,
     pub peer_enc_pk: Vec<u8>,
     pub label: i64,
@@ -210,8 +210,8 @@ pub struct AfcUniChannelCreated {
 pub struct AfcUniChannelReceived {
     pub parent_cmd_id: Id,
     pub author_id: Id,
-    pub writer_id: Id,
-    pub reader_id: Id,
+    pub sender_id: Id,
+    pub receiver_id: Id,
     pub author_enc_pk: Vec<u8>,
     pub peer_enc_key_id: Id,
     pub label: i64,
@@ -220,17 +220,20 @@ pub struct AfcUniChannelReceived {
 /// AqcBidiChannelCreated policy effect.
 #[effect]
 pub struct AqcBidiChannelCreated {
+    pub channel_id: Id,
     pub parent_cmd_id: Id,
     pub author_id: Id,
     pub author_enc_key_id: Id,
     pub peer_id: Id,
     pub peer_enc_pk: Vec<u8>,
     pub label_id: Id,
-    pub channel_id: Id,
+    pub author_secrets_id: Id,
+    pub psk_length_in_bytes: i64,
 }
 /// AqcBidiChannelReceived policy effect.
 #[effect]
 pub struct AqcBidiChannelReceived {
+    pub channel_id: Id,
     pub parent_cmd_id: Id,
     pub author_id: Id,
     pub author_enc_pk: Vec<u8>,
@@ -238,30 +241,35 @@ pub struct AqcBidiChannelReceived {
     pub peer_enc_key_id: Id,
     pub label_id: Id,
     pub encap: Vec<u8>,
+    pub psk_length_in_bytes: i64,
 }
 /// AqcUniChannelCreated policy effect.
 #[effect]
 pub struct AqcUniChannelCreated {
+    pub channel_id: Id,
     pub parent_cmd_id: Id,
     pub author_id: Id,
-    pub writer_id: Id,
-    pub reader_id: Id,
+    pub sender_id: Id,
+    pub receiver_id: Id,
     pub author_enc_key_id: Id,
     pub peer_enc_pk: Vec<u8>,
     pub label_id: Id,
-    pub channel_id: Id,
+    pub author_secrets_id: Id,
+    pub psk_length_in_bytes: i64,
 }
 /// AqcUniChannelReceived policy effect.
 #[effect]
 pub struct AqcUniChannelReceived {
+    pub channel_id: Id,
     pub parent_cmd_id: Id,
     pub author_id: Id,
-    pub writer_id: Id,
-    pub reader_id: Id,
+    pub sender_id: Id,
+    pub receiver_id: Id,
     pub author_enc_pk: Vec<u8>,
     pub peer_enc_key_id: Id,
     pub label_id: Id,
     pub encap: Vec<u8>,
+    pub psk_length_in_bytes: i64,
 }
 /// AqcLabelCreated policy effect.
 #[effect]
@@ -276,6 +284,7 @@ pub struct AqcLabelDeleted {
     pub label_name: String,
     pub label_author_id: Id,
     pub label_id: Id,
+    pub author_id: Id,
 }
 /// QueriedAqcLabel policy effect.
 #[effect]
@@ -384,8 +393,8 @@ pub trait ActorExt {
     ) -> Result<(), ClientError>;
     fn create_afc_uni_channel(
         &mut self,
-        writer_id: Id,
-        reader_id: Id,
+        sender_id: Id,
+        receiver_id: Id,
         label: i64,
     ) -> Result<(), ClientError>;
     fn create_aqc_bidi_channel(
@@ -395,8 +404,8 @@ pub trait ActorExt {
     ) -> Result<(), ClientError>;
     fn create_aqc_uni_channel(
         &mut self,
-        writer_id: Id,
-        reader_id: Id,
+        sender_id: Id,
+        receiver_id: Id,
         label_id: Id,
     ) -> Result<(), ClientError>;
     fn create_aqc_label(&mut self, name: String) -> Result<(), ClientError>;

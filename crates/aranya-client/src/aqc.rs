@@ -7,8 +7,14 @@ use aranya_aqc_util::{
     BidiChannelCreated, BidiChannelReceived, Handler, UniChannelCreated, UniChannelReceived,
 };
 use aranya_crypto::{
-    aead::Aead, default::DefaultEngine, generic_array::GenericArray, import::Import,
-    keys::SecretKeyBytes, keystore::fs_keystore::Store, CipherSuite, Random, Rng,
+    aead::Aead,
+    aqc::{BidiChannelId, BidiPeerEncap, UniChannelId, UniPeerEncap},
+    default::DefaultEngine,
+    generic_array::GenericArray,
+    import::Import,
+    keys::SecretKeyBytes,
+    keystore::fs_keystore::Store,
+    CipherSuite, Random, Rng,
 };
 pub use aranya_daemon_api::AqcId;
 use aranya_daemon_api::{
@@ -115,6 +121,7 @@ impl<'a> AqcChannels<'a> {
                         label_id: v.label_id.into_id().into(),
                         channel_id: v.channel_id,
                         psk_length_in_bytes: 32, // TODO: don't hard-code
+                        author_secrets_id: v.author_secrets_id,
                     },
                 )
                 .map_err(AqcError::ChannelCreation)?;
@@ -172,6 +179,7 @@ impl<'a> AqcChannels<'a> {
                         label_id: v.label_id.into_id().into(),
                         channel_id: v.channel_id,
                         psk_length_in_bytes: 32, // TODO: don't hard-code
+                        author_secrets_id: v.author_secrets_id,
                     },
                 )
                 .map_err(AqcError::ChannelCreation)?;
@@ -212,6 +220,10 @@ impl<'a> AqcChannels<'a> {
 
         match aqc_info {
             BidiReceived(v) => {
+                let encap = BidiPeerEncap::<CS>::from_bytes(&v.encap)
+                    .context("unable to get encap")
+                    .map_err(AqcError::Encap)?;
+                let channel_id: BidiChannelId = encap.id();
                 let psk = self
                     .client
                     .aqc
@@ -226,7 +238,7 @@ impl<'a> AqcChannels<'a> {
                             peer_enc_key_id: v.peer_enc_key_id,
                             label_id: v.label_id.into_id().into(),
                             encap: &v.encap,
-                            channel_id: v.channel_id,
+                            channel_id,
                             psk_length_in_bytes: PSK_KEY_LEN,
                         },
                     )
@@ -234,6 +246,10 @@ impl<'a> AqcChannels<'a> {
                 debug!("psk id: {:?}", psk.identity());
             }
             UniReceived(v) => {
+                let encap = UniPeerEncap::<CS>::from_bytes(&v.encap)
+                    .context("unable to get encap")
+                    .map_err(AqcError::Encap)?;
+                let channel_id: UniChannelId = encap.id();
                 let psk = self
                     .client
                     .aqc
@@ -249,7 +265,7 @@ impl<'a> AqcChannels<'a> {
                             peer_enc_key_id: v.peer_enc_key_id,
                             label_id: v.label_id.into_id().into(),
                             encap: &v.encap,
-                            channel_id: v.channel_id,
+                            channel_id,
                             psk_length_in_bytes: PSK_KEY_LEN,
                         },
                     )

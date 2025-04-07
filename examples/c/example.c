@@ -625,7 +625,7 @@ AranyaError run_aqc_example(Team *t) {
                                   label_name, &label_id);
     EXPECT("error creating label", err);
     printf("assigning AQC label to members \r\n");
-    AranyaChanOp op = ARANYA_CHAN_OP_READ_WRITE;
+    AranyaChanOp op = ARANYA_CHAN_OP_SEND_RECV;
     err = aranya_aqc_assign_label(&t->clients.operator.client, &t->id,
                                   &t->clients.membera.id, &label_id, op);
     EXPECT("error assigning label to membera", err);

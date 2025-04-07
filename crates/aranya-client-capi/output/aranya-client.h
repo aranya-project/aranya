@@ -102,17 +102,17 @@ enum AranyaChanOp
      * The device can only receive data in channels with this
      * label.
      */
-    ARANYA_CHAN_OP_READ_ONLY,
+    ARANYA_CHAN_OP_RECV_ONLY,
     /**
      * The device can only send data in channels with this
      * label.
      */
-    ARANYA_CHAN_OP_WRITE_ONLY,
+    ARANYA_CHAN_OP_SEND_ONLY,
     /**
      * The device can send and receive data in channels with this
      * label.
      */
-    ARANYA_CHAN_OP_READ_WRITE,
+    ARANYA_CHAN_OP_SEND_RECV,
 };
 #ifndef __cplusplus
 typedef uint8_t AranyaChanOp;

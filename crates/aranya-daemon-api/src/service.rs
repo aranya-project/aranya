@@ -5,7 +5,10 @@ use std::path::PathBuf;
 
 use aranya_crypto::{
     afc::{BidiChannelId as AfcBidiChannelId, UniChannelId as AfcUniChannelId},
-    aqc::{BidiChannelId as AqcBidiChannelId, UniChannelId as AqcUniChannelId},
+    aqc::{
+        BidiAuthorSecretId, BidiChannelId as AqcBidiChannelId, UniAuthorSecretId,
+        UniChannelId as AqcUniChannelId,
+    },
     custom_id,
     default::DefaultCipherSuite,
     EncryptionKeyId, Id,
@@ -205,6 +208,7 @@ pub struct AqcBidiChannelCreatedInfo {
     pub peer_enc_pk: Vec<u8>,
     pub label_id: LabelId,
     pub channel_id: AqcBidiChannelId,
+    pub author_secrets_id: BidiAuthorSecretId,
 }
 
 /// Bidirectional AQC channel info.
@@ -218,7 +222,6 @@ pub struct AqcBidiChannelReceivedInfo {
     pub author_enc_pk: Vec<u8>,
     pub label_id: LabelId,
     pub encap: Vec<u8>,
-    pub channel_id: AqcBidiChannelId,
 }
 
 /// Unidirectional AQC channel info.
@@ -233,6 +236,7 @@ pub struct AqcUniChannelCreatedInfo {
     pub peer_enc_pk: Vec<u8>,
     pub label_id: LabelId,
     pub channel_id: AqcUniChannelId,
+    pub author_secrets_id: UniAuthorSecretId,
 }
 
 /// Unidirectional AQC channel info.
@@ -247,7 +251,6 @@ pub struct AqcUniChannelReceivedInfo {
     pub peer_enc_key_id: EncryptionKeyId,
     pub label_id: LabelId,
     pub encap: Vec<u8>,
-    pub channel_id: AqcUniChannelId,
 }
 
 /// Information needed to use the key store.
@@ -274,13 +277,13 @@ pub struct SyncPeerConfig {
 pub enum ChanOp {
     /// The device can only receive data in channels with this
     /// label.
-    ReadOnly,
+    RecvOnly,
     /// The device can only send data in channels with this
     /// label.
-    WriteOnly,
+    SendOnly,
     /// The device can send and receive data in channels with this
     /// label.
-    ReadWrite,
+    SendRecv,
 }
 
 #[tarpc::service]
