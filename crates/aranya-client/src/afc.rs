@@ -74,7 +74,7 @@ pub struct Message {
     /// The channel from which the message was received.
     pub channel: AfcId,
     /// The Aranya Fast Channel label associated with the message.
-    pub label: Label,
+    pub label_id: LabelId,
     /// The order of the message in the channel.
     pub seq: Seq,
 }
@@ -219,6 +219,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
         cmd: AfcCtrl,
         team_id: TeamId,
         afc_id: AfcId,
+        // TODO: update ChannelId to use LabelId
         chan_id: ChannelId,
     ) -> Result<(), AfcError> {
         debug!("sending control message");
@@ -413,6 +414,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
             .checked_sub(Client::<S>::OVERHEAD)
             .ok_or(AfcError::PayloadTooSmall)?;
         let mut plaintext = vec![0; plaintext_len];
+        // TODO: return LabelId
         let (label, seq) = self
             .afc
             .open(chan_id.node_id(), &mut plaintext, ciphertext)
@@ -456,6 +458,7 @@ impl<S: AfcState> FastChannelsImpl<S> {
         id: AfcId,
         net_id: NetIdentifier,
         team_id: TeamId,
+        // TODO: update ChannelId to use LabelId
         channel_id: ChannelId,
         addr: SocketAddr,
     ) -> Result<(), AfcError> {
@@ -542,6 +545,7 @@ impl<S> fmt::Debug for FastChannelsImpl<S> {
 #[derive(Debug)]
 struct FastChannel {
     net_id: NetIdentifier,
+    // TODO: update ChannelId to use LabelId
     channel_id: ChannelId,
     /// Used to look up the TCP stream.
     address: SocketAddr,
@@ -598,7 +602,7 @@ impl<'a> FastChannels<'a> {
         &mut self,
         team_id: TeamId,
         peer: NetIdentifier,
-        label: Label,
+        label_id: LabelId,
     ) -> crate::Result<AfcId> {
         debug!("creating bidi channel");
 
@@ -612,6 +616,7 @@ impl<'a> FastChannels<'a> {
             .await??;
         debug!(%afc_id, %node_id, %label, "created bidi channel");
 
+        // TODO: update ChannelId to use LabelId
         let chan_id = ChannelId::new(node_id, label);
         self.client
             .afc
@@ -665,7 +670,7 @@ impl<'a> FastChannels<'a> {
         // TODO(eric): This method should block until a message
         // has been received.
         let msg = self.client.afc.msgs.pop_front()?;
-        debug!(label = %msg.label, seq = %msg.seq, "received AFC data message");
+        debug!(label_id = %msg.label_id, seq = %msg.seq, "received AFC data message");
         Some(msg)
     }
 
@@ -730,6 +735,7 @@ impl<'a> FastChannels<'a> {
                         .await??;
                     debug!(%node_id, %label, "applied AFC control msg");
 
+                    // TODO: update ChannelId to use LabelId
                     let chan_id = ChannelId::new(node_id, label);
                     afc.add_channel(afc_id, peer, ctrl.team_id, chan_id, addr)
                         .await?;

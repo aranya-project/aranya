@@ -458,56 +458,6 @@ where
         .in_current_span()
     }
 
-    /// Defines an AFC label.
-    #[instrument(skip(self), fields(label = %label))]
-    fn define_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.define_label(i64::from(label.to_u32()))?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Undefines an AFC label.
-    #[instrument(skip(self), fields(label = %label))]
-    fn undefine_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.undefine_label(i64::from(label.to_u32()))?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Grants an app permission to use an AFC label.
-    #[instrument(skip(self), fields(device_id = %device_id, label = %label, op = %op))]
-    fn assign_label(
-        &self,
-        device_id: DeviceId,
-        label: Label,
-        op: ChanOp,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.assign_label(device_id.into(), i64::from(label.to_u32()), op)?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Revokes an AFC label.
-    #[instrument(skip(self), fields(device_id = %device_id, label = %label))]
-    fn revoke_label(
-        &self,
-        device_id: DeviceId,
-        label: Label,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, %label, "revoking AFC label");
-        self.with_actor(move |actor| {
-            actor.revoke_label(device_id.into(), i64::from(label.to_u32()))?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
     /// Sets an AFC network name.
     #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
     #[cfg(feature = "afc")]
@@ -539,54 +489,51 @@ where
         .in_current_span()
     }
 
-    /// Create an AQC label.
+    /// Create a label.
     #[instrument(skip(self), fields(name = %name))]
-    fn create_aqc_label(&self, name: String) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn create_label(&self, name: String) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_aqc_label(name)?;
+            actor.create_label(name)?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Delete an AQC label.
+    /// Delete a label.
     #[instrument(skip(self), fields(label_id = %label_id))]
-    fn delete_aqc_label(
-        &self,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn delete_label(&self, label_id: LabelId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.delete_aqc_label(label_id.into())?;
+            actor.delete_label(label_id.into())?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Assigns an AQC label to a device.
+    /// Assigns a label to a device.
     #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id, op = %op))]
-    fn assign_aqc_label(
+    fn assign_label(
         &self,
         device_id: DeviceId,
         label_id: LabelId,
         op: ChanOp,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_aqc_label(device_id.into(), label_id.into(), op)?;
+            actor.assign_label(device_id.into(), label_id.into(), op)?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Revokes an AQC label.
+    /// Revokes a label.
     #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id))]
-    fn revoke_aqc_label(
+    fn revoke_label(
         &self,
         device_id: DeviceId,
         label_id: LabelId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         info!(%device_id, %label_id, "revoking AQC label");
         self.with_actor(move |actor| {
-            actor.revoke_aqc_label(device_id.into(), label_id.into())?;
+            actor.revoke_label(device_id.into(), label_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -627,10 +574,10 @@ where
     fn create_afc_bidi_channel(
         &self,
         peer_id: DeviceId,
-        label: Label,
+        label_id: LabelId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_afc_bidi_channel(peer_id.into(), i64::from(label.to_u32()))?;
+            actor.create_afc_bidi_channel(peer_id.into(), label.into_id())?;
             Ok(())
         })
         .in_current_span()

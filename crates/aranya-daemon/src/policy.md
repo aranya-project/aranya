@@ -135,13 +135,6 @@ fact DeviceEncKey[device_id id]=>{key_id id, key bytes}
 // Indicates that the team has been terminated.
 fact TeamEnd[]=>{}
 
-// Records a channel label that has been defined for use.
-fact Label[label int]=>{}
-
-// Records that a device was granted permission to use a label
-// for certain channel operations.
-fact AssignedLabel[device_id id, label int]=>{op enum ChanOp}
-
 // Stores a Member's associated network identifier for AFC.
 fact AfcMemberNetworkId[device_id id]=>{net_identifier string}
 
@@ -254,12 +247,6 @@ function open_envelope(sealed_envelope struct Envelope) bytes {
 #### Channel Functions
 
 ```policy
-// Reports whether `label` is a valid label.
-//
-// A valid label must be an unsigned, 32-bit integer.
-function is_valid_label(label int) bool {
-    return label >= 0 && label <= 4294967295
-}
 
 // Reports whether `size` is a valid PSK length (in bytes).
 //
@@ -268,16 +255,10 @@ function is_valid_psk_length(size int) bool {
     return size >= 32 && size < 65536
 }
 
-// Returns the AQC channel operation for a particular label.
-function get_allowed_op(device_id id, label int) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedLabel[device_id: device_id, label: label]
-    return assigned_label.op
-}
-
 
 // Returns the channel operation for a particular label.
-function aqc_get_allowed_op(device_id id, label_id id) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedAqcLabel[device_id: device_id, label_id: label_id]
+function get_allowed_op(device_id id, label_id id) enum ChanOp {
+    let assigned_label = check_unwrap query AssignedLabel[device_id: device_id, label_id: label_id]
     return assigned_label.op
 }
 
@@ -303,12 +284,10 @@ function select_peer_id(device_id id, id_a id, id_b id) id {
 
 ```policy
 // Reports whether the devices have permission to create a bidirectional AFC channel with each other.
-function can_create_afc_bidi_channel(device1 id, device2 id, label int) bool {
-    let device1_op = get_allowed_op(device1, label)
-    let device2_op = get_allowed_op(device2, label)
+function can_create_afc_bidi_channel(device1 id, device2 id, label_id id) bool {
+    let device1_op = get_allowed_op(device1, label_id)
+    let device2_op = get_allowed_op(device2, label_id)
 
-    // Label must be valid.
-    check is_valid_label(label)
     // Members can't create channels with themselves.
     check device1 != device2
 
@@ -320,12 +299,10 @@ function can_create_afc_bidi_channel(device1 id, device2 id, label int) bool {
 }
 
 // Reports whether the devices have permission to create a unidirectional AFC channel with each other.
-function can_create_afc_uni_channel(sender_id id, receiver_id id, label int) bool {
-    let writer_op = get_allowed_op(sender_id, label)
-    let reader_op = get_allowed_op(receiver_id, label)
+function can_create_afc_uni_channel(sender_id id, receiver_id id, label_id id) bool {
+    let writer_op = get_allowed_op(sender_id, label_id)
+    let reader_op = get_allowed_op(receiver_id, label_id)
 
-     // Label must be valid.
-    check is_valid_label(label)
     // Members can't create channels with themselves.
     check sender_id != receiver_id
 
@@ -354,12 +331,12 @@ function can_create_aqc_bidi_channel(device1 id, device2 id, label_id id) bool {
 
     // Both devices must have permissions to read (recv) and
     // write (send) data.
-    let device1_op = aqc_get_allowed_op(device1, label_id)
+    let device1_op = get_allowed_op(device1, label_id)
     if device1_op != ChanOp::SendRecv {
         return false
     }
 
-    let device2_op = aqc_get_allowed_op(device2, label_id)
+    let device2_op = get_allowed_op(device2, label_id)
     if device2_op != ChanOp::SendRecv {
         return false
     }
@@ -377,7 +354,7 @@ function can_create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) b
     check sender_id != receiver_id
 
     // The writer must have permissions to write (send) data.
-    let writer_op = aqc_get_allowed_op(sender_id, label_id)
+    let writer_op = get_allowed_op(sender_id, label_id)
     match writer_op {
         ChanOp::RecvOnly => { return false }
         ChanOp::SendOnly => {}
@@ -385,7 +362,7 @@ function can_create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) b
     }
 
     // The reader must have permission to read (receive) data.
-    let reader_op = aqc_get_allowed_op(receiver_id, label_id)
+    let reader_op = get_allowed_op(receiver_id, label_id)
     match reader_op {
         ChanOp::RecvOnly => {}
         ChanOp::SendOnly => { return false }
@@ -979,237 +956,6 @@ command RevokeOperator{
 - Only Owners can revoke the Admin role.
 - Only Owners and Admins can revoke the Operator role.
 
-## DefineLabel
-
-Establishes a whitelist of channel labels that can be assigned to Members.
-
-```policy
-// Defines an channel label.
-action define_label(label int) {
-    publish DefineLabel {
-        label: label,
-    }
-}
-
-effect LabelDefined {
-    label int,
-}
-
-command DefineLabel {
-    fields {
-        // The label being added.
-        label int,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        let author = get_valid_device(envelope::author_id(envelope))
-
-        // Owners, Admins and Operators can define channel labels.
-        check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
-        // It must be a valid channel label that does not already exist.
-        check is_valid_label(this.label)
-        check !exists Label[label: this.label]
-
-        finish {
-            create Label[label: this.label]=>{}
-
-            emit LabelDefined {
-                label: this.label,
-            }
-        }
-    }
-}
-```
-
-**Invariants**:
-
-- Only Members cannot define channel labels.
-- Owners, Admins and Operators are allowed to define channel labels.
-- Channel labels must be unsigned, 32-bit integers.
-
-## UndefineLabel
-
-Removes a channel label from the whitelist. This operation will result in the channel label revocation across all Members that were assigned to it.
-
-
-```policy
-// Undefines a channel label.
-action undefine_label(label int) {
-    // In a single transaction, publish the command to undefine the channel label as well as a
-    // sequence of channel label revocation commands to revoke it from each Member role.
-    publish UndefineLabel {
-        label: label,
-    }
-
-    // TODO: add back when transaction bug is resolved
-    // map AssignedLabel[label: label, device_id: ?] as member {
-    //     action revoke_label(member.device_id, label)
-    // }
-}
-
-effect LabelUndefined {
-    label int,
-}
-
-command UndefineLabel {
-    fields {
-        // The label being undefined.
-        label int,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        let author = get_valid_device(envelope::author_id(envelope))
-
-        // Only Owners and Admins can undefine channel labels.
-        check is_owner(author.role) || is_admin(author.role)
-        check exists Label[label: this.label]
-
-        finish {
-            delete Label[label: this.label]
-
-            emit LabelUndefined {
-                label: this.label,
-            }
-        }
-    }
-}
-```
-
-**Invariants**:
-
-- Only Owners and Admins are allowed to undefine channel labels.
-
-
-## AssignLabel
-
-Assigns a channel label to a Member.
-
-```policy
-// Assigns the device a `label` to .
-action assign_label(device_id id, label int, op enum ChanOp) {
-    publish AssignLabel {
-        device_id: device_id,
-        label: label,
-        op: op,
-    }
-}
-
-effect LabelAssigned {
-    // The device being assigned the label.
-    device_id id,
-    // The label being assigned.
-    label int,
-    // The operation that can be performed with the label.
-    op enum ChanOp,
-}
-
-command AssignLabel {
-    fields {
-        // The device being assigned the label.
-        device_id id,
-        // The label being assigned.
-        label int,
-        // The operations that can be performed with the label.
-        op enum ChanOp,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        let author = get_valid_device(envelope::author_id(envelope))
-        let device = check_unwrap find_existing_device(this.device_id)
-
-        // Only Owners and Operators can assign channel labels to Members.
-        check is_owner(author.role) || is_operator(author.role)
-        check is_member(device.role)
-
-        // Obviously it must be a valid label.
-        check is_valid_label(this.label)
-        // The label must exist.
-        check exists Label[label: this.label]
-
-        finish {
-            create AssignedLabel[device_id: device.device_id, label: this.label]=>{op: this.op}
-
-            emit LabelAssigned {
-                device_id: device.device_id,
-                label: this.label,
-                op: this.op,
-            }
-        }
-    }
-}
-```
-
-**Invariants**:
-
-- Labels must be unsigned, 32-bit integers.
-- Only Owners and Operators are allowed to assign labels.
-- Only Members can be assigned channel labels.
-- Only labels that are defined are allowed to be assigned.
-
-## RevokeLabel
-Revokes a channel label from a Member. Note that peers communicating with this Member over a
-channel under the revoked label should delete their channel once the label revocation command is
-received.
-
-```policy
-// Revokes the device's access to the channel `label`.
-action revoke_label(device_id id, label int) {
-    publish RevokeLabel {
-        device_id: device_id,
-        label: label,
-    }
-}
-
-effect LabelRevoked {
-    // The device for whom the label is being revoked.
-    device_id id,
-    // The label being revoked.
-    label int,
-}
-
-command RevokeLabel {
-    fields {
-        // The device for whom the label is being revoked.
-        device_id id,
-        // The label being revoked.
-        label int,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        let author = get_valid_device(envelope::author_id(envelope))
-        let device = check_unwrap find_existing_device(this.device_id)
-
-        // Only Owners, Admins, and Operators are allowed to revoke a label from a Member.
-        check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
-        check is_member(device.role)
-
-        // Verify that channel label has been assigned to this Member
-        check exists AssignedLabel[device_id: device.device_id, label: this.label]
-
-        finish {
-            delete AssignedLabel[device_id: device.device_id, label: this.label]
-
-            emit LabelRevoked {
-                device_id: device.device_id,
-                label: this.label,
-            }
-        }
-    }
-}
-```
-
 **Invariants**:
 
 - Only Owners and Operators can revoke labels from Members.
@@ -1460,7 +1206,7 @@ author, and sends the encapsulations through the `AfcCreateBidiChannel` command.
 command, the device will decapsulate their keys and store them in the shared memory DB.
 
 ```policy
-action create_afc_bidi_channel(peer_id id, label int) {
+action create_afc_bidi_channel(peer_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
     let author = get_valid_device(author_id)
@@ -1472,12 +1218,12 @@ action create_afc_bidi_channel(peer_id id, label int) {
         author_id,
         peer_enc_pk,
         peer_id,
-        label,
+        label_id,
     )
 
     publish AfcCreateBidiChannel {
         peer_id: peer_id,
-        label: label,
+        label_id: id,
         peer_encap: channel.peer_encap,
         channel_key_id: channel.key_id,
     }
@@ -1489,7 +1235,7 @@ effect AfcBidiChannelCreated {
     author_enc_key_id id,
     peer_id id,
     peer_enc_pk bytes,
-    label int,
+    label_id id,
     channel_key_id id,
 }
 
@@ -1499,14 +1245,14 @@ effect AfcBidiChannelReceived {
     author_enc_pk bytes,
     peer_id id,
     peer_enc_key_id id,
-    label int,
+    label_id id,
     encap bytes,
 }
 
 command AfcCreateBidiChannel {
     fields {
         peer_id id,
-        label int,
+        label_id id,
         peer_encap bytes,
         channel_key_id id,
     }
@@ -1523,7 +1269,7 @@ command AfcCreateBidiChannel {
         check is_member(peer.role)
 
         // Members must be different and both must have bidirectional permissions over valid label.
-        check can_create_afc_bidi_channel(author.device_id, peer.device_id, this.label)
+        check can_create_afc_bidi_channel(author.device_id, peer.device_id, this.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
@@ -1538,7 +1284,7 @@ command AfcCreateBidiChannel {
                     author_enc_key_id: author.enc_key_id,
                     peer_id: peer.device_id,
                     peer_enc_pk: peer_enc_pk,
-                    label: this.label,
+                    label_id: this.label_id,
                     channel_key_id: this.channel_key_id,
                 }
             }
@@ -1553,7 +1299,7 @@ command AfcCreateBidiChannel {
                     author_enc_pk: author_enc_pk,
                     peer_id: peer.device_id,
                     peer_enc_key_id: peer.enc_key_id,
-                    label: this.label,
+                    label_id: this.label_id,
                     encap: this.peer_encap,
                 }
             }
@@ -1583,7 +1329,7 @@ the encapsulation through the `AfcCreateUniChannel` command. When processing the
 corresponding recipient will decapsulate their key and store it in the shared memory DB.
 
 ```policy
-action create_afc_uni_channel(sender_id id, receiver_id id, label int) {
+action create_afc_uni_channel(sender_id id, receiver_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author = get_valid_device(device::current_device_id())
     let peer_id = select_peer_id(author.device_id, sender_id, receiver_id)
@@ -1601,7 +1347,7 @@ action create_afc_uni_channel(sender_id id, receiver_id id, label int) {
     publish AfcCreateUniChannel {
         sender_id: sender_id,
         receiver_id: receiver_id,
-        label: label,
+        label_id: label_id,
         peer_encap: channel.peer_encap,
         channel_key_id: channel.key_id,
     }
@@ -1614,7 +1360,7 @@ effect AfcUniChannelCreated {
     receiver_id id,
     author_enc_key_id id,
     peer_enc_pk bytes,
-    label int,
+    label_id id,
     channel_key_id id,
 }
 
@@ -1625,7 +1371,7 @@ effect AfcUniChannelReceived {
     receiver_id id,
     author_enc_pk bytes,
     peer_enc_key_id id,
-    label int,
+    label_id id,
     encap bytes,
 }
 
@@ -1636,7 +1382,7 @@ command AfcCreateUniChannel {
         // The DeviceID of the side that can decrypt data.
         receiver_id id,
         // The label to use.
-        label int,
+        label_id id,
         // The encapsulated key for the recipient of the command.
         peer_encap bytes,
         // The ID of the AFC channel key.
@@ -1658,7 +1404,7 @@ command AfcCreateUniChannel {
         check is_member(peer.role)
 
         // Both devices must have valid permissions.
-        check can_create_afc_uni_channel(this.sender_id, this.receiver_id, this.label)
+        check can_create_afc_uni_channel(this.sender_id, this.receiver_id, this.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
@@ -1675,7 +1421,7 @@ command AfcCreateUniChannel {
                     receiver_id: this.receiver_id,
                     author_enc_key_id: author.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
-                    label: this.label,
+                    label_id: this.label_id,
                     channel_key_id: this.channel_key_id,
                 }
             }
@@ -1692,7 +1438,7 @@ command AfcCreateUniChannel {
                     receiver_id: this.receiver_id,
                     author_enc_pk: author_enc_pk,
                     peer_enc_key_id: peer.enc_key_id,
-                    label: this.label,
+                    label_id: this.label_id,
                     encap: this.peer_encap,
                 }
             }
@@ -1834,7 +1580,7 @@ command AqcCreateBidiChannel {
         check is_valid_psk_length(this.psk_length_in_bytes)
 
         // The label must exist.
-        let label = check_unwrap query AqcLabel[label_id: this.label_id]
+        let label = check_unwrap query Label[label_id: this.label_id]
 
         // Check that both devices are allowed to participate in
         // this bidirectional channel.
@@ -2040,7 +1786,7 @@ command AqcCreateUniChannel {
         check is_valid_psk_length(this.psk_length_in_bytes)
 
         // The label must exist.
-        let label = check_unwrap query AqcLabel[label_id: this.label_id]
+        let label = check_unwrap query Label[label_id: this.label_id]
 
         // Check that both devices are allowed to participate in
         // this unidirectional channel.
@@ -2109,16 +1855,16 @@ command AqcCreateUniChannel {
 // Records a label for AQC and AFC.
 //
 // `name` is a short description of the label. E.g., "TELEMETRY".
-fact AqcLabel[label_id id]=>{name string, author_id id}
+fact Label[label_id id]=>{name string, author_id id}
 
 // Creates a label for AQC and AFC.
-action create_aqc_label(name string) {
-    publish CreateAqcLabel {
+action create_label(name string) {
+    publish CreateLabel {
         label_name: name,
     }
 }
 
-command CreateAqcLabel {
+command CreateLabel {
     fields {
         // The label name.
         label_name string,
@@ -2140,12 +1886,12 @@ command CreateAqcLabel {
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        check !exists AqcLabel[label_id: label_id]
+        check !exists Label[label_id: label_id]
 
         finish {
-            create AqcLabel[label_id: label_id]=>{name: this.label_name, author_id: author.device_id}
+            create Label[label_id: label_id]=>{name: this.label_name, author_id: author.device_id}
 
-            emit AqcLabelCreated {
+            emit LabelCreated {
                 label_id: label_id,
                 label_name: this.label_name,
                 label_author_id: author.device_id,
@@ -2154,9 +1900,9 @@ command CreateAqcLabel {
     }
 }
 
-// The effect emitted when the `CreateAqcLabel` command is
+// The effect emitted when the `CreateLabel` command is
 // successfully processed.
-effect AqcLabelCreated {
+effect LabelCreated {
     // Uniquely identifies the label.
     label_id id,
     // The label name.
@@ -2165,13 +1911,13 @@ effect AqcLabelCreated {
     label_author_id id,
 }
 
-action delete_aqc_label(label_id id) {
-    publish DeleteAqcLabel {
+action delete_label(label_id id) {
+    publish DeleteLabel {
         label_id: label_id,
     }
 }
 
-command DeleteAqcLabel {
+command DeleteLabel {
     fields {
         // The unique ID of the label being deleted.
         label_id id,
@@ -2190,15 +1936,15 @@ command DeleteAqcLabel {
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        let label = check_unwrap query AqcLabel[label_id: this.label_id]
+        let label = check_unwrap query Label[label_id: this.label_id]
 
         finish {
             // Cascade deleting the label assignments.
-            delete AssignedAqcLabel[device_id: ?, label_id: label.label_id]
+            delete AssignedLabel[device_id: ?, label_id: label.label_id]
 
-            delete AqcLabel[label_id: label.label_id]
+            delete Label[label_id: label.label_id]
 
-            emit AqcLabelDeleted {
+            emit LabelDeleted {
                 label_name: label.name,
                 label_author_id: label.author_id,
                 label_id: this.label_id,
@@ -2208,9 +1954,9 @@ command DeleteAqcLabel {
     }
 }
 
-// The effect emitted when the `DeleteAqcLabel` command is
+// The effect emitted when the `DeleteLabel` command is
 // successfully processed.
-effect AqcLabelDeleted {
+effect LabelDeleted {
     // The label name.
     label_name string,
     // The label author's device ID.
@@ -2221,10 +1967,10 @@ effect AqcLabelDeleted {
     author_id id,
 }
 
-// Emits `QueriedAqcLabel` for all labels.
-action query_aqc_labels() {
-    map AqcLabel[label_id: ?] as f {
-        publish QueryAqcLabel {
+// Emits `QueriedLabel` for all labels.
+action query_labels() {
+    map Label[label_id: ?] as f {
+        publish QueryLabel {
             label_id: f.label_id,
             label_name: f.name,
             label_author_id: f.author_id,
@@ -2232,7 +1978,7 @@ action query_aqc_labels() {
     }
 }
 
-command QueryAqcLabel {
+command QueryLabel {
     fields {
         label_id id,
         label_name string,
@@ -2244,7 +1990,7 @@ command QueryAqcLabel {
 
     policy {
         finish {
-            emit QueriedAqcLabel {
+            emit QueriedLabel {
                 label_id: this.label_id,
                 label_name: this.label_name,
                 label_author_id: this.label_author_id,
@@ -2253,7 +1999,7 @@ command QueryAqcLabel {
     }
 }
 
-effect QueriedAqcLabel {
+effect QueriedLabel {
     // The label's unique ID.
     label_id id,
     // The label name.
@@ -2264,7 +2010,7 @@ effect QueriedAqcLabel {
 
 // Records that a device was granted permission to use a label
 // for certain channel operations.
-fact AssignedAqcLabel[device_id id, label_id id]=>{op enum ChanOp}
+fact AssignedLabel[device_id id, label_id id]=>{op enum ChanOp}
 
 // Grants the device permission to use the label.
 //
@@ -2272,15 +2018,15 @@ fact AssignedAqcLabel[device_id id, label_id id]=>{op enum ChanOp}
 // - It is an error if the label does not exist.
 // - It is an error if the device has already been granted
 //   permission to use this label.
-action assign_aqc_label(device_id id, label_id id, op enum ChanOp) {
-    publish AssignAqcLabel {
+action assign_label(device_id id, label_id id, op enum ChanOp) {
+    publish AssignLabel {
         device_id: device_id,
         label_id: label_id,
         op: op,
     }
 }
 
-command AssignAqcLabel {
+command AssignLabel {
     fields {
         // The target device.
         device_id id,
@@ -2300,7 +2046,7 @@ command AssignAqcLabel {
 
         // NB: Check roles, other ACLs here.
 
-        let label = check_unwrap query AqcLabel[label_id: this.label_id]
+        let label = check_unwrap query Label[label_id: this.label_id]
 
         // Verify that the device has not already been granted
         // permission to use the label.
@@ -2308,12 +2054,12 @@ command AssignAqcLabel {
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        check !exists AssignedAqcLabel[device_id: target.device_id, label_id: label.label_id]
+        check !exists AssignedLabel[device_id: target.device_id, label_id: label.label_id]
 
         finish {
-            create AssignedAqcLabel[device_id: target.device_id, label_id: label.label_id]=>{op: this.op}
+            create AssignedLabel[device_id: target.device_id, label_id: label.label_id]=>{op: this.op}
 
-            emit AqcLabelAssigned {
+            emit LabelAssigned {
                 label_id: label.label_id,
                 label_name: label.name,
                 label_author_id: label.author_id,
@@ -2323,9 +2069,9 @@ command AssignAqcLabel {
     }
 }
 
-// The effect emitted when the `AssignAqcLabel` command is
+// The effect emitted when the `AssignLabel` command is
 // successfully processed.
-effect AqcLabelAssigned {
+effect LabelAssigned {
     // The ID of the label that was assigned.
     label_id id,
     // The name of the label that was assigned.
@@ -2342,14 +2088,14 @@ effect AqcLabelAssigned {
 // - It is an error if the label does not exist.
 // - It is an error if the device has not been granted permission
 //   to use this label.
-action revoke_aqc_label(device_id id, label_id id) {
-    publish RevokeAqcLabel {
+action revoke_label(device_id id, label_id id) {
+    publish RevokeLabel {
         device_id: device_id,
         label_id: label_id,
     }
 }
 
-command RevokeAqcLabel {
+command RevokeLabel {
     fields {
         // The target device.
         device_id id,
@@ -2366,7 +2112,7 @@ command RevokeAqcLabel {
 
         // NB: Check roles, other ACLs here.
 
-        let label = check_unwrap query AqcLabel[label_id: this.label_id]
+        let label = check_unwrap query Label[label_id: this.label_id]
 
         // Verify that the device has been granted permission to
         // use the label.
@@ -2374,12 +2120,12 @@ command RevokeAqcLabel {
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        check exists AssignedAqcLabel[device_id: target.device_id, label_id: label.label_id]
+        check exists AssignedLabel[device_id: target.device_id, label_id: label.label_id]
 
         finish {
-            delete AssignedAqcLabel[device_id: target.device_id, label_id: label.label_id]
+            delete AssignedLabel[device_id: target.device_id, label_id: label.label_id]
 
-            emit AqcLabelRevoked {
+            emit LabelRevoked {
                 label_id: label.label_id,
                 label_name: label.name,
                 label_author_id: label.author_id,
@@ -2389,9 +2135,9 @@ command RevokeAqcLabel {
     }
 }
 
-// The effect emitted when the `RevokeAqcLabel` command is
+// The effect emitted when the `RevokeLabel` command is
 // successfully processed.
-effect AqcLabelRevoked {
+effect LabelRevoked {
     // The ID of the label that was revoked.
     label_id id,
     // The name of the label that was revoked.
@@ -2404,10 +2150,10 @@ effect AqcLabelRevoked {
 
 // Emits `QueriedLabelAssignment` for all labels the device has
 // been granted permission to use.
-action query_aqc_label_assignments(device_id id) {
-    map AssignedAqcLabel[device_id: device_id, label_id: ?] as f {
-        let label = check_unwrap query AqcLabel[label_id: f.label_id]
-        publish QueryAqcLabelAssignment {
+action query_label_assignments(device_id id) {
+    map AssignedLabel[device_id: device_id, label_id: ?] as f {
+        let label = check_unwrap query Label[label_id: f.label_id]
+        publish QueryLabelAssignment {
             device_id: f.device_id,
             label_id: f.label_id,
             label_name: label.name,
@@ -2416,7 +2162,7 @@ action query_aqc_label_assignments(device_id id) {
     }
 }
 
-command QueryAqcLabelAssignment {
+command QueryLabelAssignment {
     fields {
         device_id id,
         label_id id,
@@ -2429,7 +2175,7 @@ command QueryAqcLabelAssignment {
 
     policy {
         finish {
-            emit QueriedAqcLabelAssignment {
+            emit QueriedLabelAssignment {
                 device_id: this.device_id,
                 label_id: this.label_id,
                 label_name: this.label_name,
@@ -2439,7 +2185,7 @@ command QueryAqcLabelAssignment {
     }
 }
 
-effect QueriedAqcLabelAssignment {
+effect QueriedLabelAssignment {
     // The device's unique ID.
     device_id id,
     // The label's unique ID.
@@ -2574,17 +2320,17 @@ Queries device label assignments.
 ```policy
 action query_device_label_assignments(device_id id) {
     map AssignedLabel[device_id: device_id, label:?] as f {
-        publish QueryDeviceLabelAssignments { label: f.label }
+        publish QueryDeviceLabelAssignments { label_id: f.label }
     }
 }
 
 effect QueryDeviceLabelAssignmentsResult {
-    label int,
+    label_id id,
 }
 
 command QueryDeviceLabelAssignments {
     fields {
-        label int,
+        label_id id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -2593,7 +2339,7 @@ command QueryDeviceLabelAssignments {
     policy {
         finish {
             emit QueryDeviceLabelAssignmentsResult {
-                label: this.label
+                label_id: this.label_id
             }
         }
     }
@@ -2694,15 +2440,15 @@ Queries whether a label exists.
 ```policy
 
 // Returns whether a label exists.
-function check_label_exists(label int) bool {
-    let label_exists = exists Label[label: label]
+function check_label_exists(label_id id) bool {
+    let label_exists = exists Label[label_id: label_id]
 
     return label_exists
 }
 
-action query_label_exists(label int) {
+action query_label_exists(label_id id) {
     publish QueryLabelExists {
-        label: label,
+        label_id: label_id,
     }
 }
 
@@ -2712,16 +2458,14 @@ effect QueryLabelExistsResult {
 
 command QueryLabelExists {
     fields {
-        label int,
+        label_id id,
     }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        // It must be a valid label that does not already exist.
-        check is_valid_label(this.label)
-        let label_exists = check_label_exists(this.label)
+        let label_exists = check_label_exists(this.label_id)
 
         finish {
             emit QueryLabelExistsResult {

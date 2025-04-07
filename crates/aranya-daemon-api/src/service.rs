@@ -356,16 +356,6 @@ pub trait DaemonApi {
         device: DeviceId,
         name: NetIdentifier,
     ) -> Result<()>;
-
-    /// Create a fast channels label.
-    async fn create_label(team: TeamId, label: AfcLabel) -> Result<()>;
-    /// Delete a fast channels label.
-    async fn delete_label(team: TeamId, label: AfcLabel) -> Result<()>;
-
-    /// Assign a fast channels label to a device.
-    async fn assign_label(team: TeamId, device: DeviceId, label: AfcLabel) -> Result<()>;
-    /// Revoke a fast channels label from a device.
-    async fn revoke_label(team: TeamId, device: DeviceId, label: AfcLabel) -> Result<()>;
     /// Create a fast channel.
     async fn create_afc_bidi_channel(
         team: TeamId,
@@ -382,19 +372,19 @@ pub trait DaemonApi {
         ctrl: AfcCtrl,
     ) -> Result<(AfcId, NetIdentifier, AfcLabel)>;
 
-    // Create an AQC label.
-    async fn create_aqc_label(team: TeamId, name: String) -> Result<LabelId>;
-    // Delete an AQC label.
-    async fn delete_aqc_label(team: TeamId, label_id: LabelId) -> Result<()>;
-    // Assign an AQC label.
-    async fn assign_aqc_label(
+    // Create a label.
+    async fn create_label(team: TeamId, name: String) -> Result<LabelId>;
+    // Delete a label.
+    async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
+    // Assign a label.
+    async fn assign_label(
         team: TeamId,
         device: DeviceId,
         label_id: LabelId,
         op: ChanOp,
     ) -> Result<()>;
-    // Revoke an AQC label.
-    async fn revoke_aqc_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
+    // Revoke a label.
+    async fn revoke_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
 
     /// Create a bidirectional QUIC channel.
     async fn create_aqc_bidi_channel(
@@ -426,10 +416,12 @@ pub trait DaemonApi {
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device label assignments.
-    async fn query_device_label_assignments(
-        team: TeamId,
-        device: DeviceId,
-    ) -> Result<Vec<AfcLabel>>;
+    async fn query_device_label_assignments(team: TeamId, device: DeviceId)
+        -> Result<Vec<LabelId>>;
+    /// Query label exists.
+    async fn query_label_exists(team: TeamId, label: AfcLabel) -> Result<bool>;
+    // Query labels.
+    async fn query_labels(team: TeamId) -> Result<Vec<LabelId>>;
     /// Query AFC network ID.
     async fn query_afc_net_identifier(
         team: TeamId,
@@ -440,8 +432,4 @@ pub trait DaemonApi {
         team: TeamId,
         device: DeviceId,
     ) -> Result<Option<NetIdentifier>>;
-    /// Query label exists.
-    async fn query_label_exists(team: TeamId, label: AfcLabel) -> Result<bool>;
-    // Query AQC labels.
-    async fn query_aqc_labels(team: TeamId) -> Result<Vec<LabelId>>;
 }

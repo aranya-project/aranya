@@ -508,13 +508,11 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     sleep(sleep_interval).await;
 
     // operator assigns labels for AFC channels.
-    let label1 = Label::new(1);
-    operator_team.create_label(label1).await?;
+    let label1 = operator_team.create_label("label1".to_string()).await?;
     operator_team.assign_label(team.membera.id, label1).await?;
     operator_team.assign_label(team.memberb.id, label1).await?;
 
-    let label2 = Label::new(2);
-    operator_team.create_label(label2).await?;
+    let label2 = operator_team.create_label("label2".to_string()).await?;
     operator_team.assign_label(team.membera.id, label2).await?;
     operator_team.assign_label(team.memberb.id, label2).await?;
 
@@ -840,8 +838,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     // ==== BASIC SETUP DONE ====
 
     // operator assigns labels for AFC channels.
-    let label1 = Label::new(1);
-    operator_team.create_label(label1).await?;
+    let label1 = operator_team.create_label("label1".to_string()).await?;
     operator_team.assign_label(team.membera.id, label1).await?;
     operator_team.assign_label(team.memberb.id, label1).await?;
 
@@ -1058,8 +1055,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     // ==== BASIC SETUP DONE ====
 
     // operator assigns labels for AFC channels.
-    let label1 = Label::new(1);
-    operator_team.create_label(label1).await?;
+    let label1 = operator_team.create_label("label1".to_string()).await?;
     operator_team.assign_label(team.membera.id, label1).await?;
     operator_team.assign_label(team.memberb.id, label1).await?;
 

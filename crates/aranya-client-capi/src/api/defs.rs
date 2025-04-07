@@ -898,92 +898,6 @@ pub unsafe fn aqc_remove_net_identifier(
     Ok(())
 }
 
-/// Create a channel label.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param label the AFC channel label [`Label`] to create.
-///
-/// @relates AranyaClient.
-pub fn create_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.0).create_label(label.into()))?;
-    Ok(())
-}
-
-/// Delete a channel label.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param label the channel label [`Label`] to delete.
-///
-/// @relates AranyaClient.
-pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.0).delete_label(label.into()))?;
-    Ok(())
-}
-
-/// Assign an AFC label to a device so that it can be used for an AFC channel.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to assign the label to.
-/// @param label the AFC channel label [`Label`].
-///
-/// @relates AranyaClient.
-pub fn assign_label(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-    label: Label,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.0)
-            .assign_label(device.0, label.into()),
-    )?;
-    Ok(())
-}
-
-/// Revoke an AFC label from a device.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to revoke the label from.
-/// @param label the AFC channel label [`Label`].
-///
-/// @relates AranyaClient.
-pub fn revoke_label(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-    label: Label,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.0)
-            .revoke_label(device.0, label.into()),
-    )?;
-    Ok(())
-}
-
 /// Associate an AFC network identifier to a device.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
@@ -1228,7 +1142,7 @@ pub unsafe fn afc_recv_data(
     Ok(true)
 }
 
-/// Create an AQC channel label.
+/// Create a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -1237,7 +1151,7 @@ pub unsafe fn afc_recv_data(
 /// @param name label name string [`LabelName`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_create_label(
+pub fn create_label(
     client: &mut Client,
     team: &TeamId,
     name: LabelName,
@@ -1247,11 +1161,11 @@ pub fn aqc_create_label(
     let name = unsafe { name.as_underlying() }?;
     let label_id = client
         .rt
-        .block_on(client.inner.team(team.0).create_aqc_label(name))?;
+        .block_on(client.inner.team(team.0).create_label(name))?;
     Ok(LabelId(label_id))
 }
 
-/// Delete an AQC channel label.
+/// Delete a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -1260,7 +1174,7 @@ pub fn aqc_create_label(
 /// @param label_id the channel label ID [`LabelId`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn aqc_delete_label(
+pub fn delete_label(
     client: &mut Client,
     team: &TeamId,
     label_id: &LabelId,
@@ -1268,11 +1182,11 @@ pub fn aqc_delete_label(
     let client = client.deref_mut();
     client
         .rt
-        .block_on(client.inner.team(team.0).delete_aqc_label(label_id.0))?;
+        .block_on(client.inner.team(team.0).delete_label(label_id.0))?;
     Ok(())
 }
 
-/// Assign an AQC label to a device so that it can be used for an AQC channel.
+/// Assign a label to a device so that it can be used for a channel.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -1282,7 +1196,7 @@ pub fn aqc_delete_label(
 /// @param label_id the AQC channel label ID [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_assign_label(
+pub fn assign_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -1290,14 +1204,12 @@ pub fn aqc_assign_label(
     op: ChanOp,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client
-        .rt
-        .block_on(
-            client
-                .inner
-                .team(team.0)
-                .assign_aqc_label(device.0, label_id.0, op.into()),
-        )?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .assign_label(device.0, label_id.0, op.into()),
+    )?;
     Ok(())
 }
 
@@ -1311,19 +1223,16 @@ pub fn aqc_assign_label(
 /// @param label_id the AQC channel label ID [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_revoke_label(
+pub fn revoke_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
     label_id: &LabelId,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.0)
-            .revoke_aqc_label(device.0, label_id.0),
-    )?;
+    client
+        .rt
+        .block_on(client.inner.team(team.0).revoke_label(device.0, label_id.0))?;
     Ok(())
 }
 
@@ -1502,7 +1411,7 @@ pub unsafe fn query_device_keybundle(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param labels returns a list of labels assigned to the device [`Label`].
+/// @param labels returns a list of labels assigned to the device [`LabelId`].
 /// @param labels_len returns the length of the labels list [`Label`].
 ///
 /// @relates AranyaClient.
@@ -1510,7 +1419,7 @@ pub fn query_device_label_assignments(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    labels: Option<&mut MaybeUninit<u32>>,
+    labels: Option<&mut MaybeUninit<LabelId>>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
@@ -1527,7 +1436,7 @@ pub fn query_device_label_assignments(
     };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.to_u32());
+        dst.write(LabelId(*src));
     }
     if *labels_len < data.len() {
         *labels_len = data.len();
