@@ -220,7 +220,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfigBuilder {
     uint8_t __for_size_only[40];
 } AranyaSyncPeerConfigBuilder;
 
-#if defined(ENABLE_AFC)
 /**
  * Configuration info builder for Aranya Fast Channels.
  */
@@ -232,9 +231,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcConfigBuilder {
      */
     uint8_t __for_size_only[24];
 } AranyaAfcConfigBuilder;
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Configuration info for Aranya Fast Channels.
  */
@@ -246,7 +243,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaAfcConfig {
      */
     uint8_t __for_size_only[40];
 } AranyaAfcConfig;
-#endif
 
 /**
  * Configuration info builder for Aranya.
@@ -359,7 +355,6 @@ typedef const char *AranyaNetIdentifier;
  */
 typedef uint32_t AranyaLabel;
 
-#if defined(ENABLE_AFC)
 /**
  * Channel ID for a fast channel.
  */
@@ -371,21 +366,17 @@ typedef struct ARANYA_ALIGNED(1) AranyaChannelId {
      */
     uint8_t __for_size_only[16];
 } AranyaChannelId;
-#endif
 
 /**
  * A type to represent a span of time in nanoseconds.
  */
 typedef uint64_t AranyaDuration;
 
-#if defined(ENABLE_AFC)
 /**
  * Network socket address.
  */
 typedef struct sockaddr_storage AranyaSocketAddr;
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Aranya Fast Channels (AFC) message info.
  */
@@ -409,7 +400,6 @@ typedef struct AranyaAfcMsgInfo {
      */
     AranyaSocketAddr addr;
 } AranyaAfcMsgInfo;
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -588,7 +578,6 @@ AranyaError aranya_sync_peer_config_builder_cleanup(struct AranyaSyncPeerConfigB
 AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerConfigBuilder *ptr,
                                                         struct AranyaExtError *__ext_err);
 
-#if defined(ENABLE_AFC)
 /**
  * Sets the shared memory path that AFC should use for storing channel data.
  *
@@ -597,9 +586,7 @@ AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerCon
  */
 AranyaError aranya_afc_config_builder_set_shm_path(struct AranyaAfcConfigBuilder *cfg,
                                                    const char *shm_path);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Sets the shared memory path that AFC should use for storing channel data.
  *
@@ -609,9 +596,7 @@ AranyaError aranya_afc_config_builder_set_shm_path(struct AranyaAfcConfigBuilder
 AranyaError aranya_afc_config_builder_set_shm_path_ext(struct AranyaAfcConfigBuilder *cfg,
                                                        const char *shm_path,
                                                        struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Sets the maximum number of channels that are stored in shared memory.
  *
@@ -620,9 +605,7 @@ AranyaError aranya_afc_config_builder_set_shm_path_ext(struct AranyaAfcConfigBui
  */
 AranyaError aranya_afc_config_builder_set_max_channels(struct AranyaAfcConfigBuilder *cfg,
                                                        size_t max_channels);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Sets the maximum number of channels that are stored in shared memory.
  *
@@ -632,9 +615,7 @@ AranyaError aranya_afc_config_builder_set_max_channels(struct AranyaAfcConfigBui
 AranyaError aranya_afc_config_builder_set_max_channels_ext(struct AranyaAfcConfigBuilder *cfg,
                                                            size_t max_channels,
                                                            struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Sets the address that the AFC server should bind to for listening.
  *
@@ -643,9 +624,7 @@ AranyaError aranya_afc_config_builder_set_max_channels_ext(struct AranyaAfcConfi
  */
 AranyaError aranya_afc_config_builder_set_address(struct AranyaAfcConfigBuilder *cfg,
                                                   const char *address);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Sets the address that the AFC server should bind to for listening.
  *
@@ -655,9 +634,7 @@ AranyaError aranya_afc_config_builder_set_address(struct AranyaAfcConfigBuilder 
 AranyaError aranya_afc_config_builder_set_address_ext(struct AranyaAfcConfigBuilder *cfg,
                                                       const char *address,
                                                       struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Attempts to construct an [`AranyaAfcConfig`](@ref AranyaAfcConfig), returning an `Error::Bug`
  * if there are invalid parameters.
@@ -667,9 +644,7 @@ AranyaError aranya_afc_config_builder_set_address_ext(struct AranyaAfcConfigBuil
  */
 AranyaError aranya_afc_config_builder_build(struct AranyaAfcConfigBuilder *cfg,
                                             struct AranyaAfcConfig *out);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Attempts to construct an [`AranyaAfcConfig`](@ref AranyaAfcConfig), returning an `Error::Bug`
  * if there are invalid parameters.
@@ -680,7 +655,6 @@ AranyaError aranya_afc_config_builder_build(struct AranyaAfcConfigBuilder *cfg,
 AranyaError aranya_afc_config_builder_build_ext(struct AranyaAfcConfigBuilder *cfg,
                                                 struct AranyaAfcConfig *out,
                                                 struct AranyaExtError *__ext_err);
-#endif
 
 /**
  * Sets the daemon address that the Client should try to connect to.
@@ -701,7 +675,6 @@ AranyaError aranya_client_config_builder_set_daemon_addr_ext(struct AranyaClient
                                                              const char *address,
                                                              struct AranyaExtError *__ext_err);
 
-#if defined(ENABLE_AFC)
 /**
  * Sets the configuration for Aranya Fast Channels.
  *
@@ -710,9 +683,7 @@ AranyaError aranya_client_config_builder_set_daemon_addr_ext(struct AranyaClient
  */
 AranyaError aranya_client_config_builder_set_afc_config(struct AranyaClientConfigBuilder *cfg,
                                                         struct AranyaAfcConfig *afc_config);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Sets the configuration for Aranya Fast Channels.
  *
@@ -722,7 +693,6 @@ AranyaError aranya_client_config_builder_set_afc_config(struct AranyaClientConfi
 AranyaError aranya_client_config_builder_set_afc_config_ext(struct AranyaClientConfigBuilder *cfg,
                                                             struct AranyaAfcConfig *afc_config,
                                                             struct AranyaExtError *__ext_err);
-#endif
 
 /**
  * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Bug`
@@ -1365,7 +1335,6 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
                                     AranyaLabel label,
                                     struct AranyaExtError *__ext_err);
 
-#if defined(ENABLE_AFC)
 /**
  * Associate an AFC network identifier to a device.
  *
@@ -1386,9 +1355,7 @@ AranyaError aranya_afc_assign_net_identifier(struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              const struct AranyaDeviceId *device,
                                              AranyaNetIdentifier net_identifier);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Associate an AFC network identifier to a device.
  *
@@ -1410,9 +1377,7 @@ AranyaError aranya_afc_assign_net_identifier_ext(struct AranyaClient *client,
                                                  const struct AranyaDeviceId *device,
                                                  AranyaNetIdentifier net_identifier,
                                                  struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Disassociate an AFC network identifier from a device.
  *
@@ -1429,9 +1394,7 @@ AranyaError aranya_afc_remove_net_identifier(struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              const struct AranyaDeviceId *device,
                                              AranyaNetIdentifier net_identifier);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Disassociate an AFC network identifier from a device.
  *
@@ -1449,9 +1412,7 @@ AranyaError aranya_afc_remove_net_identifier_ext(struct AranyaClient *client,
                                                  const struct AranyaDeviceId *device,
                                                  AranyaNetIdentifier net_identifier,
                                                  struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Create an Aranya Fast Channel (AFC).
  *
@@ -1473,9 +1434,7 @@ AranyaError aranya_afc_create_bidi_channel(struct AranyaClient *client,
                                            AranyaNetIdentifier peer,
                                            AranyaLabel label,
                                            struct AranyaChannelId *__output);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Create an Aranya Fast Channel (AFC).
  *
@@ -1498,9 +1457,7 @@ AranyaError aranya_afc_create_bidi_channel_ext(struct AranyaClient *client,
                                                AranyaLabel label,
                                                struct AranyaChannelId *__output,
                                                struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Delete an Aranya Fast Channel (AFC).
  *
@@ -1511,9 +1468,7 @@ AranyaError aranya_afc_create_bidi_channel_ext(struct AranyaClient *client,
  */
 AranyaError aranya_afc_delete_channel(struct AranyaClient *client,
                                       struct AranyaChannelId chan);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Delete an Aranya Fast Channel (AFC).
  *
@@ -1525,9 +1480,7 @@ AranyaError aranya_afc_delete_channel(struct AranyaClient *client,
 AranyaError aranya_afc_delete_channel_ext(struct AranyaClient *client,
                                           struct AranyaChannelId chan,
                                           struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Poll for new Aranya Fast Channels (AFC) data.
  *
@@ -1540,9 +1493,7 @@ AranyaError aranya_afc_delete_channel_ext(struct AranyaClient *client,
  */
 AranyaError aranya_afc_poll_data(struct AranyaClient *client,
                                  AranyaDuration timeout);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Poll for new Aranya Fast Channels (AFC) data.
  *
@@ -1556,9 +1507,7 @@ AranyaError aranya_afc_poll_data(struct AranyaClient *client,
 AranyaError aranya_afc_poll_data_ext(struct AranyaClient *client,
                                      AranyaDuration timeout,
                                      struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Send Aranya Fast Channels (AFC) data.
  *
@@ -1573,9 +1522,7 @@ AranyaError aranya_afc_send_data(struct AranyaClient *client,
                                  struct AranyaChannelId chan,
                                  const uint8_t *data,
                                  size_t data_len);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Send Aranya Fast Channels (AFC) data.
  *
@@ -1591,9 +1538,7 @@ AranyaError aranya_afc_send_data_ext(struct AranyaClient *client,
                                      const uint8_t *data,
                                      size_t data_len,
                                      struct AranyaExtError *__ext_err);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Receive Aranya Fast Channels (AFC) data.
  *
@@ -1610,9 +1555,7 @@ AranyaError aranya_afc_recv_data(struct AranyaClient *client,
                                  size_t *buf_len,
                                  struct AranyaAfcMsgInfo *info,
                                  bool *__output);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Receive Aranya Fast Channels (AFC) data.
  *
@@ -1630,7 +1573,6 @@ AranyaError aranya_afc_recv_data_ext(struct AranyaClient *client,
                                      struct AranyaAfcMsgInfo *info,
                                      bool *__output,
                                      struct AranyaExtError *__ext_err);
-#endif
 
 /**
  * Configures how often the peer will be synced with.
@@ -1831,7 +1773,6 @@ AranyaError aranya_query_device_label_assignments_ext(struct AranyaClient *clien
                                                       size_t *labels_len,
                                                       struct AranyaExtError *__ext_err);
 
-#if defined(ENABLE_AFC)
 /**
  * Query device's AFC network identifier.
  *
@@ -1848,9 +1789,7 @@ AranyaError aranya_query_afc_net_identifier(struct AranyaClient *client,
                                             char *ident,
                                             size_t *ident_len,
                                             bool *__output);
-#endif
 
-#if defined(ENABLE_AFC)
 /**
  * Query device's AFC network identifier.
  *
@@ -1868,7 +1807,6 @@ AranyaError aranya_query_afc_net_identifier_ext(struct AranyaClient *client,
                                                 size_t *ident_len,
                                                 bool *__output,
                                                 struct AranyaExtError *__ext_err);
-#endif
 
 /**
  * Query device's AQC network identifier.

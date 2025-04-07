@@ -197,6 +197,9 @@ struct DaemonApiHandler {
     /// AFC peers.
     #[cfg(feature = "afc")]
     afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
+    /// Flag to check whether afc_peers needs to be synced with the factDB.
+    #[cfg(feature = "afc")]
+    afc_peers_dirty: Arc<AtomicBool>,
     /// Handles AFC effects.
     #[cfg(feature = "afc")]
     handler: Arc<Mutex<Handler<Store>>>,

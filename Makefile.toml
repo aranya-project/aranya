@@ -85,17 +85,18 @@ tar -cvzf aranya-client-lib.tar.gz -C "${capi}" .
 
 [tasks.install-cbindgen]
 private = true
-install_crate = { crate_name = "cbindgen", version = "0.27.0", binary = "cbindgen", test_arg = "-V" }
+install_crate = { crate_name = "cbindgen", version = "0.28.0", binary = "cbindgen", test_arg = "-V" }
 
 
 # Test
 [tasks.test]
 category = "test"
 description = "Run Unit Tests"
+toolchain = "${NIGHTLY}"
 workspace = true
 command = "cargo"
 args = ["--verbose", "test-all-features", "${@}"]
-dependencies = ["install-cargo-all-features"]
+dependencies = ["install-cargo-all-features", "install-nightly"]
 
 
 # Security
@@ -188,13 +189,15 @@ dependencies = ["install-cargo-all-features"]
 [tasks.clippy]
 category = "correctness"
 description = "Run clippy to lint code"
+toolchain = "${NIGHTLY}"
 workspace = true
 script = '''
-cargo clippy
-cargo clippy --all-targets
-cargo clippy --no-default-features
-cargo clippy --all-targets --all-features
+cargo +${NIGHTLY} clippy
+cargo +${NIGHTLY} clippy --all-targets
+cargo +${NIGHTLY} clippy --no-default-features
+cargo +${NIGHTLY} clippy --all-targets --all-features
 '''
+dependencies = ["install-nightly"]
 install_crate = { rustup_component_name = "clippy" }
 
 [tasks.machete]
