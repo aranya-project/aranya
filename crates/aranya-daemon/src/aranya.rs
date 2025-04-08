@@ -24,7 +24,7 @@ use tokio::{
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
 
 use crate::{
-    policy::{ActorExt, ChanOp, Effect, KeyBundle, Role},
+    policy::{ActorExt, Effect, KeyBundle, Role},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -459,6 +459,7 @@ where
 
     /// Defines an AFC label.
     #[instrument(skip(self), fields(label = %label))]
+    #[cfg(any())]
     fn define_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
             actor.define_label(i64::from(label.to_u32()))?;
@@ -469,6 +470,7 @@ where
 
     /// Undefines an AFC label.
     #[instrument(skip(self), fields(label = %label))]
+    #[cfg(any())]
     fn undefine_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
             actor.undefine_label(i64::from(label.to_u32()))?;
@@ -479,6 +481,7 @@ where
 
     /// Grants an app permission to use an AFC label.
     #[instrument(skip(self), fields(device_id = %device_id, label = %label, op = %op))]
+    #[cfg(any())]
     fn assign_label(
         &self,
         device_id: DeviceId,
@@ -494,6 +497,7 @@ where
 
     /// Revokes an AFC label.
     #[instrument(skip(self), fields(device_id = %device_id, label = %label))]
+    #[cfg(any())]
     fn revoke_label(
         &self,
         device_id: DeviceId,
@@ -509,7 +513,7 @@ where
 
     /// Sets an AFC network name.
     #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn set_afc_network_name(
         &self,
         device_id: DeviceId,
@@ -525,7 +529,7 @@ where
 
     /// Sets an AFC network name.
     #[instrument(skip(self), fields(device_id = %device_id))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn unset_afc_network_name(
         &self,
         device_id: DeviceId,
@@ -569,7 +573,7 @@ where
 
     /// Creates a bidirectional AFC channel.
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn create_afc_bidi_channel(
         &self,
         peer_id: DeviceId,
@@ -585,7 +589,7 @@ where
     /// Creates a bidirectional AFC channel off graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn create_afc_bidi_channel_off_graph(
         &self,
         peer_id: DeviceId,
@@ -603,7 +607,7 @@ where
 
     /// Creates a unidirectional AFC channel.
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn create_afc_uni_channel(
         &self,
         seal_id: DeviceId,
@@ -624,7 +628,7 @@ where
     /// Creates a unidirectional AFC channel.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn create_afc_uni_channel_off_graph(
         &self,
         seal_id: DeviceId,

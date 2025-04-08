@@ -810,6 +810,7 @@ pub unsafe fn aqc_remove_net_identifier(
 /// @param label the AFC channel label [`Label`] to create.
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "afc")]
 pub fn create_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
@@ -827,6 +828,7 @@ pub fn create_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
 /// @param label the channel label [`Label`] to delete.
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "afc")]
 pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
@@ -845,6 +847,7 @@ pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
 /// @param label the AFC channel label [`Label`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "afc")]
 pub fn assign_label(
     client: &mut Client,
     team: &TeamId,
@@ -871,6 +874,7 @@ pub fn assign_label(
 /// @param label the AFC channel label [`Label`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "afc")]
 pub fn revoke_label(
     client: &mut Client,
     team: &TeamId,
@@ -1264,6 +1268,7 @@ pub unsafe fn query_device_keybundle(
 /// @param labels_len returns the length of the labels list [`Label`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "afc")]
 pub fn query_device_label_assignments(
     client: &mut Client,
     team: &TeamId,
