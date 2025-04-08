@@ -1271,7 +1271,7 @@ pub fn query_device_role(
     Ok(role.into())
 }
 
-/// The size in bytes of a [`Role`] converted to a human-readable string.
+/// The size in bytes of a `Role` converted to a human-readable string.
 pub const ARANYA_ROLE_STR_LEN: u64 = 256;
 
 /// Writes the human-readable encoding of `role` to `str`.
