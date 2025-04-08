@@ -158,14 +158,14 @@ impl fmt::Display for AqcId {
     }
 }
 
-/// Convert from [`BidiChannelId`] to [`AqcId`]
+/// Convert from [`AqcBidiChannelId`] to [`AqcId`]
 impl From<AqcBidiChannelId> for AqcId {
     fn from(value: AqcBidiChannelId) -> Self {
         Self(*truncate(value.as_array()))
     }
 }
 
-/// Convert from [`UniChannelId`] to [`AqcId`]
+/// Convert from [`AqcUniChannelId`] to [`AqcId`]
 impl From<AqcUniChannelId> for AqcId {
     fn from(value: AqcUniChannelId) -> Self {
         Self(*truncate(value.as_array()))

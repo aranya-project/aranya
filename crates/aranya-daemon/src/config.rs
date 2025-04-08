@@ -52,7 +52,7 @@ impl Config {
     }
 
     /// Path to the [`DefaultEngine`]'s key wrapping key.
-    pub fn key_wrap_key_path(&self) -> PathBuf {
+    pub(crate) fn key_wrap_key_path(&self) -> PathBuf {
         self.work_dir.join("key_wrap_key")
     }
 
