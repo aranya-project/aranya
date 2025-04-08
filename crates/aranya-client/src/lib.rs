@@ -14,6 +14,7 @@
 #[cfg(feature = "afc")]
 pub mod afc;
 pub mod aqc;
+pub mod aqc_net;
 pub mod client;
 pub mod config;
 pub mod error;
