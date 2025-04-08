@@ -91,7 +91,7 @@
 #define ARANYA_DEVICE_ID_STR_LEN (((64 * 1375) / 1000) + 1)
 
 /**
- * The size in bytes of a `DeviceId` converted to a human-readable base64 string.
+ * The size in bytes of a [`Role`] converted to a human-readable string.
  */
 #define ARANYA_ROLE_STR_LEN 256
 
