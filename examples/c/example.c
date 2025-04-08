@@ -424,6 +424,19 @@ AranyaError run(Team *t) {
         printf("label: %u at index: %zu/%zu \r\n", label_result, i, labels_len);
     }
 
+    AranyaRole memberb_role;
+    err = aranya_query_device_role(&t->clients.operator.client, &t->id,
+                                   &t->clients.memberb.id, &memberb_role);
+    EXPECT("error querying memberb role", err);
+    size_t role_str_len = ARANYA_ROLE_STR_LEN;
+    char *role_str      = malloc(ARANYA_ROLE_STR_LEN);
+    aranya_role_to_str(memberb_role, role_str, &role_str_len);
+    printf(
+        "%s role: %s"
+        "\r\n",
+        t->clients_arr[MEMBERB].name, role_str);
+    free(role_str);
+
     AranyaKeyBundle memberb_keybundle;
     err = aranya_query_device_keybundle(&t->clients.operator.client, &t->id,
                                         &t->clients.memberb.id,
