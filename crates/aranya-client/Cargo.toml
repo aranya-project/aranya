@@ -25,8 +25,12 @@ aranya-daemon-api = { workspace = true }
 aranya-aqc-util = { workspace = true }
 aranya-crypto = { workspace = true }
 aranya-fast-channels = { workspace = true, features = ["std", "posix"] }
+aranya-runtime = { workspace = true, features = ["std"] }
 aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
+bytes = { workspace = true }
+heapless = { workspace = true, features = ["serde"] }
+s2n-quic = { workspace = true }
 spideroak-base58 = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
@@ -44,6 +48,7 @@ tracing = { workspace = true }
 aranya-daemon = { path = "../aranya-daemon" }
 
 backon = { workspace = true }
+rcgen = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
