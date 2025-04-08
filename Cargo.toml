@@ -63,13 +63,17 @@ aranya-keygen = { version = "0.5.1", path = "crates/aranya-keygen" }
 aranya-util = { version = "0.5.1", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
+bytes = { version = "1.0" }
 backon = { version = "1.2.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 futures-util = { version = "0.3.30" }
+heapless = { version = "0.8", default-features = false }
 libc = { version = "0.2" }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
+rcgen = { version = "0.13", default-features = false, features = ["pem", "aws_lc_rs"] }
+s2n-quic = { version = "1.51.0", default-features = false, features = ["provider-address-token-default", "provider-tls-s2n"] }
 serde = "1"
 serial_test = { version = "3" }
 tarpc = { version = "0.35.0", features = ["unix", "serde-transport", "serde-transport-json"] }
