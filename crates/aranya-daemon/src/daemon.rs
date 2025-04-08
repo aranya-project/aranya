@@ -1,4 +1,4 @@
-#[cfg(any())]
+#[cfg(feature = "afc")]
 use std::str::FromStr;
 use std::{io, path::Path, sync::Arc};
 
@@ -8,7 +8,7 @@ use aranya_crypto::{
     keys::SecretKeyBytes, keystore::fs_keystore::Store, CipherSuite, Random, Rng,
 };
 use aranya_daemon_api::CS;
-#[cfg(any())]
+#[cfg(feature = "afc")]
 use aranya_fast_channels::shm::{self, Flag, Mode, WriteState};
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
@@ -19,7 +19,7 @@ use aranya_util::Addr;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
-#[cfg(any())]
+#[cfg(feature = "afc")]
 use tracing::debug;
 use tracing::{error, info};
 
@@ -106,7 +106,7 @@ impl Daemon {
         });
 
         let api = {
-            #[cfg(any())]
+            #[cfg(feature = "afc")]
             {
                 let afc = self.setup_afc()?;
                 DaemonApiServer::new(
@@ -122,6 +122,7 @@ impl Daemon {
                 )
                 .context("Unable to start daemon API!")?
             }
+            #[cfg(not(feature = "afc"))]
             {
                 DaemonApiServer::new(
                     client,
@@ -190,7 +191,7 @@ impl Daemon {
     }
 
     /// Creates AFC shm.
-    #[cfg(any())]
+    #[cfg(feature = "afc")]
     fn setup_afc(&self) -> Result<WriteState<CS, Rng>> {
         // TODO: issue stellar-tapestry#34
         // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
@@ -272,7 +273,7 @@ impl Daemon {
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        #[cfg(any())]
+        #[cfg(feature = "afc")]
         if self.cfg.afc.unlink_at_exit {
             if let Ok(path) = aranya_util::util::ShmPathBuf::from_str(&self.cfg.afc.shm_path) {
                 let _ = shm::unlink(path);

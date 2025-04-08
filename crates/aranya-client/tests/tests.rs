@@ -13,8 +13,6 @@ use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
-#[cfg(any())]
-use aranya_client::afc::Message;
 use aranya_client::client::Client;
 #[cfg(feature = "afc")]
 use aranya_client::SyncPeerConfig;
@@ -23,15 +21,9 @@ use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
-#[cfg(feature = "afc")]
-use aranya_daemon_api::NetIdentifier;
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
-#[cfg(any())]
-use aranya_fast_channels::{Label, Seq};
 use aranya_util::addr::Addr;
 use backon::{ExponentialBuilder, Retryable};
-#[cfg(any())]
-use buggy::BugExt;
 use spideroak_base58::ToBase58;
 use tempfile::tempdir;
 use test_log::test;
@@ -294,7 +286,7 @@ impl DeviceCtx {
         Ok(self.client.local_addr().await?)
     }
 
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     async fn afc_local_addr(&mut self) -> Result<SocketAddr> {
         Ok(self.client.afc().local_addr().await?)
     }
@@ -398,10 +390,6 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let operator_addr = team.operator.aranya_local_addr().await?;
     let membera_addr = team.membera.aranya_local_addr().await?;
     let memberb_addr = team.memberb.aranya_local_addr().await?;
-
-    // get afc addresses.
-    let membera_afc_addr = team.membera.afc_local_addr().await?;
-    let memberb_afc_addr = team.memberb.afc_local_addr().await?;
 
     // setup sync peers.
     let mut owner_team = team.owner.client.team(team_id);
@@ -507,6 +495,10 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
 
     #[cfg(any())]
     {
+        // get afc addresses.
+        let membera_afc_addr = team.membera.afc_local_addr().await?;
+        let memberb_afc_addr = team.memberb.afc_local_addr().await?;
+
         // operator assigns labels for AFC channels.
         let label1 = Label::new(1);
         operator_team.create_label(label1).await?;
@@ -525,14 +517,14 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         operator_team
             .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
             .await?;
+        // TODO: use aqc addr
+        operator_team
+            .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
+            .await?;
+        operator_team
+            .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
+            .await?;
     }
-    // TODO: use aqc addr
-    operator_team
-        .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
-        .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -548,17 +540,17 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let keybundle = queries.device_keybundle(team.membera.id).await?;
     debug!("membera keybundle: {:?}", keybundle);
 
-    let aqc_net_identifier = queries
-        .aqc_net_identifier(team.membera.id)
-        .await?
-        .expect("expected net identifier");
-    assert_eq!(
-        aqc_net_identifier,
-        NetIdentifier(membera_afc_addr.to_string())
-    );
-
     #[cfg(any())]
     {
+        let aqc_net_identifier = queries
+            .aqc_net_identifier(team.membera.id)
+            .await?
+            .expect("expected net identifier");
+        assert_eq!(
+            aqc_net_identifier,
+            NetIdentifier(membera_afc_addr.to_string())
+        );
+
         let labels = queries.device_label_assignments(team.membera.id).await?;
         assert_eq!(labels.iter().count(), 2);
         debug!("membera labels: {:?}", labels.__data());

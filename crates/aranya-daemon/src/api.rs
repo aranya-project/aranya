@@ -35,7 +35,7 @@ use crate::{
     Client, EF,
 };
 
-#[cfg(any())]
+#[cfg(feature = "afc")]
 mod afc_imports {
     pub(super) use aranya_afc_util::Handler;
     pub(super) use aranya_crypto::{keystore::fs_keystore::Store, DeviceId};
@@ -45,7 +45,7 @@ mod afc_imports {
 
     pub(super) use crate::CE;
 }
-#[cfg(any())]
+#[cfg(feature = "afc")]
 #[allow(clippy::wildcard_imports)]
 use afc_imports::*;
 
@@ -77,7 +77,7 @@ impl DaemonApiServer {
     /// Create new RPC server.
     #[allow(clippy::too_many_arguments)]
     #[instrument(skip_all)]
-    #[cfg(any())]
+    #[cfg(feature = "afc")]
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
@@ -109,6 +109,7 @@ impl DaemonApiServer {
 
     /// Create new RPC server.
     #[instrument(skip_all)]
+    #[cfg(not(feature = "afc"))]
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
@@ -187,16 +188,20 @@ struct DaemonApiHandler {
     /// Aranya sync peers,
     peers: SyncPeers,
     /// AFC shm write.
-    #[cfg(any())]
+    #[cfg(feature = "afc")]
+    #[allow(dead_code)]
     afc: Arc<Mutex<WriteState<CS, Rng>>>,
     /// AFC peers.
-    #[cfg(any())]
+    #[cfg(feature = "afc")]
+    #[allow(dead_code)]
     afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
     /// Handles AFC effects.
-    #[cfg(any())]
+    #[cfg(feature = "afc")]
+    #[allow(dead_code)]
     handler: Arc<Mutex<Handler<Store>>>,
     /// An implementation of [`Engine`][crypto::Engine].
-    #[cfg(any())]
+    #[cfg(feature = "afc")]
+    #[allow(dead_code)]
     eng: CE,
 }
 
