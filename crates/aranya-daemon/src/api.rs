@@ -21,11 +21,10 @@ use aranya_daemon_api::{
     DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, KeyStoreInfo, LabelId as ApiLabelId,
     NetIdentifier, Result as ApiResult, Role as ApiRole, SyncPeerConfig, TeamId, CS,
 };
-use aranya_fast_channels::{Label, NodeId};
+use aranya_fast_channels::NodeId;
 use aranya_keygen::PublicKeys;
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
-use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,
@@ -257,10 +256,10 @@ impl DaemonApiHandler {
                 Effect::OwnerRevoked(_owner_revoked) => {}
                 Effect::AdminRevoked(_admin_revoked) => {}
                 Effect::OperatorRevoked(_operator_revoked) => {}
-                Effect::LabelDefined(_label_defined) => {}
-                Effect::LabelUndefined(_label_undefined) => {}
-                Effect::LabelAssigned(_label_assigned) => {}
-                Effect::LabelRevoked(_label_revoked) => {}
+                Effect::LabelCreated(_) => {}
+                Effect::LabelDeleted(_) => {}
+                Effect::LabelAssigned(_) => {}
+                Effect::LabelRevoked(_) => {}
                 Effect::AfcNetworkNameSet(e) => {
                     #[cfg(feature = "afc")]
                     self.afc_peers
@@ -276,11 +275,6 @@ impl DaemonApiHandler {
                         .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
                 }
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
-                Effect::AqcLabelCreated(_) => {}
-                Effect::AqcLabelDeleted(_) => {}
-                Effect::AqcLabelAssigned(_) => {}
-                Effect::AqcLabelRevoked(_) => {}
-                Effect::QueriedAqcLabel(_) => {}
                 Effect::AfcBidiChannelCreated(v) => {
                     debug!("received AfcBidiChannelCreated effect");
                     #[cfg(feature = "afc")]
@@ -309,7 +303,8 @@ impl DaemonApiHandler {
                 Effect::QueryAqcNetIdentifierResult(_) => {}
                 Effect::QueryLabelExistsResult(_) => {}
                 Effect::QueryDeviceLabelAssignmentsResult(_) => {}
-                Effect::QueriedAqcLabelAssignment(_) => {}
+                Effect::QueriedLabelAssignment(_) => {}
+                Effect::QueriedLabel(_) => {}
             }
         }
         Ok(())
@@ -324,9 +319,6 @@ impl DaemonApiHandler {
         node_id: NodeId,
     ) -> Result<()> {
         debug!("received BidiChannelCreated effect");
-        // NB: this shouldn't happen because the policy should
-        // ensure that label fits inside a `u32`.
-        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
         // TODO: don't clone the eng.
         let AfcBidiKeys { seal, open } = self.afc_handler.lock().await.bidi_channel_created(
             &mut self.eng.clone(),
@@ -336,12 +328,11 @@ impl DaemonApiHandler {
                 author_enc_key_id: v.author_enc_key_id.into(),
                 peer_id: v.peer_id.into(),
                 peer_enc_pk: &v.peer_enc_pk,
-                label,
+                label_id: v.label_id, // TODO: requires afc label id ffi updates
                 key_id: v.channel_key_id.into(),
             },
         )?;
-        let label = Label::new(v.label.try_into().expect("expected label conversion"));
-        let channel_id = ChannelId::new(node_id, label);
+        let channel_id = ChannelId::new(node_id, v.label_id);
         debug!(%channel_id, "created AFC bidi channel `ChannelId`");
         self.afc
             .lock()
@@ -359,9 +350,6 @@ impl DaemonApiHandler {
         v: &AfcBidiChannelReceivedEffect,
         node_id: NodeId,
     ) -> Result<()> {
-        // NB: this shouldn't happen because the policy should
-        // ensure that label fits inside a `u32`.
-        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
         let AfcBidiKeys { seal, open } = self.afc_handler.lock().await.bidi_channel_received(
             &mut self.eng.clone(),
             &AfcBidiChannelReceived {
@@ -370,12 +358,11 @@ impl DaemonApiHandler {
                 author_enc_pk: &v.author_enc_pk,
                 peer_id: v.peer_id.into(),
                 peer_enc_key_id: v.peer_enc_key_id.into(),
-                label,
+                label_id: v.label_id, // TODO: requires afc label id ffi updates
                 encap: &v.encap,
             },
         )?;
-        let label = Label::new(v.label.try_into().expect("expected label conversion"));
-        let channel_id = ChannelId::new(node_id, label);
+        let channel_id = ChannelId::new(node_id, label_id);
         debug!(?channel_id, "received AFC bidi channel `ChannelId`");
         self.afc
             .lock()
@@ -623,60 +610,6 @@ impl DaemonApi for DaemonApiHandler {
         Ok(())
     }
 
-    #[instrument(skip(self))]
-    async fn create_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
-        self.client
-            .actions(&team.into_id().into())
-            .define_label(label)
-            .await
-            .context("unable to create label")?;
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
-    async fn delete_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
-        self.client
-            .actions(&team.into_id().into())
-            .undefine_label(label)
-            .await
-            .context("unable to delete label")?;
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
-    async fn assign_label(
-        self,
-        _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        label: Label,
-    ) -> ApiResult<()> {
-        // TODO: support other channel permissions.
-        self.client
-            .actions(&team.into_id().into())
-            .assign_label(device.into_id().into(), label, ChanOp::SendRecv)
-            .await
-            .context("unable to assign label")?;
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
-    async fn revoke_label(
-        self,
-        _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        label: Label,
-    ) -> ApiResult<()> {
-        let id = self.pk.ident_pk.id()?;
-        self.client
-            .actions(&team.into_id().into())
-            .revoke_label(id, label)
-            .await
-            .context("unable to revoke label")?;
-        Ok(())
-    }
-
     #[cfg(feature = "afc")]
     #[instrument(skip_all)]
     async fn create_afc_bidi_channel(
@@ -685,7 +618,7 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
-        label: Label,
+        label_id: ApiLabelId,
     ) -> ApiResult<(AfcId, AfcCtrl)> {
         info!("create_afc_bidi_channel");
 
@@ -700,7 +633,7 @@ impl DaemonApi for DaemonApiHandler {
         let (ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
-            .create_afc_bidi_channel_off_graph(peer_id, label)
+            .create_afc_bidi_channel_off_graph(peer_id, label_id.into_id().into())
             .await?;
         let id = self.pk.ident_pk.id()?;
 
@@ -731,7 +664,7 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         node_id: NodeId,
         ctrl: AfcCtrl,
-    ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
+    ) -> ApiResult<(AfcId, NetIdentifier, ApiLabelId)> {
         let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
@@ -745,7 +678,6 @@ impl DaemonApi for DaemonApiHandler {
             let encap = BidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
             let afc_id: AfcId = encap.id().into();
             debug!(?afc_id, "processed afc ID");
-            let label = Label::new(e.label.try_into().expect("expected label conversion"));
             let net = self
                 .afc_peers
                 .lock()
@@ -753,7 +685,7 @@ impl DaemonApi for DaemonApiHandler {
                 .get_by_right(&e.author_id.into())
                 .context("missing net identifier for channel author")?
                 .clone();
-            return Ok((afc_id, net, label));
+            return Ok((afc_id, net, e.label_id.into()));
         }
         Err(anyhow!("unable to find AfcBidiChannelReceived effect").into())
     }
@@ -961,7 +893,7 @@ impl DaemonApi for DaemonApiHandler {
         _: TeamId,
         _: NetIdentifier,
         _: NodeId,
-        _: Label,
+        _: ApiLabelId,
     ) -> ApiResult<(AfcId, AfcCtrl)> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
@@ -978,12 +910,12 @@ impl DaemonApi for DaemonApiHandler {
         _: TeamId,
         _: NodeId,
         _: AfcCtrl,
-    ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
+    ) -> ApiResult<(AfcId, NetIdentifier, ApiLabelId)> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
-    /// Create an AQC label.
-    async fn create_aqc_label(
+    /// Create a label.
+    async fn create_label(
         self,
         _: context::Context,
         team: TeamId,
@@ -992,20 +924,18 @@ impl DaemonApi for DaemonApiHandler {
         let effects = self
             .client
             .actions(&team.into_id().into())
-            .create_aqc_label(label_name)
+            .create_label(label_name)
             .await
-            .context("unable to create AQC label")?;
-        if let Some(Effect::AqcLabelCreated(e)) =
-            find_effect!(&effects, Effect::AqcLabelCreated(_e))
-        {
+            .context("unable to create label")?;
+        if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
             Ok(e.label_id.into())
         } else {
-            Err(anyhow!("unable to create AQC label").into())
+            Err(anyhow!("unable to create label").into())
         }
     }
 
-    /// Delete an AQC label.
-    async fn delete_aqc_label(
+    /// Delete a label.
+    async fn delete_label(
         self,
         _: context::Context,
         team: TeamId,
@@ -1014,20 +944,18 @@ impl DaemonApi for DaemonApiHandler {
         let effects = self
             .client
             .actions(&team.into_id().into())
-            .delete_aqc_label(label_id.into_id().into())
+            .delete_label(label_id.into_id().into())
             .await
-            .context("unable to delete AQC label")?;
-        if let Some(Effect::AqcLabelDeleted(_e)) =
-            find_effect!(&effects, Effect::AqcLabelDeleted(_e))
-        {
+            .context("unable to delete label")?;
+        if let Some(Effect::LabelDeleted(_e)) = find_effect!(&effects, Effect::LabelDeleted(_e)) {
             Ok(())
         } else {
-            Err(anyhow!("unable to delete AQC label").into())
+            Err(anyhow!("unable to delete label").into())
         }
     }
 
-    /// Assign an AQC label.
-    async fn assign_aqc_label(
+    /// Assign a label.
+    async fn assign_label(
         self,
         _: context::Context,
         team: TeamId,
@@ -1038,24 +966,22 @@ impl DaemonApi for DaemonApiHandler {
         let effects = self
             .client
             .actions(&team.into_id().into())
-            .assign_aqc_label(
+            .assign_label(
                 device.into_id().into(),
                 label_id.into_id().into(),
                 op.into(),
             )
             .await
             .context("unable to assign AQC label")?;
-        if let Some(Effect::AqcLabelAssigned(_e)) =
-            find_effect!(&effects, Effect::AqcLabelAssigned(_e))
-        {
+        if let Some(Effect::LabelAssigned(_e)) = find_effect!(&effects, Effect::LabelAssigned(_e)) {
             Ok(())
         } else {
             Err(anyhow!("unable to assign AQC label").into())
         }
     }
 
-    /// Revoke an AQC label.
-    async fn revoke_aqc_label(
+    /// Revoke a label.
+    async fn revoke_label(
         self,
         _: context::Context,
         team: TeamId,
@@ -1065,12 +991,10 @@ impl DaemonApi for DaemonApiHandler {
         let effects = self
             .client
             .actions(&team.into_id().into())
-            .revoke_aqc_label(device.into_id().into(), label_id.into_id().into())
+            .revoke_label(device.into_id().into(), label_id.into_id().into())
             .await
             .context("unable to revoke AQC label")?;
-        if let Some(Effect::AqcLabelRevoked(_e)) =
-            find_effect!(&effects, Effect::AqcLabelRevoked(_e))
-        {
+        if let Some(Effect::LabelRevoked(_e)) = find_effect!(&effects, Effect::LabelRevoked(_e)) {
             Ok(())
         } else {
             Err(anyhow!("unable to revoke AQC label").into())
@@ -1149,26 +1073,62 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: TeamId,
         device: ApiDeviceId,
-    ) -> ApiResult<Vec<Label>> {
+    ) -> ApiResult<Vec<ApiLabelId>> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
             .query_device_label_assignments_off_graph(device.into_id().into())
             .await
             .context("unable to query device label assignments")?;
-        let mut labels = Vec::new();
+        let mut labels: Vec<ApiLabelId> = Vec::new();
         for e in effects {
             if let Effect::QueryDeviceLabelAssignmentsResult(e) = e {
-                let label = Label::new(
-                    u32::try_from(e.label)
-                        .assume("`label` is out of range")
-                        .context("label is out of range")?,
-                );
-                debug!("found label: {} assigned to device: {}", label, device);
-                labels.push(label);
+                debug!("found label: {} assigned to device: {}", e.label_id, device);
+                labels.push(e.label_id.into());
             }
         }
         return Ok(labels);
+    }
+
+    /// Query label exists.
+    #[instrument(skip(self))]
+    async fn query_label_exists(
+        self,
+        _: context::Context,
+        team: TeamId,
+        label_id: ApiLabelId,
+    ) -> ApiResult<bool> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_label_exists_off_graph(label_id.into_id().into())
+            .await
+            .context("unable to query label")?;
+        if let Some(Effect::QueryLabelExistsResult(e)) =
+            find_effect!(&effects, Effect::QueryLabelExistsResult(_e))
+        {
+            Ok(e.label_exists)
+        } else {
+            Err(anyhow!("unable to query aqc network identifier").into())
+        }
+    }
+
+    /// Query labels.
+    async fn query_labels(self, _: context::Context, team: TeamId) -> ApiResult<Vec<ApiLabelId>> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_aqc_labels_off_graph()
+            .await
+            .context("unable to query aqc labels")?;
+        let mut labels: Vec<ApiLabelId> = Vec::new();
+        for e in effects {
+            if let Effect::QueriedLabel(e) = e {
+                debug!("found label: {}", e.label_id);
+                labels.push(e.label_id.into());
+            }
+        }
+        Ok(labels)
     }
 
     /// Query AFC network ID.
@@ -1228,51 +1188,6 @@ impl DaemonApi for DaemonApiHandler {
             }
         }
         Ok(None)
-    }
-
-    /// Query label exists.
-    #[instrument(skip(self))]
-    async fn query_label_exists(
-        self,
-        _: context::Context,
-        team: TeamId,
-        label: Label,
-    ) -> ApiResult<bool> {
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_label_exists_off_graph(label)
-            .await
-            .context("unable to query label")?;
-        if let Some(Effect::QueryLabelExistsResult(e)) =
-            find_effect!(&effects, Effect::QueryLabelExistsResult(_e))
-        {
-            Ok(e.label_exists)
-        } else {
-            Err(anyhow!("unable to query aqc network identifier").into())
-        }
-    }
-
-    /// Query an AQC labels.
-    async fn query_aqc_labels(
-        self,
-        _: context::Context,
-        team: TeamId,
-    ) -> ApiResult<Vec<ApiLabelId>> {
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_aqc_labels_off_graph()
-            .await
-            .context("unable to query aqc labels")?;
-        let mut labels: Vec<ApiLabelId> = Vec::new();
-        for e in effects {
-            if let Effect::QueriedAqcLabel(e) = e {
-                debug!("found label: {}", e.label_id);
-                labels.push(e.label_id.into());
-            }
-        }
-        Ok(labels)
     }
 }
 

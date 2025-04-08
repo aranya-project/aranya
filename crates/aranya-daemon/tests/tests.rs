@@ -113,13 +113,13 @@ async fn test_afc_bidirectional_channel() -> Result<()> {
 
     let clients = ctx.new_team().await?;
     let team = TestTeam::new(&clients);
-    let label = Label::new(1);
 
     // TODO: assign label with operator when it works.
     team.operator.sync(team.owner).await?;
-    team.operator
+    let label = team
+        .operator
         .actions()
-        .define_label(label)
+        .create_label("label".to_string())
         .await
         .context("unable to define label")?;
     team.operator
@@ -151,14 +151,14 @@ async fn test_revoke_afc_label() -> Result<()> {
 
     let clients = ctx.new_team().await?;
     let team = TestTeam::new(&clients);
-    let label = Label::new(1);
 
     team.operator.sync(team.owner).await?;
-    team.operator
+    let label = team
+        .operator
         .actions()
-        .define_label(label)
+        .create_label("label".to_string())
         .await
-        .context("unable to define label")?;
+        .context("unable to create label")?;
     team.operator
         .actions()
         .assign_label(team.membera.pk.ident_pk.id()?, label, ChanOp::SendRecv)
@@ -210,13 +210,12 @@ async fn test_afc_unidirectional_channels() -> Result<()> {
     let clients = ctx.new_team().await?;
     let team = TestTeam::new(&clients);
 
-    let label1 = Label::new(1);
-
-    team.operator
+    let label1 = team
+        .operator
         .actions()
-        .define_label(label1)
+        .create_label("label1".to_string())
         .await
-        .context("unable to define label")?;
+        .context("unable to create label")?;
 
     team.operator
         .actions()
@@ -241,13 +240,12 @@ async fn test_afc_unidirectional_channels() -> Result<()> {
         .await
         .context("unable to create uni channel label1")?;
 
-    let label2 = Label::new(2);
-
-    team.operator
+    let label2 = team
+        .operator
         .actions()
-        .define_label(label2)
+        .create_label("label2".to_string())
         .await
-        .context("unable to define label")?;
+        .context("unable to create label")?;
 
     team.operator
         .actions()
