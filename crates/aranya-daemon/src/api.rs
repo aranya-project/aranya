@@ -40,7 +40,9 @@ mod afc_imports {
     pub(super) use aranya_afc_util::Handler;
     pub(super) use aranya_crypto::{keystore::fs_keystore::Store, DeviceId};
     pub(super) use aranya_fast_channels::shm::WriteState;
+    pub(super) use aranya_runtime::StorageProvider;
     pub(super) use bimap::BiBTreeMap;
+    pub(super) use buggy::bug;
     pub(super) use tokio::sync::Mutex;
 
     pub(super) use crate::CE;
@@ -78,7 +80,7 @@ impl DaemonApiServer {
     #[allow(clippy::too_many_arguments)]
     #[instrument(skip_all)]
     #[cfg(feature = "afc")]
-    pub fn new(
+    pub async fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
         afc: Arc<Mutex<WriteState<CS, Rng>>>,
@@ -91,6 +93,18 @@ impl DaemonApiServer {
     ) -> Result<Self> {
         info!("uds path: {:?}", daemon_sock);
         let device_id = pk.ident_pk.id()?;
+        let aranya = client.aranya.lock().await;
+        let provider = aranya.provider();
+        let Ok(graph_id) = provider.list_graph_ids().iter().next() else {
+            bug!("Unable to get GraphID!");
+        };
+        let afc_peers = BiBTreeMap::new();
+        afc_peers.extend(
+            client
+                .actions(graph_id)
+                .query_afc_network_names_off_graph()
+                .await?,
+        );
         Ok(Self {
             daemon_sock,
             recv_effects,
@@ -101,7 +115,7 @@ impl DaemonApiServer {
                 eng,
                 pk,
                 peers,
-                afc_peers: Arc::default(),
+                afc_peers: Arc::new(Mutex::new(afc_peers)),
                 handler: Arc::new(Mutex::new(Handler::new(device_id, store))),
             },
         })
@@ -110,7 +124,7 @@ impl DaemonApiServer {
     /// Create new RPC server.
     #[instrument(skip_all)]
     #[cfg(not(feature = "afc"))]
-    pub fn new(
+    pub async fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
         daemon_sock: PathBuf,
