@@ -1208,35 +1208,6 @@ AranyaError aranya_team_id_to_bytes(const struct AranyaTeamId *team_id,
                                     uint8_t *bytes,
                                     size_t bytes_len);
 
-#if defined(ENABLE_AFC)
-/**
- * Writes the human-readable encoding of `channel` to `str`.
- *
- * To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
- *
- * @param channel ID [`AranyaChannelId`](@ref AranyaChannelId).
- * @param str ID string [`AranyaChannelId`](@ref AranyaChannelId).
- * @param str_len returns the length of `str`
- *
- * @relates AranyaError.
- */
-AranyaError aranya_channel_id_to_str(struct AranyaChannelId channel,
-                                     char *str,
-                                     size_t *str_len);
-#endif
-
-#if defined(ENABLE_AFC)
-/**
- * Returns the bytes of `channel_id` as an array.
- *
- * @param device ID [`AranyaChannelId`](@ref AranyaChannelId).
- *
- */
-AranyaError aranya_channel_id_to_bytes(const struct AranyaChannelId *channel_id,
-                                       uint8_t *bytes,
-                                       size_t bytes_len);
-#endif
-
 /**
  * Query device's keybundle.
  *

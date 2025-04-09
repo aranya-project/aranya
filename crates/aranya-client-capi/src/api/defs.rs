@@ -1309,44 +1309,6 @@ pub fn team_id_to_bytes(team_id: &TeamId, bytes: &mut [u8]) -> Result<(), imp::E
     }
 }
 
-/// Writes the human-readable encoding of `channel` to `str`.
-///
-/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
-///
-/// @param channel ID [`ChannelId`].
-/// @param str ID string [`ChannelId`].
-/// @param str_len returns the length of `str`
-///
-/// @relates AranyaError.
-#[aranya_capi_core::no_ext_error]
-#[cfg(feature = "afc")]
-pub fn channel_id_to_str(
-    channel: ChannelId,
-    str: &mut MaybeUninit<c_char>,
-    str_len: &mut usize,
-) -> Result<(), imp::Error> {
-    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
-    aranya_capi_core::write_c_str(str, &channel.0, str_len)?;
-    Ok(())
-}
-
-/// Returns the bytes of `channel_id` as an array.
-///
-/// @param device ID [`ChannelId`].
-///
-// TODO: bytes param comment
-#[aranya_capi_core::no_ext_error]
-#[cfg(feature = "afc")]
-pub fn channel_id_to_bytes(channel_id: &ChannelId, bytes: &mut [u8]) {
-    let src = channel_id.0.as_array();
-    if bytes.len() >= src.len() {
-        bytes[0..src.len()].copy_from_slice(src);
-        Ok(())
-    } else {
-        Err(imp::Error::BufferTooSmall)
-    }
-}
-
 // TODO: query_device_role
 
 /// Query device's keybundle.
