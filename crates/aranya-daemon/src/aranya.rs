@@ -460,9 +460,9 @@ where
     /// Defines an AFC label.
     #[instrument(skip(self), fields(label = %label))]
     #[cfg(any())]
-    fn define_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn define_afc_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.define_label(i64::from(label.to_u32()))?;
+            actor.define_afc_label(i64::from(label.to_u32()))?;
             Ok(())
         })
         .in_current_span()
@@ -471,9 +471,9 @@ where
     /// Undefines an AFC label.
     #[instrument(skip(self), fields(label = %label))]
     #[cfg(any())]
-    fn undefine_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn undefine_afc_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.undefine_label(i64::from(label.to_u32()))?;
+            actor.undefine_afc_label(i64::from(label.to_u32()))?;
             Ok(())
         })
         .in_current_span()
@@ -482,14 +482,14 @@ where
     /// Grants an app permission to use an AFC label.
     #[instrument(skip(self), fields(device_id = %device_id, label = %label, op = %op))]
     #[cfg(any())]
-    fn assign_label(
+    fn assign_afc_label(
         &self,
         device_id: DeviceId,
         label: Label,
         op: ChanOp,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_label(device_id.into(), i64::from(label.to_u32()), op)?;
+            actor.assign_afc_label(device_id.into(), i64::from(label.to_u32()), op)?;
             Ok(())
         })
         .in_current_span()
@@ -498,14 +498,14 @@ where
     /// Revokes an AFC label.
     #[instrument(skip(self), fields(device_id = %device_id, label = %label))]
     #[cfg(any())]
-    fn revoke_label(
+    fn revoke_afc_label(
         &self,
         device_id: DeviceId,
         label: Label,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         info!(%device_id, %label, "revoking AFC label");
         self.with_actor(move |actor| {
-            actor.revoke_label(device_id.into(), i64::from(label.to_u32()))?;
+            actor.revoke_afc_label(device_id.into(), i64::from(label.to_u32()))?;
             Ok(())
         })
         .in_current_span()
@@ -687,15 +687,15 @@ where
         .in_current_span()
     }
 
-    /// Query device label assignments off-graph.
+    /// Query device AFC label assignments off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_device_label_assignments_off_graph(
+    fn query_device_afc_label_assignments_off_graph(
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_device_label_assignments",
+            name: "query_device_afc_label_assignments",
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
         .in_current_span()
@@ -729,15 +729,15 @@ where
         .in_current_span()
     }
 
-    /// Query label exists off-graph.
+    /// Query AFC label exists off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_label_exists_off_graph(
+    fn query_afc_label_exists_off_graph(
         &self,
         label: Label,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_label_exists",
+            name: "query_afc_label_exists",
             args: Cow::Owned(vec![Value::from(i64::from(label.to_u32()))]),
         })
         .in_current_span()

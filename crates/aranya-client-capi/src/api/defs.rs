@@ -804,7 +804,7 @@ pub unsafe fn aqc_remove_net_identifier(
     Ok(())
 }
 
-/// Create a channel label.
+/// Create an AFC channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -814,15 +814,15 @@ pub unsafe fn aqc_remove_net_identifier(
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn create_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
+pub fn create_afc_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
         .rt
-        .block_on(client.inner.team(team.0).create_label(label.into()))?;
+        .block_on(client.inner.team(team.0).create_afc_label(label.into()))?;
     Ok(())
 }
 
-/// Delete a channel label.
+/// Delete an AFC channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -832,11 +832,11 @@ pub fn create_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
+pub fn delete_afc_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
         .rt
-        .block_on(client.inner.team(team.0).delete_label(label.into()))?;
+        .block_on(client.inner.team(team.0).delete_afc_label(label.into()))?;
     Ok(())
 }
 
@@ -851,7 +851,7 @@ pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn assign_label(
+pub fn assign_afc_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -862,7 +862,7 @@ pub fn assign_label(
         client
             .inner
             .team(team.0)
-            .assign_label(device.0, label.into()),
+            .assign_afc_label(device.0, label.into()),
     )?;
     Ok(())
 }
@@ -878,7 +878,7 @@ pub fn assign_label(
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn revoke_label(
+pub fn revoke_afc_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -889,7 +889,7 @@ pub fn revoke_label(
         client
             .inner
             .team(team.0)
-            .revoke_label(device.0, label.into()),
+            .revoke_afc_label(device.0, label.into()),
     )?;
     Ok(())
 }
@@ -1272,7 +1272,7 @@ pub unsafe fn query_device_keybundle(
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn query_device_label_assignments(
+pub fn query_device_afc_label_assignments(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -1284,7 +1284,7 @@ pub fn query_device_label_assignments(
         client
             .inner
             .queries(team.0)
-            .device_label_assignments(device.0),
+            .device_afc_label_assignments(device.0),
     )?;
     let data = data.__data();
     let Some(labels) = labels else {
@@ -1367,7 +1367,7 @@ pub unsafe fn query_aqc_net_identifier(
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub unsafe fn query_label_exists(
+pub unsafe fn query_afc_label_exists(
     client: &mut Client,
     team: &TeamId,
     label: &Label,
@@ -1375,6 +1375,6 @@ pub unsafe fn query_label_exists(
     let client = client.deref_mut();
     let exists = client
         .rt
-        .block_on(client.inner.queries(team.0).label_exists(label.0.into()))?;
+        .block_on(client.inner.queries(team.0).afc_label_exists(label.0.into()))?;
     Ok(exists)
 }

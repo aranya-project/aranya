@@ -562,39 +562,39 @@ impl DaemonApi for DaemonApiHandler {
 
     #[cfg(any())]
     #[instrument(skip(self))]
-    async fn create_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
+    async fn create_afc_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
         self.client
             .actions(&team.into_id().into())
-            .define_label(label)
+            .define_afc_label(label)
             .await
             .context("unable to create label")?;
         Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn create_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
+    async fn create_afc_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
     #[cfg(any())]
     #[instrument(skip(self))]
-    async fn delete_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
+    async fn delete_afc_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
         self.client
             .actions(&team.into_id().into())
-            .undefine_label(label)
+            .undefine_afc_label(label)
             .await
             .context("unable to delete label")?;
         Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn delete_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
+    async fn delete_afc_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
     #[cfg(any())]
     #[instrument(skip(self))]
-    async fn assign_label(
+    async fn assign_afc_label(
         self,
         _: context::Context,
         team: TeamId,
@@ -604,14 +604,14 @@ impl DaemonApi for DaemonApiHandler {
         // TODO: support other channel permissions.
         self.client
             .actions(&team.into_id().into())
-            .assign_label(device.into_id().into(), label, ChanOp::ReadWrite)
+            .assign_afc_label(device.into_id().into(), label, ChanOp::ReadWrite)
             .await
             .context("unable to assign label")?;
         Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn assign_label(
+    async fn assign_afc_label(
         self,
         _: context::Context,
         team: TeamId,
@@ -623,7 +623,7 @@ impl DaemonApi for DaemonApiHandler {
 
     #[cfg(any())]
     #[instrument(skip(self))]
-    async fn revoke_label(
+    async fn revoke_afc_label(
         self,
         _: context::Context,
         team: TeamId,
@@ -633,14 +633,14 @@ impl DaemonApi for DaemonApiHandler {
         let id = self.pk.ident_pk.id()?;
         self.client
             .actions(&team.into_id().into())
-            .revoke_label(id, label)
+            .revoke_afc_label(id, label)
             .await
             .context("unable to revoke label")?;
         Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn revoke_label(
+    async fn revoke_afc_label(
         self,
         _: context::Context,
         team: TeamId,
@@ -848,7 +848,7 @@ impl DaemonApi for DaemonApiHandler {
     #[cfg(any())]
     /// Query device label assignments.
     #[instrument(skip(self))]
-    async fn query_device_label_assignments(
+    async fn query_device_afc_label_assignments(
         self,
         _: context::Context,
         team: TeamId,
@@ -857,7 +857,7 @@ impl DaemonApi for DaemonApiHandler {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
-            .query_device_label_assignments_off_graph(device.into_id().into())
+            .query_device_afc_label_assignments_off_graph(device.into_id().into())
             .await
             .context("unable to query device label assignments")?;
         let mut labels = Vec::new();
@@ -877,7 +877,7 @@ impl DaemonApi for DaemonApiHandler {
 
     /// Query device label assignments.
     #[instrument(skip(self))]
-    async fn query_device_label_assignments(
+    async fn query_device_afc_label_assignments(
         self,
         _: context::Context,
         _: TeamId,
@@ -947,7 +947,7 @@ impl DaemonApi for DaemonApiHandler {
     /// Query label exists.
     #[cfg(any())]
     #[instrument(skip(self))]
-    async fn query_label_exists(
+    async fn query_afc_label_exists(
         self,
         _: context::Context,
         team: TeamId,
@@ -956,7 +956,7 @@ impl DaemonApi for DaemonApiHandler {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
-            .query_label_exists_off_graph(label)
+            .query_afc_label_exists_off_graph(label)
             .await
             .context("unable to query label")?;
         if let Some(Effect::QueryLabelExistsResult(e)) =
@@ -969,7 +969,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn query_label_exists(self, _: context::Context, _: TeamId, _: Label) -> ApiResult<bool> {
+    async fn query_afc_label_exists(self, _: context::Context, _: TeamId, _: Label) -> ApiResult<bool> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 }
