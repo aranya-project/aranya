@@ -18,8 +18,8 @@ pub mod client;
 pub mod error;
 
 #[doc(inline)]
-#[cfg(feature = "afc")]
-pub use crate::{
+#[cfg(any())]
+use crate::{
     afc::{AfcId, FastChannels, Label, Message, PollData},
     error::AfcError,
 };

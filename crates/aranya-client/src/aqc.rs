@@ -1,6 +1,6 @@
 //! AQC support.
 
-use std::{io, path::PathBuf};
+use std::{io, net::SocketAddr, path::PathBuf};
 
 use anyhow::{anyhow, bail, Context};
 use aranya_aqc_util::{
@@ -75,6 +75,11 @@ pub struct AqcChannels<'a> {
 impl<'a> AqcChannels<'a> {
     pub(crate) fn new(client: &'a mut crate::Client) -> Self {
         Self { client }
+    }
+
+    /// Returns the address that AQC is bound to.
+    pub fn local_addr(&self) -> Result<SocketAddr, AqcError> {
+        todo!()
     }
 
     /// Creates a bidirectional AQC channel with a peer.

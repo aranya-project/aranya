@@ -164,6 +164,11 @@ impl Client {
             .map_err(Into::into)
     }
 
+    /// Returns the address that the AQC server is bound to.
+    pub async fn aqc_local_addr(&mut self) -> Result<SocketAddr> {
+        Ok(self.aqc().local_addr()?)
+    }
+
     /// Gets the public key bundle for this device.
     pub async fn get_key_bundle(&mut self) -> Result<KeyBundle> {
         self.daemon
@@ -377,19 +382,19 @@ impl Team<'_> {
     }
 
     /// Create an Aranya Fast Channels (AFC) label.
-    pub async fn create_label(&mut self, label: Label) -> Result<()> {
+    pub async fn create_afc_label(&mut self, label: Label) -> Result<()> {
         self.client
             .daemon
-            .create_label(context::current(), self.id, label)
+            .create_afc_label(context::current(), self.id, label)
             .await?
             .map_err(Into::into)
     }
 
     /// Delete an Aranya Fast Channels (AFC) label.
-    pub async fn delete_label(&mut self, label: Label) -> Result<()> {
+    pub async fn delete_afc_label(&mut self, label: Label) -> Result<()> {
         self.client
             .daemon
-            .delete_label(context::current(), self.id, label)
+            .delete_afc_label(context::current(), self.id, label)
             .await?
             .map_err(Into::into)
     }
@@ -398,43 +403,43 @@ impl Team<'_> {
     ///
     /// This grants the device permission to send/receive AFC data using that label.
     /// A channel must be created with the label in order to send data using that label.
-    pub async fn assign_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
+    pub async fn assign_afc_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
         self.client
             .daemon
-            .assign_label(context::current(), self.id, device, label)
+            .assign_afc_label(context::current(), self.id, device, label)
             .await?
             .map_err(Into::into)
     }
 
     /// Revoke an Aranya Fast Channels (AFC) label from a device.
-    pub async fn revoke_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
+    pub async fn revoke_afc_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
         self.client
             .daemon
-            .revoke_label(context::current(), self.id, device, label)
+            .revoke_afc_label(context::current(), self.id, device, label)
             .await?
             .map_err(Into::into)
     }
 
-    /// Create an AQC label.
-    pub async fn create_aqc_label(&mut self, label_name: String) -> Result<LabelId> {
+    /// Create a label.
+    pub async fn create_label(&mut self, label_name: String) -> Result<LabelId> {
         self.client
             .daemon
-            .create_aqc_label(context::current(), self.id, label_name)
+            .create_label(context::current(), self.id, label_name)
             .await?
             .map_err(Into::into)
     }
 
-    /// Delete an AQC label.
-    pub async fn delete_aqc_label(&mut self, label_id: LabelId) -> Result<()> {
+    /// Delete a label.
+    pub async fn delete_label(&mut self, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
-            .delete_aqc_label(context::current(), self.id, label_id)
+            .delete_label(context::current(), self.id, label_id)
             .await?
             .map_err(Into::into)
     }
 
-    /// Assign an AQC label to a device.
-    pub async fn assign_aqc_label(
+    /// Assign a label to a device.
+    pub async fn assign_label(
         &mut self,
         device: DeviceId,
         label_id: LabelId,
@@ -442,16 +447,16 @@ impl Team<'_> {
     ) -> Result<()> {
         self.client
             .daemon
-            .assign_aqc_label(context::current(), self.id, device, label_id, op)
+            .assign_label(context::current(), self.id, device, label_id, op)
             .await?
             .map_err(Into::into)
     }
 
-    /// Revoke an AQC label from a device.
-    pub async fn revoke_aqc_label(&mut self, device: DeviceId, label_id: LabelId) -> Result<()> {
+    /// Revoke a label from a device.
+    pub async fn revoke_label(&mut self, device: DeviceId, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
-            .revoke_aqc_label(context::current(), self.id, device, label_id)
+            .revoke_label(context::current(), self.id, device, label_id)
             .await?
             .map_err(Into::into)
     }
@@ -493,12 +498,12 @@ impl Queries<'_> {
     }
 
     /// Returns a list of labels assiged to the current device.
-    pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
+    pub async fn device_afc_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
         Ok(Labels {
             data: self
                 .client
                 .daemon
-                .query_device_label_assignments(context::current(), self.id, device)
+                .query_device_afc_label_assignments(context::current(), self.id, device)
                 .await??,
         })
     }
@@ -523,10 +528,10 @@ impl Queries<'_> {
     }
 
     /// Returns whether a label exists.
-    pub async fn label_exists(&mut self, label: Label) -> Result<bool> {
+    pub async fn afc_label_exists(&mut self, label: Label) -> Result<bool> {
         self.client
             .daemon
-            .query_label_exists(context::current(), self.id, label)
+            .query_afc_label_exists(context::current(), self.id, label)
             .await?
             .map_err(Into::into)
     }

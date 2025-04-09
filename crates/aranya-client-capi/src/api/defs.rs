@@ -308,16 +308,19 @@ impl LabelName {
 /// An AFC label.
 ///
 /// It identifies the policy rules that govern the AFC channel.
+#[cfg(feature = "afc")]
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
 pub struct Label(u32);
 
+#[cfg(feature = "afc")]
 impl From<Label> for aranya_fast_channels::Label {
     fn from(value: Label) -> Self {
         Self::new(value.0)
     }
 }
 
+#[cfg(feature = "afc")]
 impl From<aranya_fast_channels::Label> for Label {
     fn from(value: aranya_fast_channels::Label) -> Self {
         Self(value.to_u32())
@@ -898,7 +901,7 @@ pub unsafe fn aqc_remove_net_identifier(
     Ok(())
 }
 
-/// Create a channel label.
+/// Create an AFC channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -907,15 +910,20 @@ pub unsafe fn aqc_remove_net_identifier(
 /// @param label the AFC channel label [`Label`] to create.
 ///
 /// @relates AranyaClient.
-pub fn create_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
+#[cfg(feature = "afc")]
+pub fn create_afc_label(
+    client: &mut Client,
+    team: &TeamId,
+    label: Label,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
         .rt
-        .block_on(client.inner.team(team.0).create_label(label.into()))?;
+        .block_on(client.inner.team(team.0).create_afc_label(label.into()))?;
     Ok(())
 }
 
-/// Delete a channel label.
+/// Delete an AFC channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -924,11 +932,16 @@ pub fn create_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
 /// @param label the channel label [`Label`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
+#[cfg(feature = "afc")]
+pub fn delete_afc_label(
+    client: &mut Client,
+    team: &TeamId,
+    label: Label,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
         .rt
-        .block_on(client.inner.team(team.0).delete_label(label.into()))?;
+        .block_on(client.inner.team(team.0).delete_afc_label(label.into()))?;
     Ok(())
 }
 
@@ -942,7 +955,8 @@ pub fn delete_label(client: &mut Client, team: &TeamId, label: Label) -> Result<
 /// @param label the AFC channel label [`Label`].
 ///
 /// @relates AranyaClient.
-pub fn assign_label(
+#[cfg(feature = "afc")]
+pub fn assign_afc_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -953,7 +967,7 @@ pub fn assign_label(
         client
             .inner
             .team(team.0)
-            .assign_label(device.0, label.into()),
+            .assign_afc_label(device.0, label.into()),
     )?;
     Ok(())
 }
@@ -968,7 +982,8 @@ pub fn assign_label(
 /// @param label the AFC channel label [`Label`].
 ///
 /// @relates AranyaClient.
-pub fn revoke_label(
+#[cfg(feature = "afc")]
+pub fn revoke_afc_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -979,7 +994,7 @@ pub fn revoke_label(
         client
             .inner
             .team(team.0)
-            .revoke_label(device.0, label.into()),
+            .revoke_afc_label(device.0, label.into()),
     )?;
     Ok(())
 }
@@ -1228,7 +1243,7 @@ pub unsafe fn afc_recv_data(
     Ok(true)
 }
 
-/// Create an AQC channel label.
+/// Create a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -1237,7 +1252,7 @@ pub unsafe fn afc_recv_data(
 /// @param name label name string [`LabelName`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_create_label(
+pub fn create_label(
     client: &mut Client,
     team: &TeamId,
     name: LabelName,
@@ -1247,11 +1262,11 @@ pub fn aqc_create_label(
     let name = unsafe { name.as_underlying() }?;
     let label_id = client
         .rt
-        .block_on(client.inner.team(team.0).create_aqc_label(name))?;
+        .block_on(client.inner.team(team.0).create_label(name))?;
     Ok(LabelId(label_id))
 }
 
-/// Delete an AQC channel label.
+/// Delete a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -1260,7 +1275,7 @@ pub fn aqc_create_label(
 /// @param label_id the channel label ID [`LabelId`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn aqc_delete_label(
+pub fn delete_label(
     client: &mut Client,
     team: &TeamId,
     label_id: &LabelId,
@@ -1268,11 +1283,11 @@ pub fn aqc_delete_label(
     let client = client.deref_mut();
     client
         .rt
-        .block_on(client.inner.team(team.0).delete_aqc_label(label_id.0))?;
+        .block_on(client.inner.team(team.0).delete_label(label_id.0))?;
     Ok(())
 }
 
-/// Assign an AQC label to a device so that it can be used for an AQC channel.
+/// Assign a label to a device so that it can be used for a channel.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -1282,7 +1297,7 @@ pub fn aqc_delete_label(
 /// @param label_id the AQC channel label ID [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_assign_label(
+pub fn assign_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -1290,18 +1305,16 @@ pub fn aqc_assign_label(
     op: ChanOp,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client
-        .rt
-        .block_on(
-            client
-                .inner
-                .team(team.0)
-                .assign_aqc_label(device.0, label_id.0, op.into()),
-        )?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.0)
+            .assign_label(device.0, label_id.0, op.into()),
+    )?;
     Ok(())
 }
 
-/// Revoke an AQC label from a device.
+/// Revoke a label from a device.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -1311,19 +1324,16 @@ pub fn aqc_assign_label(
 /// @param label_id the AQC channel label ID [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_revoke_label(
+pub fn revoke_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
     label_id: &LabelId,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.0)
-            .revoke_aqc_label(device.0, label_id.0),
-    )?;
+    client
+        .rt
+        .block_on(client.inner.team(team.0).revoke_label(device.0, label_id.0))?;
     Ok(())
 }
 
@@ -1506,7 +1516,8 @@ pub unsafe fn query_device_keybundle(
 /// @param labels_len returns the length of the labels list [`Label`].
 ///
 /// @relates AranyaClient.
-pub fn query_device_label_assignments(
+#[cfg(feature = "afc")]
+pub fn query_device_afc_label_assignments(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
@@ -1518,7 +1529,7 @@ pub fn query_device_label_assignments(
         client
             .inner
             .queries(team.0)
-            .device_label_assignments(device.0),
+            .device_afc_label_assignments(device.0),
     )?;
     let data = data.__data();
     let Some(labels) = labels else {
@@ -1600,14 +1611,18 @@ pub unsafe fn query_aqc_net_identifier(
 /// @param __output the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_label_exists(
+#[cfg(feature = "afc")]
+pub unsafe fn query_afc_label_exists(
     client: &mut Client,
     team: &TeamId,
     label: &Label,
 ) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
-    let exists = client
-        .rt
-        .block_on(client.inner.queries(team.0).label_exists(label.0.into()))?;
+    let exists = client.rt.block_on(
+        client
+            .inner
+            .queries(team.0)
+            .afc_label_exists(label.0.into()),
+    )?;
     Ok(exists)
 }

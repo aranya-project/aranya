@@ -1,11 +1,12 @@
 use std::{
     net::SocketAddr,
-    path::{Path, PathBuf},
+    net::Ipv4Addr,
+    path::PathBuf,
     time::Duration,
 };
 use aranya_daemon_api::ChanOp;
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{afc::Message, client::Client, SyncPeerConfig};
+use aranya_client::{client::Client, SyncPeerConfig};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
@@ -13,16 +14,14 @@ use aranya_daemon::{
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
-use buggy::BugExt;
 use tempfile::tempdir;
 use tokio::{fs, task, time::sleep};
-use tracing::{debug, info, Metadata};
+use tracing::{info, Metadata};
 use tracing_subscriber::{
     layer::{Context, Filter},
     prelude::*,
     EnvFilter,
 };
-use aranya_client::Label;
 
 struct TeamCtx {
     owner: UserCtx,
@@ -101,9 +100,6 @@ impl UserCtx {
         let mut client = (|| {
             Client::connect(
                 &cfg.uds_api_path,
-                Path::new(&cfg.afc.shm_path),
-                cfg.afc.max_chans,
-                cfg.sync_addr.to_socket_addrs(),
             )
         })
         .retry(ExponentialBuilder::default())
@@ -120,37 +116,6 @@ impl UserCtx {
     async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.local_addr().await?)
     }
-
-    async fn afc_local_addr(&mut self) -> Result<SocketAddr> {
-        Ok(self.client.afc().local_addr().await?)
-    }
-}
-
-/// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the
-/// clients are pending.
-// TODO(nikki): alternative to select!{} to resolve lifetime issues
-macro_rules! do_poll {
-    ($($client:expr),*) => {
-        debug!(
-            clients = stringify!($($client),*),
-            "start `do_poll`",
-        );
-        loop {
-            let mut afcs = [ $($client.afc()),* ];
-            let mut afcs = afcs.iter_mut();
-            tokio::select! {
-                biased;
-                $(data = afcs.next().assume("macro enforces client count")?.poll_data() => {
-                    $client.afc().handle_data(data?).await?
-                },)*
-                _ = async {} => break,
-            }
-        }
-        debug!(
-            clients = stringify!($($client),*),
-            "finish `do_poll`",
-        );
-    };
 }
 
 struct DemoFilter {
@@ -193,7 +158,7 @@ async fn main() -> Result<()> {
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_afc_router".into(), work_dir).await?;
+    let mut team = TeamCtx::new("rust_example".into(), work_dir).await?;
 
     // create team.
     info!("creating team");
@@ -212,9 +177,10 @@ async fn main() -> Result<()> {
     let membera_addr = team.membera.aranya_local_addr().await?;
     let memberb_addr = team.memberb.aranya_local_addr().await?;
 
-    // get afc addresses.
-    let membera_afc_addr = team.membera.afc_local_addr().await?;
-    let memberb_afc_addr = team.memberb.afc_local_addr().await?;
+    // get aqc addresses.
+    // TODO: use aqc_local_addr()
+    let membera_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
+    let memberb_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 1);
 
     // setup sync peers.
     let mut owner_team = team.owner.client.team(team_id);
@@ -327,29 +293,12 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // operator assigns labels for AFC channels.
-    let label1 = Label::new(1);
-    operator_team.create_label(label1).await?;
-    operator_team.assign_label(team.membera.id, label1).await?;
-    operator_team.assign_label(team.memberb.id, label1).await?;
-
-    let label2 = Label::new(2);
-    operator_team.create_label(label2).await?;
-    operator_team.assign_label(team.membera.id, label2).await?;
-    operator_team.assign_label(team.memberb.id, label2).await?;
-
-    // assign network addresses.
+    info!("assigning aqc net identifiers");
     operator_team
-        .assign_afc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
+        .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_aqc_addr.to_string()))
         .await?;
     operator_team
-        .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
+        .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_aqc_addr.to_string()))
         .await?;
 
     // wait for syncing.
@@ -363,103 +312,39 @@ async fn main() -> Result<()> {
     info!("membera role: {:?}", role);
     let keybundle = queries.device_keybundle(team.membera.id).await?;
     info!("membera keybundle: {:?}", keybundle);
-    let labels = queries.device_label_assignments(team.membera.id).await?;
-    info!("membera labels: {:?}", labels.__data());
-    let afc_net_identifier = queries.afc_net_identifier(team.membera.id).await?;
-    info!("membera afc_net_identifer: {:?}", afc_net_identifier);
-    let aqc_net_identifier = queries.aqc_net_identifier(team.membera.id).await?;
-    info!("membera aqc_net_identifer: {:?}", aqc_net_identifier);
-    let label_exists = queries.label_exists(label1).await?;
-    info!("membera label1 exists?: {:?}", label_exists);
+    let queried_membera_net_ident = queries.aqc_net_identifier(team.membera.id).await?;
+    info!("membera queried_membera_net_ident: {:?}", queried_membera_net_ident);
+    let queried_memberb_net_ident = queries.aqc_net_identifier(team.memberb.id).await?;
+    info!("memberb queried_memberb_net_ident: {:?}", queried_memberb_net_ident);
 
-    info!("demo afc functionality");
-    // membera creates bidi channel with memberb
-    let afc_id1 = team
-        .membera
-        .client
-        .afc()
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
-        .await?;
-
-    // membera creates bidi channel with memberb
-    let afc_id2 = team
-        .membera
-        .client
-        .afc()
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
-        .await?;
-
-    // wait for ctrl message to be sent.
-    sleep(Duration::from_millis(100)).await;
-
-    do_poll!(team.membera.client, team.memberb.client);
-
-    let msg = "hello world label1";
-    team.membera
-        .client
-        .afc()
-        .send_data(afc_id1, msg.as_bytes())
-        .await?;
-    debug!(?msg, "sent message");
-
-    let msg = "hello world label2";
-    team.membera
-        .client
-        .afc()
-        .send_data(afc_id2, msg.as_bytes())
-        .await?;
-    debug!(?msg, "sent message");
-
-    sleep(Duration::from_millis(100)).await;
-    do_poll!(team.membera.client, team.memberb.client);
-
-    let Some(Message { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
-        bail!("no message available!")
-    };
-    debug!(
-        n = data.len(),
-        ?label,
-        "received message: {:?}",
-        core::str::from_utf8(&data)?
-    );
-
-    let Some(Message { data, label, .. }) = team.memberb.client.afc().try_recv_data() else {
-        bail!("no message available!")
-    };
-    debug!(
-        n = data.len(),
-        ?label,
-        "received message: {:?}",
-        core::str::from_utf8(&data)?
-    );
-
-    info!("completed afc demo");
+    // wait for syncing.
+    sleep(sleep_interval).await;
 
     info!("demo aqc functionality");
     info!("creating aqc label");
-    let label3 = operator_team.create_aqc_label("label3".to_string()).await?;
+    let label3 = operator_team.create_label("label3".to_string()).await?;
     let op = ChanOp::SendRecv;
-    info!("assigning aqc label to membera");
-    operator_team.assign_aqc_label(team.membera.id, label3, op).await?;
-    info!("assigning aqc label to memberb");
-    operator_team.assign_aqc_label(team.memberb.id, label3, op).await?;
+    info!("assigning label to membera");
+    operator_team.assign_label(team.membera.id, label3, op).await?;
+    info!("assigning label to memberb");
+    operator_team.assign_label(team.memberb.id, label3, op).await?;
     
     // wait for syncing.
     sleep(sleep_interval).await;
 
     // TODO: send AQC ctrl via network
     info!("creating acq bidi channel");
-    let (_aqc_id1, aqc_bidi_ctrl) = team.membera.client.aqc().create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label3).await?;
+    let (_aqc_id1, aqc_bidi_ctrl) = team.membera.client.aqc().create_bidi_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label3).await?;
     info!("receiving acq bidi channel");
     team.memberb.client.aqc().receive_aqc_ctrl(team_id, aqc_bidi_ctrl).await?;
     
     // TODO: send AQC data.
-    info!("revoking aqc label from membera");
-    operator_team.revoke_aqc_label(team.membera.id, label3).await?;
-    info!("revoking aqc label from memberb");
-    operator_team.revoke_aqc_label(team.memberb.id, label3).await?;
-    info!("deleting aqc label");
-    operator_team.delete_aqc_label(label3).await?;
+    info!("revoking label from membera");
+    operator_team.revoke_label(team.membera.id, label3).await?;
+    info!("revoking label from memberb");
+    operator_team.revoke_label(team.memberb.id, label3).await?;
+    info!("deleting label");
+    operator_team.delete_label(label3).await?;
 
     info!("completed aqc demo");
 

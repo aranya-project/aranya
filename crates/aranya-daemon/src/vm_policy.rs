@@ -20,8 +20,7 @@ use aranya_runtime::{
 };
 use tracing::instrument;
 
-use super::policy::ChanOp;
-use crate::policy::Role;
+use crate::policy::{ChanOp, Role};
 
 /// Policy loaded from policy.md file.
 pub const TEST_POLICY_1: &str = include_str!("./policy.md");
