@@ -9,9 +9,14 @@ use serde::{Deserialize, Serialize};
 /// A bundle of cryptographic keys for secure communication in Aranya.
 ///
 /// A KeyBundle contains identifiers for three types of keys:
-/// - Device identity key: Used to identify a device in an Aranya team
-/// - Encryption key: Used for secure data encryption and decryption
-/// - Signing key: Used for creating and verifying cryptographic signatures
+/// - Device identity key: Used to identify a device in an Aranya team. A device's ID
+///     is derived from the public portion of the device identity key. The device key is
+///     used for digital signatures allowing others to verify signatures created with this key.
+/// - Encryption key: Used for secure data encryption and decryption. This key is used
+///     for the encapsulation and decapsulation of KEM shared secrets.
+/// - Signing key: Used for creating and verifying cryptographic signatures. Whenever
+///     this device publishes a command, it is signed using the secret portion of this key.
+///     Other devices can use the public portion of this key to verify those signatures.
 ///
 /// The actual key material is stored in the provided `KeyStore`, and this
 /// structure only contains references to those keys.
@@ -44,8 +49,8 @@ pub struct KeyBundle {
 
     /// Identifier for the encryption key.
     ///
-    /// The encryption key is a public key used to encrypt
-    /// data to this device.
+    /// The encryption key in the keybundle is used for the secure
+    /// sharing of KEM shared secrets.
     ///
     /// See [`EncryptionKey`].
     pub enc_id: EncryptionKeyId,
@@ -53,7 +58,8 @@ pub struct KeyBundle {
     /// Identifier for the signing key.
     ///
     /// The signing key is used for creating cryptographic signatures that can be
-    /// verified using the corresponding public key.
+    /// verified using the corresponding public key. This key is used to sign
+    /// commands published by this device.
     ///
     /// See [`SigningKey`].
     pub sign_id: SigningKeyId,
@@ -76,10 +82,10 @@ pub struct PublicKeys<CS: CipherSuite> {
     /// Public identity key for device identification.
     pub ident_pk: IdentityVerifyingKey<CS>,
 
-    /// Public encryption key for encrypting messages to this device.
+    /// Public encryption key for securely exchanging KEM shared secrets.
     pub enc_pk: EncryptionPublicKey<CS>,
 
-    /// Public verification key for verifying signatures from this device.
+    /// Public verification key for verifying command signatures from this device.
     pub sign_pk: VerifyingKey<CS>,
 }
 
