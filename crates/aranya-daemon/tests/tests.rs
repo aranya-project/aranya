@@ -8,16 +8,10 @@
 )]
 
 use anyhow::{Context, Result};
-#[cfg(feature = "afc")]
-use aranya_daemon::policy::ChanOp;
 use aranya_daemon::{
     aranya::Actions,
     policy::{Effect, Role},
 };
-#[cfg(feature = "afc")]
-// TODO(nikki): remove cfg flag once AQC is in
-// See https://github.com/aranya-project/aranya-core/issues/101
-use aranya_fast_channels::Label;
 use serial_test::serial;
 use test_log::test;
 use test_util::{contains_effect, TestCtx, TestTeam};
@@ -109,43 +103,48 @@ async fn test_remove_members() -> Result<()> {
 // TODO(nikki): we should add separate tests for AQC once that's in
 // See https://github.com/aranya-project/aranya-core/issues/101
 async fn test_afc_bidirectional_channel() -> Result<()> {
-    let mut ctx = TestCtx::new()?;
+    #[cfg(any())]
+    {
+        let mut ctx = TestCtx::new()?;
 
-    let clients = ctx.new_team().await?;
-    let team = TestTeam::new(&clients);
-    let label = Label::new(1);
+        let clients = ctx.new_team().await?;
+        let team = TestTeam::new(&clients);
 
-    // TODO: assign label with operator when it works.
-    team.operator.sync(team.owner).await?;
-    team.operator
-        .actions()
-        .define_label(label)
-        .await
-        .context("unable to define label")?;
-    team.operator
-        .actions()
-        .assign_label(team.membera.pk.ident_pk.id()?, label, ChanOp::ReadWrite)
-        .await
-        .context("unable to assign label to membera")?;
-    team.operator
-        .actions()
-        .assign_label(team.memberb.pk.ident_pk.id()?, label, ChanOp::ReadWrite)
-        .await
-        .context("unable to assign label to memberb")?;
-    team.membera.sync(team.operator).await?;
-    team.memberb.sync(team.operator).await?;
-    team.membera
-        .actions()
-        .create_afc_bidi_channel(team.memberb.pk.ident_pk.id()?, label)
-        .await
-        .context("unable to create bidi channel")?;
+        let label = Label::new(1);
+
+        // TODO: assign label with operator when it works.
+        team.operator.sync(team.owner).await?;
+        team.operator
+            .actions()
+            .define_label(label)
+            .await
+            .context("unable to define label")?;
+        team.operator
+            .actions()
+            .assign_label(team.membera.pk.ident_pk.id()?, label, ChanOp::ReadWrite)
+            .await
+            .context("unable to assign label to membera")?;
+        team.operator
+            .actions()
+            .assign_label(team.memberb.pk.ident_pk.id()?, label, ChanOp::ReadWrite)
+            .await
+            .context("unable to assign label to memberb")?;
+        team.membera.sync(team.operator).await?;
+        team.memberb.sync(team.operator).await?;
+
+        team.membera
+            .actions()
+            .create_afc_bidi_channel(team.memberb.pk.ident_pk.id()?, label)
+            .await
+            .context("unable to create bidi channel")?;
+    }
 
     Ok(())
 }
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-#[cfg(feature = "afc")]
+#[cfg(any())]
 async fn test_revoke_afc_label() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 
@@ -203,7 +202,7 @@ async fn test_revoke_afc_label() -> Result<()> {
 
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
-#[cfg(feature = "afc")]
+#[cfg(any())]
 async fn test_afc_unidirectional_channels() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 

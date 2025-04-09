@@ -182,10 +182,10 @@ pub trait DaemonApi {
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
-    /// Create a label.
-    async fn create_label(team: TeamId, label: Label) -> Result<()>;
-    /// Delete a label.
-    async fn delete_label(team: TeamId, label: Label) -> Result<()>;
+    /// Create an AFC label.
+    async fn create_afc_label(team: TeamId, label: Label) -> Result<()>;
+    /// Delete an AFC label.
+    async fn delete_afc_label(team: TeamId, label: Label) -> Result<()>;
 
     /// Assign a fast channels network identifier to a device.
     async fn assign_afc_net_identifier(
@@ -214,9 +214,9 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     /// Assign a fast channels label to a device.
-    async fn assign_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
+    async fn assign_afc_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
     /// Revoke a fast channels label from a device.
-    async fn revoke_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
+    async fn revoke_afc_label(team: TeamId, device: DeviceId, label: Label) -> Result<()>;
     /// Create a fast channel.
     async fn create_afc_bidi_channel(
         team: TeamId,
@@ -238,8 +238,11 @@ pub trait DaemonApi {
     async fn query_device_role(team: TeamId, device: DeviceId) -> Result<Role>;
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
-    /// Query device label assignments.
-    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
+    /// Query device AFC label assignments.
+    async fn query_device_afc_label_assignments(
+        team: TeamId,
+        device: DeviceId,
+    ) -> Result<Vec<Label>>;
     /// Query AFC network ID.
     async fn query_afc_net_identifier(
         team: TeamId,
@@ -250,6 +253,6 @@ pub trait DaemonApi {
         team: TeamId,
         device: DeviceId,
     ) -> Result<Option<NetIdentifier>>;
-    /// Query label exists.
-    async fn query_label_exists(team: TeamId, label: Label) -> Result<bool>;
+    /// Query whether an AFC label exists.
+    async fn query_afc_label_exists(team: TeamId, label: Label) -> Result<bool>;
 }

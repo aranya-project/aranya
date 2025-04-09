@@ -1,8 +1,8 @@
 #![allow(missing_docs)]
 
-use std::{fmt, marker::PhantomData, str::FromStr};
+use std::{fmt, marker::PhantomData};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use aranya_afc_util::Ffi as AfcFfi;
 use aranya_crypto::{keystore::fs_keystore::Store, DeviceId};
 use aranya_crypto_ffi::Ffi as CryptoFfi;
@@ -19,31 +19,10 @@ use aranya_runtime::{
 };
 use tracing::instrument;
 
-use super::policy::ChanOp;
 use crate::policy::Role;
 
 /// Policy loaded from policy.md file.
 pub const TEST_POLICY_1: &str = include_str!("./policy.md");
-
-/// Converts [`ChanOp`] to string.
-impl FromStr for ChanOp {
-    type Err = anyhow::Error;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "ChanOp::ReadOnly" => Ok(Self::ReadOnly),
-            "ChanOp::WriteOnly" => Ok(Self::WriteOnly),
-            "ChanOp::ReadWrite" => Ok(Self::ReadWrite),
-            _ => Err(anyhow!("unknown `ChanOp`: {s}")),
-        }
-    }
-}
-
-/// Display implementation for [`ChanOp`]
-impl fmt::Display for ChanOp {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ChanOp::{:?}", self)
-    }
-}
 
 /// Engine using policy from [`policy.md`].
 pub struct PolicyEngine<E, KS> {
