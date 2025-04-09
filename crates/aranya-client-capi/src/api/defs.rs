@@ -251,16 +251,19 @@ impl NetIdentifier {
 /// An AFC label.
 ///
 /// It identifies the policy rules that govern the AFC channel.
+#[cfg(feature = "afc")]
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
 pub struct Label(u32);
 
+#[cfg(feature = "afc")]
 impl From<Label> for aranya_fast_channels::Label {
     fn from(value: Label) -> Self {
         Self::new(value.0)
     }
 }
 
+#[cfg(feature = "afc")]
 impl From<aranya_fast_channels::Label> for Label {
     fn from(value: aranya_fast_channels::Label) -> Self {
         Self(value.to_u32())
@@ -1363,6 +1366,7 @@ pub unsafe fn query_aqc_net_identifier(
 /// @param __output the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "afc")]
 pub unsafe fn query_label_exists(
     client: &mut Client,
     team: &TeamId,

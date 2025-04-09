@@ -329,13 +329,6 @@ typedef const char *AranyaNetIdentifier;
  */
 typedef uint64_t AranyaDuration;
 
-/**
- * An AFC label.
- *
- * It identifies the policy rules that govern the AFC channel.
- */
-typedef uint32_t AranyaLabel;
-
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -1239,37 +1232,6 @@ AranyaError aranya_query_aqc_net_identifier_ext(struct AranyaClient *client,
                                                 size_t *ident_len,
                                                 bool *__output,
                                                 struct AranyaExtError *__ext_err);
-
-/**
- * Query device's AQC network identifier.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_label_exists(struct AranyaClient *client,
-                                      const struct AranyaTeamId *team,
-                                      const AranyaLabel *label,
-                                      bool *__output);
-
-/**
- * Query device's AQC network identifier.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_query_label_exists_ext(struct AranyaClient *client,
-                                          const struct AranyaTeamId *team,
-                                          const AranyaLabel *label,
-                                          bool *__output,
-                                          struct AranyaExtError *__ext_err);
 
 #ifdef __cplusplus
 }  // extern "C"
