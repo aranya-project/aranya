@@ -218,24 +218,6 @@ pub enum AqcError {
     #[error("stream not found: {0}")]
     StreamNotFound(std::net::SocketAddr),
 
-    // Protocol-related errors
-    // TODO: replace with QUIC header error.
-    /// Invalid AC header.
-    //#[error("invalid AQC header: {0}")]
-    //InvalidHeader(#[from] aranya_fast_channels::HeaderError),
-
-    /// Invalid AFC magic.
-    #[error("invalid magic: {0}")]
-    InvalidMagic(u32),
-
-    /// Invalid AFC message.
-    #[error("invalid message: {0}")]
-    InvalidMsg(#[from] aranya_fast_channels::ParseError),
-
-    /// AFC message was replayed.
-    #[error("AFC message was replayed: {0}")]
-    MsgReplayed(String),
-
     /// The message length prefix was larger than the maximum
     /// allowed size.
     #[error("message too large: {got} > {max}")]
@@ -265,10 +247,6 @@ pub enum AqcError {
     },
 
     // General errors
-    /// The channel was not found.
-    #[error("channel not found: {0}")]
-    ChannelNotFound(AqcId),
-
     /// Some other error.
     #[error("{0}")]
     Other(#[from] anyhow::Error),
