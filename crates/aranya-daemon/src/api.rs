@@ -99,7 +99,12 @@ impl DaemonApiServer {
             bug!("Unable to get GraphID!");
         };
         let afc_peers = BiBTreeMap::new();
-        afc_peers.extend(client.actions(graph_id).query_afc_network_names().await?);
+        afc_peers.extend(
+            client
+                .actions(graph_id)
+                .query_afc_network_names_off_graph()
+                .await?,
+        );
         Ok(Self {
             daemon_sock,
             recv_effects,

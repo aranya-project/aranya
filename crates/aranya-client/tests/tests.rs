@@ -366,12 +366,12 @@ async fn test_sync_now() -> Result<()> {
 #[cfg(feature = "afc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_one_way_two_chans() -> Result<()> {
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
     let interval = Duration::from_millis(100);
     let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
     let sleep_interval = interval * 6;
-
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
 
     let mut team = TeamCtx::new("test_afc_one_way_two_chans".into(), work_dir).await?;
 
@@ -659,12 +659,12 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
 #[cfg(feature = "afc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_two_way_one_chan() -> Result<()> {
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
     let interval = Duration::from_millis(100);
     let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
     let sleep_interval = interval * 6;
-
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
 
     let mut team = TeamCtx::new("test_afc_two_way_one_chan".into(), work_dir).await?;
 
@@ -880,12 +880,12 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
 #[cfg(feature = "afc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_monotonic_seq() -> Result<()> {
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
     let interval = Duration::from_millis(100);
     let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
     let sleep_interval = interval * 6;
-
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
 
     let mut team = TeamCtx::new("test_afc_monotonic_seq".into(), work_dir).await?;
 
@@ -1104,17 +1104,17 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     Ok(())
 }
 
-/// This tests a bug where if the daemon is killed after registering net identifiers, they're not
-/// reloaded upon reboot, which causes create_bidi_channel to fail with "unable to lookup peer".
+/// This tests that if a daemon gets killed and reloads, any AFC-specific data
+/// gets reloaded from the factDB.
 #[cfg(feature = "afc")]
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_afc_persist_net_identifier() -> Result<()> {
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
     let interval = Duration::from_millis(100);
     let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
     let sleep_interval = interval * 6;
-
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
 
     let mut team = TeamCtx::new("test_afc_persist_net_identifier".into(), work_dir.clone()).await?;
 
@@ -1126,7 +1126,6 @@ async fn test_afc_persist_net_identifier() -> Result<()> {
         .await
         .expect("expected to create team");
     info!(?team_id);
-    // TODO: implement add_team.
     /*
     team.admin.client.add_team(team_id).await?;
     team.operator.client.add_team(team_id).await?;
@@ -1276,9 +1275,16 @@ async fn test_afc_persist_net_identifier() -> Result<()> {
         work_dir.join("membera"),
     )
     .await?;
+    drop(team.memberb);
+    team.memberb = DeviceCtx::new(
+        "test_afc_persist_net_identifier".into(),
+        "memberb".into(),
+        work_dir.join("memberb"),
+    )
+    .await?;
 
     // Create a new channel, which should fail to lookup peer if we haven't re-populated afc_peers.
-    let _ = team
+    let afc_id = team
         .membera
         .client
         .afc()
@@ -1287,6 +1293,33 @@ async fn test_afc_persist_net_identifier() -> Result<()> {
 
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
+
+    let msg = "a to b";
+    team.membera
+        .client
+        .afc()
+        .send_data(afc_id, msg.as_bytes())
+        .await?;
+    debug!(msg = msg, "sent message");
+
+    do_poll!(team.membera.client, team.memberb.client);
+
+    let got = team
+        .memberb
+        .client
+        .afc()
+        .try_recv_data()
+        .expect("should have a message");
+    let want = Message {
+        data: msg.as_bytes().to_vec(),
+        // We don't know the address of outgoing connections, so
+        // assume `got.addr` is correct here.
+        address: got.address,
+        channel: afc_id,
+        label,
+        seq: Seq::ZERO,
+    };
+    assert_eq!(got, want, "a->b");
 
     Ok(())
 }
