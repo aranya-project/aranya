@@ -86,10 +86,6 @@ criteria = "safe-to-deploy"
 version = "3.0.6"
 criteria = "safe-to-deploy"
 
-[[exemptions.anyhow]]
-version = "1.0.94"
-criteria = "safe-to-deploy"
-
 [[exemptions.async-trait]]
 version = "0.1.83"
 criteria = "safe-to-deploy"
@@ -484,10 +480,6 @@ criteria = "safe-to-run"
 
 [[exemptions.sec1]]
 version = "0.7.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.semver]]
-version = "1.0.24"
 criteria = "safe-to-deploy"
 
 [[exemptions.serde_json]]

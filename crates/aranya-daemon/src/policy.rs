@@ -54,17 +54,10 @@ pub enum Effect {
     AfcNetworkNameUnset(AfcNetworkNameUnset),
     AqcNetworkNameSet(AqcNetworkNameSet),
     AqcNetworkNameUnset(AqcNetworkNameUnset),
-    AfcBidiChannelCreated(AfcBidiChannelCreated),
-    AfcBidiChannelReceived(AfcBidiChannelReceived),
-    AfcUniChannelCreated(AfcUniChannelCreated),
-    AfcUniChannelReceived(AfcUniChannelReceived),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
-    QueryDeviceLabelAssignmentsResult(QueryDeviceLabelAssignmentsResult),
-    QueryAfcNetIdentifierResult(QueryAfcNetIdentifierResult),
     QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
-    QueryLabelExistsResult(QueryLabelExistsResult),
 }
 /// TeamCreated policy effect.
 #[effect]
@@ -168,52 +161,6 @@ pub struct AqcNetworkNameSet {
 pub struct AqcNetworkNameUnset {
     pub device_id: Id,
 }
-/// AfcBidiChannelCreated policy effect.
-#[effect]
-pub struct AfcBidiChannelCreated {
-    pub parent_cmd_id: Id,
-    pub author_id: Id,
-    pub author_enc_key_id: Id,
-    pub peer_id: Id,
-    pub peer_enc_pk: Vec<u8>,
-    pub label: i64,
-    pub channel_key_id: Id,
-}
-/// AfcBidiChannelReceived policy effect.
-#[effect]
-pub struct AfcBidiChannelReceived {
-    pub parent_cmd_id: Id,
-    pub author_id: Id,
-    pub author_enc_pk: Vec<u8>,
-    pub peer_id: Id,
-    pub peer_enc_key_id: Id,
-    pub label: i64,
-    pub encap: Vec<u8>,
-}
-/// AfcUniChannelCreated policy effect.
-#[effect]
-pub struct AfcUniChannelCreated {
-    pub parent_cmd_id: Id,
-    pub author_id: Id,
-    pub writer_id: Id,
-    pub reader_id: Id,
-    pub author_enc_key_id: Id,
-    pub peer_enc_pk: Vec<u8>,
-    pub label: i64,
-    pub channel_key_id: Id,
-}
-/// AfcUniChannelReceived policy effect.
-#[effect]
-pub struct AfcUniChannelReceived {
-    pub parent_cmd_id: Id,
-    pub author_id: Id,
-    pub writer_id: Id,
-    pub reader_id: Id,
-    pub author_enc_pk: Vec<u8>,
-    pub peer_enc_key_id: Id,
-    pub label: i64,
-    pub encap: Vec<u8>,
-}
 /// QueryDevicesOnTeamResult policy effect.
 #[effect]
 pub struct QueryDevicesOnTeamResult {
@@ -229,25 +176,10 @@ pub struct QueryDeviceRoleResult {
 pub struct QueryDeviceKeyBundleResult {
     pub device_keys: KeyBundle,
 }
-/// QueryDeviceLabelAssignmentsResult policy effect.
-#[effect]
-pub struct QueryDeviceLabelAssignmentsResult {
-    pub label: i64,
-}
-/// QueryAfcNetIdentifierResult policy effect.
-#[effect]
-pub struct QueryAfcNetIdentifierResult {
-    pub net_identifier: String,
-}
 /// QueryAqcNetIdentifierResult policy effect.
 #[effect]
 pub struct QueryAqcNetIdentifierResult {
     pub net_identifier: String,
-}
-/// QueryLabelExistsResult policy effect.
-#[effect]
-pub struct QueryLabelExistsResult {
-    pub label_exists: bool,
 }
 /// Implements all supported policy actions.
 #[actions]
@@ -284,25 +216,8 @@ pub trait ActorExt {
         net_identifier: String,
     ) -> Result<(), ClientError>;
     fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn create_afc_bidi_channel(
-        &mut self,
-        peer_id: Id,
-        label: i64,
-    ) -> Result<(), ClientError>;
-    fn create_afc_uni_channel(
-        &mut self,
-        writer_id: Id,
-        reader_id: Id,
-        label: i64,
-    ) -> Result<(), ClientError>;
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
     fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn query_device_label_assignments(
-        &mut self,
-        device_id: Id,
-    ) -> Result<(), ClientError>;
-    fn query_afc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn query_label_exists(&mut self, label: i64) -> Result<(), ClientError>;
 }

@@ -273,7 +273,6 @@ dependencies = [
  "aranya-daemon-api",
  "aranya-util",
  "backon",
- "buggy",
  "tempfile",
  "tokio",
  "tracing",
