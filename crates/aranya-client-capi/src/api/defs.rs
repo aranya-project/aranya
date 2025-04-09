@@ -1226,15 +1226,23 @@ pub fn query_devices_on_team(
     Ok(())
 }
 
-/// The size in bytes of a `DeviceId` converted to a human-readable base64 string.
-pub const ARANYA_DEVICE_ID_STR_LEN: u64 = (64 * 1375) / 1000 + 1;
+/// The size in bytes of an ID converted to a human-readable base58 string.
+pub const ARANYA_ID_STR_LEN: u64 = (64 * 1375) / 1000 + 1;
+
+/// The size in bytes of an ID
+pub const ARANYA_ID_LEN: u64 = 64; // size_of::<aranya_fast_channels::crypto::aranya_crypto::Id>() as u64;
+
+const _: () = {
+    assert!(ARANYA_ID_LEN == size_of::<aranya_fast_channels::crypto::aranya_crypto::Id>() as u64);
+};
 
 /// Writes the human-readable encoding of `device` to `str`.
 ///
-/// To always succeed, `str` must be at least `ARANYA_DEVICE_ID_STR_LEN` bytes long.
+/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
 ///
 /// @param device ID [`DeviceId`].
-/// @param device ID string [`DeviceId`].
+/// @param str ID string [`DeviceId`].
+/// @param str_len returns the length of `str`
 ///
 /// @relates AranyaError.
 #[aranya_capi_core::no_ext_error]
@@ -1246,6 +1254,97 @@ pub fn device_id_to_str(
     let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
     aranya_capi_core::write_c_str(str, &device.0, str_len)?;
     Ok(())
+}
+
+/// Returns the bytes of `device_id` as an array.
+///
+/// @param device ID [`DeviceId`].
+///
+/// cbindgen:ptrs-as-arrays=[[bytes; 64]]
+// TODO: bytes param comment
+#[aranya_capi_core::no_ext_error]
+pub fn device_id_to_bytes(device_id: &DeviceId, bytes: &mut [u8]) -> Result<(), imp::Error> {
+    let src = device_id.0.as_array();
+    if bytes.len() >= src.len() {
+        bytes[0..src.len()].copy_from_slice(src);
+        Ok(())
+    } else {
+        Err(imp::Error::BufferTooSmall)
+    }
+}
+
+/// Writes the human-readable encoding of `team` to `str`.
+///
+/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
+///
+/// @param team ID [`TeamId`].
+/// @param str ID string [`TeamId`].
+/// @param str_len returns the length of `str`
+///
+/// @relates AranyaError.
+#[aranya_capi_core::no_ext_error]
+pub fn team_id_to_str(
+    team: TeamId,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    aranya_capi_core::write_c_str(str, &team.0, str_len)?;
+    Ok(())
+}
+
+/// Returns the bytes of `team_id` as an array.
+///
+/// @param device ID [`TeamId`].
+///
+// TODO: bytes param comment
+#[aranya_capi_core::no_ext_error]
+pub fn team_id_to_bytes(team_id: &TeamId, bytes: &mut [u8]) -> Result<(), imp::Error> {
+    let src = team_id.0.as_array();
+    if bytes.len() >= src.len() {
+        bytes[0..src.len()].copy_from_slice(src);
+        Ok(())
+    } else {
+        Err(imp::Error::BufferTooSmall)
+    }
+}
+
+/// Writes the human-readable encoding of `channel` to `str`.
+///
+/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
+///
+/// @param channel ID [`ChannelId`].
+/// @param str ID string [`ChannelId`].
+/// @param str_len returns the length of `str`
+///
+/// @relates AranyaError.
+#[aranya_capi_core::no_ext_error]
+#[cfg(feature = "afc")]
+pub fn channel_id_to_str(
+    channel: ChannelId,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    aranya_capi_core::write_c_str(str, &channel.0, str_len)?;
+    Ok(())
+}
+
+/// Returns the bytes of `channel_id` as an array.
+///
+/// @param device ID [`ChannelId`].
+///
+// TODO: bytes param comment
+#[aranya_capi_core::no_ext_error]
+#[cfg(feature = "afc")]
+pub fn channel_id_to_bytes(channel_id: &ChannelId, bytes: &mut [u8]) {
+    let src = channel_id.0.as_array();
+    if bytes.len() >= src.len() {
+        bytes[0..src.len()].copy_from_slice(src);
+        Ok(())
+    } else {
+        Err(imp::Error::BufferTooSmall)
+    }
 }
 
 // TODO: query_device_role
