@@ -239,7 +239,10 @@ pub trait DaemonApi {
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device AFC label assignments.
-    async fn query_device_afc_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
+    async fn query_device_afc_label_assignments(
+        team: TeamId,
+        device: DeviceId,
+    ) -> Result<Vec<Label>>;
     /// Query AFC network ID.
     async fn query_afc_net_identifier(
         team: TeamId,

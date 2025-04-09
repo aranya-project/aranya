@@ -814,7 +814,11 @@ pub unsafe fn aqc_remove_net_identifier(
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn create_afc_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
+pub fn create_afc_label(
+    client: &mut Client,
+    team: &TeamId,
+    label: Label,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
         .rt
@@ -832,7 +836,11 @@ pub fn create_afc_label(client: &mut Client, team: &TeamId, label: Label) -> Res
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
-pub fn delete_afc_label(client: &mut Client, team: &TeamId, label: Label) -> Result<(), imp::Error> {
+pub fn delete_afc_label(
+    client: &mut Client,
+    team: &TeamId,
+    label: Label,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
         .rt
@@ -1373,8 +1381,11 @@ pub unsafe fn query_afc_label_exists(
     label: &Label,
 ) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
-    let exists = client
-        .rt
-        .block_on(client.inner.queries(team.0).afc_label_exists(label.0.into()))?;
+    let exists = client.rt.block_on(
+        client
+            .inner
+            .queries(team.0)
+            .afc_label_exists(label.0.into()),
+    )?;
     Ok(exists)
 }

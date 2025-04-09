@@ -562,7 +562,12 @@ impl DaemonApi for DaemonApiHandler {
 
     #[cfg(any())]
     #[instrument(skip(self))]
-    async fn create_afc_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
+    async fn create_afc_label(
+        self,
+        _: context::Context,
+        team: TeamId,
+        label: Label,
+    ) -> ApiResult<()> {
         self.client
             .actions(&team.into_id().into())
             .define_afc_label(label)
@@ -572,13 +577,23 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn create_afc_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
+    async fn create_afc_label(
+        self,
+        _: context::Context,
+        team: TeamId,
+        label: Label,
+    ) -> ApiResult<()> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
     #[cfg(any())]
     #[instrument(skip(self))]
-    async fn delete_afc_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
+    async fn delete_afc_label(
+        self,
+        _: context::Context,
+        team: TeamId,
+        label: Label,
+    ) -> ApiResult<()> {
         self.client
             .actions(&team.into_id().into())
             .undefine_afc_label(label)
@@ -588,7 +603,12 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn delete_afc_label(self, _: context::Context, team: TeamId, label: Label) -> ApiResult<()> {
+    async fn delete_afc_label(
+        self,
+        _: context::Context,
+        team: TeamId,
+        label: Label,
+    ) -> ApiResult<()> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
@@ -969,7 +989,12 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn query_afc_label_exists(self, _: context::Context, _: TeamId, _: Label) -> ApiResult<bool> {
+    async fn query_afc_label_exists(
+        self,
+        _: context::Context,
+        _: TeamId,
+        _: Label,
+    ) -> ApiResult<bool> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 }
