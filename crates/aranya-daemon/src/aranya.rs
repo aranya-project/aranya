@@ -4,8 +4,9 @@ use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, syn
 
 use anyhow::{bail, Context, Result};
 use aranya_crypto::{Csprng, DeviceId, Rng};
-#[cfg(feature = "afc")]
+#[cfg(any())]
 use aranya_daemon_api::NetIdentifier;
+#[cfg(any())]
 use aranya_fast_channels::Label;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
@@ -16,7 +17,7 @@ use aranya_runtime::{
 };
 use aranya_util::Addr;
 use buggy::bug;
-#[cfg(feature = "afc")]
+#[cfg(any())]
 use futures_util::TryFutureExt as _;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -44,7 +45,7 @@ pub enum SyncResponse {
 /// Aranya client.
 pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
-    aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
     _eng: PhantomData<CE>,
 }
 
@@ -694,6 +695,7 @@ where
     /// Query device AFC label assignments off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
+    #[cfg(any())]
     fn query_device_afc_label_assignments_off_graph(
         &self,
         device_id: DeviceId,
@@ -708,7 +710,7 @@ where
     /// Query AFC net identifier off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn query_afc_net_identifier_off_graph(
         &self,
         device_id: DeviceId,
@@ -737,6 +739,7 @@ where
     /// Query AFC label exists off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
+    #[cfg(any())]
     fn query_afc_label_exists_off_graph(
         &self,
         label: Label,
@@ -751,7 +754,7 @@ where
     /// Query assigned network identifiers.
     #[allow(clippy::type_complexity)]
     #[instrument(skip_all)]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn query_afc_network_names(
         &self,
     ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {

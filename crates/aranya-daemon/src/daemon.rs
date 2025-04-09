@@ -120,6 +120,7 @@ impl Daemon {
                     peers,
                     recv_effects,
                 )
+                .await
                 .context("Unable to start daemon API!")?
             }
             #[cfg(not(feature = "afc"))]
@@ -132,6 +133,7 @@ impl Daemon {
                     peers,
                     recv_effects,
                 )
+                .await
                 .context("Unable to start daemon API!")?
             }
         };

@@ -13,6 +13,8 @@ use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
+#[cfg(feature = "afc")]
+use aranya_client::afc::Label;
 use aranya_client::client::Client;
 #[cfg(feature = "afc")]
 use aranya_client::SyncPeerConfig;
@@ -21,6 +23,8 @@ use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
+#[cfg(feature = "afc")]
+use aranya_daemon_api::NetIdentifier;
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
 use aranya_util::addr::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -289,7 +293,7 @@ impl DeviceCtx {
         Ok(self.client.local_addr().await?)
     }
 
-    #[cfg(any())]
+    #[cfg(feature = "afc")]
     async fn afc_local_addr(&mut self) -> Result<SocketAddr> {
         Ok(self.client.afc().local_addr().await?)
     }
@@ -1245,9 +1249,13 @@ async fn test_afc_persist_net_identifier() -> Result<()> {
 
     // operator assigns labels for AFC channels.
     let label = Label::new(1);
-    operator_team.create_label(label).await?;
-    operator_team.assign_label(team.membera.id, label).await?;
-    operator_team.assign_label(team.memberb.id, label).await?;
+    operator_team.create_afc_label(label).await?;
+    operator_team
+        .assign_afc_label(team.membera.id, label)
+        .await?;
+    operator_team
+        .assign_afc_label(team.memberb.id, label)
+        .await?;
 
     // assign network addresses.
     operator_team
