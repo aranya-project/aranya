@@ -1,7 +1,7 @@
 #[cfg(feature = "afc")]
 use core::ptr;
 use core::{ffi::c_char, ops::DerefMut, slice};
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+use std::{ffi::OsStr, mem, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use tracing::debug;
@@ -186,9 +186,9 @@ pub struct Id {
     bytes: [u8; ARANYA_ID_LEN],
 }
 
-impl From<&Id> for aranya_crypto::Id {
-    fn from(value: &Id) -> Self {
-        Self::from(value.bytes)
+impl AsRef<aranya_crypto::Id> for Id {
+    fn as_ref(&self) -> &aranya_crypto::Id {
+        unsafe { mem::transmute(self) }
     }
 }
 
@@ -1316,7 +1316,7 @@ pub fn id_to_str(
     str_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
-    aranya_capi_core::write_c_str(str, &aranya_crypto::Id::from(id), str_len)?;
+    aranya_capi_core::write_c_str(str, id.as_ref(), str_len)?;
     Ok(())
 }
 
