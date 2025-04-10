@@ -1,7 +1,6 @@
 use aranya_crypto::apq::Version as AqcVersion;
 #[cfg(feature = "afc")]
 use aranya_daemon_api::AfcId;
-use aranya_daemon_api::AqcId;
 #[cfg(feature = "afc")]
 use aranya_fast_channels::Version;
 
