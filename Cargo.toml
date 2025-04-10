@@ -47,7 +47,6 @@ aranya-device-ffi = { version = "0.6.0" }
 aranya-envelope-ffi = { version = "0.6.0" }
 aranya-fast-channels = { version = "0.6.0", features = ["posix", "std", "memory"] }
 aranya-idam-ffi = { version = "0.6.0" }
-aranya-libc = { version = "0.6.0" }
 aranya-perspective-ffi = { version = "0.6.0" }
 aranya-policy-compiler = { version = "0.6.0" }
 aranya-policy-ifgen = { version = "0.6.0", features = ["serde"] }
