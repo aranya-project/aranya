@@ -186,6 +186,12 @@ pub struct Id {
     bytes: [u8; ARANYA_ID_LEN],
 }
 
+impl From<&Id> for aranya_crypto::Id {
+    fn from(value: &Id) -> Self {
+        Self::from(value.bytes)
+    }
+}
+
 /// Team ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -1294,43 +1300,23 @@ pub fn query_devices_on_team(
 /// The size in bytes of an ID converted to a human-readable base58 string.
 pub const ARANYA_ID_STR_LEN: u64 = (64 * 1375) / 1000 + 1;
 
-/// Writes the human-readable encoding of `device` to `str`.
+/// Writes the human-readable encoding of `id` to `str`.
 ///
 /// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
 ///
-/// @param device ID [`DeviceId`].
-/// @param str ID string [`DeviceId`].
+/// @param device ID [`Id`].
+/// @param str ID string [`Id`].
 /// @param str_len returns the length of `str`
 ///
 /// @relates AranyaError.
 #[aranya_capi_core::no_ext_error]
-pub fn device_id_to_str(
-    device: &DeviceId,
+pub fn id_to_str(
+    id: &Id,
     str: &mut MaybeUninit<c_char>,
     str_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
-    aranya_capi_core::write_c_str(str, &aranya_daemon_api::DeviceId::from(device), str_len)?;
-    Ok(())
-}
-
-/// Writes the human-readable encoding of `team` to `str`.
-///
-/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
-///
-/// @param team ID [`TeamId`].
-/// @param str ID string [`TeamId`].
-/// @param str_len returns the length of `str`
-///
-/// @relates AranyaError.
-#[aranya_capi_core::no_ext_error]
-pub fn team_id_to_str(
-    team: &TeamId,
-    str: &mut MaybeUninit<c_char>,
-    str_len: &mut usize,
-) -> Result<(), imp::Error> {
-    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
-    aranya_capi_core::write_c_str(str, &aranya_daemon_api::TeamId::from(team), str_len)?;
+    aranya_capi_core::write_c_str(str, &aranya_crypto::Id::from(id), str_len)?;
     Ok(())
 }
 

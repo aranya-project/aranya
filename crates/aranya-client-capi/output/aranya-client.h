@@ -1153,34 +1153,19 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
                                              struct AranyaExtError *__ext_err);
 
 /**
- * Writes the human-readable encoding of `device` to `str`.
+ * Writes the human-readable encoding of `id` to `str`.
  *
  * To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
  *
- * @param device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param str ID string [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param device ID [`AranyaId`](@ref AranyaId).
+ * @param str ID string [`AranyaId`](@ref AranyaId).
  * @param str_len returns the length of `str`
  *
  * @relates AranyaError.
  */
-AranyaError aranya_device_id_to_str(const struct AranyaDeviceId *device,
-                                    char *str,
-                                    size_t *str_len);
-
-/**
- * Writes the human-readable encoding of `team` to `str`.
- *
- * To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
- *
- * @param team ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param str ID string [`AranyaTeamId`](@ref AranyaTeamId).
- * @param str_len returns the length of `str`
- *
- * @relates AranyaError.
- */
-AranyaError aranya_team_id_to_str(const struct AranyaTeamId *team,
-                                  char *str,
-                                  size_t *str_len);
+AranyaError aranya_id_to_str(const struct AranyaId *id,
+                             char *str,
+                             size_t *str_len);
 
 /**
  * Query device's keybundle.
