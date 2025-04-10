@@ -14,23 +14,17 @@ use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{Client, TeamConfigBuilder};
+use aranya_client::{client::Client, TeamConfigBuilder};
 #[cfg(feature = "afc")]
-use aranya_client::{Message, SyncPeerConfig};
+use aranya_client::SyncPeerConfig;
 use aranya_crypto::{hash::Hash as _, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
-#[cfg(feature = "afc")]
-use aranya_daemon_api::NetIdentifier;
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
-#[cfg(feature = "afc")]
-use aranya_fast_channels::{Label, Seq};
-use aranya_util::Addr;
+use aranya_util::addr::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
-#[cfg(feature = "afc")]
-use buggy::BugExt as _;
 use spideroak_base58::ToBase58 as _;
 use tempfile::tempdir;
 use test_log::test;
@@ -140,7 +134,7 @@ fn trim(mut d: u128, mut width: usize) -> (u128, usize) {
 /// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the
 /// clients are pending.
 // TODO(nikki): alternative to select!{} to resolve lifetime issues
-#[cfg(feature = "afc")]
+#[cfg(any())]
 macro_rules! do_poll {
     ($($client:expr),*) => {
         debug!(
@@ -293,7 +287,7 @@ impl DeviceCtx {
         Ok(self.client.local_addr().await?)
     }
 
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     async fn afc_local_addr(&mut self) -> Result<SocketAddr> {
         Ok(self.client.afc().local_addr().await?)
     }
@@ -398,10 +392,6 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let membera_addr = team.membera.aranya_local_addr().await?;
     let memberb_addr = team.memberb.aranya_local_addr().await?;
 
-    // get afc addresses.
-    let membera_afc_addr = team.membera.afc_local_addr().await?;
-    let memberb_afc_addr = team.memberb.afc_local_addr().await?;
-
     // setup sync peers.
     let mut owner_team = team.owner.client.team(team_id);
     let mut admin_team = team.admin.client.team(team_id);
@@ -504,31 +494,38 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // operator assigns labels for AFC channels.
-    let label1 = Label::new(1);
-    operator_team.create_label(label1).await?;
-    operator_team.assign_label(team.membera.id, label1).await?;
-    operator_team.assign_label(team.memberb.id, label1).await?;
+    #[cfg(any())]
+    {
+        // get afc addresses.
+        let membera_afc_addr = team.membera.afc_local_addr().await?;
+        let memberb_afc_addr = team.memberb.afc_local_addr().await?;
 
-    let label2 = Label::new(2);
-    operator_team.create_label(label2).await?;
-    operator_team.assign_label(team.membera.id, label2).await?;
-    operator_team.assign_label(team.memberb.id, label2).await?;
+        // operator assigns labels for AFC channels.
+        let label1 = Label::new(1);
+        operator_team.create_label(label1).await?;
+        operator_team.assign_label(team.membera.id, label1).await?;
+        operator_team.assign_label(team.memberb.id, label1).await?;
 
-    // assign network addresses.
-    operator_team
-        .assign_afc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
-        .await?;
-    operator_team
-        .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
-        .await?;
-    // TODO: use aqc addr
-    operator_team
-        .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
-        .await?;
-    operator_team
-        .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
-        .await?;
+        let label2 = Label::new(2);
+        operator_team.create_label(label2).await?;
+        operator_team.assign_label(team.membera.id, label2).await?;
+        operator_team.assign_label(team.memberb.id, label2).await?;
+
+        // assign network addresses.
+        operator_team
+            .assign_afc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
+            .await?;
+        operator_team
+            .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
+            .await?;
+        // TODO: use aqc addr
+        operator_team
+            .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
+            .await?;
+        operator_team
+            .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
+            .await?;
+    }
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -543,104 +540,111 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     debug!("membera role: {:?}", role);
     let keybundle = queries.device_keybundle(team.membera.id).await?;
     debug!("membera keybundle: {:?}", keybundle);
-    let labels = queries.device_label_assignments(team.membera.id).await?;
-    assert_eq!(labels.iter().count(), 2);
-    debug!("membera labels: {:?}", labels.__data());
-    let afc_net_identifier = queries
-        .afc_net_identifier(team.membera.id)
-        .await?
-        .expect("expected net identifier");
-    assert_eq!(
-        afc_net_identifier,
-        NetIdentifier(membera_afc_addr.to_string())
-    );
-    debug!("membera afc_net_identifer: {:?}", afc_net_identifier);
-    let aqc_net_identifier = queries
-        .aqc_net_identifier(team.membera.id)
-        .await?
-        .expect("expected net identifier");
-    assert_eq!(
-        aqc_net_identifier,
-        NetIdentifier(membera_afc_addr.to_string())
-    );
-    debug!("membera aqc_net_identifer: {:?}", aqc_net_identifier);
-    let label_exists = queries.label_exists(label1).await?;
-    assert!(label_exists);
-    debug!("membera label1 exists?: {:?}", label_exists);
 
-    // membera creates bidi channel with memberb
-    let afc_id1 = team
-        .membera
-        .client
-        .afc()
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
-        .await?;
+    #[cfg(any())]
+    {
+        let aqc_net_identifier = queries
+            .aqc_net_identifier(team.membera.id)
+            .await?
+            .expect("expected net identifier");
+        assert_eq!(
+            aqc_net_identifier,
+            NetIdentifier(membera_afc_addr.to_string())
+        );
 
-    // membera creates bidi channel with memberb
-    let afc_id2 = team
-        .membera
-        .client
-        .afc()
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
-        .await?;
+        let labels = queries.device_label_assignments(team.membera.id).await?;
+        assert_eq!(labels.iter().count(), 2);
+        debug!("membera labels: {:?}", labels.__data());
 
-    // wait for ctrl message to be sent.
-    sleep(Duration::from_millis(100)).await;
+        let afc_net_identifier = queries
+            .afc_net_identifier(team.membera.id)
+            .await?
+            .expect("expected net identifier");
+        assert_eq!(
+            afc_net_identifier,
+            NetIdentifier(membera_afc_addr.to_string())
+        );
+        debug!("membera afc_net_identifer: {:?}", afc_net_identifier);
 
-    do_poll!(team.membera.client, team.memberb.client);
+        debug!("membera aqc_net_identifer: {:?}", aqc_net_identifier);
+        let label_exists = queries.label_exists(label1).await?;
+        assert!(label_exists);
+        debug!("membera label1 exists?: {:?}", label_exists);
 
-    let msgs = ["hello world label1", "hello world label2"];
+        // membera creates bidi channel with memberb
+        let afc_id1 = team
+            .membera
+            .client
+            .afc()
+            .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+            .await?;
 
-    team.membera
-        .client
-        .afc()
-        .send_data(afc_id1, msgs[0].as_bytes())
-        .await?;
-    debug!(msg = msgs[0], "sent message");
+        // membera creates bidi channel with memberb
+        let afc_id2 = team
+            .membera
+            .client
+            .afc()
+            .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
+            .await?;
 
-    team.membera
-        .client
-        .afc()
-        .send_data(afc_id2, msgs[1].as_bytes())
-        .await?;
-    debug!(msg = msgs[1], "sent message");
+        // wait for ctrl message to be sent.
+        sleep(Duration::from_millis(100)).await;
 
-    sleep(sleep_interval).await;
-    do_poll!(team.membera.client, team.memberb.client);
+        do_poll!(team.membera.client, team.memberb.client);
 
-    let got = team
-        .memberb
-        .client
-        .afc()
-        .try_recv_data()
-        .expect("should have a message");
-    let want = Message {
-        data: msgs[0].as_bytes().to_vec(),
-        // We don't know the address of outgoing connections, so
-        // assume `got.addr` is correct here.
-        address: got.address,
-        channel: afc_id1,
-        label: label1,
-        seq: Seq::ZERO,
-    };
-    assert_eq!(got, want);
+        let msgs = ["hello world label1", "hello world label2"];
 
-    let got = team
-        .memberb
-        .client
-        .afc()
-        .try_recv_data()
-        .expect("should have a message");
-    let want = Message {
-        data: msgs[1].as_bytes().to_vec(),
-        // We don't know the address of outgoing connections, so
-        // assume `got.addr` is correct here.
-        address: got.address,
-        channel: afc_id2,
-        label: label2,
-        seq: Seq::ZERO,
-    };
-    assert_eq!(got, want);
+        team.membera
+            .client
+            .afc()
+            .send_data(afc_id1, msgs[0].as_bytes())
+            .await?;
+        debug!(msg = msgs[0], "sent message");
+
+        team.membera
+            .client
+            .afc()
+            .send_data(afc_id2, msgs[1].as_bytes())
+            .await?;
+        debug!(msg = msgs[1], "sent message");
+
+        sleep(sleep_interval).await;
+        do_poll!(team.membera.client, team.memberb.client);
+
+        let got = team
+            .memberb
+            .client
+            .afc()
+            .try_recv_data()
+            .expect("should have a message");
+        let want = Message {
+            data: msgs[0].as_bytes().to_vec(),
+            // We don't know the address of outgoing connections, so
+            // assume `got.addr` is correct here.
+            address: got.address,
+            channel: afc_id1,
+            label: label1,
+            seq: Seq::ZERO,
+        };
+        assert_eq!(got, want);
+
+        let got = team
+            .memberb
+            .client
+            .afc()
+            .try_recv_data()
+            .expect("should have a message");
+        let want = Message {
+            data: msgs[1].as_bytes().to_vec(),
+            // We don't know the address of outgoing connections, so
+            // assume `got.addr` is correct here.
+            address: got.address,
+            channel: afc_id2,
+            label: label2,
+            seq: Seq::ZERO,
+        };
+        assert_eq!(got, want);
+    }
 
     Ok(())
 }
@@ -674,10 +678,6 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let membera_addr = team.membera.aranya_local_addr().await?;
     let memberb_addr = team.memberb.aranya_local_addr().await?;
 
-    // get afc addresses.
-    let membera_afc_addr = team.membera.afc_local_addr().await?;
-    let memberb_afc_addr = team.memberb.afc_local_addr().await?;
-
     // setup sync peers.
     let mut owner_team = team.owner.client.team(team_id);
     let mut admin_team = team.admin.client.team(team_id);
@@ -783,82 +783,89 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     // ==== BASIC SETUP DONE ====
 
     // operator assigns labels for AFC channels.
-    let label1 = Label::new(1);
-    operator_team.create_label(label1).await?;
-    operator_team.assign_label(team.membera.id, label1).await?;
-    operator_team.assign_label(team.memberb.id, label1).await?;
+    #[cfg(any())]
+    {
+        // get afc addresses.
+        let membera_afc_addr = team.membera.afc_local_addr().await?;
+        let memberb_afc_addr = team.memberb.afc_local_addr().await?;
 
-    // assign network addresses.
-    operator_team
-        .assign_afc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
-        .await?;
-    operator_team
-        .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
-        .await?;
+        let label1 = Label::new(1);
+        operator_team.create_label(label1).await?;
+        operator_team.assign_label(team.membera.id, label1).await?;
+        operator_team.assign_label(team.memberb.id, label1).await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
+        // assign network addresses.
+        operator_team
+            .assign_afc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
+            .await?;
+        operator_team
+            .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
+            .await?;
 
-    // membera creates bidi channel with memberb
-    let afc_id1 = team
-        .membera
-        .client
-        .afc()
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
-        .await?;
+        // wait for syncing.
+        sleep(sleep_interval).await;
 
-    let msg = "a to b";
-    team.membera
-        .client
-        .afc()
-        .send_data(afc_id1, msg.as_bytes())
-        .await?;
-    debug!(msg = msg, "sent message");
+        // membera creates bidi channel with memberb
+        let afc_id1 = team
+            .membera
+            .client
+            .afc()
+            .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+            .await?;
 
-    do_poll!(team.membera.client, team.memberb.client);
+        let msg = "a to b";
+        team.membera
+            .client
+            .afc()
+            .send_data(afc_id1, msg.as_bytes())
+            .await?;
+        debug!(msg = msg, "sent message");
 
-    let got = team
-        .memberb
-        .client
-        .afc()
-        .try_recv_data()
-        .expect("should have a message");
-    let want = Message {
-        data: msg.as_bytes().to_vec(),
-        // We don't know the address of outgoing connections, so
-        // assume `got.addr` is correct here.
-        address: got.address,
-        channel: afc_id1,
-        label: label1,
-        seq: Seq::ZERO,
-    };
-    assert_eq!(got, want, "a->b");
+        do_poll!(team.membera.client, team.memberb.client);
 
-    let msg = "b to a";
-    team.memberb
-        .client
-        .afc()
-        .send_data(afc_id1, msg.as_bytes())
-        .await?;
-    debug!(msg, "sent message");
+        let got = team
+            .memberb
+            .client
+            .afc()
+            .try_recv_data()
+            .expect("should have a message");
+        let want = Message {
+            data: msg.as_bytes().to_vec(),
+            // We don't know the address of outgoing connections, so
+            // assume `got.addr` is correct here.
+            address: got.address,
+            channel: afc_id1,
+            label: label1,
+            seq: Seq::ZERO,
+        };
+        assert_eq!(got, want, "a->b");
 
-    sleep(Duration::from_secs(1)).await;
-    do_poll!(team.membera.client, team.memberb.client);
+        let msg = "b to a";
+        team.memberb
+            .client
+            .afc()
+            .send_data(afc_id1, msg.as_bytes())
+            .await?;
+        debug!(msg, "sent message");
 
-    let want = Message {
-        data: msg.as_bytes().to_vec(),
-        address: memberb_afc_addr,
-        channel: afc_id1,
-        label: label1,
-        seq: Seq::ZERO,
-    };
-    let got = team
-        .membera
-        .client
-        .afc()
-        .try_recv_data()
-        .expect("should have a message");
-    assert_eq!(got, want, "b->a");
+        sleep(Duration::from_secs(1)).await;
+        do_poll!(team.membera.client, team.memberb.client);
+
+        let want = Message {
+            data: msg.as_bytes().to_vec(),
+            address: memberb_afc_addr,
+            channel: afc_id1,
+            label: label1,
+            seq: Seq::ZERO,
+        };
+        let got = team
+            .membera
+            .client
+            .afc()
+            .try_recv_data()
+            .expect("should have a message");
+        assert_eq!(got, want, "b->a");
+    }
 
     Ok(())
 }
@@ -892,10 +899,6 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     let membera_addr = team.membera.aranya_local_addr().await?;
     let memberb_addr = team.memberb.aranya_local_addr().await?;
 
-    // get afc addresses.
-    let membera_afc_addr = team.membera.afc_local_addr().await?;
-    let memberb_afc_addr = team.memberb.afc_local_addr().await?;
-
     // setup sync peers.
     let mut owner_team = team.owner.client.team(team_id);
     let mut admin_team = team.admin.client.team(team_id);
@@ -1000,89 +1003,96 @@ async fn test_afc_monotonic_seq() -> Result<()> {
 
     // ==== BASIC SETUP DONE ====
 
-    // operator assigns labels for AFC channels.
-    let label1 = Label::new(1);
-    operator_team.create_label(label1).await?;
-    operator_team.assign_label(team.membera.id, label1).await?;
-    operator_team.assign_label(team.memberb.id, label1).await?;
+    #[cfg(any())]
+    {
+        // get afc addresses.
+        let membera_afc_addr = team.membera.afc_local_addr().await?;
+        let memberb_afc_addr = team.memberb.afc_local_addr().await?;
 
-    // assign network addresses.
-    operator_team
-        .assign_afc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
-        .await?;
-    operator_team
-        .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
-        .await?;
+        // operator assigns labels for AFC channels.
+        let label1 = Label::new(1);
+        operator_team.create_label(label1).await?;
+        operator_team.assign_label(team.membera.id, label1).await?;
+        operator_team.assign_label(team.memberb.id, label1).await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // membera creates bidi channel with memberb
-    let afc_id1 = team
-        .membera
-        .client
-        .afc()
-        .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
-        .await?;
-
-    for i in 0..10u64 {
-        let seq = Seq::new(i);
-
-        let msg = format!("ping {i}");
-        team.membera
-            .client
-            .afc()
-            .send_data(afc_id1, msg.as_bytes())
+        // assign network addresses.
+        operator_team
+            .assign_afc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
             .await?;
-        debug!(msg = msg, "sent message");
-
-        sleep(Duration::from_secs(1)).await;
-        do_poll!(team.membera.client, team.memberb.client);
-        do_poll!(team.membera.client, team.memberb.client);
-
-        let got = team
-            .memberb
-            .client
-            .afc()
-            .try_recv_data()
-            .expect("should have a message");
-        let want = Message {
-            data: msg.into(),
-            // We don't know the address of outgoing connections,
-            // so assume `got.addr` is correct here.
-            address: got.address,
-            channel: afc_id1,
-            label: label1,
-            seq,
-        };
-        assert_eq!(got, want, "a->b");
-
-        let msg = format!("pong {i}");
-        team.memberb
-            .client
-            .afc()
-            .send_data(afc_id1, msg.as_bytes())
+        operator_team
+            .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
             .await?;
-        debug!(msg, "sent message");
 
-        sleep(Duration::from_secs(1)).await;
-        do_poll!(team.membera.client, team.memberb.client);
-        do_poll!(team.membera.client, team.memberb.client);
+        // wait for syncing.
+        sleep(sleep_interval).await;
 
-        let want = Message {
-            data: msg.into(),
-            address: memberb_afc_addr,
-            channel: afc_id1,
-            label: label1,
-            seq,
-        };
-        let got = team
+        // membera creates bidi channel with memberb
+        let afc_id1 = team
             .membera
             .client
             .afc()
-            .try_recv_data()
-            .expect("should have a message");
-        assert_eq!(got, want, "b->a");
+            .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label1)
+            .await?;
+
+        for i in 0..10u64 {
+            let seq = Seq::new(i);
+
+            let msg = format!("ping {i}");
+            team.membera
+                .client
+                .afc()
+                .send_data(afc_id1, msg.as_bytes())
+                .await?;
+            debug!(msg = msg, "sent message");
+
+            sleep(Duration::from_secs(1)).await;
+            do_poll!(team.membera.client, team.memberb.client);
+            do_poll!(team.membera.client, team.memberb.client);
+
+            let got = team
+                .memberb
+                .client
+                .afc()
+                .try_recv_data()
+                .expect("should have a message");
+            let want = Message {
+                data: msg.into(),
+                // We don't know the address of outgoing connections,
+                // so assume `got.addr` is correct here.
+                address: got.address,
+                channel: afc_id1,
+                label: label1,
+                seq,
+            };
+            assert_eq!(got, want, "a->b");
+
+            let msg = format!("pong {i}");
+            team.memberb
+                .client
+                .afc()
+                .send_data(afc_id1, msg.as_bytes())
+                .await?;
+            debug!(msg, "sent message");
+
+            sleep(Duration::from_secs(1)).await;
+            do_poll!(team.membera.client, team.memberb.client);
+            do_poll!(team.membera.client, team.memberb.client);
+
+            let want = Message {
+                data: msg.into(),
+                address: memberb_afc_addr,
+                channel: afc_id1,
+                label: label1,
+                seq,
+            };
+            let got = team
+                .membera
+                .client
+                .afc()
+                .try_recv_data()
+                .expect("should have a message");
+            assert_eq!(got, want, "b->a");
+        }
     }
 
     Ok(())
