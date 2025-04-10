@@ -77,6 +77,11 @@
 #endif /* ARANYA_PACKED */
 
 
+/**
+ * The size in bytes of an ID
+ */
+#define ARANYA_ID_LEN 64
+
 #define ARANYA_DURATION_SECONDS (1000 * ARANYA_DURATION_MILLISECONDS)
 
 #define ARANYA_DURATION_MILLISECONDS (1000 * ARANYA_DURATION_MICROSECONDS)
@@ -89,11 +94,6 @@
  * The size in bytes of an ID converted to a human-readable base58 string.
  */
 #define ARANYA_ID_STR_LEN (((64 * 1375) / 1000) + 1)
-
-/**
- * The size in bytes of an ID
- */
-#define ARANYA_ID_LEN 64
 
 /**
  * An error code.
@@ -279,28 +279,22 @@ typedef struct ARANYA_DESIGNATED_INIT AranyaKeyBundle {
     size_t enc_key_len;
 } AranyaKeyBundle;
 
+typedef struct AranyaId {
+    uint8_t bytes[ARANYA_ID_LEN];
+} AranyaId;
+
 /**
  * Device ID.
  */
-typedef struct ARANYA_ALIGNED(1) AranyaDeviceId {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[64];
+typedef struct AranyaDeviceId {
+    struct AranyaId id;
 } AranyaDeviceId;
 
 /**
  * Team ID.
  */
-typedef struct ARANYA_ALIGNED(1) AranyaTeamId {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[64];
+typedef struct AranyaTeamId {
+    struct AranyaId id;
 } AranyaTeamId;
 
 /**
@@ -1169,19 +1163,9 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
  *
  * @relates AranyaError.
  */
-AranyaError aranya_device_id_to_str(struct AranyaDeviceId device,
+AranyaError aranya_device_id_to_str(const struct AranyaDeviceId *device,
                                     char *str,
                                     size_t *str_len);
-
-/**
- * Returns the bytes of `device_id` as an array.
- *
- * @param device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- *
- */
-AranyaError aranya_device_id_to_bytes(const struct AranyaDeviceId *device_id,
-                                      uint8_t *bytes,
-                                      size_t bytes_len);
 
 /**
  * Writes the human-readable encoding of `team` to `str`.
@@ -1194,19 +1178,9 @@ AranyaError aranya_device_id_to_bytes(const struct AranyaDeviceId *device_id,
  *
  * @relates AranyaError.
  */
-AranyaError aranya_team_id_to_str(struct AranyaTeamId team,
+AranyaError aranya_team_id_to_str(const struct AranyaTeamId *team,
                                   char *str,
                                   size_t *str_len);
-
-/**
- * Returns the bytes of `team_id` as an array.
- *
- * @param device ID [`AranyaTeamId`](@ref AranyaTeamId).
- *
- */
-AranyaError aranya_team_id_to_bytes(const struct AranyaTeamId *team_id,
-                                    uint8_t *bytes,
-                                    size_t bytes_len);
 
 /**
  * Query device's keybundle.

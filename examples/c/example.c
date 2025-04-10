@@ -426,7 +426,7 @@ AranyaError run(Team *t) {
         AranyaDeviceId device_result = devices[i];
         size_t device_str_len        = ARANYA_ID_STR_LEN;
         char *device_str             = malloc(ARANYA_ID_STR_LEN);
-        aranya_device_id_to_str(device_result, device_str, &device_str_len);
+        aranya_device_id_to_str(&device_result, device_str, &device_str_len);
         printf("device_id: %s at index: %zu/%zu \r\n", device_str, i,
                devices_len);
         free(device_str);
