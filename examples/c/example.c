@@ -665,7 +665,7 @@ AranyaError run_aqc_example(Team *t) {
     EXPECT("error assigning label to memberb", err);
     sleep(1);
 
-    // Create channel
+    // Create channel using Member A's client
     printf("creating AQC channel \r\n");
     AranyaAqcChannelId chan_id;
     err =
@@ -675,7 +675,7 @@ AranyaError run_aqc_example(Team *t) {
 
     // TODO: send AQC data
 
-    // Revoke/delete label
+    // Revoke/delete label using the Operator
     printf("revoke/delete label \r\n");
     err = aranya_revoke_label(&t->clients.operator.client, &t->id,
                               &t->clients.membera.id, &label_id);
