@@ -176,7 +176,7 @@ pub type Client = Safe<imp::Client>;
 pub const ARANYA_ID_LEN: usize = 64;
 
 const _: () = {
-    assert!(ARANYA_ID_LEN == size_of::<aranya_fast_channels::crypto::aranya_crypto::Id>());
+    assert!(ARANYA_ID_LEN == size_of::<aranya_crypto::Id>());
 };
 
 // Aranya ID
