@@ -14,9 +14,9 @@ use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{client::Client, TeamConfigBuilder};
 #[cfg(feature = "afc")]
 use aranya_client::SyncPeerConfig;
+use aranya_client::{client::Client, TeamConfigBuilder};
 use aranya_crypto::{hash::Hash as _, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},
