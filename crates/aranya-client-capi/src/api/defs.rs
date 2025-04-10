@@ -68,6 +68,9 @@ pub enum Error {
 
     #[capi(msg = "invalid index")]
     InvalidIndex,
+
+    #[capi(msg = "invalid config")]
+    Config,
 }
 
 impl From<&imp::Error> for Error {
@@ -85,13 +88,16 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Connecting(_) => Self::Connecting,
                 aranya_client::Error::Rpc(_) => Self::Rpc,
                 aranya_client::Error::Daemon(_) => Self::Daemon,
+                aranya_client::Error::Config(_) => Self::Config,
                 #[cfg(feature = "afc")]
                 aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::InvalidArg { .. } => Self::InvalidArgument,
+                _ => todo!(),
             },
             imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::InvalidIndex(_) => Self::InvalidIndex,
+            imp::Error::Config(_) => Self::Config,
         }
     }
 }
@@ -382,7 +388,7 @@ pub fn afc_config_builder_set_address(cfg: &mut AfcConfigBuilder, address: *cons
     cfg.addr = address;
 }
 
-/// Attempts to construct an [`AfcConfig`], returning an `Error::Bug`
+/// Attempts to construct an [`AfcConfig`], returning an `Error::InvalidArgument`
 /// if there are invalid parameters.
 ///
 /// @param cfg a pointer to the afc config builder
@@ -427,7 +433,7 @@ pub fn client_config_builder_set_afc_config(
     cfg.afc = Some(**afc_config);
 }
 
-/// Attempts to construct a [`ClientConfig`], returning an `Error::Bug`
+/// Attempts to construct a [`ClientConfig`], returning an `Error::InvalidArgument`
 /// if there are invalid parameters.
 ///
 /// @param cfg a pointer to the client config builder
@@ -518,27 +524,54 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
     Ok(DeviceId(id))
 }
 
+#[aranya_capi_core::opaque(size = 24, align = 8)]
+pub type TeamConfig = Safe<imp::TeamConfig>;
+
+#[aranya_capi_core::opaque(size = 4, align = 4)]
+pub type TeamConfigBuilder = imp::TeamConfigBuilder;
+
+/// Attempts to construct a [`TeamConfig`], returning an `Error::InvalidArgument`
+/// if there are invalid parameters.
+///
+/// @param cfg a pointer to the team config builder
+/// @param out a pointer to write the team config to
+pub fn team_config_builder_build(
+    cfg: &mut TeamConfigBuilder,
+    out: &mut MaybeUninit<TeamConfig>,
+) -> Result<(), imp::Error> {
+    Safe::init(out, cfg.build()?);
+    Ok(())
+}
+
 /// Create a new graph/team with the current device as the owner.
 ///
 /// @param client the Aranya Client [`Client`].
+/// @param cfg the Team Configuration [`TeamConfig`].
 /// @param __output the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-pub fn create_team(client: &mut Client) -> Result<TeamId, imp::Error> {
+#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
+pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.deref_mut();
-    let id = client.rt.block_on(client.inner.create_team())?;
+    let cfg = aranya_client::TeamConfigBuilder::new().build()?;
+    let id = client.rt.block_on(client.inner.create_team(cfg))?;
     Ok(TeamId(id))
 }
 
 /// Add a team to the local device store.
 ///
+/// NOTE: this function is unfinished and will panic if called.
+///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
+/// @param cfg the Team Configuration [`TeamConfig`].
 ///
 /// @relates AranyaClient.
-pub fn add_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
+pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(client.inner.add_team(team.0))?;
+    let cfg = aranya_client::TeamConfigBuilder::new().build()?;
+    client.rt.block_on(client.inner.add_team(team.0, cfg))?;
     Ok(())
 }
 
