@@ -1161,7 +1161,7 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
  * @param str ID string [`AranyaId`](@ref AranyaId).
  * @param str_len returns the length of `str`
  *
- * @relates AranyaError.
+ * @relates AranyaId.
  */
 AranyaError aranya_id_to_str(const struct AranyaId *id,
                              char *str,
@@ -1173,7 +1173,7 @@ AranyaError aranya_id_to_str(const struct AranyaId *id,
  *
  * @param str pointer to a null-terminated string.
  *
- * @relates AranyaError.
+ * @relates AranyaId.
  */
 AranyaError aranya_id_from_str(const char *str, struct AranyaId *__output);
 

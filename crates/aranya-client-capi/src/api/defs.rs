@@ -1315,7 +1315,7 @@ pub const ARANYA_ID_STR_LEN: usize = (ARANYA_ID_LEN * 1375) / 1000 + 1;
 /// @param str ID string [`Id`].
 /// @param str_len returns the length of `str`
 ///
-/// @relates AranyaError.
+/// @relates AranyaId.
 #[aranya_capi_core::no_ext_error]
 pub fn id_to_str(
     id: &Id,
@@ -1332,7 +1332,7 @@ pub fn id_to_str(
 ///
 /// @param str pointer to a null-terminated string.
 ///
-/// @relates AranyaError.
+/// @relates AranyaId.
 #[aranya_capi_core::no_ext_error]
 pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
     // SAFETY: Caller must ensure the pointer is a valid C String.

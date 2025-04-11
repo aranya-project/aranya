@@ -223,6 +223,23 @@ AranyaError init_team(Team *t) {
     err = aranya_create_team(&t->clients.owner.client, &t->id);
     EXPECT("error creating team", err);
 
+    // Test ID serialization and deserialization
+    size_t team_id_str_len        = ARANYA_ID_STR_LEN;
+    char *team_id_str             = malloc(team_id_str_len);
+    aranya_id_to_str(&t->id.id, team_id_str, &team_id_str_len);
+    printf("Team ID: %s \r\n", team_id_str);
+
+    AranyaId decodedId;
+    err = aranya_id_from_str(team_id_str, &decodedId);
+    EXPECT("error decoding string into an ID", err);
+
+    free(team_id_str);
+
+    if (!(memcmp(decodedId.bytes, t->id.id.bytes, ARANYA_ID_LEN) == 0)) {
+        fprintf(stderr, "application failed: Decoded ID doesn't match\r\n");
+        return EXIT_FAILURE;
+    }
+
     return ARANYA_ERROR_SUCCESS;
 }
 
