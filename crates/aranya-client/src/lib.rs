@@ -13,6 +13,7 @@
 
 #[cfg(feature = "afc")]
 pub mod afc;
+pub mod aqc;
 pub mod client;
 pub mod error;
 

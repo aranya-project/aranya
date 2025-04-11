@@ -114,6 +114,8 @@ impl Daemon {
                     local_addr,
                     Arc::new(Mutex::new(afc)),
                     eng,
+                    self.cfg.keystore_path(),
+                    self.cfg.key_wrap_key_path(),
                     store,
                     self.cfg.uds_api_path.clone(),
                     Arc::new(pk),
@@ -127,6 +129,8 @@ impl Daemon {
                 DaemonApiServer::new(
                     client,
                     local_addr,
+                    self.cfg.keystore_path(),
+                    self.cfg.key_wrap_key_path(),
                     self.cfg.uds_api_path.clone(),
                     Arc::new(pk),
                     peers,
@@ -326,7 +330,7 @@ mod tests {
             pid_file: work_dir.join("pid"),
             sync_addr: any,
             afc: AfcConfig {
-                shm_path: "/test_daemon".to_owned(),
+                shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,
                 unlink_at_exit: true,
                 create: true,

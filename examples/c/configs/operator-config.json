@@ -14,12 +14,12 @@
 	"pid_file": "out/operator/hub.pid",
 
 	// Aranya sync server address.
-	"sync_addr": "127.0.0.1:10003"
+	"sync_addr": "127.0.0.1:10003",
 
 	// AFC configuration.
 	"afc": {
 		// Shared memory path.
-		"shm_path": "/operator",
+		"shm_path": "/afc_operator",
 
 		// Unlink `shm_path` before creating the shared memory?
 		//
