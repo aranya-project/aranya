@@ -53,6 +53,7 @@ pub enum Effect {
     AqcUniChannelReceived(AqcUniChannelReceived),
     LabelCreated(LabelCreated),
     LabelDeleted(LabelDeleted),
+    QueryLabelExistsResult(QueryLabelExistsResult),
     QueriedLabel(QueriedLabel),
     LabelAssigned(LabelAssigned),
     LabelRevoked(LabelRevoked),
@@ -193,6 +194,13 @@ pub struct LabelDeleted {
     pub label_id: Id,
     pub author_id: Id,
 }
+/// QueryLabelExistsResult policy effect.
+#[effect]
+pub struct QueryLabelExistsResult {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+}
 /// QueriedLabel policy effect.
 #[effect]
 pub struct QueriedLabel {
@@ -276,6 +284,7 @@ pub trait ActorExt {
     ) -> Result<(), ClientError>;
     fn create_label(&mut self, name: String) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: Id) -> Result<(), ClientError>;
+    fn query_label_exists(&mut self, label_id: Id) -> Result<(), ClientError>;
     fn query_labels(&mut self) -> Result<(), ClientError>;
     fn assign_label(
         &mut self,

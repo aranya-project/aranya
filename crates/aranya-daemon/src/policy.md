@@ -1538,6 +1538,45 @@ effect LabelDeleted {
     author_id id,
 }
 
+// Emits `LabelExistsResult` for label if it exists.
+action query_label_exists(label_id id) {
+    publish QueryLabelExists {
+        label_id: label_id,
+    }
+}
+
+command QueryLabelExists {
+    fields {
+        label_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+
+        // Get label if it exists
+        let label = check_unwrap query Label[label_id: this.label_id]
+
+        finish {
+            emit QueryLabelExistsResult {
+                label_id: label.label_id,
+                label_name: label.name,
+                label_author_id: label.author_id,
+            }
+        }
+    }
+}
+
+effect QueryLabelExistsResult {
+    // The label's unique ID.
+    label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
+}
+
 // Emits `QueriedLabel` for all labels.
 action query_labels() {
     map Label[label_id: ?] as f {

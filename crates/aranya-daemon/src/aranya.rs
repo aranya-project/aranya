@@ -5,7 +5,6 @@ use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, syn
 use anyhow::{bail, Context, Result};
 use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Rng};
-use aranya_fast_channels::Label;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
@@ -802,9 +801,24 @@ where
         .in_current_span()
     }
 
+    /// Query device label assignments off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_label_assignments_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_label_assignments",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
     /// Query device AFC label assignments off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
+    #[cfg(any())]
     fn query_device_afc_label_assignments_off_graph(
         &self,
         device_id: DeviceId,
@@ -819,6 +833,7 @@ where
     /// Query AFC net identifier off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
+    #[cfg(any())]
     fn query_afc_net_identifier_off_graph(
         &self,
         device_id: DeviceId,
@@ -844,9 +859,24 @@ where
         .in_current_span()
     }
 
+    /// Query label exists off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_label_exists_off_graph(
+        &self,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_label_exists",
+            args: Cow::Owned(vec![Value::from(label_id)]),
+        })
+        .in_current_span()
+    }
+
     /// Query AFC label exists off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
+    #[cfg(any())]
     fn query_afc_label_exists_off_graph(
         &self,
         label: Label,
@@ -865,7 +895,7 @@ where
         &self,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "querys_labels",
+            name: "query_labels",
             args: Cow::Owned(vec![]),
         })
         .in_current_span()

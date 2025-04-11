@@ -86,9 +86,9 @@
 #define ARANYA_DURATION_NANOSECONDS 1
 
 /**
- * The size in bytes of a `DeviceId` converted to a human-readable base64 string.
+ * The size in bytes of an Aranya ID converted to a human-readable base64 string.
  */
-#define ARANYA_DEVICE_ID_STR_LEN (((64 * 1375) / 1000) + 1)
+#define ARANYA_ID_STR_LEN (((64 * 1375) / 1000) + 1)
 
 /**
  * Valid channel operations for a label assignment.
@@ -1504,9 +1504,23 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
                                              struct AranyaExtError *__ext_err);
 
 /**
- * Writes the human-readable encoding of `device` to `str`.
+ * Writes the human-readable encoding of `team` ID to `str`.
  *
- * To always succeed, `str` must be at least `ARANYA_DEVICE_ID_STR_LEN` bytes long.
+ * To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
+ *
+ * @param team ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param team ID string [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * @relates AranyaError.
+ */
+AranyaError aranya_team_id_to_str(struct AranyaTeamId team,
+                                  char *str,
+                                  size_t *str_len);
+
+/**
+ * Writes the human-readable encoding of `device` ID to `str`.
+ *
+ * To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
  *
  * @param device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
  * @param device ID string [`AranyaDeviceId`](@ref AranyaDeviceId).
@@ -1516,6 +1530,20 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
 AranyaError aranya_device_id_to_str(struct AranyaDeviceId device,
                                     char *str,
                                     size_t *str_len);
+
+/**
+ * Writes the human-readable encoding of `label` ID to `str`.
+ *
+ * To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
+ *
+ * @param label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param label ID string [`AranyaLabelId`](@ref AranyaLabelId).
+ *
+ * @relates AranyaError.
+ */
+AranyaError aranya_label_id_to_str(struct AranyaLabelId label_id,
+                                   char *str,
+                                   size_t *str_len);
 
 /**
  * Query device's keybundle.
@@ -1547,6 +1575,41 @@ AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
                                               const struct AranyaDeviceId *device,
                                               struct AranyaKeyBundle *__output,
                                               struct AranyaExtError *__ext_err);
+
+/**
+ * Query device label assignments.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
+                                                  const struct AranyaTeamId *team,
+                                                  const struct AranyaDeviceId *device,
+                                                  struct AranyaLabelId *labels,
+                                                  size_t *labels_len);
+
+/**
+ * Query device label assignments.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_device_label_assignments_ext(struct AranyaClient *client,
+                                                      const struct AranyaTeamId *team,
+                                                      const struct AranyaDeviceId *device,
+                                                      struct AranyaLabelId *labels,
+                                                      size_t *labels_len,
+                                                      struct AranyaExtError *__ext_err);
 
 /**
  * Query device's AQC network identifier.
@@ -1582,6 +1645,70 @@ AranyaError aranya_query_aqc_net_identifier_ext(struct AranyaClient *client,
                                                 size_t *ident_len,
                                                 bool *__output,
                                                 struct AranyaExtError *__ext_err);
+
+/**
+ * Query if a label exists.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param label the label [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param __output boolean indicating whether the label exists.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_label_exists(struct AranyaClient *client,
+                                      const struct AranyaTeamId *team,
+                                      const struct AranyaLabelId *label,
+                                      bool *__output);
+
+/**
+ * Query if a label exists.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param label the label [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param __output boolean indicating whether the label exists.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_label_exists_ext(struct AranyaClient *client,
+                                          const struct AranyaTeamId *team,
+                                          const struct AranyaLabelId *label,
+                                          bool *__output,
+                                          struct AranyaExtError *__ext_err);
+
+/**
+ * Query for list of existing labels.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_labels(struct AranyaClient *client,
+                                const struct AranyaTeamId *team,
+                                struct AranyaLabelId *labels,
+                                size_t *labels_len);
+
+/**
+ * Query for list of existing labels.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_query_labels_ext(struct AranyaClient *client,
+                                    const struct AranyaTeamId *team,
+                                    struct AranyaLabelId *labels,
+                                    size_t *labels_len,
+                                    struct AranyaExtError *__ext_err);
 
 #ifdef __cplusplus
 }  // extern "C"

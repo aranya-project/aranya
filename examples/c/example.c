@@ -442,13 +442,14 @@ AranyaError run(Team *t) {
     }
     for (size_t i = 0; i < devices_len; i++) {
         AranyaDeviceId device_result = devices[i];
-        size_t device_str_len        = ARANYA_DEVICE_ID_STR_LEN;
-        char *device_str             = malloc(ARANYA_DEVICE_ID_STR_LEN);
+        size_t device_str_len        = ARANYA_ID_STR_LEN;
+        char *device_str             = malloc(ARANYA_ID_STR_LEN);
         aranya_device_id_to_str(device_result, device_str, &device_str_len);
         printf("device_id: %s at index: %zu/%zu \r\n", device_str, i,
                devices_len);
         free(device_str);
     }
+    free(devices);
 
     AranyaKeyBundle memberb_keybundle;
     err = aranya_query_device_keybundle(&t->clients.operator.client, &t->id,
@@ -664,6 +665,59 @@ AranyaError run_aqc_example(Team *t) {
                               &t->clients.memberb.id, &label_id, op);
     EXPECT("error assigning label to memberb", err);
     sleep(1);
+
+    // Queries
+    printf("query if label exists on team \r\n");
+    bool exists = false;
+    err         = aranya_query_label_exists(&t->clients.membera.client, &t->id,
+                                            &label_id, &exists);
+    EXPECT("error querying label exists", err);
+    printf("%s label exists: %s \r\n", t->clients_arr[MEMBERB].name,
+           exists ? "true" : "false");
+
+    size_t device_str_len = ARANYA_ID_STR_LEN;
+    char *device_str      = malloc(ARANYA_ID_STR_LEN);
+    aranya_device_id_to_str(t->clients.memberb.id, device_str, &device_str_len);
+    printf("query labels assigned to device: %s\r\n", device_str);
+    size_t labels_len     = BUF_LEN;
+    AranyaLabelId *labels = malloc(labels_len * sizeof(AranyaLabelId));
+    err = aranya_query_device_label_assignments(&t->clients.operator.client,
+                                                &t->id, &t->clients.memberb.id,
+                                                labels, &labels_len);
+    EXPECT("error querying labels assigned to device", err);
+    if (labels == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+    for (size_t i = 0; i < labels_len; i++) {
+        AranyaLabelId label_result = labels[i];
+        size_t label_str_len       = ARANYA_ID_STR_LEN;
+        char *label_str            = malloc(ARANYA_ID_STR_LEN);
+        aranya_label_id_to_str(label_result, label_str, &label_str_len);
+        printf("label_id: %s at index: %zu/%zu \r\n", label_str, i, labels_len);
+        free(label_str);
+    }
+    free(device_str);
+
+    size_t team_str_len = ARANYA_ID_STR_LEN;
+    char *team_str      = malloc(ARANYA_ID_STR_LEN);
+    aranya_team_id_to_str(t->id, team_str, &team_str_len);
+    printf("query labels on team: %s\r\n", team_str);
+    err = aranya_query_labels(&t->clients.operator.client, &t->id, labels,
+                              &labels_len);
+    EXPECT("error querying labels on team", err);
+    if (labels == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+    for (size_t i = 0; i < labels_len; i++) {
+        AranyaLabelId label_result = labels[i];
+        size_t label_str_len       = ARANYA_ID_STR_LEN;
+        char *label_str            = malloc(ARANYA_ID_STR_LEN);
+        aranya_label_id_to_str(label_result, label_str, &label_str_len);
+        printf("label_id: %s at index: %zu/%zu \r\n", label_str, i, labels_len);
+        free(label_str);
+    }
+    free(labels);
+    free(team_str);
 
     // Create channel using Member A's client
     printf("creating AQC channel \r\n");

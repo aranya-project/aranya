@@ -43,11 +43,29 @@ impl Devices {
     }
 }
 
+/// List of labels IDs.
+pub struct LabelIds {
+    pub data: Vec<LabelId>,
+}
+
+impl LabelIds {
+    pub fn iter(&self) -> impl Iterator<Item = &LabelId> {
+        self.data.iter()
+    }
+
+    #[doc(hidden)]
+    pub fn __data(&self) -> &[LabelId] {
+        self.data.as_slice()
+    }
+}
+
 /// List of labels.
+#[cfg(feature = "afc")]
 pub struct Labels {
     pub data: Vec<Label>,
 }
 
+#[cfg(feature = "afc")]
 impl Labels {
     pub fn iter(&self) -> impl Iterator<Item = &Label> {
         self.data.iter()
@@ -498,6 +516,18 @@ impl Queries<'_> {
     }
 
     /// Returns a list of labels assiged to the current device.
+    pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<LabelIds> {
+        Ok(LabelIds {
+            data: self
+                .client
+                .daemon
+                .query_device_label_assignments(context::current(), self.id, device)
+                .await??,
+        })
+    }
+
+    /// Returns a list of AFC labels assiged to the current device.
+    #[cfg(feature = "afc")]
     pub async fn device_afc_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
         Ok(Labels {
             data: self
@@ -528,6 +558,27 @@ impl Queries<'_> {
     }
 
     /// Returns whether a label exists.
+    pub async fn label_exists(&mut self, label_id: LabelId) -> Result<bool> {
+        self.client
+            .daemon
+            .query_label_exists(context::current(), self.id, label_id)
+            .await?
+            .map_err(Into::into)
+    }
+
+    /// Returns a list of labels on the team.
+    pub async fn labels(&mut self) -> Result<LabelIds> {
+        Ok(LabelIds {
+            data: self
+                .client
+                .daemon
+                .query_labels(context::current(), self.id)
+                .await??,
+        })
+    }
+
+    /// Returns whether an AFC label exists.
+    #[cfg(feature = "afc")]
     pub async fn afc_label_exists(&mut self, label: Label) -> Result<bool> {
         self.client
             .daemon

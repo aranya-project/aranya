@@ -1463,12 +1463,31 @@ pub fn query_devices_on_team(
     Ok(())
 }
 
-/// The size in bytes of a `DeviceId` converted to a human-readable base64 string.
-pub const ARANYA_DEVICE_ID_STR_LEN: u64 = (64 * 1375) / 1000 + 1;
+/// The size in bytes of an Aranya ID converted to a human-readable base64 string.
+pub const ARANYA_ID_STR_LEN: u64 = (64 * 1375) / 1000 + 1;
 
-/// Writes the human-readable encoding of `device` to `str`.
+/// Writes the human-readable encoding of `team` ID to `str`.
 ///
-/// To always succeed, `str` must be at least `ARANYA_DEVICE_ID_STR_LEN` bytes long.
+/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
+///
+/// @param team ID [`TeamId`].
+/// @param team ID string [`TeamId`].
+///
+/// @relates AranyaError.
+#[aranya_capi_core::no_ext_error]
+pub fn team_id_to_str(
+    team: TeamId,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    aranya_capi_core::write_c_str(str, &team.0, str_len)?;
+    Ok(())
+}
+
+/// Writes the human-readable encoding of `device` ID to `str`.
+///
+/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
 ///
 /// @param device ID [`DeviceId`].
 /// @param device ID string [`DeviceId`].
@@ -1482,6 +1501,25 @@ pub fn device_id_to_str(
 ) -> Result<(), imp::Error> {
     let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
     aranya_capi_core::write_c_str(str, &device.0, str_len)?;
+    Ok(())
+}
+
+/// Writes the human-readable encoding of `label` ID to `str`.
+///
+/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
+///
+/// @param label ID [`LabelId`].
+/// @param label ID string [`LabelId`].
+///
+/// @relates AranyaError.
+#[aranya_capi_core::no_ext_error]
+pub fn label_id_to_str(
+    label_id: LabelId,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    aranya_capi_core::write_c_str(str, &label_id.0, str_len)?;
     Ok(())
 }
 
@@ -1505,6 +1543,46 @@ pub unsafe fn query_device_keybundle(
         .rt
         .block_on(client.inner.queries(team.0).device_keybundle(device.0))?;
     Ok(KeyBundle::from_underlying(keys))
+}
+
+/// Query device label assignments.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param labels returns a list of labels assigned to the device [`LabelId`].
+/// @param labels_len returns the length of the labels list [`LabelId`].
+///
+/// @relates AranyaClient.
+pub fn query_device_label_assignments(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    labels: Option<&mut MaybeUninit<LabelId>>,
+    labels_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let data = client.rt.block_on(
+        client
+            .inner
+            .queries(team.0)
+            .device_label_assignments(device.0),
+    )?;
+    let data = data.__data();
+    let Some(labels) = labels else {
+        *labels_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    };
+    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(LabelId(*src));
+    }
+    if *labels_len < data.len() {
+        *labels_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *labels_len = data.len();
+    Ok(())
 }
 
 /// Query device label assignments.
@@ -1603,12 +1681,67 @@ pub unsafe fn query_aqc_net_identifier(
     Ok(true)
 }
 
-/// Query device's AQC network identifier.
+/// Query if a label exists.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param __output the device's network identifier [`NetIdentifier`].
+/// @param label the label [`LabelId`].
+/// @param __output boolean indicating whether the label exists.
+///
+/// @relates AranyaClient.
+pub unsafe fn query_label_exists(
+    client: &mut Client,
+    team: &TeamId,
+    label: &LabelId,
+) -> Result<bool, imp::Error> {
+    let client = client.deref_mut();
+    let exists = client
+        .rt
+        .block_on(client.inner.queries(team.0).label_exists(label.0))?;
+    Ok(exists)
+}
+
+/// Query for list of existing labels.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param labels returns a list of labels [`LabelId`].
+/// @param labels_len returns the length of the labels list [`LabelId`].
+///
+/// @relates AranyaClient.
+pub fn query_labels(
+    client: &mut Client,
+    team: &TeamId,
+    labels: Option<&mut MaybeUninit<LabelId>>,
+    labels_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let data = client.rt.block_on(client.inner.queries(team.0).labels())?;
+    let data = data.__data();
+    let Some(labels) = labels else {
+        *labels_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    };
+    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(LabelId(*src));
+    }
+    if *labels_len < data.len() {
+        *labels_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *labels_len = data.len();
+    Ok(())
+}
+
+/// Query if an AFC label exists.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param label the AFC label [`Label`].
+/// @param __output boolean indicating whether the label exists.
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]

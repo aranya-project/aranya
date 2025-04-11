@@ -293,6 +293,7 @@ impl DaemonApiHandler {
                 Effect::QueryDeviceKeyBundleResult(_) => {}
                 Effect::QueryAqcNetIdentifierResult(_) => {}
                 Effect::QueriedLabelAssignment(_) => {}
+                Effect::QueryLabelExistsResult(_) => {}
             }
         }
         Ok(())
@@ -1172,8 +1173,32 @@ impl DaemonApi for DaemonApiHandler {
         }
     }
 
-    #[cfg(any())]
     /// Query device label assignments.
+    #[instrument(skip(self))]
+    async fn query_device_label_assignments(
+        self,
+        _: context::Context,
+        team: TeamId,
+        device: ApiDeviceId,
+    ) -> ApiResult<Vec<ApiLabelId>> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_label_assignments_off_graph(device.into_id().into())
+            .await
+            .context("unable to query device label assignments")?;
+        let mut labels: Vec<ApiLabelId> = Vec::new();
+        for e in effects {
+            if let Effect::QueriedLabelAssignment(e) = e {
+                debug!("found label: {}", e.label_id);
+                labels.push(e.label_id.into());
+            }
+        }
+        return Ok(labels);
+    }
+
+    #[cfg(any())]
+    /// Query device AFC label assignments.
     #[instrument(skip(self))]
     async fn query_device_afc_label_assignments(
         self,
@@ -1189,7 +1214,7 @@ impl DaemonApi for DaemonApiHandler {
             .context("unable to query device label assignments")?;
         let mut labels = Vec::new();
         for e in effects {
-            if let Effect::QueryDeviceLabelAssignmentsResult(e) = e {
+            if let Effect::QueryDeviceAfcLabelAssignmentsResult(e) = e {
                 let label = Label::new(
                     u32::try_from(e.label)
                         .assume("`label` is out of range")
@@ -1202,7 +1227,7 @@ impl DaemonApi for DaemonApiHandler {
         return Ok(labels);
     }
 
-    /// Query device label assignments.
+    /// Query device AFC label assignments.
     #[instrument(skip(self))]
     async fn query_device_afc_label_assignments(
         self,
@@ -1272,6 +1297,28 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     /// Query label exists.
+    async fn query_label_exists(
+        self,
+        _: context::Context,
+        team: TeamId,
+        label_id: ApiLabelId,
+    ) -> ApiResult<bool> {
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_label_exists_off_graph(label_id.into_id().into())
+            .await
+            .context("unable to query label")?;
+        if let Some(Effect::QueryLabelExistsResult(_e)) =
+            find_effect!(&effects, Effect::QueryLabelExistsResult(_e))
+        {
+            Ok(true)
+        } else {
+            Err(anyhow!("unable to query whether label exists").into())
+        }
+    }
+
+    /// Query AFC label exists.
     #[cfg(any())]
     #[instrument(skip(self))]
     async fn query_afc_label_exists(
@@ -1291,10 +1338,11 @@ impl DaemonApi for DaemonApiHandler {
         {
             Ok(e.label_exists)
         } else {
-            Err(anyhow!("unable to query aqc network identifier").into())
+            Err(anyhow!("unable to query whether afc label exists").into())
         }
     }
 
+    /// Query AFC label exists.
     #[instrument(skip(self))]
     async fn query_afc_label_exists(
         self,
@@ -1312,7 +1360,7 @@ impl DaemonApi for DaemonApiHandler {
             .actions(&team.into_id().into())
             .query_labels_off_graph()
             .await
-            .context("unable to query aqc labels")?;
+            .context("unable to query labels")?;
         let mut labels: Vec<ApiLabelId> = Vec::new();
         for e in effects {
             if let Effect::QueriedLabel(e) = e {

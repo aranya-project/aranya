@@ -425,6 +425,9 @@ pub trait DaemonApi {
     async fn query_device_role(team: TeamId, device: DeviceId) -> Result<Role>;
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
+    /// Query device label assignments.
+    async fn query_device_label_assignments(team: TeamId, device: DeviceId)
+        -> Result<Vec<LabelId>>;
     /// Query device AFC label assignments.
     async fn query_device_afc_label_assignments(
         team: TeamId,
@@ -440,8 +443,10 @@ pub trait DaemonApi {
         team: TeamId,
         device: DeviceId,
     ) -> Result<Option<NetIdentifier>>;
-    // Query labels.
+    // Query labels on team.
     async fn query_labels(team: TeamId) -> Result<Vec<LabelId>>;
+    /// Query whether a label exists.
+    async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
     /// Query whether an AFC label exists.
     async fn query_afc_label_exists(team: TeamId, label: AfcLabel) -> Result<bool>;
 }
