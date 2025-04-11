@@ -191,6 +191,14 @@ impl AsRef<aranya_crypto::Id> for Id {
     }
 }
 
+impl From<aranya_crypto::Id> for Id {
+    fn from(value: aranya_crypto::Id) -> Self {
+        Id {
+            bytes: value.into(),
+        }
+    }
+}
+
 /// Team ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -1297,7 +1305,7 @@ pub fn query_devices_on_team(
 }
 
 /// The size in bytes of an ID converted to a human-readable base58 string.
-pub const ARANYA_ID_STR_LEN: u64 = (64 * 1375) / 1000 + 1;
+pub const ARANYA_ID_STR_LEN: usize = (ARANYA_ID_LEN * 1375) / 1000 + 1;
 
 /// Writes the human-readable encoding of `id` to `str`.
 ///
@@ -1317,6 +1325,22 @@ pub fn id_to_str(
     let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
     aranya_capi_core::write_c_str(str, id.as_ref(), str_len)?;
     Ok(())
+}
+
+/// Decodes `str` into an [`Id`].
+///
+///
+/// @param str pointer to a null-terminated string.
+///
+/// @relates AranyaError.
+#[aranya_capi_core::no_ext_error]
+pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
+    // SAFETY: Caller must ensure the pointer is a valid C String.
+    let cstr = unsafe { std::ffi::CStr::from_ptr(str) };
+
+    aranya_crypto::Id::decode(cstr.to_bytes())
+        .map_err(|_| InvalidArg::new("str", "unable to decode ID from bytes").into())
+        .map(Into::into)
 }
 
 // TODO: query_device_role

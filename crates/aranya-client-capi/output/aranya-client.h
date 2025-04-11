@@ -93,7 +93,7 @@
 /**
  * The size in bytes of an ID converted to a human-readable base58 string.
  */
-#define ARANYA_ID_STR_LEN (((64 * 1375) / 1000) + 1)
+#define ARANYA_ID_STR_LEN (((ARANYA_ID_LEN * 1375) / 1000) + 1)
 
 /**
  * An error code.
@@ -1166,6 +1166,16 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
 AranyaError aranya_id_to_str(const struct AranyaId *id,
                              char *str,
                              size_t *str_len);
+
+/**
+ * Decodes `str` into an [`AranyaId`](@ref AranyaId).
+ *
+ *
+ * @param str pointer to a null-terminated string.
+ *
+ * @relates AranyaError.
+ */
+AranyaError aranya_id_from_str(const char *str, struct AranyaId *__output);
 
 /**
  * Query device's keybundle.

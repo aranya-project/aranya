@@ -429,7 +429,18 @@ AranyaError run(Team *t) {
         aranya_id_to_str(&device_result.id, device_str, &device_str_len);
         printf("device_id: %s at index: %zu/%zu \r\n", device_str, i,
                devices_len);
+
+        AranyaId decodedId;
+        err = aranya_id_from_str(device_str, &decodedId);
+        EXPECT("error decoding string into an ID", err);
+
         free(device_str);
+
+        if (!(memcmp(decodedId.bytes, device_result.id.bytes, ARANYA_ID_LEN) == 0)) {
+            fprintf(stderr, "application failed: Decoded ID doesn't match\r\n");
+            return EXIT_FAILURE;
+        }
+
     }
 
     AranyaKeyBundle memberb_keybundle;
