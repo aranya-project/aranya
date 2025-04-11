@@ -1,7 +1,5 @@
-#[cfg(feature = "afc")]
-use core::ptr;
-use core::{ffi::c_char, ops::DerefMut, slice};
-use std::{ffi::OsStr, mem, os::unix::ffi::OsStrExt};
+use core::{ffi::c_char, ops::DerefMut, ptr, slice};
+use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use tracing::debug;
@@ -188,7 +186,8 @@ pub struct Id {
 
 impl AsRef<aranya_crypto::Id> for Id {
     fn as_ref(&self) -> &aranya_crypto::Id {
-        unsafe { mem::transmute(self) }
+        // SAFETY: Each type is a struct with a single field containing an array of 64 bytes
+        unsafe { &*ptr::from_ref::<[u8; ARANYA_ID_LEN]>(&self.bytes).cast::<aranya_crypto::Id>() }
     }
 }
 
