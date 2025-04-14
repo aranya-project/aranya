@@ -604,25 +604,6 @@ pub fn team_config_builder_build(
     Ok(())
 }
 
-#[aranya_capi_core::opaque(size = 24, align = 8)]
-pub type TeamConfig = Safe<imp::TeamConfig>;
-
-#[aranya_capi_core::opaque(size = 4, align = 4)]
-pub type TeamConfigBuilder = imp::TeamConfigBuilder;
-
-/// Attempts to construct a [`TeamConfig`], returning an `Error::InvalidArgument`
-/// if there are invalid parameters.
-///
-/// @param cfg a pointer to the team config builder
-/// @param out a pointer to write the team config to
-pub fn team_config_builder_build(
-    cfg: &mut TeamConfigBuilder,
-    out: &mut MaybeUninit<TeamConfig>,
-) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
-    Ok(())
-}
-
 /// Create a new graph/team with the current device as the owner.
 ///
 /// @param client the Aranya Client [`Client`].
