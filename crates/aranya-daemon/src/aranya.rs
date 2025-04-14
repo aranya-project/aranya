@@ -755,7 +755,7 @@ where
     #[allow(clippy::type_complexity)]
     #[instrument(skip_all)]
     #[cfg(any())]
-    fn query_afc_network_names(
+    fn query_afc_network_names_off_graph(
         &self,
     ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {
         self.session_action(move || VmAction {

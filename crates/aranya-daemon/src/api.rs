@@ -42,7 +42,6 @@ mod afc_imports {
     pub(super) use aranya_fast_channels::shm::WriteState;
     pub(super) use aranya_runtime::StorageProvider;
     pub(super) use bimap::BiBTreeMap;
-    pub(super) use buggy::bug;
     pub(super) use tokio::sync::Mutex;
 
     pub(super) use crate::CE;
@@ -93,18 +92,21 @@ impl DaemonApiServer {
     ) -> Result<Self> {
         info!("uds path: {:?}", daemon_sock);
         let device_id = pk.ident_pk.id()?;
-        let aranya = client.aranya.lock().await;
-        let provider = aranya.provider();
-        let Ok(graph_id) = provider.list_graph_ids().iter().next() else {
-            bug!("Unable to get GraphID!");
-        };
+
         let afc_peers = BiBTreeMap::new();
-        afc_peers.extend(
-            client
-                .actions(graph_id)
-                .query_afc_network_names_off_graph()
-                .await?,
-        );
+        let mut aranya = client.aranya.lock().await;
+        #[allow(unused_variables)]
+        if let Some(graph_id) = aranya.provider().list_graph_ids()?.next() {
+            #[cfg(any())]
+            afc_peers.extend(
+                client
+                    .actions(&graph_id?)
+                    .query_afc_network_names_off_graph()
+                    .await?,
+            );
+        };
+        drop(aranya);
+
         Ok(Self {
             daemon_sock,
             recv_effects,
