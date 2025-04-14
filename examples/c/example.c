@@ -223,6 +223,23 @@ AranyaError init_team(Team *t) {
     err = aranya_create_team(&t->clients.owner.client, &t->id);
     EXPECT("error creating team", err);
 
+    // Test ID serialization and deserialization
+    size_t team_id_str_len        = ARANYA_ID_STR_LEN;
+    char *team_id_str             = malloc(team_id_str_len);
+    aranya_id_to_str(&t->id.id, team_id_str, &team_id_str_len);
+    printf("Team ID: %s \r\n", team_id_str);
+
+    AranyaId decodedId;
+    err = aranya_id_from_str(team_id_str, &decodedId);
+    EXPECT("error decoding string into an ID", err);
+
+    free(team_id_str);
+
+    if (!(memcmp(decodedId.bytes, t->id.id.bytes, ARANYA_ID_LEN) == 0)) {
+        fprintf(stderr, "application failed: Decoded ID doesn't match\r\n");
+        return EXIT_FAILURE;
+    }
+
     return ARANYA_ERROR_SUCCESS;
 }
 
@@ -424,12 +441,23 @@ AranyaError run(Team *t) {
     }
     for (size_t i = 0; i < devices_len; i++) {
         AranyaDeviceId device_result = devices[i];
-        size_t device_str_len        = ARANYA_DEVICE_ID_STR_LEN;
-        char *device_str             = malloc(ARANYA_DEVICE_ID_STR_LEN);
-        aranya_device_id_to_str(device_result, device_str, &device_str_len);
+        size_t device_str_len        = ARANYA_ID_STR_LEN;
+        char *device_str             = malloc(ARANYA_ID_STR_LEN);
+        aranya_id_to_str(&device_result.id, device_str, &device_str_len);
         printf("device_id: %s at index: %zu/%zu \r\n", device_str, i,
                devices_len);
+
+        AranyaId decodedId;
+        err = aranya_id_from_str(device_str, &decodedId);
+        EXPECT("error decoding string into an ID", err);
+
         free(device_str);
+
+        if (!(memcmp(decodedId.bytes, device_result.id.bytes, ARANYA_ID_LEN) == 0)) {
+            fprintf(stderr, "application failed: Decoded ID doesn't match\r\n");
+            return EXIT_FAILURE;
+        }
+
     }
 
     AranyaKeyBundle memberb_keybundle;
