@@ -35,23 +35,23 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
-aranya-afc-util = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c", features = ["alloc"] }
-aranya-capi-core = { version = "0.2.3", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c" }
-aranya-capi-codegen = { version = "0.2.2", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c" }
-aranya-crypto = { version = "0.5.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
-aranya-crypto-ffi = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c" }
-aranya-device-ffi = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c" }
-aranya-envelope-ffi = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c" }
-aranya-fast-channels = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c", features = ["posix", "std", "memory"] }
-aranya-idam-ffi = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c" }
-aranya-libc = { version = "0.1.1", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c" }
-aranya-perspective-ffi = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c" }
-aranya-policy-compiler = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c" }
-aranya-policy-ifgen = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c", features = ["serde"] }
-aranya-policy-ifgen-build = { version = "0.3.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c" }
-aranya-policy-lang = { version = "0.3.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c" }
-aranya-policy-vm = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c", features = ["std"] }
-aranya-runtime = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "e2bffa866471f47fdf8037d39bb91f352f22af6c", features = ["std", "libc"] }
+aranya-afc-util = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526", features = ["alloc"] }
+aranya-capi-core = { version = "0.2.3", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526" }
+aranya-capi-codegen = { version = "0.2.2", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526" }
+aranya-crypto = { version = "0.5.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
+aranya-crypto-ffi = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526" }
+aranya-device-ffi = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526" }
+aranya-envelope-ffi = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526" }
+aranya-fast-channels = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526", features = ["posix", "std", "memory"] }
+aranya-idam-ffi = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526" }
+aranya-libc = { version = "0.1.1", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526" }
+aranya-perspective-ffi = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526" }
+aranya-policy-compiler = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526" }
+aranya-policy-ifgen = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526", features = ["serde"] }
+aranya-policy-ifgen-build = { version = "0.3.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526" }
+aranya-policy-lang = { version = "0.3.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526" }
+aranya-policy-vm = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526", features = ["std"] }
+aranya-runtime = { version = "0.6.0", git = "https://github.com/aranya-project/aranya-core", rev = "5ac223caa22babf237fc48eb60310278b2dd6526", features = ["std", "libc"] }
 
 spideroak-base58 = { version = "0.1.0" }
 buggy = { version = "0.1.0" }
