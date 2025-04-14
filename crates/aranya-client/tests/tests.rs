@@ -16,7 +16,7 @@ use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 use anyhow::{bail, Context as _, Result};
 #[cfg(feature = "afc")]
 use aranya_client::SyncPeerConfig;
-use aranya_client::{client::Client, TeamConfigBuilder};
+use aranya_client::{client::Client, TeamConfig};
 use aranya_crypto::{hash::Hash as _, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},
@@ -308,10 +308,11 @@ async fn test_sync_now() -> Result<()> {
     let mut team = TeamCtx::new("test_sync_now".into(), work_dir).await?;
 
     // create team.
+    let cfg = TeamConfig::builder().build()?;
     let team_id = team
         .owner
         .client
-        .create_team(TeamConfigBuilder::new().build()?)
+        .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -370,10 +371,11 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let mut team = TeamCtx::new("test_afc_one_way_two_chans".into(), work_dir).await?;
 
     // create team.
+    let cfg = TeamConfig::builder().build()?;
     let team_id = team
         .owner
         .client
-        .create_team(TeamConfigBuilder::new().build()?)
+        .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -663,10 +665,11 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let mut team = TeamCtx::new("test_afc_two_way_one_chan".into(), work_dir).await?;
 
     // create team.
+    let cfg = TeamConfig::builder().build()?;
     let team_id = team
         .owner
         .client
-        .create_team(TeamConfigBuilder::new().build()?)
+        .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -884,10 +887,11 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     let mut team = TeamCtx::new("test_afc_monotonic_seq".into(), work_dir).await?;
 
     // create team.
+    let cfg = TeamConfig::builder().build()?;
     let team_id = team
         .owner
         .client
-        .create_team(TeamConfigBuilder::new().build()?)
+        .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);

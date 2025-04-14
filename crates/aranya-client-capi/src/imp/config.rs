@@ -1,9 +1,7 @@
 use std::ffi::c_char;
 
-use aranya_capi_core::{
-    safe::{TypeId, Typed},
-    InvalidArg,
-};
+use aranya_capi_core::safe::{TypeId, Typed};
+use aranya_client::ConfigError;
 
 use crate::api::defs::Duration;
 
@@ -33,23 +31,23 @@ pub struct ClientConfigBuilder {
 
 impl ClientConfigBuilder {
     /// Attempts to construct a [`ClientConfig`], returning an
-    /// [`Error::InvalidArg`](super::Error::InvalidArg) if there are invalid parameters.
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
     pub fn build(self) -> Result<ClientConfig, super::Error> {
         if self.daemon_addr.is_null() {
-            let e = InvalidArg::new(
-                "daemon_addr",
-                "Tried to create a `ClientConfig` without setting the daemon address!",
-            );
+            let e = ConfigError::InvalidArg {
+                arg: "daemon_addr",
+                reason: "Tried to create a `ClientConfig` without setting the daemon address!",
+            };
             return Err(e.into());
         }
 
         #[cfg(feature = "afc")]
         let Some(afc) = self.afc
         else {
-            let e = InvalidArg::new(
-                "afc_config",
-                "Tried to create a `ClientConfig` without setting a valid `AfcConfig`!",
-            );
+            let e = ConfigError::InvalidArg {
+                arg: "afc_config",
+                reason: "Tried to create a `ClientConfig` without setting a valid `AfcConfig`!",
+            };
             return Err(e.into());
         };
 
@@ -96,21 +94,21 @@ pub struct AfcConfigBuilder {
 #[cfg(feature = "afc")]
 impl AfcConfigBuilder {
     /// Attempts to construct an [`AfcConfig`], returning an
-    /// [`Error::InvalidArg`](super::Error::InvalidArg) if there are invalid parameters.
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
     pub fn build(self) -> Result<AfcConfig, super::Error> {
         if self.shm_path.is_null() {
-            let e = InvalidArg::new(
-                "shm_path",
-                "Tried to create a `AfcConfig` without setting a valid shared memory path!",
-            );
+            let e = ConfigError::InvalidArg {
+                arg: "shm_path",
+                reason: "Tried to create a `AfcConfig` without setting a valid shared memory path!",
+            };
             return Err(e.into());
         }
 
         if self.addr.is_null() {
-            let e = InvalidArg::new(
-                "address",
-                "Tried to create a `AfcConfig` without setting a valid address!",
-            );
+            let e = ConfigError::InvalidArg {
+                arg: "address",
+                reason: "Tried to create a `AfcConfig` without setting a valid address!",
+            };
             return Err(e.into());
         }
 
@@ -172,13 +170,13 @@ impl SyncPeerConfigBuilder {
     }
 
     /// Attempts to construct a [`SyncPeerConfig`], returning an
-    /// [`Error::InvalidArg`](super::Error::InvalidArg) if there are invalid parameters.
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
     pub fn build(&self) -> Result<SyncPeerConfig, super::Error> {
         let Some(interval) = self.interval else {
-            let e = InvalidArg::new(
-                "interval",
-                "Tried to create a `SyncPeerConfig` without setting the interval!",
-            );
+            let e = ConfigError::InvalidArg {
+                arg: "interval",
+                reason: "Tried to create a `SyncPeerConfig` without setting the interval!",
+            };
             return Err(e.into());
         };
 
@@ -220,7 +218,7 @@ pub struct TeamConfigBuilder {}
 
 impl TeamConfigBuilder {
     /// Attempts to construct a [`TeamConfig`], returning an
-    /// [`Error::InvalidArg`](super::Error::InvalidArg) if there are invalid parameters.
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
     pub fn build(self) -> Result<TeamConfig, super::Error> {
         Ok(TeamConfig {})
     }

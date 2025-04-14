@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{client::Client, SyncPeerConfig, TeamConfigBuilder};
+use aranya_client::{client::Client, SyncPeerConfig, TeamConfig};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
@@ -161,10 +161,11 @@ async fn main() -> Result<()> {
 
     // create team.
     info!("creating team");
+    let cfg = TeamConfig::builder().build()?;
     let team_id = team
         .owner
         .client
-        .create_team(TeamConfigBuilder::new().build()?)
+        .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);

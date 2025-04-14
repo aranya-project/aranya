@@ -85,11 +85,10 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Connecting(_) => Self::Connecting,
                 aranya_client::Error::Rpc(_) => Self::Rpc,
                 aranya_client::Error::Daemon(_) => Self::Daemon,
-                aranya_client::Error::Config(_) => Self::Config,
                 #[cfg(feature = "afc")]
                 aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Bug(_) => Self::Bug,
-                aranya_client::Error::InvalidArg { .. } => Self::InvalidArgument,
+                aranya_client::Error::Config(_) => Self::Config,
                 _ => {
                     error!("Forgot to implement an error variant!");
                     Self::Bug
@@ -615,7 +614,7 @@ pub fn team_config_builder_build(
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.deref_mut();
-    let cfg = aranya_client::TeamConfigBuilder::new().build()?;
+    let cfg = aranya_client::TeamConfig::builder().build()?;
     let id = client.rt.block_on(client.inner.create_team(cfg))?;
     Ok(id.into())
 }
@@ -632,7 +631,7 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let cfg = aranya_client::TeamConfigBuilder::new().build()?;
+    let cfg = aranya_client::TeamConfig::builder().build()?;
     client
         .rt
         .block_on(client.inner.add_team(team.into(), cfg))?;

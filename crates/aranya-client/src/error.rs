@@ -31,7 +31,12 @@ pub enum Error {
     /// An unexpected internal error happened.
     #[error("Unexpected internal error: {0}")]
     Bug(#[from] buggy::Bug),
+}
 
+/// Possible errors that could happen when creating configuration info.
+#[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
+pub enum ConfigError {
     /// An invalid argument was provided.
     #[error("Invalid argument `{arg}`: {reason}")]
     InvalidArg {
@@ -39,11 +44,6 @@ pub enum Error {
         reason: &'static str,
     },
 }
-
-/// Possible errors that could happen when creating configuration info.
-#[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
-pub enum ConfigError {}
 
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
