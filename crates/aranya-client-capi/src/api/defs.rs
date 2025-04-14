@@ -2,7 +2,7 @@ use core::{ffi::c_char, ops::DerefMut, ptr, slice};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
-use tracing::debug;
+use tracing::{debug, error};
 
 use crate::imp;
 
@@ -61,12 +61,11 @@ pub enum Error {
     #[capi(msg = "AFC library error")]
     Afc,
 
+    /// Failed trying to construct a new tokio runtime.
     #[capi(msg = "tokio runtime error")]
     Runtime,
 
-    #[capi(msg = "invalid index")]
-    InvalidIndex,
-
+    /// Unable to create configuration info.
     #[capi(msg = "invalid config")]
     Config,
 }
@@ -91,10 +90,12 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::InvalidArg { .. } => Self::InvalidArgument,
-                _ => todo!(),
+                _ => {
+                    error!("Forgot to implement an error variant!");
+                    Self::Bug
+                }
             },
             imp::Error::Runtime(_) => Self::Runtime,
-            imp::Error::InvalidIndex(_) => Self::InvalidIndex,
             imp::Error::Config(_) => Self::Config,
         }
     }
@@ -632,7 +633,9 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let cfg = aranya_client::TeamConfigBuilder::new().build()?;
-    client.rt.block_on(client.inner.add_team(team.into(), cfg))?;
+    client
+        .rt
+        .block_on(client.inner.add_team(team.into(), cfg))?;
     Ok(())
 }
 

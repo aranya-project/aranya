@@ -81,7 +81,9 @@ impl Default for SyncPeerConfigBuilder {
 }
 
 /// Configuration info for adding and creating teams.
-pub struct TeamConfig {}
+pub struct TeamConfig {
+    _priv: (),
+}
 
 impl TeamConfig {
     /// Creates a default [`TeamConfigBuilder`].
@@ -98,7 +100,9 @@ impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
 
 /// Builder for a [`TeamConfig`]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct TeamConfigBuilder {}
+pub struct TeamConfigBuilder {
+    _priv: (),
+}
 
 impl TeamConfigBuilder {
     /// Creates a new builder for [`TeamConfig`].
@@ -108,6 +112,6 @@ impl TeamConfigBuilder {
 
     /// Attempts to build a [`TeamConfig`] using the provided parameters.
     pub fn build(self) -> Result<TeamConfig> {
-        Ok(TeamConfig {})
+        Ok(TeamConfig { _priv: () })
     }
 }
