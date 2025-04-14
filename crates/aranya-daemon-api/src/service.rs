@@ -209,6 +209,7 @@ pub struct AqcBidiChannelCreatedInfo {
     pub label_id: LabelId,
     pub channel_id: AqcBidiChannelId,
     pub author_secrets_id: BidiAuthorSecretId,
+    pub psk_length_in_bytes: u16,
 }
 
 /// Bidirectional AQC channel info.
@@ -222,6 +223,7 @@ pub struct AqcBidiChannelReceivedInfo {
     pub author_enc_pk: Vec<u8>,
     pub label_id: LabelId,
     pub encap: Vec<u8>,
+    pub psk_length_in_bytes: u16,
 }
 
 /// Unidirectional AQC channel info.
@@ -237,6 +239,7 @@ pub struct AqcUniChannelCreatedInfo {
     pub label_id: LabelId,
     pub channel_id: AqcUniChannelId,
     pub author_secrets_id: UniAuthorSecretId,
+    pub psk_length_in_bytes: u16,
 }
 
 /// Unidirectional AQC channel info.
@@ -251,6 +254,7 @@ pub struct AqcUniChannelReceivedInfo {
     pub peer_enc_key_id: EncryptionKeyId,
     pub label_id: LabelId,
     pub encap: Vec<u8>,
+    pub psk_length_in_bytes: u16,
 }
 
 /// Information needed to use the key store.

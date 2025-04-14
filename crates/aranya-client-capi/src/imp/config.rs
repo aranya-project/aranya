@@ -58,8 +58,8 @@ impl Typed for ClientConfig {
 pub struct ClientConfigBuilder {
     pub daemon_addr: *const c_char,
     #[cfg(feature = "afc")]
-    pub afc: Option<AfcConfig>,
-    pub aqc: Option<AqcConfig>,
+    pub(crate) afc: Option<AfcConfig>,
+    pub(crate) aqc: Option<AqcConfig>,
 }
 
 impl ClientConfigBuilder {
@@ -199,7 +199,7 @@ impl AfcConfigBuilder {
 /// Configuration info for Aranya Fast Channels
 pub struct AqcConfig {
     /// Address to bind AQC server to.
-    pub addr: *const c_char,
+    pub(crate) addr: *const c_char,
 }
 
 impl Typed for AqcConfig {
@@ -211,7 +211,7 @@ impl Typed for AqcConfig {
 /// Builder for an [`AqcConfig`]
 pub struct AqcConfigBuilder {
     /// Address to bind AQC server to.
-    pub addr: *const c_char,
+    pub(crate) addr: *const c_char,
 }
 
 impl AqcConfigBuilder {

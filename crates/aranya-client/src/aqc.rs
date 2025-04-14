@@ -33,9 +33,6 @@ pub(crate) type CE = DefaultEngine;
 /// KS = Key Store
 pub(crate) type KS = Store;
 
-/// Length of a PSK key.
-const PSK_KEY_LEN: u16 = 32;
-
 /// Sends and receives AQC messages.
 pub(crate) struct AqcChannelsImpl {
     // TODO: add Aqc fields.
@@ -198,7 +195,7 @@ impl<'a> AqcChannels<'a> {
     }
 
     /// Deletes an AQC channel.
-    // TODO(eric): Is it an error if the channel does not exist?
+    // It is an error if the channel does not exist
     #[instrument(skip_all, fields(aqc_id = %id))]
     pub async fn delete_channel(&mut self, id: AqcId) -> crate::Result<()> {
         let _ctrl = self
@@ -244,7 +241,7 @@ impl<'a> AqcChannels<'a> {
                             label_id: v.label_id.into_id().into(),
                             encap: &v.encap,
                             channel_id,
-                            psk_length_in_bytes: PSK_KEY_LEN,
+                            psk_length_in_bytes: v.psk_length_in_bytes,
                         },
                     )
                     .map_err(AqcError::ChannelCreation)?;
@@ -271,7 +268,7 @@ impl<'a> AqcChannels<'a> {
                             label_id: v.label_id.into_id().into(),
                             encap: &v.encap,
                             channel_id,
-                            psk_length_in_bytes: PSK_KEY_LEN,
+                            psk_length_in_bytes: v.psk_length_in_bytes,
                         },
                     )
                     .map_err(AqcError::ChannelCreation)?;

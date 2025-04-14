@@ -25,6 +25,7 @@ use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
+use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,
@@ -870,6 +871,9 @@ impl DaemonApi for DaemonApiHandler {
             label_id: e.label_id.into(),
             channel_id: e.channel_id.into(),
             author_secrets_id: e.author_secrets_id.into(),
+            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
+                .assume("`psk_length_in_bytes` is out of range")
+                .context("psk_length_in_bytes is out of range")?,
         });
 
         Ok((aqc_id, ctrl, aqc_info))
@@ -920,6 +924,9 @@ impl DaemonApi for DaemonApiHandler {
             label_id: e.label_id.into(),
             channel_id: e.channel_id.into(),
             author_secrets_id: e.author_secrets_id.into(),
+            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
+                .assume("`psk_length_in_bytes` is out of range")
+                .context("psk_length_in_bytes is out of range")?,
         });
 
         Ok((aqc_id, ctrl, aqc_info))
@@ -954,6 +961,9 @@ impl DaemonApi for DaemonApiHandler {
                     peer_enc_key_id: e.peer_enc_key_id.into(),
                     label_id: e.label_id.into(),
                     encap: e.encap.clone(),
+                    psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
+                        .assume("`psk_length_in_bytes` is out of range")
+                        .context("psk_length_in_bytes is out of range")?,
                 });
 
                 let encap =
@@ -981,6 +991,9 @@ impl DaemonApi for DaemonApiHandler {
                     peer_enc_key_id: e.peer_enc_key_id.into(),
                     label_id: e.label_id.into(),
                     encap: e.encap.clone(),
+                    psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
+                        .assume("`psk_length_in_bytes` is out of range")
+                        .context("psk_length_in_bytes is out of range")?,
                 });
 
                 let encap =
