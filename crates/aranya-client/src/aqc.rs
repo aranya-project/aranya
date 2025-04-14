@@ -122,7 +122,7 @@ impl<'a> AqcChannels<'a> {
                         peer_enc_pk: &v.peer_enc_pk,
                         label_id: v.label_id.into_id().into(),
                         channel_id: v.channel_id,
-                        psk_length_in_bytes: 32, // TODO: don't hard-code
+                        psk_length_in_bytes: v.psk_length_in_bytes,
                         author_secrets_id: v.author_secrets_id,
                     },
                 )
@@ -180,7 +180,7 @@ impl<'a> AqcChannels<'a> {
                         peer_enc_pk: &v.peer_enc_pk,
                         label_id: v.label_id.into_id().into(),
                         channel_id: v.channel_id,
-                        psk_length_in_bytes: 32, // TODO: don't hard-code
+                        psk_length_in_bytes: v.psk_length_in_bytes,
                         author_secrets_id: v.author_secrets_id,
                     },
                 )

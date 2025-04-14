@@ -182,11 +182,6 @@ impl Client {
             .map_err(Into::into)
     }
 
-    /// Returns the address that the AQC server is bound to.
-    pub async fn aqc_local_addr(&mut self) -> Result<SocketAddr> {
-        Ok(self.aqc().local_addr()?)
-    }
-
     /// Gets the public key bundle for this device.
     pub async fn get_key_bundle(&mut self) -> Result<KeyBundle> {
         self.daemon
