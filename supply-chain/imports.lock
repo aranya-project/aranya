@@ -2,62 +2,68 @@
 # cargo-vet imports lock
 
 [[publisher.aranya-afc-util]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-aqc-util]]
+version = "0.1.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-codegen]]
-version = "0.2.2"
-when = "2025-03-27"
+version = "0.2.3"
+when = "2025-04-08"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-core]]
-version = "0.2.1"
-when = "2025-03-21"
+version = "0.2.3"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-macro]]
-version = "0.2.0"
-when = "2025-03-12"
+version = "0.2.2"
+when = "2025-04-08"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto]]
-version = "0.4.0"
-when = "2025-03-19"
+version = "0.5.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto-ffi]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-device-ffi]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-envelope-ffi]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-fast-channels]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-idam-ffi]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -68,38 +74,38 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-perspective-ffi]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ast]]
-version = "0.2.0"
-when = "2025-03-12"
+version = "0.3.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-compiler]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-derive]]
-version = "0.3.0"
-when = "2025-03-12"
+version = "0.4.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-build]]
-version = "0.2.0"
-when = "2025-03-12"
+version = "0.3.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -110,26 +116,26 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-lang]]
-version = "0.2.0"
-when = "2025-03-12"
+version = "0.3.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-module]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-vm]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-runtime]]
-version = "0.5.0"
-when = "2025-03-19"
+version = "0.6.0"
+when = "2025-04-10"
 user-id = 293722
 user-login = "aranya-project-bot"
 
