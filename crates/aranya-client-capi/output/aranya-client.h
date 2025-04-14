@@ -153,8 +153,13 @@ enum AranyaError
      * AFC library error.
      */
     ARANYA_ERROR_AFC,
+    /**
+     * Failed trying to construct a new tokio runtime.
+     */
     ARANYA_ERROR_RUNTIME,
-    ARANYA_ERROR_INVALID_INDEX,
+    /**
+     * Unable to create configuration info.
+     */
     ARANYA_ERROR_CONFIG,
 };
 #ifndef __cplusplus
