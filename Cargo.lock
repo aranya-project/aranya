@@ -231,6 +231,7 @@ dependencies = [
  "aranya-capi-codegen",
  "aranya-capi-core",
  "aranya-client",
+ "aranya-crypto",
  "aranya-daemon-api",
  "aranya-fast-channels",
  "aranya-util",

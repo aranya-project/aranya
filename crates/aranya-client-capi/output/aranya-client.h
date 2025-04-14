@@ -77,6 +77,11 @@
 #endif /* ARANYA_PACKED */
 
 
+/**
+ * The size in bytes of an ID
+ */
+#define ARANYA_ID_LEN 64
+
 #define ARANYA_DURATION_SECONDS (1000 * ARANYA_DURATION_MILLISECONDS)
 
 #define ARANYA_DURATION_MILLISECONDS (1000 * ARANYA_DURATION_MICROSECONDS)
@@ -86,9 +91,9 @@
 #define ARANYA_DURATION_NANOSECONDS 1
 
 /**
- * The size in bytes of an Aranya ID converted to a human-readable base64 string.
+ * The size in bytes of an ID converted to a human-readable base58 string.
  */
-#define ARANYA_ID_STR_LEN (((64 * 1375) / 1000) + 1)
+#define ARANYA_ID_STR_LEN (((ARANYA_ID_LEN * 1375) / 1000) + 1)
 
 /**
  * Valid channel operations for a label assignment.
@@ -330,28 +335,22 @@ typedef struct ARANYA_DESIGNATED_INIT AranyaKeyBundle {
     size_t enc_key_len;
 } AranyaKeyBundle;
 
+typedef struct AranyaId {
+    uint8_t bytes[ARANYA_ID_LEN];
+} AranyaId;
+
 /**
  * Device ID.
  */
-typedef struct ARANYA_ALIGNED(1) AranyaDeviceId {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[64];
+typedef struct AranyaDeviceId {
+    struct AranyaId id;
 } AranyaDeviceId;
 
 /**
  * Team ID.
  */
-typedef struct ARANYA_ALIGNED(1) AranyaTeamId {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[64];
+typedef struct AranyaTeamId {
+    struct AranyaId id;
 } AranyaTeamId;
 
 /**
@@ -390,13 +389,8 @@ typedef const char *AranyaLabelName;
 /**
  * Label ID.
  */
-typedef struct ARANYA_ALIGNED(1) AranyaLabelId {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[64];
+typedef struct AranyaLabelId {
+    struct AranyaId id;
 } AranyaLabelId;
 
 /**
@@ -1504,46 +1498,29 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
                                              struct AranyaExtError *__ext_err);
 
 /**
- * Writes the human-readable encoding of `team` ID to `str`.
+ * Writes the human-readable encoding of `id` to `str`.
  *
  * To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
  *
- * @param team ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param team ID string [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device ID [`AranyaId`](@ref AranyaId).
+ * @param str ID string [`AranyaId`](@ref AranyaId).
+ * @param str_len returns the length of `str`
  *
- * @relates AranyaError.
+ * @relates AranyaId.
  */
-AranyaError aranya_team_id_to_str(struct AranyaTeamId team,
-                                  char *str,
-                                  size_t *str_len);
+AranyaError aranya_id_to_str(const struct AranyaId *id,
+                             char *str,
+                             size_t *str_len);
 
 /**
- * Writes the human-readable encoding of `device` ID to `str`.
+ * Decodes `str` into an [`AranyaId`](@ref AranyaId).
  *
- * To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
  *
- * @param device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param device ID string [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param str pointer to a null-terminated string.
  *
- * @relates AranyaError.
+ * @relates AranyaId.
  */
-AranyaError aranya_device_id_to_str(struct AranyaDeviceId device,
-                                    char *str,
-                                    size_t *str_len);
-
-/**
- * Writes the human-readable encoding of `label` ID to `str`.
- *
- * To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
- *
- * @param label ID [`AranyaLabelId`](@ref AranyaLabelId).
- * @param label ID string [`AranyaLabelId`](@ref AranyaLabelId).
- *
- * @relates AranyaError.
- */
-AranyaError aranya_label_id_to_str(struct AranyaLabelId label_id,
-                                   char *str,
-                                   size_t *str_len);
+AranyaError aranya_id_from_str(const char *str, struct AranyaId *__output);
 
 /**
  * Query device's keybundle.

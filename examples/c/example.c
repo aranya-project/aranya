@@ -238,6 +238,23 @@ AranyaError init_team(Team *t) {
     err = aranya_create_team(&t->clients.owner.client, &t->id);
     EXPECT("error creating team", err);
 
+    // Test ID serialization and deserialization
+    size_t team_id_str_len = ARANYA_ID_STR_LEN;
+    char *team_id_str      = malloc(team_id_str_len);
+    aranya_id_to_str(&t->id.id, team_id_str, &team_id_str_len);
+    printf("Team ID: %s \r\n", team_id_str);
+
+    AranyaId decodedId;
+    err = aranya_id_from_str(team_id_str, &decodedId);
+    EXPECT("error decoding string into an ID", err);
+
+    free(team_id_str);
+
+    if (!(memcmp(decodedId.bytes, t->id.id.bytes, ARANYA_ID_LEN) == 0)) {
+        fprintf(stderr, "application failed: Decoded ID doesn't match\r\n");
+        return EXIT_FAILURE;
+    }
+
     return ARANYA_ERROR_SUCCESS;
 }
 
@@ -444,10 +461,21 @@ AranyaError run(Team *t) {
         AranyaDeviceId device_result = devices[i];
         size_t device_str_len        = ARANYA_ID_STR_LEN;
         char *device_str             = malloc(ARANYA_ID_STR_LEN);
-        aranya_device_id_to_str(device_result, device_str, &device_str_len);
+        aranya_id_to_str(&device_result.id, device_str, &device_str_len);
         printf("device_id: %s at index: %zu/%zu \r\n", device_str, i,
                devices_len);
+
+        AranyaId decodedId;
+        err = aranya_id_from_str(device_str, &decodedId);
+        EXPECT("error decoding string into an ID", err);
+
         free(device_str);
+
+        if (!(memcmp(decodedId.bytes, device_result.id.bytes, ARANYA_ID_LEN) ==
+              0)) {
+            fprintf(stderr, "application failed: Decoded ID doesn't match\r\n");
+            return EXIT_FAILURE;
+        }
     }
     free(devices);
 
@@ -677,7 +705,7 @@ AranyaError run_aqc_example(Team *t) {
 
     size_t device_str_len = ARANYA_ID_STR_LEN;
     char *device_str      = malloc(ARANYA_ID_STR_LEN);
-    aranya_device_id_to_str(t->clients.memberb.id, device_str, &device_str_len);
+    aranya_id_to_str(&t->clients.memberb.id.id, device_str, &device_str_len);
     printf("query labels assigned to device: %s\r\n", device_str);
     size_t labels_len     = BUF_LEN;
     AranyaLabelId *labels = malloc(labels_len * sizeof(AranyaLabelId));
@@ -692,7 +720,7 @@ AranyaError run_aqc_example(Team *t) {
         AranyaLabelId label_result = labels[i];
         size_t label_str_len       = ARANYA_ID_STR_LEN;
         char *label_str            = malloc(ARANYA_ID_STR_LEN);
-        aranya_label_id_to_str(label_result, label_str, &label_str_len);
+        aranya_id_to_str(&label_result.id, label_str, &label_str_len);
         printf("label_id: %s at index: %zu/%zu \r\n", label_str, i, labels_len);
         free(label_str);
     }
@@ -700,7 +728,7 @@ AranyaError run_aqc_example(Team *t) {
 
     size_t team_str_len = ARANYA_ID_STR_LEN;
     char *team_str      = malloc(ARANYA_ID_STR_LEN);
-    aranya_team_id_to_str(t->id, team_str, &team_str_len);
+    aranya_id_to_str(&t->id.id, team_str, &team_str_len);
     printf("query labels on team: %s\r\n", team_str);
     err = aranya_query_labels(&t->clients.operator.client, &t->id, labels,
                               &labels_len);
@@ -712,7 +740,7 @@ AranyaError run_aqc_example(Team *t) {
         AranyaLabelId label_result = labels[i];
         size_t label_str_len       = ARANYA_ID_STR_LEN;
         char *label_str            = malloc(ARANYA_ID_STR_LEN);
-        aranya_label_id_to_str(label_result, label_str, &label_str_len);
+        aranya_id_to_str(&label_result.id, label_str, &label_str_len);
         printf("label_id: %s at index: %zu/%zu \r\n", label_str, i, labels_len);
         free(label_str);
     }

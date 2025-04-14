@@ -1,6 +1,4 @@
-#[cfg(feature = "afc")]
-use core::ptr;
-use core::{ffi::c_char, ops::DerefMut, slice};
+use core::{ffi::c_char, ops::DerefMut, ptr, slice};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
@@ -177,23 +175,103 @@ pub fn init_logging() -> Result<(), imp::Error> {
 #[aranya_capi_core::opaque(size = 3728, align = 16)]
 pub type Client = Safe<imp::Client>;
 
-/// Team ID.
-#[repr(transparent)]
+/// The size in bytes of an ID
+pub const ARANYA_ID_LEN: usize = 64;
+
+const _: () = {
+    assert!(ARANYA_ID_LEN == size_of::<aranya_crypto::Id>());
+};
+
+// Aranya ID
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 64, align = 1)]
-pub struct TeamId(aranya_daemon_api::TeamId);
+pub struct Id {
+    bytes: [u8; ARANYA_ID_LEN],
+}
+
+impl AsRef<aranya_crypto::Id> for Id {
+    fn as_ref(&self) -> &aranya_crypto::Id {
+        // SAFETY: Each type is a struct with a single field containing an array of 64 bytes
+        unsafe { &*ptr::from_ref::<[u8; ARANYA_ID_LEN]>(&self.bytes).cast::<aranya_crypto::Id>() }
+    }
+}
+
+impl From<aranya_crypto::Id> for Id {
+    fn from(value: aranya_crypto::Id) -> Self {
+        Id {
+            bytes: value.into(),
+        }
+    }
+}
+
+/// Team ID.
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct TeamId {
+    id: Id,
+}
+
+impl From<aranya_daemon_api::TeamId> for TeamId {
+    fn from(value: aranya_daemon_api::TeamId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&TeamId> for aranya_daemon_api::TeamId {
+    fn from(value: &TeamId) -> Self {
+        value.id.bytes.into()
+    }
+}
 
 /// Device ID.
-#[repr(transparent)]
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 64, align = 1)]
-pub struct DeviceId(aranya_daemon_api::DeviceId);
+pub struct DeviceId {
+    id: Id,
+}
+
+impl From<aranya_daemon_api::DeviceId> for DeviceId {
+    fn from(value: aranya_daemon_api::DeviceId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&DeviceId> for aranya_daemon_api::DeviceId {
+    fn from(value: &DeviceId) -> Self {
+        value.id.bytes.into()
+    }
+}
 
 /// Label ID.
-#[repr(transparent)]
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 64, align = 1)]
-pub struct LabelId(aranya_daemon_api::LabelId);
+pub struct LabelId {
+    id: Id,
+}
+
+impl From<aranya_daemon_api::LabelId> for LabelId {
+    fn from(value: aranya_daemon_api::LabelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&LabelId> for aranya_daemon_api::LabelId {
+    fn from(value: &LabelId) -> Self {
+        value.id.bytes.into()
+    }
+}
 
 /// Channel ID for AQC channel.
 #[repr(transparent)]
@@ -612,7 +690,7 @@ pub fn get_key_bundle(client: &mut Client) -> Result<KeyBundle, imp::Error> {
 pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
     let client = client.deref_mut();
     let id = client.rt.block_on(client.inner.get_device_id())?;
-    Ok(DeviceId(id))
+    Ok(id.into())
 }
 
 /// Create a new graph/team with the current device as the owner.
@@ -624,7 +702,7 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
 pub fn create_team(client: &mut Client) -> Result<TeamId, imp::Error> {
     let client = client.deref_mut();
     let id = client.rt.block_on(client.inner.create_team())?;
-    Ok(TeamId(id))
+    Ok(id.into())
 }
 
 /// Add a team to the local device store.
@@ -635,7 +713,7 @@ pub fn create_team(client: &mut Client) -> Result<TeamId, imp::Error> {
 /// @relates AranyaClient.
 pub fn add_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(client.inner.add_team(team.0))?;
+    client.rt.block_on(client.inner.add_team(team.into()))?;
     Ok(())
 }
 
@@ -647,7 +725,7 @@ pub fn add_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
 /// @relates AranyaClient.
 pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(client.inner.remove_team(team.0))?;
+    client.rt.block_on(client.inner.remove_team(team.into()))?;
     Ok(())
 }
 
@@ -675,7 +753,7 @@ pub unsafe fn add_sync_peer(
     client.rt.block_on(
         client
             .inner
-            .team(team.0)
+            .team(team.into())
             .add_sync_peer(addr, (**config).into()),
     )?;
     Ok(())
@@ -709,7 +787,7 @@ pub unsafe fn sync_now(
     client.rt.block_on(
         client
             .inner
-            .team(team.0)
+            .team(team.into())
             .sync_now(addr, config.map(|config| (**config).into())),
     )?;
     Ok(())
@@ -732,7 +810,7 @@ pub unsafe fn remove_sync_peer(
     let addr = unsafe { addr.as_underlying() }?;
     client
         .rt
-        .block_on(client.inner.team(team.0).remove_sync_peer(addr))?;
+        .block_on(client.inner.team(team.into()).remove_sync_peer(addr))?;
     Ok(())
 }
 
@@ -744,7 +822,9 @@ pub unsafe fn remove_sync_peer(
 /// @relates AranyaClient.
 pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(client.inner.team(team.0).close_team())?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).close_team())?;
     Ok(())
 }
 
@@ -768,7 +848,7 @@ pub unsafe fn add_device_to_team(
         unsafe { keys.as_underlying() };
     client
         .rt
-        .block_on(client.inner.team(team.0).add_device_to_team(keys))?;
+        .block_on(client.inner.team(team.into()).add_device_to_team(keys))?;
     Ok(())
 }
 
@@ -787,9 +867,12 @@ pub fn remove_device_from_team(
     device: &DeviceId,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.0).remove_device_from_team(device.0))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .remove_device_from_team(device.into()),
+    )?;
     Ok(())
 }
 
@@ -812,9 +895,12 @@ pub fn assign_role(
     role: Role,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.0).assign_role(device.0, role.into()))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .assign_role(device.into(), role.into()),
+    )?;
     Ok(())
 }
 
@@ -835,9 +921,12 @@ pub fn revoke_role(
     role: Role,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.0).revoke_role(device.0, role.into()))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .revoke_role(device.into(), role.into()),
+    )?;
     Ok(())
 }
 
@@ -867,8 +956,8 @@ pub unsafe fn aqc_assign_net_identifier(
     client.rt.block_on(
         client
             .inner
-            .team(team.0)
-            .assign_aqc_net_identifier(device.0, net_identifier),
+            .team(team.into())
+            .assign_aqc_net_identifier(device.into(), net_identifier),
     )?;
     Ok(())
 }
@@ -895,8 +984,8 @@ pub unsafe fn aqc_remove_net_identifier(
     client.rt.block_on(
         client
             .inner
-            .team(team.0)
-            .remove_aqc_net_identifier(device.0, net_identifier),
+            .team(team.into())
+            .remove_aqc_net_identifier(device.into(), net_identifier),
     )?;
     Ok(())
 }
@@ -917,9 +1006,12 @@ pub fn create_afc_label(
     label: Label,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.0).create_afc_label(label.into()))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .create_afc_label(label.into()),
+    )?;
     Ok(())
 }
 
@@ -939,9 +1031,12 @@ pub fn delete_afc_label(
     label: Label,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.0).delete_afc_label(label.into()))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .delete_afc_label(label.into()),
+    )?;
     Ok(())
 }
 
@@ -966,8 +1061,8 @@ pub fn assign_afc_label(
     client.rt.block_on(
         client
             .inner
-            .team(team.0)
-            .assign_afc_label(device.0, label.into()),
+            .team(team.into())
+            .assign_afc_label(device.into(), label.into()),
     )?;
     Ok(())
 }
@@ -993,8 +1088,8 @@ pub fn revoke_afc_label(
     client.rt.block_on(
         client
             .inner
-            .team(team.0)
-            .revoke_afc_label(device.0, label.into()),
+            .team(team.into())
+            .revoke_afc_label(device.into(), label.into()),
     )?;
     Ok(())
 }
@@ -1026,8 +1121,8 @@ pub unsafe fn afc_assign_net_identifier(
     client.rt.block_on(
         client
             .inner
-            .team(team.0)
-            .assign_afc_net_identifier(device.0, net_identifier),
+            .team(team.into())
+            .assign_afc_net_identifier(device.into(), net_identifier),
     )?;
     Ok(())
 }
@@ -1055,8 +1150,8 @@ pub unsafe fn afc_remove_net_identifier(
     client.rt.block_on(
         client
             .inner
-            .team(team.0)
-            .remove_afc_net_identifier(device.0, net_identifier),
+            .team(team.into())
+            .remove_afc_net_identifier(device.into(), net_identifier),
     )?;
     Ok(())
 }
@@ -1086,7 +1181,7 @@ pub unsafe fn afc_create_bidi_channel(
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
     let id = client.rt.block_on(client.inner.afc().create_bidi_channel(
-        team.0,
+        team.into(),
         peer,
         label.into(),
     ))?;
@@ -1262,8 +1357,8 @@ pub fn create_label(
     let name = unsafe { name.as_underlying() }?;
     let label_id = client
         .rt
-        .block_on(client.inner.team(team.0).create_label(name))?;
-    Ok(LabelId(label_id))
+        .block_on(client.inner.team(team.into()).create_label(name))?;
+    Ok(label_id.into())
 }
 
 /// Delete a channel label.
@@ -1283,7 +1378,7 @@ pub fn delete_label(
     let client = client.deref_mut();
     client
         .rt
-        .block_on(client.inner.team(team.0).delete_label(label_id.0))?;
+        .block_on(client.inner.team(team.into()).delete_label(label_id.into()))?;
     Ok(())
 }
 
@@ -1305,12 +1400,13 @@ pub fn assign_label(
     op: ChanOp,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.0)
-            .assign_label(device.0, label_id.0, op.into()),
-    )?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).assign_label(
+            device.into(),
+            label_id.into(),
+            op.into(),
+        ))?;
     Ok(())
 }
 
@@ -1331,9 +1427,12 @@ pub fn revoke_label(
     label_id: &LabelId,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.0).revoke_label(device.0, label_id.0))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .revoke_label(device.into(), label_id.into()),
+    )?;
     Ok(())
 }
 
@@ -1360,12 +1459,11 @@ pub unsafe fn aqc_create_bidi_channel(
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
-    let (aqc_id, _) = client.rt.block_on(
-        client
-            .inner
-            .aqc()
-            .create_bidi_channel(team.0, peer, label_id.0),
-    )?;
+    let (aqc_id, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
+        team.into(),
+        peer,
+        label_id.into(),
+    ))?;
     Ok(AqcChannelId(aqc_id))
 }
 
@@ -1445,7 +1543,7 @@ pub fn query_devices_on_team(
     let client = client.deref_mut();
     let data = client
         .rt
-        .block_on(client.inner.queries(team.0).devices_on_team())?;
+        .block_on(client.inner.queries(team.into()).devices_on_team())?;
     let data = data.__data();
     let Some(devices) = devices else {
         *devices_len = data.len();
@@ -1453,7 +1551,7 @@ pub fn query_devices_on_team(
     };
     let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(DeviceId(*src));
+        dst.write((*src).into());
     }
     if *devices_len < data.len() {
         *devices_len = data.len();
@@ -1463,64 +1561,43 @@ pub fn query_devices_on_team(
     Ok(())
 }
 
-/// The size in bytes of an Aranya ID converted to a human-readable base64 string.
-pub const ARANYA_ID_STR_LEN: u64 = (64 * 1375) / 1000 + 1;
+/// The size in bytes of an ID converted to a human-readable base58 string.
+pub const ARANYA_ID_STR_LEN: usize = (ARANYA_ID_LEN * 1375) / 1000 + 1;
 
-/// Writes the human-readable encoding of `team` ID to `str`.
+/// Writes the human-readable encoding of `id` to `str`.
 ///
 /// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
 ///
-/// @param team ID [`TeamId`].
-/// @param team ID string [`TeamId`].
+/// @param device ID [`Id`].
+/// @param str ID string [`Id`].
+/// @param str_len returns the length of `str`
 ///
-/// @relates AranyaError.
+/// @relates AranyaId.
 #[aranya_capi_core::no_ext_error]
-pub fn team_id_to_str(
-    team: TeamId,
+pub fn id_to_str(
+    id: &Id,
     str: &mut MaybeUninit<c_char>,
     str_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
-    aranya_capi_core::write_c_str(str, &team.0, str_len)?;
+    aranya_capi_core::write_c_str(str, id.as_ref(), str_len)?;
     Ok(())
 }
 
-/// Writes the human-readable encoding of `device` ID to `str`.
+/// Decodes `str` into an [`Id`].
 ///
-/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
 ///
-/// @param device ID [`DeviceId`].
-/// @param device ID string [`DeviceId`].
+/// @param str pointer to a null-terminated string.
 ///
-/// @relates AranyaError.
+/// @relates AranyaId.
 #[aranya_capi_core::no_ext_error]
-pub fn device_id_to_str(
-    device: DeviceId,
-    str: &mut MaybeUninit<c_char>,
-    str_len: &mut usize,
-) -> Result<(), imp::Error> {
-    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
-    aranya_capi_core::write_c_str(str, &device.0, str_len)?;
-    Ok(())
-}
+pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
+    // SAFETY: Caller must ensure the pointer is a valid C String.
+    let cstr = unsafe { std::ffi::CStr::from_ptr(str) };
 
-/// Writes the human-readable encoding of `label` ID to `str`.
-///
-/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
-///
-/// @param label ID [`LabelId`].
-/// @param label ID string [`LabelId`].
-///
-/// @relates AranyaError.
-#[aranya_capi_core::no_ext_error]
-pub fn label_id_to_str(
-    label_id: LabelId,
-    str: &mut MaybeUninit<c_char>,
-    str_len: &mut usize,
-) -> Result<(), imp::Error> {
-    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
-    aranya_capi_core::write_c_str(str, &label_id.0, str_len)?;
-    Ok(())
+    aranya_crypto::Id::decode(cstr.to_bytes())
+        .map_err(|_| InvalidArg::new("str", "unable to decode ID from bytes").into())
+        .map(Into::into)
 }
 
 // TODO: query_device_role
@@ -1539,9 +1616,12 @@ pub unsafe fn query_device_keybundle(
     device: &DeviceId,
 ) -> Result<KeyBundle, imp::Error> {
     let client = client.deref_mut();
-    let keys = client
-        .rt
-        .block_on(client.inner.queries(team.0).device_keybundle(device.0))?;
+    let keys = client.rt.block_on(
+        client
+            .inner
+            .queries(team.into())
+            .device_keybundle(device.into()),
+    )?;
     Ok(KeyBundle::from_underlying(keys))
 }
 
@@ -1565,8 +1645,8 @@ pub fn query_device_label_assignments(
     let data = client.rt.block_on(
         client
             .inner
-            .queries(team.0)
-            .device_label_assignments(device.0),
+            .queries(team.into())
+            .device_label_assignments(device.into()),
     )?;
     let data = data.__data();
     let Some(labels) = labels else {
@@ -1575,7 +1655,7 @@ pub fn query_device_label_assignments(
     };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(LabelId(*src));
+        dst.write((*src).into());
     }
     if *labels_len < data.len() {
         *labels_len = data.len();
@@ -1606,8 +1686,8 @@ pub fn query_device_afc_label_assignments(
     let data = client.rt.block_on(
         client
             .inner
-            .queries(team.0)
-            .device_afc_label_assignments(device.0),
+            .queries(team.into())
+            .device_afc_label_assignments(device.into()),
     )?;
     let data = data.__data();
     let Some(labels) = labels else {
@@ -1643,9 +1723,12 @@ pub unsafe fn query_afc_net_identifier(
     ident_len: &mut usize,
 ) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
-    let Some(net_identifier) = client
-        .rt
-        .block_on(client.inner.queries(team.0).afc_net_identifier(device.0))?
+    let Some(net_identifier) = client.rt.block_on(
+        client
+            .inner
+            .queries(team.into())
+            .afc_net_identifier(device.into()),
+    )?
     else {
         return Ok(false);
     };
@@ -1670,9 +1753,12 @@ pub unsafe fn query_aqc_net_identifier(
     ident_len: &mut usize,
 ) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
-    let Some(net_identifier) = client
-        .rt
-        .block_on(client.inner.queries(team.0).aqc_net_identifier(device.0))?
+    let Some(net_identifier) = client.rt.block_on(
+        client
+            .inner
+            .queries(team.into())
+            .aqc_net_identifier(device.into()),
+    )?
     else {
         return Ok(false);
     };
@@ -1698,7 +1784,7 @@ pub unsafe fn query_label_exists(
     let client = client.deref_mut();
     let exists = client
         .rt
-        .block_on(client.inner.queries(team.0).label_exists(label.0))?;
+        .block_on(client.inner.queries(team.into()).label_exists(label.into()))?;
     Ok(exists)
 }
 
@@ -1717,7 +1803,9 @@ pub fn query_labels(
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let data = client.rt.block_on(client.inner.queries(team.0).labels())?;
+    let data = client
+        .rt
+        .block_on(client.inner.queries(team.into()).labels())?;
     let data = data.__data();
     let Some(labels) = labels else {
         *labels_len = data.len();
@@ -1725,7 +1813,7 @@ pub fn query_labels(
     };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(LabelId(*src));
+        dst.write((*src).into());
     }
     if *labels_len < data.len() {
         *labels_len = data.len();
@@ -1754,7 +1842,7 @@ pub unsafe fn query_afc_label_exists(
     let exists = client.rt.block_on(
         client
             .inner
-            .queries(team.0)
+            .queries(team.into())
             .afc_label_exists(label.0.into()),
     )?;
     Ok(exists)
