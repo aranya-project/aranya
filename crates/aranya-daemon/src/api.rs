@@ -11,14 +11,12 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use aranya_crypto::{
-    aqc::{BidiPeerEncap as AqcBidiPeerEncap, UniPeerEncap as AqcUniPeerEncap},
-    Csprng, DeviceId, Rng,
-};
+use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_daemon_api::{
-    AfcCtrl, AfcId, AqcBidiChannelCreatedInfo, AqcBidiChannelReceivedInfo, AqcChannelInfo, AqcCtrl,
-    AqcId, AqcUniChannelCreatedInfo, AqcUniChannelReceivedInfo, ChanOp as ApiChanOp, DaemonApi,
-    DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, KeyStoreInfo, Label as ApiLabel,
+    AfcCtrl, AfcId, AqcBidiChannelCreatedInfo, AqcBidiChannelId as ApiAqcBidiChannelId,
+    AqcBidiChannelReceivedInfo, AqcChannelInfo, AqcCtrl, AqcUniChannelCreatedInfo,
+    AqcUniChannelId as ApiAqcUniChannelId, AqcUniChannelReceivedInfo, ChanOp as ApiChanOp,
+    DaemonApi, DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, KeyStoreInfo, Label as ApiLabel,
     LabelId as ApiLabelId, NetIdentifier, Result as ApiResult, Role as ApiRole, SyncPeerConfig,
     TeamId, CS,
 };
@@ -835,7 +833,7 @@ impl DaemonApi for DaemonApiHandler {
         peer: NetIdentifier,
         node_id: NodeId,
         label: ApiLabelId,
-    ) -> ApiResult<(AqcId, AqcCtrl, AqcChannelInfo)> {
+    ) -> ApiResult<(AqcCtrl, AqcChannelInfo)> {
         info!("create_aqc_bidi_channel");
 
         let peer_id = self
@@ -858,8 +856,6 @@ impl DaemonApi for DaemonApiHandler {
         else {
             return Err(anyhow::anyhow!("unable to find AqcBidiChannelCreated effect").into());
         };
-        let aqc_id: AqcId = e.channel_id.into();
-        debug!(?aqc_id, "processed aqc ID");
 
         self.handle_effects(&effects, Some(node_id)).await?;
 
@@ -877,7 +873,7 @@ impl DaemonApi for DaemonApiHandler {
                 .context("psk_length_in_bytes is out of range")?,
         });
 
-        Ok((aqc_id, ctrl, aqc_info))
+        Ok((ctrl, aqc_info))
     }
     #[instrument(skip_all)]
     async fn create_aqc_uni_channel(
@@ -887,7 +883,7 @@ impl DaemonApi for DaemonApiHandler {
         peer: NetIdentifier,
         node_id: NodeId,
         label: ApiLabelId,
-    ) -> ApiResult<(AqcId, AqcCtrl, AqcChannelInfo)> {
+    ) -> ApiResult<(AqcCtrl, AqcChannelInfo)> {
         info!("create_aqc_uni_channel");
 
         let peer_id = self
@@ -910,8 +906,6 @@ impl DaemonApi for DaemonApiHandler {
         else {
             return Err(anyhow::anyhow!("unable to find AqcUniChannelCreated effect").into());
         };
-        let aqc_id: AqcId = e.channel_id.into();
-        debug!(?aqc_id, "processed aqc ID");
 
         self.handle_effects(&effects, Some(node_id)).await?;
 
@@ -930,12 +924,25 @@ impl DaemonApi for DaemonApiHandler {
                 .context("psk_length_in_bytes is out of range")?,
         });
 
-        Ok((aqc_id, ctrl, aqc_info))
+        Ok((ctrl, aqc_info))
     }
 
     #[instrument(skip(self))]
-    async fn delete_aqc_channel(self, _: context::Context, chan: AqcId) -> ApiResult<AqcCtrl> {
-        // TODO: remove AQC channel from Aranya.
+    async fn delete_aqc_bidi_channel(
+        self,
+        _: context::Context,
+        chan: ApiAqcBidiChannelId,
+    ) -> ApiResult<AqcCtrl> {
+        // TODO: remove AQC bidi channel from Aranya.
+        todo!();
+    }
+    #[instrument(skip(self))]
+    async fn delete_aqc_uni_channel(
+        self,
+        _: context::Context,
+        chan: ApiAqcUniChannelId,
+    ) -> ApiResult<AqcCtrl> {
+        // TODO: remove AQC uni channel from Aranya.
         todo!();
     }
     #[instrument(skip_all)]
@@ -945,7 +952,7 @@ impl DaemonApi for DaemonApiHandler {
         team: TeamId,
         node_id: NodeId,
         ctrl: AqcCtrl,
-    ) -> ApiResult<(AqcId, NetIdentifier, AqcChannelInfo)> {
+    ) -> ApiResult<(NetIdentifier, AqcChannelInfo)> {
         let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
@@ -967,10 +974,6 @@ impl DaemonApi for DaemonApiHandler {
                         .context("psk_length_in_bytes is out of range")?,
                 });
 
-                let encap =
-                    AqcBidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
-                let aqc_id: AqcId = encap.id().into();
-                debug!(?aqc_id, "processed aqc ID");
                 let net = self
                     .aqc_peers
                     .lock()
@@ -978,7 +981,7 @@ impl DaemonApi for DaemonApiHandler {
                     .get_by_right(&e.author_id.into())
                     .context("missing net identifier for channel author")?
                     .clone();
-                return Ok((aqc_id, net, aqc_info));
+                return Ok((net, aqc_info));
             };
 
             if let Some(Effect::AqcUniChannelReceived(e)) = find_effect!(&effects, Effect::AqcUniChannelReceived(e) if (e.sender_id == id.into() || e.receiver_id == id.into()))
@@ -996,11 +999,6 @@ impl DaemonApi for DaemonApiHandler {
                         .assume("`psk_length_in_bytes` is out of range")
                         .context("psk_length_in_bytes is out of range")?,
                 });
-
-                let encap =
-                    AqcUniPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
-                let aqc_id: AqcId = encap.id().into();
-                debug!(?aqc_id, "processed aqc ID");
                 let net = self
                     .aqc_peers
                     .lock()
@@ -1008,7 +1006,7 @@ impl DaemonApi for DaemonApiHandler {
                     .get_by_right(&e.author_id.into())
                     .context("missing net identifier for channel author")?
                     .clone();
-                return Ok((aqc_id, net, aqc_info));
+                return Ok((net, aqc_info));
             };
         }
         Err(anyhow!("unable to find AqcBidiChannelReceived effect").into())

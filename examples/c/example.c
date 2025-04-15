@@ -779,7 +779,7 @@ AranyaError run_aqc_example(Team *t) {
 
     // Create channel using Member A's client
     printf("creating AQC channel \r\n");
-    AranyaAqcChannelId chan_id;
+    AranyaAqcBidiChannelId chan_id;
     err = aranya_aqc_create_bidi_channel(&t->clients.membera.client, &t->id,
                                          afc_addrs[MEMBERB], &label1_id,
                                          &chan_id);

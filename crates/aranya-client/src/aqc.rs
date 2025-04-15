@@ -16,7 +16,7 @@ use aranya_crypto::{
     keystore::fs_keystore::Store,
     CipherSuite, Random, Rng,
 };
-pub use aranya_daemon_api::AqcId;
+pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
 use aranya_daemon_api::{
     AqcChannelInfo::*, AqcCtrl, DeviceId, KeyStoreInfo, LabelId, NetIdentifier, TeamId, CS,
 };
@@ -93,19 +93,19 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> crate::Result<(AqcId, AqcCtrl)> {
+    ) -> crate::Result<(AqcBidiChannelId, AqcCtrl)> {
         debug!("creating bidi channel");
 
         let node_id: NodeId = 0.into();
         //let node_id = self.client.aqc.get_next_node_id().await?;
         debug!(%node_id, "selected node ID");
 
-        let (aqc_id, aqc_ctrl, aqc_info) = self
+        let (aqc_ctrl, aqc_info) = self
             .client
             .daemon
             .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label_id)
             .await??;
-        debug!(%aqc_id, %node_id, %label_id, "created bidi channel");
+        debug!(%node_id, %label_id, "created bidi channel");
 
         if let BidiCreated(v) = aqc_info {
             let psk = self
@@ -130,10 +130,13 @@ impl<'a> AqcChannels<'a> {
             debug!("psk id: {:?}", psk.identity());
 
             // TODO: send ctrl msg via network.
-        }
 
-        // TODO: for testing only. Send ctrl via network instead of returning.
-        Ok((aqc_id, aqc_ctrl))
+            // TODO: for testing only. Send ctrl via network instead of returning.
+            return Ok((v.channel_id.into_id().into(), aqc_ctrl));
+        }
+        Err(crate::Error::Aqc(AqcError::Other(anyhow!(
+            "unable to create bidi channel"
+        ))))
     }
 
     /// Creates a unidirectional AQC channel with a peer.
@@ -150,19 +153,19 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> crate::Result<(AqcId, AqcCtrl)> {
+    ) -> crate::Result<(AqcUniChannelId, AqcCtrl)> {
         debug!("creating aqc uni channel");
 
         // TODO: use correct node ID.
         let node_id: NodeId = 0.into();
         debug!(%node_id, "selected node ID");
 
-        let (aqc_id, aqc_ctrl, aqc_info) = self
+        let (aqc_ctrl, aqc_info) = self
             .client
             .daemon
             .create_aqc_uni_channel(context::current(), team_id, peer.clone(), node_id, label_id)
             .await??;
-        debug!(%aqc_id, %node_id, %label_id, "created aqc uni channel");
+        debug!(%node_id, %label_id, "created aqc uni channel");
 
         if let UniCreated(v) = aqc_info {
             let psk = self
@@ -188,22 +191,39 @@ impl<'a> AqcChannels<'a> {
             debug!("psk id: {:?}", psk.identity());
 
             // TODO: send ctrl msg via network.
+
+            // TODO: for testing only. Send ctrl via network instead of returning.
+            return Ok((v.channel_id.into_id().into(), aqc_ctrl));
         }
 
-        // TODO: for testing only. Send ctrl via network instead of returning.
-        Ok((aqc_id, aqc_ctrl))
+        Err(crate::Error::Aqc(AqcError::Other(anyhow!(
+            "unable to create uni channel"
+        ))))
     }
 
-    /// Deletes an AQC channel.
+    /// Deletes an AQC bidi channel.
     // It is an error if the channel does not exist
-    #[instrument(skip_all, fields(aqc_id = %id))]
-    pub async fn delete_channel(&mut self, id: AqcId) -> crate::Result<()> {
+    #[instrument(skip_all, fields(chan = %chan))]
+    pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannelId) -> crate::Result<()> {
         let _ctrl = self
             .client
             .daemon
-            .delete_aqc_channel(context::current(), id)
+            .delete_aqc_bidi_channel(context::current(), chan)
             .await??;
-        //self.client.aqc.remove_channel(id).await;
+        //self.client.aqc.remove_channel(chan).await;
+        Ok(())
+    }
+
+    /// Deletes an AQC uni channel.
+    // It is an error if the channel does not exist
+    #[instrument(skip_all, fields(chan = %chan))]
+    pub async fn delete_uni_channel(&mut self, chan: AqcUniChannelId) -> crate::Result<()> {
+        let _ctrl = self
+            .client
+            .daemon
+            .delete_aqc_uni_channel(context::current(), chan)
+            .await??;
+        //self.client.aqc.remove_channel(chan).await;
         Ok(())
     }
 
@@ -214,7 +234,7 @@ impl<'a> AqcChannels<'a> {
         // TODO: use correct node ID
         let node_id: NodeId = 0.into();
 
-        let (_aqc_id, _peer, aqc_info) = self
+        let (_peer, aqc_info) = self
             .client
             .daemon
             .receive_aqc_ctrl(context::current(), team, node_id, ctrl)

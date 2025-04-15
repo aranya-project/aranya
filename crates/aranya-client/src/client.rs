@@ -45,7 +45,7 @@ impl Devices {
 
 /// List of labels.
 pub struct Labels {
-    pub data: Vec<Label>,
+    data: Vec<Label>,
 }
 
 impl Labels {

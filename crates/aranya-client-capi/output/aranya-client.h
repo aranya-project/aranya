@@ -394,16 +394,18 @@ typedef struct AranyaLabelId {
 } AranyaLabelId;
 
 /**
- * Channel ID for AQC channel.
+ * Channel ID for AQC bidi channel.
  */
-typedef struct ARANYA_ALIGNED(1) AranyaAqcChannelId {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[16];
-} AranyaAqcChannelId;
+typedef struct AranyaAqcBidiChannelId {
+    struct AranyaId id;
+} AranyaAqcBidiChannelId;
+
+/**
+ * Channel ID for AQC uni channel.
+ */
+typedef struct AranyaAqcUniChannelId {
+    struct AranyaId id;
+} AranyaAqcUniChannelId;
 
 /**
  * A type to represent a span of time in nanoseconds.
@@ -1330,7 +1332,7 @@ AranyaError aranya_aqc_create_bidi_channel(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
                                            AranyaNetIdentifier peer,
                                            const struct AranyaLabelId *label_id,
-                                           struct AranyaAqcChannelId *__output);
+                                           struct AranyaAqcBidiChannelId *__output);
 
 /**
  * Create an AQC channel.
@@ -1352,31 +1354,54 @@ AranyaError aranya_aqc_create_bidi_channel_ext(struct AranyaClient *client,
                                                const struct AranyaTeamId *team,
                                                AranyaNetIdentifier peer,
                                                const struct AranyaLabelId *label_id,
-                                               struct AranyaAqcChannelId *__output,
+                                               struct AranyaAqcBidiChannelId *__output,
                                                struct AranyaExtError *__ext_err);
 
 /**
- * Delete an AQC channel.
+ * Delete a bidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param chan the AQC channel ID [`AranyaChannelId`](@ref AranyaChannelId) of the channel to delete.
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_channel(struct AranyaClient *client,
-                                      struct AranyaAqcChannelId chan);
+AranyaError aranya_aqc_delete_bidi_channel(struct AranyaClient *client,
+                                           const struct AranyaAqcBidiChannelId *chan);
 
 /**
- * Delete an AQC channel.
+ * Delete a bidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param chan the AQC channel ID [`AranyaChannelId`](@ref AranyaChannelId) of the channel to delete.
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_channel_ext(struct AranyaClient *client,
-                                          struct AranyaAqcChannelId chan,
-                                          struct AranyaExtError *__ext_err);
+AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
+                                               const struct AranyaAqcBidiChannelId *chan,
+                                               struct AranyaExtError *__ext_err);
+
+/**
+ * Delete a unidirectional AQC channel.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param chan the AQC channel ID [`AranyaChannelId`](@ref AranyaChannelId) of the channel to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_delete_uni_channel(struct AranyaClient *client,
+                                          const struct AranyaAqcUniChannelId *chan);
+
+/**
+ * Delete a unidirectional AQC channel.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param chan the AQC channel ID [`AranyaChannelId`](@ref AranyaChannelId) of the channel to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaClient *client,
+                                              const struct AranyaAqcUniChannelId *chan,
+                                              struct AranyaExtError *__ext_err);
 
 /**
  * Configures how often the peer will be synced with.

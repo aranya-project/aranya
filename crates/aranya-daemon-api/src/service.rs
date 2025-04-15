@@ -5,10 +5,7 @@ use std::path::PathBuf;
 
 use aranya_crypto::{
     afc::{BidiChannelId as AfcBidiChannelId, UniChannelId as AfcUniChannelId},
-    aqc::{
-        BidiAuthorSecretId, BidiChannelId as AqcBidiChannelId, UniAuthorSecretId,
-        UniChannelId as AqcUniChannelId,
-    },
+    aqc::{self, BidiAuthorSecretId, UniAuthorSecretId},
     custom_id,
     default::DefaultCipherSuite,
     EncryptionKeyId, Id,
@@ -67,8 +64,13 @@ custom_id! {
 }
 
 custom_id! {
-    /// An AQC channel ID.
-    pub struct ChannelId;
+    /// An AQC bidi channel ID.
+    pub struct AqcBidiChannelId;
+}
+
+custom_id! {
+    /// An AQC uni channel ID.
+    pub struct AqcUniChannelId;
 }
 
 /// A device's public key bundle.
@@ -144,41 +146,6 @@ impl From<Id> for AfcId {
     }
 }
 
-/// Uniquely identifies an AQC channel.
-///
-/// It is a [`AqcBidiChannelId`] or [`AqcUniChannelId`] truncated to
-/// 128 bits.
-#[repr(transparent)]
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct AqcId([u8; 16]);
-
-impl fmt::Display for AqcId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.to_base58())
-    }
-}
-
-/// Convert from [`AqcBidiChannelId`] to [`AqcId`]
-impl From<AqcBidiChannelId> for AqcId {
-    fn from(value: AqcBidiChannelId) -> Self {
-        Self(*truncate(value.as_array()))
-    }
-}
-
-/// Convert from [`AqcUniChannelId`] to [`AqcId`]
-impl From<AqcUniChannelId> for AqcId {
-    fn from(value: AqcUniChannelId) -> Self {
-        Self(*truncate(value.as_array()))
-    }
-}
-
-/// Convert from [`Id`] to [`AqcId`]
-impl From<Id> for AqcId {
-    fn from(value: Id) -> Self {
-        Self(*truncate(value.as_array()))
-    }
-}
-
 // serialized command which must be passed over AFC.
 pub type AfcCtrl = Vec<Box<[u8]>>;
 
@@ -198,7 +165,6 @@ pub enum AqcChannelInfo {
 }
 
 /// Bidirectional AQC channel info.
-// TODO: move AqcId into this type
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct AqcBidiChannelCreatedInfo {
     pub parent_cmd_id: Id,
@@ -207,13 +173,12 @@ pub struct AqcBidiChannelCreatedInfo {
     pub peer_id: DeviceId,
     pub peer_enc_pk: Vec<u8>,
     pub label_id: LabelId,
-    pub channel_id: AqcBidiChannelId,
+    pub channel_id: aqc::BidiChannelId,
     pub author_secrets_id: BidiAuthorSecretId,
     pub psk_length_in_bytes: u16,
 }
 
 /// Bidirectional AQC channel info.
-// TODO: move AqcId into this type
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct AqcBidiChannelReceivedInfo {
     pub parent_cmd_id: Id,
@@ -227,7 +192,6 @@ pub struct AqcBidiChannelReceivedInfo {
 }
 
 /// Unidirectional AQC channel info.
-// TODO: move AqcId into this type
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct AqcUniChannelCreatedInfo {
     pub parent_cmd_id: Id,
@@ -237,13 +201,12 @@ pub struct AqcUniChannelCreatedInfo {
     pub author_enc_key_id: EncryptionKeyId,
     pub peer_enc_pk: Vec<u8>,
     pub label_id: LabelId,
-    pub channel_id: AqcUniChannelId,
+    pub channel_id: aqc::UniChannelId,
     pub author_secrets_id: UniAuthorSecretId,
     pub psk_length_in_bytes: u16,
 }
 
 /// Unidirectional AQC channel info.
-// TODO: move AqcId into this type
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct AqcUniChannelReceivedInfo {
     pub parent_cmd_id: Id,
@@ -413,22 +376,24 @@ pub trait DaemonApi {
         peer: NetIdentifier,
         node_id: NodeId,
         label_id: LabelId,
-    ) -> Result<(AqcId, AqcCtrl, AqcChannelInfo)>;
+    ) -> Result<(AqcCtrl, AqcChannelInfo)>;
     /// Create a unidirectional QUIC channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         node_id: NodeId,
         label_id: LabelId,
-    ) -> Result<(AqcId, AqcCtrl, AqcChannelInfo)>;
-    /// Delete a QUIC channel.
-    async fn delete_aqc_channel(chan: AqcId) -> Result<AqcCtrl>;
+    ) -> Result<(AqcCtrl, AqcChannelInfo)>;
+    /// Delete a QUIC bidi channel.
+    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
+    /// Delete a QUIC uni channel.
+    async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
     /// Receive AQC ctrl message.
     async fn receive_aqc_ctrl(
         team: TeamId,
         node_id: NodeId,
         ctrl: AqcCtrl,
-    ) -> Result<(AqcId, NetIdentifier, AqcChannelInfo)>;
+    ) -> Result<(NetIdentifier, AqcChannelInfo)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;

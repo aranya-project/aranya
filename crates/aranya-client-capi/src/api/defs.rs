@@ -273,11 +273,51 @@ impl From<&LabelId> for aranya_daemon_api::LabelId {
     }
 }
 
-/// Channel ID for AQC channel.
-#[repr(transparent)]
+/// Channel ID for AQC bidi channel.
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 16, align = 1)]
-pub struct AqcChannelId(aranya_daemon_api::AqcId);
+pub struct AqcBidiChannelId {
+    id: Id,
+}
+
+impl From<aranya_daemon_api::AqcBidiChannelId> for AqcBidiChannelId {
+    fn from(value: aranya_daemon_api::AqcBidiChannelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&AqcBidiChannelId> for aranya_daemon_api::AqcBidiChannelId {
+    fn from(value: &AqcBidiChannelId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
+/// Channel ID for AQC uni channel.
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct AqcUniChannelId {
+    id: Id,
+}
+
+impl From<aranya_daemon_api::AqcUniChannelId> for AqcUniChannelId {
+    fn from(value: aranya_daemon_api::AqcUniChannelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
+    fn from(value: &AqcUniChannelId) -> Self {
+        value.id.bytes.into()
+    }
+}
 
 /// Channel ID for a fast channel.
 #[repr(transparent)]
@@ -1455,29 +1495,49 @@ pub unsafe fn aqc_create_bidi_channel(
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
-) -> Result<AqcChannelId, imp::Error> {
+) -> Result<AqcBidiChannelId, imp::Error> {
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
-    let (aqc_id, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
+    let (chan_id, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
         peer,
         label_id.into(),
     ))?;
-    Ok(AqcChannelId(aqc_id))
+    Ok(chan_id.into())
 }
 
-/// Delete an AQC channel.
+/// Delete a bidirectional AQC channel.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param chan the AQC channel ID [`ChannelId`] of the channel to delete.
 ///
 /// @relates AranyaClient.
-pub fn aqc_delete_channel(client: &mut Client, chan: AqcChannelId) -> Result<(), imp::Error> {
+pub fn aqc_delete_bidi_channel(
+    client: &mut Client,
+    chan: &AqcBidiChannelId,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client
         .rt
-        .block_on(client.inner.aqc().delete_channel(chan.0))?;
+        .block_on(client.inner.aqc().delete_bidi_channel(chan.into()))?;
+    Ok(())
+}
+
+/// Delete a unidirectional AQC channel.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param chan the AQC channel ID [`ChannelId`] of the channel to delete.
+///
+/// @relates AranyaClient.
+pub fn aqc_delete_uni_channel(
+    client: &mut Client,
+    chan: &AqcUniChannelId,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client
+        .rt
+        .block_on(client.inner.aqc().delete_uni_channel(chan.into()))?;
     Ok(())
 }
 
@@ -1630,11 +1690,11 @@ pub unsafe fn query_device_keybundle(
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
 /// Writes the number of labels that would have been returned to `labels_len`.
 /// The application can use `labels_len` to allocate a larger buffer.
-/// 
+///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// 
+///
 /// Output params:
 /// @param labels returns a list of labels assigned to the device [`LabelId`].
 /// @param labels_len returns the length of the labels list [`LabelId`].
@@ -1676,11 +1736,11 @@ pub fn query_device_label_assignments(
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
 /// Writes the number of labels that would have been returned to `labels_len`.
 /// The application can use `labels_len` to allocate a larger buffer.
-/// 
+///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// 
+///
 /// Output params:
 /// @param labels returns a list of labels assigned to the device [`Label`].
 /// @param labels_len returns the length of the labels list [`Label`].
@@ -1805,10 +1865,10 @@ pub unsafe fn query_label_exists(
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
 /// Writes the number of labels that would have been returned to `labels_len`.
 /// The application can use `labels_len` to allocate a larger buffer.
-/// 
+///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// 
+///
 /// Output params:
 /// @param labels returns a list of labels [`LabelId`].
 /// @param labels_len returns the length of the labels list [`LabelId`].
