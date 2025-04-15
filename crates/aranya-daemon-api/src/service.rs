@@ -290,6 +290,13 @@ pub enum ChanOp {
     SendRecv,
 }
 
+/// A label.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct Label {
+    pub id: LabelId,
+    pub name: String,
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
     /// Gets the key store info.
@@ -430,8 +437,7 @@ pub trait DaemonApi {
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device label assignments.
-    async fn query_device_label_assignments(team: TeamId, device: DeviceId)
-        -> Result<Vec<LabelId>>;
+    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
     /// Query device AFC label assignments.
     async fn query_device_afc_label_assignments(
         team: TeamId,
@@ -448,7 +454,7 @@ pub trait DaemonApi {
         device: DeviceId,
     ) -> Result<Option<NetIdentifier>>;
     // Query labels on team.
-    async fn query_labels(team: TeamId) -> Result<Vec<LabelId>>;
+    async fn query_labels(team: TeamId) -> Result<Vec<Label>>;
     /// Query whether a label exists.
     async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
     /// Query whether an AFC label exists.

@@ -5,10 +5,10 @@ use std::{net::SocketAddr, path::Path, time::Duration};
 #[cfg(feature = "afc")]
 use aranya_daemon_api::CS;
 use aranya_daemon_api::{
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, LabelId, NetIdentifier, Role,
-    TeamId,
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
+    Role, TeamId,
 };
-use aranya_fast_channels::Label;
+use aranya_fast_channels::Label as AfcLabel;
 #[cfg(feature = "afc")]
 use aranya_fast_channels::{
     shm::ReadState,
@@ -43,18 +43,18 @@ impl Devices {
     }
 }
 
-/// List of labels IDs.
-pub struct LabelIds {
-    pub data: Vec<LabelId>,
+/// List of labels.
+pub struct Labels {
+    pub data: Vec<Label>,
 }
 
-impl LabelIds {
-    pub fn iter(&self) -> impl Iterator<Item = &LabelId> {
+impl Labels {
+    pub fn iter(&self) -> impl Iterator<Item = &Label> {
         self.data.iter()
     }
 
     #[doc(hidden)]
-    pub fn __data(&self) -> &[LabelId] {
+    pub fn __data(&self) -> &[Label] {
         self.data.as_slice()
     }
 }
@@ -395,7 +395,7 @@ impl Team<'_> {
     }
 
     /// Create an Aranya Fast Channels (AFC) label.
-    pub async fn create_afc_label(&mut self, label: Label) -> Result<()> {
+    pub async fn create_afc_label(&mut self, label: AfcLabel) -> Result<()> {
         self.client
             .daemon
             .create_afc_label(context::current(), self.id, label)
@@ -404,7 +404,7 @@ impl Team<'_> {
     }
 
     /// Delete an Aranya Fast Channels (AFC) label.
-    pub async fn delete_afc_label(&mut self, label: Label) -> Result<()> {
+    pub async fn delete_afc_label(&mut self, label: AfcLabel) -> Result<()> {
         self.client
             .daemon
             .delete_afc_label(context::current(), self.id, label)
@@ -416,7 +416,7 @@ impl Team<'_> {
     ///
     /// This grants the device permission to send/receive AFC data using that label.
     /// A channel must be created with the label in order to send data using that label.
-    pub async fn assign_afc_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
+    pub async fn assign_afc_label(&mut self, device: DeviceId, label: AfcLabel) -> Result<()> {
         self.client
             .daemon
             .assign_afc_label(context::current(), self.id, device, label)
@@ -425,7 +425,7 @@ impl Team<'_> {
     }
 
     /// Revoke an Aranya Fast Channels (AFC) label from a device.
-    pub async fn revoke_afc_label(&mut self, device: DeviceId, label: Label) -> Result<()> {
+    pub async fn revoke_afc_label(&mut self, device: DeviceId, label: AfcLabel) -> Result<()> {
         self.client
             .daemon
             .revoke_afc_label(context::current(), self.id, device, label)
@@ -511,8 +511,8 @@ impl Queries<'_> {
     }
 
     /// Returns a list of labels assiged to the current device.
-    pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<LabelIds> {
-        Ok(LabelIds {
+    pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
+        Ok(Labels {
             data: self
                 .client
                 .daemon
@@ -562,8 +562,8 @@ impl Queries<'_> {
     }
 
     /// Returns a list of labels on the team.
-    pub async fn labels(&mut self) -> Result<LabelIds> {
-        Ok(LabelIds {
+    pub async fn labels(&mut self) -> Result<Labels> {
+        Ok(Labels {
             data: self
                 .client
                 .daemon
@@ -574,7 +574,7 @@ impl Queries<'_> {
 
     /// Returns whether an AFC label exists.
     #[cfg(feature = "afc")]
-    pub async fn afc_label_exists(&mut self, label: Label) -> Result<bool> {
+    pub async fn afc_label_exists(&mut self, label: AfcLabel) -> Result<bool> {
         self.client
             .daemon
             .query_afc_label_exists(context::current(), self.id, label)

@@ -18,8 +18,9 @@ use aranya_crypto::{
 use aranya_daemon_api::{
     AfcCtrl, AfcId, AqcBidiChannelCreatedInfo, AqcBidiChannelReceivedInfo, AqcChannelInfo, AqcCtrl,
     AqcId, AqcUniChannelCreatedInfo, AqcUniChannelReceivedInfo, ChanOp as ApiChanOp, DaemonApi,
-    DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, KeyStoreInfo, LabelId as ApiLabelId,
-    NetIdentifier, Result as ApiResult, Role as ApiRole, SyncPeerConfig, TeamId, CS,
+    DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, KeyStoreInfo, Label as ApiLabel,
+    LabelId as ApiLabelId, NetIdentifier, Result as ApiResult, Role as ApiRole, SyncPeerConfig,
+    TeamId, CS,
 };
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
@@ -1193,18 +1194,21 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: TeamId,
         device: ApiDeviceId,
-    ) -> ApiResult<Vec<ApiLabelId>> {
+    ) -> ApiResult<Vec<ApiLabel>> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
             .query_label_assignments_off_graph(device.into_id().into())
             .await
             .context("unable to query device label assignments")?;
-        let mut labels: Vec<ApiLabelId> = Vec::new();
+        let mut labels: Vec<ApiLabel> = Vec::new();
         for e in effects {
             if let Effect::QueriedLabelAssignment(e) = e {
                 debug!("found label: {}", e.label_id);
-                labels.push(e.label_id.into());
+                labels.push(ApiLabel {
+                    id: e.label_id.into(),
+                    name: e.label_name,
+                });
             }
         }
         return Ok(labels);
@@ -1367,18 +1371,21 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     /// Query list of labels.
-    async fn query_labels(self, _: context::Context, team: TeamId) -> ApiResult<Vec<ApiLabelId>> {
+    async fn query_labels(self, _: context::Context, team: TeamId) -> ApiResult<Vec<ApiLabel>> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
             .query_labels_off_graph()
             .await
             .context("unable to query labels")?;
-        let mut labels: Vec<ApiLabelId> = Vec::new();
+        let mut labels: Vec<ApiLabel> = Vec::new();
         for e in effects {
             if let Effect::QueriedLabel(e) = e {
                 debug!("found label: {}", e.label_id);
-                labels.push(e.label_id.into());
+                labels.push(ApiLabel {
+                    id: e.label_id.into(),
+                    name: e.label_name,
+                });
             }
         }
         Ok(labels)

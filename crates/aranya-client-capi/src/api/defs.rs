@@ -1655,7 +1655,7 @@ pub fn query_device_label_assignments(
     };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write((*src).into());
+        dst.write(src.id.into());
     }
     if *labels_len < data.len() {
         *labels_len = data.len();
@@ -1813,7 +1813,7 @@ pub fn query_labels(
     };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write((*src).into());
+        dst.write(src.id.into());
     }
     if *labels_len < data.len() {
         *labels_len = data.len();
