@@ -87,14 +87,11 @@ enum Role {
 
 // Valid channel operations for a label assignment.
 enum ChanOp {
-    // The device can only receive data in channels with this
-    // label.
+    // The device can only receive data in channels with this label.
     RecvOnly,
-    // The device can only send data in channels with this
-    // label.
+    // The device can only send data in channels with this label.
     SendOnly,
-    // The device can send and receive data in channels with this
-    // label.
+    // The device can send and receive data in channels with this label.
     SendRecv,
 }
 

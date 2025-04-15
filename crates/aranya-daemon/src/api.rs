@@ -12,14 +12,7 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 use aranya_crypto::{Csprng, DeviceId, Rng};
-use aranya_daemon_api::{
-    AfcCtrl, AfcId, AqcBidiChannelCreatedInfo, AqcBidiChannelId as ApiAqcBidiChannelId,
-    AqcBidiChannelReceivedInfo, AqcChannelInfo, AqcCtrl, AqcUniChannelCreatedInfo,
-    AqcUniChannelId as ApiAqcUniChannelId, AqcUniChannelReceivedInfo, ChanOp as ApiChanOp,
-    DaemonApi, DeviceId as ApiDeviceId, KeyBundle as ApiKeyBundle, KeyStoreInfo, Label as ApiLabel,
-    LabelId as ApiLabelId, NetIdentifier, Result as ApiResult, Role as ApiRole, SyncPeerConfig,
-    TeamId, CS,
-};
+use aranya_daemon_api::{self as api, DaemonApi};
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
 use aranya_util::Addr;
@@ -129,7 +122,7 @@ impl DaemonApiServer {
         keystore_path: PathBuf,
         wrapped_key_path: PathBuf,
         daemon_sock: PathBuf,
-        pk: Arc<PublicKeys<CS>>,
+        pk: Arc<PublicKeys<api::CS>>,
         peers: SyncPeers,
         recv_effects: mpsc::Receiver<Vec<EF>>,
     ) -> Result<Self> {
@@ -202,7 +195,7 @@ struct DaemonApiHandler {
     /// Local socket address of the API.
     local_addr: SocketAddr,
     /// Public keys of current device.
-    pk: Arc<PublicKeys<CS>>,
+    pk: Arc<PublicKeys<api::CS>>,
     /// Aranya sync peers,
     peers: SyncPeers,
     /// Key store path.
@@ -216,13 +209,13 @@ struct DaemonApiHandler {
     /// AFC peers.
     #[cfg(feature = "afc")]
     #[allow(dead_code)]
-    afc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
+    afc_peers: Arc<Mutex<BiBTreeMap<api::NetIdentifier, DeviceId>>>,
     /// Handles AFC effects.
     #[cfg(feature = "afc")]
     #[allow(dead_code)]
     afc_handler: Arc<Mutex<Handler<Store>>>,
     /// AQC peers.
-    aqc_peers: Arc<Mutex<BiBTreeMap<NetIdentifier, DeviceId>>>,
+    aqc_peers: Arc<Mutex<BiBTreeMap<api::NetIdentifier, DeviceId>>>,
     /// An implementation of [`Engine`][crypto::Engine].
     #[cfg(feature = "afc")]
     #[allow(dead_code)]
@@ -230,7 +223,7 @@ struct DaemonApiHandler {
 }
 
 impl DaemonApiHandler {
-    fn get_pk(&self) -> ApiResult<KeyBundle> {
+    fn get_pk(&self) -> api::Result<KeyBundle> {
         Ok(KeyBundle::try_from(&*self.pk).context("bad key bundle")?)
     }
 
@@ -253,20 +246,20 @@ impl DaemonApiHandler {
                 Effect::OperatorRevoked(_operator_revoked) => {}
                 #[cfg(any())]
                 Effect::AfcNetworkNameSet(e) => {
-                    self.afc_peers
-                        .lock()
-                        .await
-                        .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
+                    self.afc_peers.lock().await.insert(
+                        api::NetIdentifier(e.net_identifier.clone()),
+                        e.device_id.into(),
+                    );
                 }
                 Effect::LabelCreated(_) => {}
                 Effect::LabelDeleted(_) => {}
                 Effect::LabelAssigned(_) => {}
                 Effect::LabelRevoked(_) => {}
                 Effect::AqcNetworkNameSet(e) => {
-                    self.aqc_peers
-                        .lock()
-                        .await
-                        .insert(NetIdentifier(e.net_identifier.clone()), e.device_id.into());
+                    self.aqc_peers.lock().await.insert(
+                        api::NetIdentifier(e.net_identifier.clone()),
+                        e.device_id.into(),
+                    );
                 }
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::QueriedLabel(_) => {}
@@ -372,20 +365,20 @@ impl DaemonApiHandler {
 
 impl DaemonApi for DaemonApiHandler {
     #[instrument(skip(self))]
-    async fn get_keystore_info(self, context: context::Context) -> ApiResult<KeyStoreInfo> {
-        Ok(KeyStoreInfo {
+    async fn get_keystore_info(self, context: context::Context) -> api::Result<api::KeyStoreInfo> {
+        Ok(api::KeyStoreInfo {
             path: self.keystore_path,
             wrapped_key: self.wrapped_key_path,
         })
     }
 
     #[instrument(skip(self))]
-    async fn aranya_local_addr(self, context: context::Context) -> ApiResult<SocketAddr> {
+    async fn aranya_local_addr(self, context: context::Context) -> api::Result<SocketAddr> {
         Ok(self.local_addr)
     }
 
     #[instrument(skip(self))]
-    async fn get_key_bundle(self, _: context::Context) -> ApiResult<ApiKeyBundle> {
+    async fn get_key_bundle(self, _: context::Context) -> api::Result<api::KeyBundle> {
         Ok(self
             .get_pk()
             .context("unable to get device public keys")?
@@ -393,7 +386,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn get_device_id(self, _: context::Context) -> ApiResult<ApiDeviceId> {
+    async fn get_device_id(self, _: context::Context) -> api::Result<api::DeviceId> {
         Ok(self
             .pk
             .ident_pk
@@ -408,9 +401,9 @@ impl DaemonApi for DaemonApiHandler {
         mut self,
         _: context::Context,
         peer: Addr,
-        team: TeamId,
-        cfg: SyncPeerConfig,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        cfg: api::SyncPeerConfig,
+    ) -> api::Result<()> {
         self.peers
             .add_peer(peer, team.into_id().into(), cfg)
             .await?;
@@ -422,9 +415,9 @@ impl DaemonApi for DaemonApiHandler {
         self,
         _: context::Context,
         peer: Addr,
-        team: TeamId,
-        cfg: Option<SyncPeerConfig>,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        cfg: Option<api::SyncPeerConfig>,
+    ) -> api::Result<()> {
         self.peers
             .sync_now(peer, team.into_id().into(), cfg)
             .await?;
@@ -436,8 +429,8 @@ impl DaemonApi for DaemonApiHandler {
         mut self,
         _: context::Context,
         peer: Addr,
-        team: TeamId,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+    ) -> api::Result<()> {
         self.peers
             .remove_peer(peer, team.into_id().into())
             .await
@@ -446,17 +439,17 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn add_team(self, _: context::Context, team: TeamId) -> ApiResult<()> {
+    async fn add_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
         todo!()
     }
 
     #[instrument(skip(self))]
-    async fn remove_team(self, _: context::Context, team: TeamId) -> ApiResult<()> {
+    async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
         todo!();
     }
 
     #[instrument(skip(self))]
-    async fn create_team(self, _: context::Context) -> ApiResult<TeamId> {
+    async fn create_team(self, _: context::Context) -> api::Result<api::TeamId> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
@@ -471,7 +464,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn close_team(self, _: context::Context, team: TeamId) -> ApiResult<()> {
+    async fn close_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
         todo!();
     }
 
@@ -479,9 +472,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn add_device_to_team(
         self,
         _: context::Context,
-        team: TeamId,
-        keys: ApiKeyBundle,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        keys: api::KeyBundle,
+    ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
             .add_member(keys.into())
@@ -494,9 +487,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn remove_device_from_team(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
             .remove_member(device.into_id().into())
@@ -509,10 +502,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn assign_role(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        role: ApiRole,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        device: api::DeviceId,
+        role: api::Role,
+    ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
             .assign_role(device.into_id().into(), role.into())
@@ -525,10 +518,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn revoke_role(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        role: ApiRole,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        device: api::DeviceId,
+        role: api::Role,
+    ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
             .revoke_role(device.into_id().into(), role.into())
@@ -542,10 +535,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn assign_afc_net_identifier(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        name: NetIdentifier,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        device: api::DeviceId,
+        name: api::NetIdentifier,
+    ) -> api::Result<()> {
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -561,10 +554,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn remove_afc_net_identifier(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        name: NetIdentifier,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        device: api::DeviceId,
+        name: api::NetIdentifier,
+    ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
             .unset_afc_network_name(device.into_id().into())
@@ -577,10 +570,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn assign_aqc_net_identifier(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        name: NetIdentifier,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        device: api::DeviceId,
+        name: api::NetIdentifier,
+    ) -> api::Result<()> {
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -595,10 +588,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn remove_aqc_net_identifier(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        name: NetIdentifier,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        device: api::DeviceId,
+        name: api::NetIdentifier,
+    ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
             .unset_aqc_network_name(device.into_id().into())
@@ -612,9 +605,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn create_afc_label(
         self,
         _: context::Context,
-        team: TeamId,
+        team: api::TeamId,
         label: Label,
-    ) -> ApiResult<()> {
+    ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
             .define_afc_label(label)
@@ -627,9 +620,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn create_afc_label(
         self,
         _: context::Context,
-        team: TeamId,
+        team: api::TeamId,
         label: Label,
-    ) -> ApiResult<()> {
+    ) -> api::Result<()> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
@@ -638,9 +631,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn delete_afc_label(
         self,
         _: context::Context,
-        team: TeamId,
+        team: api::TeamId,
         label: Label,
-    ) -> ApiResult<()> {
+    ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
             .undefine_afc_label(label)
@@ -653,9 +646,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn delete_afc_label(
         self,
         _: context::Context,
-        team: TeamId,
+        team: api::TeamId,
         label: Label,
-    ) -> ApiResult<()> {
+    ) -> api::Result<()> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
@@ -664,10 +657,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn assign_afc_label(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
+        team: api::TeamId,
+        device: api::DeviceId,
         label: Label,
-    ) -> ApiResult<()> {
+    ) -> api::Result<()> {
         // TODO: support other channel permissions.
         self.client
             .actions(&team.into_id().into())
@@ -681,10 +674,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn assign_afc_label(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
+        team: api::TeamId,
+        device: api::DeviceId,
         label: Label,
-    ) -> ApiResult<()> {
+    ) -> api::Result<()> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
@@ -693,10 +686,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn revoke_afc_label(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
+        team: api::TeamId,
+        device: api::DeviceId,
         label: Label,
-    ) -> ApiResult<()> {
+    ) -> api::Result<()> {
         let id = self.pk.ident_pk.id()?;
         self.client
             .actions(&team.into_id().into())
@@ -710,10 +703,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn revoke_afc_label(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
+        team: api::TeamId,
+        device: api::DeviceId,
         label: Label,
-    ) -> ApiResult<()> {
+    ) -> api::Result<()> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
@@ -722,11 +715,11 @@ impl DaemonApi for DaemonApiHandler {
     async fn create_afc_bidi_channel(
         self,
         _: context::Context,
-        team: TeamId,
-        peer: NetIdentifier,
+        team: api::TeamId,
+        peer: api::NetIdentifier,
         node_id: NodeId,
         label: Label,
-    ) -> ApiResult<(AfcId, AfcCtrl)> {
+    ) -> api::Result<(AfcId, AfcCtrl)> {
         info!("create_afc_bidi_channel");
 
         let peer_id = self
@@ -760,23 +753,27 @@ impl DaemonApi for DaemonApiHandler {
     async fn create_afc_bidi_channel(
         self,
         _: context::Context,
-        _: TeamId,
-        _: NetIdentifier,
+        _: api::TeamId,
+        _: api::NetIdentifier,
         _: NodeId,
         _: Label,
-    ) -> ApiResult<(AfcId, AfcCtrl)> {
+    ) -> api::Result<(api::AfcId, api::AfcCtrl)> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
     #[cfg(any())]
     #[instrument(skip(self))]
-    async fn delete_afc_channel(self, _: context::Context, chan: AfcId) -> ApiResult<AfcCtrl> {
+    async fn delete_afc_channel(self, _: context::Context, chan: AfcId) -> api::Result<AfcCtrl> {
         // TODO: remove AFC channel from Aranya.
         todo!();
     }
 
     #[instrument(skip(self))]
-    async fn delete_afc_channel(self, _: context::Context, _: AfcId) -> ApiResult<AfcCtrl> {
+    async fn delete_afc_channel(
+        self,
+        _: context::Context,
+        _: api::AfcId,
+    ) -> api::Result<api::AfcCtrl> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
@@ -785,10 +782,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn receive_afc_ctrl(
         self,
         _: context::Context,
-        team: TeamId,
-        node_id: NodeId,
-        ctrl: AfcCtrl,
-    ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
+        team: api::TeamId,
+        node_id: api::NodeId,
+        ctrl: api::AfcCtrl,
+    ) -> api::Result<(AfcId, NetIdentifier, Label)> {
         let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
@@ -818,10 +815,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn receive_afc_ctrl(
         self,
         _: context::Context,
-        _: TeamId,
+        _: api::TeamId,
         _: NodeId,
-        _: AfcCtrl,
-    ) -> ApiResult<(AfcId, NetIdentifier, Label)> {
+        _: api::AfcCtrl,
+    ) -> api::Result<(api::AfcId, api::NetIdentifier, Label)> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
@@ -829,11 +826,11 @@ impl DaemonApi for DaemonApiHandler {
     async fn create_aqc_bidi_channel(
         self,
         _: context::Context,
-        team: TeamId,
-        peer: NetIdentifier,
+        team: api::TeamId,
+        peer: api::NetIdentifier,
         node_id: NodeId,
-        label: ApiLabelId,
-    ) -> ApiResult<(AqcCtrl, AqcChannelInfo)> {
+        label: api::LabelId,
+    ) -> api::Result<(api::AqcCtrl, api::AqcChannelInfo)> {
         info!("create_aqc_bidi_channel");
 
         let peer_id = self
@@ -859,7 +856,7 @@ impl DaemonApi for DaemonApiHandler {
 
         self.handle_effects(&effects, Some(node_id)).await?;
 
-        let aqc_info = AqcChannelInfo::BidiCreated(AqcBidiChannelCreatedInfo {
+        let aqc_info = api::AqcChannelInfo::BidiCreated(api::AqcBidiChannelCreatedInfo {
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
@@ -879,11 +876,11 @@ impl DaemonApi for DaemonApiHandler {
     async fn create_aqc_uni_channel(
         self,
         _: context::Context,
-        team: TeamId,
-        peer: NetIdentifier,
+        team: api::TeamId,
+        peer: api::NetIdentifier,
         node_id: NodeId,
-        label: ApiLabelId,
-    ) -> ApiResult<(AqcCtrl, AqcChannelInfo)> {
+        label: api::LabelId,
+    ) -> api::Result<(api::AqcCtrl, api::AqcChannelInfo)> {
         info!("create_aqc_uni_channel");
 
         let peer_id = self
@@ -909,7 +906,7 @@ impl DaemonApi for DaemonApiHandler {
 
         self.handle_effects(&effects, Some(node_id)).await?;
 
-        let aqc_info = AqcChannelInfo::UniCreated(AqcUniChannelCreatedInfo {
+        let aqc_info = api::AqcChannelInfo::UniCreated(api::AqcUniChannelCreatedInfo {
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
@@ -931,8 +928,8 @@ impl DaemonApi for DaemonApiHandler {
     async fn delete_aqc_bidi_channel(
         self,
         _: context::Context,
-        chan: ApiAqcBidiChannelId,
-    ) -> ApiResult<AqcCtrl> {
+        chan: api::AqcBidiChannelId,
+    ) -> api::Result<api::AqcCtrl> {
         // TODO: remove AQC bidi channel from Aranya.
         todo!();
     }
@@ -940,8 +937,8 @@ impl DaemonApi for DaemonApiHandler {
     async fn delete_aqc_uni_channel(
         self,
         _: context::Context,
-        chan: ApiAqcUniChannelId,
-    ) -> ApiResult<AqcCtrl> {
+        chan: api::AqcUniChannelId,
+    ) -> api::Result<api::AqcCtrl> {
         // TODO: remove AQC uni channel from Aranya.
         todo!();
     }
@@ -949,10 +946,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn receive_aqc_ctrl(
         self,
         _: context::Context,
-        team: TeamId,
+        team: api::TeamId,
         node_id: NodeId,
-        ctrl: AqcCtrl,
-    ) -> ApiResult<(NetIdentifier, AqcChannelInfo)> {
+        ctrl: api::AqcCtrl,
+    ) -> api::Result<(api::NetIdentifier, api::AqcChannelInfo)> {
         let mut session = self.client.session_new(&team.into_id().into()).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
@@ -961,7 +958,7 @@ impl DaemonApi for DaemonApiHandler {
             if let Some(Effect::AqcBidiChannelReceived(e)) =
                 find_effect!(&effects, Effect::AqcBidiChannelReceived(e) if e.peer_id == id.into())
             {
-                let aqc_info = AqcChannelInfo::BidiReceived(AqcBidiChannelReceivedInfo {
+                let aqc_info = api::AqcChannelInfo::BidiReceived(api::AqcBidiChannelReceivedInfo {
                     parent_cmd_id: e.parent_cmd_id,
                     author_id: e.author_id.into(),
                     author_enc_pk: e.author_enc_pk.clone(),
@@ -986,7 +983,7 @@ impl DaemonApi for DaemonApiHandler {
 
             if let Some(Effect::AqcUniChannelReceived(e)) = find_effect!(&effects, Effect::AqcUniChannelReceived(e) if (e.sender_id == id.into() || e.receiver_id == id.into()))
             {
-                let aqc_info = AqcChannelInfo::UniReceived(AqcUniChannelReceivedInfo {
+                let aqc_info = api::AqcChannelInfo::UniReceived(api::AqcUniChannelReceivedInfo {
                     parent_cmd_id: e.parent_cmd_id,
                     send_id: e.sender_id.into(),
                     recv_id: e.receiver_id.into(),
@@ -1015,20 +1012,20 @@ impl DaemonApi for DaemonApiHandler {
     async fn assign_afc_net_identifier(
         self,
         _: context::Context,
-        _: TeamId,
-        _: ApiDeviceId,
-        _: NetIdentifier,
-    ) -> ApiResult<()> {
+        _: api::TeamId,
+        _: api::DeviceId,
+        _: api::NetIdentifier,
+    ) -> api::Result<()> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
     async fn remove_afc_net_identifier(
         self,
         _: context::Context,
-        _: TeamId,
-        _: ApiDeviceId,
-        _: NetIdentifier,
-    ) -> ApiResult<()> {
+        _: api::TeamId,
+        _: api::DeviceId,
+        _: api::NetIdentifier,
+    ) -> api::Result<()> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
@@ -1036,9 +1033,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn create_label(
         self,
         _: context::Context,
-        team: TeamId,
+        team: api::TeamId,
         label_name: String,
-    ) -> ApiResult<ApiLabelId> {
+    ) -> api::Result<api::LabelId> {
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -1056,9 +1053,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn delete_label(
         self,
         _: context::Context,
-        team: TeamId,
-        label_id: ApiLabelId,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        label_id: api::LabelId,
+    ) -> api::Result<()> {
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -1076,11 +1073,11 @@ impl DaemonApi for DaemonApiHandler {
     async fn assign_label(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        label_id: ApiLabelId,
-        op: ApiChanOp,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        device: api::DeviceId,
+        label_id: api::LabelId,
+        op: api::ChanOp,
+    ) -> api::Result<()> {
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -1102,10 +1099,10 @@ impl DaemonApi for DaemonApiHandler {
     async fn revoke_label(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-        label_id: ApiLabelId,
-    ) -> ApiResult<()> {
+        team: api::TeamId,
+        device: api::DeviceId,
+        label_id: api::LabelId,
+    ) -> api::Result<()> {
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -1124,15 +1121,15 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_devices_on_team(
         self,
         _: context::Context,
-        team: TeamId,
-    ) -> ApiResult<Vec<ApiDeviceId>> {
+        team: api::TeamId,
+    ) -> api::Result<Vec<api::DeviceId>> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
             .query_devices_on_team_off_graph()
             .await
             .context("unable to query devices on team")?;
-        let mut devices: Vec<ApiDeviceId> = Vec::new();
+        let mut devices: Vec<api::DeviceId> = Vec::new();
         for e in effects {
             if let Effect::QueryDevicesOnTeamResult(e) = e {
                 devices.push(e.device_id.into());
@@ -1145,9 +1142,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_device_role(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-    ) -> ApiResult<ApiRole> {
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<api::Role> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -1157,7 +1154,7 @@ impl DaemonApi for DaemonApiHandler {
         if let Some(Effect::QueryDeviceRoleResult(e)) =
             find_effect!(&effects, Effect::QueryDeviceRoleResult(_e))
         {
-            Ok(ApiRole::from(e.role))
+            Ok(api::Role::from(e.role))
         } else {
             Err(anyhow!("unable to query device role").into())
         }
@@ -1167,9 +1164,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_device_keybundle(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-    ) -> ApiResult<ApiKeyBundle> {
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<api::KeyBundle> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -1179,7 +1176,7 @@ impl DaemonApi for DaemonApiHandler {
         if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
             find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
         {
-            Ok(ApiKeyBundle::from(e.device_keys))
+            Ok(api::KeyBundle::from(e.device_keys))
         } else {
             Err(anyhow!("unable to query device keybundle").into())
         }
@@ -1190,20 +1187,20 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_device_label_assignments(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-    ) -> ApiResult<Vec<ApiLabel>> {
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<Vec<api::Label>> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
             .query_label_assignments_off_graph(device.into_id().into())
             .await
             .context("unable to query device label assignments")?;
-        let mut labels: Vec<ApiLabel> = Vec::new();
+        let mut labels: Vec<api::Label> = Vec::new();
         for e in effects {
             if let Effect::QueriedLabelAssignment(e) = e {
                 debug!("found label: {}", e.label_id);
-                labels.push(ApiLabel {
+                labels.push(api::Label {
                     id: e.label_id.into(),
                     name: e.label_name,
                 });
@@ -1218,9 +1215,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_device_afc_label_assignments(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-    ) -> ApiResult<Vec<Label>> {
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<Vec<Label>> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -1247,9 +1244,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_device_afc_label_assignments(
         self,
         _: context::Context,
-        _: TeamId,
-        _: ApiDeviceId,
-    ) -> ApiResult<Vec<Label>> {
+        _: api::TeamId,
+        _: api::DeviceId,
+    ) -> api::Result<Vec<Label>> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
@@ -1259,9 +1256,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_afc_net_identifier(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-    ) -> ApiResult<Option<NetIdentifier>> {
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<Option<api::NetIdentifier>> {
         if let Ok((_ctrl, effects)) = self
             .client
             .actions(&team.into_id().into())
@@ -1271,7 +1268,7 @@ impl DaemonApi for DaemonApiHandler {
             if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
                 find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
             {
-                return Ok(Some(NetIdentifier(e.net_identifier)));
+                return Ok(Some(api::NetIdentifier(e.net_identifier)));
             }
         }
         Ok(None)
@@ -1282,9 +1279,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_afc_net_identifier(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-    ) -> ApiResult<Option<NetIdentifier>> {
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<Option<api::NetIdentifier>> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
@@ -1293,9 +1290,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_aqc_net_identifier(
         self,
         _: context::Context,
-        team: TeamId,
-        device: ApiDeviceId,
-    ) -> ApiResult<Option<NetIdentifier>> {
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<Option<api::NetIdentifier>> {
         if let Ok((_ctrl, effects)) = self
             .client
             .actions(&team.into_id().into())
@@ -1305,7 +1302,7 @@ impl DaemonApi for DaemonApiHandler {
             if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
                 find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
             {
-                return Ok(Some(NetIdentifier(e.net_identifier)));
+                return Ok(Some(api::NetIdentifier(e.net_identifier)));
             }
         }
         Ok(None)
@@ -1315,9 +1312,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_label_exists(
         self,
         _: context::Context,
-        team: TeamId,
-        label_id: ApiLabelId,
-    ) -> ApiResult<bool> {
+        team: api::TeamId,
+        label_id: api::LabelId,
+    ) -> api::Result<bool> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -1339,9 +1336,9 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_afc_label_exists(
         self,
         _: context::Context,
-        team: TeamId,
+        team: api::TeamId,
         label: Label,
-    ) -> ApiResult<bool> {
+    ) -> api::Result<bool> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -1362,25 +1359,29 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_afc_label_exists(
         self,
         _: context::Context,
-        _: TeamId,
+        _: api::TeamId,
         _: Label,
-    ) -> ApiResult<bool> {
+    ) -> api::Result<bool> {
         Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
     /// Query list of labels.
-    async fn query_labels(self, _: context::Context, team: TeamId) -> ApiResult<Vec<ApiLabel>> {
+    async fn query_labels(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+    ) -> api::Result<Vec<api::Label>> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
             .query_labels_off_graph()
             .await
             .context("unable to query labels")?;
-        let mut labels: Vec<ApiLabel> = Vec::new();
+        let mut labels: Vec<api::Label> = Vec::new();
         for e in effects {
             if let Effect::QueriedLabel(e) = e {
                 debug!("found label: {}", e.label_id);
-                labels.push(ApiLabel {
+                labels.push(api::Label {
                     id: e.label_id.into(),
                     name: e.label_name,
                 });
@@ -1390,8 +1391,8 @@ impl DaemonApi for DaemonApiHandler {
     }
 }
 
-impl From<ApiKeyBundle> for KeyBundle {
-    fn from(value: ApiKeyBundle) -> Self {
+impl From<api::KeyBundle> for KeyBundle {
+    fn from(value: api::KeyBundle) -> Self {
         KeyBundle {
             ident_key: value.identity,
             sign_key: value.signing,
@@ -1400,9 +1401,9 @@ impl From<ApiKeyBundle> for KeyBundle {
     }
 }
 
-impl From<KeyBundle> for ApiKeyBundle {
+impl From<KeyBundle> for api::KeyBundle {
     fn from(value: KeyBundle) -> Self {
-        ApiKeyBundle {
+        api::KeyBundle {
             identity: value.ident_key,
             signing: value.sign_key,
             encoding: value.enc_key,
@@ -1410,44 +1411,44 @@ impl From<KeyBundle> for ApiKeyBundle {
     }
 }
 
-impl From<ApiRole> for Role {
-    fn from(value: ApiRole) -> Self {
+impl From<api::Role> for Role {
+    fn from(value: api::Role) -> Self {
         match value {
-            ApiRole::Owner => Role::Owner,
-            ApiRole::Admin => Role::Admin,
-            ApiRole::Operator => Role::Operator,
-            ApiRole::Member => Role::Member,
+            api::Role::Owner => Role::Owner,
+            api::Role::Admin => Role::Admin,
+            api::Role::Operator => Role::Operator,
+            api::Role::Member => Role::Member,
         }
     }
 }
 
-impl From<Role> for ApiRole {
+impl From<Role> for api::Role {
     fn from(value: Role) -> Self {
         match value {
-            Role::Owner => ApiRole::Owner,
-            Role::Admin => ApiRole::Admin,
-            Role::Operator => ApiRole::Operator,
-            Role::Member => ApiRole::Member,
+            Role::Owner => api::Role::Owner,
+            Role::Admin => api::Role::Admin,
+            Role::Operator => api::Role::Operator,
+            Role::Member => api::Role::Member,
         }
     }
 }
 
-impl From<ApiChanOp> for ChanOp {
-    fn from(value: ApiChanOp) -> Self {
+impl From<api::ChanOp> for ChanOp {
+    fn from(value: api::ChanOp) -> Self {
         match value {
-            ApiChanOp::SendRecv => ChanOp::SendRecv,
-            ApiChanOp::RecvOnly => ChanOp::RecvOnly,
-            ApiChanOp::SendOnly => ChanOp::SendOnly,
+            api::ChanOp::SendRecv => ChanOp::SendRecv,
+            api::ChanOp::RecvOnly => ChanOp::RecvOnly,
+            api::ChanOp::SendOnly => ChanOp::SendOnly,
         }
     }
 }
 
-impl From<ChanOp> for ApiChanOp {
+impl From<ChanOp> for api::ChanOp {
     fn from(value: ChanOp) -> Self {
         match value {
-            ChanOp::SendRecv => ApiChanOp::SendRecv,
-            ChanOp::RecvOnly => ApiChanOp::RecvOnly,
-            ChanOp::SendOnly => ApiChanOp::SendOnly,
+            ChanOp::SendRecv => api::ChanOp::SendRecv,
+            ChanOp::RecvOnly => api::ChanOp::RecvOnly,
+            ChanOp::SendOnly => api::ChanOp::SendOnly,
         }
     }
 }

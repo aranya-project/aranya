@@ -41,7 +41,8 @@ pub(crate) struct AqcChannelsImpl {
 }
 
 impl AqcChannelsImpl {
-    /// Creates a new `FastChannelsImpl` listening for connections on `address`.
+    /// Creates a new `AqcChannelsImpl` listening for connections on `address`.
+    #[instrument(skip_all, fields(device_id = %device_id))]
     pub(crate) async fn new(
         device_id: DeviceId,
         keystore_info: KeyStoreInfo,
@@ -63,7 +64,7 @@ impl AqcChannelsImpl {
     }
 }
 
-/// Aranya Fast Channels client that allows for opening and closing channels and
+/// Aranya QUIC Channels client that allows for opening and closing channels and
 /// sending data between peers.
 pub struct AqcChannels<'a> {
     client: &'a mut crate::Client,
@@ -134,6 +135,8 @@ impl<'a> AqcChannels<'a> {
             // TODO: for testing only. Send ctrl via network instead of returning.
             return Ok((v.channel_id.into_id().into(), aqc_ctrl));
         }
+
+        // TODO: clean up error-handling
         Err(crate::Error::Aqc(AqcError::Other(anyhow!(
             "unable to create bidi channel"
         ))))
@@ -168,25 +171,23 @@ impl<'a> AqcChannels<'a> {
         debug!(%node_id, %label_id, "created aqc uni channel");
 
         if let UniCreated(v) = aqc_info {
+            let effect = UniChannelCreated {
+                parent_cmd_id: v.parent_cmd_id,
+                author_id: v.author_id.into_id().into(),
+                author_enc_key_id: v.author_enc_key_id,
+                send_id: v.send_id.into_id().into(),
+                recv_id: v.recv_id.into_id().into(),
+                peer_enc_pk: &v.peer_enc_pk,
+                label_id: v.label_id.into_id().into(),
+                channel_id: v.channel_id,
+                psk_length_in_bytes: v.psk_length_in_bytes,
+                author_secrets_id: v.author_secrets_id,
+            };
             let psk = self
                 .client
                 .aqc
                 .handler
-                .uni_channel_created(
-                    &mut self.client.aqc.eng.clone(),
-                    &UniChannelCreated {
-                        parent_cmd_id: v.parent_cmd_id,
-                        author_id: v.author_id.into_id().into(),
-                        author_enc_key_id: v.author_enc_key_id,
-                        send_id: v.send_id.into_id().into(),
-                        recv_id: v.recv_id.into_id().into(),
-                        peer_enc_pk: &v.peer_enc_pk,
-                        label_id: v.label_id.into_id().into(),
-                        channel_id: v.channel_id,
-                        psk_length_in_bytes: v.psk_length_in_bytes,
-                        author_secrets_id: v.author_secrets_id,
-                    },
-                )
+                .uni_channel_created(&mut self.client.aqc.eng.clone(), &effect)
                 .map_err(AqcError::ChannelCreation)?;
             debug!("psk id: {:?}", psk.identity());
 
@@ -196,6 +197,7 @@ impl<'a> AqcChannels<'a> {
             return Ok((v.channel_id.into_id().into(), aqc_ctrl));
         }
 
+        // TODO: clean up error-handling
         Err(crate::Error::Aqc(AqcError::Other(anyhow!(
             "unable to create uni channel"
         ))))
@@ -246,24 +248,22 @@ impl<'a> AqcChannels<'a> {
                     .context("unable to get encap")
                     .map_err(AqcError::Encap)?;
                 let channel_id: BidiChannelId = encap.id();
+                let effect = BidiChannelReceived {
+                    parent_cmd_id: v.parent_cmd_id,
+                    author_id: v.author_id.into_id().into(),
+                    author_enc_pk: &v.author_enc_pk,
+                    peer_id: v.peer_id.into_id().into(),
+                    peer_enc_key_id: v.peer_enc_key_id,
+                    label_id: v.label_id.into_id().into(),
+                    encap: &v.encap,
+                    channel_id,
+                    psk_length_in_bytes: v.psk_length_in_bytes,
+                };
                 let psk = self
                     .client
                     .aqc
                     .handler
-                    .bidi_channel_received(
-                        &mut self.client.aqc.eng.clone(),
-                        &BidiChannelReceived {
-                            parent_cmd_id: v.parent_cmd_id,
-                            author_id: v.author_id.into_id().into(),
-                            author_enc_pk: &v.author_enc_pk,
-                            peer_id: v.peer_id.into_id().into(),
-                            peer_enc_key_id: v.peer_enc_key_id,
-                            label_id: v.label_id.into_id().into(),
-                            encap: &v.encap,
-                            channel_id,
-                            psk_length_in_bytes: v.psk_length_in_bytes,
-                        },
-                    )
+                    .bidi_channel_received(&mut self.client.aqc.eng.clone(), &effect)
                     .map_err(AqcError::ChannelCreation)?;
                 debug!("psk id: {:?}", psk.identity());
             }

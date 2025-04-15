@@ -165,10 +165,10 @@ impl Client {
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
         debug!("connected to daemon");
 
-        debug!("getting key store info");
         let keystore_info = daemon.get_keystore_info(context::current()).await??;
-        debug!("getting device id");
+        debug!(?keystore_info);
         let device_id = daemon.get_device_id(context::current()).await??;
+        debug!(?device_id);
         let aqc = AqcChannelsImpl::new(device_id, keystore_info).await?;
 
         Ok(Self { daemon, aqc })
