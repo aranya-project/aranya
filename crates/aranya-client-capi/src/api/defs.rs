@@ -1627,6 +1627,10 @@ pub unsafe fn query_device_keybundle(
 
 /// Query device label assignments.
 ///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+/// Writes the number of labels that would have been returned to `labels_len`.
+/// The application can use `labels_len` to allocate a larger buffer.
+/// 
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
@@ -1669,9 +1673,15 @@ pub fn query_device_label_assignments(
 
 /// Query device AFC label assignments.
 ///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+/// Writes the number of labels that would have been returned to `labels_len`.
+/// The application can use `labels_len` to allocate a larger buffer.
+/// 
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
+/// 
+/// Output params:
 /// @param labels returns a list of labels assigned to the device [`Label`].
 /// @param labels_len returns the length of the labels list [`Label`].
 ///
@@ -1792,8 +1802,14 @@ pub unsafe fn query_label_exists(
 
 /// Query for list of existing labels.
 ///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+/// Writes the number of labels that would have been returned to `labels_len`.
+/// The application can use `labels_len` to allocate a larger buffer.
+/// 
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
+/// 
+/// Output params:
 /// @param labels returns a list of labels [`LabelId`].
 /// @param labels_len returns the length of the labels list [`LabelId`].
 ///
