@@ -59,20 +59,20 @@ impl Labels {
     }
 }
 
-/// List of labels.
+/// List of AFC labels.
 #[cfg(feature = "afc")]
-pub struct Labels {
-    pub data: Vec<Label>,
+pub struct AfcLabels {
+    pub data: Vec<AfcLabel>,
 }
 
 #[cfg(feature = "afc")]
-impl Labels {
-    pub fn iter(&self) -> impl Iterator<Item = &Label> {
+impl AfcLabels {
+    pub fn iter(&self) -> impl Iterator<Item = &AfcLabel> {
         self.data.iter()
     }
 
     #[doc(hidden)]
-    pub fn __data(&self) -> &[Label] {
+    pub fn __data(&self) -> &[AfcLabel] {
         self.data.as_slice()
     }
 }
@@ -523,8 +523,8 @@ impl Queries<'_> {
 
     /// Returns a list of AFC labels assiged to the current device.
     #[cfg(feature = "afc")]
-    pub async fn device_afc_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
-        Ok(Labels {
+    pub async fn device_afc_label_assignments(&mut self, device: DeviceId) -> Result<AfcLabels> {
+        Ok(AfcLabels {
             data: self
                 .client
                 .daemon
