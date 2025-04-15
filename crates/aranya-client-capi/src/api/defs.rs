@@ -1550,12 +1550,12 @@ pub fn query_devices_on_team(
         return Err(imp::Error::BufferTooSmall);
     };
     let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
-    for (dst, src) in out.iter_mut().zip(data) {
-        dst.write((*src).into());
-    }
     if *devices_len < data.len() {
         *devices_len = data.len();
         return Err(imp::Error::BufferTooSmall);
+    }
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write((*src).into());
     }
     *devices_len = data.len();
     Ok(())
@@ -1630,6 +1630,8 @@ pub unsafe fn query_device_keybundle(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
+/// 
+/// Output params:
 /// @param labels returns a list of labels assigned to the device [`LabelId`].
 /// @param labels_len returns the length of the labels list [`LabelId`].
 ///
@@ -1654,18 +1656,18 @@ pub fn query_device_label_assignments(
         return Err(imp::Error::BufferTooSmall);
     };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-    for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.id.into());
-    }
     if *labels_len < data.len() {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
+    }
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src.id.into());
     }
     *labels_len = data.len();
     Ok(())
 }
 
-/// Query device label assignments.
+/// Query device AFC label assignments.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
@@ -1695,12 +1697,12 @@ pub fn query_device_afc_label_assignments(
         return Err(imp::Error::BufferTooSmall);
     };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-    for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.to_u32());
-    }
     if *labels_len < data.len() {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
+    }
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src.to_u32());
     }
     *labels_len = data.len();
     Ok(())

@@ -1559,6 +1559,8 @@ AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ *
+ * Output params:
  * @param labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
  * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
  *
@@ -1576,6 +1578,8 @@ AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ *
+ * Output params:
  * @param labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
  * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
  *
