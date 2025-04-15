@@ -401,7 +401,7 @@ AranyaError run(Team *t) {
     // permitted devices using the `aranya_create_label` function.
 
     // operator creates AFC labels and assigns them to team members.
-    AranyaLabel label = 42;
+    AranyaLabel label1 = 42;
     err = aranya_create_afc_label(&t->clients.operator.client, &t->id, label);
     EXPECT("error creating afc label", err);
 
@@ -679,26 +679,37 @@ AranyaError run_aqc_example(Team *t) {
 
     // Create label and assign it to members
     printf("creating label \r\n");
-    const char *label_name = "label3";
-    AranyaLabelId label_id;
-    err = aranya_create_label(&t->clients.operator.client, &t->id, label_name,
-                              &label_id);
-    EXPECT("error creating label", err);
+    const char *label1_name = "label1";
+    AranyaLabelId label1_id;
+    err = aranya_create_label(&t->clients.operator.client, &t->id, label1_name,
+                              &label1_id);
+    EXPECT("error creating label1", err);
+    const char *label2_name = "label2";
+    AranyaLabelId label2_id;
+    err = aranya_create_label(&t->clients.operator.client, &t->id, label2_name,
+                              &label2_id);
+    EXPECT("error creating label2", err);
     printf("assigning label to members \r\n");
     AranyaChanOp op = ARANYA_CHAN_OP_SEND_RECV;
     err             = aranya_assign_label(&t->clients.operator.client, &t->id,
-                                          &t->clients.membera.id, &label_id, op);
-    EXPECT("error assigning label to membera", err);
+                                          &t->clients.membera.id, &label1_id, op);
+    EXPECT("error assigning label1 to membera", err);
     err = aranya_assign_label(&t->clients.operator.client, &t->id,
-                              &t->clients.memberb.id, &label_id, op);
-    EXPECT("error assigning label to memberb", err);
+                              &t->clients.memberb.id, &label1_id, op);
+    EXPECT("error assigning label2 to memberb", err);
+    err = aranya_assign_label(&t->clients.operator.client, &t->id,
+                              &t->clients.membera.id, &label2_id, op);
+    EXPECT("error assigning label2 to membera", err);
+    err = aranya_assign_label(&t->clients.operator.client, &t->id,
+                              &t->clients.memberb.id, &label2_id, op);
+    EXPECT("error assigning label2 to memberb", err);
     sleep(1);
 
     // Queries
     printf("query if label exists on team \r\n");
     bool exists = false;
     err         = aranya_query_label_exists(&t->clients.membera.client, &t->id,
-                                            &label_id, &exists);
+                                            &label1_id, &exists);
     EXPECT("error querying label exists", err);
     printf("%s label exists: %s \r\n", t->clients_arr[MEMBERB].name,
            exists ? "true" : "false");
@@ -707,11 +718,20 @@ AranyaError run_aqc_example(Team *t) {
     char *device_str      = malloc(ARANYA_ID_STR_LEN);
     aranya_id_to_str(&t->clients.memberb.id.id, device_str, &device_str_len);
     printf("query labels assigned to device: %s\r\n", device_str);
-    size_t labels_len     = BUF_LEN;
+    // `labels_len` is intentionally set to 1 when there are 2 labels to test
+    // `ARANYA_ERROR_BUFFER_TOO_SMALL` error handling.
+    size_t labels_len     = 1;
     AranyaLabelId *labels = malloc(labels_len * sizeof(AranyaLabelId));
     err = aranya_query_device_label_assignments(&t->clients.operator.client,
                                                 &t->id, &t->clients.memberb.id,
                                                 labels, &labels_len);
+    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        printf("handling buffer too small error\r\n");
+        free(labels);
+        labels = malloc(labels_len * sizeof(AranyaLabelId));
+        err = aranya_query_labels(&t->clients.operator.client, &t->id, labels,
+                                  &labels_len);
+    }
     EXPECT("error querying labels assigned to device", err);
     if (labels == NULL) {
         return ARANYA_ERROR_BUG;
@@ -730,8 +750,18 @@ AranyaError run_aqc_example(Team *t) {
     char *team_str      = malloc(ARANYA_ID_STR_LEN);
     aranya_id_to_str(&t->id.id, team_str, &team_str_len);
     printf("query labels on team: %s\r\n", team_str);
+    // `labels_len` is intentionally set to 1 when there are 2 labels to test
+    // `ARANYA_ERROR_BUFFER_TOO_SMALL` error handling.
+    labels_len = 1;
     err = aranya_query_labels(&t->clients.operator.client, &t->id, labels,
                               &labels_len);
+    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        printf("handling buffer too small error\r\n");
+        free(labels);
+        labels = malloc(labels_len * sizeof(AranyaLabelId));
+        err = aranya_query_labels(&t->clients.operator.client, &t->id, labels,
+                                  &labels_len);
+    }
     EXPECT("error querying labels on team", err);
     if (labels == NULL) {
         return ARANYA_ERROR_BUG;
@@ -750,9 +780,9 @@ AranyaError run_aqc_example(Team *t) {
     // Create channel using Member A's client
     printf("creating AQC channel \r\n");
     AranyaAqcChannelId chan_id;
-    err =
-        aranya_aqc_create_bidi_channel(&t->clients.membera.client, &t->id,
-                                       afc_addrs[MEMBERB], &label_id, &chan_id);
+    err = aranya_aqc_create_bidi_channel(&t->clients.membera.client, &t->id,
+                                         afc_addrs[MEMBERB], &label1_id,
+                                         &chan_id);
     EXPECT("error creating aqc bidi channel", err);
 
     // TODO: send AQC data
@@ -760,12 +790,12 @@ AranyaError run_aqc_example(Team *t) {
     // Revoke/delete label using the Operator
     printf("revoke/delete label \r\n");
     err = aranya_revoke_label(&t->clients.operator.client, &t->id,
-                              &t->clients.membera.id, &label_id);
+                              &t->clients.membera.id, &label1_id);
     EXPECT("error revoking label from membera", err);
     err = aranya_revoke_label(&t->clients.operator.client, &t->id,
-                              &t->clients.memberb.id, &label_id);
+                              &t->clients.memberb.id, &label1_id);
     EXPECT("error revoking label from memberb", err);
-    err = aranya_delete_label(&t->clients.operator.client, &t->id, &label_id);
+    err = aranya_delete_label(&t->clients.operator.client, &t->id, &label1_id);
     EXPECT("error deleting label", err);
 
     return err;

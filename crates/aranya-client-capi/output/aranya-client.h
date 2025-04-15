@@ -1556,6 +1556,10 @@ AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
 /**
  * Query device label assignments.
  *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
@@ -1574,6 +1578,10 @@ AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
 
 /**
  * Query device label assignments.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -1663,8 +1671,14 @@ AranyaError aranya_query_label_exists_ext(struct AranyaClient *client,
 /**
  * Query for list of existing labels.
  *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * Output params:
  * @param labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
  * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
  *
@@ -1678,8 +1692,14 @@ AranyaError aranya_query_labels(struct AranyaClient *client,
 /**
  * Query for list of existing labels.
  *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+ * Writes the number of labels that would have been returned to `labels_len`.
+ * The application can use `labels_len` to allocate a larger buffer.
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * Output params:
  * @param labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
  * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
  *
