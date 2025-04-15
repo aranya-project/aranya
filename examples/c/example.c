@@ -727,8 +727,7 @@ AranyaError run_aqc_example(Team *t) {
                                                 labels, &labels_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error\r\n");
-        free(labels);
-        labels = malloc(labels_len * sizeof(AranyaLabelId));
+        labels = realloc(labels, labels_len * sizeof(AranyaLabelId));
         err = aranya_query_labels(&t->clients.operator.client, &t->id, labels,
                                   &labels_len);
     }
@@ -757,8 +756,7 @@ AranyaError run_aqc_example(Team *t) {
                               &labels_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error\r\n");
-        free(labels);
-        labels = malloc(labels_len * sizeof(AranyaLabelId));
+        labels = realloc(labels, labels_len * sizeof(AranyaLabelId));
         err = aranya_query_labels(&t->clients.operator.client, &t->id, labels,
                                   &labels_len);
     }
