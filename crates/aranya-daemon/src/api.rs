@@ -78,13 +78,12 @@ impl DaemonApiServer {
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
-        afc: Arc<Mutex<WriteState<CS, Rng>>>,
+        afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
         eng: CE,
-        keystore_path: PathBuf,
-        wrapped_key_path: PathBuf,
+        keystore_info: api::KeyStoreInfo,
         store: Store,
         daemon_sock: PathBuf,
-        pk: Arc<PublicKeys<CS>>,
+        pk: Arc<PublicKeys<api::CS>>,
         peers: SyncPeers,
         recv_effects: mpsc::Receiver<Vec<EF>>,
     ) -> Result<Self> {
@@ -100,8 +99,7 @@ impl DaemonApiServer {
                 eng,
                 pk,
                 peers,
-                keystore_path,
-                wrapped_key_path,
+                keystore_info,
                 afc_peers: Arc::default(),
                 afc_handler: Arc::new(Mutex::new(Handler::new(
                     device_id,
@@ -115,12 +113,10 @@ impl DaemonApiServer {
     /// Create new RPC server.
     #[instrument(skip_all)]
     #[cfg(not(feature = "afc"))]
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
-        keystore_path: PathBuf,
-        wrapped_key_path: PathBuf,
+        keystore_info: api::KeyStoreInfo,
         daemon_sock: PathBuf,
         pk: Arc<PublicKeys<api::CS>>,
         peers: SyncPeers,
@@ -135,8 +131,7 @@ impl DaemonApiServer {
                 local_addr,
                 pk,
                 peers,
-                keystore_path,
-                wrapped_key_path,
+                keystore_info,
                 aqc_peers: Arc::default(),
             },
         })
@@ -198,14 +193,12 @@ struct DaemonApiHandler {
     pk: Arc<PublicKeys<api::CS>>,
     /// Aranya sync peers,
     peers: SyncPeers,
-    /// Key store path.
-    keystore_path: PathBuf,
-    /// Key store wrapped key path.
-    wrapped_key_path: PathBuf,
+    /// Key store paths.
+    keystore_info: api::KeyStoreInfo,
     /// AFC shm write.
     #[cfg(feature = "afc")]
     #[allow(dead_code)]
-    afc: Arc<Mutex<WriteState<CS, Rng>>>,
+    afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
     /// AFC peers.
     #[cfg(feature = "afc")]
     #[allow(dead_code)]
@@ -366,10 +359,7 @@ impl DaemonApiHandler {
 impl DaemonApi for DaemonApiHandler {
     #[instrument(skip(self))]
     async fn get_keystore_info(self, context: context::Context) -> api::Result<api::KeyStoreInfo> {
-        Ok(api::KeyStoreInfo {
-            path: self.keystore_path,
-            wrapped_key: self.wrapped_key_path,
-        })
+        Ok(self.keystore_info)
     }
 
     #[instrument(skip(self))]
@@ -796,7 +786,8 @@ impl DaemonApi for DaemonApiHandler {
             else {
                 continue;
             };
-            let encap = BidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
+            let encap =
+                BidiPeerEncap::<api::CS>::from_bytes(&e.encap).context("unable to get encap")?;
             let afc_id: AfcId = encap.id().into();
             debug!(?afc_id, "processed afc ID");
             let label = Label::new(e.label.try_into().expect("expected label conversion"));
