@@ -62,7 +62,7 @@ impl Labels {
 /// List of AFC labels.
 #[cfg(feature = "afc")]
 pub struct AfcLabels {
-    pub data: Vec<AfcLabel>,
+    data: Vec<AfcLabel>,
 }
 
 #[cfg(feature = "afc")]
