@@ -1,4 +1,4 @@
-//! Utility routines.
+//! General utility functions and types.
 
 use std::{fs::Permissions, os::unix::fs::PermissionsExt, path::Path, str::FromStr};
 
@@ -6,29 +6,60 @@ use aranya_fast_channels::shm;
 use tokio::{fs, io};
 use tracing::warn;
 
-/// Writes `data` to `path` using with 600 permissions.
+/// Asynchronously writes `data` to the specified `path`, creating the file if it
+/// doesn't exist, and truncating it if it does.
+///
+/// After writing, it attempts to set the file permissions to `0o600` (read/write
+/// for owner only). A warning is logged if setting permissions fails, but the
+/// operation is still considered successful.
+///
+/// # Errors
+///
+/// Returns `io::Error` if the file cannot be written to (e.g., due to permissions
+/// or invalid path), but not if setting permissions fails.
 pub async fn write_file(path: impl AsRef<Path>, data: &[u8]) -> io::Result<()> {
     fs::write(path.as_ref(), data).await?;
     let perms = Permissions::from_mode(0o600);
     if let Err(err) = fs::set_permissions(&path, perms).await {
-        warn!(err = ?err, path = %path.as_ref().display(), "unable to set file perms");
+        warn!(err = ?err, path = %path.as_ref().display(), "unable to set file perms to 0o600");
     }
     Ok(())
 }
 
-/// Creates all directories in `path` with 700 permissions.
+/// Asynchronously creates a directory and all of its parent components if they
+/// are missing.
+///
+/// After creating the directory (or if it already exists), it attempts to set
+/// the directory permissions to `0o700` (read/write/execute for owner only).
+/// A warning is logged if setting permissions fails, but the operation is still
+/// considered successful.
+///
+/// # Errors
+///
+/// Returns `io::Error` if the directory cannot be created (e.g., due to permissions
+/// or invalid path), but not if setting permissions fails.
 pub async fn create_dir_all(path: impl AsRef<Path>) -> io::Result<()> {
     fs::create_dir_all(path.as_ref()).await?;
     let perms = Permissions::from_mode(0o700);
     if let Err(err) = fs::set_permissions(&path, perms).await {
-        warn!(err = ?err, path = %path.as_ref().display(), "unable to set directory perms");
+        warn!(err = ?err, path = %path.as_ref().display(), "unable to set directory perms to 0o700");
     }
     Ok(())
 }
 
-/// An owned shared memory path.
+/// An owned, validated buffer representing a shared memory path string.
 ///
-/// It's like `Vec<u8>`, but syntactically valid.
+/// Shared memory paths often have specific syntax requirements (e.g., starting
+/// with '/' and containing only a single slash). The requirements for
+/// shared memory path also depend on the operating system.
+/// `ShmPathBuf` wraps a `Vec<u8>` but ensures (upon creation via `FromStr`
+/// or `TryFrom`) that the content represents a valid shared memory path
+/// according to [`aranya_fast_channels::shm::Path::validate`].
+///
+/// # Errors
+///
+/// The `FromStr` and `TryFrom` implementations return `shm::InvalidPathError`
+/// if the input string is not a valid shared memory path.
 #[derive(Clone)]
 pub struct ShmPathBuf(Vec<u8>);
 
