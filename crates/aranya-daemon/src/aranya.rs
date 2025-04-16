@@ -7,7 +7,6 @@ use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Rng};
 #[cfg(any())]
 use aranya_daemon_api::NetIdentifier;
-#[cfg(any())]
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;

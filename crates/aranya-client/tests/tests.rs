@@ -520,19 +520,15 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     let label1 = Label::new(1);
     operator_team.create_afc_afc_label(label1).await?;
     operator_team
-            
         .assign_afc_afc_label(team.membera.id, label1)
-            
         .await?;
     operator_team
-            
         .assign_afc_afc_label(team.memberb.id, label1)
-            
         .await?;
 
-        let label2 = operator_team.create_label("label2".to_string()).await?;
-        operator_team.assign_label(team.membera.id, label2).await?;
-        operator_team.assign_label(team.memberb.id, label2).await?;
+    let label2 = operator_team.create_label("label2".to_string()).await?;
+    operator_team.assign_label(team.membera.id, label2).await?;
+    operator_team.assign_label(team.memberb.id, label2).await?;
 
     // assign network addresses.
     operator_team

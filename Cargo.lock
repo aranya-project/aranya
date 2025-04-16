@@ -136,8 +136,7 @@ dependencies = [
 [[package]]
 name = "aranya-aqc-util"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c0e98f03e9487727f3ce83d558bbe73f88c6a7862ad2c786b1e3dca092248c9"
+source = "git+https://github.com/aranya-project/aranya-core?rev=1ee86eada84042d329cb3c75f0d8c87e55b06803#1ee86eada84042d329cb3c75f0d8c87e55b06803"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
