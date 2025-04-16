@@ -32,15 +32,15 @@ struct TeamCtx {
 }
 
 impl TeamCtx {
-    pub async fn new(name: String, work_dir: PathBuf) -> Result<Self> {
-        let owner = UserCtx::new(name.clone(), "owner".into(), work_dir.join("owner")).await?;
-        let admin = UserCtx::new(name.clone(), "admin".into(), work_dir.join("admin")).await?;
+    pub async fn new(name: String, daemon_work_dir: PathBuf, client_work_dir: PathBuf) -> Result<Self> {
+        let owner = UserCtx::new(name.clone(), "owner".into(), daemon_work_dir.join("owner"), client_work_dir.join("owner")).await?;
+        let admin = UserCtx::new(name.clone(), "admin".into(), daemon_work_dir.join("admin"), client_work_dir.join("admin")).await?;
         let operator =
-            UserCtx::new(name.clone(), "operator".into(), work_dir.join("operator")).await?;
+            UserCtx::new(name.clone(), "operator".into(), daemon_work_dir.join("operator"), client_work_dir.join("operator")).await?;
         let membera =
-            UserCtx::new(name.clone(), "membera".into(), work_dir.join("membera")).await?;
+            UserCtx::new(name.clone(), "membera".into(), daemon_work_dir.join("membera"), client_work_dir.join("membera")).await?;
         let memberb =
-            UserCtx::new(name.clone(), "memberb".into(), work_dir.join("memberb")).await?;
+            UserCtx::new(name.clone(), "memberb".into(), daemon_work_dir.join("memberb"), client_work_dir.join("memberb")).await?;
 
         Ok(Self {
             owner,
@@ -59,19 +59,19 @@ struct UserCtx {
 }
 
 impl UserCtx {
-    pub async fn new(team_name: String, name: String, work_dir: PathBuf) -> Result<Self> {
-        fs::create_dir_all(work_dir.clone()).await?;
+    pub async fn new(team_name: String, name: String, daemon_work_dir: PathBuf, client_work_dir: PathBuf) -> Result<Self> {
+        fs::create_dir_all(daemon_work_dir.clone()).await?;
 
         // Setup daemon config.
-        let uds_api_path = work_dir.join("uds.sock");
+        let uds_api_path = daemon_work_dir.join("uds.sock");
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let afc_shm_path = format!("/afc_{}_{}", team_name, name).to_string();
         let max_chans = 100;
         let cfg = Config {
             name: "daemon".into(),
-            work_dir: work_dir.clone(),
+            work_dir: daemon_work_dir.clone(),
             uds_api_path: uds_api_path.clone(),
-            pid_file: work_dir.join("pid"),
+            pid_file: daemon_work_dir.join("pid"),
             sync_addr: any,
             afc: AfcConfig {
                 shm_path: afc_shm_path.clone(),
@@ -100,6 +100,7 @@ impl UserCtx {
         let mut client = (|| {
             Client::connect(
                 &cfg.uds_api_path,
+                &client_work_dir,
             )
         })
         .retry(ExponentialBuilder::default())
@@ -155,10 +156,12 @@ async fn main() -> Result<()> {
     let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
+    let daemon_tmp = tempdir()?;
+    let daemon_work_dir = daemon_tmp.path().to_path_buf();
+    let client_tmp = tempdir()?;
+    let client_work_dir = client_tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("rust_example".into(), work_dir).await?;
+    let mut team = TeamCtx::new("rust_example".into(), daemon_work_dir, client_work_dir).await?;
 
     // create team.
     info!("creating team");

@@ -70,6 +70,16 @@ impl Config {
     pub(crate) fn storage_path(&self) -> PathBuf {
         self.work_dir.join("storage")
     }
+
+    /// Path to the [`DefaultEngine`]'s AQC PSK key wrapping key.
+    pub(crate) fn aqc_psk_key_wrap_key_path(&self) -> PathBuf {
+        self.work_dir.join("aqc_psk_key_wrap_key")
+    }
+
+    /// Path to AQC PSK `Store`.
+    pub(crate) fn aqc_psk_keystore_path(&self) -> PathBuf {
+        self.work_dir.join("aqc_psk_keystore")
+    }
 }
 
 /// Reads JSON from `path`.

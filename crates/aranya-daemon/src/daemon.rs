@@ -105,6 +105,10 @@ impl Daemon {
             }
         });
 
+        let keystore_info = KeyStoreInfo {
+            path: self.cfg.aqc_psk_keystore_path(),
+            wrapped_key: self.cfg.aqc_psk_key_wrap_key_path(),
+        };
         let api = {
             #[cfg(feature = "afc")]
             {
@@ -114,10 +118,7 @@ impl Daemon {
                     local_addr,
                     Arc::new(Mutex::new(afc)),
                     eng,
-                    KeyStoreInfo {
-                        path: self.cfg.keystore_path(),
-                        wrapped_key: self.cfg.key_wrap_key_path(),
-                    },
+                    keystore_info,
                     store,
                     self.cfg.uds_api_path.clone(),
                     Arc::new(pk),
@@ -131,10 +132,7 @@ impl Daemon {
                 DaemonApiServer::new(
                     client,
                     local_addr,
-                    KeyStoreInfo {
-                        path: self.cfg.keystore_path(),
-                        wrapped_key: self.cfg.key_wrap_key_path(),
-                    },
+                    keystore_info,
                     self.cfg.uds_api_path.clone(),
                     Arc::new(pk),
                     peers,

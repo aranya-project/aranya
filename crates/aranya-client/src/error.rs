@@ -11,6 +11,10 @@ pub enum Error {
     #[error("Unable to connect to the daemon: {0}")]
     Connecting(#[source] std::io::Error),
 
+    /// IO error.
+    #[error("IO error: {0}")]
+    IO(#[source] std::io::Error),
+
     /// Unable to communicate with the daemon.
     #[error("Unable to communicate with the daemon: {0}")]
     Rpc(#[from] tarpc::client::RpcError),

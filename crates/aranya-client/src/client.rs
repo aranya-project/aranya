@@ -16,6 +16,7 @@ use aranya_fast_channels::{
 };
 use aranya_util::Addr;
 use tarpc::{context, tokio_serde::formats::Json};
+use tokio::fs;
 #[cfg(feature = "afc")]
 use tokio::net::ToSocketAddrs;
 use tracing::{debug, info, instrument};
@@ -156,7 +157,7 @@ impl Client {
     /// - `daemon_socket`: The socket path to communicate with the daemon.
     #[cfg(not(feature = "afc"))]
     #[instrument(skip_all, fields(?daemon_socket))]
-    pub async fn connect(daemon_socket: &Path) -> Result<Self> {
+    pub async fn connect(daemon_socket: &Path, work_dir: &Path) -> Result<Self> {
         info!("starting Aranya client");
 
         let transport = tarpc::serde_transport::unix::connect(daemon_socket, Json::default)
@@ -165,10 +166,20 @@ impl Client {
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
         debug!("connected to daemon");
 
-        let keystore_info = daemon.get_keystore_info(context::current()).await??;
+        // TODO: load keystore correctly for AQC PSK.
+
+        //let keystore_info = daemon.get_keystore_info(context::current()).await??;
+        let keystore_info = KeyStoreInfo {
+            path: work_dir.join("keystore"),
+            wrapped_key: work_dir.join("key_wrap_key_path"),
+        };
+        fs::create_dir_all(keystore_info.path.clone())
+            .await
+            .map_err(Error::Connecting)?;
         debug!(?keystore_info);
         let device_id = daemon.get_device_id(context::current()).await??;
         debug!(?device_id);
+
         let aqc = AqcChannelsImpl::new(device_id, keystore_info).await?;
 
         Ok(Self { daemon, aqc })
