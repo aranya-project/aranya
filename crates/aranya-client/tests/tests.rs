@@ -9,6 +9,8 @@
     rust_2018_idioms
 )]
 #[cfg(feature = "afc")]
+use std::net::Ipv4Addr;
+#[cfg(feature = "afc")]
 use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
@@ -21,6 +23,10 @@ use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
+#[cfg(feature = "afc")]
+use aranya_daemon_api::ChanOp;
+#[cfg(feature = "afc")]
+use aranya_daemon_api::NetIdentifier;
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
 use aranya_util::addr::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -501,12 +507,15 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
 
         // operator assigns labels for AFC channels.
         let label1 = Label::new(1);
-        operator_team.create_label(label1).await?;
-        operator_team.assign_label(team.membera.id, label1).await?;
-        operator_team.assign_label(team.memberb.id, label1).await?;
+        operator_team.create_afc_label(label1).await?;
+        operator_team
+            .assign_afc_label(team.membera.id, label1)
+            .await?;
+        operator_team
+            .assign_afc_label(team.memberb.id, label1)
+            .await?;
 
-        let label2 = Label::new(2);
-        operator_team.create_label(label2).await?;
+        let label2 = operator_team.create_label("label2".to_string()).await?;
         operator_team.assign_label(team.membera.id, label2).await?;
         operator_team.assign_label(team.memberb.id, label2).await?;
 
@@ -517,14 +526,20 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         operator_team
             .assign_afc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
             .await?;
-        // TODO: use aqc addr
-        operator_team
-            .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_afc_addr.to_string()))
-            .await?;
-        operator_team
-            .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_afc_addr.to_string()))
-            .await?;
     }
+
+    // get aqc addresses.
+    // TODO: use aqc_local_addr()
+    let membera_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
+    let memberb_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 1);
+
+    // TODO: use aqc addr
+    operator_team
+        .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_aqc_addr.to_string()))
+        .await?;
+    operator_team
+        .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_aqc_addr.to_string()))
+        .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -551,9 +566,13 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
             NetIdentifier(membera_afc_addr.to_string())
         );
 
-        let labels = queries.device_label_assignments(team.membera.id).await?;
-        assert_eq!(labels.iter().count(), 2);
-        debug!("membera labels: {:?}", labels.__data());
+        // membera creates afc bidi channel with memberb
+        let afc_id2 = team
+            .membera
+            .client
+            .afc()
+            .create_bidi_channel(team_id, NetIdentifier(memberb_afc_addr.to_string()), label2)
+            .await?;
 
         let afc_net_identifier = queries
             .afc_net_identifier(team.membera.id)
@@ -644,6 +663,55 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         };
         assert_eq!(got, want);
     }
+
+    let label3 = operator_team.create_label("label3".to_string()).await?;
+    let op = ChanOp::SendRecv;
+    operator_team
+        .assign_label(team.membera.id, label3, op)
+        .await?;
+    operator_team
+        .assign_label(team.memberb.id, label3, op)
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // membera creates aqc bidi channel with memberb
+    let (_aqc_id1, aqc_bidi_ctrl) = team
+        .membera
+        .client
+        .aqc()
+        .create_bidi_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label3)
+        .await?;
+
+    // memberb received aqc bidi channel ctrl message
+    // TODO: receiving AQC ctrl messages will happen via the network.
+    team.memberb
+        .client
+        .aqc()
+        .receive_aqc_ctrl(team_id, aqc_bidi_ctrl)
+        .await?;
+
+    // membera creates aqc uni channel with memberb
+    let (_aqc_id1, aqc_uni_ctrl) = team
+        .membera
+        .client
+        .aqc()
+        .create_uni_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label3)
+        .await?;
+
+    // memberb received aqc uni channel ctrl message
+    // TODO: receiving AQC ctrl messages will happen via the network.
+    team.memberb
+        .client
+        .aqc()
+        .receive_aqc_ctrl(team_id, aqc_uni_ctrl)
+        .await?;
+
+    // TODO: send AQC data.
+    operator_team.revoke_label(team.membera.id, label3).await?;
+    operator_team.revoke_label(team.memberb.id, label3).await?;
+    operator_team.delete_label(label3).await?;
 
     Ok(())
 }
