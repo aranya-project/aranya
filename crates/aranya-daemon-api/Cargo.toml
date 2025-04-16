@@ -17,14 +17,19 @@ workspace = true
 aranya-crypto = { workspace = true }
 aranya-fast-channels = { workspace = true }
 aranya-util = { workspace = true }
+buggy = { workspace = true }
 spideroak-base58 = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
+bytes = { version = "1" }
+futures = { version = "0.3" }
+pin-project = { version = "1.1" }
 postcard = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
-
+tokio = { version = "1.44" }
 
 [package.metadata.cargo-machete]
 ignored = ["postcard"]

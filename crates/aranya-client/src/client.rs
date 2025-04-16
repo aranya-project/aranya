@@ -1,12 +1,18 @@
 //! Client-daemon connection.
 
-use std::{net::SocketAddr, path::Path, time::Duration};
+use std::{
+    io,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
+use aranya_crypto::{import::Import, keystore::KeyStore};
 #[cfg(feature = "afc")]
 use aranya_daemon_api::CS;
 use aranya_daemon_api::{
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
-    Role, TeamId,
+    crypto::ClientCodec, ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label,
+    LabelId, NetIdentifier, Role, TeamId,
 };
 use aranya_fast_channels::Label as AfcLabel;
 #[cfg(feature = "afc")]
@@ -24,7 +30,7 @@ use tracing::{debug, info, instrument};
 use crate::afc::{setup_afc_shm, FastChannels, FastChannelsImpl};
 use crate::{
     aqc::{AqcChannels, AqcChannelsImpl},
-    error::{Error, Result},
+    error::{Error, IpcError, Result},
 };
 
 /// List of device IDs.
@@ -77,108 +83,126 @@ impl AfcLabels {
     }
 }
 
+/// Instructs [`Client`] how to connect to the daemon.
+#[derive(Debug)]
+pub struct DaemonAddr {
+    sock: PathBuf,
+}
+
+impl DaemonAddr {
+    pub fn try_from_uds_path(sock: PathBuf) -> Result<Self> {
+        Ok(Self { sock })
+    }
+}
+
+/// Builds a [`Client`].
+pub struct ClientBuilder<'a> {
+    sock: Option<&'a Path>,
+    // The daemon's public key.
+    pk: Vec<u8>,
+}
+
+impl ClientBuilder<'_> {
+    fn new() -> Self {
+        Self {
+            sock: None,
+            pk: Vec::new(),
+        }
+    }
+
+    pub fn with_server_pk(mut self, pk: Vec<u8>) -> Self {
+        self.pk = pk;
+        self
+    }
+
+    /// Connects to the daemon.
+    pub async fn connect(self) -> Result<Client> {
+        let Some(sock) = self.sock else {
+            return Err(Error::Connecting(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "UDS socket not specified",
+            )));
+        };
+        Client::connect(sock).await
+    }
+}
+
+impl<'a> ClientBuilder<'a> {
+    /// Specifies the UDS socket path the daemon is listening on.
+    #[cfg(unix)]
+    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    pub fn with_uds_sock(mut self, sock: &'a Path) -> Self {
+        self.sock = Some(sock);
+        self
+    }
+}
+
 /// A client for invoking actions on and processing effects from
 /// the Aranya graph.
 ///
-/// `Client` interacts with the [Aranya daemon] via
-/// [`aranya-daemon-api`] ([`tarpc`] over Unix domain sockets).
-/// The client provides AFC functionality by interfacing with AFC
-/// utilities in the Aranya core crates.
+/// `Client` interacts with the [Aranya daemon] over
+/// a platform-specific IPC mechanism. The client provides AFC
+/// functionality by interfacing with AFC utilities in the Aranya
+/// core crates.
 ///
 /// [Aranya daemon]: https://crates.io/crates/aranya-daemon
-/// [`aranya-daemon-api`]: https://crates.io/crates/aranya-daemon-api
-/// [`tarpc`]: https://crates.io/crates/tarpc
 pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
-    #[cfg(feature = "afc")]
-    /// Support for Aranya Fast Channels
-    pub(crate) afc: FastChannelsImpl<ReadState<CS>>,
     /// Support for AQC
     pub(crate) aqc: AqcChannelsImpl,
 }
 
 impl Client {
+    pub fn builder<'a>() -> ClientBuilder<'a> {
+        ClientBuilder::new()
+    }
+
     /// Creates a client connection to the daemon.
-    ///
-    /// - `daemon_socket`: The socket path to communicate with the daemon.
-    /// - `afc_shm_path`: AFC's shared memory path. The daemon must also use the
-    ///   same path.
-    /// - `max_channels`: The maximum number of channels that AFC should support.
-    ///   The daemon must also use the same number.
-    /// - `afc_address`: The address that AFC listens for incoming connections
-    ///   on.
-    // TODO: aqc_address
-    #[cfg(feature = "afc")]
-    #[instrument(skip_all, fields(?daemon_socket, ?afc_shm_path, max_channels))]
-    pub async fn connect<A>(
-        daemon_socket: &Path,
-        afc_shm_path: &Path,
-        max_channels: usize,
-        afc_address: A,
-    ) -> Result<Self>
-    where
-        A: ToSocketAddrs,
-    {
+    #[instrument(skip_all, fields(?sock))]
+    async fn connect(sock: &Path, pk: &[u8]) -> Result<Self> {
         info!("starting Aranya client");
 
-        let transport = tarpc::serde_transport::unix::connect(daemon_socket, Json::default)
-            .await
-            .map_err(Error::Connecting)?;
+        let pk = <CE::Kem as Kem>::import(pk)?;
+        let info = sock.as_os_str.as_encoded_bytes();
+        let transport = tarpc::serde_transport::unix::connect(&sock, || {
+            ClientCodec::<CE::Aead, _, _, _>::new(&mut Rng, &pk, Json::default(), info)
+        })
+        .await
+        .map_err(Error::Connecting)?;
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
         debug!("connected to daemon");
 
-        let afc_read = setup_afc_shm(afc_shm_path, max_channels)?;
-        let afc = FastChannelsImpl::new(afc::Client::new(afc_read), afc_address).await?;
-        debug!(
-            addr = ?afc.local_addr().map_err(Error::Afc)?,
-            "bound AFC router",
-        );
-        debug!("getting key store info");
-        let keystore_info = daemon.get_keystore_info(context::current()).await??;
-        debug!("getting device id");
-        let device_id = daemon.get_device_id(context::current()).await??;
-        let aqc = AqcChannelsImpl::new(device_id, keystore_info).await?;
-
-        Ok(Self { daemon, afc, aqc })
-    }
-
-    /// Returns key store info.
-    pub async fn get_keystore_info(&self) -> Result<KeyStoreInfo> {
-        self.daemon
+        let keystore_info = daemon
             .get_keystore_info(context::current())
-            .await?
-            .map_err(Into::into)
-    }
-
-    /// Creates a client connection to the daemon.
-    ///
-    /// - `daemon_socket`: The socket path to communicate with the daemon.
-    #[cfg(not(feature = "afc"))]
-    #[instrument(skip_all, fields(?daemon_socket))]
-    pub async fn connect(daemon_socket: &Path) -> Result<Self> {
-        info!("starting Aranya client");
-
-        let transport = tarpc::serde_transport::unix::connect(daemon_socket, Json::default)
             .await
-            .map_err(Error::Connecting)?;
-        let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
-        debug!("connected to daemon");
-
-        let keystore_info = daemon.get_keystore_info(context::current()).await??;
+            .map_err(IpcError)?;
         debug!(?keystore_info);
-        let device_id = daemon.get_device_id(context::current()).await??;
+        let device_id = daemon
+            .get_device_id(context::current())
+            .await
+            .map_err(IpcError)?;
         debug!(?device_id);
         let aqc = AqcChannelsImpl::new(device_id, keystore_info).await?;
 
         Ok(Self { daemon, aqc })
     }
 
+    /// Returns key store info.
+    pub async fn get_keystore_info(&self) -> Result<KeyStoreInfo> {
+        self.daemon
+            .get_keystore_info(context::current())
+            .await
+            .map_err(IpcError)?
+            .map_err(Into::into)
+    }
+
     /// Returns the address that the Aranya sync server is bound to.
     pub async fn local_addr(&self) -> Result<SocketAddr> {
         self.daemon
             .aranya_local_addr(context::current())
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -186,7 +210,8 @@ impl Client {
     pub async fn get_key_bundle(&mut self) -> Result<KeyBundle> {
         self.daemon
             .get_key_bundle(context::current())
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -194,7 +219,8 @@ impl Client {
     pub async fn get_device_id(&mut self) -> Result<DeviceId> {
         self.daemon
             .get_device_id(context::current())
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -202,7 +228,8 @@ impl Client {
     pub async fn create_team(&mut self) -> Result<TeamId> {
         self.daemon
             .create_team(context::current())
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -210,7 +237,8 @@ impl Client {
     pub async fn add_team(&mut self, team: TeamId) -> Result<()> {
         self.daemon
             .add_team(context::current(), team)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -262,7 +290,8 @@ impl Team<'_> {
         self.client
             .daemon
             .add_sync_peer(context::current(), addr, self.id, config.into())
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -274,7 +303,8 @@ impl Team<'_> {
         self.client
             .daemon
             .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -283,7 +313,8 @@ impl Team<'_> {
         self.client
             .daemon
             .remove_sync_peer(context::current(), addr, self.id)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -292,7 +323,8 @@ impl Team<'_> {
         self.client
             .daemon
             .close_team(context::current(), self.id)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -301,7 +333,8 @@ impl Team<'_> {
         self.client
             .daemon
             .add_device_to_team(context::current(), self.id, keys)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -310,7 +343,8 @@ impl Team<'_> {
         self.client
             .daemon
             .remove_device_from_team(context::current(), self.id, device)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -319,7 +353,8 @@ impl Team<'_> {
         self.client
             .daemon
             .assign_role(context::current(), self.id, device, role)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -328,7 +363,8 @@ impl Team<'_> {
         self.client
             .daemon
             .revoke_role(context::current(), self.id, device, role)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -346,7 +382,8 @@ impl Team<'_> {
         self.client
             .daemon
             .assign_afc_net_identifier(context::current(), self.id, device, net_identifier)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -360,7 +397,8 @@ impl Team<'_> {
         self.client
             .daemon
             .remove_afc_net_identifier(context::current(), self.id, device, net_identifier)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -377,7 +415,8 @@ impl Team<'_> {
         self.client
             .daemon
             .assign_aqc_net_identifier(context::current(), self.id, device, net_identifier)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -390,7 +429,8 @@ impl Team<'_> {
         self.client
             .daemon
             .remove_aqc_net_identifier(context::current(), self.id, device, net_identifier)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -399,7 +439,8 @@ impl Team<'_> {
         self.client
             .daemon
             .create_afc_label(context::current(), self.id, label)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -408,7 +449,8 @@ impl Team<'_> {
         self.client
             .daemon
             .delete_afc_label(context::current(), self.id, label)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -420,7 +462,8 @@ impl Team<'_> {
         self.client
             .daemon
             .assign_afc_label(context::current(), self.id, device, label)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -429,7 +472,8 @@ impl Team<'_> {
         self.client
             .daemon
             .revoke_afc_label(context::current(), self.id, device, label)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -438,7 +482,8 @@ impl Team<'_> {
         self.client
             .daemon
             .create_label(context::current(), self.id, label_name)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -447,7 +492,8 @@ impl Team<'_> {
         self.client
             .daemon
             .delete_label(context::current(), self.id, label_id)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -461,7 +507,8 @@ impl Team<'_> {
         self.client
             .daemon
             .assign_label(context::current(), self.id, device, label_id, op)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -470,7 +517,8 @@ impl Team<'_> {
         self.client
             .daemon
             .revoke_label(context::current(), self.id, device, label_id)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 }
@@ -483,13 +531,13 @@ pub struct Queries<'a> {
 impl Queries<'_> {
     /// Returns the list of devices on the current team.
     pub async fn devices_on_team(&mut self) -> Result<Devices> {
-        Ok(Devices {
-            data: self
-                .client
-                .daemon
-                .query_devices_on_team(context::current(), self.id)
-                .await??,
-        })
+        let data = self
+            .client
+            .daemon
+            .query_devices_on_team(context::current(), self.id)
+            .await
+            .map_err(IpcError)??;
+        Ok(Devices { data })
     }
 
     /// Returns the role of the current device.
@@ -497,7 +545,8 @@ impl Queries<'_> {
         self.client
             .daemon
             .query_device_role(context::current(), self.id, device)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -506,31 +555,32 @@ impl Queries<'_> {
         self.client
             .daemon
             .query_device_keybundle(context::current(), self.id, device)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
     /// Returns a list of labels assiged to the current device.
     pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
-        Ok(Labels {
-            data: self
-                .client
-                .daemon
-                .query_device_label_assignments(context::current(), self.id, device)
-                .await??,
-        })
+        let data = self
+            .client
+            .daemon
+            .query_device_label_assignments(context::current(), self.id, device)
+            .await
+            .map_err(IpcError)?;
+        Ok(Labels { data })
     }
 
     /// Returns a list of AFC labels assiged to the current device.
     #[cfg(feature = "afc")]
     pub async fn device_afc_label_assignments(&mut self, device: DeviceId) -> Result<AfcLabels> {
-        Ok(AfcLabels {
-            data: self
-                .client
-                .daemon
-                .query_device_afc_label_assignments(context::current(), self.id, device)
-                .await??,
-        })
+        let data = self
+            .client
+            .daemon
+            .query_device_afc_label_assignments(context::current(), self.id, device)
+            .await
+            .map_err(IpcError)?;
+        Ok(AfcLabels { data })
     }
 
     /// Returns the AFC network identifier assigned to the current device.
@@ -539,7 +589,8 @@ impl Queries<'_> {
         self.client
             .daemon
             .query_afc_net_identifier(context::current(), self.id, device)
-            .await?
+            .await
+            .map_err(IpcError)
             .map_err(Into::into)
     }
 
@@ -548,7 +599,8 @@ impl Queries<'_> {
         self.client
             .daemon
             .query_aqc_net_identifier(context::current(), self.id, device)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
@@ -557,19 +609,20 @@ impl Queries<'_> {
         self.client
             .daemon
             .query_label_exists(context::current(), self.id, label_id)
-            .await?
+            .await
+            .map_err(IpcError)?
             .map_err(Into::into)
     }
 
     /// Returns a list of labels on the team.
     pub async fn labels(&mut self) -> Result<Labels> {
-        Ok(Labels {
-            data: self
-                .client
-                .daemon
-                .query_labels(context::current(), self.id)
-                .await??,
-        })
+        let data = self
+            .client
+            .daemon
+            .query_labels(context::current(), self.id)
+            .await
+            .map_err(IpcError)??;
+        Ok(Labels { data })
     }
 
     /// Returns whether an AFC label exists.
@@ -578,7 +631,8 @@ impl Queries<'_> {
         self.client
             .daemon
             .query_afc_label_exists(context::current(), self.id, label)
-            .await?
+            .await
+            .map_err(IpcError)
             .map_err(Into::into)
     }
 }

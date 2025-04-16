@@ -30,6 +30,9 @@ pub struct Config {
 
     /// AFC configuration.
     pub afc: AfcConfig,
+
+    /// AQC configuration.
+    pub aqc: AfcConfig,
 }
 
 // TODO: remove allow dead_code once all methods are used.
@@ -61,7 +64,7 @@ impl Config {
         self.work_dir.join("key_bundle")
     }
 
-    /// Path to `Store`.
+    /// The directory where keystore files are written.
     pub(crate) fn keystore_path(&self) -> PathBuf {
         self.work_dir.join("keystore")
     }
@@ -103,6 +106,11 @@ pub struct AfcConfig {
     pub max_chans: usize,
 }
 
+/// AQC configuration.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AqcConfig {}
+
 #[cfg(test)]
 mod tests {
     use std::net::Ipv4Addr;
@@ -129,6 +137,7 @@ mod tests {
                 create: true,
                 max_chans: 100,
             },
+            aqc: AqcConfig {},
         };
         assert_eq!(got, want);
         Ok(())

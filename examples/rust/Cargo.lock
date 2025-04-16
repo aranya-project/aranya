@@ -252,10 +252,16 @@ dependencies = [
  "aranya-crypto",
  "aranya-fast-channels",
  "aranya-util",
+ "buggy",
+ "bytes",
+ "futures",
+ "pin-project",
  "postcard",
  "serde",
  "spideroak-base58",
  "tarpc",
+ "thiserror 2.0.12",
+ "tokio",
  "tracing",
 ]
 

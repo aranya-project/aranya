@@ -12,6 +12,7 @@ use aranya_crypto::{
 };
 use aranya_fast_channels::{Label as AfcLabel, NodeId};
 use aranya_util::Addr;
+use buggy::Bug;
 use serde::{Deserialize, Serialize};
 use spideroak_base58::ToBase58;
 use tracing::error;
@@ -23,6 +24,13 @@ pub type CS = DefaultCipherSuite;
 // TODO: enum?
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Error(String);
+
+impl From<Bug> for Error {
+    fn from(err: Bug) -> Self {
+        error!(?err);
+        Self(format!("{err:?}"))
+    }
+}
 
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
@@ -158,9 +166,7 @@ pub type AqcCtrl = Vec<Box<[u8]>>;
 /// - Decode the PSK encap to derive the PSK.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub enum AqcChannelInfo {
-    BidiCreated(AqcBidiChannelCreatedInfo),
     BidiReceived(AqcBidiChannelReceivedInfo),
-    UniCreated(AqcUniChannelCreatedInfo),
     UniReceived(AqcUniChannelReceivedInfo),
 }
 
@@ -263,7 +269,6 @@ pub struct Label {
 #[tarpc::service]
 pub trait DaemonApi {
     /// Gets the key store info.
-    /// The keystore can be used to pass private keys and secrets between the client and daemon.
     async fn get_keystore_info() -> Result<KeyStoreInfo>;
 
     /// Gets local address the Aranya sync server is bound to.
@@ -374,16 +379,14 @@ pub trait DaemonApi {
     async fn create_aqc_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
-        node_id: NodeId,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcChannelInfo)>;
+    ) -> Result<(AqcCtrl, AqcBidiChannelCreatedInfo)>;
     /// Create a unidirectional QUIC channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
-        node_id: NodeId,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcChannelInfo)>;
+    ) -> Result<(AqcCtrl, AqcUniChannelCreatedInfo)>;
     /// Delete a QUIC bidi channel.
     async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
     /// Delete a QUIC uni channel.
@@ -391,7 +394,6 @@ pub trait DaemonApi {
     /// Receive AQC ctrl message.
     async fn receive_aqc_ctrl(
         team: TeamId,
-        node_id: NodeId,
         ctrl: AqcCtrl,
     ) -> Result<(NetIdentifier, AqcChannelInfo)>;
 

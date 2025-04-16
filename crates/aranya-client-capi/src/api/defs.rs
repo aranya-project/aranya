@@ -51,7 +51,7 @@ pub enum Error {
 
     /// Could not send request to daemon.
     #[capi(msg = "could not send request to daemon")]
-    Rpc,
+    Ipc,
 
     /// Daemon reported error.
     #[capi(msg = "daemon reported error")]
@@ -85,7 +85,7 @@ impl From<&imp::Error> for Error {
             imp::Error::BufferTooSmall => Self::BufferTooSmall,
             imp::Error::Client(err) => match err {
                 aranya_client::Error::Connecting(_) => Self::Connecting,
-                aranya_client::Error::Rpc(_) => Self::Rpc,
+                aranya_client::Error::Ipc(_) => Self::Ipc,
                 aranya_client::Error::Daemon(_) => Self::Daemon,
                 #[cfg(feature = "afc")]
                 aranya_client::Error::Afc(_) => Self::Afc,

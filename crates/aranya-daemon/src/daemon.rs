@@ -68,20 +68,28 @@ impl Daemon {
 
         let mut set = JoinSet::new();
 
-        // Load keys from the keystore or generate new ones if there are no existing keys.
-        let mut store = KS::open(self.cfg.keystore_path()).context("unable to open keystore")?;
+        let store_dir = self.cfg.keystore_path();
+        aranya_util::create_dir_all(&store_dir).await?;
+        let mut root_store =
+            KS::open(store_dir.join("root")).context("unable to open root keystore")?;
+        let local_store =
+            KS::open(store_dir.join("local")).context("unable to open local keystore")?;
         let mut eng = {
+            // Load keys from the keystore or generate new ones
+            // if there are no existing keys.
             let key = self.load_or_gen_key_wrap_key().await?;
             CE::new(&key, Rng)
         };
-        let pk = self.load_or_gen_public_keys(&mut eng, &mut store).await?;
+        let pk = self
+            .load_or_gen_public_keys(&mut eng, &mut root_store)
+            .await?;
 
         // Initialize Aranya client.
         let (client, local_addr) = {
             let (client, server) = self
                 .setup_aranya(
                     eng.clone(),
-                    store.try_clone().context("unable to clone keystore")?,
+                    root_store.try_clone().context("unable to clone keystore")?,
                     &pk,
                     self.cfg.sync_addr,
                 )
@@ -107,41 +115,25 @@ impl Daemon {
 
         let api = {
             #[cfg(feature = "afc")]
-            {
-                let afc = self.setup_afc()?;
-                DaemonApiServer::new(
-                    client,
-                    local_addr,
-                    Arc::new(Mutex::new(afc)),
-                    eng,
-                    KeyStoreInfo {
-                        path: self.cfg.keystore_path(),
-                        wrapped_key: self.cfg.key_wrap_key_path(),
-                    },
-                    store,
-                    self.cfg.uds_api_path.clone(),
-                    Arc::new(pk),
-                    peers,
-                    recv_effects,
-                )
-                .context("Unable to start daemon API!")?
-            }
-            #[cfg(not(feature = "afc"))]
-            {
-                DaemonApiServer::new(
-                    client,
-                    local_addr,
-                    KeyStoreInfo {
-                        path: self.cfg.keystore_path(),
-                        wrapped_key: self.cfg.key_wrap_key_path(),
-                    },
-                    self.cfg.uds_api_path.clone(),
-                    Arc::new(pk),
-                    peers,
-                    recv_effects,
-                )
-                .context("Unable to start daemon API!")?
-            }
+            let afc = self.setup_afc()?;
+            DaemonApiServer::new(
+                client,
+                local_addr,
+                KeyStoreInfo {
+                    path: self.cfg.keystore_path(),
+                    wrapped_key: self.cfg.key_wrap_key_path(),
+                },
+                self.cfg.uds_api_path.clone(),
+                Arc::new(pk),
+                peers,
+                recv_effects,
+                local_store,
+                #[cfg(feature = "afc")]
+                Arc::new(Mutex::new(afc)),
+                #[cfg(feature = "afc")]
+                eng,
+            )
+            .context("Unable to start daemon API!")?
         };
         api.serve().await?;
 
@@ -169,14 +161,14 @@ impl Daemon {
     async fn setup_aranya(
         &self,
         eng: CE,
-        store: KS,
+        root_store: KS,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
     ) -> Result<(Client, Server)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
-            EN::new(TEST_POLICY_1, eng, store, device_id)?,
+            EN::new(TEST_POLICY_1, eng, root_store, device_id)?,
             SP::new(
                 FileManager::new(self.cfg.storage_path())
                     .context("unable to create `FileManager`")?,
@@ -291,7 +283,7 @@ impl Drop for Daemon {
     }
 }
 
-/// Tries to read JSON from `path`.
+/// Tries to read CBOR from `path`.
 async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<Option<T>> {
     match fs::read(path.as_ref()).await {
         Ok(buf) => Ok(cbor::from_reader(&buf[..])?),
@@ -300,7 +292,7 @@ async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<Op
     }
 }
 
-/// Writes `data` as JSON to `path`.
+/// Writes `data` as CBOR to `path`.
 async fn write_cbor(path: impl AsRef<Path>, data: impl Serialize) -> Result<()> {
     let mut buf = Vec::new();
     cbor::into_writer(&data, &mut buf)?;

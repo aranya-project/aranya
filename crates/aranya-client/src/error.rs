@@ -13,7 +13,7 @@ pub enum Error {
 
     /// Unable to communicate with the daemon.
     #[error("Unable to communicate with the daemon: {0}")]
-    Rpc(#[from] tarpc::client::RpcError),
+    Ipc(#[from] IpcError),
 
     /// The daemon returned an error.
     #[error("Daemon reported error: {0}")]
@@ -39,6 +39,11 @@ pub enum Error {
         reason: &'static str,
     },
 }
+
+/// An IPC error.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct IpcError(#[from] pub(crate) tarpc::client::RpcError);
 
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
