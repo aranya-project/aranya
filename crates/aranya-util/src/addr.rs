@@ -42,7 +42,7 @@ macro_rules! const_assert {
 ///
 /// `Addr` ensures that the host part is a syntactically valid domain name or IP address.
 /// It provides methods for DNS lookup, conversion to socket addresses, and serde
-/// serialization.
+/// serialization/deserialization.
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Addr {
     host: Host,
