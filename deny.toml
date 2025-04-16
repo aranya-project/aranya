@@ -113,6 +113,7 @@ exceptions = [
     # Each entry is the crate and version constraint, and its specific allow
     # list
     { allow = ["AGPL-3.0"], crate = "aranya-afc-util" },
+    { allow = ["AGPL-3.0"], crate = "aranya-aqc-util" },
     { allow = ["AGPL-3.0"], crate = "aranya-capi-codegen" },
     { allow = ["AGPL-3.0"], crate = "aranya-capi-core" },
     { allow = ["AGPL-3.0"], crate = "aranya-capi-macro" },
@@ -239,10 +240,12 @@ skip = [
     "getrandom@0.2.15",
     "heapless@0.7.17",
     "hash32@0.2.1",
-    "linux-raw-sys@0.4.15",
+    # TODO: add this back when afc is added back in.
+    #"linux-raw-sys@0.4.15",
     "regex-automata@0.1.10",
     "regex-syntax@0.6.29",
-    "rustix@0.38.44",
+    # TODO: add this back when afc is added back in.
+    #"rustix@0.38.44",
     "syn@1.0.109",
     "thiserror-impl@1.0.69",
     "thiserror@1.0.69",

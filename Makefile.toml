@@ -65,7 +65,7 @@ category = "build"
 description = "Build C API shared library"
 cwd = "crates/aranya-client-capi"
 command = "cargo"
-args = ["build", "--release", "--features", "afc"]
+args = ["build", "--release"] # "--features", "afc"
 dependencies = ["install-nightly"]
 
 [tasks.tgz-capi]

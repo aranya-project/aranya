@@ -19,7 +19,7 @@
 	// AFC configuration.
 	"afc": {
 		// Shared memory path.
-		"shm_path": "/hub",
+		"shm_path": "/afc",
 
 		// Unlink `shm_path` before creating the shared memory?
 		//
