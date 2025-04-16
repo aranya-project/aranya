@@ -58,7 +58,13 @@ where
     E: aranya_crypto::Engine,
 {
     /// Creates a `PolicyEngine` from a policy document.
-    pub fn new(policy_doc: &str, eng: E, store: Store, device_id: DeviceId) -> Result<Self> {
+    pub fn new(
+        policy_doc: &str,
+        eng: E,
+        store: Store,
+        aqc_psk_store: Store,
+        device_id: DeviceId,
+    ) -> Result<Self> {
         // compile the policy.
         let ast = parse_policy_document(policy_doc).context("unable to parse policy document")?;
         let module = Compiler::new(&ast)
@@ -78,7 +84,7 @@ where
         // select which FFI moddules to use.
         let ffis: Vec<Box<dyn FfiCallable<E> + Send + 'static>> = vec![
             Box::from(AfcFfi::new(store.try_clone()?)),
-            Box::from(AqcFfi::new(store.try_clone()?)),
+            Box::from(AqcFfi::new(aqc_psk_store.try_clone()?)),
             Box::from(CryptoFfi::new(store.try_clone()?)),
             Box::from(DeviceFfi::new(device_id)),
             Box::from(EnvelopeFfi),

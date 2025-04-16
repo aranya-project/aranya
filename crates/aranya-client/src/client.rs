@@ -134,8 +134,8 @@ impl Client {
             addr = ?afc.local_addr().map_err(Error::Afc)?,
             "bound AFC router",
         );
-        debug!("getting key store info");
-        let keystore_info = daemon.get_keystore_info(context::current()).await??;
+        debug!("getting aqc psk key store info");
+        let keystore_info = daemon.get_psk_keystore_info(context::current()).await??;
         debug!("getting device id");
         let device_id = daemon.get_device_id(context::current()).await??;
         let aqc = AqcChannelsImpl::new(device_id, keystore_info).await?;
@@ -143,10 +143,10 @@ impl Client {
         Ok(Self { daemon, afc, aqc })
     }
 
-    /// Returns key store info.
-    pub async fn get_keystore_info(&self) -> Result<KeyStoreInfo> {
+    /// Returns AQC PSK key store info.
+    pub async fn get_psk_keystore_info(&self) -> Result<KeyStoreInfo> {
         self.daemon
-            .get_keystore_info(context::current())
+            .get_psk_keystore_info(context::current())
             .await?
             .map_err(Into::into)
     }
@@ -165,7 +165,7 @@ impl Client {
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
         debug!("connected to daemon");
 
-        let keystore_info = daemon.get_keystore_info(context::current()).await??;
+        let keystore_info = daemon.get_psk_keystore_info(context::current()).await??;
         debug!(?keystore_info);
         let device_id = daemon.get_device_id(context::current()).await??;
         debug!(?device_id);

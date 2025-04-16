@@ -66,6 +66,16 @@ impl Config {
         self.work_dir.join("keystore")
     }
 
+    /// Path to AQC PSK `Store`.
+    pub(crate) fn psk_keystore_path(&self) -> PathBuf {
+        self.work_dir.join("aqc_psk_keystore")
+    }
+
+    /// Path to the [`DefaultEngine`]'s AQC PSK key wrapping key.
+    pub(crate) fn psk_key_wrap_key_path(&self) -> PathBuf {
+        self.work_dir.join("psk_key_wrap_key")
+    }
+
     /// Path to the runtime's storage.
     pub(crate) fn storage_path(&self) -> PathBuf {
         self.work_dir.join("storage")

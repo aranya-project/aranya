@@ -80,7 +80,7 @@ impl DaemonApiServer {
         local_addr: SocketAddr,
         afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
         eng: CE,
-        keystore_info: api::KeyStoreInfo,
+        psk_keystore_info: api::KeyStoreInfo,
         store: Store,
         daemon_sock: PathBuf,
         pk: Arc<PublicKeys<api::CS>>,
@@ -99,7 +99,7 @@ impl DaemonApiServer {
                 eng,
                 pk,
                 peers,
-                keystore_info,
+                psk_keystore_info,
                 afc_peers: Arc::default(),
                 afc_handler: Arc::new(Mutex::new(Handler::new(
                     device_id,
@@ -116,7 +116,7 @@ impl DaemonApiServer {
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
-        keystore_info: api::KeyStoreInfo,
+        psk_keystore_info: api::KeyStoreInfo,
         daemon_sock: PathBuf,
         pk: Arc<PublicKeys<api::CS>>,
         peers: SyncPeers,
@@ -131,7 +131,7 @@ impl DaemonApiServer {
                 local_addr,
                 pk,
                 peers,
-                keystore_info,
+                psk_keystore_info,
                 aqc_peers: Arc::default(),
             },
         })
@@ -193,8 +193,8 @@ struct DaemonApiHandler {
     pk: Arc<PublicKeys<api::CS>>,
     /// Aranya sync peers,
     peers: SyncPeers,
-    /// Key store paths.
-    keystore_info: api::KeyStoreInfo,
+    /// AQC PSK key store paths.
+    psk_keystore_info: api::KeyStoreInfo,
     /// AFC shm write.
     #[cfg(feature = "afc")]
     #[allow(dead_code)]
@@ -358,8 +358,11 @@ impl DaemonApiHandler {
 
 impl DaemonApi for DaemonApiHandler {
     #[instrument(skip(self))]
-    async fn get_keystore_info(self, context: context::Context) -> api::Result<api::KeyStoreInfo> {
-        Ok(self.keystore_info)
+    async fn get_psk_keystore_info(
+        self,
+        context: context::Context,
+    ) -> api::Result<api::KeyStoreInfo> {
+        Ok(self.psk_keystore_info)
     }
 
     #[instrument(skip(self))]

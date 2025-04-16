@@ -262,9 +262,9 @@ pub struct Label {
 
 #[tarpc::service]
 pub trait DaemonApi {
-    /// Gets the key store info.
-    /// The keystore can be used to pass private keys and secrets between the client and daemon.
-    async fn get_keystore_info() -> Result<KeyStoreInfo>;
+    /// Gets the AQC PSK key store info.
+    /// The keystore can be used to pass the AQC PSKs between the client and daemon.
+    async fn get_psk_keystore_info() -> Result<KeyStoreInfo>;
 
     /// Gets local address the Aranya sync server is bound to.
     async fn aranya_local_addr() -> Result<SocketAddr>;

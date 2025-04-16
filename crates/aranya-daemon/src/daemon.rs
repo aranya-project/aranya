@@ -76,12 +76,18 @@ impl Daemon {
         };
         let pk = self.load_or_gen_public_keys(&mut eng, &mut store).await?;
 
+        let psk_store =
+            KS::open(self.cfg.psk_keystore_path()).context("unable to open aqc psk keystore")?;
+
         // Initialize Aranya client.
         let (client, local_addr) = {
             let (client, server) = self
                 .setup_aranya(
                     eng.clone(),
                     store.try_clone().context("unable to clone keystore")?,
+                    psk_store
+                        .try_clone()
+                        .context("unable to clone aqc psk keystore")?,
                     &pk,
                     self.cfg.sync_addr,
                 )
@@ -115,8 +121,8 @@ impl Daemon {
                     Arc::new(Mutex::new(afc)),
                     eng,
                     KeyStoreInfo {
-                        path: self.cfg.keystore_path(),
-                        wrapped_key: self.cfg.key_wrap_key_path(),
+                        path: self.cfg.psk_keystore_path(),
+                        wrapped_key: self.cfg.psk_key_wrap_key_path(),
                     },
                     store,
                     self.cfg.uds_api_path.clone(),
@@ -132,8 +138,8 @@ impl Daemon {
                     client,
                     local_addr,
                     KeyStoreInfo {
-                        path: self.cfg.keystore_path(),
-                        wrapped_key: self.cfg.key_wrap_key_path(),
+                        path: self.cfg.psk_keystore_path(),
+                        wrapped_key: self.cfg.psk_key_wrap_key_path(),
                     },
                     self.cfg.uds_api_path.clone(),
                     Arc::new(pk),
@@ -153,6 +159,7 @@ impl Daemon {
         // These directories aren't created for us.
         for (name, path) in [
             ("keystore", self.cfg.keystore_path()),
+            ("aqc_psk_keystore", self.cfg.psk_keystore_path()),
             ("storage", self.cfg.storage_path()),
         ] {
             aranya_util::create_dir_all(&path)
@@ -170,13 +177,14 @@ impl Daemon {
         &self,
         eng: CE,
         store: KS,
+        psk_store: KS,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
     ) -> Result<(Client, Server)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
-            EN::new(TEST_POLICY_1, eng, store, device_id)?,
+            EN::new(TEST_POLICY_1, eng, store, psk_store, device_id)?,
             SP::new(
                 FileManager::new(self.cfg.storage_path())
                     .context("unable to create `FileManager`")?,

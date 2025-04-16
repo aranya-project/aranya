@@ -168,6 +168,11 @@ impl TestCtx {
                 fs::create_dir_all(&path)?;
                 Store::open(path)?
             };
+            let aqc_psk_store = {
+                let path = root.join("aqc_psk_keystore");
+                fs::create_dir_all(&path)?;
+                Store::open(path)?
+            };
             let (mut eng, _) = DefaultEngine::<Rng>::from_entropy(Rng);
             let bundle = KeyBundle::generate(&mut eng, &mut store)
                 .context("unable to generate `KeyBundle`")?;
@@ -189,6 +194,9 @@ impl TestCtx {
                     TEST_POLICY_1,
                     eng,
                     store.try_clone().context("unable to clone keystore")?,
+                    aqc_psk_store
+                        .try_clone()
+                        .context("unable to clone psk keystore")?,
                     bundle.device_id,
                 )?,
                 LinearStorageProvider::new(FileManager::new(&storage_dir)?),
