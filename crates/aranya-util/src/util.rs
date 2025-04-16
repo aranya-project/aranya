@@ -2,6 +2,8 @@
 
 use std::{fs::Permissions, os::unix::fs::PermissionsExt, path::Path, str::FromStr};
 
+use anyhow::Context as _;
+use aranya_crypto::{import::Import, keys::SecretKey, Rng};
 use aranya_fast_channels::shm;
 use tokio::{fs, io};
 use tracing::warn;
@@ -65,5 +67,28 @@ impl TryFrom<String> for ShmPathBuf {
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
         s.parse::<Self>()
+    }
+}
+
+/// Loads a key from a file or generates and writes a new one.
+pub async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> anyhow::Result<K> {
+    match fs::read(&path).await {
+        Ok(buf) => {
+            tracing::info!("loaded key");
+            let key = Import::import(buf.as_slice()).context("unable to import key from file")?;
+            Ok(key)
+        }
+        Err(err) if err.kind() == io::ErrorKind::NotFound => {
+            tracing::info!("generating key");
+            let key = K::new(&mut Rng);
+            let bytes = key
+                .try_export_secret()
+                .context("unable to export new key")?;
+            write_file(&path, bytes.as_bytes())
+                .await
+                .context("unable to write key")?;
+            Ok(key)
+        }
+        Err(err) => Err(err).context("unable to read key"),
     }
 }

@@ -1,20 +1,16 @@
 //! AQC support.
 
-use std::{io, net::SocketAddr, path::PathBuf};
+use std::net::SocketAddr;
 
-use anyhow::{anyhow, bail, Context};
+use anyhow::{anyhow, Context};
 use aranya_aqc_util::{
     BidiChannelCreated, BidiChannelReceived, Handler, UniChannelCreated, UniChannelReceived,
 };
 use aranya_crypto::{
-    aead::Aead,
     aqc::{BidiChannelId, BidiPeerEncap, UniChannelId, UniPeerEncap},
     default::DefaultEngine,
-    generic_array::GenericArray,
-    import::Import,
-    keys::SecretKeyBytes,
     keystore::fs_keystore::Store,
-    CipherSuite, Random, Rng,
+    Rng,
 };
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
 use aranya_daemon_api::{
@@ -22,8 +18,7 @@ use aranya_daemon_api::{
 };
 use aranya_fast_channels::NodeId;
 use tarpc::context;
-use tokio::fs;
-use tracing::{debug, info, instrument};
+use tracing::{debug, instrument};
 
 use crate::error::AqcError;
 
@@ -56,7 +51,7 @@ impl AqcChannelsImpl {
             store.try_clone().context("unable to clone keystore")?,
         );
         let eng = {
-            let key = load_or_gen_key_wrap_key(keystore_info.wrapped_key).await?;
+            let key = aranya_util::load_or_gen_key(keystore_info.wrapped_key).await?;
             CE::new(&key, Rng)
         };
 
@@ -299,38 +294,4 @@ impl<'a> AqcChannels<'a> {
 
         Ok(())
     }
-}
-
-// TODO: borrowed from daemon.
-type KeyWrapKeyBytes = SecretKeyBytes<<<CS as CipherSuite>::Aead as Aead>::KeySize>;
-type KeyWrapKey = <<CS as CipherSuite>::Aead as Aead>::Key;
-
-// TODO: this was borrowed from daemon.rs. Move to util crate for reuse.
-/// Loads the key wrapping key used by [`CryptoEngine`].
-async fn load_or_gen_key_wrap_key(path: PathBuf) -> anyhow::Result<KeyWrapKey> {
-    let (bytes, loaded) = match fs::read(&path).await {
-        Ok(buf) => {
-            info!("loaded key wrap key");
-            let bytes = KeyWrapKeyBytes::new(
-                *GenericArray::try_from_slice(&buf)
-                    .map_err(|_| anyhow!("invalid key wrap key length"))?,
-            );
-            (bytes, true)
-        }
-        Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            info!("generating key wrap key");
-            let bytes = KeyWrapKeyBytes::random(&mut Rng);
-            (bytes, false)
-        }
-        Err(err) => bail!("unable to read key wrap key: {err}"),
-    };
-
-    // Import before writing in case importing fails.
-    let key = Import::import(bytes.as_bytes()).context("unable to import new key wrap key")?;
-    if !loaded {
-        aranya_util::write_file(&path, bytes.as_bytes())
-            .await
-            .context("unable to write key wrap key")?;
-    }
-    Ok(key)
 }

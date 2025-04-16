@@ -568,6 +568,7 @@ name = "aranya-util"
 version = "0.5.1"
 dependencies = [
  "anyhow",
+ "aranya-crypto",
  "aranya-fast-channels",
  "buggy",
  "serde",
