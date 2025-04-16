@@ -37,8 +37,10 @@ macro_rules! const_assert {
     }
 }
 
-/// Represents a network address composed of a host (domain name, IPv4, or IPv6)
-/// and a port number.
+/// A "host:port" network address.
+///
+/// The host can be a domain name, IPv4, or IPv6 address and the
+/// port must be a valid [u16].
 ///
 /// `Addr` ensures that the host part is a syntactically valid domain name or IP address.
 /// It provides methods for DNS lookup, conversion to socket addresses, and serde
@@ -127,7 +129,7 @@ impl FromStr for Addr {
     ///
     /// The string can be in several forms:
     /// - `host:port` (e.g., "spideroak.com:80", "192.168.1.1:8080")
-    /// - IPv6 address with port: `[ipv6_addr]:port` (e.g., "[::1]:443")
+    /// - IPv6 address with port: `[ipv6_addr]:port` (e.g., "\[::1\]:443")
     /// - A string representation of a `SocketAddr` (which `std::net::SocketAddr::from_str` can parse).
     ///
     /// This function first attempts to parse using [`SocketAddr`], then falls
