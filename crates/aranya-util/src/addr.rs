@@ -5,7 +5,7 @@
 //!
 //!
 //! The Addr type supports parsing addresses from strings in various formats
-//! (e.g., "spideroak.com:80", "192.168.1.1:8080", "[::1]:443"), asynchronous DNS
+//! (e.g., "spideroak.com:80", "192.168.1.1:8080", "\[::1\]:443"), asynchronous DNS
 //! resolution via [`Addr::lookup`], and conversion to and from standard library
 //! types like [`std::net::SocketAddr`], [`std::net::Ipv4Addr`], and
 //! [`std::net::Ipv6Addr`].
