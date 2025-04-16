@@ -6,7 +6,7 @@ use anyhow::Context as _;
 use aranya_crypto::{import::Import, keys::SecretKey, Rng};
 use aranya_fast_channels::shm;
 use tokio::{fs, io};
-use tracing::warn;
+use tracing::{info_span, warn, Instrument as _};
 
 /// Writes `data` to `path` using with 600 permissions.
 pub async fn write_file(path: impl AsRef<Path>, data: &[u8]) -> io::Result<()> {
@@ -72,23 +72,31 @@ impl TryFrom<String> for ShmPathBuf {
 
 /// Loads a key from a file or generates and writes a new one.
 pub async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> anyhow::Result<K> {
-    match fs::read(&path).await {
-        Ok(buf) => {
-            tracing::info!("loaded key");
-            let key = Import::import(buf.as_slice()).context("unable to import key from file")?;
-            Ok(key)
+    pub async fn inner<K: SecretKey>(path: &Path) -> anyhow::Result<K> {
+        match fs::read(&path).await {
+            Ok(buf) => {
+                tracing::info!("loading key");
+                let key =
+                    Import::import(buf.as_slice()).context("unable to import key from file")?;
+                Ok(key)
+            }
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                tracing::info!("generating key");
+                let key = K::new(&mut Rng);
+                let bytes = key
+                    .try_export_secret()
+                    .context("unable to export new key")?;
+                write_file(&path, bytes.as_bytes())
+                    .await
+                    .context("unable to write key")?;
+                Ok(key)
+            }
+            Err(err) => Err(err).context("unable to read key"),
         }
-        Err(err) if err.kind() == io::ErrorKind::NotFound => {
-            tracing::info!("generating key");
-            let key = K::new(&mut Rng);
-            let bytes = key
-                .try_export_secret()
-                .context("unable to export new key")?;
-            write_file(&path, bytes.as_bytes())
-                .await
-                .context("unable to write key")?;
-            Ok(key)
-        }
-        Err(err) => Err(err).context("unable to read key"),
     }
+    let path = path.as_ref();
+    inner(path)
+        .instrument(info_span!("load_or_gen_key", ?path))
+        .await
+        .with_context(|| format!("load_or_gen_key({path:?})"))
 }
