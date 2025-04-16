@@ -25,6 +25,13 @@ pub enum Role {
     Operator,
     Member,
 }
+/// ChanOp policy enum.
+#[value]
+pub enum ChanOp {
+    RecvOnly,
+    SendOnly,
+    SendRecv,
+}
 /// Enum of policy effects that can occur in response to a policy action.
 #[effects]
 pub enum Effect {
@@ -40,6 +47,17 @@ pub enum Effect {
     OperatorRevoked(OperatorRevoked),
     AqcNetworkNameSet(AqcNetworkNameSet),
     AqcNetworkNameUnset(AqcNetworkNameUnset),
+    AqcBidiChannelCreated(AqcBidiChannelCreated),
+    AqcBidiChannelReceived(AqcBidiChannelReceived),
+    AqcUniChannelCreated(AqcUniChannelCreated),
+    AqcUniChannelReceived(AqcUniChannelReceived),
+    LabelCreated(LabelCreated),
+    LabelDeleted(LabelDeleted),
+    QueryLabelExistsResult(QueryLabelExistsResult),
+    QueriedLabel(QueriedLabel),
+    LabelAssigned(LabelAssigned),
+    LabelRevoked(LabelRevoked),
+    QueriedLabelAssignment(QueriedLabelAssignment),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
@@ -107,6 +125,113 @@ pub struct AqcNetworkNameSet {
 pub struct AqcNetworkNameUnset {
     pub device_id: Id,
 }
+/// AqcBidiChannelCreated policy effect.
+#[effect]
+pub struct AqcBidiChannelCreated {
+    pub channel_id: Id,
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub author_enc_key_id: Id,
+    pub peer_id: Id,
+    pub peer_enc_pk: Vec<u8>,
+    pub label_id: Id,
+    pub author_secrets_id: Id,
+    pub psk_length_in_bytes: i64,
+}
+/// AqcBidiChannelReceived policy effect.
+#[effect]
+pub struct AqcBidiChannelReceived {
+    pub channel_id: Id,
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_id: Id,
+    pub peer_enc_key_id: Id,
+    pub label_id: Id,
+    pub encap: Vec<u8>,
+    pub psk_length_in_bytes: i64,
+}
+/// AqcUniChannelCreated policy effect.
+#[effect]
+pub struct AqcUniChannelCreated {
+    pub channel_id: Id,
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub sender_id: Id,
+    pub receiver_id: Id,
+    pub author_enc_key_id: Id,
+    pub peer_enc_pk: Vec<u8>,
+    pub label_id: Id,
+    pub author_secrets_id: Id,
+    pub psk_length_in_bytes: i64,
+}
+/// AqcUniChannelReceived policy effect.
+#[effect]
+pub struct AqcUniChannelReceived {
+    pub channel_id: Id,
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub sender_id: Id,
+    pub receiver_id: Id,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_enc_key_id: Id,
+    pub label_id: Id,
+    pub encap: Vec<u8>,
+    pub psk_length_in_bytes: i64,
+}
+/// LabelCreated policy effect.
+#[effect]
+pub struct LabelCreated {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+}
+/// LabelDeleted policy effect.
+#[effect]
+pub struct LabelDeleted {
+    pub label_name: String,
+    pub label_author_id: Id,
+    pub label_id: Id,
+    pub author_id: Id,
+}
+/// QueryLabelExistsResult policy effect.
+#[effect]
+pub struct QueryLabelExistsResult {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+}
+/// QueriedLabel policy effect.
+#[effect]
+pub struct QueriedLabel {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+}
+/// LabelAssigned policy effect.
+#[effect]
+pub struct LabelAssigned {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+    pub author_id: Id,
+}
+/// LabelRevoked policy effect.
+#[effect]
+pub struct LabelRevoked {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+    pub author_id: Id,
+}
+/// QueriedLabelAssignment policy effect.
+#[effect]
+pub struct QueriedLabelAssignment {
+    pub device_id: Id,
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+}
 /// QueryDevicesOnTeamResult policy effect.
 #[effect]
 pub struct QueryDevicesOnTeamResult {
@@ -146,6 +271,29 @@ pub trait ActorExt {
         net_identifier: String,
     ) -> Result<(), ClientError>;
     fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn create_aqc_bidi_channel(
+        &mut self,
+        peer_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn create_aqc_uni_channel(
+        &mut self,
+        sender_id: Id,
+        receiver_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn create_label(&mut self, name: String) -> Result<(), ClientError>;
+    fn delete_label(&mut self, label_id: Id) -> Result<(), ClientError>;
+    fn query_label_exists(&mut self, label_id: Id) -> Result<(), ClientError>;
+    fn query_labels(&mut self) -> Result<(), ClientError>;
+    fn assign_label(
+        &mut self,
+        device_id: Id,
+        label_id: Id,
+        op: ChanOp,
+    ) -> Result<(), ClientError>;
+    fn revoke_label(&mut self, device_id: Id, label_id: Id) -> Result<(), ClientError>;
+    fn query_label_assignments(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
     fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;

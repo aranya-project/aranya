@@ -1,9 +1,10 @@
 #![allow(missing_docs)]
 
-use std::{fmt, marker::PhantomData};
+use std::{fmt, marker::PhantomData, str::FromStr};
 
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use aranya_afc_util::Ffi as AfcFfi;
+use aranya_aqc_util::Ffi as AqcFfi;
 use aranya_crypto::{keystore::fs_keystore::Store, DeviceId};
 use aranya_crypto_ffi::Ffi as CryptoFfi;
 use aranya_device_ffi::FfiDevice as DeviceFfi;
@@ -19,10 +20,30 @@ use aranya_runtime::{
 };
 use tracing::instrument;
 
-use crate::policy::Role;
+use crate::policy::{ChanOp, Role};
 
 /// Policy loaded from policy.md file.
 pub const TEST_POLICY_1: &str = include_str!("./policy.md");
+
+/// Converts [`ChanOp`] to string.
+impl FromStr for ChanOp {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "ChanOp::RecvOnly" => Ok(Self::RecvOnly),
+            "ChanOp::SendOnly" => Ok(Self::SendOnly),
+            "ChanOp::SendRecv" => Ok(Self::SendRecv),
+            _ => Err(anyhow!("unknown `ChanOp`: {s}")),
+        }
+    }
+}
+
+/// Display implementation for [`ChanOp`]
+impl fmt::Display for ChanOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ChanOp::{:?}", self)
+    }
+}
 
 /// Engine using policy from [`policy.md`].
 pub struct PolicyEngine<E, KS> {
@@ -43,6 +64,7 @@ where
         let module = Compiler::new(&ast)
             .ffi_modules(&[
                 AfcFfi::<Store>::SCHEMA,
+                AqcFfi::<Store>::SCHEMA,
                 CryptoFfi::<Store>::SCHEMA,
                 DeviceFfi::SCHEMA,
                 EnvelopeFfi::SCHEMA,
@@ -56,6 +78,7 @@ where
         // select which FFI moddules to use.
         let ffis: Vec<Box<dyn FfiCallable<E> + Send + 'static>> = vec![
             Box::from(AfcFfi::new(store.try_clone()?)),
+            Box::from(AqcFfi::new(store.try_clone()?)),
             Box::from(CryptoFfi::new(store.try_clone()?)),
             Box::from(DeviceFfi::new(device_id)),
             Box::from(EnvelopeFfi),

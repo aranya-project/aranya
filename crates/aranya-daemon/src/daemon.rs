@@ -7,7 +7,7 @@ use aranya_crypto::{
     aead::Aead, default::DefaultEngine, generic_array::GenericArray, import::Import,
     keys::SecretKeyBytes, keystore::fs_keystore::Store, CipherSuite, Random, Rng,
 };
-use aranya_daemon_api::CS;
+use aranya_daemon_api::{KeyStoreInfo, CS};
 #[cfg(feature = "afc")]
 use aranya_fast_channels::shm::{self, Flag, Mode, WriteState};
 use aranya_keygen::{KeyBundle, PublicKeys};
@@ -114,6 +114,10 @@ impl Daemon {
                     local_addr,
                     Arc::new(Mutex::new(afc)),
                     eng,
+                    KeyStoreInfo {
+                        path: self.cfg.keystore_path(),
+                        wrapped_key: self.cfg.key_wrap_key_path(),
+                    },
                     store,
                     self.cfg.uds_api_path.clone(),
                     Arc::new(pk),
@@ -128,6 +132,10 @@ impl Daemon {
                 DaemonApiServer::new(
                     client,
                     local_addr,
+                    KeyStoreInfo {
+                        path: self.cfg.keystore_path(),
+                        wrapped_key: self.cfg.key_wrap_key_path(),
+                    },
                     self.cfg.uds_api_path.clone(),
                     Arc::new(pk),
                     peers,
@@ -328,7 +336,7 @@ mod tests {
             pid_file: work_dir.join("pid"),
             sync_addr: any,
             afc: AfcConfig {
-                shm_path: "/test_daemon".to_owned(),
+                shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,
                 unlink_at_exit: true,
                 create: true,
