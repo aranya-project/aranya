@@ -3,8 +3,8 @@
 use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
 
 use anyhow::{bail, Context, Result};
+use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Rng};
-use aranya_fast_channels::Label;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
@@ -459,9 +459,10 @@ where
 
     /// Defines an AFC label.
     #[instrument(skip(self), fields(label = %label))]
-    fn define_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    #[cfg(any())]
+    fn define_afc_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.define_label(i64::from(label.to_u32()))?;
+            actor.define_afc_label(i64::from(label.to_u32()))?;
             Ok(())
         })
         .in_current_span()
@@ -469,9 +470,10 @@ where
 
     /// Undefines an AFC label.
     #[instrument(skip(self), fields(label = %label))]
-    fn undefine_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    #[cfg(any())]
+    fn undefine_afc_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.undefine_label(i64::from(label.to_u32()))?;
+            actor.undefine_afc_label(i64::from(label.to_u32()))?;
             Ok(())
         })
         .in_current_span()
@@ -479,14 +481,15 @@ where
 
     /// Grants an app permission to use an AFC label.
     #[instrument(skip(self), fields(device_id = %device_id, label = %label, op = %op))]
-    fn assign_label(
+    #[cfg(any())]
+    fn assign_afc_label(
         &self,
         device_id: DeviceId,
         label: Label,
         op: ChanOp,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_label(device_id.into(), i64::from(label.to_u32()), op)?;
+            actor.assign_afc_label(device_id.into(), i64::from(label.to_u32()), op)?;
             Ok(())
         })
         .in_current_span()
@@ -494,14 +497,15 @@ where
 
     /// Revokes an AFC label.
     #[instrument(skip(self), fields(device_id = %device_id, label = %label))]
-    fn revoke_label(
+    #[cfg(any())]
+    fn revoke_afc_label(
         &self,
         device_id: DeviceId,
         label: Label,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         info!(%device_id, %label, "revoking AFC label");
         self.with_actor(move |actor| {
-            actor.revoke_label(device_id.into(), i64::from(label.to_u32()))?;
+            actor.revoke_afc_label(device_id.into(), i64::from(label.to_u32()))?;
             Ok(())
         })
         .in_current_span()
@@ -509,7 +513,7 @@ where
 
     /// Sets an AFC network name.
     #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn set_afc_network_name(
         &self,
         device_id: DeviceId,
@@ -525,7 +529,7 @@ where
 
     /// Sets an AFC network name.
     #[instrument(skip(self), fields(device_id = %device_id))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn unset_afc_network_name(
         &self,
         device_id: DeviceId,
@@ -533,6 +537,56 @@ where
         info!(%device_id, "unsetting AFC network name");
         self.with_actor(move |actor| {
             actor.unset_afc_network_name(device_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Create a label.
+    #[instrument(skip(self), fields(name = %name))]
+    fn create_label(&self, name: String) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.create_label(name)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Delete a label.
+    #[instrument(skip(self), fields(label_id = %label_id))]
+    fn delete_label(&self, label_id: LabelId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.delete_label(label_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Assigns a label to a device.
+    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id, op = %op))]
+    fn assign_label(
+        &self,
+        device_id: DeviceId,
+        label_id: LabelId,
+        op: ChanOp,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.assign_label(device_id.into(), label_id.into(), op)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Revokes a label.
+    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id))]
+    fn revoke_label(
+        &self,
+        device_id: DeviceId,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        info!(%device_id, %label_id, "revoking AQC label");
+        self.with_actor(move |actor| {
+            actor.revoke_label(device_id.into(), label_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -569,7 +623,7 @@ where
 
     /// Creates a bidirectional AFC channel.
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn create_afc_bidi_channel(
         &self,
         peer_id: DeviceId,
@@ -582,10 +636,74 @@ where
         .in_current_span()
     }
 
+    /// Creates a bidirectional AQC channel off graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self), fields(peer_id = %peer_id, label = %label_id))]
+    fn create_aqc_bidi_channel_off_graph(
+        &self,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "create_aqc_bidi_channel",
+            args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Creates a unidirectional AQC channel.
+    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
+    fn create_aqc_uni_channel(
+        &self,
+        seal_id: DeviceId,
+        open_id: DeviceId,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.create_aqc_uni_channel(seal_id.into(), open_id.into(), label_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Creates a unidirectional AQC channel.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
+    fn create_aqc_uni_channel_off_graph(
+        &self,
+        seal_id: DeviceId,
+        open_id: DeviceId,
+        label: LabelId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "create_aqc_uni_channel",
+            args: Cow::Owned(vec![
+                Value::from(seal_id),
+                Value::from(open_id),
+                Value::from(label),
+            ]),
+        })
+        .in_current_span()
+    }
+
+    /// Creates a bidirectional AQC channel.
+    #[instrument(skip(self), fields(peer_id = %peer_id, label_id = %label_id))]
+    fn create_aqc_bidi_channel(
+        &self,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.create_aqc_bidi_channel(peer_id.into(), label_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
     /// Creates a bidirectional AFC channel off graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn create_afc_bidi_channel_off_graph(
         &self,
         peer_id: DeviceId,
@@ -603,7 +721,7 @@ where
 
     /// Creates a unidirectional AFC channel.
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn create_afc_uni_channel(
         &self,
         seal_id: DeviceId,
@@ -624,7 +742,7 @@ where
     /// Creates a unidirectional AFC channel.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
-    #[cfg(feature = "afc")]
+    #[cfg(any())]
     fn create_afc_uni_channel_off_graph(
         &self,
         seal_id: DeviceId,
@@ -686,12 +804,27 @@ where
     /// Query device label assignments off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_device_label_assignments_off_graph(
+    fn query_label_assignments_off_graph(
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_device_label_assignments",
+            name: "query_label_assignments",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query device AFC label assignments off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    #[cfg(any())]
+    fn query_device_afc_label_assignments_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_device_afc_label_assignments",
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
         .in_current_span()
@@ -700,6 +833,7 @@ where
     /// Query AFC net identifier off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
+    #[cfg(any())]
     fn query_afc_net_identifier_off_graph(
         &self,
         device_id: DeviceId,
@@ -730,11 +864,39 @@ where
     #[instrument(skip(self))]
     fn query_label_exists_off_graph(
         &self,
-        label: Label,
+        label_id: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
             name: "query_label_exists",
+            args: Cow::Owned(vec![Value::from(label_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query AFC label exists off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    #[cfg(any())]
+    fn query_afc_label_exists_off_graph(
+        &self,
+        label: Label,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_afc_label_exists",
             args: Cow::Owned(vec![Value::from(i64::from(label.to_u32()))]),
+        })
+        .in_current_span()
+    }
+
+    /// Query labels off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_labels_off_graph(
+        &self,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_labels",
+            args: Cow::Owned(vec![]),
         })
         .in_current_span()
     }
