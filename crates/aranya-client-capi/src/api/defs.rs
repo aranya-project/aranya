@@ -555,10 +555,9 @@ pub fn key_bundle_deserialize(
     buf_len: &mut usize,
 ) -> Result<KeyBundle, imp::Error> {
     let input = aranya_capi_core::try_as_mut_slice!(buf, *buf_len);
-    // TODO: don't use vec for this.
-    let mut data: Vec<u8> = Vec::new();
+    let mut data: Vec<u8> = Vec::with_capacity(*buf_len);
     for src in input.iter_mut() {
-        // SAFETY: todo
+        // SAFETY: Must trust caller provides valid ptr/len.
         unsafe { data.push(src.assume_init_read() as u8) };
     }
     let kb = postcard::from_bytes(&data)?;
