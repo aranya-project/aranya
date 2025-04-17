@@ -41,10 +41,10 @@ impl From<&SyncPeerConfig> for aranya_client::client::SyncPeerConfig {
 #[aranya_capi_core::opaque(size = 40, align = 8)]
 /// Configuration info for Aranya
 pub struct ClientConfig {
-    pub daemon_addr: *const c_char,
+    pub(crate) daemon_addr: *const c_char,
     #[cfg(feature = "afc")]
-    pub afc: AfcConfig,
-    pub aqc: AqcConfig,
+    afc: AfcConfig,
+    aqc: AqcConfig,
 }
 
 impl Typed for ClientConfig {
@@ -56,13 +56,27 @@ impl Typed for ClientConfig {
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 /// Builder for a [`ClientConfig`]
 pub struct ClientConfigBuilder {
-    pub daemon_addr: *const c_char,
+    daemon_addr: *const c_char,
     #[cfg(feature = "afc")]
-    pub(crate) afc: Option<AfcConfig>,
-    pub(crate) aqc: Option<AqcConfig>,
+    afc: Option<AfcConfig>,
+    aqc: Option<AqcConfig>,
+}
+
+impl Typed for ClientConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
 }
 
 impl ClientConfigBuilder {
+    /// Set the address for the daemon
+    pub fn daemon_addr(&mut self, addr: *const c_char) {
+        self.daemon_addr = addr;
+    }
+
+    /// Set the config to be used for AQC
+    pub fn aqc(&mut self, cfg: AqcConfig) {
+        self.aqc = Some(cfg);
+    }
+
     /// Attempts to construct a [`ClientConfig`], returning an [`Error::Bug`](super::Error::Bug) if
     /// there are invalid parameters.
     pub fn build(self) -> Result<ClientConfig, super::Error> {
@@ -86,6 +100,17 @@ impl ClientConfigBuilder {
             afc,
             aqc,
         })
+    }
+}
+
+impl Default for ClientConfigBuilder {
+    fn default() -> Self {
+        Self {
+            daemon_addr: std::ptr::null(),
+            aqc: None,
+            #[cfg(feature = "afc")]
+            afc: None,
+        }
     }
 }
 
@@ -199,7 +224,7 @@ impl AfcConfigBuilder {
 /// Configuration info for Aranya Fast Channels
 pub struct AqcConfig {
     /// Address to bind AQC server to.
-    pub(crate) addr: *const c_char,
+    addr: *const c_char,
 }
 
 impl Typed for AqcConfig {
@@ -211,10 +236,19 @@ impl Typed for AqcConfig {
 /// Builder for an [`AqcConfig`]
 pub struct AqcConfigBuilder {
     /// Address to bind AQC server to.
-    pub(crate) addr: *const c_char,
+    addr: *const c_char,
+}
+
+impl Typed for AqcConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x227DFCA0);
 }
 
 impl AqcConfigBuilder {
+    /// Set the Address to bind AQC server to
+    pub fn addr(&mut self, addr: *const c_char) {
+        self.addr = addr;
+    }
+
     /// Attempts to construct an [`AqcConfig`], returning an [`Error::Bug`](super::Error::Bug) if
     /// there are invalid parameters.
     pub fn build(self) -> Result<AqcConfig, super::Error> {
@@ -223,5 +257,13 @@ impl AqcConfigBuilder {
         }
 
         Ok(AqcConfig { addr: self.addr })
+    }
+}
+
+impl Default for AqcConfigBuilder {
+    fn default() -> Self {
+        Self {
+            addr: std::ptr::null(),
+        }
     }
 }

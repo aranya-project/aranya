@@ -590,6 +590,46 @@ AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerCon
                                                         struct AranyaExtError *__ext_err);
 
 /**
+ * Initializes `AranyaAqcConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaAqcConfigBuilder
+ */
+AranyaError aranya_aqc_config_builder_init(struct AranyaAqcConfigBuilder *out);
+
+/**
+ * Initializes `AranyaAqcConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaAqcConfigBuilder
+ */
+AranyaError aranya_aqc_config_builder_init_ext(struct AranyaAqcConfigBuilder *out,
+                                               struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_aqc_config_builder_init`.
+ *
+ * @relates AranyaAqcConfigBuilder
+ */
+AranyaError aranya_aqc_config_builder_cleanup(struct AranyaAqcConfigBuilder *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_aqc_config_builder_init`.
+ *
+ * @relates AranyaAqcConfigBuilder
+ */
+AranyaError aranya_aqc_config_builder_cleanup_ext(struct AranyaAqcConfigBuilder *ptr,
+                                                  struct AranyaExtError *__ext_err);
+
+/**
  * Sets the address that the AQC server should bind to for listening.
  *
  * @param cfg a pointer to the aqc config builder
@@ -628,6 +668,46 @@ AranyaError aranya_aqc_config_builder_build(struct AranyaAqcConfigBuilder *cfg,
 AranyaError aranya_aqc_config_builder_build_ext(struct AranyaAqcConfigBuilder *cfg,
                                                 struct AranyaAqcConfig *out,
                                                 struct AranyaExtError *__ext_err);
+
+/**
+ * Initializes `AranyaClientConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaClientConfigBuilder
+ */
+AranyaError aranya_client_config_builder_init(struct AranyaClientConfigBuilder *out);
+
+/**
+ * Initializes `AranyaClientConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaClientConfigBuilder
+ */
+AranyaError aranya_client_config_builder_init_ext(struct AranyaClientConfigBuilder *out,
+                                                  struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_client_config_builder_init`.
+ *
+ * @relates AranyaClientConfigBuilder
+ */
+AranyaError aranya_client_config_builder_cleanup(struct AranyaClientConfigBuilder *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_client_config_builder_init`.
+ *
+ * @relates AranyaClientConfigBuilder
+ */
+AranyaError aranya_client_config_builder_cleanup_ext(struct AranyaClientConfigBuilder *ptr,
+                                                     struct AranyaExtError *__ext_err);
 
 /**
  * Sets the daemon address that the Client should try to connect to.
@@ -676,7 +756,7 @@ AranyaError aranya_client_config_builder_build_ext(struct AranyaClientConfigBuil
  * @param aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
  */
 AranyaError aranya_client_config_builder_set_aqc_config(struct AranyaClientConfigBuilder *cfg,
-                                                        struct AranyaAqcConfig *aqc_config);
+                                                        const struct AranyaAqcConfig *aqc_config);
 
 /**
  * Sets the configuration for Aranya QUIC Channels.
@@ -685,7 +765,7 @@ AranyaError aranya_client_config_builder_set_aqc_config(struct AranyaClientConfi
  * @param aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
  */
 AranyaError aranya_client_config_builder_set_aqc_config_ext(struct AranyaClientConfigBuilder *cfg,
-                                                            struct AranyaAqcConfig *aqc_config,
+                                                            const struct AranyaAqcConfig *aqc_config,
                                                             struct AranyaExtError *__ext_err);
 
 /**

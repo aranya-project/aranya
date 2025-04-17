@@ -588,15 +588,16 @@ pub fn client_config_builder_set_afc_config(
 pub type AqcConfig = Safe<imp::AqcConfig>;
 
 /// Configuration info builder for Aranya QUIC Channels.
+#[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 24, align = 8)]
-pub type AqcConfigBuilder = imp::AqcConfigBuilder;
+pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
 
 /// Sets the address that the AQC server should bind to for listening.
 ///
 /// @param cfg a pointer to the aqc config builder
 /// @param address a string with the address to bind to
 pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *const c_char) {
-    cfg.addr = address;
+    cfg.addr(address);
 }
 
 /// Attempts to construct an [`AqcConfig`], returning an `Error::Bug`
@@ -617,8 +618,9 @@ pub fn aqc_config_builder_build(
 pub type ClientConfig = Safe<imp::ClientConfig>;
 
 /// Configuration info builder for Aranya.
+#[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 56, align = 8)]
-pub type ClientConfigBuilder = imp::ClientConfigBuilder;
+pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
 
 /// Sets the daemon address that the Client should try to connect to.
 ///
@@ -628,7 +630,7 @@ pub fn client_config_builder_set_daemon_addr(
     cfg: &mut ClientConfigBuilder,
     address: *const c_char,
 ) {
-    cfg.daemon_addr = address;
+    cfg.daemon_addr(address);
 }
 
 /// Attempts to construct a [`ClientConfig`], returning an `Error::Bug`
@@ -648,11 +650,8 @@ pub fn client_config_builder_build(
 ///
 /// @param cfg a pointer to the client config builder
 /// @param aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
-pub fn client_config_builder_set_aqc_config(
-    cfg: &mut ClientConfigBuilder,
-    aqc_config: &mut AqcConfig,
-) {
-    cfg.aqc = Some(**aqc_config);
+pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
+    cfg.aqc(**aqc_config);
 }
 
 /// Initializes a new client instance.
