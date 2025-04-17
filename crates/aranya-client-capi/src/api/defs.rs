@@ -479,7 +479,7 @@ impl From<Duration> for std::time::Duration {
 /// Public Key bundle for a device.
 #[repr(C)]
 #[must_use]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct KeyBundle {
     /// Public identity key.
     pub ident_key: *const u8,
@@ -577,6 +577,14 @@ pub fn key_bundle_deserialize(buf: &[u8]) -> Result<KeyBundle, imp::Error> {
     let kb = postcard::from_bytes(buf)?;
 
     Ok(KeyBundle::from_underlying(kb))
+}
+
+// TODO: for testing only
+/// Compare serialized key bundle to device key bundle
+pub fn cmp_key_bundle(client: &mut Client, buf: &[u8]) -> Result<bool, imp::Error> {
+    let kb1 = get_key_bundle(client)?;
+    let kb2 = key_bundle_deserialize(buf)?;
+    Ok(kb1 == kb2)
 }
 
 /// Configuration info for Aranya Fast Channels.

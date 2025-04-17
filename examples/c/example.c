@@ -224,10 +224,16 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 
     printf("serialized key bundle into %zu bytes\r\n", buf_len);
 
+    bool eq;
+    err = aranya_cmp_key_bundle(&c->client, buf, buf_len, &eq);
+    CLIENT_EXPECT("error comparing key bundle", c->name, err);
+    printf("are keybundles equal? %s\r\n", eq ? "true" : "false");
+
     err = aranya_key_bundle_deserialize(buf, buf_len, &c->pk);
     CLIENT_EXPECT("error deserializing key bundle", c->name, err);
 
     printf("deserialized key bundle from %zu bytes\r\n", buf_len);
+
     free(buf);
 
     return ARANYA_ERROR_SUCCESS;

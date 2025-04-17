@@ -669,6 +669,23 @@ AranyaError aranya_key_bundle_deserialize_ext(const uint8_t *buf,
                                               struct AranyaExtError *__ext_err);
 
 /**
+ * Compare serialized key bundle to device key bundle
+ */
+AranyaError aranya_cmp_key_bundle(struct AranyaClient *client,
+                                  const uint8_t *buf,
+                                  size_t buf_len,
+                                  bool *__output);
+
+/**
+ * Compare serialized key bundle to device key bundle
+ */
+AranyaError aranya_cmp_key_bundle_ext(struct AranyaClient *client,
+                                      const uint8_t *buf,
+                                      size_t buf_len,
+                                      bool *__output,
+                                      struct AranyaExtError *__ext_err);
+
+/**
  * Sets the address that the AQC server should bind to for listening.
  *
  * @param cfg a pointer to the aqc config builder
