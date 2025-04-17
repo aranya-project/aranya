@@ -43,7 +43,7 @@ impl From<&SyncPeerConfig> for aranya_client::client::SyncPeerConfig {
 pub struct ClientConfig {
     pub(crate) daemon_addr: *const c_char,
     #[cfg(feature = "afc")]
-    afc: AfcConfig,
+    pub(crate) afc: AfcConfig,
     aqc: AqcConfig,
 }
 
@@ -75,6 +75,12 @@ impl ClientConfigBuilder {
     /// Set the config to be used for AQC
     pub fn aqc(&mut self, cfg: AqcConfig) {
         self.aqc = Some(cfg);
+    }
+
+    #[cfg(feature = "afc")]
+    /// Set the config to be used for AFC
+    pub fn afc(&mut self, cfg: AfcConfig) {
+        self.afc = Some(cfg);
     }
 
     /// Attempts to construct a [`ClientConfig`], returning an [`Error::Bug`](super::Error::Bug) if

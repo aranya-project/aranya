@@ -580,7 +580,7 @@ pub fn client_config_builder_set_afc_config(
     cfg: &mut ClientConfigBuilder,
     afc_config: &mut AfcConfig,
 ) {
-    cfg.afc = Some(**afc_config);
+    cfg.afc(**afc_config);
 }
 
 /// Configuration info for Aranya QUIC Channels.
@@ -619,7 +619,7 @@ pub type ClientConfig = Safe<imp::ClientConfig>;
 
 /// Configuration info builder for Aranya.
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 56, align = 8)]
+#[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
 
 /// Sets the daemon address that the Client should try to connect to.
