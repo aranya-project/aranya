@@ -581,11 +581,14 @@ pub fn key_bundle_deserialize(buf: &[u8]) -> Result<KeyBundle, imp::Error> {
 
 // TODO: for testing only
 /// Compare serialized key bundle to device key bundle
-pub fn cmp_key_bundle(client: &mut Client, buf: &[u8]) -> Result<bool, imp::Error> {
-    let kb1 = get_key_bundle(client)?;
+pub unsafe fn cmp_key_bundle(client: &mut Client, buf: &[u8]) -> Result<bool, imp::Error> {
+    // SAFETY: Must trust caller provides valid keybundle.
+    let kb1 = unsafe { get_key_bundle(client)?.as_underlying() };
     debug!("{:?}", kb1);
-    let kb2 = key_bundle_deserialize(buf)?;
+    // SAFETY: Must trust caller provides valid keybundle.
+    let kb2: aranya_daemon_api::KeyBundle = unsafe { key_bundle_deserialize(buf)?.as_underlying() };
     debug!("{:?}", kb2);
+
     Ok(kb1 == kb2)
 }
 
