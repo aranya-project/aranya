@@ -766,7 +766,7 @@ AranyaError aranya_client_init_ext(struct AranyaClient *client,
  * Gets the public key bundle for this device.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param keybundle keybundle byte buffer [`KeyBundle`].
+ * @param keybundle keybundle byte buffer `KeyBundle`.
  * @param keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
@@ -779,7 +779,7 @@ AranyaError aranya_get_key_bundle(struct AranyaClient *client,
  * Gets the public key bundle for this device.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param keybundle keybundle byte buffer [`KeyBundle`].
+ * @param keybundle keybundle byte buffer `KeyBundle`.
  * @param keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
@@ -1024,7 +1024,7 @@ AranyaError aranya_close_team_ext(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param keybundle serialized keybundle byte buffer [`KeyBundle`].
+ * @param keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param keybundle_len is the length of the serialized keybundle.
  *
  * @relates AranyaClient.
@@ -1041,7 +1041,7 @@ AranyaError aranya_add_device_to_team(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param keybundle serialized keybundle byte buffer [`KeyBundle`].
+ * @param keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param keybundle_len is the length of the serialized keybundle.
  *
  * @relates AranyaClient.
@@ -1612,7 +1612,7 @@ AranyaError aranya_id_from_str(const char *str, struct AranyaId *__output);
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param keybundle keybundle byte buffer [`KeyBundle`].
+ * @param keybundle keybundle byte buffer `KeyBundle`.
  * @param keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
@@ -1629,7 +1629,7 @@ AranyaError aranya_query_device_keybundle(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param keybundle keybundle byte buffer [`KeyBundle`].
+ * @param keybundle keybundle byte buffer `KeyBundle`.
  * @param keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
