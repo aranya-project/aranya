@@ -591,14 +591,40 @@ AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerCon
                                                         struct AranyaExtError *__ext_err);
 
 /**
- * Returns serialized bytes of a key bundle.
+ * Serializes the KeyBundle and writes the bytes to the output buffer.
+ *
+ * The buffer must have enough memory allocated to it to store the serialized KeyBundle.
+ * The exact size depends on the the underlying cipher-suite.
+ * Starting with a buffer size of 256 bytes will work for the default cipher-suite.
+ *
+ * If the buffer does not have enough space, a `::ARANYA_ERROR_BUFFER_TOO_SMALL` error will be returned.
+ * This gives the caller the opportunity to allocate a larger buffer and try again.
+ *
+ * @param keybundle KeyBundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param buf keybundle byte buffer [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param buf_len returns the length of the serialized keybundle.
+ *
+ * @relates KeyBundle.
  */
 AranyaError aranya_key_bundle_serialize(const struct AranyaKeyBundle *keybundle,
                                         uint8_t *buf,
                                         size_t *buf_len);
 
 /**
- * Returns serialized bytes of a key bundle.
+ * Serializes the KeyBundle and writes the bytes to the output buffer.
+ *
+ * The buffer must have enough memory allocated to it to store the serialized KeyBundle.
+ * The exact size depends on the the underlying cipher-suite.
+ * Starting with a buffer size of 256 bytes will work for the default cipher-suite.
+ *
+ * If the buffer does not have enough space, a `::ARANYA_ERROR_BUFFER_TOO_SMALL` error will be returned.
+ * This gives the caller the opportunity to allocate a larger buffer and try again.
+ *
+ * @param keybundle KeyBundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param buf keybundle byte buffer [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param buf_len returns the length of the serialized keybundle.
+ *
+ * @relates KeyBundle.
  */
 AranyaError aranya_key_bundle_serialize_ext(const struct AranyaKeyBundle *keybundle,
                                             uint8_t *buf,
@@ -607,6 +633,17 @@ AranyaError aranya_key_bundle_serialize_ext(const struct AranyaKeyBundle *keybun
 
 /**
  * Converts serialized bytes into a key bundle.
+ *
+ * The KeyBundle buffer is expected to have been serialized with `aranya_key_bundle_serialize()`.
+ * The buffer pointer and length must correspond to a valid buffer allocated by the caller.
+ *
+ * @param buf serialized keybundle byte buffer [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param buf_len is the length of the serialized keybundle.
+ *
+ * Output params:
+ * @param keybundle KeyBundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ *
+ * @relates KeyBundle.
  */
 AranyaError aranya_key_bundle_deserialize(uint8_t *buf,
                                           size_t buf_len,
@@ -614,6 +651,17 @@ AranyaError aranya_key_bundle_deserialize(uint8_t *buf,
 
 /**
  * Converts serialized bytes into a key bundle.
+ *
+ * The KeyBundle buffer is expected to have been serialized with `aranya_key_bundle_serialize()`.
+ * The buffer pointer and length must correspond to a valid buffer allocated by the caller.
+ *
+ * @param buf serialized keybundle byte buffer [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param buf_len is the length of the serialized keybundle.
+ *
+ * Output params:
+ * @param keybundle KeyBundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ *
+ * @relates KeyBundle.
  */
 AranyaError aranya_key_bundle_deserialize_ext(uint8_t *buf,
                                               size_t buf_len,

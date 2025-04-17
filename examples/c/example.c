@@ -211,9 +211,15 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     CLIENT_EXPECT("error getting key bundle", c->name, err);
 
     // test postcard serialization/deserialization of key bundle.
-    size_t buf_len = 255;
-    uint8_t *buf   = malloc(buf_len);
-    err            = aranya_key_bundle_serialize(&c->pk, buf, &buf_len);
+    size_t buf_len =
+        10; // intentionally set to small size to show reallocation.
+    uint8_t *buf = malloc(buf_len);
+    err          = aranya_key_bundle_serialize(&c->pk, buf, &buf_len);
+    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        printf("reallocating key bundle buffer\r\n");
+        buf = realloc(buf, buf_len);
+        err = aranya_key_bundle_serialize(&c->pk, buf, &buf_len);
+    }
     CLIENT_EXPECT("error serializing key bundle", c->name, err);
 
     printf("serialized key bundle into %zu bytes\r\n", buf_len);
@@ -222,6 +228,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     CLIENT_EXPECT("error deserializing key bundle", c->name, err);
 
     printf("deserialized key bundle from %zu bytes\r\n", buf_len);
+    free(buf);
 
     return ARANYA_ERROR_SUCCESS;
 }
