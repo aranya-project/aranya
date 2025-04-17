@@ -541,6 +541,7 @@ pub fn key_bundle_serialize(
     }
     let out = aranya_capi_core::try_as_mut_slice!(buf, *buf_len);
     for (dst, src) in out.iter_mut().zip(&data) {
+        // TODO: cast warning
         dst.write(*src as i8);
     }
     *buf_len = data.len();
@@ -558,6 +559,7 @@ pub fn key_bundle_deserialize(
     let input = aranya_capi_core::try_as_mut_slice!(buf, buf_len);
     let mut data: Vec<u8> = Vec::with_capacity(buf_len);
     for src in input.iter_mut() {
+        // TODO: cast warning
         // SAFETY: Must trust caller provides valid ptr/len.
         unsafe { data.push(src.assume_init_read() as u8) };
     }
