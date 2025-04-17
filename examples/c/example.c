@@ -219,7 +219,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 
     printf("serialized key bundle into %zu bytes\r\n", buf_len);
 
-    err = aranya_key_bundle_deserialize(buf, &buf_len, &c->pk);
+    err = aranya_key_bundle_deserialize(buf, buf_len, &c->pk);
     CLIENT_EXPECT("error deserializing key bundle", c->name, err);
 
     printf("deserialized key bundle from %zu bytes\r\n", buf_len);

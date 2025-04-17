@@ -552,10 +552,11 @@ pub fn key_bundle_serialize(
 // TODO: docs
 pub fn key_bundle_deserialize(
     buf: &mut MaybeUninit<c_char>,
-    buf_len: &mut usize,
+    buf_len: usize,
 ) -> Result<KeyBundle, imp::Error> {
-    let input = aranya_capi_core::try_as_mut_slice!(buf, *buf_len);
-    let mut data: Vec<u8> = Vec::with_capacity(*buf_len);
+    // TODO: try_as_slice once marked as unsafe
+    let input = aranya_capi_core::try_as_mut_slice!(buf, buf_len);
+    let mut data: Vec<u8> = Vec::with_capacity(buf_len);
     for src in input.iter_mut() {
         // SAFETY: Must trust caller provides valid ptr/len.
         unsafe { data.push(src.assume_init_read() as u8) };

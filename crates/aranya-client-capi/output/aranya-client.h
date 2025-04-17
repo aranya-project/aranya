@@ -609,14 +609,14 @@ AranyaError aranya_key_bundle_serialize_ext(const struct AranyaKeyBundle *keybun
  * Converts serialized bytes into a key bundle.
  */
 AranyaError aranya_key_bundle_deserialize(char *buf,
-                                          size_t *buf_len,
+                                          size_t buf_len,
                                           struct AranyaKeyBundle *__output);
 
 /**
  * Converts serialized bytes into a key bundle.
  */
 AranyaError aranya_key_bundle_deserialize_ext(char *buf,
-                                              size_t *buf_len,
+                                              size_t buf_len,
                                               struct AranyaKeyBundle *__output,
                                               struct AranyaExtError *__ext_err);
 
