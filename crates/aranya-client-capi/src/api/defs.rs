@@ -1498,12 +1498,14 @@ pub unsafe fn aqc_create_bidi_channel(
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
-    let (chan_id, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
-    Ok(chan_id.into())
+    let (chan, _) = client.rt.block_on(
+        client
+            .inner
+            .aqc()
+            .create_bidi_channel(team.0, peer, label_id.0),
+    )?;
+    let aqc_id = chan.aqc_id();
+    Ok(AqcChannelId(aqc_id))
 }
 
 /// Delete a bidirectional AQC channel.

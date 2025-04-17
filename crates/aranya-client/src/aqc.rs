@@ -20,10 +20,13 @@ use aranya_daemon_api::{
 };
 use aranya_fast_channels::NodeId;
 use tarpc::context;
-use tokio::fs;
-use tracing::{debug, instrument, Instrument as _};
+use tokio::{fs, sync::mpsc};
+use tracing::{debug, info, instrument, Instrument as _};
 
-use crate::error::AqcError;
+use crate::{
+    aqc_net::{AqcBidirectionalChannel, AqcChannelType, AqcClient},
+    error::AqcError,
+};
 
 // TODO: use same generics as daemon.
 /// CE = Crypto Engine
@@ -31,16 +34,22 @@ pub(crate) type CE = DefaultEngine;
 /// KS = Key Store
 pub(crate) type KS = Store;
 
+/// NOTE: this certificate is to be used for demonstration purposes only!
+pub static CERT_PEM: &str = include_str!("./cert.pem");
+/// NOTE: this certificate is to be used for demonstration purposes only!
+pub static KEY_PEM: &str = include_str!("./key.pem");
+
 /// Sends and receives AQC messages.
 pub(crate) struct AqcChannelsImpl {
+    client: AqcClient,
+    client_sender: mpsc::Sender<AqcChannelType>,
     // TODO: add Aqc fields.
     handler: Handler<Store>,
     eng: CE,
 }
 
 impl AqcChannelsImpl {
-    /// Creates a new `AqcChannelsImpl` listening for connections on `address`.
-    #[instrument(skip_all, fields(device_id = %device_id))]
+    /// Creates a new `QuicChannelsImpl` listening for connections on `address`.
     pub(crate) async fn new(
         device_id: DeviceId,
         keystore_info: KeyStoreInfo,
@@ -58,7 +67,45 @@ impl AqcChannelsImpl {
             CE::new(&key, Rng)
         };
 
-        Ok(Self { handler, eng })
+        let (client, sender) = AqcClient::new(CERT_PEM)?;
+        Ok(Self {
+            client,
+            client_sender: sender,
+            handler,
+            eng,
+        })
+    }
+
+    /// Returns the sender for the client.
+    pub fn get_client_sender(&self) -> mpsc::Sender<AqcChannelType> {
+        self.client_sender.clone()
+    }
+
+    /// Returns the local address that AQC is bound to.
+    pub async fn local_addr(&self) -> Result<SocketAddr, AqcError> {
+        Ok(self.client.local_addr().await?)
+    }
+
+    pub async fn create_bidirectional_channel(
+        &mut self,
+        peer: NetIdentifier,
+        label_id: LabelId,
+    ) -> Result<AqcBidirectionalChannel, AqcError> {
+        let peer_addr = tokio::net::lookup_host(peer.as_ref())
+            .await
+            .map_err(anyhow::Error::new)?
+            .next()
+            .ok_or_else(|| anyhow!("No addresses found for {}", peer))?;
+
+        self.client
+            .create_bidirectional_channel(peer_addr, label_id)
+            .await
+            .map_err(AqcError::Other)
+    }
+
+    /// Receives a channel.
+    pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
+        self.client.receive_channel().await
     }
 }
 
@@ -74,8 +121,13 @@ impl<'a> AqcChannels<'a> {
     }
 
     /// Returns the address that AQC is bound to.
-    pub fn local_addr(&self) -> Result<SocketAddr, AqcError> {
-        todo!()
+    pub async fn local_addr(&self) -> Result<SocketAddr, AqcError> {
+        self.client.aqc.local_addr().await
+    }
+
+    /// Returns the sender for the client.
+    pub fn get_client_sender(&self) -> mpsc::Sender<AqcChannelType> {
+        self.client.aqc.get_client_sender()
     }
 
     /// Creates a bidirectional AQC channel with a peer.
@@ -91,8 +143,9 @@ impl<'a> AqcChannels<'a> {
         &mut self,
         team_id: TeamId,
         peer: NetIdentifier,
+        peer_addr: NetIdentifier,
         label_id: LabelId,
-    ) -> crate::Result<(AqcBidiChannelId, AqcCtrl)> {
+    ) -> crate::Result<(AqcBidirectionalChannel, AqcCtrl)> {
         debug!("creating bidi channel");
 
         let node_id: NodeId = 0.into();
@@ -127,15 +180,18 @@ impl<'a> AqcChannels<'a> {
             debug!("psk id: {:?}", psk.identity());
 
             // TODO: send ctrl msg via network.
-
+            let channel = self
+                .client
+                .aqc
+                .create_bidirectional_channel(peer_addr, label_id)
+                .await?;
             // TODO: for testing only. Send ctrl via network instead of returning.
-            return Ok((v.channel_id.into_id().into(), aqc_ctrl));
+            Ok((channel, aqc_ctrl))
+        } else {
+            Err(crate::Error::Aqc(AqcError::Other(anyhow!(
+                "unable to create uni channel"
+            ))))
         }
-
-        // TODO: clean up error-handling
-        Err(crate::Error::Aqc(AqcError::Other(anyhow!(
-            "unable to create bidi channel"
-        ))))
     }
 
     /// Creates a unidirectional AQC channel with a peer.
@@ -292,6 +348,11 @@ impl<'a> AqcChannels<'a> {
         }
 
         Ok(())
+    }
+
+    /// Waits for a peer to create an AQC channel with this client.
+    pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
+        self.client.aqc.receive_channel().await
     }
 }
 
