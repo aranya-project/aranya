@@ -594,28 +594,28 @@ AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerCon
  * Returns serialized bytes of a key bundle.
  */
 AranyaError aranya_key_bundle_serialize(const struct AranyaKeyBundle *keybundle,
-                                        char *buf,
+                                        uint8_t *buf,
                                         size_t *buf_len);
 
 /**
  * Returns serialized bytes of a key bundle.
  */
 AranyaError aranya_key_bundle_serialize_ext(const struct AranyaKeyBundle *keybundle,
-                                            char *buf,
+                                            uint8_t *buf,
                                             size_t *buf_len,
                                             struct AranyaExtError *__ext_err);
 
 /**
  * Converts serialized bytes into a key bundle.
  */
-AranyaError aranya_key_bundle_deserialize(char *buf,
+AranyaError aranya_key_bundle_deserialize(uint8_t *buf,
                                           size_t buf_len,
                                           struct AranyaKeyBundle *__output);
 
 /**
  * Converts serialized bytes into a key bundle.
  */
-AranyaError aranya_key_bundle_deserialize_ext(char *buf,
+AranyaError aranya_key_bundle_deserialize_ext(uint8_t *buf,
                                               size_t buf_len,
                                               struct AranyaKeyBundle *__output,
                                               struct AranyaExtError *__ext_err);
