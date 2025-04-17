@@ -538,9 +538,9 @@ impl KeyBundle {
 /// @param buf_len returns the length of the serialized keybundle.
 ///
 /// @relates KeyBundle.
-pub fn key_bundle_serialize(
+pub unsafe fn key_bundle_serialize(
     keybundle: &KeyBundle,
-    buf: &mut MaybeUninit<u8>,
+    buf: *mut MaybeUninit<u8>,
     buf_len: &mut usize,
 ) -> Result<(), imp::Error> {
     // SAFETY: Must trust caller provides valid keybundle.
@@ -551,6 +551,7 @@ pub fn key_bundle_serialize(
         *buf_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
+    // SAFETY: Must trust caller provides valid ptr/len.
     let out = aranya_capi_core::try_as_mut_slice!(buf, *buf_len);
     for (dst, src) in out.iter_mut().zip(&data) {
         dst.write(*src);
@@ -573,17 +574,9 @@ pub fn key_bundle_serialize(
 ///
 /// @relates KeyBundle.
 pub fn key_bundle_deserialize(
-    buf: &mut MaybeUninit<u8>,
-    buf_len: usize,
+    buf: &[u8],
 ) -> Result<KeyBundle, imp::Error> {
-    // TODO: try_as_slice once marked as unsafe
-    let input = aranya_capi_core::try_as_mut_slice!(buf, buf_len);
-    let mut data = Vec::with_capacity(buf_len);
-    for src in input.iter_mut() {
-        // SAFETY: Must trust caller provides valid ptr/len.
-        unsafe { data.push(src.assume_init_read()) };
-    }
-    let kb = postcard::from_bytes(&data)?;
+    let kb = postcard::from_bytes(buf)?;
 
     Ok(KeyBundle::from_underlying(kb))
 }

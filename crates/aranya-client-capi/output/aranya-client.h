@@ -645,7 +645,7 @@ AranyaError aranya_key_bundle_serialize_ext(const struct AranyaKeyBundle *keybun
  *
  * @relates KeyBundle.
  */
-AranyaError aranya_key_bundle_deserialize(uint8_t *buf,
+AranyaError aranya_key_bundle_deserialize(const uint8_t *buf,
                                           size_t buf_len,
                                           struct AranyaKeyBundle *__output);
 
@@ -663,7 +663,7 @@ AranyaError aranya_key_bundle_deserialize(uint8_t *buf,
  *
  * @relates KeyBundle.
  */
-AranyaError aranya_key_bundle_deserialize_ext(uint8_t *buf,
+AranyaError aranya_key_bundle_deserialize_ext(const uint8_t *buf,
                                               size_t buf_len,
                                               struct AranyaKeyBundle *__output,
                                               struct AranyaExtError *__ext_err);
