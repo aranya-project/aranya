@@ -187,6 +187,9 @@ impl DaemonApiServer {
     }
 }
 
+/// A mapping of `Net ID <=> Device ID`, separated by `Graph ID`.
+type PeerMap = Arc<Mutex<BTreeMap<GraphId, BiBTreeMap<api::NetIdentifier, DeviceId>>>>;
+
 #[derive(Clone)]
 struct DaemonApiHandler {
     /// Aranya client for
@@ -206,13 +209,13 @@ struct DaemonApiHandler {
     /// AFC peers.
     #[cfg(feature = "afc")]
     #[allow(dead_code)]
-    afc_peers: Arc<Mutex<BTreeMap<GraphId, BiBTreeMap<api::NetIdentifier, DeviceId>>>>,
+    afc_peers: PeerMap,
     /// Handles AFC effects.
     #[cfg(feature = "afc")]
     #[allow(dead_code)]
     afc_handler: Arc<Mutex<Handler<Store>>>,
     /// AQC peers.
-    aqc_peers: Arc<Mutex<BTreeMap<GraphId, BiBTreeMap<api::NetIdentifier, DeviceId>>>>,
+    aqc_peers: PeerMap,
     /// An implementation of [`Engine`][crypto::Engine].
     #[cfg(feature = "afc")]
     #[allow(dead_code)]
