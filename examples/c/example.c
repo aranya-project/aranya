@@ -94,8 +94,10 @@ typedef struct {
     const char *name;
     // Pointer to Aranya client.
     AranyaClient client;
-    // Aranya client's public key bundle.
-    AranyaKeyBundle pk;
+    // Aranya client's serialized public key bundle.
+    uint8_t *pk;
+    // Aranya client's serialized public key bundle length.
+    size_t pk_len;
     // Aranya client's public id.
     AranyaDeviceId id;
 } Client;
@@ -207,34 +209,15 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     err = aranya_get_device_id(&c->client, &c->id);
     CLIENT_EXPECT("error getting device id", c->name, err);
 
-    err = aranya_get_key_bundle(&c->client, &c->pk);
-    CLIENT_EXPECT("error getting key bundle", c->name, err);
-
-    // test postcard serialization/deserialization of key bundle.
-    size_t buf_len =
-        10; // intentionally set to small size to show reallocation.
-    uint8_t *buf = malloc(buf_len);
-    err          = aranya_key_bundle_serialize(&c->pk, buf, &buf_len);
+    c->pk_len = 8; // intentionally set to small size to show reallocation
+    c->pk     = malloc(c->pk_len);
+    err       = aranya_get_key_bundle(&c->client, c->pk, &c->pk_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("reallocating key bundle buffer\r\n");
-        buf = realloc(buf, buf_len);
-        err = aranya_key_bundle_serialize(&c->pk, buf, &buf_len);
+        c->pk = realloc(c->pk, c->pk_len);
+        err   = aranya_get_key_bundle(&c->client, c->pk, &c->pk_len);
     }
-    CLIENT_EXPECT("error serializing key bundle", c->name, err);
-
-    printf("serialized key bundle into %zu bytes\r\n", buf_len);
-
-    bool eq = false;
-    err     = aranya_cmp_key_bundle(&c->client, buf, buf_len, &eq);
-    CLIENT_EXPECT("error comparing key bundle", c->name, err);
-    printf("are keybundles equal? %s\r\n", eq ? "true" : "false");
-
-    err = aranya_key_bundle_deserialize(buf, buf_len, &c->pk);
-    CLIENT_EXPECT("error deserializing key bundle", c->name, err);
-
-    printf("deserialized key bundle from %zu bytes\r\n", buf_len);
-
-    free(buf);
+    CLIENT_EXPECT("error getting key bundle", c->name, err);
 
     return ARANYA_ERROR_SUCCESS;
 }
@@ -290,6 +273,7 @@ AranyaError cleanup_team(Team *t) {
     AranyaError retErr = ARANYA_ERROR_SUCCESS;
 
     for (int i = 0; i < NUM_CLIENTS; i++) {
+        free(t->clients_arr[i].pk);
         err = aranya_client_cleanup(&t->clients_arr[i].client);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "error cleaning up %s: %s\r\n",
@@ -342,13 +326,15 @@ AranyaError run(Team *t) {
     EXPECT("error initializing team", err);
 
     // add admin to team.
-    err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
-                                    &t->clients.admin.pk);
+    err =
+        aranya_add_device_to_team(&t->clients.owner.client, &t->id,
+                                  t->clients.admin.pk, t->clients.admin.pk_len);
     EXPECT("error adding admin to team", err);
 
     // add operator to team.
     err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
-                                    &t->clients.operator.pk);
+                                    t->clients.operator.pk,
+                                    t->clients.operator.pk_len);
     EXPECT("error adding operator to team", err);
 
     // upgrade role to admin.
@@ -409,12 +395,14 @@ AranyaError run(Team *t) {
 
     // add membera to team.
     err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
-                                    &t->clients.membera.pk);
+                                    t->clients.membera.pk,
+                                    t->clients.membera.pk_len);
     EXPECT("error adding membera to team", err);
 
     // add memberb to team.
     err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
-                                    &t->clients.memberb.pk);
+                                    t->clients.memberb.pk,
+                                    t->clients.memberb.pk_len);
     EXPECT("error adding memberb to team", err);
 
     sleep(1);
@@ -505,16 +493,16 @@ AranyaError run(Team *t) {
     }
     free(devices);
 
-    AranyaKeyBundle memberb_keybundle;
-    err = aranya_query_device_keybundle(&t->clients.operator.client, &t->id,
-                                        &t->clients.memberb.id,
-                                        &memberb_keybundle);
+    size_t memberb_keybundle_len = 255;
+    uint8_t *memberb_keybundle   = malloc(memberb_keybundle_len);
+    err                          = aranya_query_device_keybundle(
+        &t->clients.operator.client, &t->id, &t->clients.memberb.id,
+        memberb_keybundle, &memberb_keybundle_len);
     EXPECT("error querying memberb key bundle", err);
     printf(
-        "%s key bundle enc_key_len %lu, sign_key_len %lu, ident_key_len %lu "
+        "%s key bundle len: %zu"
         "\r\n",
-        t->clients_arr[MEMBERB].name, memberb_keybundle.enc_key_len,
-        memberb_keybundle.sign_key_len, memberb_keybundle.ident_key_len);
+        t->clients_arr[MEMBERB].name, memberb_keybundle_len);
 
 #if defined(ENABLE_AFC)
     size_t labels_len   = BUF_LEN;
