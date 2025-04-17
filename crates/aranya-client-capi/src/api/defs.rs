@@ -667,7 +667,7 @@ pub unsafe fn client_init(
 /// Gets the public key bundle for this device.
 ///
 /// @param client the Aranya Client [`Client`].
-/// @param keybundle keybundle byte buffer [`KeyBundle`].
+/// @param keybundle keybundle byte buffer `KeyBundle`.
 /// @param keybundle_len returns the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.
@@ -837,7 +837,7 @@ pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> 
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param keybundle serialized keybundle byte buffer [`KeyBundle`].
+/// @param keybundle serialized keybundle byte buffer `KeyBundle`.
 /// @param keybundle_len is the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.
@@ -1630,7 +1630,7 @@ pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param keybundle keybundle byte buffer [`KeyBundle`].
+/// @param keybundle keybundle byte buffer `KeyBundle`.
 /// @param keybundle_len returns the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.

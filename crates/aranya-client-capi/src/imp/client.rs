@@ -17,20 +17,7 @@ impl Typed for Client {
     const TYPE_ID: TypeId = TypeId::new(0xbbafb41c);
 }
 
-/// Serializes the KeyBundle and writes the bytes to the output buffer.
-///
-/// The buffer must have enough memory allocated to it to store the serialized KeyBundle.
-/// The exact size depends on the the underlying cipher-suite.
-/// Starting with a buffer size of 256 bytes will work for the default cipher-suite.
-///
-/// If the buffer does not have enough space, a `::ARANYA_ERROR_BUFFER_TOO_SMALL` error will be returned.
-/// This gives the caller the opportunity to allocate a larger buffer and try again.
-///
-/// @param keybundle KeyBundle [`KeyBundle`].
-/// @param buf keybundle byte buffer [`KeyBundle`].
-/// @param buf_len returns the length of the serialized keybundle.
-///
-/// @relates KeyBundle.
+/// Serializes a [`KeyBundle`] into the output buffer.
 pub unsafe fn key_bundle_serialize(
     keybundle: &aranya_daemon_api::KeyBundle,
     buf: *mut MaybeUninit<u8>,
@@ -52,18 +39,7 @@ pub unsafe fn key_bundle_serialize(
     Ok(())
 }
 
-/// Converts serialized bytes into a key bundle.
-///
-/// The KeyBundle buffer is expected to have been serialized with `aranya_key_bundle_serialize()`.
-/// The buffer pointer and length must correspond to a valid buffer allocated by the caller.
-///
-/// @param buf serialized keybundle byte buffer [`KeyBundle`].
-/// @param buf_len is the length of the serialized keybundle.
-///
-/// Output params:
-/// @param keybundle KeyBundle [`KeyBundle`].
-///
-/// @relates KeyBundle.
+/// Deserializes key bundle buffer into a [`KeyBundle`].
 pub fn key_bundle_deserialize(
     buf: &[u8],
 ) -> Result<aranya_daemon_api::KeyBundle, crate::imp::Error> {
