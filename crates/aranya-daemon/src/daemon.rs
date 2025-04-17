@@ -3,7 +3,9 @@ use std::str::FromStr;
 use std::{io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
-use aranya_crypto::{default::DefaultEngine, keystore::fs_keystore::Store, Rng};
+use aranya_crypto::{
+    default::DefaultEngine, import::Import, keys::SecretKey, keystore::fs_keystore::Store, Rng,
+};
 use aranya_daemon_api::{KeyStoreInfo, CS};
 #[cfg(feature = "afc")]
 use aranya_fast_channels::shm::{self, Flag, Mode, WriteState};
@@ -18,7 +20,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
 #[cfg(feature = "afc")]
 use tracing::debug;
-use tracing::{error, info};
+use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
     api::DaemonApiServer,
@@ -66,7 +68,7 @@ impl Daemon {
         // Load keys from the keystore or generate new ones if there are no existing keys.
         let mut store = KS::open(self.cfg.keystore_path()).context("unable to open keystore")?;
         let mut eng = {
-            let key = aranya_util::load_or_gen_key(self.cfg.key_wrap_key_path()).await?;
+            let key = load_or_gen_key(self.cfg.key_wrap_key_path()).await?;
             CE::new(&key, Rng)
         };
         let pk = self.load_or_gen_public_keys(&mut eng, &mut store).await?;
@@ -256,7 +258,7 @@ impl Drop for Daemon {
     }
 }
 
-/// Tries to read JSON from `path`.
+/// Tries to read CBOR from `path`.
 async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<Option<T>> {
     match fs::read(path.as_ref()).await {
         Ok(buf) => Ok(cbor::from_reader(&buf[..])?),
@@ -265,11 +267,42 @@ async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<Op
     }
 }
 
-/// Writes `data` as JSON to `path`.
+/// Writes `data` as CBOR to `path`.
 async fn write_cbor(path: impl AsRef<Path>, data: impl Serialize) -> Result<()> {
     let mut buf = Vec::new();
     cbor::into_writer(&data, &mut buf)?;
     Ok(aranya_util::write_file(path, &buf).await?)
+}
+
+/// Loads a key from a file or generates and writes a new one.
+async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
+    pub async fn load_or_gen_key_inner<K: SecretKey>(path: &Path) -> Result<K> {
+        match fs::read(&path).await {
+            Ok(buf) => {
+                tracing::info!("loading key");
+                let key =
+                    Import::import(buf.as_slice()).context("unable to import key from file")?;
+                Ok(key)
+            }
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                tracing::info!("generating key");
+                let key = K::new(&mut Rng);
+                let bytes = key
+                    .try_export_secret()
+                    .context("unable to export new key")?;
+                aranya_util::write_file(&path, bytes.as_bytes())
+                    .await
+                    .context("unable to write key")?;
+                Ok(key)
+            }
+            Err(err) => Err(err).context("unable to read key"),
+        }
+    }
+    let path = path.as_ref();
+    load_or_gen_key_inner(path)
+        .instrument(info_span!("load_or_gen_key", ?path))
+        .await
+        .with_context(|| format!("load_or_gen_key({path:?})"))
 }
 
 #[cfg(test)]
