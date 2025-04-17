@@ -187,6 +187,7 @@ enum AranyaError
     ARANYA_ERROR_AQC,
     ARANYA_ERROR_RUNTIME,
     ARANYA_ERROR_INVALID_INDEX,
+    ARANYA_ERROR_POSTCARD,
 };
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
@@ -258,6 +259,36 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfigBuilder {
 } AranyaSyncPeerConfigBuilder;
 
 /**
+ * Public Key bundle for a device.
+ */
+typedef struct ARANYA_DESIGNATED_INIT AranyaKeyBundle {
+    /**
+     * Public identity key.
+     */
+    const uint8_t *ident_key;
+    /**
+     * Public identity key length.
+     */
+    size_t ident_key_len;
+    /**
+     * Public signing key.
+     */
+    const uint8_t *sign_key;
+    /**
+     * Public signing key length.
+     */
+    size_t sign_key_len;
+    /**
+     * Public encryption key.
+     */
+    const uint8_t *enc_key;
+    /**
+     * Public encryption key length.
+     */
+    size_t enc_key_len;
+} AranyaKeyBundle;
+
+/**
  * Configuration info builder for Aranya QUIC Channels.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAqcConfigBuilder {
@@ -304,36 +335,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfig {
      */
     uint8_t __for_size_only[56];
 } AranyaClientConfig;
-
-/**
- * Public Key bundle for a device.
- */
-typedef struct ARANYA_DESIGNATED_INIT AranyaKeyBundle {
-    /**
-     * Public identity key.
-     */
-    const uint8_t *ident_key;
-    /**
-     * Public identity key length.
-     */
-    size_t ident_key_len;
-    /**
-     * Public signing key.
-     */
-    const uint8_t *sign_key;
-    /**
-     * Public signing key length.
-     */
-    size_t sign_key_len;
-    /**
-     * Public encryption key.
-     */
-    const uint8_t *enc_key;
-    /**
-     * Public encryption key length.
-     */
-    size_t enc_key_len;
-} AranyaKeyBundle;
 
 typedef struct AranyaId {
     uint8_t bytes[ARANYA_ID_LEN];
@@ -588,6 +589,36 @@ AranyaError aranya_sync_peer_config_builder_cleanup(struct AranyaSyncPeerConfigB
  */
 AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerConfigBuilder *ptr,
                                                         struct AranyaExtError *__ext_err);
+
+/**
+ * Returns serialized bytes of a key bundle.
+ */
+AranyaError aranya_key_bundle_serialize(const struct AranyaKeyBundle *keybundle,
+                                        char *buf,
+                                        size_t *buf_len);
+
+/**
+ * Returns serialized bytes of a key bundle.
+ */
+AranyaError aranya_key_bundle_serialize_ext(const struct AranyaKeyBundle *keybundle,
+                                            char *buf,
+                                            size_t *buf_len,
+                                            struct AranyaExtError *__ext_err);
+
+/**
+ * Converts serialized bytes into a key bundle.
+ */
+AranyaError aranya_key_bundle_deserialize(char *buf,
+                                          size_t *buf_len,
+                                          struct AranyaKeyBundle *__output);
+
+/**
+ * Converts serialized bytes into a key bundle.
+ */
+AranyaError aranya_key_bundle_deserialize_ext(char *buf,
+                                              size_t *buf_len,
+                                              struct AranyaKeyBundle *__output,
+                                              struct AranyaExtError *__ext_err);
 
 /**
  * Sets the address that the AQC server should bind to for listening.

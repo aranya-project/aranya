@@ -210,6 +210,20 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     err = aranya_get_key_bundle(&c->client, &c->pk);
     CLIENT_EXPECT("error getting key bundle", c->name, err);
 
+    // test postcard serialization/deserialization of key bundle.
+    size_t buf_len = 255;
+    // TODO: uint8_t
+    char *buf = malloc(buf_len);
+    err       = aranya_key_bundle_serialize(&c->pk, buf, &buf_len);
+    CLIENT_EXPECT("error serializing key bundle", c->name, err);
+
+    printf("serialized key bundle into %zu bytes\r\n", buf_len);
+
+    err = aranya_key_bundle_deserialize(buf, &buf_len, &c->pk);
+    CLIENT_EXPECT("error deserializing key bundle", c->name, err);
+
+    printf("deserialized key bundle from %zu bytes\r\n", buf_len);
+
     return ARANYA_ERROR_SUCCESS;
 }
 

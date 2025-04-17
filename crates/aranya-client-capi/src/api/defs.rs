@@ -1,5 +1,5 @@
 use core::{ffi::c_char, ops::DerefMut, ptr, slice};
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
+use std::{ffi::OsStr, io::Read, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use tracing::debug;
@@ -70,6 +70,9 @@ pub enum Error {
 
     #[capi(msg = "invalid index")]
     InvalidIndex,
+
+    #[capi(msg = "postcard")]
+    Postcard,
 }
 
 impl From<&imp::Error> for Error {
@@ -95,6 +98,7 @@ impl From<&imp::Error> for Error {
             },
             imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::InvalidIndex(_) => Self::InvalidIndex,
+            imp::Error::Postcard(_) => Self::Postcard,
         }
     }
 }
@@ -518,6 +522,48 @@ impl KeyBundle {
             enc_key_len: encoding.len(),
         }
     }
+}
+
+/// Returns serialized bytes of a key bundle.
+// TODO: docs
+pub fn key_bundle_serialize(
+    keybundle: &KeyBundle,
+    buf: &mut MaybeUninit<c_char>,
+    buf_len: &mut usize,
+) -> Result<(), imp::Error> {
+    // SAFETY: Must trust caller provides valid keybundle.
+    let keybundle = unsafe { keybundle.as_underlying() };
+    let data = postcard::to_allocvec(&keybundle)?;
+
+    if *buf_len < data.len() {
+        *buf_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    let out = aranya_capi_core::try_as_mut_slice!(buf, *buf_len);
+    for (dst, src) in out.iter_mut().zip(&data) {
+        dst.write(*src as i8);
+    }
+    *buf_len = data.len();
+
+    Ok(())
+}
+
+/// Converts serialized bytes into a key bundle.
+// TODO: docs
+pub fn key_bundle_deserialize(
+    buf: &mut MaybeUninit<c_char>,
+    buf_len: &mut usize,
+) -> Result<KeyBundle, imp::Error> {
+    let input = aranya_capi_core::try_as_mut_slice!(buf, *buf_len);
+    // TODO: don't use vec for this.
+    let mut data: Vec<u8> = Vec::new();
+    for src in input.iter_mut() {
+        // SAFETY: todo
+        unsafe { data.push(src.assume_init_read() as u8) };
+    }
+    let kb = postcard::from_bytes(&data)?;
+
+    Ok(KeyBundle::from_underlying(kb))
 }
 
 /// Configuration info for Aranya Fast Channels.
