@@ -573,9 +573,7 @@ pub unsafe fn key_bundle_serialize(
 /// @param keybundle KeyBundle [`KeyBundle`].
 ///
 /// @relates KeyBundle.
-pub fn key_bundle_deserialize(
-    buf: &[u8],
-) -> Result<KeyBundle, imp::Error> {
+pub fn key_bundle_deserialize(buf: &[u8]) -> Result<KeyBundle, imp::Error> {
     let kb = postcard::from_bytes(buf)?;
 
     Ok(KeyBundle::from_underlying(kb))
