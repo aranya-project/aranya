@@ -667,21 +667,21 @@ pub unsafe fn client_init(
     // TODO: Clean this up.
     let daemon_socket = OsStr::from_bytes(
         // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.daemon_addr) }.to_bytes(),
+        unsafe { std::ffi::CStr::from_ptr(config.daemon_addr()) }.to_bytes(),
     )
     .as_ref();
 
     #[cfg(feature = "afc")]
     let afc_shm_path = OsStr::from_bytes(
         // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.afc.shm_path) }.to_bytes(),
+        unsafe { std::ffi::CStr::from_ptr(config.afc().shm_path) }.to_bytes(),
     )
     .as_ref();
 
     #[cfg(feature = "afc")]
     let afc_addr =
         // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.afc.addr) }
+        unsafe { std::ffi::CStr::from_ptr(config.afc().addr) }
         .to_str()?;
 
     let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
@@ -690,7 +690,7 @@ pub unsafe fn client_init(
     let inner = rt.block_on(aranya_client::Client::connect(
         daemon_socket,
         afc_shm_path,
-        config.afc.max_channels,
+        config.afc().max_channels,
         afc_addr,
     ))?;
     #[cfg(not(feature = "afc"))]

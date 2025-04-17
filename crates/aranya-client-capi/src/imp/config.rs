@@ -41,10 +41,21 @@ impl From<&SyncPeerConfig> for aranya_client::client::SyncPeerConfig {
 #[aranya_capi_core::opaque(size = 40, align = 8)]
 /// Configuration info for Aranya
 pub struct ClientConfig {
-    pub(crate) daemon_addr: *const c_char,
+    daemon_addr: *const c_char,
     #[cfg(feature = "afc")]
-    pub(crate) afc: AfcConfig,
+    afc: AfcConfig,
     aqc: AqcConfig,
+}
+
+impl ClientConfig {
+    pub(crate) fn daemon_addr(&self) -> *const c_char {
+        self.daemon_addr
+    }
+
+    #[cfg(feature = "afc")]
+    pub(crate) fn afc(&self) -> &AfcConfig {
+        &self.afc
+    }
 }
 
 impl Typed for ClientConfig {
