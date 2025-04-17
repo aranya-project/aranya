@@ -3,9 +3,10 @@ use aranya_crypto::apq::Version as AqcVersion;
 use aranya_daemon_api::AfcId;
 #[cfg(feature = "afc")]
 use aranya_fast_channels::Version;
+use thiserror::Error;
 
 /// Possible errors that could happen in the Aranya client.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 pub enum Error {
     /// Unable to connect to the daemon.
     #[error("Unable to connect to the daemon: {0}")]
@@ -38,6 +39,14 @@ pub enum Error {
         arg: &'static str,
         reason: &'static str,
     },
+
+    /// Error originating from the daemon API.
+    #[error("daemon api error: {0}")]
+    Api(aranya_daemon_api::Error),
+
+    /// Wrapper for anyhow errors.
+    #[error(transparent)]
+    Anyhow(#[from] anyhow::Error),
 }
 
 /// Possible errors that could happen when using Aranya Fast Channels.
@@ -176,6 +185,30 @@ pub enum AqcError {
     /// DNS lookup failed.
     #[error("DNS lookup failed: {0}")]
     DnsLookup(std::io::Error),
+
+    /// Failed to resolve address.
+    #[error("failed to resolve address: {0}")]
+    AddrResolution(std::io::Error),
+
+    /// Address not found.
+    #[error("address not found: {0}")]
+    AddrNotFound(String),
+
+    /// TLS configuration error.
+    #[error("TLS configuration error: {0}")]
+    TlsConfig(String),
+
+    /// IO configuration error.
+    #[error("IO configuration error: {0}")]
+    IoConfig(String),
+
+    /// Congestion controller configuration error.
+    #[error("Congestion controller configuration error: {0}")]
+    CongestionConfig(String),
+
+    /// Server start error.
+    #[error("Server start error: {0}")]
+    ServerStart(String),
 
     /// Local address failure.
     #[error("unable to get local address: {0}")]

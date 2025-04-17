@@ -2,12 +2,12 @@
 
 //! An implementation of the syncer using QUIC.
 
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
 use anyhow::Result;
-use aranya_fast_channels::Label;
+use aranya_crypto::Id;
+use aranya_daemon_api::{AqcId, LabelId};
 use bytes::Bytes;
-use heapless::Vec as HVec;
 use s2n_quic::{
     client::Connect,
     connection::{self, Handle},
@@ -15,10 +15,7 @@ use s2n_quic::{
     stream::{self, BidirectionalStream, PeerStream, ReceiveStream, SendStream},
     Client, Connection, Server,
 };
-use tokio::sync::{
-    mpsc::{self},
-    Mutex as TMutex,
-};
+use tokio::sync::mpsc::{self};
 use tracing::{debug, error};
 
 /// An error running the AQC client
@@ -45,30 +42,31 @@ pub enum AqcError {
     /// An internal AQC error.
     #[error("internal error: {0}")]
     Internal(#[from] anyhow::Error),
+    /// A std error.
+    #[error("std error: {0}")]
+    Std(#[from] Box<dyn std::error::Error>),
     /// A buggy error.
     #[error("buggy error: {0}")]
     Buggy(#[from] buggy::Bug),
 }
 
 /// Runs a server listening for quic channel requests from other peers.
-pub async fn run_channels(client: Arc<TMutex<AqcClient>>, mut server: Server) {
+pub async fn run_channels(mut server: Server, sender: mpsc::Sender<AqcChannelType>) {
     loop {
         match server.accept().await {
             Some(conn) => {
                 let (channel, (bi_sender, uni_sender)) = AqcBidirectionalChannel::new(
-                    AqcChannelID {
-                        label: Label::new(0),
-                    },
+                    LabelId::default(),
+                    AqcId::from(Id::default()),
                     conn.handle(),
                 );
-                if client
-                    .lock()
+                if sender
+                    .send(AqcChannelType::Bidirectional { channel })
                     .await
-                    .new_channels
-                    .push(AqcChannelType::Bidirectional { channel })
                     .is_err()
                 {
-                    error!("Channel full. Unable to insert channel");
+                    error!("Sender closed. Unable to send channel");
+                    return;
                 } else {
                     tokio::spawn(handle_streams(conn, bi_sender, uni_sender));
                 }
@@ -143,7 +141,7 @@ pub enum AqcChannelType {
 /// Allows sending data streams over a channel.
 #[derive(Debug)]
 pub struct AqcChannelSender {
-    id: AqcChannelID,
+    label_id: LabelId,
     handle: Handle,
 }
 
@@ -152,23 +150,23 @@ impl AqcChannelSender {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub fn new(id: AqcChannelID, handle: Handle) -> Self {
-        Self { id, handle }
+    pub fn new(label_id: LabelId, handle: Handle) -> Self {
+        Self { label_id, handle }
     }
 
-    /// Get the channel id.
-    pub fn id(&self) -> AqcChannelID {
-        self.id
+    /// Get the channel label id.
+    pub fn label_id(&self) -> LabelId {
+        self.label_id
     }
 
     /// Creates a new unidirectional stream for the channel.
-    pub async fn create_unidirectional_stream(&mut self) -> Result<AqcSendStream, AqcError> {
+    pub async fn create_unidirectional_stream(&mut self) -> Result<AqcSendStream> {
         let send = self.handle.open_send_stream().await?;
         Ok(AqcSendStream { send })
     }
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
-    pub fn close(&mut self) -> Result<(), AqcError> {
+    pub fn close(&mut self) -> Result<()> {
         const ERROR_CODE: u32 = 0;
         self.handle.close(ERROR_CODE.into());
         Ok(())
@@ -179,7 +177,7 @@ impl AqcChannelSender {
 /// Allows receiving data streams over a channel.
 #[derive(Debug)]
 pub struct AqcChannelReceiver {
-    id: AqcChannelID,
+    label_id: LabelId,
     uni_receiver: mpsc::Receiver<ReceiveStream>,
 }
 
@@ -188,21 +186,25 @@ impl AqcChannelReceiver {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub fn new(id: AqcChannelID) -> (Self, mpsc::Sender<ReceiveStream>) {
+    pub fn new(label_id: LabelId) -> (Self, mpsc::Sender<ReceiveStream>) {
         let (uni_sender, uni_receiver) = mpsc::channel(10);
-        (Self { id, uni_receiver }, uni_sender)
+        (
+            Self {
+                label_id,
+                uni_receiver,
+            },
+            uni_sender,
+        )
     }
 
     /// Get the channel id.
-    pub fn id(&self) -> AqcChannelID {
-        self.id
+    pub fn label_id(&self) -> LabelId {
+        self.label_id
     }
 
     /// Returns a unidirectional stream if one has been received.
     /// If no stream has been received return None.
-    pub async fn receive_unidirectional_stream(
-        &mut self,
-    ) -> Result<Option<AqcReceiveStream>, AqcError> {
+    pub async fn receive_unidirectional_stream(&mut self) -> Result<Option<AqcReceiveStream>> {
         match self.uni_receiver.recv().await {
             Some(stream) => Ok(Some(AqcReceiveStream { receive: stream })),
             None => Ok(None),
@@ -214,7 +216,8 @@ impl AqcChannelReceiver {
 /// Allows sending and receiving data streams over a channel.
 #[derive(Debug)]
 pub struct AqcBidirectionalChannel {
-    id: AqcChannelID,
+    label_id: LabelId,
+    aqc_id: AqcId,
     handle: Handle,
     uni_receiver: mpsc::Receiver<ReceiveStream>,
     bi_receiver: mpsc::Receiver<BidirectionalStream>,
@@ -223,7 +226,8 @@ pub struct AqcBidirectionalChannel {
 impl AqcBidirectionalChannel {
     /// Create a new bidirectional channel with the given id and conection handle.
     pub fn new(
-        id: AqcChannelID,
+        label_id: LabelId,
+        aqc_id: AqcId,
         handle: Handle,
     ) -> (
         Self,
@@ -236,7 +240,8 @@ impl AqcBidirectionalChannel {
         let (uni_sender, uni_receiver) = mpsc::channel(10);
         (
             Self {
-                id,
+                label_id,
+                aqc_id,
                 handle,
                 uni_receiver,
                 bi_receiver,
@@ -245,9 +250,14 @@ impl AqcBidirectionalChannel {
         )
     }
 
-    /// Get the channel id.
-    pub fn id(&self) -> AqcChannelID {
-        self.id
+    /// Get the channel label id.
+    pub fn label_id(&self) -> LabelId {
+        self.label_id
+    }
+
+    /// Get the aqc id.
+    pub fn aqc_id(&self) -> AqcId {
+        self.aqc_id
     }
 
     /// Returns a bidirectional stream if one has been received.
@@ -266,9 +276,7 @@ impl AqcBidirectionalChannel {
 
     /// Returns a unidirectional stream if one has been received.
     /// If no stream has been received return None.
-    pub async fn receive_unidirectional_stream(
-        &mut self,
-    ) -> Result<Option<AqcReceiveStream>, AqcError> {
+    pub async fn receive_unidirectional_stream(&mut self) -> Result<Option<AqcReceiveStream>> {
         match self.uni_receiver.recv().await {
             Some(stream) => Ok(Some(AqcReceiveStream { receive: stream })),
             None => Ok(None),
@@ -276,7 +284,7 @@ impl AqcBidirectionalChannel {
     }
 
     /// Creates a new unidirectional stream for the channel.
-    pub async fn create_unidirectional_stream(&mut self) -> Result<AqcSendStream, AqcError> {
+    pub async fn create_unidirectional_stream(&mut self) -> Result<AqcSendStream> {
         let send = self.handle.open_send_stream().await?;
         Ok(AqcSendStream { send })
     }
@@ -284,27 +292,17 @@ impl AqcBidirectionalChannel {
     /// Creates a new bidirectional stream for the channel.
     pub async fn create_bidirectional_stream(
         &mut self,
-    ) -> Result<(AqcSendStream, AqcReceiveStream), AqcError> {
+    ) -> Result<(AqcSendStream, AqcReceiveStream)> {
         let (receive, send) = self.handle.open_bidirectional_stream().await?.split();
         Ok((AqcSendStream { send }, AqcReceiveStream { receive }))
     }
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
-    pub fn close(&mut self) -> Result<(), AqcError> {
+    pub fn close(&mut self) -> Result<()> {
         const ERROR_CODE: u32 = 0;
         self.handle.close(ERROR_CODE.into());
         Ok(())
     }
-}
-
-#[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
-/// Identifies a unique Aqc channel between two peers.
-pub struct AqcChannelID {
-    // channel_id: u64,
-    // /// The node id of the peer.
-    // node_id: NodeId,
-    /// The channel label. This allows multiple channels between two peers.
-    label: Label,
 }
 
 /// Used to receive data from a peer.
@@ -319,7 +317,7 @@ impl AqcReceiveStream {
     /// This method will block until data is available to return.
     /// The data is not guaranteed to be complete, and may need to be called
     /// multiple times to receive all data from a message.
-    pub async fn receive(&mut self, target: &mut [u8]) -> Result<Option<usize>, AqcError> {
+    pub async fn receive(&mut self, target: &mut [u8]) -> Result<Option<usize>> {
         match self.receive.receive().await {
             Ok(Some(chunk)) => {
                 let len = chunk.len();
@@ -339,13 +337,13 @@ pub struct AqcSendStream {
 
 impl AqcSendStream {
     /// Send data to the given stream.
-    pub async fn send(&mut self, data: &[u8]) -> Result<(), AqcError> {
+    pub async fn send(&mut self, data: &[u8]) -> Result<()> {
         self.send.send(Bytes::copy_from_slice(data)).await?;
         Ok(())
     }
 
     /// Close the stream.
-    pub async fn close(&mut self) -> Result<(), AqcError> {
+    pub async fn close(&mut self) -> Result<()> {
         self.send.close().await?;
         Ok(())
     }
@@ -359,35 +357,46 @@ const MAXIMUM_UNRECEIVED_CHANNELS: usize = 20;
 pub struct AqcClient {
     quic_client: Client,
     /// Holds channels that have created, but not yet been received.
-    pub new_channels: HVec<AqcChannelType, MAXIMUM_UNRECEIVED_CHANNELS>,
+    receiver: mpsc::Receiver<AqcChannelType>,
 }
 
 impl AqcClient {
     /// Create an Aqc client with the given certificate chain.
-    pub fn new<T: provider::tls::Provider>(cert: T) -> Result<AqcClient, AqcError> {
+    pub fn new<T: provider::tls::Provider>(
+        cert: T,
+    ) -> Result<(AqcClient, mpsc::Sender<AqcChannelType>)> {
+        let (sender, receiver) = mpsc::channel(MAXIMUM_UNRECEIVED_CHANNELS);
         let quic_client = Client::builder()
             .with_tls(cert)?
             .with_io("0.0.0.0:0")?
             .start()?;
-        Ok(AqcClient {
-            quic_client,
-            new_channels: HVec::new(),
-        })
+        Ok((
+            AqcClient {
+                quic_client,
+                receiver,
+            },
+            sender,
+        ))
     }
 
-    /// Receive the next available channel. If no channel is available, return None.
+    /// Get the local address of the client.
+    pub async fn local_addr(&self) -> Result<SocketAddr> {
+        Ok(self.quic_client.local_addr()?)
+    }
+
+    /// Receive the next available channel. If the channel is closed, return None.
     /// This method will return a channel created by a peer that hasn't been received yet.
-    pub fn receive_channel(&mut self) -> Option<AqcChannelType> {
-        self.new_channels.pop()
+    pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
+        self.receiver.recv().await
     }
 
     /// Create a new channel to the given address.
     async fn create_channel(
         &mut self,
         addr: SocketAddr,
-        label: Label,
+        label_id: LabelId,
         direction: AqcChannelDirection,
-    ) -> Result<AqcChannelType, AqcError> {
+    ) -> Result<AqcChannelType> {
         // TODO: Create the channel in the graph.
         let mut conn = self
             .quic_client
@@ -396,11 +405,14 @@ impl AqcClient {
         conn.keep_alive(true)?;
         let channel = match direction {
             AqcChannelDirection::UNIDIRECTIONAL => AqcChannelType::Sender {
-                sender: AqcChannelSender::new(AqcChannelID { label }, conn.handle()),
+                sender: AqcChannelSender::new(label_id, conn.handle()),
             },
             AqcChannelDirection::BIDIRECTIONAL => {
-                let (channel, (bi_sender, uni_sender)) =
-                    AqcBidirectionalChannel::new(AqcChannelID { label }, conn.handle());
+                let (channel, (bi_sender, uni_sender)) = AqcBidirectionalChannel::new(
+                    label_id,
+                    AqcId::from(Id::default()),
+                    conn.handle(),
+                );
                 tokio::spawn(handle_streams(conn, bi_sender, uni_sender));
                 AqcChannelType::Bidirectional { channel }
             }
@@ -412,10 +424,10 @@ impl AqcClient {
     pub async fn create_unidirectional_channel(
         &mut self,
         addr: SocketAddr,
-        label: Label,
-    ) -> Result<AqcChannelSender, AqcError> {
+        label_id: LabelId,
+    ) -> Result<AqcChannelSender> {
         match self
-            .create_channel(addr, label, AqcChannelDirection::UNIDIRECTIONAL)
+            .create_channel(addr, label_id, AqcChannelDirection::UNIDIRECTIONAL)
             .await?
         {
             AqcChannelType::Sender { sender } => Ok(sender),
@@ -427,10 +439,10 @@ impl AqcClient {
     pub async fn create_bidirectional_channel(
         &mut self,
         addr: SocketAddr,
-        label: Label,
-    ) -> Result<AqcBidirectionalChannel, AqcError> {
+        label_id: LabelId,
+    ) -> Result<AqcBidirectionalChannel> {
         match self
-            .create_channel(addr, label, AqcChannelDirection::BIDIRECTIONAL)
+            .create_channel(addr, label_id, AqcChannelDirection::BIDIRECTIONAL)
             .await?
         {
             AqcChannelType::Bidirectional { channel } => Ok(channel),

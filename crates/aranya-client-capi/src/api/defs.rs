@@ -98,6 +98,8 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Aqc(_) => Self::Aqc,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::InvalidArg { .. } => Self::InvalidArgument,
+                aranya_client::Error::Api(_) => Self::Daemon,
+                aranya_client::Error::Anyhow(_) => Self::Bug,
             },
             imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::InvalidIndex(_) => Self::InvalidIndex,
@@ -1465,12 +1467,14 @@ pub unsafe fn aqc_create_bidi_channel(
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
-    let (chan_id, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
-    Ok(chan_id.into())
+    let (chan, _) = client.rt.block_on(
+        client
+            .inner
+            .aqc()
+            .create_bidi_channel(team.0, peer, label_id.0),
+    )?;
+    let aqc_id = chan.aqc_id();
+    Ok(AqcChannelId(aqc_id))
 }
 
 /// Delete a bidirectional AQC channel.

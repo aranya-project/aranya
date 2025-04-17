@@ -11,26 +11,28 @@
 
 #[cfg(feature = "afc")]
 use std::path::Path;
-use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
+use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
+#[cfg(feature = "afc")]
+use aranya_client::SyncPeerConfig;
 use aranya_client::{Client, SyncPeerConfig};
 use aranya_crypto::{hash::Hash as _, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},
     Daemon,
 };
+#[cfg(feature = "afc")]
+use aranya_daemon_api::ChanOp;
+#[cfg(feature = "afc")]
+use aranya_daemon_api::NetIdentifier;
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use spideroak_base58::ToBase58 as _;
+use tempfile::tempdir;
 use test_log::test;
-use tokio::{
-    fs,
-    task::{self, AbortHandle},
-    time::{self, Sleep},
-};
-use tracing::{debug, info, instrument};
+use tracing::info;
 
 #[cfg(any())]
 mod afc_imports {
@@ -381,6 +383,8 @@ impl Drop for DeviceCtx {
         self.daemon.abort();
     }
 }
+mod common;
+use common::{sleep, TeamCtx}; // Import from common
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
