@@ -711,7 +711,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     // TODO: send AQC data.
     operator_team.revoke_label(team.membera.id, label3).await?;
     operator_team.revoke_label(team.memberb.id, label3).await?;
-    operator_team.delete_label(label3).await?;
+    admin_team.delete_label(label3).await?;
 
     Ok(())
 }
