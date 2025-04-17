@@ -224,8 +224,8 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 
     printf("serialized key bundle into %zu bytes\r\n", buf_len);
 
-    bool eq;
-    err = aranya_cmp_key_bundle(&c->client, buf, buf_len, &eq);
+    bool eq = false;
+    err     = aranya_cmp_key_bundle(&c->client, buf, buf_len, &eq);
     CLIENT_EXPECT("error comparing key bundle", c->name, err);
     printf("are keybundles equal? %s\r\n", eq ? "true" : "false");
 
