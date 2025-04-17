@@ -525,18 +525,18 @@ impl KeyBundle {
 }
 
 /// Serializes the KeyBundle and writes the bytes to the output buffer.
-/// 
+///
 /// The buffer must have enough memory allocated to it to store the serialized KeyBundle.
 /// The exact size depends on the the underlying cipher-suite.
 /// Starting with a buffer size of 256 bytes will work for the default cipher-suite.
-/// 
+///
 /// If the buffer does not have enough space, a `::ARANYA_ERROR_BUFFER_TOO_SMALL` error will be returned.
 /// This gives the caller the opportunity to allocate a larger buffer and try again.
-/// 
+///
 /// @param keybundle KeyBundle [`KeyBundle`].
 /// @param buf keybundle byte buffer [`KeyBundle`].
 /// @param buf_len returns the length of the serialized keybundle.
-/// 
+///
 /// @relates KeyBundle.
 pub fn key_bundle_serialize(
     keybundle: &KeyBundle,
@@ -561,16 +561,16 @@ pub fn key_bundle_serialize(
 }
 
 /// Converts serialized bytes into a key bundle.
-/// 
+///
 /// The KeyBundle buffer is expected to have been serialized with `aranya_key_bundle_serialize()`.
 /// The buffer pointer and length must correspond to a valid buffer allocated by the caller.
-/// 
+///
 /// @param buf serialized keybundle byte buffer [`KeyBundle`].
 /// @param buf_len is the length of the serialized keybundle.
-/// 
+///
 /// Output params:
 /// @param keybundle KeyBundle [`KeyBundle`].
-/// 
+///
 /// @relates KeyBundle.
 pub fn key_bundle_deserialize(
     buf: &mut MaybeUninit<u8>,
