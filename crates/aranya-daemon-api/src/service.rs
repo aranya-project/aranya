@@ -385,9 +385,9 @@ pub trait DaemonApi {
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AqcChannelInfo)>;
     /// Delete a QUIC bidi channel.
-    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
+    async fn delete_aqc_bidi_channel(key_id: BidiAuthorSecretId) -> Result<()>;
     /// Delete a QUIC uni channel.
-    async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
+    async fn delete_aqc_uni_channel(key_id: UniAuthorSecretId) -> Result<()>;
     /// Receive AQC ctrl message.
     async fn receive_aqc_ctrl(
         team: TeamId,

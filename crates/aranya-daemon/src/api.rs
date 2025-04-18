@@ -11,8 +11,11 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use aranya_crypto::{Csprng, DeviceId, Rng};
-use aranya_daemon_api::{self as api, DaemonApi};
+use aranya_crypto::{
+    aqc::{BidiAuthorSecret, UniAuthorSecret},
+    Csprng, DeviceId, KeyStoreExt, Rng,
+};
+use aranya_daemon_api::{self as api, DaemonApi, CS};
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
 use aranya_util::Addr;
@@ -31,7 +34,7 @@ use crate::{
     aranya::Actions,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::SyncPeers,
-    Client, EF,
+    Client, CE, EF, KS,
 };
 
 #[cfg(feature = "afc")]
@@ -39,8 +42,6 @@ mod afc_imports {
     pub(super) use aranya_afc_util::Handler;
     pub(super) use aranya_crypto::keystore::fs_keystore::Store;
     pub(super) use aranya_fast_channels::shm::WriteState;
-
-    pub(super) use crate::CE;
 }
 #[cfg(feature = "afc")]
 #[allow(clippy::wildcard_imports)]
@@ -78,12 +79,12 @@ impl DaemonApiServer {
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
-        afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
+        afc: Arc<Mutex<WriteState<CS, Rng>>>,
         eng: CE,
         keystore_info: api::KeyStoreInfo,
         store: Store,
         daemon_sock: PathBuf,
-        pk: Arc<PublicKeys<api::CS>>,
+        pk: Arc<PublicKeys<CS>>,
         peers: SyncPeers,
         recv_effects: mpsc::Receiver<Vec<EF>>,
     ) -> Result<Self> {
@@ -113,12 +114,14 @@ impl DaemonApiServer {
     /// Create new RPC server.
     #[instrument(skip_all)]
     #[cfg(not(feature = "afc"))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
+        eng: CE,
         keystore_info: api::KeyStoreInfo,
         daemon_sock: PathBuf,
-        pk: Arc<PublicKeys<api::CS>>,
+        pk: Arc<PublicKeys<CS>>,
         peers: SyncPeers,
         recv_effects: mpsc::Receiver<Vec<EF>>,
     ) -> Result<Self> {
@@ -129,6 +132,7 @@ impl DaemonApiServer {
             handler: DaemonApiHandler {
                 client,
                 local_addr,
+                eng,
                 pk,
                 peers,
                 keystore_info,
@@ -190,7 +194,7 @@ struct DaemonApiHandler {
     /// Local socket address of the API.
     local_addr: SocketAddr,
     /// Public keys of current device.
-    pk: Arc<PublicKeys<api::CS>>,
+    pk: Arc<PublicKeys<CS>>,
     /// Aranya sync peers,
     peers: SyncPeers,
     /// Key store paths.
@@ -198,7 +202,7 @@ struct DaemonApiHandler {
     /// AFC shm write.
     #[cfg(feature = "afc")]
     #[allow(dead_code)]
-    afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
+    afc: Arc<Mutex<WriteState<CS, Rng>>>,
     /// AFC peers.
     #[cfg(feature = "afc")]
     #[allow(dead_code)]
@@ -210,8 +214,6 @@ struct DaemonApiHandler {
     /// AQC peers.
     aqc_peers: Arc<Mutex<BiBTreeMap<api::NetIdentifier, DeviceId>>>,
     /// An implementation of [`Engine`][crypto::Engine].
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
     eng: CE,
 }
 
@@ -786,8 +788,7 @@ impl DaemonApi for DaemonApiHandler {
             else {
                 continue;
             };
-            let encap =
-                BidiPeerEncap::<api::CS>::from_bytes(&e.encap).context("unable to get encap")?;
+            let encap = BidiPeerEncap::<CS>::from_bytes(&e.encap).context("unable to get encap")?;
             let afc_id: AfcId = encap.id().into();
             debug!(?afc_id, "processed afc ID");
             let label = Label::new(e.label.try_into().expect("expected label conversion"));
@@ -919,19 +920,23 @@ impl DaemonApi for DaemonApiHandler {
     async fn delete_aqc_bidi_channel(
         self,
         _: context::Context,
-        chan: api::AqcBidiChannelId,
-    ) -> api::Result<api::AqcCtrl> {
-        // TODO: remove AQC bidi channel from Aranya.
-        todo!();
+        key_id: aranya_crypto::aqc::BidiAuthorSecretId,
+    ) -> api::Result<()> {
+        let mut store =
+            KS::open(self.keystore_info.path.clone()).context("unable to open keystore")?;
+        let _ = store.remove_key::<CE, BidiAuthorSecret<CS>>(&mut self.eng.clone(), key_id.into());
+        Ok(())
     }
     #[instrument(skip(self))]
     async fn delete_aqc_uni_channel(
         self,
         _: context::Context,
-        chan: api::AqcUniChannelId,
-    ) -> api::Result<api::AqcCtrl> {
-        // TODO: remove AQC uni channel from Aranya.
-        todo!();
+        key_id: aranya_crypto::aqc::UniAuthorSecretId,
+    ) -> api::Result<()> {
+        let mut store =
+            KS::open(self.keystore_info.path.clone()).context("unable to open keystore")?;
+        let _ = store.remove_key::<CE, UniAuthorSecret<CS>>(&mut self.eng.clone(), key_id.into());
+        Ok(())
     }
     #[instrument(skip_all)]
     async fn receive_aqc_ctrl(

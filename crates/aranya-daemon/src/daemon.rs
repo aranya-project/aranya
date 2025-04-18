@@ -131,6 +131,7 @@ impl Daemon {
                 DaemonApiServer::new(
                     client,
                     local_addr,
+                    eng,
                     KeyStoreInfo {
                         path: self.cfg.keystore_path(),
                         wrapped_key: self.cfg.key_wrap_key_path(),
