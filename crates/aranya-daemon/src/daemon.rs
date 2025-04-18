@@ -83,6 +83,9 @@ impl Daemon {
         let pk = self
             .load_or_gen_public_keys(&mut eng, &mut root_store)
             .await?;
+        let pk = self
+            .load_or_gen_public_keys(&mut eng, &mut local_store)
+            .await?;
 
         // Initialize Aranya client.
         let (client, local_addr) = {
@@ -224,6 +227,23 @@ impl Daemon {
         eng: &mut CE,
         store: &mut KS,
     ) -> Result<PublicKeys<CS>> {
+        let path = self.cfg.key_bundle_path();
+        let bundle = match try_read_cbor(&path).await? {
+            Some(bundle) => bundle,
+            None => {
+                let bundle =
+                    KeyBundle::generate(eng, store).context("unable to generate key bundle")?;
+                info!("generated key bundle");
+                write_cbor(&path, &bundle)
+                    .await
+                    .context("unable to write `KeyBundle` to disk")?;
+                bundle
+            }
+        };
+        bundle.public_keys(eng, store)
+    }
+
+    async fn load_or_gen_public_key(&self, eng: &mut CE, store: &mut KS) -> Result<PublicKeys<CS>> {
         let path = self.cfg.key_bundle_path();
         let bundle = match try_read_cbor(&path).await? {
             Some(bundle) => bundle,

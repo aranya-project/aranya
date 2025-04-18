@@ -1,6 +1,6 @@
 //! AQC support.
 
-use std::{io, net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{io, net::SocketAddr, path::PathBuf};
 
 use anyhow::{anyhow, bail, Context};
 use aranya_aqc_util::{
@@ -9,7 +9,6 @@ use aranya_aqc_util::{
 use aranya_crypto::{
     aead::Aead,
     aqc::{BidiChannelId, BidiPeerEncap, UniChannelId, UniPeerEncap},
-    default::DefaultEngine,
     generic_array::GenericArray,
     import::Import,
     keys::SecretKeyBytes,
@@ -18,17 +17,14 @@ use aranya_crypto::{
 };
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
 use aranya_daemon_api::{
-    AqcChannelInfo::*, AqcCtrl, DeviceId, KeyStoreInfo, LabelId, NetIdentifier, TeamId, CS,
+    AqcChannelInfo::*, AqcCtrl, DeviceId, KeyStoreInfo, LabelId, NetIdentifier, TeamId, CE, CS,
 };
 use tarpc::context;
 use tokio::fs;
 use tracing::{debug, info, instrument};
 
-use crate::error::AqcError;
+use crate::error::{AqcError, IpcError};
 
-// TODO: use same generics as daemon.
-/// CE = Crypto Engine
-pub(crate) type CE = DefaultEngine;
 /// KS = Key Store
 pub(crate) type KS = Store;
 
@@ -100,7 +96,8 @@ impl<'a> AqcChannels<'a> {
             .client
             .daemon
             .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), label_id)
-            .await??;
+            .await
+            .map_err(IpcError)??;
         debug!(%label_id, "created bidi channel");
 
         let v = &aqc_info;
@@ -150,7 +147,8 @@ impl<'a> AqcChannels<'a> {
             .client
             .daemon
             .create_aqc_uni_channel(context::current(), team_id, peer.clone(), label_id)
-            .await??;
+            .await
+            .map_err(IpcError)??;
         debug!(%label_id, "created aqc uni channel");
 
         let v = &aqc_info;
@@ -188,7 +186,8 @@ impl<'a> AqcChannels<'a> {
             .client
             .daemon
             .delete_aqc_bidi_channel(context::current(), chan)
-            .await??;
+            .await
+            .map_err(IpcError)??;
         // TODO(geoff): implement this
         //self.client.aqc.remove_channel(chan).await;
         Ok(())
@@ -202,7 +201,8 @@ impl<'a> AqcChannels<'a> {
             .client
             .daemon
             .delete_aqc_uni_channel(context::current(), chan)
-            .await??;
+            .await
+            .map_err(IpcError)??;
         // TODO(geoff): implement this
         //self.client.aqc.remove_channel(chan).await;
         Ok(())
@@ -216,7 +216,8 @@ impl<'a> AqcChannels<'a> {
             .client
             .daemon
             .receive_aqc_ctrl(context::current(), team, ctrl)
-            .await??;
+            .await
+            .map_err(IpcError)??;
 
         match aqc_info {
             BidiReceived(v) => {

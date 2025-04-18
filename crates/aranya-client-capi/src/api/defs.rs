@@ -687,15 +687,12 @@ pub unsafe fn client_init(
 
     let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
 
-    #[cfg(feature = "afc")]
-    let inner = rt.block_on(aranya_client::Client::connect(
-        daemon_socket,
-        afc_shm_path,
-        config.afc.max_channels,
-        afc_addr,
-    ))?;
-    #[cfg(not(feature = "afc"))]
-    let inner = rt.block_on(aranya_client::Client::connect(daemon_socket))?;
+    let inner = rt.block_on({
+        aranya_client::Client::builder()
+            .with_uds_sock(daemon_socket)
+            .with_server_pk(&[])
+            .connect()
+    })?;
 
     Safe::init(
         client,

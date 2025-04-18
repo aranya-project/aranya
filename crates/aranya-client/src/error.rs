@@ -9,7 +9,7 @@ use aranya_fast_channels::Version;
 pub enum Error {
     /// Unable to connect to the daemon.
     #[error("Unable to connect to the daemon: {0}")]
-    Connecting(#[source] std::io::Error),
+    Connecting(#[from] std::io::Error),
 
     /// Unable to communicate with the daemon.
     #[error("Unable to communicate with the daemon: {0}")]

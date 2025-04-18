@@ -7,7 +7,7 @@ use aranya_crypto::{
     afc::{BidiChannelId as AfcBidiChannelId, UniChannelId as AfcUniChannelId},
     aqc::{self, BidiAuthorSecretId, UniAuthorSecretId},
     custom_id,
-    default::DefaultCipherSuite,
+    default::{DefaultCipherSuite, DefaultEngine},
     EncryptionKeyId, Id,
 };
 use aranya_fast_channels::{Label as AfcLabel, NodeId};
@@ -17,6 +17,8 @@ use serde::{Deserialize, Serialize};
 use spideroak_base58::ToBase58;
 use tracing::error;
 
+/// CE = Crypto Engine
+pub type CE = DefaultEngine;
 /// CS = Cipher Suite
 pub type CS = DefaultCipherSuite;
 
@@ -268,6 +270,9 @@ pub struct Label {
 
 #[tarpc::service]
 pub trait DaemonApi {
+    /// Says hello to the daemon.
+    async fn hello() -> Result<u32>;
+
     /// Gets the key store info.
     async fn get_keystore_info() -> Result<KeyStoreInfo>;
 

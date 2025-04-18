@@ -1,18 +1,14 @@
 //! Client-daemon connection.
 
-use std::{
-    io,
-    net::SocketAddr,
-    path::{Path, PathBuf},
-    time::Duration,
-};
+use core::{borrow::Borrow, net::SocketAddr, time::Duration};
+use std::{io, path::Path};
 
-use aranya_crypto::{import::Import, keystore::KeyStore};
+use aranya_crypto::{import::Import, kem::Kem, keys::PublicKey, CipherSuite, Rng};
 #[cfg(feature = "afc")]
 use aranya_daemon_api::CS;
 use aranya_daemon_api::{
-    crypto::ClientCodec, ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label,
-    LabelId, NetIdentifier, Role, TeamId,
+    self as api, crypto::LengthDelimitedCodec, ChanOp, DaemonApiClient, DeviceId, KeyBundle,
+    KeyStoreInfo, Label, LabelId, NetIdentifier, Role, TeamId, CS,
 };
 use aranya_fast_channels::Label as AfcLabel;
 #[cfg(feature = "afc")]
@@ -21,9 +17,10 @@ use aranya_fast_channels::{
     {self as afc},
 };
 use aranya_util::Addr;
-use tarpc::{context, tokio_serde::formats::Json};
+use tarpc::context;
 #[cfg(feature = "afc")]
 use tokio::net::ToSocketAddrs;
+use tokio::net::UnixStream;
 use tracing::{debug, info, instrument};
 
 #[cfg(feature = "afc")]
@@ -83,35 +80,27 @@ impl AfcLabels {
     }
 }
 
-/// Instructs [`Client`] how to connect to the daemon.
-#[derive(Debug)]
-pub struct DaemonAddr {
-    sock: PathBuf,
-}
-
-impl DaemonAddr {
-    pub fn try_from_uds_path(sock: PathBuf) -> Result<Self> {
-        Ok(Self { sock })
-    }
-}
-
 /// Builds a [`Client`].
 pub struct ClientBuilder<'a> {
     sock: Option<&'a Path>,
     // The daemon's public key.
-    pk: Vec<u8>,
+    pk: Option<Vec<u8>>,
 }
 
 impl ClientBuilder<'_> {
     fn new() -> Self {
         Self {
             sock: None,
-            pk: Vec::new(),
+            pk: None,
         }
     }
 
-    pub fn with_server_pk(mut self, pk: Vec<u8>) -> Self {
-        self.pk = pk;
+    /// Specifies the daemon's public key.
+    pub fn with_server_pk<K>(mut self, pk: &K::EncapKey) -> Self
+    where
+        K: Kem,
+    {
+        self.pk = Some(pk.export().borrow().to_vec());
         self
     }
 
@@ -123,7 +112,13 @@ impl ClientBuilder<'_> {
                 "UDS socket not specified",
             )));
         };
-        Client::connect(sock).await
+        let Some(pk) = &self.pk else {
+            return Err(Error::Connecting(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "UDS socket not specified",
+            )));
+        };
+        Client::connect(sock, pk).await
     }
 }
 
@@ -159,31 +154,47 @@ impl Client {
     }
 
     /// Creates a client connection to the daemon.
-    #[instrument(skip_all, fields(?sock))]
-    async fn connect(sock: &Path, pk: &[u8]) -> Result<Self> {
+    #[instrument(skip_all, fields(?path))]
+    async fn connect(path: &Path, pk: &[u8]) -> Result<Self> {
         info!("starting Aranya client");
 
-        let pk = <CE::Kem as Kem>::import(pk)?;
-        let info = sock.as_os_str.as_encoded_bytes();
-        let transport = tarpc::serde_transport::unix::connect(&sock, || {
-            ClientCodec::<CE::Aead, _, _, _>::new(&mut Rng, &pk, Json::default(), info)
-        })
+        let sock = UnixStream::connect(path).await?;
+        let pk = <<<CS as CipherSuite>::Kem as Kem>::EncapKey as Import<_>>::import(pk)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+        let info = path.as_os_str().as_encoded_bytes();
+        let codec = LengthDelimitedCodec::builder()
+            .max_frame_length(usize::MAX)
+            .new_codec();
+        let transport = api::crypto::client::<
+            _,
+            _,
+            <CS as CipherSuite>::Kem,
+            <CS as CipherSuite>::Kdf,
+            <CS as CipherSuite>::Aead,
+            _,
+            _,
+        >(sock, codec, Rng, pk, info)
         .await
         .map_err(Error::Connecting)?;
+
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
         debug!("connected to daemon");
 
-        let keystore_info = daemon
-            .get_keystore_info(context::current())
-            .await
-            .map_err(IpcError)?;
-        debug!(?keystore_info);
-        let device_id = daemon
-            .get_device_id(context::current())
-            .await
-            .map_err(IpcError)?;
-        debug!(?device_id);
-        let aqc = AqcChannelsImpl::new(device_id, keystore_info).await?;
+        let aqc = {
+            let keystore_info = daemon
+                .get_keystore_info(context::current())
+                .await
+                .map_err(IpcError)??;
+            debug!(?keystore_info);
+
+            let device_id = daemon
+                .get_device_id(context::current())
+                .await
+                .map_err(IpcError)??;
+            debug!(?device_id);
+
+            AqcChannelsImpl::new(device_id, keystore_info).await?
+        };
 
         Ok(Self { daemon, aqc })
     }
@@ -567,7 +578,7 @@ impl Queries<'_> {
             .daemon
             .query_device_label_assignments(context::current(), self.id, device)
             .await
-            .map_err(IpcError)?;
+            .map_err(IpcError)??;
         Ok(Labels { data })
     }
 
@@ -579,7 +590,7 @@ impl Queries<'_> {
             .daemon
             .query_device_afc_label_assignments(context::current(), self.id, device)
             .await
-            .map_err(IpcError)?;
+            .map_err(IpcError)??;
         Ok(AfcLabels { data })
     }
 

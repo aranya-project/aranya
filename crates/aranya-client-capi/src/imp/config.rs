@@ -42,8 +42,6 @@ impl From<&SyncPeerConfig> for aranya_client::client::SyncPeerConfig {
 /// Configuration info for Aranya
 pub struct ClientConfig {
     pub daemon_addr: *const c_char,
-    #[cfg(feature = "afc")]
-    pub afc: AfcConfig,
     pub aqc: AqcConfig,
 }
 
@@ -57,8 +55,6 @@ impl Typed for ClientConfig {
 /// Builder for a [`ClientConfig`]
 pub struct ClientConfigBuilder {
     pub daemon_addr: *const c_char,
-    #[cfg(feature = "afc")]
-    pub(crate) afc: Option<AfcConfig>,
     pub(crate) aqc: Option<AqcConfig>,
 }
 
@@ -70,20 +66,12 @@ impl ClientConfigBuilder {
             bug!("Tried to create a ClientConfig without a valid address!");
         }
 
-        #[cfg(feature = "afc")]
-        let Some(afc) = self.afc
-        else {
-            bug!("Tried to create a ClientConfig without a valid AfcConfig!");
-        };
-
         let Some(aqc) = self.aqc else {
             bug!("Tried to create a ClientConfig without a valid AqcConfig!");
         };
 
         Ok(ClientConfig {
             daemon_addr: self.daemon_addr,
-            #[cfg(feature = "afc")]
-            afc,
             aqc,
         })
     }

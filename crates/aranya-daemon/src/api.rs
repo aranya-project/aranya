@@ -24,7 +24,10 @@ use tarpc::{
     server::{self, Channel},
     tokio_serde::formats::Json,
 };
-use tokio::sync::{mpsc, Mutex};
+use tokio::{
+    net::UnixStream,
+    sync::{mpsc, Mutex},
+};
 use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
@@ -62,9 +65,6 @@ macro_rules! find_effect {
 }
 
 /// Daemon API Server.
-///
-/// Hosts a `tarpc` server listening on a UDS socket path.
-/// The user library will make requests to this API.
 pub struct DaemonApiServer {
     daemon_sock: PathBuf,
     /// Channel for receiving effects from the syncer.
@@ -85,7 +85,6 @@ impl DaemonApiServer {
         pk: Arc<PublicKeys<api::CS>>,
         peers: SyncPeers,
         recv_effects: mpsc::Receiver<Vec<EF>>,
-        local_store: KS,
         #[cfg(feature = "afc")] afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
         #[cfg(feature = "afc")] eng: CE,
     ) -> Result<Self> {
@@ -104,7 +103,6 @@ impl DaemonApiServer {
                 keystore_info,
 
                 aqc_peers: Arc::default(),
-                local_store: Arc::new(local_store),
 
                 #[cfg(feature = "afc")]
                 afc,
@@ -174,8 +172,6 @@ struct DaemonApiHandler {
     peers: SyncPeers,
     /// Key store paths.
     keystore_info: api::KeyStoreInfo,
-    /// Stores keys for internal (non-Aranya) use.
-    local_store: Arc<KS>,
 
     /// AQC peers.
     aqc_peers: Arc<Mutex<BiBTreeMap<api::NetIdentifier, DeviceId>>>,
@@ -340,6 +336,11 @@ impl DaemonApiHandler {
 }
 
 impl DaemonApi for DaemonApiHandler {
+    #[instrument(skip(self))]
+    async fn hello(self, context: context::Context) -> api::Result<u32> {
+        Ok(42)
+    }
+
     #[instrument(skip(self))]
     async fn get_keystore_info(self, context: context::Context) -> api::Result<api::KeyStoreInfo> {
         Ok(self.keystore_info)
