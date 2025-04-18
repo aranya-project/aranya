@@ -9,6 +9,8 @@
     rust_2018_idioms
 )]
 
+#[cfg(feature = "afc")]
+use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
@@ -42,7 +44,9 @@ mod afc_imports {
 #[cfg(any())]
 use afc_imports::*;
 
-const SLEEP_INTERVAL: Duration = Duration::from_millis(600);
+const SYNC_INTERVAL: Duration = Duration::from_millis(100);
+// Allow for one missed sync and a misaligned sync rate, while keeping run times low.
+const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
 #[instrument(skip_all, fields(%duration = FmtDuration(d)))]
 fn sleep(d: Duration) -> Sleep {
@@ -194,7 +198,7 @@ impl TeamCtx {
     }
 
     async fn add_all_sync_peers(&mut self, team_id: TeamId) -> Result<()> {
-        let config = SyncPeerConfig::builder().build()?;
+        let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
         let mut devices = self.devices();
         for i in 0..devices.len() {
             let (device, peers) = devices[i..].split_first_mut().unwrap();
@@ -227,11 +231,16 @@ impl TeamCtx {
         // Make sure it sees the configuration change.
         sleep(SLEEP_INTERVAL).await;
 
-        // Add the operator as a new device, and assign its role.
+        // Add the operator as a new device.
         info!("adding operator to team");
         owner_team
             .add_device_to_team(self.operator.pk.clone())
             .await?;
+
+        // Make sure it sees the configuration change.
+        sleep(SLEEP_INTERVAL).await;
+
+        // Assign the operator its role.
         admin_team
             .assign_role(self.operator.id, Role::Operator)
             .await?;
