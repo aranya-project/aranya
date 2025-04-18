@@ -4,6 +4,7 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use std::{
+    collections::BTreeMap,
     future::{self, Future},
     net::SocketAddr,
     path::PathBuf,
@@ -15,6 +16,7 @@ use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_daemon_api::{self as api, DaemonApi};
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
+use aranya_runtime::GraphId;
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::BugExt;
@@ -64,11 +66,13 @@ macro_rules! find_effect {
     }
 }
 
+type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
+
 /// Daemon API Server.
 pub struct DaemonApiServer {
     daemon_sock: PathBuf,
     /// Channel for receiving effects from the syncer.
-    recv_effects: mpsc::Receiver<Vec<EF>>,
+    recv_effects: EffectReceiver,
     // TODO(eric): make this Arc<DaemonApiHandler>?
     handler: DaemonApiHandler,
 }
@@ -84,9 +88,7 @@ impl DaemonApiServer {
         daemon_sock: PathBuf,
         pk: Arc<PublicKeys<api::CS>>,
         peers: SyncPeers,
-        recv_effects: mpsc::Receiver<Vec<EF>>,
-        #[cfg(feature = "afc")] afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
-        #[cfg(feature = "afc")] eng: CE,
+        recv_effects: EffectReceiver,
     ) -> Result<Self> {
         info!("uds path: {:?}", daemon_sock);
 
@@ -104,17 +106,35 @@ impl DaemonApiServer {
 
                 aqc_peers: Arc::default(),
 
-                #[cfg(feature = "afc")]
-                afc,
-                #[cfg(feature = "afc")]
-                afc_peers: Arc::default(),
-                #[cfg(feature = "afc")]
-                afc_handler: Arc::new(Mutex::new(Handler::new(
-                    device_id,
-                    store.try_clone().context("unable to clone keystore")?,
-                ))),
-                #[cfg(feature = "afc")]
-                eng,
+                aqc_peers: Arc::default(),
+            },
+        })
+    }
+
+    /// Create new RPC server.
+    #[instrument(skip_all)]
+    #[cfg(not(feature = "afc"))]
+    pub fn new(
+        client: Arc<Client>,
+        local_addr: SocketAddr,
+        keystore_info: api::KeyStoreInfo,
+        daemon_sock: PathBuf,
+        pk: Arc<PublicKeys<api::CS>>,
+        peers: SyncPeers,
+        recv_effects: EffectReceiver,
+    ) -> Result<Self> {
+        info!("uds path: {:?}", daemon_sock);
+        Ok(Self {
+            daemon_sock,
+            recv_effects,
+            handler: DaemonApiHandler {
+                client,
+                local_addr,
+                pk,
+                peers,
+                keystore_info,
+                aqc_peers: Arc::default(),
+>>>>>>> origin/main
             },
         })
     }
@@ -149,8 +169,8 @@ impl DaemonApiServer {
                 .buffer_unordered(10)
                 .for_each(|_| async {}),
             async {
-                while let Some(effects) = self.recv_effects.recv().await {
-                    if let Err(e) = self.handler.handle_effects(&effects, None).await {
+                while let Some((graph, effects)) = self.recv_effects.recv().await {
+                    if let Err(e) = self.handler.handle_effects(graph, &effects, None).await {
                         error!(?e, "error handling effects");
                     }
                 }
@@ -159,6 +179,9 @@ impl DaemonApiServer {
         Ok(())
     }
 }
+
+/// A mapping of `Net ID <=> Device ID`, separated by `Graph ID`.
+type PeerMap = Arc<Mutex<BTreeMap<GraphId, BiBTreeMap<api::NetIdentifier, DeviceId>>>>;
 
 #[derive(Clone)]
 struct DaemonApiHandler {
@@ -174,24 +197,7 @@ struct DaemonApiHandler {
     keystore_info: api::KeyStoreInfo,
 
     /// AQC peers.
-    aqc_peers: Arc<Mutex<BiBTreeMap<api::NetIdentifier, DeviceId>>>,
-
-    /// AFC shm write.
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
-    /// AFC peers.
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    afc_peers: Arc<Mutex<BiBTreeMap<api::NetIdentifier, DeviceId>>>,
-    /// Handles AFC effects.
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    afc_handler: Arc<Mutex<Handler<Store>>>,
-    /// An implementation of [`Engine`][crypto::Engine].
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    eng: CE,
+    aqc_peers: PeerMap,
 }
 
 impl DaemonApiHandler {
@@ -202,7 +208,12 @@ impl DaemonApiHandler {
     /// Handles effects resulting from invoking an Aranya action.
     #[instrument(skip_all)]
     #[allow(unused_variables)]
-    async fn handle_effects(&self, effects: &[Effect], node_id: Option<NodeId>) -> Result<()> {
+    async fn handle_effects(
+        &self,
+        graph: GraphId,
+        effects: &[Effect],
+        node_id: Option<NodeId>,
+    ) -> Result<()> {
         for effect in effects {
             debug!(?effect, "handling effect");
             match effect {
@@ -218,20 +229,30 @@ impl DaemonApiHandler {
                 Effect::OperatorRevoked(_operator_revoked) => {}
                 #[cfg(any())]
                 Effect::AfcNetworkNameSet(e) => {
-                    self.afc_peers.lock().await.insert(
-                        api::NetIdentifier(e.net_identifier.clone()),
-                        e.device_id.into(),
-                    );
+                    self.afc_peers
+                        .lock()
+                        .await
+                        .entry(graph)
+                        .or_default()
+                        .insert(
+                            api::NetIdentifier(e.net_identifier.clone()),
+                            e.device_id.into(),
+                        );
                 }
                 Effect::LabelCreated(_) => {}
                 Effect::LabelDeleted(_) => {}
                 Effect::LabelAssigned(_) => {}
                 Effect::LabelRevoked(_) => {}
                 Effect::AqcNetworkNameSet(e) => {
-                    self.aqc_peers.lock().await.insert(
-                        api::NetIdentifier(e.net_identifier.clone()),
-                        e.device_id.into(),
-                    );
+                    self.aqc_peers
+                        .lock()
+                        .await
+                        .entry(graph)
+                        .or_default()
+                        .insert(
+                            api::NetIdentifier(e.net_identifier.clone()),
+                            e.device_id.into(),
+                        );
                 }
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::QueriedLabel(_) => {}
@@ -554,7 +575,8 @@ impl DaemonApi for DaemonApiHandler {
             .set_aqc_network_name(device.into_id().into(), name.0)
             .await
             .context("unable to assign aqc network identifier")?;
-        self.handle_effects(&effects, None).await?;
+        self.handle_effects(GraphId::from(team.into_id()), &effects, None)
+            .await?;
         Ok(())
     }
 
@@ -696,17 +718,20 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<(AfcId, AfcCtrl)> {
         info!("create_afc_bidi_channel");
 
+        let graph = GraphId::from(team.into_id());
+
         let peer_id = self
             .afc_peers
             .lock()
             .await
-            .get_by_left(&peer)
+            .get(&graph)
+            .and_then(|map| map.get_by_left(&peer))
             .copied()
             .context("unable to lookup peer")?;
 
         let (ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(&graph)
             .create_afc_bidi_channel_off_graph(peer_id, label)
             .await?;
         let id = self.pk.ident_pk.id()?;
@@ -760,7 +785,8 @@ impl DaemonApi for DaemonApiHandler {
         node_id: api::NodeId,
         ctrl: api::AfcCtrl,
     ) -> api::Result<(AfcId, NetIdentifier, Label)> {
-        let mut session = self.client.session_new(&team.into_id().into()).await?;
+        let graph = GraphId::from(team.into_id());
+        let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
             let id = self.pk.ident_pk.id()?;
@@ -779,7 +805,8 @@ impl DaemonApi for DaemonApiHandler {
                 .afc_peers
                 .lock()
                 .await
-                .get_by_right(&e.author_id.into())
+                .get(&graph)
+                .and_then(|map| map.get_by_right(&e.author_id.into()))
                 .context("missing net identifier for channel author")?
                 .clone();
             return Ok((afc_id, net, label));
@@ -807,17 +834,20 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<(api::AqcCtrl, api::AqcBidiChannelCreatedInfo)> {
         info!("create_aqc_bidi_channel");
 
+        let graph = GraphId::from(team.into_id());
+
         let peer_id = self
             .aqc_peers
             .lock()
             .await
-            .get_by_left(&peer)
+            .get(&graph)
+            .and_then(|map| map.get_by_left(&peer))
             .copied()
             .context("unable to lookup peer")?;
 
         let (ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(&graph)
             .create_aqc_bidi_channel_off_graph(peer_id, label.into_id().into())
             .await?;
         let id = self.pk.ident_pk.id()?;
@@ -828,7 +858,7 @@ impl DaemonApi for DaemonApiHandler {
             return Err(anyhow::anyhow!("unable to find AqcBidiChannelCreated effect").into());
         };
 
-        self.handle_effects(&effects, None).await?;
+        self.handle_effects(graph, &effects, None).await?;
 
         let info = api::AqcBidiChannelCreatedInfo {
             parent_cmd_id: e.parent_cmd_id,
@@ -857,18 +887,21 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<(api::AqcCtrl, api::AqcUniChannelCreatedInfo)> {
         info!("create_aqc_uni_channel");
 
+        let graph = GraphId::from(team.into_id());
+
         let peer_id = self
             .aqc_peers
             .lock()
             .await
-            .get_by_left(&peer)
+            .get(&graph)
+            .and_then(|map| map.get_by_left(&peer))
             .copied()
             .context("unable to lookup peer")?;
 
         let id = self.pk.ident_pk.id()?;
         let (ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(&graph)
             .create_aqc_uni_channel_off_graph(id, peer_id, label.into_id().into())
             .await?;
 
@@ -878,7 +911,7 @@ impl DaemonApi for DaemonApiHandler {
             return Err(anyhow::anyhow!("unable to find AqcUniChannelCreated effect").into());
         };
 
-        self.handle_effects(&effects, None).await?;
+        self.handle_effects(graph, &effects, None).await?;
 
         let info = api::AqcUniChannelCreatedInfo {
             parent_cmd_id: e.parent_cmd_id,
@@ -925,11 +958,12 @@ impl DaemonApi for DaemonApiHandler {
         team: api::TeamId,
         ctrl: api::AqcCtrl,
     ) -> api::Result<(api::NetIdentifier, api::AqcChannelInfo)> {
-        let mut session = self.client.session_new(&team.into_id().into()).await?;
+        let graph = GraphId::from(team.into_id());
+        let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
             let id = self.pk.ident_pk.id()?;
-            self.handle_effects(&effects, None).await?;
+            self.handle_effects(graph,&effects, None).await?;
             if let Some(Effect::AqcBidiChannelReceived(e)) =
                 find_effect!(&effects, Effect::AqcBidiChannelReceived(e) if e.peer_id == id.into())
             {
@@ -949,7 +983,8 @@ impl DaemonApi for DaemonApiHandler {
                     .aqc_peers
                     .lock()
                     .await
-                    .get_by_right(&e.author_id.into())
+                    .get(&graph)
+                    .and_then(|map| map.get_by_right(&e.author_id.into()))
                     .context("missing net identifier for channel author")?
                     .clone();
                 return Ok((net, aqc_info));
@@ -973,7 +1008,8 @@ impl DaemonApi for DaemonApiHandler {
                     .aqc_peers
                     .lock()
                     .await
-                    .get_by_right(&e.author_id.into())
+                    .get(&graph)
+                    .and_then(|map| map.get_by_right(&e.author_id.into()))
                     .context("missing net identifier for channel author")?
                     .clone();
                 return Ok((net, aqc_info));
