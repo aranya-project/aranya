@@ -1,6 +1,7 @@
 #![allow(clippy::expect_used, clippy::indexing_slicing, rust_2018_idioms)]
 
 use std::{
+    collections::BTreeMap,
     fs,
     ops::{Deref, DerefMut},
     sync::Arc,
@@ -195,8 +196,9 @@ impl TestCtx {
             );
 
             let aranya = Arc::new(Mutex::new(graph));
-            let client = TestClient::new(Arc::clone(&aranya));
-            let server = TestServer::new(Arc::clone(&aranya), listener);
+            let peer_cache = Arc::new(Mutex::new(BTreeMap::new()));
+            let client = TestClient::new(Arc::clone(&aranya), Arc::clone(&peer_cache));
+            let server = TestServer::new(Arc::clone(&aranya), Arc::clone(&peer_cache), listener);
             (client, server, local_addr, pk)
         };
 

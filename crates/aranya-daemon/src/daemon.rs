@@ -1,6 +1,6 @@
 #[cfg(feature = "afc")]
 use std::str::FromStr;
-use std::{io, path::Path, sync::Arc};
+use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use aranya_crypto::{
@@ -182,15 +182,16 @@ impl Daemon {
                     .context("unable to create `FileManager`")?,
             ),
         )));
+        let peer_caches = Arc::new(Mutex::new(BTreeMap::new()));
 
-        let client = Client::new(Arc::clone(&aranya));
+        let client = Client::new(Arc::clone(&aranya), Arc::clone(&peer_caches));
 
         let server = {
             info!(addr = %external_sync_addr, "starting TCP server");
             let listener = TcpListener::bind(external_sync_addr.to_socket_addrs())
                 .await
                 .context("unable to bind TCP listener")?;
-            Server::new(Arc::clone(&aranya), listener)
+            Server::new(Arc::clone(&aranya), Arc::clone(&peer_caches), listener)
         };
 
         info!(device_id = %device_id, "set up Aranya");
