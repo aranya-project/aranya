@@ -254,7 +254,7 @@ dependencies = [
  "aranya-util",
  "buggy",
  "bytes",
- "futures",
+ "futures-util",
  "pin-project",
  "postcard",
  "serde",

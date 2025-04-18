@@ -22,7 +22,7 @@ spideroak-base58 = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
 bytes = { version = "1", features = ["serde"] }
-futures = { version = "0.3" }
+futures-util = { workspace = true }
 pin-project = { version = "1.1" }
 postcard = { workspace = true }
 serde = { workspace = true }

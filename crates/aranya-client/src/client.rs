@@ -1,9 +1,9 @@
 //! Client-daemon connection.
 
-use core::{borrow::Borrow, net::SocketAddr, time::Duration};
+use core::{net::SocketAddr, time::Duration};
 use std::{io, path::Path};
 
-use aranya_crypto::{import::Import, kem::Kem, keys::PublicKey, CipherSuite, Rng};
+use aranya_crypto::{import::Import, kem::Kem, CipherSuite, Rng};
 use aranya_daemon_api::{
     self as api, crypto::LengthDelimitedCodec, ChanOp, DaemonApiClient, DeviceId, KeyBundle,
     KeyStoreInfo, Label, LabelId, NetIdentifier, Role, TeamId, CS,
@@ -80,31 +80,23 @@ impl AfcLabels {
 
 /// Builds a [`Client`].
 pub struct ClientBuilder<'a> {
-    sock: Option<&'a Path>,
+    /// The UDS that the daemon is listening on.
+    uds_path: Option<&'a Path>,
     // The daemon's public key.
-    pk: Option<Vec<u8>>,
+    pk: Option<&'a [u8]>,
 }
 
 impl ClientBuilder<'_> {
     fn new() -> Self {
         Self {
-            sock: None,
+            uds_path: None,
             pk: None,
         }
     }
 
-    /// Specifies the daemon's public key.
-    pub fn with_server_pk<K>(mut self, pk: &K::EncapKey) -> Self
-    where
-        K: Kem,
-    {
-        self.pk = Some(pk.export().borrow().to_vec());
-        self
-    }
-
     /// Connects to the daemon.
     pub async fn connect(self) -> Result<Client> {
-        let Some(sock) = self.sock else {
+        let Some(sock) = self.uds_path else {
             return Err(Error::Connecting(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "UDS socket not specified",
@@ -124,8 +116,14 @@ impl<'a> ClientBuilder<'a> {
     /// Specifies the UDS socket path the daemon is listening on.
     #[cfg(unix)]
     #[cfg_attr(docsrs, doc(cfg(unix)))]
-    pub fn with_uds_sock(mut self, sock: &'a Path) -> Self {
-        self.sock = Some(sock);
+    pub fn with_daemon_uds_path(mut self, sock: &'a Path) -> Self {
+        self.uds_path = Some(sock);
+        self
+    }
+
+    /// Specifies the daemon's public API key.
+    pub fn with_daemon_api_pk(mut self, pk: &'a [u8]) -> Self {
+        self.pk = Some(pk);
         self
     }
 }
@@ -682,11 +680,10 @@ impl SyncPeerConfigBuilder {
     /// Build a [`SyncPeerConfig`]
     pub fn build(self) -> Result<SyncPeerConfig> {
         let Some(interval) = self.interval else {
-            let e = Error::InvalidArg {
+            return Err(Error::InvalidArg {
                 arg: "interval",
-                reason: "Tried to create a `SyncPeerConfig` without setting the interval!",
-            };
-            return Err(e);
+                reason: "must call `SyncPeerConfigBuilder::interval`",
+            });
         };
 
         Ok(SyncPeerConfig {
@@ -700,7 +697,7 @@ impl SyncPeerConfigBuilder {
     /// By default, the interval is not set. It is an error to call
     /// [`build`][Self::build] before setting the interval with
     /// this method
-    pub fn interval(mut self, duration: Duration) -> Self {
+    pub fn with_interval(mut self, duration: Duration) -> Self {
         self.interval = Some(duration);
         self
     }
@@ -708,7 +705,7 @@ impl SyncPeerConfigBuilder {
     /// Configures whether the peer will be immediately synced with after being added.
     ///
     /// By default, the peer is immediately synced with.
-    pub fn sync_now(mut self, sync_now: bool) -> Self {
+    pub fn with_sync_now(mut self, sync_now: bool) -> Self {
         self.sync_now = sync_now;
         self
     }

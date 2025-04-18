@@ -1,4 +1,8 @@
-use core::{ffi::c_char, ops::DerefMut, ptr};
+use core::{
+    ffi::{c_char, CStr},
+    ops::{Deref, DerefMut},
+    ptr,
+};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
@@ -393,7 +397,7 @@ pub struct Addr(*const c_char);
 impl Addr {
     unsafe fn as_underlying(self) -> Result<aranya_util::Addr, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
+        let cstr = unsafe { CStr::from_ptr(self.0) };
         Ok(cstr.to_str()?.parse()?)
     }
 }
@@ -408,7 +412,7 @@ pub struct NetIdentifier(*const c_char);
 impl NetIdentifier {
     unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
+        let cstr = unsafe { CStr::from_ptr(self.0) };
         Ok(aranya_daemon_api::NetIdentifier(String::from(
             cstr.to_str()?,
         )))
@@ -425,7 +429,7 @@ pub struct LabelName(*const c_char);
 impl LabelName {
     unsafe fn as_underlying(self) -> Result<String, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
+        let cstr = unsafe { CStr::from_ptr(self.0) };
         Ok(String::from(cstr.to_str()?))
     }
 }
@@ -523,10 +527,11 @@ pub fn afc_config_builder_set_address(cfg: &mut AfcConfigBuilder, address: *cons
 /// @param out a pointer to write the afc config to
 #[cfg(feature = "afc")]
 pub fn afc_config_builder_build(
-    cfg: &mut AfcConfigBuilder,
+    cfg: OwnedPtr<AfcConfigBuilder>,
     out: &mut MaybeUninit<AfcConfig>,
 ) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
     Ok(())
 }
 
@@ -556,7 +561,7 @@ pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
 /// @param cfg a pointer to the aqc config builder
 /// @param address a string with the address to bind to
 pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *const c_char) {
-    cfg.addr(address);
+    cfg.set_addr(address);
 }
 
 /// Attempts to construct an [`AqcConfig`], returning an `Error::Bug`
@@ -565,10 +570,11 @@ pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *cons
 /// @param cfg a pointer to the aqc config builder
 /// @param out a pointer to write the aqc config to
 pub fn aqc_config_builder_build(
-    cfg: &mut AqcConfigBuilder,
+    cfg: OwnedPtr<AqcConfigBuilder>,
     out: &mut MaybeUninit<AqcConfig>,
 ) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
     Ok(())
 }
 
@@ -581,15 +587,23 @@ pub type ClientConfig = Safe<imp::ClientConfig>;
 #[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
 
-/// Sets the daemon address that the Client should try to connect to.
+/// Sets UDS path that the daemon is listening on.
 ///
 /// @param cfg a pointer to the client config builder
 /// @param address a string containing the address
-pub fn client_config_builder_set_daemon_addr(
+pub fn client_config_builder_set_daemon_uds_path(
     cfg: &mut ClientConfigBuilder,
     address: *const c_char,
 ) {
-    cfg.daemon_addr(address);
+    cfg.set_daemon_addr(address);
+}
+
+/// Sets the daemon's public API key.
+///
+/// @param cfg a pointer to the client config builder
+/// @param address a string containing the address
+pub fn client_config_builder_set_daemon_api_pk(cfg: &mut ClientConfigBuilder, pk: &[u8]) {
+    cfg.set_daemon_pk(pk);
 }
 
 /// Attempts to construct a [`ClientConfig`], returning an `Error::Bug`
@@ -598,10 +612,11 @@ pub fn client_config_builder_set_daemon_addr(
 /// @param cfg a pointer to the client config builder
 /// @param out a pointer to write the client config to
 pub fn client_config_builder_build(
-    cfg: &mut ClientConfigBuilder,
+    cfg: OwnedPtr<ClientConfigBuilder>,
     out: &mut MaybeUninit<ClientConfig>,
 ) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
     Ok(())
 }
 
@@ -610,7 +625,7 @@ pub fn client_config_builder_build(
 /// @param cfg a pointer to the client config builder
 /// @param aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
 pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
-    cfg.aqc(**aqc_config);
+    cfg.set_aqc(aqc_config.deref().clone());
 }
 
 /// Initializes a new client instance.
@@ -626,29 +641,16 @@ pub unsafe fn client_init(
     // TODO: Clean this up.
     let daemon_socket = OsStr::from_bytes(
         // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.daemon_addr()) }.to_bytes(),
+        unsafe { CStr::from_ptr(config.daemon_addr()) }.to_bytes(),
     )
     .as_ref();
-
-    #[cfg(feature = "afc")]
-    let afc_shm_path = OsStr::from_bytes(
-        // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.afc().shm_path) }.to_bytes(),
-    )
-    .as_ref();
-
-    #[cfg(feature = "afc")]
-    let afc_addr =
-        // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.afc().addr) }
-        .to_str()?;
 
     let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
 
     let inner = rt.block_on({
         aranya_client::Client::builder()
-            .with_uds_sock(daemon_socket)
-            .with_server_pk(&[])
+            .with_daemon_uds_path(daemon_socket)
+            .with_daemon_api_pk(config.daemon_api_pk())
             .connect()
     })?;
 
@@ -1543,10 +1545,11 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 ///
 /// @param cfg a pointer to the builder for a sync config
 pub fn sync_peer_config_builder_build(
-    cfg: &SyncPeerConfigBuilder,
+    cfg: OwnedPtr<SyncPeerConfigBuilder>,
     out: &mut MaybeUninit<SyncPeerConfig>,
 ) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
     Ok(())
 }
 /// Query devices on team.
@@ -1616,7 +1619,7 @@ pub fn id_to_str(
 #[aranya_capi_core::no_ext_error]
 pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
     // SAFETY: Caller must ensure the pointer is a valid C String.
-    let cstr = unsafe { std::ffi::CStr::from_ptr(str) };
+    let cstr = unsafe { CStr::from_ptr(str) };
 
     aranya_crypto::Id::decode(cstr.to_bytes())
         .map_err(|_| InvalidArg::new("str", "unable to decode ID from bytes").into())

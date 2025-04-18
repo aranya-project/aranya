@@ -3,16 +3,15 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-use core::{borrow::Borrow, fmt, marker::PhantomData};
-use std::{
-    collections::BTreeMap,
+use core::{
     future::{self, Future},
     net::SocketAddr,
-    path::PathBuf,
-    sync::Arc,
+    pin::Pin,
+    task::{Context, Poll},
 };
+use std::{collections::BTreeMap, io, path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Context as _, Result};
 use aranya_crypto::{CipherSuite, Csprng, DeviceId, Rng};
 use aranya_daemon_api::{self as api, crypto::LengthDelimitedCodec, DaemonApi, CS};
 use aranya_fast_channels::{Label, NodeId};
@@ -21,13 +20,13 @@ use aranya_runtime::GraphId;
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::BugExt;
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::{Stream, StreamExt, TryStreamExt};
 use tarpc::{
     context,
     server::{self, Channel},
 };
 use tokio::{
-    net::UnixListener,
+    net::{UnixListener, UnixStream},
     sync::{mpsc, Mutex},
 };
 use tracing::{debug, error, info, instrument, warn};
@@ -111,7 +110,7 @@ impl DaemonApiServer {
     #[instrument(skip_all)]
     #[allow(clippy::disallowed_macros)]
     pub async fn serve(mut self) -> Result<()> {
-        let mut listener = UnixListener::bind(&self.daemon_sock)?;
+        let listener = UnixListener::bind(&self.daemon_sock)?;
         info!(
             addr = ?listener
                 .local_addr()
@@ -132,7 +131,12 @@ impl DaemonApiServer {
             <CS as CipherSuite>::Aead,
             _,
             _,
-        >(listener, codec, self.sk.into_inner(), info);
+        >(
+            UnixListenerStream(listener),
+            codec,
+            self.sk.into_inner(),
+            info,
+        );
 
         // TODO: determine if there's a performance benefit to putting these branches in different threads.
         tokio::join!(
@@ -158,6 +162,23 @@ impl DaemonApiServer {
             },
         );
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct UnixListenerStream(UnixListener);
+impl Stream for UnixListenerStream {
+    type Item = io::Result<UnixStream>;
+
+    fn poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<io::Result<UnixStream>>> {
+        match self.0.poll_accept(cx) {
+            Poll::Ready(Ok((stream, _))) => Poll::Ready(Some(Ok(stream))),
+            Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 

@@ -17,7 +17,7 @@ use aranya_crypto::{
 };
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
-use futures::{ready, Sink, Stream, TryFuture};
+use futures_util::{ready, Sink, Stream, TryStream};
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub use tarpc::tokio_util::codec::length_delimited::{Builder, LengthDelimitedCodec};
@@ -243,10 +243,6 @@ pub fn server<L, K, F, A, Item, SinkItem>(
 ) -> Server<L, K, F, A, Item, SinkItem>
 where
     K: Kem,
-    F: Kdf,
-    A: Aead + IndCca2,
-    Item: for<'de> Deserialize<'de>,
-    SinkItem: Serialize,
 {
     Server {
         listener,
@@ -276,12 +272,14 @@ where
     S: AsyncRead + AsyncWrite,
     K: Kem,
     A: Aead + IndCca2,
-    L: TryFuture<Ok = S, Error = io::Error>,
+    L: TryStream<Ok = S, Error = io::Error>,
 {
     type Item = io::Result<ServerConn<S, K, F, A, Item, SinkItem>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let io = ready!(self.as_mut().project().listener.try_poll(cx)?);
+        let Some(io) = ready!(self.as_mut().project().listener.try_poll_next(cx)?) else {
+            return Poll::Ready(None);
+        };
         let inner = serde_transport::new(
             Framed::new(io, self.codec.clone()),
             SymmetricalMessagePack::default(),

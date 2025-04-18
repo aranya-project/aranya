@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use aranya_crypto::Id;
 use aranya_util::Addr;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -28,15 +29,16 @@ pub struct Config {
     /// Network address of Aranya sync server.
     pub sync_addr: Addr,
 
+    /// The daemon's public API key's unique ID.
+    pub api_pk_id: Id,
+
     /// AFC configuration.
     pub afc: AfcConfig,
 
     /// AQC configuration.
-    pub aqc: AfcConfig,
+    pub aqc: AqcConfig,
 }
 
-// TODO: remove allow dead_code once all methods are used.
-#[allow(dead_code)]
 impl Config {
     /// Reads the configuration from `path`.
     pub fn load<P>(path: P) -> Result<Self>
@@ -47,11 +49,6 @@ impl Config {
             .context(format!("unable to parse config: {:?}", path.as_ref()))?;
 
         Ok(cfg)
-    }
-
-    /// Path to `State`.
-    pub(crate) fn state_path(&self) -> PathBuf {
-        self.work_dir.join("app_state.cbor")
     }
 
     /// Path to the [`DefaultEngine`]'s key wrapping key.
@@ -134,6 +131,7 @@ mod tests {
             work_dir: "/var/lib/work_dir".parse()?,
             uds_api_path: "/var/run/uds.sock".parse()?,
             pid_file: "/var/run/hub.pid".parse()?,
+            api_pk_id: Id::default(),
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
             afc: AfcConfig {
                 shm_path: "/afc".to_owned(),

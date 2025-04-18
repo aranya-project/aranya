@@ -1,16 +1,12 @@
-use core::borrow::Borrow;
 use std::{io, path::Path, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use aranya_crypto::{
     aead::Aead,
-    custom_id,
     default::DefaultEngine,
     generic_array::GenericArray,
-    id::{Id, IdError},
     import::Import,
-    kem::{DecapKey as _, Kem},
-    keys::{PublicKey as _, SecretKey, SecretKeyBytes},
+    keys::SecretKeyBytes,
     keystore::{fs_keystore::Store, KeyStore, KeyStoreExt},
     CipherSuite, Engine, Random, Rng,
 };
@@ -112,7 +108,6 @@ impl Daemon {
         };
 
         // Sync in the background at some specified interval.
-        // Effects are sent to `Api` via `mux`.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
         let (mut syncer, peers) = Syncer::new(Arc::clone(&client), send_effects);
         set.spawn(async move {
@@ -336,12 +331,13 @@ mod tests {
 
     use std::time::Duration;
 
+    use aranya_crypto::Id;
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;
 
     use super::*;
-    use crate::config::AfcConfig;
+    use crate::config::{AfcConfig, AqcConfig};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -355,6 +351,7 @@ mod tests {
             work_dir: work_dir.clone(),
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
+            api_pk_id: Id::default(),
             sync_addr: any,
             afc: AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
@@ -363,6 +360,7 @@ mod tests {
                 create: true,
                 max_chans: 100,
             },
+            aqc: AqcConfig {},
         };
 
         let daemon = Daemon::load(cfg)
