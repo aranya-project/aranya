@@ -14,8 +14,7 @@ use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
-use aranya_client::Client;
-use aranya_client::SyncPeerConfig;
+use aranya_client::{Client, SyncPeerConfig};
 use aranya_crypto::{hash::Hash as _, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},
@@ -35,11 +34,12 @@ use tracing::{debug, info, instrument};
 
 #[cfg(any())]
 mod afc_imports {
+    pub(super) use std::path::Path;
+
     pub(super) use aranya_client::afc::{Label, Message};
     pub(super) use aranya_daemon_api::NetIdentifier;
     pub(super) use aranya_fast_channels::Seq;
     pub(super) use buggy::BugExt as _;
-    pub(super) use std::path::Path;
 }
 #[cfg(any())]
 use afc_imports::*;
