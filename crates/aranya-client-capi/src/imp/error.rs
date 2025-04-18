@@ -40,6 +40,9 @@ pub enum Error {
 
     #[error("invalid index: {0}")]
     InvalidIndex(usize),
+
+    #[error("serialization errors: {0}")]
+    Serialization(#[from] postcard::Error),
 }
 
 impl From<WriteCStrError> for Error {
