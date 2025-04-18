@@ -429,7 +429,12 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn add_team(self, _: context::Context, team: api::TeamId, cfg: TeamConfig) -> api::Result<()> {
+    async fn add_team(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        cfg: api::TeamConfig,
+    ) -> api::Result<()> {
         todo!()
     }
 
@@ -439,7 +444,11 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn create_team(self, _: context::Context, cfg: TeamConfig) -> api::Result<api::TeamId> {
+    async fn create_team(
+        self,
+        _: context::Context,
+        cfg: api::TeamConfig,
+    ) -> api::Result<api::TeamId> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);

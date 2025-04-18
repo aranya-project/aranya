@@ -673,7 +673,7 @@ AranyaError aranya_aqc_config_builder_set_address_ext(struct AranyaAqcConfigBuil
                                                       struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Bug`
+ * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the aqc config builder
@@ -683,7 +683,7 @@ AranyaError aranya_aqc_config_builder_build(struct AranyaAqcConfigBuilder *cfg,
                                             struct AranyaAqcConfig *out);
 
 /**
- * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Bug`
+ * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the aqc config builder
@@ -753,7 +753,7 @@ AranyaError aranya_client_config_builder_set_daemon_addr_ext(struct AranyaClient
                                                              struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::InvalidArgument`
+ * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the client config builder
@@ -763,7 +763,7 @@ AranyaError aranya_client_config_builder_build(struct AranyaClientConfigBuilder 
                                                struct AranyaClientConfig *out);
 
 /**
- * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::InvalidArgument`
+ * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the client config builder
@@ -862,7 +862,7 @@ AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::InvalidArgument`
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the team config builder
@@ -872,7 +872,7 @@ AranyaError aranya_team_config_builder_build(struct AranyaTeamConfigBuilder *cfg
                                              struct AranyaTeamConfig *out);
 
 /**
- * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::InvalidArgument`
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the team config builder

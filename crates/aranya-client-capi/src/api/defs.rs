@@ -563,7 +563,7 @@ pub fn afc_config_builder_set_address(cfg: &mut AfcConfigBuilder, address: *cons
     cfg.addr = address;
 }
 
-/// Attempts to construct an [`AfcConfig`], returning an `Error::InvalidArgument`
+/// Attempts to construct an [`AfcConfig`], returning an `Error::Config`
 /// if there are invalid parameters.
 ///
 /// @param cfg a pointer to the afc config builder
@@ -606,7 +606,7 @@ pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *cons
     cfg.addr(address);
 }
 
-/// Attempts to construct an [`AqcConfig`], returning an `Error::Bug`
+/// Attempts to construct an [`AqcConfig`], returning an `Error::Config`
 /// if there are invalid parameters.
 ///
 /// @param cfg a pointer to the aqc config builder
@@ -639,7 +639,7 @@ pub fn client_config_builder_set_daemon_addr(
     cfg.daemon_addr(address);
 }
 
-/// Attempts to construct a [`ClientConfig`], returning an `Error::InvalidArgument`
+/// Attempts to construct a [`ClientConfig`], returning an `Error::Config`
 /// if there are invalid parameters.
 ///
 /// @param cfg a pointer to the client config builder
@@ -744,7 +744,7 @@ pub type TeamConfig = Safe<imp::TeamConfig>;
 #[aranya_capi_core::opaque(size = 4, align = 4)]
 pub type TeamConfigBuilder = imp::TeamConfigBuilder;
 
-/// Attempts to construct a [`TeamConfig`], returning an `Error::InvalidArgument`
+/// Attempts to construct a [`TeamConfig`], returning an `Error::Config`
 /// if there are invalid parameters.
 ///
 /// @param cfg a pointer to the team config builder

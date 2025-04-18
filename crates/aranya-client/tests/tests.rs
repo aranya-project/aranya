@@ -14,7 +14,7 @@ use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
-use aranya_client::{Client, SyncPeerConfig};
+use aranya_client::{Client, SyncPeerConfig, TeamConfig};
 use aranya_crypto::{hash::Hash as _, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},

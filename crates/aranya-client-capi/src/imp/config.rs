@@ -85,7 +85,11 @@ impl ClientConfigBuilder {
         };
 
         let Some(aqc) = self.aqc else {
-            bug!("Tried to create a ClientConfig without a valid AqcConfig!");
+            let e = ConfigError::InvalidArg {
+                arg: "aqc_config",
+                reason: "Tried to create a `ClientConfig` without setting a valid `AqcConfig`!",
+            };
+            return Err(e.into());
         };
 
         Ok(ClientConfig {
@@ -148,7 +152,8 @@ impl AfcConfigBuilder {
         if self.shm_path.is_null() {
             let e = ConfigError::InvalidArg {
                 arg: "shm_path",
-                reason: "Tried to create a `AfcConfig` without setting a valid shared memory path!",
+                reason:
+                    "Tried to create an `AfcConfig` without setting a valid shared memory path!",
             };
             return Err(e.into());
         }
@@ -156,7 +161,7 @@ impl AfcConfigBuilder {
         if self.addr.is_null() {
             let e = ConfigError::InvalidArg {
                 arg: "address",
-                reason: "Tried to create a `AfcConfig` without setting a valid address!",
+                reason: "Tried to create an `AfcConfig` without setting a valid address!",
             };
             return Err(e.into());
         }
@@ -200,11 +205,15 @@ impl AqcConfigBuilder {
         self.addr = addr;
     }
 
-    /// Attempts to construct an [`AqcConfig`], returning an [`Error::Bug`](super::Error::Bug) if
-    /// there are invalid parameters.
+    /// Attempts to construct an [`AqcConfig`], returning an
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
     pub fn build(self) -> Result<AqcConfig, super::Error> {
         if self.addr.is_null() {
-            bug!("Tried to create an AqcConfig without a valid address!");
+            let e = ConfigError::InvalidArg {
+                arg: "address",
+                reason: "Tried to create an `AqcConfig` without setting a valid address!",
+            };
+            return Err(e.into());
         }
 
         Ok(AqcConfig { addr: self.addr })
