@@ -74,7 +74,7 @@ custom_id! {
 }
 
 /// A device's public key bundle.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KeyBundle {
     pub identity: Vec<u8>,
     pub signing: Vec<u8>,
