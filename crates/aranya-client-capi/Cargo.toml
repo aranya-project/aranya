@@ -34,6 +34,7 @@ aranya-fast-channels = { workspace = true }
 buggy = { workspace = true }
 
 libc = { workspace = true, features = ["extra_traits"] }
+postcard = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
