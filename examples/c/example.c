@@ -188,15 +188,16 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     aranya_client_config_builder_set_aqc_config(&cli_build, &aqc_cfg);
 
     err = aranya_client_config_builder_build(&cli_build, &cli_cfg);
-    
+
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "error initializing client config: %s\r\n",
-            aranya_error_to_str(err));
-            return err;
+                aranya_error_to_str(err));
+        return err;
     }
-        
+
     err = aranya_client_config_builder_cleanup(&cli_build);
-    EXPECT("error running the cleanup routine for the client config builder", err);
+    EXPECT("error running the cleanup routine for the client config builder",
+           err);
 
     err = aranya_client_init(&c->client, &cli_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
@@ -803,7 +804,7 @@ AranyaError run_aqc_example(Team *t) {
     err = aranya_revoke_label(&t->clients.operator.client, &t->id,
                               &t->clients.memberb.id, &label1_id);
     EXPECT("error revoking label from memberb", err);
-    err = aranya_delete_label(&t->clients.operator.client, &t->id, &label1_id);
+    err = aranya_delete_label(&t->clients.admin.client, &t->id, &label1_id);
     EXPECT("error deleting label", err);
 
     return err;
