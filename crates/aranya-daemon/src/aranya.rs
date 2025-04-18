@@ -129,7 +129,7 @@ where
             if !cmds.is_empty() {
                 let mut client = self.aranya.lock().await;
                 let mut trx = client.transaction(id);
-                // TODO: save PeerCache somewhere.
+
                 client
                     .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
@@ -387,7 +387,7 @@ where
         resp.receive(request).context("sync recv failed")?;
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
-        // TODO: save PeerCache somewhere.
+
         let len = resp
             .poll(
                 &mut buf,
