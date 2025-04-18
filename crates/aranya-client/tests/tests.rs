@@ -17,7 +17,7 @@ use anyhow::{bail, Context, Result};
 use aranya_client::{Client, SyncPeerConfig};
 use aranya_crypto::{hash::Hash as _, rust::Sha256};
 use aranya_daemon::{
-    config::{AfcConfig, Config},
+    config::{AfcConfig, AqcConfig, Config},
     Daemon,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
@@ -203,7 +203,9 @@ impl TeamCtx {
     }
 
     async fn add_all_sync_peers(&mut self, team_id: TeamId) -> Result<()> {
-        let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
+        let config = SyncPeerConfig::builder()
+            .with_interval(SYNC_INTERVAL)
+            .build()?;
         let mut devices = self.devices();
         for i in 0..devices.len() {
             let (device, peers) = devices[i..].split_first_mut().unwrap();
@@ -301,6 +303,7 @@ impl DeviceCtx {
                 create: true,
                 max_chans,
             },
+            aqc: AqcConfig {},
         };
 
         // Load daemon from config.
@@ -320,29 +323,13 @@ impl DeviceCtx {
         sleep(SLEEP_INTERVAL).await;
 
         // Initialize the user library.
-        let mut client = {
-            #[cfg(feature = "afc")]
-            {
-                let mut client = (|| {
-                    Client::connect(
-                        &uds_api_path,
-                        Path::new(&afc_shm_path),
-                        max_chans,
-                        "localhost:0",
-                    )
-                })
-                .retry(ExponentialBuilder::default())
-                .await
-                .context("unable to init client")?;
-                client.afc().set_name(name.to_string());
-                client
-            }
-            #[cfg(not(feature = "afc"))]
-            (|| Client::connect(&uds_api_path))
-                .retry(ExponentialBuilder::default())
-                .await
-                .context("unable to init client")?
-        };
+        let mut client = Client::builder()
+            .with_daemon_api_pk(&[])
+            .with_daemon_uds_path(&uds_api_path)
+            .connect()
+            .retry(ExponentialBuilder::default())
+            .await
+            .context("unable to init client")?;
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");

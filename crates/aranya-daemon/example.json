@@ -1,7 +1,7 @@
 {
 	// The daemon's name.
 	"name": "name",
-	
+
 	// The daemon's working directory.
 	//
 	// Must already exist.
@@ -39,5 +39,8 @@
 
 		// Maximum number of channels AFC should support.
 		"max_chans": 100,
-	}
+	},
+
+    // AQC configuration
+    "aqc": {}
 }

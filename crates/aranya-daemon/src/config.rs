@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
+use aranya_crypto::Id;
 use aranya_util::Addr;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
@@ -28,12 +29,16 @@ pub struct Config {
     /// Network address of Aranya sync server.
     pub sync_addr: Addr,
 
+    /// The daemon's public API key's unique ID.
+    pub api_pk_id: Id,
+
     /// AFC configuration.
     pub afc: AfcConfig,
+
+    /// AQC configuration.
+    pub aqc: AqcConfig,
 }
 
-// TODO: remove allow dead_code once all methods are used.
-#[allow(dead_code)]
 impl Config {
     /// Reads the configuration from `path`.
     pub fn load<P>(path: P) -> Result<Self>
@@ -46,11 +51,6 @@ impl Config {
         Ok(cfg)
     }
 
-    /// Path to `State`.
-    pub(crate) fn state_path(&self) -> PathBuf {
-        self.work_dir.join("app_state.cbor")
-    }
-
     /// Path to the [`DefaultEngine`]'s key wrapping key.
     pub(crate) fn key_wrap_key_path(&self) -> PathBuf {
         self.work_dir.join("key_wrap_key")
@@ -61,7 +61,12 @@ impl Config {
         self.work_dir.join("key_bundle")
     }
 
-    /// Path to `Store`.
+    /// Path to the daemon's public API key.
+    pub(crate) fn daemon_api_pk_path(&self) -> PathBuf {
+        self.work_dir.join("daemon_api_pk")
+    }
+
+    /// The directory where keystore files are written.
     pub(crate) fn keystore_path(&self) -> PathBuf {
         self.work_dir.join("keystore")
     }
@@ -103,6 +108,11 @@ pub struct AfcConfig {
     pub max_chans: usize,
 }
 
+/// AQC configuration.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AqcConfig {}
+
 #[cfg(test)]
 mod tests {
     use std::net::Ipv4Addr;
@@ -121,6 +131,7 @@ mod tests {
             work_dir: "/var/lib/work_dir".parse()?,
             uds_api_path: "/var/run/uds.sock".parse()?,
             pid_file: "/var/run/hub.pid".parse()?,
+            api_pk_id: Id::default(),
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
             afc: AfcConfig {
                 shm_path: "/afc".to_owned(),
@@ -129,6 +140,7 @@ mod tests {
                 create: true,
                 max_chans: 100,
             },
+            aqc: AqcConfig {},
         };
         assert_eq!(got, want);
         Ok(())

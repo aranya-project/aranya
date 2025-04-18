@@ -1,4 +1,8 @@
 //! The Daemon library.
+//!
+//! This crate is an implementation detail for the
+//! `aranya-daemon` executable. It is permanently unstable and
+//! does NOT promise backward compatibility.
 
 #![allow(unstable_name_collisions)]
 #![warn(
@@ -33,6 +37,7 @@ pub mod vm_policy;
 
 mod api;
 mod daemon;
+mod keys;
 mod sync;
 
 pub use daemon::*;

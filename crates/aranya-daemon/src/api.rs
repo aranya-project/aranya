@@ -3,32 +3,35 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-use std::{
-    collections::BTreeMap,
+use core::{
     future::{self, Future},
     net::SocketAddr,
-    path::PathBuf,
-    sync::Arc,
+    pin::Pin,
+    task::{Context, Poll},
 };
+use std::{collections::BTreeMap, io, path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context, Result};
-use aranya_crypto::{Csprng, DeviceId, Rng};
-use aranya_daemon_api::{self as api, DaemonApi};
+use anyhow::{anyhow, Context as _, Result};
+use aranya_crypto::{CipherSuite, Csprng, DeviceId, Rng};
+use aranya_daemon_api::{self as api, crypto::LengthDelimitedCodec, DaemonApi, CS};
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::BugExt;
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::{Stream, StreamExt, TryStreamExt};
 use tarpc::{
     context,
     server::{self, Channel},
-    tokio_serde::formats::Json,
 };
-use tokio::sync::{mpsc, Mutex};
+use tokio::{
+    net::{UnixListener, UnixStream},
+    sync::{mpsc, Mutex},
+};
 use tracing::{debug, error, info, instrument, warn};
 
+pub(crate) use crate::keys::{ApiKey, PublicApiKey};
 use crate::{
     aranya::Actions,
     policy::{ChanOp, Effect, KeyBundle, Role},
@@ -64,71 +67,33 @@ macro_rules! find_effect {
 type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
 
 /// Daemon API Server.
-///
-/// Hosts a `tarpc` server listening on a UDS socket path.
-/// The user library will make requests to this API.
 pub struct DaemonApiServer {
+    // Used to encrypt data sent over the API.
+    sk: ApiKey<CS>,
     daemon_sock: PathBuf,
     /// Channel for receiving effects from the syncer.
     recv_effects: EffectReceiver,
+    // TODO(eric): make this Arc<DaemonApiHandler>?
     handler: DaemonApiHandler,
 }
 
 impl DaemonApiServer {
-    /// Create new RPC server.
+    /// Create new `DaemonApiServer`.
+    #[instrument(skip_all)]
     #[allow(clippy::too_many_arguments)]
-    #[instrument(skip_all)]
-    #[cfg(feature = "afc")]
-    pub fn new(
-        client: Arc<Client>,
-        local_addr: SocketAddr,
-        afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
-        eng: CE,
-        keystore_info: api::KeyStoreInfo,
-        store: Store,
-        daemon_sock: PathBuf,
-        pk: Arc<PublicKeys<api::CS>>,
-        peers: SyncPeers,
-        recv_effects: EffectReceiver,
-    ) -> Result<Self> {
-        info!("uds path: {:?}", daemon_sock);
-        let device_id = pk.ident_pk.id()?;
-        Ok(Self {
-            daemon_sock,
-            recv_effects,
-            handler: DaemonApiHandler {
-                client,
-                local_addr,
-                afc,
-                eng,
-                pk,
-                peers,
-                keystore_info,
-                afc_peers: Arc::default(),
-                afc_handler: Arc::new(Mutex::new(Handler::new(
-                    device_id,
-                    store.try_clone().context("unable to clone keystore")?,
-                ))),
-                aqc_peers: Arc::default(),
-            },
-        })
-    }
-
-    /// Create new RPC server.
-    #[instrument(skip_all)]
-    #[cfg(not(feature = "afc"))]
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
         keystore_info: api::KeyStoreInfo,
         daemon_sock: PathBuf,
-        pk: Arc<PublicKeys<api::CS>>,
+        sk: ApiKey<CS>,
+        pk: Arc<PublicKeys<CS>>,
         peers: SyncPeers,
         recv_effects: EffectReceiver,
-    ) -> Result<Self> {
-        info!("uds path: {:?}", daemon_sock);
-        Ok(Self {
+    ) -> Self {
+        Self {
             daemon_sock,
+            sk,
             recv_effects,
             handler: DaemonApiHandler {
                 client,
@@ -136,47 +101,60 @@ impl DaemonApiServer {
                 pk,
                 peers,
                 keystore_info,
-                aqc_peers: Arc::default(),
+                aqc_peers: PeerMap::default(),
             },
-        })
+        }
     }
 
     /// Run the RPC server.
     #[instrument(skip_all)]
     #[allow(clippy::disallowed_macros)]
     pub async fn serve(mut self) -> Result<()> {
-        let mut listener =
-            tarpc::serde_transport::unix::listen(&self.daemon_sock, Json::default).await?;
+        let listener = UnixListener::bind(&self.daemon_sock)?;
         info!(
-            "listening on {:?}",
-            listener
+            addr = ?listener
                 .local_addr()
+                .assume("should be able to retrieve local addr")?
                 .as_pathname()
-                .expect("expected uds api path to be set")
+                .assume("addr should be a pathname")?,
+            "listening"
         );
-        listener.config_mut().max_frame_length(usize::MAX);
+
+        let info = self.daemon_sock.as_os_str().as_encoded_bytes();
+        let codec = LengthDelimitedCodec::builder()
+            .max_frame_length(usize::MAX)
+            .new_codec();
+        let server = api::crypto::server::<
+            _,
+            <CS as CipherSuite>::Kem,
+            <CS as CipherSuite>::Kdf,
+            <CS as CipherSuite>::Aead,
+            _,
+            _,
+        >(
+            UnixListenerStream(listener),
+            codec,
+            self.sk.into_inner(),
+            info,
+        );
+
         // TODO: determine if there's a performance benefit to putting these branches in different threads.
         tokio::join!(
-            listener
+            server
                 .inspect_err(|err| warn!(%err, "accept error"))
                 // Ignore accept errors.
                 .filter_map(|r| future::ready(r.ok()))
                 .map(server::BaseChannel::with_defaults)
-                // serve is generated by the service attribute. It takes as input any type implementing
-                // the generated World trait.
                 .map(|channel| {
                     debug!("accepted channel connection");
                     channel
                         .execute(self.handler.clone().serve())
                         .for_each(spawn)
                 })
-                // Max 10 channels.
                 .buffer_unordered(10)
                 .for_each(|_| async {}),
             async {
-                // receive effects from syncer.
                 while let Some((graph, effects)) = self.recv_effects.recv().await {
-                    // handle effects.
                     if let Err(e) = self.handler.handle_effects(graph, &effects, None).await {
                         error!(?e, "error handling effects");
                     }
@@ -184,6 +162,23 @@ impl DaemonApiServer {
             },
         );
         Ok(())
+    }
+}
+
+#[derive(Debug)]
+struct UnixListenerStream(UnixListener);
+impl Stream for UnixListenerStream {
+    type Item = io::Result<UnixStream>;
+
+    fn poll_next(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<io::Result<UnixStream>>> {
+        match self.0.poll_accept(cx) {
+            Poll::Ready(Ok((stream, _))) => Poll::Ready(Some(Ok(stream))),
+            Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
+            Poll::Pending => Poll::Pending,
+        }
     }
 }
 
@@ -197,29 +192,14 @@ struct DaemonApiHandler {
     /// Local socket address of the API.
     local_addr: SocketAddr,
     /// Public keys of current device.
-    pk: Arc<PublicKeys<api::CS>>,
+    pk: Arc<PublicKeys<CS>>,
     /// Aranya sync peers,
     peers: SyncPeers,
     /// Key store paths.
     keystore_info: api::KeyStoreInfo,
-    /// AFC shm write.
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
-    /// AFC peers.
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    afc_peers: PeerMap,
-    /// Handles AFC effects.
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    afc_handler: Arc<Mutex<Handler<Store>>>,
+
     /// AQC peers.
     aqc_peers: PeerMap,
-    /// An implementation of [`Engine`][crypto::Engine].
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    eng: CE,
 }
 
 impl DaemonApiHandler {
@@ -379,6 +359,11 @@ impl DaemonApiHandler {
 }
 
 impl DaemonApi for DaemonApiHandler {
+    #[instrument(skip(self))]
+    async fn hello(self, context: context::Context) -> api::Result<u32> {
+        Ok(42)
+    }
+
     #[instrument(skip(self))]
     async fn get_keystore_info(self, context: context::Context) -> api::Result<api::KeyStoreInfo> {
         Ok(self.keystore_info)
@@ -847,9 +832,8 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: api::TeamId,
         peer: api::NetIdentifier,
-        node_id: NodeId,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AqcChannelInfo)> {
+    ) -> api::Result<(api::AqcCtrl, api::AqcBidiChannelCreatedInfo)> {
         info!("create_aqc_bidi_channel");
 
         let graph = GraphId::from(team.into_id());
@@ -876,9 +860,9 @@ impl DaemonApi for DaemonApiHandler {
             return Err(anyhow::anyhow!("unable to find AqcBidiChannelCreated effect").into());
         };
 
-        self.handle_effects(graph, &effects, Some(node_id)).await?;
+        self.handle_effects(graph, &effects, None).await?;
 
-        let aqc_info = api::AqcChannelInfo::BidiCreated(api::AqcBidiChannelCreatedInfo {
+        let info = api::AqcBidiChannelCreatedInfo {
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
@@ -890,19 +874,19 @@ impl DaemonApi for DaemonApiHandler {
             psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
                 .assume("`psk_length_in_bytes` is out of range")
                 .context("psk_length_in_bytes is out of range")?,
-        });
+        };
 
-        Ok((ctrl, aqc_info))
+        Ok((ctrl, info))
     }
+
     #[instrument(skip_all)]
     async fn create_aqc_uni_channel(
         self,
         _: context::Context,
         team: api::TeamId,
         peer: api::NetIdentifier,
-        node_id: NodeId,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AqcChannelInfo)> {
+    ) -> api::Result<(api::AqcCtrl, api::AqcUniChannelCreatedInfo)> {
         info!("create_aqc_uni_channel");
 
         let graph = GraphId::from(team.into_id());
@@ -929,9 +913,9 @@ impl DaemonApi for DaemonApiHandler {
             return Err(anyhow::anyhow!("unable to find AqcUniChannelCreated effect").into());
         };
 
-        self.handle_effects(graph, &effects, Some(node_id)).await?;
+        self.handle_effects(graph, &effects, None).await?;
 
-        let aqc_info = api::AqcChannelInfo::UniCreated(api::AqcUniChannelCreatedInfo {
+        let info = api::AqcUniChannelCreatedInfo {
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
@@ -944,9 +928,9 @@ impl DaemonApi for DaemonApiHandler {
             psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
                 .assume("`psk_length_in_bytes` is out of range")
                 .context("psk_length_in_bytes is out of range")?,
-        });
+        };
 
-        Ok((ctrl, aqc_info))
+        Ok((ctrl, info))
     }
 
     #[instrument(skip(self))]
@@ -958,6 +942,7 @@ impl DaemonApi for DaemonApiHandler {
         // TODO: remove AQC bidi channel from Aranya.
         todo!();
     }
+
     #[instrument(skip(self))]
     async fn delete_aqc_uni_channel(
         self,
@@ -967,12 +952,12 @@ impl DaemonApi for DaemonApiHandler {
         // TODO: remove AQC uni channel from Aranya.
         todo!();
     }
+
     #[instrument(skip_all)]
     async fn receive_aqc_ctrl(
         self,
         _: context::Context,
         team: api::TeamId,
-        node_id: NodeId,
         ctrl: api::AqcCtrl,
     ) -> api::Result<(api::NetIdentifier, api::AqcChannelInfo)> {
         let graph = GraphId::from(team.into_id());
@@ -980,7 +965,7 @@ impl DaemonApi for DaemonApiHandler {
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
             let id = self.pk.ident_pk.id()?;
-            self.handle_effects(graph, &effects, Some(node_id)).await?;
+            self.handle_effects(graph, &effects, None).await?;
             if let Some(Effect::AqcBidiChannelReceived(e)) =
                 find_effect!(&effects, Effect::AqcBidiChannelReceived(e) if e.peer_id == id.into())
             {
@@ -993,8 +978,7 @@ impl DaemonApi for DaemonApiHandler {
                     label_id: e.label_id.into(),
                     encap: e.encap.clone(),
                     psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                        .assume("`psk_length_in_bytes` is out of range")
-                        .context("psk_length_in_bytes is out of range")?,
+                        .assume("`psk_length_in_bytes` is out of range")?,
                 });
 
                 let net = self
@@ -1020,8 +1004,7 @@ impl DaemonApi for DaemonApiHandler {
                     label_id: e.label_id.into(),
                     encap: e.encap.clone(),
                     psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                        .assume("`psk_length_in_bytes` is out of range")
-                        .context("psk_length_in_bytes is out of range")?,
+                        .assume("`psk_length_in_bytes` is out of range")?,
                 });
                 let net = self
                     .aqc_peers

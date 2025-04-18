@@ -1,11 +1,14 @@
-#[cfg(feature = "afc")]
-use std::str::FromStr;
 use std::{io, path::Path, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use aranya_crypto::{
-    aead::Aead, default::DefaultEngine, generic_array::GenericArray, import::Import,
-    keys::SecretKeyBytes, keystore::fs_keystore::Store, CipherSuite, Random, Rng,
+    aead::Aead,
+    default::DefaultEngine,
+    generic_array::GenericArray,
+    import::Import,
+    keys::SecretKeyBytes,
+    keystore::{fs_keystore::Store, KeyStore, KeyStoreExt},
+    CipherSuite, Engine, Random, Rng,
 };
 use aranya_daemon_api::{KeyStoreInfo, CS};
 #[cfg(feature = "afc")]
@@ -16,6 +19,7 @@ use aranya_runtime::{
     ClientState,
 };
 use aranya_util::Addr;
+use buggy::BugExt;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
@@ -24,7 +28,7 @@ use tracing::debug;
 use tracing::{error, info};
 
 use crate::{
-    api::DaemonApiServer,
+    api::{ApiKey, DaemonApiServer, PublicApiKey},
     aranya,
     config::Config,
     policy,
@@ -68,20 +72,30 @@ impl Daemon {
 
         let mut set = JoinSet::new();
 
-        // Load keys from the keystore or generate new ones if there are no existing keys.
-        let mut store = KS::open(self.cfg.keystore_path()).context("unable to open keystore")?;
+        let store_dir = self.cfg.keystore_path();
+        aranya_util::create_dir_all(&store_dir).await?;
+        let mut root_store =
+            KS::open(store_dir.join("root")).context("unable to open root keystore")?;
         let mut eng = {
+            // Load keys from the keystore or generate new ones
+            // if there are no existing keys.
             let key = self.load_or_gen_key_wrap_key().await?;
             CE::new(&key, Rng)
         };
-        let pk = self.load_or_gen_public_keys(&mut eng, &mut store).await?;
+        let pk = self
+            .load_or_gen_public_keys(&mut eng, &mut root_store)
+            .await?;
+
+        let mut local_store =
+            KS::open(store_dir.join("local")).context("unable to open local keystore")?;
+        let api_sk = self.load_or_gen_api_key(&mut eng, &mut local_store).await?;
 
         // Initialize Aranya client.
         let (client, local_addr) = {
             let (client, server) = self
                 .setup_aranya(
                     eng.clone(),
-                    store.try_clone().context("unable to clone keystore")?,
+                    root_store.try_clone().context("unable to clone keystore")?,
                     &pk,
                     self.cfg.sync_addr,
                 )
@@ -94,7 +108,6 @@ impl Daemon {
         };
 
         // Sync in the background at some specified interval.
-        // Effects are sent to `Api` via `mux`.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
         let (mut syncer, peers) = Syncer::new(Arc::clone(&client), send_effects);
         set.spawn(async move {
@@ -105,44 +118,19 @@ impl Daemon {
             }
         });
 
-        let api = {
-            #[cfg(feature = "afc")]
-            {
-                let afc = self.setup_afc()?;
-                DaemonApiServer::new(
-                    client,
-                    local_addr,
-                    Arc::new(Mutex::new(afc)),
-                    eng,
-                    KeyStoreInfo {
-                        path: self.cfg.keystore_path(),
-                        wrapped_key: self.cfg.key_wrap_key_path(),
-                    },
-                    store,
-                    self.cfg.uds_api_path.clone(),
-                    Arc::new(pk),
-                    peers,
-                    recv_effects,
-                )
-                .context("Unable to start daemon API!")?
-            }
-            #[cfg(not(feature = "afc"))]
-            {
-                DaemonApiServer::new(
-                    client,
-                    local_addr,
-                    KeyStoreInfo {
-                        path: self.cfg.keystore_path(),
-                        wrapped_key: self.cfg.key_wrap_key_path(),
-                    },
-                    self.cfg.uds_api_path.clone(),
-                    Arc::new(pk),
-                    peers,
-                    recv_effects,
-                )
-                .context("Unable to start daemon API!")?
-            }
-        };
+        let api = DaemonApiServer::new(
+            client,
+            local_addr,
+            KeyStoreInfo {
+                path: self.cfg.keystore_path(),
+                wrapped_key: self.cfg.key_wrap_key_path(),
+            },
+            self.cfg.uds_api_path.clone(),
+            api_sk,
+            Arc::new(pk),
+            peers,
+            recv_effects,
+        );
         api.serve().await?;
 
         Ok(())
@@ -169,14 +157,14 @@ impl Daemon {
     async fn setup_aranya(
         &self,
         eng: CE,
-        store: KS,
+        root_store: KS,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
     ) -> Result<(Client, Server)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
-            EN::new(TEST_POLICY_1, eng, store, device_id)?,
+            EN::new(TEST_POLICY_1, eng, root_store, device_id)?,
             SP::new(
                 FileManager::new(self.cfg.storage_path())
                     .context("unable to create `FileManager`")?,
@@ -248,6 +236,36 @@ impl Daemon {
         bundle.public_keys(eng, store)
     }
 
+    /// Loads or generates the [`ApiKey`].
+    async fn load_or_gen_api_key<E, S>(&self, eng: &mut E, store: &mut S) -> Result<ApiKey<E::CS>>
+    where
+        E: Engine,
+        S: KeyStore,
+    {
+        let path = self.cfg.daemon_api_pk_path();
+        match try_read_cbor::<PublicApiKey<E::CS>>(&path).await? {
+            Some(pk) => {
+                let id = pk.id()?;
+                let sk = store
+                    .get_key::<E, ApiKey<E::CS>>(eng, id.into())?
+                    // If the public API key exists then the
+                    // secret half should exist the keystore. If
+                    // not, then something deleted it frmo the
+                    // keystore.
+                    .assume("`ApiKey` should exist")?;
+                Ok(sk)
+            }
+            None => {
+                let sk = ApiKey::generate(eng, store).context("unable to generate `ApiKey`")?;
+                info!("generated `ApiKey`");
+                write_cbor(&path, &sk.public()?)
+                    .await
+                    .context("unable to write `PublicApiKey` to disk")?;
+                Ok(sk)
+            }
+        }
+    }
+
     /// Loads the key wrapping key used by [`CryptoEngine`].
     async fn load_or_gen_key_wrap_key(&self) -> Result<KeyWrapKey> {
         let path = self.cfg.key_wrap_key_path();
@@ -291,7 +309,7 @@ impl Drop for Daemon {
     }
 }
 
-/// Tries to read JSON from `path`.
+/// Tries to read CBOR from `path`.
 async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<Option<T>> {
     match fs::read(path.as_ref()).await {
         Ok(buf) => Ok(cbor::from_reader(&buf[..])?),
@@ -300,7 +318,7 @@ async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<Op
     }
 }
 
-/// Writes `data` as JSON to `path`.
+/// Writes `data` as CBOR to `path`.
 async fn write_cbor(path: impl AsRef<Path>, data: impl Serialize) -> Result<()> {
     let mut buf = Vec::new();
     cbor::into_writer(&data, &mut buf)?;
@@ -313,12 +331,13 @@ mod tests {
 
     use std::time::Duration;
 
+    use aranya_crypto::Id;
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;
 
     use super::*;
-    use crate::config::AfcConfig;
+    use crate::config::{AfcConfig, AqcConfig};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -332,6 +351,7 @@ mod tests {
             work_dir: work_dir.clone(),
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
+            api_pk_id: Id::default(),
             sync_addr: any,
             afc: AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
@@ -340,6 +360,7 @@ mod tests {
                 create: true,
                 max_chans: 100,
             },
+            aqc: AqcConfig {},
         };
 
         let daemon = Daemon::load(cfg)
