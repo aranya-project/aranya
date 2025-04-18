@@ -257,7 +257,7 @@ function is_valid_psk_length(size int) bool {
 
 // Returns the channel operation for a particular label.
 function get_allowed_op(device_id id, label_id id) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedLabel[device_id: device_id, label_id: label_id]
+    let assigned_label = check_unwrap query AssignedLabel[label_id: label_id, device_id: device_id]
     return assigned_label.op
 }
 
@@ -1590,7 +1590,7 @@ command DeleteLabel {
 
         finish {
             // Cascade deleting the label assignments.
-            delete AssignedLabel[device_id: ?, label_id: label.label_id]
+            delete AssignedLabel[label_id: label.label_id, device_id: ?]
 
             delete Label[label_id: label.label_id]
 
@@ -1629,7 +1629,7 @@ Assigns a label to a Member.
 ```policy
 // Records that a device was granted permission to use a label
 // for certain channel operations.
-fact AssignedLabel[device_id id, label_id id]=>{op enum ChanOp}
+fact AssignedLabel[label_id id, device_id id]=>{op enum ChanOp}
 
 // Grants the device permission to use the label.
 //
@@ -1677,10 +1677,10 @@ command AssignLabel {
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        check !exists AssignedLabel[device_id: target.device_id, label_id: label.label_id]
+        check !exists AssignedLabel[label_id: label.label_id, device_id: target.device_id]
 
         finish {
-            create AssignedLabel[device_id: target.device_id, label_id: label.label_id]=>{op: this.op}
+            create AssignedLabel[label_id: label.label_id, device_id: target.device_id]=>{op: this.op}
 
             emit LabelAssigned {
                 label_id: label.label_id,
@@ -1762,10 +1762,10 @@ command RevokeLabel {
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        check exists AssignedLabel[device_id: target.device_id, label_id: label.label_id]
+        check exists AssignedLabel[label_id: label.label_id, device_id: target.device_id]
 
         finish {
-            delete AssignedLabel[device_id: target.device_id, label_id: label.label_id]
+            delete AssignedLabel[label_id: label.label_id, device_id: target.device_id]
 
             emit LabelRevoked {
                 label_id: label.label_id,
@@ -1906,13 +1906,17 @@ Queries for a list labels assigned to a device.
 // Emits `QueriedLabelAssignment` for all labels the device has
 // been granted permission to use.
 action query_label_assignments(device_id id) {
-    map AssignedLabel[device_id: device_id, label_id: ?] as f {
-        let label = check_unwrap query Label[label_id: f.label_id]
-        publish QueryLabelAssignment {
-            device_id: f.device_id,
-            label_id: f.label_id,
-            label_name: label.name,
-            label_author_id: label.author_id,
+    // TODO: make this query more efficient when policy supports it.
+    // The key order is optimized for `delete AssignedLabel`.
+    map AssignedLabel[label_id: ?, device_id: ?] as f {
+        if f.device_id == device_id {
+            let label = check_unwrap query Label[label_id: f.label_id]
+            publish QueryLabelAssignment {
+                device_id: f.device_id,
+                label_id: f.label_id,
+                label_name: label.name,
+                label_author_id: label.author_id,
+            }
         }
     }
 }
