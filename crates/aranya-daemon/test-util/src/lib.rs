@@ -1,6 +1,7 @@
 #![allow(clippy::expect_used, clippy::indexing_slicing, rust_2018_idioms)]
 
 use std::{
+    collections::BTreeMap,
     fs,
     ops::{Deref, DerefMut},
     sync::Arc,
@@ -20,7 +21,7 @@ use aranya_daemon::{
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState, GraphId, PeerCache,
+    ClientState, GraphId,
 };
 use aranya_util::Addr;
 use tempfile::{tempdir, TempDir};
@@ -195,7 +196,7 @@ impl TestCtx {
             );
 
             let aranya = Arc::new(Mutex::new(graph));
-            let peer_cache = Arc::new(Mutex::new(PeerCache::new()));
+            let peer_cache = Arc::new(Mutex::new(BTreeMap::new()));
             let client = TestClient::new(Arc::clone(&aranya), Arc::clone(&peer_cache));
             let server = TestServer::new(Arc::clone(&aranya), Arc::clone(&peer_cache), listener);
             (client, server, local_addr, pk)

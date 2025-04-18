@@ -1,6 +1,9 @@
 //! Aranya.
 
-use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
+use std::{
+    borrow::Cow, collections::BTreeMap, future::Future, marker::PhantomData, net::SocketAddr,
+    sync::Arc,
+};
 
 use anyhow::{bail, Context, Result};
 use aranya_aqc_util::LabelId;
@@ -43,16 +46,19 @@ pub struct Client<EN, SP, CE> {
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
     /// Thread-safe Peer Cache reference.
     /// Lock must be aquired after [`Self::aranya`]
-    peer_cache: Arc<Mutex<PeerCache>>,
+    peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
     _eng: PhantomData<CE>,
 }
 
 impl<EN, SP, CE> Client<EN, SP, CE> {
     /// Creates a new [`Client`].
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>, peer_cache: Arc<Mutex<PeerCache>>) -> Self {
+    pub fn new(
+        aranya: Arc<Mutex<ClientState<EN, SP>>>,
+        peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+    ) -> Self {
         Client {
             aranya,
-            peer_cache,
+            peer_caches,
             _eng: PhantomData,
         }
     }
@@ -80,10 +86,11 @@ where
 
         let (len, _) = {
             let mut client = self.aranya.lock().await;
-            let mut peer_cache = self.peer_cache.lock().await;
-            // TODO: save PeerCache somewhere.
+            let mut peer_caches = self.peer_caches.lock().await;
+            let peer_cache = peer_caches.entry(*addr).or_insert_with(|| PeerCache::new());
+
             syncer
-                .poll(&mut send_buf, client.provider(), &mut peer_cache)
+                .poll(&mut send_buf, client.provider(), peer_cache)
                 .context("sync poll failed")?
         };
         debug!(?len, "sync poll finished");
@@ -259,7 +266,7 @@ pub struct Server<EN, SP> {
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
     /// Thread-safe Peer Cache reference.
     /// Lock must be aquired after [`Self::aranya`]
-    peer_cache: Arc<Mutex<PeerCache>>,
+    peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
     /// Used to receive sync requests and send responses.
     listener: TcpListener,
     /// Tracks running tasks.
@@ -271,12 +278,12 @@ impl<EN, SP> Server<EN, SP> {
     #[inline]
     pub fn new(
         aranya: Arc<Mutex<ClientState<EN, SP>>>,
-        peer_cache: Arc<Mutex<PeerCache>>,
+        peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
         listener: TcpListener,
     ) -> Self {
         Self {
             aranya,
-            peer_cache,
+            peer_caches,
             listener,
             set: JoinSet::new(),
         }
@@ -309,10 +316,12 @@ where
             debug!(?addr, "received sync request");
 
             let client = Arc::clone(&self.aranya);
-            let peer_cache = Arc::clone(&self.peer_cache);
+            let peer_caches = Arc::clone(&self.peer_caches);
             self.set.spawn(
                 async move {
-                    if let Err(err) = Self::sync(client, peer_cache, &mut stream, addr).await {
+                    if let Err(err) =
+                        Self::sync(client, peer_caches, &mut stream, addr.into()).await
+                    {
                         error!(%err, "request failure");
                     }
                 }
@@ -325,9 +334,9 @@ where
     #[instrument(skip_all, fields(addr = %addr))]
     async fn sync(
         client: Arc<Mutex<ClientState<EN, SP>>>,
-        peer_cache: Arc<Mutex<PeerCache>>,
+        peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
         stream: &mut TcpStream,
-        addr: SocketAddr,
+        addr: Addr,
     ) -> Result<()> {
         let mut recv = Vec::new();
         stream
@@ -337,7 +346,7 @@ where
         debug!(n = recv.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let resp = match Self::sync_respond(client, peer_cache, &recv).await {
+        let resp = match Self::sync_respond(client, peer_caches, addr, &recv).await {
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
                 error!(?err, "error responding to sync request");
@@ -359,7 +368,8 @@ where
     #[instrument(skip_all)]
     async fn sync_respond(
         client: Arc<Mutex<ClientState<EN, SP>>>,
-        peer_cache: Arc<Mutex<PeerCache>>,
+        peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+        addr: Addr,
         request: &[u8],
     ) -> Result<Box<[u8]>> {
         // TODO: Use real server address
@@ -382,7 +392,11 @@ where
             .poll(
                 &mut buf,
                 client.lock().await.provider(),
-                &mut *peer_cache.lock().await,
+                peer_caches
+                    .lock()
+                    .await
+                    .entry(addr)
+                    .or_insert_with(|| PeerCache::new()),
             )
             .context("sync resp poll failed")?;
         debug!(len = len, "sync poll finished");
