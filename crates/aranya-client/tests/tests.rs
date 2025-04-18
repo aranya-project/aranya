@@ -14,7 +14,7 @@ use std::path::Path;
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
-use aranya_client::{Client, SyncPeerConfig};
+use aranya_client::{Client, SyncPeerConfig, TeamConfig};
 use aranya_crypto::{hash::Hash as _, rust::Sha256};
 use aranya_daemon::{
     config::{AfcConfig, Config},
@@ -390,10 +390,11 @@ async fn test_sync_now() -> Result<()> {
     let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
 
     // Create the initial team, and get our TeamId.
+    let cfg = TeamConfig::builder().build()?;
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -452,10 +453,11 @@ async fn test_query_functions() -> Result<()> {
     let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
 
     // Create the initial team, and get our TeamId.
+    let cfg = TeamConfig::builder().build()?;
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -679,10 +681,11 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     let mut team = TeamCtx::new("test_afc_two_way_one_chan", work_dir).await?;
 
     // Create the initial team, and get our TeamId.
+    let cfg = TeamConfig::builder().build()?;
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -801,10 +804,11 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     let mut team = TeamCtx::new("test_afc_monotonic_seq", work_dir).await?;
 
     // Create the initial team, and get our TeamId.
+    let cfg = TeamConfig::builder().build()?;
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
