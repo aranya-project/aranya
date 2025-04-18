@@ -1,11 +1,14 @@
-//! Address routines.
+//! Network address handling and utilities.
 //!
-//! Utilities for network addresses including:
-//! - DNS lookup.
-//! - Printing out human readable strings.
-//! - Parsing hostname and port from addresses.
-//! - Conversions to/from SocketAddr, IPv4, IPv6.
-//! - Checking for valid formatting.
+//! This module provides the [`Addr`] type for representing network addresses
+//! (hostname/IP and port) and associated functionality.
+//!
+//!
+//! The Addr type supports parsing addresses from strings in various formats
+//! (e.g., "spideroak.com:80", "192.168.1.1:8080", "\[::1\]:443"), asynchronous DNS
+//! resolution via [`Addr::lookup`], and conversion to and from standard library
+//! types like [`std::net::SocketAddr`], [`std::net::Ipv4Addr`], and
+//! [`std::net::Ipv6Addr`].
 
 use std::{
     cmp::Ordering,
@@ -34,10 +37,14 @@ macro_rules! const_assert {
     }
 }
 
-/// A 'host:port' network address.
+/// A "host:port" network address.
 ///
-/// The 'host' portion can be a domain name, IPv4 address, or
-/// IPv6 address.
+/// The host can be a domain name, IPv4, or IPv6 address and the
+/// port must be a valid [u16].
+///
+/// `Addr` ensures that the host part is a syntactically valid domain name or IP address.
+/// It provides methods for DNS lookup, conversion to socket addresses, and serde
+/// serialization/deserialization.
 #[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Addr {
     host: Host,
@@ -46,10 +53,17 @@ pub struct Addr {
 const_assert!(size_of::<Addr>() == 256);
 
 impl Addr {
-    /// Creates a new `Addr`.
+    /// Creates a new `Addr` from a host representation and a port number.
     ///
-    /// `host` can be a domain name, IPv4 address, or IPv6
-    /// address.
+    /// The `host` can be a domain name (e.g., "spideroak.com"), an IPv4 address string
+    /// (e.g., "192.168.1.1"), or an IPv6 address string (e.g., "::1").
+    ///
+    /// Returns an error if the host is not a valid domain name or IP address string.
+    ///
+    /// # Errors
+    ///
+    /// Returns `AddrError::InvalidAddr` if the `host` string is not a valid
+    /// domain name or IP address.
     pub fn new<T>(host: T, port: u16) -> Result<Self, AddrError>
     where
         T: AsRef<str>,
@@ -58,29 +72,32 @@ impl Addr {
         let host = Host::from_domain(host)
             .or_else(|| host.parse::<Ipv4Addr>().ok().map(Into::into))
             .or_else(|| host.parse::<Ipv6Addr>().ok().map(Into::into))
-            .ok_or(AddrError::InvalidAddr("not a valid domain name"))?;
+            .ok_or(AddrError::InvalidAddr(
+                "not a valid domain name or IP address",
+            ))?;
         Ok(Self { host, port })
     }
 
-    /// Returns the host name.
+    /// Returns a reference to the host part (domain name or IP address) of the `Addr`.
     pub fn host(&self) -> &str {
         &self.host
     }
 
-    /// Returns the port number.
+    /// Returns the port number of the `Addr`.
     pub fn port(&self) -> u16 {
         self.port
     }
 
-    /// Performs a DNS lookup.
+    /// Performs an asynchronous DNS lookup for this `Addr`.
+    ///
+    /// Resolves the host part of the address to one or more [`SocketAddr`] values.
     #[instrument(skip_all, fields(host = %self))]
     pub async fn lookup(&self) -> io::Result<impl Iterator<Item = SocketAddr> + '_> {
         debug!("performing DNS lookup");
-
         net::lookup_host(Into::<(&str, u16)>::into(self)).await
     }
 
-    /// Converts the `Addr` to a [`ToSocketAddrs`].
+    /// Converts the `Addr` into a type that implements [`ToSocketAddrs`].
     pub fn to_socket_addrs(&self) -> impl ToSocketAddrs + '_ {
         Into::<(&str, u16)>::into(self)
     }
@@ -108,6 +125,21 @@ where
 impl FromStr for Addr {
     type Err = AddrError;
 
+    /// Parses a string into an `Addr`.
+    ///
+    /// The string can be in several forms:
+    /// - `host:port` (e.g., "spideroak.com:80", "192.168.1.1:8080")
+    /// - IPv6 address with port: `[ipv6_addr]:port` (e.g., "\[::1\]:443")
+    /// - A string representation of a `SocketAddr` (which `std::net::SocketAddr::from_str` can parse).
+    ///
+    /// This function first attempts to parse using [`SocketAddr`], then falls
+    /// back to splitting the string at the first ":" character to parse the
+    /// host and port.
+    ///
+    /// # Errors
+    ///
+    /// Returns `AddrError::InvalidAddr` if the string format is invalid or the port
+    /// number is malformed.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Ok(addr) = SocketAddr::from_str(s) {
             return Ok(addr.into());
@@ -544,7 +576,7 @@ const fn base16(x: u8) -> u8 {
 pub enum AddrError {
     /// An internal bug was discovered.
     Bug(Bug),
-    /// The address is invalid.
+    /// The provided address string is invalid.
     InvalidAddr(&'static str),
 }
 
