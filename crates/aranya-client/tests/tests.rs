@@ -137,12 +137,16 @@ fn trim(mut d: u128, mut width: usize) -> (u128, usize) {
 /// Repeatedly calls `poll_data`, followed by `handle_data`, until all of the clients are pending.
 // TODO(nikki): alternative to select!{} to resolve lifetime issues
 #[cfg(any())]
-macro_rules! do_poll {
+macro_rules! do_afc_poll {
     ($($client:expr),*) => {
         debug!(
             clients = stringify!($($client),*),
-            "start `do_poll`",
+            "start `do_afc_poll`",
         );
+
+        // Make sure any changes before now get synced before we try polling.
+        sleep(SLEEP_INTERVAL).await;
+
         loop {
             let mut afcs = [ $($client.afc()),* ];
             let mut afcs = afcs.iter_mut();
@@ -154,9 +158,10 @@ macro_rules! do_poll {
                 _ = async {} => break,
             }
         }
+
         debug!(
             clients = stringify!($($client),*),
-            "finish `do_poll`",
+            "finish `do_afc_poll`",
         );
     };
 }
@@ -431,7 +436,7 @@ async fn test_sync_now() -> Result<()> {
 
     // Let's sync immediately, which will propagate the role change.
     admin.sync_now(owner_addr.into(), None).await?;
-    sleep(Duration::from_secs(1)).await;
+    sleep(SLEEP_INTERVAL).await;
 
     // Now we should be able to successfully assign a role.
     admin.assign_role(team.operator.id, Role::Operator).await?;
@@ -603,8 +608,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
         .await?;
 
     // Make sure both clients are polling for AFC data.
-    sleep(SLEEP_INTERVAL).await;
-    do_poll!(team.membera.client, team.memberb.client);
+    do_afc_poll!(team.membera.client, team.memberb.client);
 
     let msgs = ["hello world label1", "hello world label2"];
 
@@ -625,8 +629,7 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     debug!(msg = msgs[1], "sent message");
 
     // Make sure that Member B receives both messages.
-    sleep(SLEEP_INTERVAL).await;
-    do_poll!(team.membera.client, team.memberb.client);
+    do_afc_poll!(team.membera.client, team.memberb.client);
 
     // Check that the first message arrived.
     let got = team
@@ -738,8 +741,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     debug!(msg = msg, "sent message");
 
     // Make sure both peers are polling so Member B can receive the message and respond.
-    sleep(SLEEP_INTERVAL).await;
-    do_poll!(team.membera.client, team.memberb.client);
+    do_afc_poll!(team.membera.client, team.memberb.client);
 
     // Try to receive the message from Member A.
     let got = team
@@ -769,8 +771,7 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     debug!(msg, "sent message");
 
     // Sleep and make sure we're polling so we can receive the message back.
-    sleep(SLEEP_INTERVAL).await;
-    do_poll!(team.membera.client, team.memberb.client);
+    do_afc_poll!(team.membera.client, team.memberb.client);
 
     // Check that we actually got the message.
     let want = Message {
@@ -865,8 +866,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
         debug!(msg = msg, "sent message");
 
         // Sleep and make sure that both peers are polling so we can receive the message.
-        sleep(SLEEP_INTERVAL).await;
-        do_poll!(team.membera.client, team.memberb.client);
+        do_afc_poll!(team.membera.client, team.memberb.client);
 
         // Check that we got a message, and make sure it has the correct sequence number.
         let got = team
@@ -896,8 +896,7 @@ async fn test_afc_monotonic_seq() -> Result<()> {
         debug!(msg, "sent message");
 
         // Sleep and make sure that both peers are polling so we can receive the message.
-        sleep(SLEEP_INTERVAL).await;
-        do_poll!(team.membera.client, team.memberb.client);
+        do_afc_poll!(team.membera.client, team.memberb.client);
 
         // Make sure we get back the message we expect, and that it has the right sequence number.
         let want = Message {
@@ -995,8 +994,7 @@ async fn test_afc_reboot() -> Result<()> {
     debug!(msg = msg, "sent message");
 
     // Sleep and make sure we're polling so we can receive the message back.
-    sleep(SLEEP_INTERVAL).await;
-    do_poll!(team.membera.client, team.memberb.client);
+    do_afc_poll!(team.membera.client, team.memberb.client);
 
     // Make sure Member B gets the correct message.
     let got = team
@@ -1026,8 +1024,7 @@ async fn test_afc_reboot() -> Result<()> {
     debug!(msg, "sent message");
 
     // Sleep and make sure we're polling so we can receive the message back.
-    sleep(SLEEP_INTERVAL).await;
-    do_poll!(team.membera.client, team.memberb.client);
+    do_afc_poll!(team.membera.client, team.memberb.client);
 
     // Check that we actually got the response back.
     let want = Message {
