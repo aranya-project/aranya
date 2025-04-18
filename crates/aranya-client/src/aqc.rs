@@ -1,6 +1,6 @@
 //! AQC support.
 
-use std::{io, net::SocketAddr, path::PathBuf};
+use std::{collections::BTreeMap, io, net::SocketAddr, path::PathBuf};
 
 use anyhow::{anyhow, bail, Context};
 use aranya_aqc_util::{
@@ -8,7 +8,10 @@ use aranya_aqc_util::{
 };
 use aranya_crypto::{
     aead::Aead,
-    aqc::{BidiChannelId, BidiPeerEncap, UniChannelId, UniPeerEncap},
+    aqc::{
+        BidiAuthorSecretId, BidiChannelId, BidiPeerEncap, UniAuthorSecretId, UniChannelId,
+        UniPeerEncap,
+    },
     default::DefaultEngine,
     generic_array::GenericArray,
     import::Import,
@@ -68,11 +71,17 @@ impl AqcChannelsImpl {
 /// sending data between peers.
 pub struct AqcChannels<'a> {
     client: &'a mut crate::Client,
+    bidi_chans: BTreeMap<AqcBidiChannelId, BidiAuthorSecretId>,
+    uni_chans: BTreeMap<AqcUniChannelId, UniAuthorSecretId>,
 }
 
 impl<'a> AqcChannels<'a> {
     pub(crate) fn new(client: &'a mut crate::Client) -> Self {
-        Self { client }
+        Self {
+            client,
+            bidi_chans: BTreeMap::new(),
+            uni_chans: BTreeMap::new(),
+        }
     }
 
     /// Returns the address that AQC is bound to.
@@ -127,6 +136,9 @@ impl<'a> AqcChannels<'a> {
                 .bidi_channel_created(&mut self.client.aqc.eng.clone(), &effect)
                 .map_err(AqcError::ChannelCreation)?;
             debug!("psk id: {:?}", psk.identity());
+
+            self.bidi_chans
+                .insert(v.channel_id.into_id().into(), v.author_secrets_id);
 
             // TODO: send ctrl msg via network.
 
@@ -189,6 +201,9 @@ impl<'a> AqcChannels<'a> {
                 .map_err(AqcError::ChannelCreation)?;
             debug!("psk id: {:?}", psk.identity());
 
+            self.uni_chans
+                .insert(v.channel_id.into_id().into(), v.author_secrets_id);
+
             // TODO: send ctrl msg via network.
 
             // TODO: for testing only. Send ctrl via network instead of returning.
@@ -205,12 +220,18 @@ impl<'a> AqcChannels<'a> {
     // It is an error if the channel does not exist
     #[instrument(skip_all, fields(chan = %chan))]
     pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannelId) -> crate::Result<()> {
-        let _ctrl = self
-            .client
+        let Some(secret_id) = self.bidi_chans.remove(&chan) else {
+            return Ok(());
+        };
+        self.client
             .daemon
-            .delete_aqc_bidi_channel(context::current(), chan)
+            .delete_aqc_bidi_channel(context::current(), secret_id)
             .await??;
-        //self.client.aqc.remove_channel(chan).await;
+
+        // TODO: delete QUIC channel.
+
+        // TODO: delete channel PSK
+
         Ok(())
     }
 
@@ -218,12 +239,18 @@ impl<'a> AqcChannels<'a> {
     // It is an error if the channel does not exist
     #[instrument(skip_all, fields(chan = %chan))]
     pub async fn delete_uni_channel(&mut self, chan: AqcUniChannelId) -> crate::Result<()> {
-        let _ctrl = self
-            .client
+        let Some(secret_id) = self.uni_chans.remove(&chan) else {
+            return Ok(());
+        };
+        self.client
             .daemon
-            .delete_aqc_uni_channel(context::current(), chan)
+            .delete_aqc_uni_channel(context::current(), secret_id)
             .await??;
-        //self.client.aqc.remove_channel(chan).await;
+
+        // TODO: delete QUIC channel.
+
+        // TODO: delete channel PSK
+
         Ok(())
     }
 
