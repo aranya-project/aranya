@@ -159,15 +159,13 @@ function find_existing_device(device_id id) optional struct Device {
     return device
 }
 
-// Checks if the team exists.
+// Returns whether the team exists.
+// Returns true if the team exists, returns false otherwise.
 // This should always be the first thing that is checked before executing a command on a team.
 // The only command that doesn't run this check first is `CreateTeam`.
-// Caller does not need to check the return bool, since it will always be true if the `check` succeeds.
-function check_team_exists() bool {
+function team_exists() bool {
     // Check to see if team is active.
-    check !exists TeamEnd[]=> {}
-
-    return true
+    return !exists TeamEnd[]=> {}
 }
 
 // Returns a valid Device after performing sanity checks per the stated invariants.
@@ -459,7 +457,7 @@ command TerminateTeam {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(envelope::author_id(envelope))
@@ -514,7 +512,7 @@ command AddMember {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         // Derive the key IDs from the provided KeyBundle.
@@ -570,7 +568,7 @@ command RemoveMember{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
@@ -656,7 +654,7 @@ command AssignOwner{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
@@ -710,7 +708,7 @@ command AssignAdmin{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
@@ -751,7 +749,7 @@ command AssignOperator{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
@@ -831,7 +829,7 @@ command RevokeOwner{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
@@ -885,7 +883,7 @@ command RevokeAdmin{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
@@ -926,7 +924,7 @@ command RevokeOperator{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
@@ -983,7 +981,7 @@ command SetAqcNetworkName {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
@@ -1051,7 +1049,7 @@ command UnsetAqcNetworkName {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
@@ -1196,7 +1194,7 @@ command AqcCreateBidiChannel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let peer = get_valid_device(this.peer_id)
@@ -1394,7 +1392,7 @@ command AqcCreateUniChannel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
 
@@ -1506,7 +1504,7 @@ command CreateLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
 
@@ -1574,7 +1572,7 @@ command DeleteLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
 
@@ -1660,7 +1658,7 @@ command AssignLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
@@ -1745,7 +1743,7 @@ command RevokeLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
@@ -1819,7 +1817,7 @@ command QueryLabelExists {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         // Get label if it exists
         let label = check_unwrap query Label[label_id: this.label_id]
@@ -1876,7 +1874,7 @@ command QueryLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         finish {
             emit QueriedLabel {
@@ -1933,7 +1931,7 @@ command QueryLabelAssignment {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         finish {
             emit QueriedLabelAssignment {
@@ -1987,7 +1985,7 @@ command QueryDevicesOnTeam {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         finish {
             emit QueryDevicesOnTeamResult {
@@ -2028,7 +2026,7 @@ command QueryDeviceRole {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(this.device_id)
@@ -2086,7 +2084,7 @@ command QueryDeviceKeyBundle {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(this.device_id)
@@ -2138,7 +2136,7 @@ command QueryAqcNetIdentifier {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
-        let t = check_team_exists()
+        check team_exists()
 
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(this.device_id)
