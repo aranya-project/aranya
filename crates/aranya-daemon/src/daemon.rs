@@ -1,11 +1,18 @@
-#[cfg(feature = "afc")]
-use std::str::FromStr;
+use core::borrow::Borrow;
 use std::{io, path::Path, sync::Arc};
 
 use anyhow::{anyhow, bail, Context, Result};
 use aranya_crypto::{
-    aead::Aead, default::DefaultEngine, generic_array::GenericArray, import::Import,
-    keys::SecretKeyBytes, keystore::fs_keystore::Store, CipherSuite, Random, Rng,
+    aead::Aead,
+    custom_id,
+    default::DefaultEngine,
+    generic_array::GenericArray,
+    id::{Id, IdError},
+    import::Import,
+    kem::{DecapKey as _, Kem},
+    keys::{PublicKey as _, SecretKey, SecretKeyBytes},
+    keystore::{fs_keystore::Store, KeyStore, KeyStoreExt},
+    CipherSuite, Engine, Random, Rng,
 };
 use aranya_daemon_api::{KeyStoreInfo, CS};
 #[cfg(feature = "afc")]
@@ -16,6 +23,7 @@ use aranya_runtime::{
     ClientState,
 };
 use aranya_util::Addr;
+use buggy::BugExt;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
@@ -24,7 +32,7 @@ use tracing::debug;
 use tracing::{error, info};
 
 use crate::{
-    api::DaemonApiServer,
+    api::{ApiKey, DaemonApiServer, PublicApiKey},
     aranya,
     config::Config,
     policy,
@@ -72,8 +80,6 @@ impl Daemon {
         aranya_util::create_dir_all(&store_dir).await?;
         let mut root_store =
             KS::open(store_dir.join("root")).context("unable to open root keystore")?;
-        let local_store =
-            KS::open(store_dir.join("local")).context("unable to open local keystore")?;
         let mut eng = {
             // Load keys from the keystore or generate new ones
             // if there are no existing keys.
@@ -83,9 +89,10 @@ impl Daemon {
         let pk = self
             .load_or_gen_public_keys(&mut eng, &mut root_store)
             .await?;
-        let pk = self
-            .load_or_gen_public_keys(&mut eng, &mut local_store)
-            .await?;
+
+        let mut local_store =
+            KS::open(store_dir.join("local")).context("unable to open local keystore")?;
+        let api_sk = self.load_or_gen_api_key(&mut eng, &mut local_store).await?;
 
         // Initialize Aranya client.
         let (client, local_addr) = {
@@ -116,28 +123,19 @@ impl Daemon {
             }
         });
 
-        let api = {
-            #[cfg(feature = "afc")]
-            let afc = self.setup_afc()?;
-            DaemonApiServer::new(
-                client,
-                local_addr,
-                KeyStoreInfo {
-                    path: self.cfg.keystore_path(),
-                    wrapped_key: self.cfg.key_wrap_key_path(),
-                },
-                self.cfg.uds_api_path.clone(),
-                Arc::new(pk),
-                peers,
-                recv_effects,
-                local_store,
-                #[cfg(feature = "afc")]
-                Arc::new(Mutex::new(afc)),
-                #[cfg(feature = "afc")]
-                eng,
-            )
-            .context("Unable to start daemon API!")?
-        };
+        let api = DaemonApiServer::new(
+            client,
+            local_addr,
+            KeyStoreInfo {
+                path: self.cfg.keystore_path(),
+                wrapped_key: self.cfg.key_wrap_key_path(),
+            },
+            self.cfg.uds_api_path.clone(),
+            api_sk,
+            Arc::new(pk),
+            peers,
+            recv_effects,
+        );
         api.serve().await?;
 
         Ok(())
@@ -243,21 +241,34 @@ impl Daemon {
         bundle.public_keys(eng, store)
     }
 
-    async fn load_or_gen_public_key(&self, eng: &mut CE, store: &mut KS) -> Result<PublicKeys<CS>> {
-        let path = self.cfg.key_bundle_path();
-        let bundle = match try_read_cbor(&path).await? {
-            Some(bundle) => bundle,
-            None => {
-                let bundle =
-                    KeyBundle::generate(eng, store).context("unable to generate key bundle")?;
-                info!("generated key bundle");
-                write_cbor(&path, &bundle)
-                    .await
-                    .context("unable to write `KeyBundle` to disk")?;
-                bundle
+    /// Loads or generates the [`ApiKey`].
+    async fn load_or_gen_api_key<E, S>(&self, eng: &mut E, store: &mut S) -> Result<ApiKey<E::CS>>
+    where
+        E: Engine,
+        S: KeyStore,
+    {
+        let path = self.cfg.daemon_api_pk_path();
+        match try_read_cbor::<PublicApiKey<E::CS>>(&path).await? {
+            Some(pk) => {
+                let id = pk.id()?;
+                let sk = store
+                    .get_key::<E, ApiKey<E::CS>>(eng, id.into())?
+                    // If the public API key exists then the
+                    // secret half should exist the keystore. If
+                    // not, then something deleted it frmo the
+                    // keystore.
+                    .assume("`ApiKey` should exist")?;
+                Ok(sk)
             }
-        };
-        bundle.public_keys(eng, store)
+            None => {
+                let sk = ApiKey::generate(eng, store).context("unable to generate `ApiKey`")?;
+                info!("generated `ApiKey`");
+                write_cbor(&path, &sk.public()?)
+                    .await
+                    .context("unable to write `PublicApiKey` to disk")?;
+                Ok(sk)
+            }
+        }
     }
 
     /// Loads the key wrapping key used by [`CryptoEngine`].

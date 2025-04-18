@@ -5,6 +5,7 @@ use core::{
     pin::{pin, Pin},
     task::{Context, Poll},
 };
+use std::sync::Arc;
 
 use aranya_crypto::{
     aead::{Aead, IndCca2, Tag},
@@ -16,7 +17,7 @@ use aranya_crypto::{
 };
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
-use futures::{ready, Sink, Stream};
+use futures::{ready, Sink, Stream, TryFuture};
 use pin_project::pin_project;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub use tarpc::tokio_util::codec::length_delimited::{Builder, LengthDelimitedCodec};
@@ -38,13 +39,13 @@ where
 }
 
 /// Creates a client-side transport.
-pub async fn client<S, R, K, F, A, Item, SinkItem>(
+pub fn client<S, R, K, F, A, Item, SinkItem>(
     io: S,
     codec: LengthDelimitedCodec,
     rng: R,
     pk: K::EncapKey,
     info: &[u8],
-) -> io::Result<CryptIoClient<S, R, K, F, A, Item, SinkItem>>
+) -> ClientConn<S, R, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
     R: Csprng,
@@ -58,7 +59,7 @@ where
         Framed::new(io, codec.clone()),
         SymmetricalMessagePack::default(),
     );
-    let client = CryptIoClient {
+    ClientConn {
         inner,
         rng,
         pk,
@@ -66,13 +67,12 @@ where
         seal: None,
         open: None,
         _marker: PhantomData,
-    };
-    Ok(client)
+    }
 }
 
 /// An encrypted [`Transport`][tarpc::Transport].
 #[pin_project]
-pub struct CryptIoClient<S, R, K, F, A, Item, SinkItem>
+pub struct ClientConn<S, R, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
     K: Kem,
@@ -89,7 +89,7 @@ where
     _marker: PhantomData<fn() -> (F, Item, SinkItem)>,
 }
 
-impl<S, R, K, F, A, Item, SinkItem> CryptIoClient<S, R, K, F, A, Item, SinkItem>
+impl<S, R, K, F, A, Item, SinkItem> ClientConn<S, R, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
     K: Kem,
@@ -113,7 +113,7 @@ where
     }
 }
 
-impl<S, R, K, F, A, Item, SinkItem> CryptIoClient<S, R, K, F, A, Item, SinkItem>
+impl<S, R, K, F, A, Item, SinkItem> ClientConn<S, R, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
     K: Kem,
@@ -137,7 +137,7 @@ where
     }
 }
 
-impl<S, R, K, F, A, Item, SinkItem> CryptIoClient<S, R, K, F, A, Item, SinkItem>
+impl<S, R, K, F, A, Item, SinkItem> ClientConn<S, R, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
     R: Csprng,
@@ -165,7 +165,7 @@ where
     }
 }
 
-impl<S, R, K, F, A, Item, SinkItem> Stream for CryptIoClient<S, R, K, F, A, Item, SinkItem>
+impl<S, R, K, F, A, Item, SinkItem> Stream for ClientConn<S, R, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     R: Csprng,
@@ -198,7 +198,7 @@ where
     }
 }
 
-impl<S, R, K, F, A, Item, SinkItem> Sink<SinkItem> for CryptIoClient<S, R, K, F, A, Item, SinkItem>
+impl<S, R, K, F, A, Item, SinkItem> Sink<SinkItem> for ClientConn<S, R, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     R: Csprng,
@@ -235,37 +235,72 @@ where
 }
 
 /// Creates a server-side transport.
-pub async fn server<S, K, F, A, Item, SinkItem>(
-    io: S,
+pub fn server<L, K, F, A, Item, SinkItem>(
+    listener: L,
     codec: LengthDelimitedCodec,
     sk: K::DecapKey,
     info: &[u8],
-) -> io::Result<CryptIoServer<S, K, F, A, Item, SinkItem>>
+) -> Server<L, K, F, A, Item, SinkItem>
 where
-    S: AsyncRead + AsyncWrite,
     K: Kem,
     F: Kdf,
     A: Aead + IndCca2,
     Item: for<'de> Deserialize<'de>,
     SinkItem: Serialize,
 {
-    let inner = serde_transport::new(
-        Framed::new(io, codec.clone()),
-        SymmetricalMessagePack::default(),
-    );
-    Ok(CryptIoServer {
-        inner,
-        sk,
-        info: info.to_vec(),
-        seal: None,
-        open: None,
+    Server {
+        listener,
+        codec,
+        sk: Arc::new(sk),
+        info: Arc::from(info),
         _marker: PhantomData,
-    })
+    }
+}
+
+/// Creates [`ServerConn`]s.
+#[pin_project]
+pub struct Server<L, K, F, A, Item, SinkItem>
+where
+    K: Kem,
+{
+    #[pin]
+    listener: L,
+    codec: LengthDelimitedCodec,
+    sk: Arc<K::DecapKey>,
+    info: Arc<[u8]>,
+    _marker: PhantomData<fn() -> (F, A, Item, SinkItem)>,
+}
+
+impl<S, L, K, F, A, Item, SinkItem> Stream for Server<L, K, F, A, Item, SinkItem>
+where
+    S: AsyncRead + AsyncWrite,
+    K: Kem,
+    A: Aead + IndCca2,
+    L: TryFuture<Ok = S, Error = io::Error>,
+{
+    type Item = io::Result<ServerConn<S, K, F, A, Item, SinkItem>>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let io = ready!(self.as_mut().project().listener.try_poll(cx)?);
+        let inner = serde_transport::new(
+            Framed::new(io, self.codec.clone()),
+            SymmetricalMessagePack::default(),
+        );
+        let conn = ServerConn {
+            inner,
+            sk: Arc::clone(&self.sk),
+            info: Arc::clone(&self.info),
+            seal: None,
+            open: None,
+            _marker: PhantomData,
+        };
+        Poll::Ready(Some(Ok(conn)))
+    }
 }
 
 /// An encrypted [`Transport`][tarpc::Transport].
 #[pin_project]
-pub struct CryptIoServer<S, K, F, A, Item, SinkItem>
+pub struct ServerConn<S, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
     K: Kem,
@@ -273,15 +308,15 @@ where
 {
     #[pin]
     inner: Transport<S, Msg, Msg, SymmetricalMessagePack<Msg>>,
-    sk: K::DecapKey,
-    info: Vec<u8>,
+    sk: Arc<K::DecapKey>,
+    info: Arc<[u8]>,
     seal: Option<SealCtx<A>>,
     open: Option<OpenCtx<A>>,
     #[allow(clippy::type_complexity)]
     _marker: PhantomData<fn() -> (F, Item, SinkItem)>,
 }
 
-impl<S, K, F, A, Item, SinkItem> CryptIoServer<S, K, F, A, Item, SinkItem>
+impl<S, K, F, A, Item, SinkItem> ServerConn<S, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
     K: Kem,
@@ -305,7 +340,7 @@ where
     }
 }
 
-impl<S, K, F, A, Item, SinkItem> CryptIoServer<S, K, F, A, Item, SinkItem>
+impl<S, K, F, A, Item, SinkItem> ServerConn<S, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
     K: Kem,
@@ -329,7 +364,7 @@ where
     }
 }
 
-impl<S, K, F, A, Item, SinkItem> CryptIoServer<S, K, F, A, Item, SinkItem>
+impl<S, K, F, A, Item, SinkItem> ServerConn<S, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
     K: Kem,
@@ -354,7 +389,7 @@ where
     }
 }
 
-impl<S, K, F, A, Item, SinkItem> Stream for CryptIoServer<S, K, F, A, Item, SinkItem>
+impl<S, K, F, A, Item, SinkItem> Stream for ServerConn<S, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     K: Kem,
@@ -386,7 +421,7 @@ where
     }
 }
 
-impl<S, K, F, A, Item, SinkItem> Sink<SinkItem> for CryptIoServer<S, K, F, A, Item, SinkItem>
+impl<S, K, F, A, Item, SinkItem> Sink<SinkItem> for ServerConn<S, K, F, A, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     K: Kem,

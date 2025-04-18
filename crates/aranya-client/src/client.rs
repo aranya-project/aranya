@@ -4,8 +4,6 @@ use core::{borrow::Borrow, net::SocketAddr, time::Duration};
 use std::{io, path::Path};
 
 use aranya_crypto::{import::Import, kem::Kem, keys::PublicKey, CipherSuite, Rng};
-#[cfg(feature = "afc")]
-use aranya_daemon_api::CS;
 use aranya_daemon_api::{
     self as api, crypto::LengthDelimitedCodec, ChanOp, DaemonApiClient, DeviceId, KeyBundle,
     KeyStoreInfo, Label, LabelId, NetIdentifier, Role, TeamId, CS,
@@ -173,9 +171,7 @@ impl Client {
             <CS as CipherSuite>::Aead,
             _,
             _,
-        >(sock, codec, Rng, pk, info)
-        .await
-        .map_err(Error::Connecting)?;
+        >(sock, codec, Rng, pk, info);
 
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
         debug!("connected to daemon");

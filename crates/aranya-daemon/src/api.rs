@@ -3,6 +3,7 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
+use core::{borrow::Borrow, fmt, marker::PhantomData};
 use std::{
     collections::BTreeMap,
     future::{self, Future},
@@ -12,8 +13,8 @@ use std::{
 };
 
 use anyhow::{anyhow, Context, Result};
-use aranya_crypto::{Csprng, DeviceId, Rng};
-use aranya_daemon_api::{self as api, DaemonApi};
+use aranya_crypto::{CipherSuite, Csprng, DeviceId, Rng};
+use aranya_daemon_api::{self as api, crypto::LengthDelimitedCodec, DaemonApi, CS};
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -24,14 +25,14 @@ use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,
     server::{self, Channel},
-    tokio_serde::formats::Json,
 };
 use tokio::{
-    net::UnixStream,
+    net::UnixListener,
     sync::{mpsc, Mutex},
 };
 use tracing::{debug, error, info, instrument, warn};
 
+pub(crate) use crate::keys::{ApiKey, PublicApiKey};
 use crate::{
     aranya::Actions,
     policy::{ChanOp, Effect, KeyBundle, Role},
@@ -51,8 +52,6 @@ mod afc_imports {
 #[allow(clippy::wildcard_imports)]
 use afc_imports::*;
 
-use crate::daemon::KS;
-
 async fn spawn(fut: impl Future<Output = ()> + Send + 'static) {
     tokio::spawn(fut);
 }
@@ -70,6 +69,8 @@ type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
 
 /// Daemon API Server.
 pub struct DaemonApiServer {
+    // Used to encrypt data sent over the API.
+    sk: ApiKey<CS>,
     daemon_sock: PathBuf,
     /// Channel for receiving effects from the syncer.
     recv_effects: EffectReceiver,
@@ -78,7 +79,7 @@ pub struct DaemonApiServer {
 }
 
 impl DaemonApiServer {
-    /// Create new RPC server.
+    /// Create new `DaemonApiServer`.
     #[instrument(skip_all)]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -86,16 +87,14 @@ impl DaemonApiServer {
         local_addr: SocketAddr,
         keystore_info: api::KeyStoreInfo,
         daemon_sock: PathBuf,
-        pk: Arc<PublicKeys<api::CS>>,
+        sk: ApiKey<CS>,
+        pk: Arc<PublicKeys<CS>>,
         peers: SyncPeers,
         recv_effects: EffectReceiver,
-    ) -> Result<Self> {
-        info!("uds path: {:?}", daemon_sock);
-
-        #[cfg(feature = "afc")]
-        let device_id = pk.ident_pk.id()?;
-        Ok(Self {
+    ) -> Self {
+        Self {
             daemon_sock,
+            sk,
             recv_effects,
             handler: DaemonApiHandler {
                 client,
@@ -103,59 +102,41 @@ impl DaemonApiServer {
                 pk,
                 peers,
                 keystore_info,
-
-                aqc_peers: Arc::default(),
-
-                aqc_peers: Arc::default(),
+                aqc_peers: PeerMap::default(),
             },
-        })
-    }
-
-    /// Create new RPC server.
-    #[instrument(skip_all)]
-    #[cfg(not(feature = "afc"))]
-    pub fn new(
-        client: Arc<Client>,
-        local_addr: SocketAddr,
-        keystore_info: api::KeyStoreInfo,
-        daemon_sock: PathBuf,
-        pk: Arc<PublicKeys<api::CS>>,
-        peers: SyncPeers,
-        recv_effects: EffectReceiver,
-    ) -> Result<Self> {
-        info!("uds path: {:?}", daemon_sock);
-        Ok(Self {
-            daemon_sock,
-            recv_effects,
-            handler: DaemonApiHandler {
-                client,
-                local_addr,
-                pk,
-                peers,
-                keystore_info,
-                aqc_peers: Arc::default(),
->>>>>>> origin/main
-            },
-        })
+        }
     }
 
     /// Run the RPC server.
     #[instrument(skip_all)]
     #[allow(clippy::disallowed_macros)]
     pub async fn serve(mut self) -> Result<()> {
-        let mut listener =
-            tarpc::serde_transport::unix::listen(&self.daemon_sock, Json::default).await?;
+        let mut listener = UnixListener::bind(&self.daemon_sock)?;
         info!(
-            "listening on {:?}",
-            listener
+            addr = ?listener
                 .local_addr()
+                .assume("should be able to retrieve local addr")?
                 .as_pathname()
-                .assume("expected uds api path to be set")?
+                .assume("addr should be a pathname")?,
+            "listening"
         );
-        listener.config_mut().max_frame_length(usize::MAX);
+
+        let info = self.daemon_sock.as_os_str().as_encoded_bytes();
+        let codec = LengthDelimitedCodec::builder()
+            .max_frame_length(usize::MAX)
+            .new_codec();
+        let server = api::crypto::server::<
+            _,
+            <CS as CipherSuite>::Kem,
+            <CS as CipherSuite>::Kdf,
+            <CS as CipherSuite>::Aead,
+            _,
+            _,
+        >(listener, codec, self.sk.into_inner(), info);
+
         // TODO: determine if there's a performance benefit to putting these branches in different threads.
         tokio::join!(
-            listener
+            server
                 .inspect_err(|err| warn!(%err, "accept error"))
                 // Ignore accept errors.
                 .filter_map(|r| future::ready(r.ok()))
@@ -190,7 +171,7 @@ struct DaemonApiHandler {
     /// Local socket address of the API.
     local_addr: SocketAddr,
     /// Public keys of current device.
-    pk: Arc<PublicKeys<api::CS>>,
+    pk: Arc<PublicKeys<CS>>,
     /// Aranya sync peers,
     peers: SyncPeers,
     /// Key store paths.
@@ -963,7 +944,7 @@ impl DaemonApi for DaemonApiHandler {
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
             let id = self.pk.ident_pk.id()?;
-            self.handle_effects(graph,&effects, None).await?;
+            self.handle_effects(graph, &effects, None).await?;
             if let Some(Effect::AqcBidiChannelReceived(e)) =
                 find_effect!(&effects, Effect::AqcBidiChannelReceived(e) if e.peer_id == id.into())
             {
