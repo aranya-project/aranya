@@ -151,6 +151,8 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 
     struct AranyaClientConfigBuilder cli_build;
     struct AranyaClientConfig cli_cfg;
+    err = aranya_client_config_builder_init(&cli_build);
+    EXPECT("error initializing client config builder", err);
     aranya_client_config_builder_set_daemon_addr(&cli_build, daemon_addr);
 #if defined(ENABLE_AFC)
     struct AranyaAfcConfigBuilder afc_build;
@@ -170,6 +172,8 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 #endif
     struct AranyaAqcConfigBuilder aqc_build;
     struct AranyaAqcConfig aqc_cfg;
+    err = aranya_aqc_config_builder_init(&aqc_build);
+    EXPECT("error initializing client config builder", err);
     aranya_aqc_config_builder_set_address(&aqc_build, aqc_addr);
     err = aranya_aqc_config_builder_build(&aqc_build, &aqc_cfg);
 
@@ -178,6 +182,9 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                 aranya_error_to_str(err));
         return err;
     }
+    err = aranya_aqc_config_builder_cleanup(&aqc_build);
+    EXPECT("error running the cleanup routine for the aqc config builder", err);
+
     aranya_client_config_builder_set_aqc_config(&cli_build, &aqc_cfg);
 
     err = aranya_client_config_builder_build(&cli_build, &cli_cfg);
@@ -187,6 +194,10 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                 aranya_error_to_str(err));
         return err;
     }
+
+    err = aranya_client_config_builder_cleanup(&cli_build);
+    EXPECT("error running the cleanup routine for the client config builder",
+           err);
 
     err = aranya_client_init(&c->client, &cli_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
@@ -793,7 +804,7 @@ AranyaError run_aqc_example(Team *t) {
     err = aranya_revoke_label(&t->clients.operator.client, &t->id,
                               &t->clients.memberb.id, &label1_id);
     EXPECT("error revoking label from memberb", err);
-    err = aranya_delete_label(&t->clients.operator.client, &t->id, &label1_id);
+    err = aranya_delete_label(&t->clients.admin.client, &t->id, &label1_id);
     EXPECT("error deleting label", err);
 
     return err;
