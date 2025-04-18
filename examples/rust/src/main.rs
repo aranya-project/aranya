@@ -345,7 +345,7 @@ async fn main() -> Result<()> {
     info!("revoking label from memberb");
     operator_team.revoke_label(team.memberb.id, label3).await?;
     info!("deleting label");
-    operator_team.delete_label(label3).await?;
+    admin_team.delete_label(label3).await?;
 
     info!("completed aqc demo");
 
