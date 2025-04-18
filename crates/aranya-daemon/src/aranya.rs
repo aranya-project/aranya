@@ -87,7 +87,7 @@ where
         let (len, _) = {
             let mut client = self.aranya.lock().await;
             let mut peer_caches = self.peer_caches.lock().await;
-            let peer_cache = peer_caches.entry(*addr).or_insert_with(|| PeerCache::new());
+            let peer_cache = peer_caches.entry(*addr).or_insert_with(PeerCache::new);
 
             syncer
                 .poll(&mut send_buf, client.provider(), peer_cache)
@@ -396,7 +396,7 @@ where
                     .lock()
                     .await
                     .entry(addr)
-                    .or_insert_with(|| PeerCache::new()),
+                    .or_insert_with(PeerCache::new),
             )
             .context("sync resp poll failed")?;
         debug!(len = len, "sync poll finished");
