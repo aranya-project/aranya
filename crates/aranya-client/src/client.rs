@@ -5,8 +5,7 @@ use std::{net::SocketAddr, path::Path, time::Duration};
 #[cfg(feature = "afc")]
 use aranya_daemon_api::CS;
 use aranya_daemon_api::{
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
-    Role, TeamId,
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier, Role, RoleId, TeamId
 };
 use aranya_fast_channels::Label as AfcLabel;
 #[cfg(feature = "afc")]
@@ -55,6 +54,22 @@ impl Labels {
 
     #[doc(hidden)]
     pub fn __data(&self) -> &[Label] {
+        self.data.as_slice()
+    }
+}
+
+/// List of roles.
+pub struct Roles {
+    data: Vec<Role>,
+}
+
+impl Roles {
+    pub fn iter(&self) -> impl Iterator<Item = &Role> {
+        self.data.iter()
+    }
+
+    #[doc(hidden)]
+    pub fn __data(&self) -> &[Role] {
         self.data.as_slice()
     }
 }
@@ -315,7 +330,7 @@ impl Team<'_> {
     }
 
     /// Assign a role to a device.
-    pub async fn assign_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    pub async fn assign_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
             .daemon
             .assign_role(context::current(), self.id, device, role)
@@ -324,7 +339,7 @@ impl Team<'_> {
     }
 
     /// Revoke a role from a device. This sets the device's role back to the default `Member` role.
-    pub async fn revoke_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    pub async fn revoke_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
             .daemon
             .revoke_role(context::current(), self.id, device, role)
@@ -493,12 +508,13 @@ impl Queries<'_> {
     }
 
     /// Returns the role of the current device.
-    pub async fn device_role(&mut self, device: DeviceId) -> Result<Role> {
-        self.client
+    pub async fn device_roles(&mut self, device: DeviceId) -> Result<Roles> {
+        Ok(Roles {
+            data: self.client
             .daemon
-            .query_device_role(context::current(), self.id, device)
-            .await?
-            .map_err(Into::into)
+            .query_device_roles(context::current(), self.id, device)
+            .await??,
+        })
     }
 
     /// Returns the keybundle of the current device.

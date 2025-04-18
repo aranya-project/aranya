@@ -5,6 +5,7 @@ use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, syn
 use anyhow::{bail, Context, Result};
 use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Rng};
+use aranya_daemon_api::RoleId;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
@@ -24,7 +25,7 @@ use tokio::{
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
 
 use crate::{
-    policy::{ActorExt, ChanOp, Effect, KeyBundle, Role},
+    policy::{ActorExt, ChanOp, Effect, KeyBundle},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -434,10 +435,10 @@ where
     fn assign_role(
         &self,
         device_id: DeviceId,
-        role: Role,
+        role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_role(device_id.into(), role)?;
+            actor.assign_role(device_id.into(), role_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -448,10 +449,10 @@ where
     fn revoke_role(
         &self,
         device_id: DeviceId,
-        role: Role,
+        role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.revoke_role(device_id.into(), role)?;
+            actor.revoke_role(device_id.into(), role_id.into())?;
             Ok(())
         })
         .in_current_span()

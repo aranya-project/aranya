@@ -75,13 +75,16 @@ use perspective
 
 ```policy
 
-// Defines the roles a team member may have.
-// TODO: implement custom ID-based roles.
-enum Role {
-    Owner,
-    Admin,
-    Operator,
-    Member,
+// Permissions that can be assigned to a role.
+enum Permission {
+    TerminateTeam,
+    AddMember,
+    RemoveMember,
+    CreateRole,
+    DeleteRole,
+    AssignRole,
+    RevokeRole,
+    // TODO
 }
 
 // Valid channel operations for a label assignment.
@@ -111,13 +114,32 @@ struct KeyIds {
     sign_key_id id,
     enc_key_id id,
 }
+
+// Defines a device on the team.
+struct Device {
+    device_id id,
+    role_id id,
+    priority int,
+    sign_key_id id,
+    enc_key_id id,
+}
+
+// Defines a role on the team.
+struct Role {
+    // ID of the role.
+    role_id id,
+    // Name of the role.
+    name string,
+    // ID of device that created the role.
+    author_id id,
+}
 ```
 
 ### Facts
 
 ```policy
 // A device on the team.
-fact Device[device_id id]=>{role enum Role, sign_key_id id, enc_key_id id}
+fact Device[device_id id]=>{device struct Device}
 
 // A device's public IdentityKey
 fact DeviceIdentKey[device_id id]=>{key bytes}
@@ -127,6 +149,15 @@ fact DeviceSignKey[device_id id]=>{key_id id, key bytes}
 
 // A device's public EncryptionKey.
 fact DeviceEncKey[device_id id]=>{key_id id, key bytes}
+
+// A ID-based role on the team.
+fact Role[role_id id]=>{role struct Role}
+
+// Records that a role was assigned to a device.
+fact AssignedRole[role_id id, device_id id]=>{}
+
+// Records that a role was assigned permission to execute a certain command.
+fact AssignedPermissions[role_id id, cmd enum Permission]=>{}
 
 // Indicates that the team has been terminated.
 fact TeamEnd[]=>{}
@@ -187,26 +218,6 @@ function derive_device_key_ids(device_keys struct KeyBundle) struct KeyIds {
         sign_key_id: sign_key_id,
         enc_key_id: enc_key_id,
     }
-}
-
-// Verify team member has `Role::Owner`
-function is_owner(role enum Role) bool {
-    return role == Role::Owner
-}
-
-// Verify team member has `Role::Admin`
-function is_admin(role enum Role) bool {
-    return role == Role::Admin
-}
-
-// Verify team member has `Role::Operator`
-function is_operator(role enum Role) bool {
-    return role == Role::Operator
-}
-
-// Verify team member has `Role::Member`
-function is_member(role enum Role) bool {
-    return role == Role::Member
 }
 
 // Seals a serialized basic command into an envelope, using the stored SigningKey for this device.
@@ -402,7 +413,16 @@ command CreateTeam {
         check author_id == owner_key_ids.device_id
 
         finish {
-            add_new_device(this.owner_keys, owner_key_ids, Role::Owner)
+            // Add device to team.
+            add_new_device(this.owner_keys, owner_key_ids)
+            // Create a new owner role.
+            let role = create_role("Owner")
+            
+            // TODO: assign default permissions to owner role.
+
+            // Assign owner role to device.
+            assign_role_to_device(author_id, role.role_id)
+
 
             emit TeamCreated {
                 owner_id: author_id,
@@ -524,7 +544,7 @@ command AddMember {
         check find_existing_device(device_key_ids.device_id) is None
 
         finish {
-            add_new_device(this.device_keys, device_key_ids, Role::Member)
+            add_new_device(this.device_keys, device_key_ids)
 
             emit MemberAdded {
                 device_id: device_key_ids.device_id,
@@ -601,7 +621,116 @@ finish function remove_device(device_id id) {
 
 - Members can only be removed by Operators and Owners.
 - Removing non-Members requires revoking their higher role so the device is made into a Member first.
+## AssignPriority
 
+Assign priority to a device on a team.
+
+## CreateRole
+
+Create a new custom role.
+
+```policy
+// Create a new custom role.
+action create_role(name string){
+    publish CreateRole {
+        name: name,
+    }
+}
+
+// A Member was added to the Team.
+effect RoleCreated {
+    // ID of the role.
+    role_id id,
+    // Name of the role.
+    name string,
+    // ID of the device that created the role.
+    author_id id,
+}
+
+command CreateRole {
+    fields {
+        // The name of the custom role.
+        name string,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_valid_device(envelope::author_id(envelope))
+
+        // Only the owner is allowed to create new roles.
+        check is_owner(author.role)
+
+        // A role's ID is the ID of the command that created it.
+        let role_id = envelope::command_id(envelope)
+
+        finish {
+            create Role[role_id: role_id]=>{role_id: role_id, name: this.name, author_id: author.device_id}
+
+            emit RoleCreated {
+                role_id: role_id,
+                name: this.name,
+                author_id: author.device_id,
+            }
+        }
+    }
+}
+```
+
+## DeleteRole
+
+Delete a custom role.
+
+```policy
+// A role was deleted from the team.
+effect RoleDeleted {
+    // ID of the role.
+    role_id id,
+    // Name of the role.
+    name string,
+    // ID of the device that deleted the role.
+    author_id id,
+}
+```
+
+## AssignRolePermission
+
+Assign permission to execute a certain command to the role.
+
+```policy
+// A permission was assigned to a role on the team.
+effect RolePermissionAssigned {
+    // ID of the role.
+    role_id id,
+    // Name of the role.
+    name string,
+    // Permission assigned to the role.
+    perm enum Permission,
+    // ID of the device that assigned the permission.
+    author_id id,
+}
+```
+
+## RevokeRolePermission
+
+Revoke permission to execute a certain command from the role.
+
+```policy
+// A permission was revoked from a role on the team.
+effect RolePermissionRevoked {
+    // ID of the role.
+    role_id id,
+    // Name of the role.
+    name string,
+    // Permission revoked from the role.
+    perm enum Permission,
+    // ID of the device that revoked the permission.
+    author_id id,
+}
+```
 
 ## AssignRole
 
@@ -609,169 +738,26 @@ Assign a role to a device.
 
 ```policy
 // Assigns the specified role to the device.
-action assign_role(device_id id, role enum Role){
-    match role {
-        Role::Owner => {
-            // Assigns the Owner role.
-            publish AssignOwner {
-                device_id: device_id,
-            }
-        }
-        Role::Admin => {
-            // Assigns the Admin role.
-            publish AssignAdmin {
-                device_id: device_id,
-            }
-        }
-        Role::Operator => {
-            // Assigns the Operator role.
-            publish AssignOperator {
-                device_id: device_id,
-            }
-        }
-        _ => { check false }
-    }
+action assign_role(device_id id, role_id id){
+    create AssignedRole[role_id: role_id, device_id: device_id]=>{}
 }
-```
 
-### AssignOwner
-
-Assign the `Owner` role to a device.
-
-```policy
-// A device was assigned with the Owner role.
-effect OwnerAssigned {
+// A role was assigned to a device on the team.
+effect RoleAssigned {
+    // ID of device the role was assigned to.
     device_id id,
-}
-
-command AssignOwner{
-    fields {
-        // The assigned device's ID.
-        device_id id,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_valid_device(envelope::author_id(envelope))
-        let device = get_valid_device(this.device_id)
-
-        // Only an Owner can assign the Owner role.
-        check is_owner(author.role)
-        // The device must not already have the Owner role.
-        check device.role != Role::Owner
-
-        finish {
-            assign_role(device, Role::Owner)
-
-            emit OwnerAssigned {
-                device_id: this.device_id,
-            }
-        }
-    }
-}
-
-// Assigns the device to the specified role.
-finish function assign_role(device struct Device, role enum Role) {
-    update Device[device_id: device.device_id]=>{
-        role: device.role,
-        sign_key_id: device.sign_key_id,
-        enc_key_id: device.enc_key_id,
-        } to {
-            role: role,
-            sign_key_id: device.sign_key_id,
-            enc_key_id: device.enc_key_id,
-        }
-}
-```
-
-### AssignAdmin
-
-Assign the `Admin` role to a device.
-
-```policy
-// A device was assigned with the Admin role.
-effect AdminAssigned {
-    device_id id,
-}
-
-command AssignAdmin{
-    fields {
-        // The assigned device's ID.
-        device_id id,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_valid_device(envelope::author_id(envelope))
-        let device = get_valid_device(this.device_id)
-
-        // Only an Owner can assign the Admin role.
-        check is_owner(author.role)
-        // The device must not already have the Admin role.
-        check device.role != Role::Admin
-
-        finish {
-            assign_role(device, Role::Admin)
-
-            emit AdminAssigned {
-                device_id: this.device_id,
-            }
-        }
-    }
-}
-```
-
-### AssignOperator
-
-Assign the `Operator` role to a device.
-
-```policy
-// A device was assigned with the Operator role.
-effect OperatorAssigned {
-    device_id id,
-}
-
-command AssignOperator{
-    fields {
-        // The assigned device's ID.
-        device_id id,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_valid_device(envelope::author_id(envelope))
-        let device = get_valid_device(this.device_id)
-
-        // Only Owners and Admins can assign the Operator role.
-        check is_owner(author.role) || is_admin(author.role)
-        // The device must not already have the Operator role.
-        check device.role != Role::Operator
-
-        finish {
-            assign_role(device, Role::Operator)
-
-            emit OperatorAssigned {
-                device_id: this.device_id,
-            }
-        }
-    }
+    // ID of the role.
+    role_id id,
+    // Name of the role.
+    name string,
+    // ID of the device that assigned the role.
+    author_id id,
 }
 ```
 
 **Invariants**:
 
+TODO: fix these docs
 - devices cannot assign roles to themselves.
 - Only Owners can assign the Owner role.
 - Only Owners can assign the Admin role.
@@ -780,179 +766,25 @@ command AssignOperator{
 
 ## RevokeRole
 
-Revoke a role from a device. The set's the device role back to the default `Member` role.
 
 ```policy
-// Revokes the specified role from the device.
-action revoke_role(device_id id, role enum Role){
-    match role {
-        Role::Owner => {
-            // Revokes the Owner role.
-            publish RevokeOwner {
-                device_id: device_id,
-            }
-        }
-        Role::Admin => {
-            // Revokes the Admin role.
-            publish RevokeAdmin {
-                device_id: device_id,
-            }
-        }
-        Role::Operator => {
-            // Revokes the Operator role.
-            publish RevokeOperator {
-                device_id: device_id,
-            }
-        }
-        _ => { check false }
-    }
+// Revoke a role from a device.
+action revoke_role(device_id id, role_id id){
+    delete AssignedRole[role_id: role_id, device_id: device_id]
 }
-```
 
-### RevokeOwner
-
-Revoke the `Owner` role from a device.
-
-```policy
-// The Owner role was revoked from A device.
-effect OwnerRevoked {
+// A role was revoked from a device on the team.
+effect RoleRevoked {
+    // ID of device the role was revoked from.
     device_id id,
-}
-
-command RevokeOwner{
-    fields {
-        // The revoked device's ID.
-        device_id id,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_valid_device(envelope::author_id(envelope))
-        let device = get_valid_device(this.device_id)
-
-        // Owner can only revoke the role from itself.
-        check author.device_id == this.device_id
-        // Check that the device is an Owner.
-        check is_owner(author.role)
-
-        finish {
-            revoke_role(device)
-
-            emit OwnerRevoked {
-                device_id: this.device_id,
-            }
-        }
-    }
-}
-
-// Revokes the specified role from the device. This automatically sets their role to Member instead.
-finish function revoke_role(device struct Device) {
-    update Device[device_id: device.device_id]=>{
-        role: device.role,
-        sign_key_id: device.sign_key_id,
-        enc_key_id: device.enc_key_id,
-        } to {
-            role: Role::Member,
-            sign_key_id: device.sign_key_id,
-            enc_key_id: device.enc_key_id,
-            }
+    // ID of the role.
+    role_id id,
+    // Name of the role.
+    name string,
+    // ID of the device that revoked the role.
+    author_id id,
 }
 ```
-
-### RevokeAdmin
-
-Revoke the `Admin` role from a device.
-
-```policy
-// The Admin role was revoke from A device.
-effect AdminRevoked {
-    device_id id,
-}
-
-command RevokeAdmin{
-    fields {
-        // The revoked device's ID.
-        device_id id,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_valid_device(envelope::author_id(envelope))
-        let device = get_valid_device(this.device_id)
-
-        // Only Owners can revoke the Admin role.
-        check is_owner(author.role)
-        // Check that the device is an Admin.
-        check is_admin(device.role)
-
-        finish {
-            revoke_role(device)
-
-            emit AdminRevoked {
-                device_id: this.device_id,
-            }
-        }
-    }
-}
-```
-
-### RevokeOperator
-
-Revoke the `Operator` role from a device.
-
-```policy
-// The Operator role was revoke from A device.
-effect OperatorRevoked {
-    device_id id,
-}
-
-command RevokeOperator{
-    fields {
-        // The revoked device's ID.
-        device_id id,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        check team_exists()
-
-        let author = get_valid_device(envelope::author_id(envelope))
-        let device = get_valid_device(this.device_id)
-
-        // Only Owners and Admins can revoke the Operator role.
-        check is_owner(author.role) || is_admin(author.role)
-        // Check that the device is an Operator.
-        check is_operator(device.role)
-
-        finish {
-            revoke_role(device)
-
-            emit OperatorRevoked {
-                device_id: this.device_id,
-            }
-        }
-    }
-}
-```
-
-**Invariants**:
-
-- Revoking a role from a device will assign them with the `Member` role.
-- If all `Owners` revoke their own role, it is possible for the team to be left without any `Owners`.
-- As long as there is at least one Owner in the team, new devices can continue to be added and
-  assigned to the different roles.
-- Only `Owners` can revoke the Admin role.
-- Only `Owners` and `Admins` can revoke the `Operator` role.
 
 ## SetAqcNetworkName
 
@@ -2155,3 +1987,15 @@ command QueryAqcNetIdentifier {
 
 - For a net identifier to be returned, it must have been created with the `SetAqcNetworkName` command.
 - If `UnsetAqcNetworkName` has been invoked for the device, no network identifier will be returned.
+
+### QueryTeamRoles
+
+Queries a list of roles on the team.
+
+### QueryDeviceRoles
+
+Queries a list of roles assigned to the device.
+
+### QueryRolePermissions
+
+Queries a list of permissions assigned to the role.

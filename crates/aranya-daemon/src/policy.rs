@@ -17,13 +17,23 @@ pub struct KeyBundle {
     pub sign_key: Vec<u8>,
     pub enc_key: Vec<u8>,
 }
-/// Role policy enum.
+/// Role policy struct.
 #[value]
-pub enum Role {
-    Owner,
-    Admin,
-    Operator,
-    Member,
+pub struct Role {
+    pub role_id: Id,
+    pub name: String,
+    pub author_id: Id,
+}
+/// Permission policy enum.
+#[value]
+pub enum Permission {
+    TerminateTeam,
+    AddMember,
+    RemoveMember,
+    CreateRole,
+    DeleteRole,
+    AssignRole,
+    RevokeRole,
 }
 /// ChanOp policy enum.
 #[value]
@@ -39,12 +49,12 @@ pub enum Effect {
     TeamTerminated(TeamTerminated),
     MemberAdded(MemberAdded),
     MemberRemoved(MemberRemoved),
-    OwnerAssigned(OwnerAssigned),
-    AdminAssigned(AdminAssigned),
-    OperatorAssigned(OperatorAssigned),
-    OwnerRevoked(OwnerRevoked),
-    AdminRevoked(AdminRevoked),
-    OperatorRevoked(OperatorRevoked),
+    RoleCreated(RoleCreated),
+    RoleDeleted(RoleDeleted),
+    RolePermissionAssigned(RolePermissionAssigned),
+    RolePermissionRevoked(RolePermissionRevoked),
+    RoleAssigned(RoleAssigned),
+    RoleRevoked(RoleRevoked),
     AqcNetworkNameSet(AqcNetworkNameSet),
     AqcNetworkNameUnset(AqcNetworkNameUnset),
     AqcBidiChannelCreated(AqcBidiChannelCreated),
@@ -84,35 +94,51 @@ pub struct MemberAdded {
 pub struct MemberRemoved {
     pub device_id: Id,
 }
-/// OwnerAssigned policy effect.
+/// RoleCreated policy effect.
 #[effect]
-pub struct OwnerAssigned {
-    pub device_id: Id,
+pub struct RoleCreated {
+    pub role_id: Id,
+    pub name: String,
+    pub author_id: Id,
 }
-/// AdminAssigned policy effect.
+/// RoleDeleted policy effect.
 #[effect]
-pub struct AdminAssigned {
-    pub device_id: Id,
+pub struct RoleDeleted {
+    pub role_id: Id,
+    pub name: String,
+    pub author_id: Id,
 }
-/// OperatorAssigned policy effect.
+/// RolePermissionAssigned policy effect.
 #[effect]
-pub struct OperatorAssigned {
-    pub device_id: Id,
+pub struct RolePermissionAssigned {
+    pub role_id: Id,
+    pub name: String,
+    pub perm: Permission,
+    pub author_id: Id,
 }
-/// OwnerRevoked policy effect.
+/// RolePermissionRevoked policy effect.
 #[effect]
-pub struct OwnerRevoked {
-    pub device_id: Id,
+pub struct RolePermissionRevoked {
+    pub role_id: Id,
+    pub name: String,
+    pub perm: Permission,
+    pub author_id: Id,
 }
-/// AdminRevoked policy effect.
+/// RoleAssigned policy effect.
 #[effect]
-pub struct AdminRevoked {
+pub struct RoleAssigned {
     pub device_id: Id,
+    pub role_id: Id,
+    pub name: String,
+    pub author_id: Id,
 }
-/// OperatorRevoked policy effect.
+/// RoleRevoked policy effect.
 #[effect]
-pub struct OperatorRevoked {
+pub struct RoleRevoked {
     pub device_id: Id,
+    pub role_id: Id,
+    pub name: String,
+    pub author_id: Id,
 }
 /// AqcNetworkNameSet policy effect.
 #[effect]
@@ -263,8 +289,9 @@ pub trait ActorExt {
     fn terminate_team(&mut self) -> Result<(), ClientError>;
     fn add_member(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
     fn remove_member(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn assign_role(&mut self, device_id: Id, role: Role) -> Result<(), ClientError>;
-    fn revoke_role(&mut self, device_id: Id, role: Role) -> Result<(), ClientError>;
+    fn create_role(&mut self, name: String) -> Result<(), ClientError>;
+    fn assign_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
+    fn revoke_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn set_aqc_network_name(
         &mut self,
         device_id: Id,

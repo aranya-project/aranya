@@ -59,6 +59,11 @@ custom_id! {
 }
 
 custom_id! {
+    /// A role ID.
+    pub struct RoleId;
+}
+
+custom_id! {
     /// An AQC label ID.
     pub struct LabelId;
 }
@@ -79,15 +84,6 @@ pub struct KeyBundle {
     pub identity: Vec<u8>,
     pub signing: Vec<u8>,
     pub encoding: Vec<u8>,
-}
-
-/// A device's role on the team.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub enum Role {
-    Owner,
-    Admin,
-    Operator,
-    Member,
 }
 
 /// A device's network identifier.
@@ -253,10 +249,30 @@ pub enum ChanOp {
     SendRecv,
 }
 
+/// Permission that can be assigned to roles.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum Permission {
+    TerminateTeam,
+    AddMember,
+    RemoveMember,
+    CreateRole,
+    DeleteRole,
+    AssignRole,
+    RevokeRole,
+    // TODO
+}
+
 /// A label.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Label {
     pub id: LabelId,
+    pub name: String,
+}
+
+/// A role.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct Role {
+    pub id: RoleId,
     pub name: String,
 }
 
@@ -300,10 +316,18 @@ pub trait DaemonApi {
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
 
+    /// Create a role on a team.
+    async fn create_role(team: TeamId, name: String) -> Result<Role>;
+    /// Delete a role from a team.
+    async fn delete_role(team: TeamId, role: RoleId) -> Result<()>;
+    /// Assign permissions to a role.
+    async fn assign_role_perms(team: TeamId, role: RoleId, perm: Permission) -> Result<()>;
+    /// Revoke permissions from a role.
+    async fn revoke_role_perms(team: TeamId, role: RoleId, perm: Permission) -> Result<()>;
     /// Assign a role to a device.
-    async fn assign_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
+    async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
-    async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
+    async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
 
     /// Create an AFC label.
     async fn create_afc_label(team: TeamId, label: AfcLabel) -> Result<()>;
@@ -397,8 +421,12 @@ pub trait DaemonApi {
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
-    /// Query device role.
-    async fn query_device_role(team: TeamId, device: DeviceId) -> Result<Role>;
+    /// Query roles on team.
+    async fn query_roles_on_team(team: TeamId) -> Result<Vec<Role>>;
+    /// Query device roles.
+    async fn query_device_roles(team: TeamId, device: DeviceId) -> Result<Vec<Role>>;
+    /// Query role permissions.
+    async fn query_role_permissions(team: TeamId, role: RoleId) -> Result<Vec<Permission>>;
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device label assignments.

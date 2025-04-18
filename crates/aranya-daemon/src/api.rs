@@ -31,7 +31,7 @@ use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
     aranya::Actions,
-    policy::{ChanOp, Effect, KeyBundle, Role},
+    policy::{ChanOp, Effect, KeyBundle},
     sync::SyncPeers,
     Client, EF,
 };
@@ -243,12 +243,12 @@ impl DaemonApiHandler {
                 Effect::TeamTerminated(_team_terminated) => {}
                 Effect::MemberAdded(_member_added) => {}
                 Effect::MemberRemoved(_member_removed) => {}
-                Effect::OwnerAssigned(_owner_assigned) => {}
-                Effect::AdminAssigned(_admin_assigned) => {}
-                Effect::OperatorAssigned(_operator_assigned) => {}
-                Effect::OwnerRevoked(_owner_revoked) => {}
-                Effect::AdminRevoked(_admin_revoked) => {}
-                Effect::OperatorRevoked(_operator_revoked) => {}
+                Effect::RoleCreated(_) => {}
+                Effect::RoleDeleted(_) => {}
+                Effect::RoleAssigned(_) => {}
+                Effect::RoleRevoked(_) => {}
+                Effect::RolePermissionAssigned(_) => {}
+                Effect::RolePermissionRevoked(_) => {}
                 #[cfg(any())]
                 Effect::AfcNetworkNameSet(e) => {
                     self.afc_peers
@@ -511,12 +511,32 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
+    async fn create_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        name: String,
+    ) -> api::Result<api::Role> {
+        todo!()
+    }
+
+    #[instrument(skip(self))]
+    async fn delete_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+    ) -> api::Result<()> {
+        todo!()
+    }
+
+    #[instrument(skip(self))]
     async fn assign_role(
         self,
         _: context::Context,
         team: api::TeamId,
         device: api::DeviceId,
-        role: api::Role,
+        role: api::RoleId,
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
@@ -532,7 +552,7 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: api::TeamId,
         device: api::DeviceId,
-        role: api::Role,
+        role: api::RoleId,
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
@@ -540,6 +560,28 @@ impl DaemonApi for DaemonApiHandler {
             .await
             .context("unable to revoke device role")?;
         Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn assign_role_perms(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        perm: api::Permission,
+    ) -> api::Result<()> {
+        todo!();
+    }
+
+    #[instrument(skip(self))]
+    async fn revoke_role_perms(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        perm: api::Permission,
+    ) -> api::Result<()> {
+        todo!();
     }
 
     #[cfg(any())]
@@ -1165,28 +1207,37 @@ impl DaemonApi for DaemonApiHandler {
         }
         return Ok(devices);
     }
-    /// Query device role.
-    #[instrument(skip(self))]
-    async fn query_device_role(
+
+    /// Query list of roles on team.
+    async fn query_roles_on_team(
         self,
         _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-    ) -> api::Result<api::Role> {
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_device_role_off_graph(device.into_id().into())
-            .await
-            .context("unable to query device role")?;
-        if let Some(Effect::QueryDeviceRoleResult(e)) =
-            find_effect!(&effects, Effect::QueryDeviceRoleResult(_e))
-        {
-            Ok(api::Role::from(e.role))
-        } else {
-            Err(anyhow!("unable to query device role").into())
-        }
+        _team: api::TeamId,
+    ) -> api::Result<Vec<api::Role>> {
+        todo!()
     }
+
+    /// Query device roles.
+    #[instrument(skip(self))]
+    async fn query_device_roles(
+        self,
+        _: context::Context,
+        _team: api::TeamId,
+        _device: api::DeviceId,
+    ) -> api::Result<Vec<api::Role>> {
+        todo!();
+    }
+
+    /// Query roles permissions.
+    async fn query_role_permissions(
+        self,
+        _: context::Context,
+        _team: api::TeamId,
+        _role: api::RoleId,
+    ) -> api::Result<Vec<api::Permission>> {
+        todo!();
+    }
+
     /// Query device keybundle.
     #[instrument(skip(self))]
     async fn query_device_keybundle(
@@ -1435,28 +1486,6 @@ impl From<KeyBundle> for api::KeyBundle {
             identity: value.ident_key,
             signing: value.sign_key,
             encoding: value.enc_key,
-        }
-    }
-}
-
-impl From<api::Role> for Role {
-    fn from(value: api::Role) -> Self {
-        match value {
-            api::Role::Owner => Role::Owner,
-            api::Role::Admin => Role::Admin,
-            api::Role::Operator => Role::Operator,
-            api::Role::Member => Role::Member,
-        }
-    }
-}
-
-impl From<Role> for api::Role {
-    fn from(value: Role) -> Self {
-        match value {
-            Role::Owner => api::Role::Owner,
-            Role::Admin => api::Role::Admin,
-            Role::Operator => api::Role::Operator,
-            Role::Member => api::Role::Member,
         }
     }
 }

@@ -20,7 +20,7 @@ use aranya_runtime::{
 };
 use tracing::instrument;
 
-use crate::policy::{ChanOp, Role};
+use crate::policy::ChanOp;
 
 /// Policy loaded from policy.md file.
 pub const TEST_POLICY_1: &str = include_str!("./policy.md");
@@ -112,18 +112,6 @@ where
 
     fn get_policy(&self, _id: PolicyId) -> Result<&Self::Policy, EngineError> {
         Ok(&self.policy)
-    }
-}
-
-/// Converts policy [`Role`] to string.
-impl fmt::Display for Role {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Owner => f.write_str("Owner"),
-            Self::Admin => f.write_str("Admin"),
-            Self::Operator => f.write_str("Operator"),
-            Self::Member => f.write_str("Member"),
-        }
     }
 }
 
