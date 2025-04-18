@@ -65,14 +65,17 @@ pub enum Error {
     #[capi(msg = "AQC library error")]
     Aqc,
 
+    /// Tokio runtime error.
     #[capi(msg = "tokio runtime error")]
     Runtime,
 
+    /// Invalid index error.
     #[capi(msg = "invalid index")]
     InvalidIndex,
 
-    #[capi(msg = "postcard")]
-    Postcard,
+    /// Serialization error.
+    #[capi(msg = "serialization")]
+    Serialization,
 }
 
 impl From<&imp::Error> for Error {
@@ -98,7 +101,7 @@ impl From<&imp::Error> for Error {
             },
             imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::InvalidIndex(_) => Self::InvalidIndex,
-            imp::Error::Postcard(_) => Self::Postcard,
+            imp::Error::Serialization(_) => Self::Serialization,
         }
     }
 }

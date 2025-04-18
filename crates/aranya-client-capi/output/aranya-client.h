@@ -185,9 +185,18 @@ enum AranyaError
      * AQC library error.
      */
     ARANYA_ERROR_AQC,
+    /**
+     * Tokio runtime error.
+     */
     ARANYA_ERROR_RUNTIME,
+    /**
+     * Invalid index error.
+     */
     ARANYA_ERROR_INVALID_INDEX,
-    ARANYA_ERROR_POSTCARD,
+    /**
+     * Serialization error.
+     */
+    ARANYA_ERROR_SERIALIZATION,
 };
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
