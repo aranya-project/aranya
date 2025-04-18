@@ -20,7 +20,7 @@ use aranya_daemon::{
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState, GraphId,
+    ClientState, GraphId, PeerCache,
 };
 use aranya_util::Addr;
 use tempfile::{tempdir, TempDir};
@@ -195,8 +195,9 @@ impl TestCtx {
             );
 
             let aranya = Arc::new(Mutex::new(graph));
-            let client = TestClient::new(Arc::clone(&aranya));
-            let server = TestServer::new(Arc::clone(&aranya), listener);
+            let peer_cache = Arc::new(Mutex::new(PeerCache::new()));
+            let client = TestClient::new(Arc::clone(&aranya), Arc::clone(&peer_cache));
+            let server = TestServer::new(Arc::clone(&aranya), Arc::clone(&peer_cache), listener);
             (client, server, local_addr, pk)
         };
 
