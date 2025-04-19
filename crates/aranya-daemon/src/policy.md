@@ -151,7 +151,7 @@ fact DeviceSignKey[device_id id]=>{key_id id, key bytes}
 fact DeviceEncKey[device_id id]=>{key_id id, key bytes}
 
 // A ID-based role on the team.
-fact Role[role_id id]=>{role struct Role}
+fact Roles[role_id id]=>{role struct Role}
 
 // Records that a role was assigned to a device.
 fact AssignedRole[role_id id, device_id id]=>{}
@@ -668,7 +668,7 @@ command CreateRole {
         let role_id = envelope::command_id(envelope)
 
         finish {
-            create Role[role_id: role_id]=>{role_id: role_id, name: this.name, author_id: author.device_id}
+            create Roles[role_id: role_id]=>{role_id: role_id, name: this.name, author_id: author.device_id}
 
             emit RoleCreated {
                 role_id: role_id,
