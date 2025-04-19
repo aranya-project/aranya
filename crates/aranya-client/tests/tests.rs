@@ -244,7 +244,7 @@ impl TeamCtx {
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
-        owner_team.add_device_to_team(self.admin.pk.clone()).await?;
+        owner_team.add_device_to_team(self.admin.pk.clone(), 100).await?;
         let roles = self.roles.clone().unwrap();
         owner_team
             .assign_role(self.admin.id, roles.admin.id)
@@ -253,10 +253,12 @@ impl TeamCtx {
         // Make sure it sees the configuration change.
         sleep(SLEEP_INTERVAL).await;
 
+        // TODO: use different priority for each device.
+
         // Add the operator as a new device.
         info!("adding operator to team");
         owner_team
-            .add_device_to_team(self.operator.pk.clone())
+            .add_device_to_team(self.operator.pk.clone(), 100)
             .await?;
 
         // Make sure it sees the configuration change.
@@ -273,7 +275,7 @@ impl TeamCtx {
         // Add member A as a new device.
         info!("adding membera to team");
         operator_team
-            .add_device_to_team(self.membera.pk.clone())
+            .add_device_to_team(self.membera.pk.clone(), 100)
             .await?;
         // Assign the membera its role.
         owner_team
@@ -283,7 +285,7 @@ impl TeamCtx {
         // Add member A as a new device.
         info!("adding memberb to team");
         operator_team
-            .add_device_to_team(self.memberb.pk.clone())
+            .add_device_to_team(self.memberb.pk.clone(), 100)
             .await?;
         // Assign the memberb its role.
         owner_team
@@ -294,6 +296,10 @@ impl TeamCtx {
         sleep(SLEEP_INTERVAL).await;
 
         Ok(())
+    }
+
+    async fn delete_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
+        todo!();
     }
 }
 
@@ -456,11 +462,11 @@ async fn test_sync_now() -> Result<()> {
 
     // Add the admin as a new device, but don't give it a role.
     info!("adding admin to team");
-    owner.add_device_to_team(team.admin.pk.clone()).await?;
+    owner.add_device_to_team(team.admin.pk.clone(), 100).await?;
 
     // Add the operator as a new device, but don't give it a role.
     info!("adding operator to team");
-    owner.add_device_to_team(team.operator.pk.clone()).await?;
+    owner.add_device_to_team(team.operator.pk.clone(), 100).await?;
 
     // Finally, let's give the admin its role, but don't sync with peers.
     owner.assign_role(team.admin.id, roles.admin.id).await?;

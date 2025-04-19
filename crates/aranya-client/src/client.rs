@@ -313,10 +313,10 @@ impl Team<'_> {
     }
 
     /// Add a device to the team with the default `Member` role.
-    pub async fn add_device_to_team(&mut self, keys: KeyBundle) -> Result<()> {
+    pub async fn add_device_to_team(&mut self, keys: KeyBundle, priority: i64) -> Result<()> {
         self.client
             .daemon
-            .add_device_to_team(context::current(), self.id, keys)
+            .add_device_to_team(context::current(), self.id, keys, priority)
             .await?
             .map_err(Into::into)
     }

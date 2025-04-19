@@ -864,9 +864,10 @@ pub unsafe fn add_device_to_team(
     let client = client.deref_mut();
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
+    // TODO: add priority arg.
     client
         .rt
-        .block_on(client.inner.team(team.into()).add_device_to_team(keybundle))?;
+        .block_on(client.inner.team(team.into()).add_device_to_team(keybundle, 100))?;
     Ok(())
 }
 

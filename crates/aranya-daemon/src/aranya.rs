@@ -409,9 +409,9 @@ where
 
     /// Adds a Member instance to the team.
     #[instrument(skip_all)]
-    fn add_member(&self, keys: KeyBundle) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn add_member(&self, keys: KeyBundle, priority: i64) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.add_member(keys)?;
+            actor.add_member(keys, priority)?;
             Ok(())
         })
         .in_current_span()
@@ -442,9 +442,10 @@ where
 
     /// Deletes a role.
     #[instrument(skip_all)]
-    fn delete_role(&self, _role: RoleId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |_actor| {
-            todo!();
+    fn delete_role(&self, role: RoleId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.delete_role(role.into())?;
+            Ok(())
         })
         .in_current_span()
     }

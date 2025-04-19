@@ -88,6 +88,7 @@ pub struct TeamTerminated {
 pub struct MemberAdded {
     pub device_id: Id,
     pub device_keys: KeyBundle,
+    pub priority: i64,
 }
 /// MemberRemoved policy effect.
 #[effect]
@@ -287,9 +288,14 @@ pub trait ActorExt {
         nonce: Vec<u8>,
     ) -> Result<(), ClientError>;
     fn terminate_team(&mut self) -> Result<(), ClientError>;
-    fn add_member(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
+    fn add_member(
+        &mut self,
+        device_keys: KeyBundle,
+        priority: i64,
+    ) -> Result<(), ClientError>;
     fn remove_member(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn create_role(&mut self, name: String) -> Result<(), ClientError>;
+    fn delete_role(&mut self, role_id: Id) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn set_aqc_network_name(

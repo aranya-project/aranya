@@ -117,10 +117,13 @@ struct KeyIds {
 
 // Defines a device on the team.
 struct Device {
+    // ID of the device.
     device_id id,
-    role_id id,
+    // Device priority.
     priority int,
+    // Signing key id.
     sign_key_id id,
+    // Encryption key id.
     enc_key_id id,
 }
 
@@ -157,7 +160,9 @@ fact Roles[role_id id]=>{role struct Role}
 fact AssignedRole[role_id id, device_id id]=>{}
 
 // Records that a role was assigned permission to execute a certain command.
-fact AssignedPermissions[role_id id, cmd enum Permission]=>{}
+// TODO: use enum permission key.
+//fact AssignedPermissions[role_id id, cmd enum Permission]=>{}
+fact AssignedPermissions[role_id id, cmd int]=>{}
 
 // Indicates that the team has been terminated.
 fact TeamEnd[]=>{}
@@ -170,7 +175,7 @@ fact AqcMemberNetworkId[device_id id]=>{net_identifier string}
 
 ```policy
 // Returns a device if one exists.
-function find_existing_device(device_id id) optional struct Device {
+function find_existing_device(device_id id) optional struct Devices {
     let device = query Devices[device_id: device_id]
     let has_ident = exists DeviceIdentKey[device_id: device_id]
     let has_sign = exists DeviceSignKey[device_id: device_id]
@@ -200,7 +205,7 @@ function team_exists() bool {
 }
 
 // Returns a valid Device after performing sanity checks per the stated invariants.
-function get_valid_device(device_id id) struct Device {
+function get_valid_device(device_id id) struct Devices {
     // Get and return device info.
     let device = check_unwrap find_existing_device(device_id)
     return device
@@ -412,9 +417,17 @@ command CreateTeam {
         // Check that author_id matches the device_id being created
         check author_id == owner_key_ids.device_id
 
+        // TODO: define const high priority for owner device.
+        let device = Device {
+            device_id: owner_key_ids.device_id,
+            priority: 1000,
+            sign_key_id: owner_key_ids.sign_key_id,
+            enc_key_id: owner_key_ids.enc_key_id,
+        }
+
         finish {
             // Add device to team.
-            add_new_device(this.owner_keys, owner_key_ids)
+            add_new_device(this.owner_keys, owner_key_ids, device)
             // Create a new owner role.
             let role = create_role("Owner")
             
@@ -432,12 +445,8 @@ command CreateTeam {
 }
 
 // Adds the device to the Team.
-finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, role enum Role) {
-    create Devices[device_id: key_ids.device_id]=>{
-        role: role,
-        sign_key_id: key_ids.sign_key_id,
-        enc_key_id: key_ids.enc_key_id,
-    }
+finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, device struct Device) {
+    create Devices[device_id: key_ids.device_id]=>{device: device}
 
     create DeviceIdentKey[device_id: key_ids.device_id]=>{key: key_bundle.ident_key}
     create DeviceSignKey[device_id: key_ids.device_id]=>{
@@ -508,9 +517,10 @@ Add a member to a team.
 
 ```policy
 // Adds a Member to the Team.
-action add_member(device_keys struct KeyBundle){
+action add_member(device_keys struct KeyBundle, priority int){
     publish AddMember {
         device_keys: device_keys,
+        priority: priority,
     }
 }
 
@@ -520,12 +530,16 @@ effect MemberAdded {
     device_id id,
     // The device's set of public DeviceKeys.
     device_keys struct KeyBundle,
+    // Priority of the device.
+    priority int,
 }
 
 command AddMember {
     fields {
         // The new device's public DeviceKeys.
         device_keys struct KeyBundle,
+        // Priority of the device.
+        priority int,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -543,8 +557,15 @@ command AddMember {
         // Check that the Member doesn't already exist.
         check find_existing_device(device_key_ids.device_id) is None
 
+        let device = Device {
+            device_id: device_key_ids.device_id,
+            priority: this.priority,
+            sign_key_id: device_key_ids.sign_key_id,
+            enc_key_id: device_key_ids.enc_key_id,
+        }
+
         finish {
-            add_new_device(this.device_keys, device_key_ids)
+            add_new_device(this.device_keys, device_key_ids, device)
 
             emit MemberAdded {
                 device_id: device_key_ids.device_id,
@@ -685,6 +706,13 @@ command CreateRole {
 Delete a custom role.
 
 ```policy
+// Delete a custom role.
+action delete_role(role_id id){
+    publish DeleteRole {
+        role_id: role_id,
+    }
+}
+
 // A role was deleted from the team.
 effect RoleDeleted {
     // ID of the role.
@@ -693,6 +721,40 @@ effect RoleDeleted {
     name string,
     // ID of the device that deleted the role.
     author_id id,
+}
+
+command DeleteRole {
+    fields {
+        // ID of the role to delete.
+        role_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_valid_device(envelope::author_id(envelope))
+
+        // Only the owner is allowed to create new roles.
+        check is_owner(author.role)
+
+        // Query role.
+        let role = check_unwrap query Roles[role_id: this.role_id]
+
+        finish {
+            // Delete role.
+            delete Roles[role_id: this.role_id]
+
+            // Return deleted role info.
+            emit RoleDeleted {
+                role_id: role_id,
+                name: role.name,
+                author_id: author.device_id,
+            }
+        }
+    }
 }
 ```
 

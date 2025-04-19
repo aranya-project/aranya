@@ -486,10 +486,11 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: api::TeamId,
         keys: api::KeyBundle,
+        priority: i64,
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .add_member(keys.into())
+            .add_member(keys.into(), priority)
             .await
             .context("unable to add device to team")?;
         Ok(())
@@ -527,7 +528,12 @@ impl DaemonApi for DaemonApiHandler {
         team: api::TeamId,
         role: api::RoleId,
     ) -> api::Result<()> {
-        todo!()
+        self.client
+            .actions(&team.into_id().into())
+            .delete_role(role)
+            .await
+            .context("unable to delete role from team")?;
+        Ok(())
     }
 
     #[instrument(skip(self))]

@@ -287,9 +287,10 @@ impl TestCtx {
         let memberb_role = self.create_role(owner, "memberb".into()).await?;
 
         // add members to team.
+        // TODO: assign a different priority to each device.
         owner
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&admin.pk)?)
+            .add_member(DeviceKeyBundle::try_from(&admin.pk)?, 100)
             .await
             .context("unable to add admin member")?;
         owner
@@ -300,7 +301,7 @@ impl TestCtx {
         admin.sync(owner).await?;
         owner
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&operator.pk)?)
+            .add_member(DeviceKeyBundle::try_from(&operator.pk)?, 100)
             .await
             .context("unable to add operator member")?;
         owner
@@ -311,7 +312,7 @@ impl TestCtx {
         operator.sync(owner).await?;
         operator
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&membera.pk)?)
+            .add_member(DeviceKeyBundle::try_from(&membera.pk)?, 100)
             .await
             .context("unable to add membera member")?;
         owner
@@ -322,7 +323,7 @@ impl TestCtx {
         membera.sync(admin).await?;
         operator
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&memberb.pk)?)
+            .add_member(DeviceKeyBundle::try_from(&memberb.pk)?, 100)
             .await
             .context("unable to add memberb member")?;
         owner
