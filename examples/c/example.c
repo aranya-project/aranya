@@ -336,6 +336,8 @@ AranyaError run(Team *t) {
     err = init_team(t);
     EXPECT("error initializing team", err);
 
+    // TODO(gknopf): custom roles.
+
     // add admin to team.
     err =
         aranya_add_device_to_team(&t->clients.owner.client, &t->id,
