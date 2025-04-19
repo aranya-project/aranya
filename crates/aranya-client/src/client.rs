@@ -5,7 +5,8 @@ use std::{net::SocketAddr, path::Path, time::Duration};
 #[cfg(feature = "afc")]
 use aranya_daemon_api::CS;
 use aranya_daemon_api::{
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier, Role, RoleId, TeamId
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
+    Role, RoleId, TeamId,
 };
 use aranya_fast_channels::Label as AfcLabel;
 #[cfg(feature = "afc")]
@@ -329,6 +330,24 @@ impl Team<'_> {
             .map_err(Into::into)
     }
 
+    /// Create role.
+    pub async fn create_role(&mut self, name: String) -> Result<Role> {
+        self.client
+            .daemon
+            .create_role(context::current(), self.id, name)
+            .await?
+            .map_err(Into::into)
+    }
+
+    /// Delete role.
+    pub async fn delete_role(&mut self, role: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .delete_role(context::current(), self.id, role)
+            .await?
+            .map_err(Into::into)
+    }
+
     /// Assign a role to a device.
     pub async fn assign_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
@@ -510,10 +529,11 @@ impl Queries<'_> {
     /// Returns the role of the current device.
     pub async fn device_roles(&mut self, device: DeviceId) -> Result<Roles> {
         Ok(Roles {
-            data: self.client
-            .daemon
-            .query_device_roles(context::current(), self.id, device)
-            .await??,
+            data: self
+                .client
+                .daemon
+                .query_device_roles(context::current(), self.id, device)
+                .await??,
         })
     }
 

@@ -1,3 +1,5 @@
+// TODO(gknopf): can this code in lib.rs be moved to tests.rs?
+
 #![allow(clippy::expect_used, clippy::indexing_slicing, rust_2018_idioms)]
 
 use std::{
@@ -117,7 +119,19 @@ impl DerefMut for TestDevice {
     }
 }
 
-pub struct TestTeam<'a> {
+pub struct TestRoles {
+    pub admin: Role,
+    pub operator: Role,
+    pub membera: Role,
+    pub memberb: Role,
+}
+
+pub struct TestTeam {
+    pub devices: Vec<TestDevice>,
+    pub roles: TestRoles,
+}
+
+pub struct TestDevices<'a> {
     pub owner: &'a TestDevice,
     pub admin: &'a TestDevice,
     pub operator: &'a TestDevice,
@@ -125,10 +139,10 @@ pub struct TestTeam<'a> {
     pub memberb: &'a TestDevice,
 }
 
-impl<'a> TestTeam<'a> {
+impl<'a> TestDevices<'a> {
     pub fn new(clients: &'a [TestDevice]) -> Self {
         assert!(clients.len() >= 5);
-        TestTeam {
+        TestDevices {
             owner: &clients[0],
             admin: &clients[1],
             operator: &clients[2],
@@ -203,6 +217,27 @@ impl TestCtx {
         TestDevice::new(client, server, local_addr.into(), pk, id)
     }
 
+    /// Creates a new role
+    async fn create_role(&self, owner: &TestDevice, name: String) -> Result<Role> {
+        // TODO: simplify this logic.
+        let effects = owner
+            .actions()
+            .create_role(name)
+            .await
+            .context("unable to create admin role")?;
+        if !contains_effect!(&effects, Effect::RoleCreated(_)) {
+            panic!("unable to create role");
+        }
+        let Effect::RoleCreated(ref role_created) = effects[0] else {
+            panic!("could not find role");
+        };
+        Ok(Role {
+            role_id: role_created.role_id,
+            name: role_created.name.clone(),
+            author_id: role_created.author_id,
+        })
+    }
+
     /// Creates `n` members.
     pub async fn new_group(&mut self, n: usize) -> Result<Vec<TestDevice>> {
         let mut clients = Vec::<TestDevice>::new();
@@ -233,19 +268,25 @@ impl TestCtx {
     }
 
     /// Creates default team.
-    pub async fn new_team(&mut self) -> Result<Vec<TestDevice>> {
-        let clients = self
+    pub async fn new_team(&mut self) -> Result<TestTeam> {
+        let devices = self
             .new_group(5)
             .await
             .context("unable to create clients")?;
-        let team = TestTeam::new(&clients);
+        let team = TestDevices::new(&devices);
         let owner = team.owner;
         let admin = team.admin;
         let operator = team.operator;
         let membera = team.membera;
         let memberb = team.memberb;
 
-        // team setup
+        // create roles.
+        let admin_role = self.create_role(owner, "admin".into()).await?;
+        let operator_role = self.create_role(owner, "operator".into()).await?;
+        let membera_role = self.create_role(owner, "membera".into()).await?;
+        let memberb_role = self.create_role(owner, "memberb".into()).await?;
+
+        // add members to team.
         owner
             .actions()
             .add_member(DeviceKeyBundle::try_from(&admin.pk)?)
@@ -253,7 +294,7 @@ impl TestCtx {
             .context("unable to add admin member")?;
         owner
             .actions()
-            .assign_role(admin.pk.ident_pk.id()?, Role::Admin)
+            .assign_role(admin.pk.ident_pk.id()?, admin_role.role_id.into())
             .await
             .context("unable to elevate admin role")?;
         admin.sync(owner).await?;
@@ -264,7 +305,7 @@ impl TestCtx {
             .context("unable to add operator member")?;
         owner
             .actions()
-            .assign_role(operator.pk.ident_pk.id()?, Role::Operator)
+            .assign_role(operator.pk.ident_pk.id()?, operator_role.role_id.into())
             .await
             .context("unable to elevate operator role")?;
         operator.sync(owner).await?;
@@ -273,12 +314,22 @@ impl TestCtx {
             .add_member(DeviceKeyBundle::try_from(&membera.pk)?)
             .await
             .context("unable to add membera member")?;
+        owner
+            .actions()
+            .assign_role(membera.pk.ident_pk.id()?, membera_role.role_id.into())
+            .await
+            .context("unable to elevate membera role")?;
         membera.sync(admin).await?;
         operator
             .actions()
             .add_member(DeviceKeyBundle::try_from(&memberb.pk)?)
             .await
             .context("unable to add memberb member")?;
+        owner
+            .actions()
+            .assign_role(memberb.pk.ident_pk.id()?, memberb_role.role_id.into())
+            .await
+            .context("unable to elevate memberb role")?;
         memberb.sync(admin).await?;
 
         owner.sync(operator).await?;
@@ -286,6 +337,14 @@ impl TestCtx {
         membera.sync(operator).await?;
         memberb.sync(operator).await?;
 
-        Ok(clients)
+        Ok(TestTeam {
+            devices,
+            roles: TestRoles {
+                admin: admin_role,
+                operator: operator_role,
+                membera: membera_role,
+                memberb: memberb_role,
+            },
+        })
     }
 }

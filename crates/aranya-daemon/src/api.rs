@@ -540,7 +540,7 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .assign_role(device.into_id().into(), role.into())
+            .assign_role(device.into_id().into(), role)
             .await
             .context("unable to assign role")?;
         Ok(())
@@ -556,7 +556,7 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .revoke_role(device.into_id().into(), role.into())
+            .revoke_role(device.into_id().into(), role)
             .await
             .context("unable to revoke device role")?;
         Ok(())

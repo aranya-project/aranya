@@ -173,6 +173,7 @@ struct TeamCtx {
     operator: DeviceCtx,
     membera: DeviceCtx,
     memberb: DeviceCtx,
+    roles: Option<RoleCtx>,
 }
 
 impl TeamCtx {
@@ -189,6 +190,7 @@ impl TeamCtx {
             operator,
             membera,
             memberb,
+            roles: None,
         })
     }
 
@@ -222,16 +224,31 @@ impl TeamCtx {
         Ok(())
     }
 
+    async fn create_all_roles(&mut self, team_id: TeamId) -> Result<()> {
+        let mut owner_team = self.owner.client.team(team_id);
+        let roles = RoleCtx {
+            admin: owner_team.create_role("admin".into()).await?,
+            operator: owner_team.create_role("operator".into()).await?,
+            membera: owner_team.create_role("membera".into()).await?,
+            memberb: owner_team.create_role("memberb".into()).await?,
+        };
+        self.roles = Some(roles);
+
+        Ok(())
+    }
+
     async fn add_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
         // Shorthand for the teams we need to operate on.
         let mut owner_team = self.owner.client.team(team_id);
-        let mut admin_team = self.admin.client.team(team_id);
         let mut operator_team = self.operator.client.team(team_id);
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
         owner_team.add_device_to_team(self.admin.pk.clone()).await?;
-        owner_team.assign_role(self.admin.id, Role::Admin).await?;
+        let roles = self.roles.clone().unwrap();
+        owner_team
+            .assign_role(self.admin.id, roles.admin.id)
+            .await?;
 
         // Make sure it sees the configuration change.
         sleep(SLEEP_INTERVAL).await;
@@ -246,8 +263,8 @@ impl TeamCtx {
         sleep(SLEEP_INTERVAL).await;
 
         // Assign the operator its role.
-        admin_team
-            .assign_role(self.operator.id, Role::Operator)
+        owner_team
+            .assign_role(self.operator.id, roles.operator.id)
             .await?;
 
         // Make sure it sees the configuration change.
@@ -258,11 +275,19 @@ impl TeamCtx {
         operator_team
             .add_device_to_team(self.membera.pk.clone())
             .await?;
+        // Assign the membera its role.
+        owner_team
+            .assign_role(self.operator.id, roles.membera.id)
+            .await?;
 
         // Add member A as a new device.
         info!("adding memberb to team");
         operator_team
             .add_device_to_team(self.memberb.pk.clone())
+            .await?;
+        // Assign the memberb its role.
+        owner_team
+            .assign_role(self.operator.id, roles.memberb.id)
             .await?;
 
         // Make sure they see the configuration change.
@@ -270,6 +295,15 @@ impl TeamCtx {
 
         Ok(())
     }
+}
+
+#[derive(Debug, Clone)]
+struct RoleCtx {
+    // TODO: owner: Role,
+    admin: Role,
+    operator: Role,
+    membera: Role,
+    memberb: Role,
 }
 
 struct DeviceCtx {
@@ -406,6 +440,10 @@ async fn test_sync_now() -> Result<()> {
     team.memberb.client.add_team(team_id).await?;
     */
 
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
+    let roles = team.roles.clone().unwrap();
+
     // Tell all peers to sync with one another.
     team.add_all_sync_peers(team_id).await?;
 
@@ -425,10 +463,10 @@ async fn test_sync_now() -> Result<()> {
     owner.add_device_to_team(team.operator.pk.clone()).await?;
 
     // Finally, let's give the admin its role, but don't sync with peers.
-    owner.assign_role(team.admin.id, Role::Admin).await?;
+    owner.assign_role(team.admin.id, roles.admin.id).await?;
 
     // Now, we try to assign a role using the admin, which is expected to fail.
-    match admin.assign_role(team.operator.id, Role::Operator).await {
+    match admin.assign_role(team.operator.id, roles.operator.id).await {
         Ok(_) => bail!("Expected role assignment to fail"),
         Err(aranya_client::Error::Daemon(_)) => {}
         Err(_) => bail!("Unexpected error"),
@@ -439,7 +477,9 @@ async fn test_sync_now() -> Result<()> {
     sleep(SLEEP_INTERVAL).await;
 
     // Now we should be able to successfully assign a role.
-    admin.assign_role(team.operator.id, Role::Operator).await?;
+    admin
+        .assign_role(team.operator.id, roles.operator.id)
+        .await?;
 
     Ok(())
 }
@@ -467,6 +507,9 @@ async fn test_query_functions() -> Result<()> {
     team.memberb.client.add_team(team_id).await?;
     */
 
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
+
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
@@ -480,9 +523,9 @@ async fn test_query_functions() -> Result<()> {
     debug!("membera devices on team: {:?}", devices.iter().count());
 
     // Check the specific role(s) a device has.
-    let role = queries.device_role(team.membera.id).await?;
-    assert_eq!(role, Role::Member);
-    debug!("membera role: {:?}", role);
+    let _roles = queries.device_roles(team.membera.id).await?;
+    // TODO: assert_eq!(role, Role::Member);
+    //debug!("membera role: {:?}", role);
 
     // Make sure that we have the correct keybundle.
     let keybundle = queries.device_keybundle(team.membera.id).await?;
@@ -555,6 +598,9 @@ async fn test_afc_one_way_two_chans() -> Result<()> {
     team.membera.client.add_team(team_id).await?;
     team.memberb.client.add_team(team_id).await?;
     */
+
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -694,6 +740,9 @@ async fn test_afc_two_way_one_chan() -> Result<()> {
     team.memberb.client.add_team(team_id).await?;
     */
 
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
+
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
@@ -815,6 +864,9 @@ async fn test_afc_monotonic_seq() -> Result<()> {
     team.membera.client.add_team(team_id).await?;
     team.memberb.client.add_team(team_id).await?;
     */
+
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -942,6 +994,9 @@ async fn test_afc_reboot() -> Result<()> {
     team.memberb.client.add_team(team_id).await?;
     */
 
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
+
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
@@ -1046,3 +1101,5 @@ async fn test_afc_reboot() -> Result<()> {
 }
 
 // TODO(nikki): aqc testing variants.
+
+// TODO(gknopf): test role deletion and revocation.

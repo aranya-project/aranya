@@ -430,6 +430,25 @@ where
         .in_current_span()
     }
 
+    /// Creates a new role.
+    #[instrument(skip_all)]
+    fn create_role(&self, name: String) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.create_role(name)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Deletes a role.
+    #[instrument(skip_all)]
+    fn delete_role(&self, _role: RoleId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |_actor| {
+            todo!();
+        })
+        .in_current_span()
+    }
+
     /// Assigns role to a team member.
     #[instrument(skip_all)]
     fn assign_role(
