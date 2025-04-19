@@ -257,6 +257,29 @@ impl From<&DeviceId> for aranya_daemon_api::DeviceId {
     }
 }
 
+/// Role ID.
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct RoleId {
+    id: Id,
+}
+
+impl From<aranya_daemon_api::RoleId> for RoleId {
+    fn from(value: aranya_daemon_api::RoleId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&RoleId> for aranya_daemon_api::RoleId {
+    fn from(value: &RoleId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
 /// Label ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -345,17 +368,6 @@ pub enum Role {
     Operator,
     /// Member role.
     Member,
-}
-
-impl From<Role> for aranya_daemon_api::Role {
-    fn from(value: Role) -> Self {
-        match value {
-            Role::Owner => Self::Owner,
-            Role::Admin => Self::Admin,
-            Role::Operator => Self::Operator,
-            Role::Member => Self::Member,
-        }
-    }
 }
 
 /// Valid channel operations for a label assignment.
@@ -852,9 +864,10 @@ pub unsafe fn add_device_to_team(
     let client = client.deref_mut();
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
+    // TODO: add priority arg.
     client
         .rt
-        .block_on(client.inner.team(team.into()).add_device_to_team(keybundle))?;
+        .block_on(client.inner.team(team.into()).add_device_to_team(keybundle, 100))?;
     Ok(())
 }
 
@@ -898,7 +911,7 @@ pub fn assign_role(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    role: Role,
+    role: &RoleId,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client.rt.block_on(
@@ -924,7 +937,7 @@ pub fn revoke_role(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    role: Role,
+    role: &RoleId,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client.rt.block_on(

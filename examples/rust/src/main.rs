@@ -170,6 +170,8 @@ async fn main() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
+    // TODO(gknopf): custom roles.
+
     // get sync addresses.
     let owner_addr = team.owner.aranya_local_addr().await?;
     let admin_addr = team.admin.aranya_local_addr().await?;

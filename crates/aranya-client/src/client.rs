@@ -6,7 +6,7 @@ use std::{net::SocketAddr, path::Path, time::Duration};
 use aranya_daemon_api::CS;
 use aranya_daemon_api::{
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
-    Role, TeamId,
+    Role, RoleId, TeamId,
 };
 use aranya_fast_channels::Label as AfcLabel;
 #[cfg(feature = "afc")]
@@ -55,6 +55,22 @@ impl Labels {
 
     #[doc(hidden)]
     pub fn __data(&self) -> &[Label] {
+        self.data.as_slice()
+    }
+}
+
+/// List of roles.
+pub struct Roles {
+    data: Vec<Role>,
+}
+
+impl Roles {
+    pub fn iter(&self) -> impl Iterator<Item = &Role> {
+        self.data.iter()
+    }
+
+    #[doc(hidden)]
+    pub fn __data(&self) -> &[Role] {
         self.data.as_slice()
     }
 }
@@ -297,10 +313,10 @@ impl Team<'_> {
     }
 
     /// Add a device to the team with the default `Member` role.
-    pub async fn add_device_to_team(&mut self, keys: KeyBundle) -> Result<()> {
+    pub async fn add_device_to_team(&mut self, keys: KeyBundle, priority: i64) -> Result<()> {
         self.client
             .daemon
-            .add_device_to_team(context::current(), self.id, keys)
+            .add_device_to_team(context::current(), self.id, keys, priority)
             .await?
             .map_err(Into::into)
     }
@@ -314,8 +330,26 @@ impl Team<'_> {
             .map_err(Into::into)
     }
 
+    /// Create role.
+    pub async fn create_role(&mut self, name: String) -> Result<Role> {
+        self.client
+            .daemon
+            .create_role(context::current(), self.id, name)
+            .await?
+            .map_err(Into::into)
+    }
+
+    /// Delete role.
+    pub async fn delete_role(&mut self, role: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .delete_role(context::current(), self.id, role)
+            .await?
+            .map_err(Into::into)
+    }
+
     /// Assign a role to a device.
-    pub async fn assign_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    pub async fn assign_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
             .daemon
             .assign_role(context::current(), self.id, device, role)
@@ -324,7 +358,7 @@ impl Team<'_> {
     }
 
     /// Revoke a role from a device. This sets the device's role back to the default `Member` role.
-    pub async fn revoke_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    pub async fn revoke_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
             .daemon
             .revoke_role(context::current(), self.id, device, role)
@@ -493,12 +527,14 @@ impl Queries<'_> {
     }
 
     /// Returns the role of the current device.
-    pub async fn device_role(&mut self, device: DeviceId) -> Result<Role> {
-        self.client
-            .daemon
-            .query_device_role(context::current(), self.id, device)
-            .await?
-            .map_err(Into::into)
+    pub async fn device_roles(&mut self, device: DeviceId) -> Result<Roles> {
+        Ok(Roles {
+            data: self
+                .client
+                .daemon
+                .query_device_roles(context::current(), self.id, device)
+                .await??,
+        })
     }
 
     /// Returns the keybundle of the current device.
