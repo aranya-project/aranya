@@ -138,8 +138,8 @@ struct Role {
 ### Facts
 
 ```policy
-// A device on the team.
-fact Device[device_id id]=>{device struct Device}
+// Devices on the team.
+fact Devices[device_id id]=>{device struct Device}
 
 // A device's public IdentityKey
 fact DeviceIdentKey[device_id id]=>{key bytes}
@@ -171,7 +171,7 @@ fact AqcMemberNetworkId[device_id id]=>{net_identifier string}
 ```policy
 // Returns a device if one exists.
 function find_existing_device(device_id id) optional struct Device {
-    let device = query Device[device_id: device_id]
+    let device = query Devices[device_id: device_id]
     let has_ident = exists DeviceIdentKey[device_id: device_id]
     let has_sign = exists DeviceSignKey[device_id: device_id]
     let has_enc = exists DeviceEncKey[device_id: device_id]
@@ -433,7 +433,7 @@ command CreateTeam {
 
 // Adds the device to the Team.
 finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, role enum Role) {
-    create Device[device_id: key_ids.device_id]=>{
+    create Devices[device_id: key_ids.device_id]=>{
         role: role,
         sign_key_id: key_ids.sign_key_id,
         enc_key_id: key_ids.enc_key_id,
@@ -610,7 +610,7 @@ command RemoveMember{
 
 // Removes the device from the Team.
 finish function remove_device(device_id id) {
-    delete Device[device_id: device_id]
+    delete Devices[device_id: device_id]
     delete DeviceIdentKey[device_id: device_id]
     delete DeviceSignKey[device_id: device_id]
     delete DeviceEncKey[device_id: device_id]
