@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 
 use anyhow::Result;
 use aranya_crypto::Id;
-use aranya_daemon_api::{AqcId, LabelId};
+use aranya_daemon_api::{AqcBidiChannelId, LabelId};
 use bytes::Bytes;
 use s2n_quic::{
     client::Connect,
@@ -57,7 +57,7 @@ pub async fn run_channels(mut server: Server, sender: mpsc::Sender<AqcChannelTyp
             Some(conn) => {
                 let (channel, (bi_sender, uni_sender)) = AqcBidirectionalChannel::new(
                     LabelId::default(),
-                    AqcId::from(Id::default()),
+                    AqcBidiChannelId::from(Id::default()),
                     conn.handle(),
                 );
                 if sender
@@ -217,7 +217,7 @@ impl AqcChannelReceiver {
 #[derive(Debug)]
 pub struct AqcBidirectionalChannel {
     label_id: LabelId,
-    aqc_id: AqcId,
+    aqc_id: AqcBidiChannelId,
     handle: Handle,
     uni_receiver: mpsc::Receiver<ReceiveStream>,
     bi_receiver: mpsc::Receiver<BidirectionalStream>,
@@ -227,7 +227,7 @@ impl AqcBidirectionalChannel {
     /// Create a new bidirectional channel with the given id and conection handle.
     pub fn new(
         label_id: LabelId,
-        aqc_id: AqcId,
+        aqc_id: AqcBidiChannelId,
         handle: Handle,
     ) -> (
         Self,
@@ -256,7 +256,7 @@ impl AqcBidirectionalChannel {
     }
 
     /// Get the aqc id.
-    pub fn aqc_id(&self) -> AqcId {
+    pub fn aqc_id(&self) -> AqcBidiChannelId {
         self.aqc_id
     }
 
@@ -410,7 +410,7 @@ impl AqcClient {
             AqcChannelDirection::BIDIRECTIONAL => {
                 let (channel, (bi_sender, uni_sender)) = AqcBidirectionalChannel::new(
                     label_id,
-                    AqcId::from(Id::default()),
+                    AqcBidiChannelId::from(Id::default()),
                     conn.handle(),
                 );
                 tokio::spawn(handle_streams(conn, bi_sender, uni_sender));

@@ -315,15 +315,12 @@ impl<'a> AqcChannels<'a> {
                     encap: &v.encap,
                     channel_id,
                     psk_length_in_bytes: PSK_KEY_LEN,
-                }
+                };
                 let psk = self
                     .client
                     .aqc
                     .handler
-                    .bidi_channel_received(
-                        &mut self.client.aqc.eng.clone(),
-                        &effect,
-                    )
+                    .bidi_channel_received(&mut self.client.aqc.eng.clone(), &effect)
                     .map_err(AqcError::ChannelCreation)?;
                 debug!("psk id: {:?}", psk.identity());
             }

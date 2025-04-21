@@ -222,8 +222,6 @@ impl Syncer {
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
     async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
-        info!("syncing with peer");
-
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
             self.client
@@ -233,12 +231,10 @@ impl Syncer {
                 .inspect_err(|err| error!("{err:?}"))?;
             sink.collect()?
         };
-        let n = effects.len();
         self.send_effects
             .send((*id, effects))
             .await
             .context("unable to send effects")?;
-        info!(?n, "completed sync");
         Ok(())
     }
 }

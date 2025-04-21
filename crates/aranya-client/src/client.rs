@@ -392,23 +392,6 @@ impl Team<'_> {
             .await?
             .map_err(Error::from)?;
 
-        // // Get the string representation from NetIdentifier
-        // let addr_str = net_identifier.0;
-
-        // // Try parsing as SocketAddr first, otherwise resolve as host:port
-        // let server_addr = match addr_str.parse::<SocketAddr>() {
-        //     Ok(addr) => addr,
-        //     Err(_) => {
-        //         // Assume it's a host:port string and use tokio::net::lookup_host
-        //         tokio::net::lookup_host(&addr_str)
-        //             .await
-        //             .map_err(anyhow::Error::from)?
-        //             .next()
-        //             .ok_or_else(|| anyhow::anyhow!("Could not resolve host: {}", addr_str))
-        //             .map_err(anyhow::Error::from)?
-        //     }
-        // };
-
         let server_addr = net_identifier.0.parse::<SocketAddr>().unwrap();
         println!("server_addr: {:?}", server_addr);
         let server = Server::builder()
