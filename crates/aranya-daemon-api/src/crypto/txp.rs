@@ -8,12 +8,12 @@ use core::{
 use std::sync::Arc;
 
 use aranya_crypto::{
-    aead::{Aead, IndCca2, Tag},
+    aead::Tag,
     csprng::Csprng,
     hpke::{Hpke, HpkeError, Mode, OpenCtx, SealCtx, Seq},
     import::Import,
-    kdf::Kdf,
     kem::Kem,
+    CipherSuite,
 };
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
@@ -31,6 +31,8 @@ use tarpc::{
 };
 use tokio::io::{self, AsyncRead, AsyncWrite};
 
+use crate::crypto::{ApiKey, PublicApiKey};
+
 fn other<E>(err: E) -> io::Error
 where
     E: Into<Box<dyn error::Error + Send + Sync>>,
@@ -39,19 +41,17 @@ where
 }
 
 /// Creates a client-side transport.
-pub fn client<S, R, K, F, A, Item, SinkItem>(
+pub fn client<S, R, CS, Item, SinkItem>(
     io: S,
     codec: LengthDelimitedCodec,
     rng: R,
-    pk: K::EncapKey,
+    pk: PublicApiKey<CS>,
     info: &[u8],
-) -> ClientConn<S, R, K, F, A, Item, SinkItem>
+) -> ClientConn<S, R, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
     R: Csprng,
-    K: Kem,
-    F: Kdf,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
     Item: for<'de> Deserialize<'de>,
     SinkItem: Serialize,
 {
@@ -72,34 +72,32 @@ where
 
 /// An encrypted [`Transport`][tarpc::Transport].
 #[pin_project]
-pub struct ClientConn<S, R, K, F, A, Item, SinkItem>
+pub struct ClientConn<S, R, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
-    K: Kem,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
 {
     #[pin]
     inner: Transport<S, Msg, Msg, SymmetricalMessagePack<Msg>>,
     rng: R,
-    pk: K::EncapKey,
+    pk: PublicApiKey<CS>,
     info: Vec<u8>,
-    seal: Option<SealCtx<A>>,
-    open: Option<OpenCtx<A>>,
+    seal: Option<SealCtx<CS::Aead>>,
+    open: Option<OpenCtx<CS::Aead>>,
     #[allow(clippy::type_complexity)]
-    _marker: PhantomData<fn() -> (F, Item, SinkItem)>,
+    _marker: PhantomData<fn() -> (Item, SinkItem)>,
 }
 
-impl<S, R, K, F, A, Item, SinkItem> ClientConn<S, R, K, F, A, Item, SinkItem>
+impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
-    K: Kem,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
     SinkItem: Serialize,
 {
     fn encrypt(&mut self, item: SinkItem) -> io::Result<Data> {
         let mut codec = MessagePack::<Item, SinkItem>::default();
         let mut plaintext = BytesMut::from(pin!(codec).serialize(&item)?);
-        let mut tag = BytesMut::from(&*Tag::<A>::default());
+        let mut tag = BytesMut::from(&*Tag::<CS::Aead>::default());
         self.seal
             .as_mut()
             .assume("`self.seal` should be `Some`")
@@ -113,11 +111,10 @@ where
     }
 }
 
-impl<S, R, K, F, A, Item, SinkItem> ClientConn<S, R, K, F, A, Item, SinkItem>
+impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
-    K: Kem,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
     Item: DeserializeOwned,
 {
     fn decrypt(&mut self, data: Data) -> io::Result<Item> {
@@ -137,17 +134,19 @@ where
     }
 }
 
-impl<S, R, K, F, A, Item, SinkItem> ClientConn<S, R, K, F, A, Item, SinkItem>
+impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
     R: Csprng,
-    K: Kem,
-    F: Kdf,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
 {
     fn rekey(&mut self) -> Result<Hello, HpkeError> {
-        let (enc, send) =
-            Hpke::<K, F, A>::setup_send(&mut self.rng, Mode::Base, &self.pk, &self.info)?;
+        let (enc, send) = Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_send(
+            &mut self.rng,
+            Mode::Base,
+            self.pk.as_inner(),
+            &self.info,
+        )?;
         let (open_key, open_nonce) = {
             let key = send.export(b"cryptio server seal key")?;
             let nonce = send.export(b"cryptio server seal nonce")?;
@@ -165,13 +164,11 @@ where
     }
 }
 
-impl<S, R, K, F, A, Item, SinkItem> Stream for ClientConn<S, R, K, F, A, Item, SinkItem>
+impl<S, R, CS, Item, SinkItem> Stream for ClientConn<S, R, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     R: Csprng,
-    K: Kem,
-    F: Kdf,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
     Item: DeserializeOwned,
 {
     type Item = io::Result<Item>;
@@ -198,13 +195,11 @@ where
     }
 }
 
-impl<S, R, K, F, A, Item, SinkItem> Sink<SinkItem> for ClientConn<S, R, K, F, A, Item, SinkItem>
+impl<S, R, CS, Item, SinkItem> Sink<SinkItem> for ClientConn<S, R, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     R: Csprng,
-    K: Kem,
-    F: Kdf,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
     SinkItem: Serialize,
 {
     type Error = io::Error;
@@ -235,14 +230,14 @@ where
 }
 
 /// Creates a server-side transport.
-pub fn server<L, K, F, A, Item, SinkItem>(
+pub fn server<L, CS, Item, SinkItem>(
     listener: L,
     codec: LengthDelimitedCodec,
-    sk: K::DecapKey,
+    sk: ApiKey<CS>,
     info: &[u8],
-) -> Server<L, K, F, A, Item, SinkItem>
+) -> Server<L, CS, Item, SinkItem>
 where
-    K: Kem,
+    CS: CipherSuite,
 {
     Server {
         listener,
@@ -255,26 +250,25 @@ where
 
 /// Creates [`ServerConn`]s.
 #[pin_project]
-pub struct Server<L, K, F, A, Item, SinkItem>
+pub struct Server<L, CS, Item, SinkItem>
 where
-    K: Kem,
+    CS: CipherSuite,
 {
     #[pin]
     listener: L,
     codec: LengthDelimitedCodec,
-    sk: Arc<K::DecapKey>,
+    sk: Arc<ApiKey<CS>>,
     info: Arc<[u8]>,
-    _marker: PhantomData<fn() -> (F, A, Item, SinkItem)>,
+    _marker: PhantomData<fn() -> (Item, SinkItem)>,
 }
 
-impl<S, L, K, F, A, Item, SinkItem> Stream for Server<L, K, F, A, Item, SinkItem>
+impl<S, L, CS, Item, SinkItem> Stream for Server<L, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
-    K: Kem,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
     L: TryStream<Ok = S, Error = io::Error>,
 {
-    type Item = io::Result<ServerConn<S, K, F, A, Item, SinkItem>>;
+    type Item = io::Result<ServerConn<S, CS, Item, SinkItem>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let Some(io) = ready!(self.as_mut().project().listener.try_poll_next(cx)?) else {
@@ -298,33 +292,31 @@ where
 
 /// An encrypted [`Transport`][tarpc::Transport].
 #[pin_project]
-pub struct ServerConn<S, K, F, A, Item, SinkItem>
+pub struct ServerConn<S, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
-    K: Kem,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
 {
     #[pin]
     inner: Transport<S, Msg, Msg, SymmetricalMessagePack<Msg>>,
-    sk: Arc<K::DecapKey>,
+    sk: Arc<ApiKey<CS>>,
     info: Arc<[u8]>,
-    seal: Option<SealCtx<A>>,
-    open: Option<OpenCtx<A>>,
+    seal: Option<SealCtx<CS::Aead>>,
+    open: Option<OpenCtx<CS::Aead>>,
     #[allow(clippy::type_complexity)]
-    _marker: PhantomData<fn() -> (F, Item, SinkItem)>,
+    _marker: PhantomData<fn() -> (Item, SinkItem)>,
 }
 
-impl<S, K, F, A, Item, SinkItem> ServerConn<S, K, F, A, Item, SinkItem>
+impl<S, CS, Item, SinkItem> ServerConn<S, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
-    K: Kem,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
     SinkItem: Serialize,
 {
     fn encrypt(&mut self, item: SinkItem) -> io::Result<Data> {
         let mut codec = MessagePack::<Item, SinkItem>::default();
         let mut plaintext = BytesMut::from(pin!(codec).serialize(&item)?);
-        let mut tag = BytesMut::from(&*Tag::<A>::default());
+        let mut tag = BytesMut::from(&*Tag::<CS::Aead>::default());
         self.seal
             .as_mut()
             .assume("`self.seal` should be `Some`")
@@ -338,11 +330,10 @@ where
     }
 }
 
-impl<S, K, F, A, Item, SinkItem> ServerConn<S, K, F, A, Item, SinkItem>
+impl<S, CS, Item, SinkItem> ServerConn<S, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
-    K: Kem,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
     Item: DeserializeOwned,
 {
     fn decrypt(&mut self, data: Data) -> io::Result<Item> {
@@ -362,17 +353,20 @@ where
     }
 }
 
-impl<S, K, F, A, Item, SinkItem> ServerConn<S, K, F, A, Item, SinkItem>
+impl<S, CS, Item, SinkItem> ServerConn<S, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
-    K: Kem,
-    F: Kdf,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
 {
     fn rekey(&mut self, enc: &[u8]) -> Result<(), HpkeError> {
-        let enc = <K::Encap as Import<_>>::import(enc)?;
+        let enc = <<CS::Kem as Kem>::Encap as Import<_>>::import(enc)?;
 
-        let recv = Hpke::<K, F, A>::setup_recv(Mode::Base, &enc, &self.sk, &self.info)?;
+        let recv = Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_recv(
+            Mode::Base,
+            &enc,
+            self.sk.as_inner(),
+            &self.info,
+        )?;
         let (seal_key, seal_nonce) = {
             let key = recv.export(b"cryptio server seal key")?;
             let nonce = recv.export(b"cryptio server seal nonce")?;
@@ -387,12 +381,10 @@ where
     }
 }
 
-impl<S, K, F, A, Item, SinkItem> Stream for ServerConn<S, K, F, A, Item, SinkItem>
+impl<S, CS, Item, SinkItem> Stream for ServerConn<S, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite + Unpin,
-    K: Kem,
-    F: Kdf,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
     Item: DeserializeOwned,
 {
     type Item = io::Result<Item>;
@@ -419,12 +411,10 @@ where
     }
 }
 
-impl<S, K, F, A, Item, SinkItem> Sink<SinkItem> for ServerConn<S, K, F, A, Item, SinkItem>
+impl<S, CS, Item, SinkItem> Sink<SinkItem> for ServerConn<S, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite + Unpin,
-    K: Kem,
-    F: Kdf,
-    A: Aead + IndCca2,
+    CS: CipherSuite,
     SinkItem: Serialize,
 {
     type Error = io::Error;
@@ -469,4 +459,64 @@ struct Data {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Rekey {
     enc: Bytes,
+}
+
+#[cfg(test)]
+mod tests {
+    use aranya_crypto::{
+        default::{DefaultCipherSuite, DefaultEngine},
+        Rng,
+    };
+    use futures_util::{SinkExt, StreamExt, TryStreamExt};
+    use tokio::net::{UnixListener, UnixStream};
+
+    use super::*;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_ping_pong() {
+        #[derive(Clone, Debug, Serialize, Deserialize)]
+        struct Ping {
+            v: usize,
+        }
+        #[derive(Clone, Debug, Serialize, Deserialize)]
+        struct Pong {
+            v: usize,
+        }
+
+        type CS = DefaultCipherSuite;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("sock");
+
+        let (mut eng, _) = DefaultEngine::from_entropy(Rng);
+        let sk = ApiKey::<CS>::new(&mut eng);
+        let pk = sk.public().unwrap();
+
+        let codec = LengthDelimitedCodec::builder()
+            .max_frame_length(usize::MAX)
+            .new_codec();
+        let info = path.as_os_str().as_encoded_bytes();
+
+        let listener = UnixListener::bind(&path).unwrap();
+        let server = server::<_, _, Ping, Pong>(listener, codec.clone(), sk, info);
+
+        tokio::spawn(async move {
+            server.inspect_err(|_| {});
+            while let Some(mut conn) = server.try_next().await? {
+                while let Some(Ping { v }) = conn.next().await {
+                    conn.send(Pong { v: v + 1 });
+                }
+            }
+            Ok(())
+        });
+
+        let sock = UnixStream::connect(&path).await.unwrap();
+        let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, info);
+
+        for v in 0..100 {
+            client.send(Ping { v }).await.unwrap();
+        }
+
+        todo!()
+    }
 }

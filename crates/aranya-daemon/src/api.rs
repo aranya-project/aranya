@@ -12,7 +12,8 @@ use core::{
 use std::{collections::BTreeMap, io, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
-use aranya_crypto::{CipherSuite, Csprng, DeviceId, Rng};
+use aranya_crypto::{Csprng, DeviceId, Rng};
+pub(crate) use aranya_daemon_api::crypto::{ApiKey, PublicApiKey};
 use aranya_daemon_api::{self as api, crypto::LengthDelimitedCodec, DaemonApi, CS};
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
@@ -31,7 +32,6 @@ use tokio::{
 };
 use tracing::{debug, error, info, instrument, warn};
 
-pub(crate) use crate::keys::{ApiKey, PublicApiKey};
 use crate::{
     aranya::Actions,
     policy::{ChanOp, Effect, KeyBundle, Role},
@@ -124,19 +124,7 @@ impl DaemonApiServer {
         let codec = LengthDelimitedCodec::builder()
             .max_frame_length(usize::MAX)
             .new_codec();
-        let server = api::crypto::server::<
-            _,
-            <CS as CipherSuite>::Kem,
-            <CS as CipherSuite>::Kdf,
-            <CS as CipherSuite>::Aead,
-            _,
-            _,
-        >(
-            UnixListenerStream(listener),
-            codec,
-            self.sk.into_inner(),
-            info,
-        );
+        let server = api::crypto::server(UnixListenerStream(listener), codec, self.sk, info);
 
         // TODO: determine if there's a performance benefit to putting these branches in different threads.
         tokio::join!(

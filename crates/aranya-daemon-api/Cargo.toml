@@ -22,16 +22,21 @@ spideroak-base58 = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
 bytes = { version = "1", features = ["serde"] }
+ciborium = { workspace = true }
 futures-util = { workspace = true }
 pin-project = { version = "1.1" }
 postcard = { workspace = true }
 serde = { workspace = true }
-serde_bytes = { version = "0.11" }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
-tokio = { version = "1.44" }
+tokio = { workspace = true }
 tokio-serde = { version = "0.9", features = ["messagepack"] }
 tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+test-log = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
 
 [package.metadata.cargo-machete]
 ignored = ["postcard"]

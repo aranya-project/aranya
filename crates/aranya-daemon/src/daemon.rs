@@ -236,6 +236,14 @@ impl Daemon {
         bundle.public_keys(eng, store)
     }
 
+    /// Loads the daemmon's public API key.
+    pub async fn load_api_pk(path: &Path) -> Result<Vec<u8>> {
+        let pk = try_read_cbor::<PublicApiKey<CS>>(&path)
+            .await?
+            .context("`PublicApiKey` not found")?;
+        pk.encode()
+    }
+
     /// Loads or generates the [`ApiKey`].
     async fn load_or_gen_api_key<E, S>(&self, eng: &mut E, store: &mut S) -> Result<ApiKey<E::CS>>
     where
@@ -331,7 +339,6 @@ mod tests {
 
     use std::time::Duration;
 
-    use aranya_crypto::Id;
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;
@@ -351,7 +358,6 @@ mod tests {
             work_dir: work_dir.clone(),
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
-            api_pk_id: Id::default(),
             sync_addr: any,
             afc: AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),

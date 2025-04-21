@@ -333,13 +333,15 @@ dependencies = [
  "aranya-util",
  "buggy",
  "bytes",
+ "ciborium",
  "futures-util",
  "pin-project",
  "postcard",
  "serde",
- "serde_bytes",
  "spideroak-base58",
  "tarpc",
+ "tempfile",
+ "test-log",
  "thiserror 2.0.12",
  "tokio",
  "tokio-serde",
@@ -2037,15 +2039,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8dfc9d19bdbf6d17e22319da49161d5d0108e4188e8b680aef6299eed22df60"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde_bytes"
-version = "0.11.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8437fd221bde2d4ca316d61b90e337e9e702b3820b87d63caa9ba6c02bd06d96"
-dependencies = [
- "serde",
 ]
 
 [[package]]

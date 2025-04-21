@@ -12,6 +12,7 @@ use aranya_crypto::{
     signer::PkError,
     CipherSuite, Engine,
 };
+use ciborium as cbor;
 use postcard::experimental::max_size::MaxSize;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
@@ -22,27 +23,39 @@ custom_id! {
 
 /// The daemon's secret key used to encrypt data sent over the
 /// API.
-pub(crate) struct ApiKey<CS: CipherSuite>(<<CS as CipherSuite>::Kem as Kem>::DecapKey);
+pub struct ApiKey<CS: CipherSuite>(<<CS as CipherSuite>::Kem as Kem>::DecapKey);
 
 impl<CS: CipherSuite> ApiKey<CS> {
-    pub(crate) fn id(&self) -> Result<ApiKeyId, IdError> {
+    pub(crate) fn new<E>(eng: &mut E) -> Self
+    where
+        E: Engine<CS = CS>,
+    {
+        Self(<<<CS as CipherSuite>::Kem as Kem>::DecapKey as SecretKey>::new(eng))
+    }
+
+    /// Returns the key's unique ID.
+    #[inline]
+    pub fn id(&self) -> Result<ApiKeyId, IdError> {
         self.public()?.id()
     }
 
-    pub(crate) fn public(&self) -> Result<PublicApiKey<CS>, PkError> {
+    /// Returns the public half of the key.
+    pub fn public(&self) -> Result<PublicApiKey<CS>, PkError> {
         Ok(PublicApiKey(self.0.public()?))
     }
 
-    pub(crate) fn into_inner(self) -> <<CS as CipherSuite>::Kem as Kem>::DecapKey {
-        self.0
+    pub(crate) fn as_inner(&self) -> &<<CS as CipherSuite>::Kem as Kem>::DecapKey {
+        &self.0
     }
 
-    pub(crate) fn generate<E, S>(eng: &mut E, store: &mut S) -> Result<Self>
+    /// Generates a key, wraps it with `eng`, and and writes the
+    /// wrapped key to `store`.
+    pub fn generate<E, S>(eng: &mut E, store: &mut S) -> Result<Self>
     where
         E: Engine<CS = CS>,
         S: KeyStore,
     {
-        let sk = Self(<<<CS as CipherSuite>::Kem as Kem>::DecapKey as SecretKey>::new(eng));
+        let sk = Self::new(eng);
         let id = sk.id()?;
         let wrapped = eng
             .wrap(sk.clone())
@@ -55,6 +68,7 @@ impl<CS: CipherSuite> ApiKey<CS> {
 }
 
 impl<CS: CipherSuite> Clone for ApiKey<CS> {
+    #[inline]
     fn clone(&self) -> Self {
         Self(self.0.clone())
     }
@@ -106,13 +120,31 @@ impl<CS: CipherSuite> UnwrappedKey<CS> for ApiKey<CS> {
 }
 
 /// The public half of [`ApiKey`].
-pub(crate) struct PublicApiKey<CS: CipherSuite>(<<CS as CipherSuite>::Kem as Kem>::EncapKey);
+pub struct PublicApiKey<CS: CipherSuite>(<<CS as CipherSuite>::Kem as Kem>::EncapKey);
 
 impl<CS: CipherSuite> PublicApiKey<CS> {
-    pub(crate) fn id(&self) -> Result<ApiKeyId, IdError> {
+    /// Returns the key's unique ID.
+    #[inline]
+    pub fn id(&self) -> Result<ApiKeyId, IdError> {
         let pk = &self.0.export();
         let id = Id::new::<CS>(pk.borrow(), b"ApiKey");
         Ok(ApiKeyId(id))
+    }
+
+    pub(crate) fn as_inner(&self) -> &<<CS as CipherSuite>::Kem as Kem>::EncapKey {
+        &self.0
+    }
+
+    /// Encodes the public key as bytes.
+    pub fn encode(&self) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        cbor::into_writer(self, &mut buf)?;
+        Ok(buf)
+    }
+
+    /// Decodes the public key from bytes.
+    pub fn decode(data: &[u8]) -> Result<Self> {
+        Ok(cbor::from_reader(data)?)
     }
 }
 
@@ -193,14 +225,14 @@ impl<CS: CipherSuite> Identified for PublicApiKey<CS> {
 // the future.
 #[allow(clippy::enum_variant_names)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, MaxSize)]
-pub(crate) enum ExportedDataType {
+enum ExportedDataType {
     PublicApiKey,
 }
 
 /// Non-secret exported from an `Engine`.
 #[derive(Serialize, Deserialize, MaxSize)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct ExportedData<T> {
+struct ExportedData<T> {
     /// Uniquely idenitifes the type of data.
     name: ExportedDataType,
     /// The exported data.
@@ -259,7 +291,7 @@ impl<'de, K: PublicKey> Deserialize<'de> for SerdeOwnedKey<K> {
 }
 
 /// A borrowed [`PublicKey`] for serializing.
-pub(crate) struct SerdeBorrowedKey<'a, K>(&'a K);
+struct SerdeBorrowedKey<'a, K>(&'a K);
 
 impl<K: PublicKey> Serialize for SerdeBorrowedKey<'_, K> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

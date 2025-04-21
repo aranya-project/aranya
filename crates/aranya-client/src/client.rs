@@ -3,10 +3,12 @@
 use core::{net::SocketAddr, time::Duration};
 use std::{io, path::Path};
 
-use aranya_crypto::{import::Import, kem::Kem, CipherSuite, Rng};
+use aranya_crypto::Rng;
 use aranya_daemon_api::{
-    self as api, crypto::LengthDelimitedCodec, ChanOp, DaemonApiClient, DeviceId, KeyBundle,
-    KeyStoreInfo, Label, LabelId, NetIdentifier, Role, TeamId, CS,
+    self as api,
+    crypto::{LengthDelimitedCodec, PublicApiKey},
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
+    Role, TeamId, CS,
 };
 use aranya_fast_channels::Label as AfcLabel;
 #[cfg(feature = "afc")]
@@ -155,21 +157,13 @@ impl Client {
         info!("starting Aranya client");
 
         let sock = UnixStream::connect(path).await?;
-        let pk = <<<CS as CipherSuite>::Kem as Kem>::EncapKey as Import<_>>::import(pk)
+        let pk = PublicApiKey::<CS>::decode(pk)
             .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
         let info = path.as_os_str().as_encoded_bytes();
         let codec = LengthDelimitedCodec::builder()
             .max_frame_length(usize::MAX)
             .new_codec();
-        let transport = api::crypto::client::<
-            _,
-            _,
-            <CS as CipherSuite>::Kem,
-            <CS as CipherSuite>::Kdf,
-            <CS as CipherSuite>::Aead,
-            _,
-            _,
-        >(sock, codec, Rng, pk, info);
+        let transport = api::crypto::client(sock, codec, Rng, pk, info);
 
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
         debug!("connected to daemon");

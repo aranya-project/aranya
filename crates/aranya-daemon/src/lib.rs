@@ -37,7 +37,6 @@ pub mod vm_policy;
 
 mod api;
 mod daemon;
-mod keys;
 mod sync;
 
 pub use daemon::*;

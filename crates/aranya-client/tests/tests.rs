@@ -322,14 +322,20 @@ impl DeviceCtx {
         // give daemon time to setup UDS API.
         sleep(SLEEP_INTERVAL).await;
 
-        // Initialize the user library.
-        let mut client = Client::builder()
-            .with_daemon_api_pk(&[])
-            .with_daemon_uds_path(&uds_api_path)
-            .connect()
-            .retry(ExponentialBuilder::default())
+        let pk = Daemon::load_api_pk(&cfg.daemon_api_pk_path())
             .await
-            .context("unable to init client")?;
+            .context("unable to find `ApiKeyId`")?;
+
+        // Initialize the user library.
+        let mut client = (|| {
+            Client::builder()
+                .with_daemon_api_pk(&pk)
+                .with_daemon_uds_path(&uds_api_path)
+                .connect()
+        })
+        .retry(ExponentialBuilder::default())
+        .await
+        .context("unable to init client")?;
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");
