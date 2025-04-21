@@ -1,14 +1,12 @@
 use std::{io, path::Path, sync::Arc};
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{Context, Result};
 use aranya_crypto::{
-    aead::Aead,
     default::DefaultEngine,
-    generic_array::GenericArray,
     import::Import,
-    keys::SecretKeyBytes,
+    keys::SecretKey,
     keystore::{fs_keystore::Store, KeyStore, KeyStoreExt},
-    CipherSuite, Engine, Random, Rng,
+    Engine, Rng,
 };
 use aranya_daemon_api::{KeyStoreInfo, CS};
 #[cfg(feature = "afc")]
@@ -25,7 +23,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
 #[cfg(feature = "afc")]
 use tracing::debug;
-use tracing::{error, info};
+use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
     api::{ApiKey, DaemonApiServer, PublicApiKey},
@@ -50,8 +48,6 @@ pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP, CE>;
 type Server = aranya::Server<EN, SP>;
-type KeyWrapKeyBytes = SecretKeyBytes<<<CS as CipherSuite>::Aead as Aead>::KeySize>;
-type KeyWrapKey = <<CS as CipherSuite>::Aead as Aead>::Key;
 
 /// The daemon itself.
 pub struct Daemon {
@@ -77,9 +73,7 @@ impl Daemon {
         let mut root_store =
             KS::open(store_dir.join("root")).context("unable to open root keystore")?;
         let mut eng = {
-            // Load keys from the keystore or generate new ones
-            // if there are no existing keys.
-            let key = self.load_or_gen_key_wrap_key().await?;
+            let key = load_or_gen_key(self.cfg.key_wrap_key_path()).await?;
             CE::new(&key, Rng)
         };
         let pk = self
@@ -273,36 +267,6 @@ impl Daemon {
             }
         }
     }
-
-    /// Loads the key wrapping key used by [`CryptoEngine`].
-    async fn load_or_gen_key_wrap_key(&self) -> Result<KeyWrapKey> {
-        let path = self.cfg.key_wrap_key_path();
-        let (bytes, loaded) = match fs::read(&path).await {
-            Ok(buf) => {
-                info!("loaded key wrap key");
-                let bytes = KeyWrapKeyBytes::new(
-                    *GenericArray::try_from_slice(&buf)
-                        .map_err(|_| anyhow!("invalid key wrap key length"))?,
-                );
-                (bytes, true)
-            }
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                info!("generating key wrap key");
-                let bytes = KeyWrapKeyBytes::random(&mut Rng);
-                (bytes, false)
-            }
-            Err(err) => bail!("unable to read key wrap key: {err}"),
-        };
-
-        // Import before writing in case importing fails.
-        let key = Import::import(bytes.as_bytes()).context("unable to import new key wrap key")?;
-        if !loaded {
-            aranya_util::write_file(&path, bytes.as_bytes())
-                .await
-                .context("unable to write key wrap key")?;
-        }
-        Ok(key)
-    }
 }
 
 impl Drop for Daemon {
@@ -331,6 +295,37 @@ async fn write_cbor(path: impl AsRef<Path>, data: impl Serialize) -> Result<()> 
     let mut buf = Vec::new();
     cbor::into_writer(&data, &mut buf)?;
     Ok(aranya_util::write_file(path, &buf).await?)
+}
+
+/// Loads a key from a file or generates and writes a new one.
+async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
+    pub async fn load_or_gen_key_inner<K: SecretKey>(path: &Path) -> Result<K> {
+        match fs::read(&path).await {
+            Ok(buf) => {
+                tracing::info!("loading key");
+                let key =
+                    Import::import(buf.as_slice()).context("unable to import key from file")?;
+                Ok(key)
+            }
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {
+                tracing::info!("generating key");
+                let key = K::new(&mut Rng);
+                let bytes = key
+                    .try_export_secret()
+                    .context("unable to export new key")?;
+                aranya_util::write_file(&path, bytes.as_bytes())
+                    .await
+                    .context("unable to write key")?;
+                Ok(key)
+            }
+            Err(err) => Err(err).context("unable to read key"),
+        }
+    }
+    let path = path.as_ref();
+    load_or_gen_key_inner(path)
+        .instrument(info_span!("load_or_gen_key", ?path))
+        .await
+        .with_context(|| format!("load_or_gen_key({path:?})"))
 }
 
 #[cfg(test)]
