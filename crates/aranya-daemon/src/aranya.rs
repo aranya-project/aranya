@@ -44,7 +44,7 @@ pub enum SyncResponse {
 pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
-    /// Thread-safe Peer Cache reference.
+    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
     /// Lock must be aquired after [`Self::aranya`]
     caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
     _eng: PhantomData<CE>,
@@ -87,7 +87,7 @@ where
         let (len, _) = {
             let mut client = self.aranya.lock().await;
             let mut peer_caches = self.caches.lock().await;
-            let peer_cache = peer_caches.entry(*addr).or_insert_with(PeerCache::new);
+            let peer_cache = peer_caches.entry(*addr).or_default();
 
             syncer
                 .poll(&mut send_buf, client.provider(), peer_cache)
@@ -264,7 +264,7 @@ where
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
-    /// Thread-safe Peer Cache reference.
+    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
     /// Lock must be aquired after [`Self::aranya`]
     caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
     /// Used to receive sync requests and send responses.
@@ -392,11 +392,7 @@ where
             .poll(
                 &mut buf,
                 client.lock().await.provider(),
-                peer_caches
-                    .lock()
-                    .await
-                    .entry(addr)
-                    .or_insert_with(PeerCache::new),
+                peer_caches.lock().await.entry(addr).or_default(),
             )
             .context("sync resp poll failed")?;
         debug!(len = len, "sync poll finished");
