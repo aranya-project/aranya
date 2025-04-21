@@ -41,7 +41,7 @@ pub struct ClientConfig {
     daemon_addr: *const c_char,
     #[cfg(feature = "afc")]
     afc: AfcConfig,
-    aqc: AqcConfig,
+    _aqc: AqcConfig,
 }
 
 impl ClientConfig {
@@ -110,7 +110,7 @@ impl ClientConfigBuilder {
             daemon_addr: self.daemon_addr,
             #[cfg(feature = "afc")]
             afc,
-            aqc,
+            _aqc: aqc,
         })
     }
 }
@@ -230,7 +230,7 @@ impl AfcConfigBuilder {
 /// Configuration info for Aranya Fast Channels
 pub struct AqcConfig {
     /// Address to bind AQC server to.
-    addr: *const c_char,
+    _addr: *const c_char,
 }
 
 impl Typed for AqcConfig {
@@ -261,7 +261,7 @@ impl AqcConfigBuilder {
             bug!("Tried to create an AqcConfig without a valid address!");
         }
 
-        Ok(AqcConfig { addr: self.addr })
+        Ok(AqcConfig { _addr: self.addr })
     }
 }
 
