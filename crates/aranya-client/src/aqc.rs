@@ -21,7 +21,7 @@ use aranya_daemon_api::{
 use aranya_fast_channels::NodeId;
 use tarpc::context;
 use tokio::{fs, sync::mpsc};
-use tracing::{debug, info, instrument, Instrument as _};
+use tracing::{debug, instrument, Instrument as _};
 
 use crate::{
     aqc_net::{AqcBidirectionalChannel, AqcChannelType, AqcClient},

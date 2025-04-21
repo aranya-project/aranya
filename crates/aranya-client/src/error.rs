@@ -187,6 +187,14 @@ pub enum AqcError {
     #[error("unable to parse encap")]
     Encap(anyhow::Error),
 
+    /// The channel was not found.
+    #[error("channel not found")]
+    ChannelNotFound,
+
+    /// Received an unexpected channel type.
+    #[error("received unexpected channel type: {0}")]
+    UnexpectedChannelType(String),
+
     // Connection-related errors
     /// Unable to bind a network addresss.
     #[error("unable to bind address: {0}")]

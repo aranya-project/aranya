@@ -26,6 +26,11 @@ use tempfile::tempdir;
 use tokio::sync::{mpsc, Mutex as TMutex};
 use tracing::{debug, info};
 
+/// NOTE: this certificate is to be used for demonstration purposes only!
+pub static CERT_PEM: &str = include_str!("../src/cert.pem");
+/// NOTE: this certificate is to be used for demonstration purposes only!
+pub static KEY_PEM: &str = include_str!("../src/key.pem");
+
 #[test_log::test(tokio::test)]
 async fn test_aqc_channels() -> Result<()> {
     let client1 = make_client();
@@ -175,7 +180,7 @@ fn make_client() -> Arc<TMutex<ClientState<TestEngine, MemStorageProvider>>> {
 }
 
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_aqc_one_way_two_chans() -> Result<()> {
+async fn test_aqc_chans() -> Result<()> {
     let interval = Duration::from_millis(100);
     let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
     let sleep_interval = interval * 6;
@@ -312,8 +317,8 @@ async fn test_aqc_one_way_two_chans() -> Result<()> {
 
     // get aqc addresses.
     // TODO: use aqc_local_addr()
-    let membera_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 5000);
-    let memberb_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 5001);
+    let membera_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 8000);
+    let memberb_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 8001);
 
     // TODO: use aqc addr
     operator_team
@@ -322,6 +327,15 @@ async fn test_aqc_one_way_two_chans() -> Result<()> {
     operator_team
         .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_aqc_addr.to_string()))
         .await?;
+
+    let membera_addr = run_aqc_server(
+        membera_aqc_addr,
+        team.membera.client.aqc().get_client_sender(),
+    )?;
+    let memberb_addr = run_aqc_server(
+        memberb_aqc_addr,
+        team.memberb.client.aqc().get_client_sender(),
+    )?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -362,18 +376,18 @@ async fn test_aqc_one_way_two_chans() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    println!(
-        "membera creating aqc bidi channel with memberb, addr: {:?}",
-        memberb_aqc_addr
-    );
     // membera creates aqc bidi channel with memberb
-    let (bidi_chan, aqc_bidi_ctrl) = team
+    let (mut bidi_chan1, aqc_bidi_ctrl) = team
         .membera
         .client
         .aqc()
-        .create_bidi_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label1)
+        .create_bidi_channel(
+            team_id,
+            NetIdentifier(memberb_aqc_addr.to_string()),
+            NetIdentifier(memberb_addr.to_string()),
+            label1,
+        )
         .await?;
-    println!("membera created aqc bidi channel with memberb");
     // memberb received aqc bidi channel ctrl message
     // TODO: receiving AQC ctrl messages will happen via the network.
     team.memberb
@@ -381,23 +395,25 @@ async fn test_aqc_one_way_two_chans() -> Result<()> {
         .aqc()
         .receive_aqc_ctrl(team_id, aqc_bidi_ctrl)
         .await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let mut bidi_chan2 = team.memberb.client.aqc()
-
-    let mut channel2 = match aqc_client2
+    let channel_type = team
+        .memberb
+        .client
+        .aqc()
         .receive_channel()
         .await
-        .assume("channel must exist")?
-    {
+        .assume("channel must exist")?;
+    let mut bidi_chan2 = match channel_type {
         AqcChannelType::Bidirectional { channel } => channel,
         _ => {
             buggy::bug!("Expected a bidirectional channel")
         }
     };
     tokio::time::sleep(Duration::from_millis(100)).await;
-    let mut send1_1 = channel1.create_unidirectional_stream().await?;
+    let mut send1_1 = bidi_chan1.create_unidirectional_stream().await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
-    let (mut send1_2, mut recv1_2) = channel1.create_bidirectional_stream().await?;
+    let (mut send1_2, mut recv1_2) = bidi_chan1.create_bidirectional_stream().await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Test sending streams
@@ -408,7 +424,7 @@ async fn test_aqc_one_way_two_chans() -> Result<()> {
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Receive a unidirectional stream from peer 1
-    let mut recv2_1 = channel2
+    let mut recv2_1 = bidi_chan2
         .receive_unidirectional_stream()
         .await
         .assume("stream not received")?
@@ -426,7 +442,7 @@ async fn test_aqc_one_way_two_chans() -> Result<()> {
     let msg2 = Bytes::from("hello2");
     send1_2.send(&msg2).await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
-    let (mut send2_2, mut recv2_2) = channel2
+    let (mut send2_2, mut recv2_2) = bidi_chan2
         .receive_bidirectional_stream()
         .await
         .assume("stream not received")?;
@@ -474,26 +490,20 @@ async fn test_aqc_one_way_two_chans() -> Result<()> {
     assert_eq!(total_len, big_data.len());
     assert_eq!(&target[..total_len], &big_data[..]);
 
-    // // membera creates aqc uni channel with memberb
-    // let (_aqc_id1, aqc_uni_ctrl) = team
-    //     .membera
-    //     .client
-    //     .aqc()
-    //     .create_uni_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label1)
-    //     .await?;
-
-    // // memberb received aqc uni channel ctrl message
-    // // TODO: receiving AQC ctrl messages will happen via the network.
-    // team.memberb
-    //     .client
-    //     .aqc()
-    //     .receive_aqc_ctrl(team_id, aqc_uni_ctrl)
-    //     .await?;
-
-    // // TODO: send AQC data.
-    // operator_team.revoke_label(team.membera.id, label1).await?;
-    // operator_team.revoke_label(team.memberb.id, label1).await?;
-    // operator_team.delete_label(label1).await?;
-
     Ok(())
+}
+
+fn run_aqc_server(
+    aqc_addr: SocketAddr,
+    sender: mpsc::Sender<AqcChannelType>,
+) -> Result<SocketAddr> {
+    let server = Server::builder()
+        .with_tls((CERT_PEM, KEY_PEM))?
+        // .with_io(aqc_addr)?
+        .with_io("127.0.0.1:0")?
+        .with_congestion_controller(Bbr::default())?
+        .start()?;
+    let addr = server.local_addr()?;
+    tokio::spawn(run_channels(server, sender));
+    Ok(addr)
 }
