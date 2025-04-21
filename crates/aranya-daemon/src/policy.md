@@ -169,8 +169,8 @@ fact AssignedRole[role_id id, device_id id]=>{}
 
 // Records that a role was assigned permission to execute a certain command.
 // TODO: use enum permission key.
-//fact AssignedPermissions[role_id id, cmd enum Permission]=>{}
-fact AssignedPermissions[role_id id, cmd int]=>{}
+//fact RolePermissions[role_id id, perm enum Permission]=>{}
+fact RolePermissions[role_id id, perm int]=>{}
 
 // Indicates that the team has been terminated.
 fact TeamEnd[]=>{}
@@ -433,23 +433,55 @@ command CreateTeam {
             enc_key_id: owner_key_ids.enc_key_id,
         }
 
+        // A role's ID is the ID of the command that created it.
+        let role_id = envelope::command_id(envelope)
+        
+        let role = Role {
+            role_id: role_id,
+            name: "Owner",
+            author_id: author_id,
+        }
+
         finish {
             // Add device to team.
             add_new_device(this.owner_keys, owner_key_ids, device)
             // Create a new owner role.
-            let role = create_role("Owner")
-            
+            create_role(role)
+
             // TODO: assign default permissions to owner role.
 
             // Assign owner role to device.
             assign_role_to_device(author_id, role.role_id)
-
 
             emit TeamCreated {
                 owner_id: author_id,
             }
         }
     }
+}
+
+finish function create_role(role struct Role) {
+    create Roles[role_id: role.role_id]=>{role: role}
+}
+
+finish function delete_role(role struct Role) {
+    delete Roles[role_id: role.role_id]
+}
+
+finish function assign_role_to_device(role_id id, device_id id) {
+    create AssignedRole[role_id: role_id, device_id: device_id]=>{}
+}
+
+finish function revoke_role_from_device(role_id id, device_id id) {
+    delete AssignedRole[role_id: role_id, device_id: device_id]
+}
+
+finish function assign_role_perm(role_id id, perm int) {
+    create RolePermissions[role_id: role_id, perm: perm]=>{}
+}
+
+finish function revoke_role_perm(role_id id, perm int) {
+    delete RolePermissions[role_id: role_id, perm: perm]
 }
 
 // Adds the device to the Team.
@@ -2332,9 +2364,9 @@ Queries a list of permissions assigned to the role.
 // Emits `QueriedRolePermisions` for all roles the device has
 // been granted permission to use.
 action query_role_perms(role_id id) {
-    map AssignedPermissions[role_id: ?] as f {
+    map RolePermissions[role_id: ?] as f {
         let role = check_unwrap query Role[role_id: f.role_id]
-        publish QueryRoleAssignment {
+        publish QueryRolePermissions {
             role_id: role.role_id,
             role_name: role.name,
             perm: f.perm,
@@ -2343,7 +2375,7 @@ action query_role_perms(role_id id) {
     }
 }
 
-command QueryRoleAssignment {
+command QueryRolePermissions {
     fields {
         role_id id,
         role_name string,

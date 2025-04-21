@@ -234,6 +234,8 @@ impl TeamCtx {
         };
         self.roles = Some(roles);
 
+        // TODO: assign permissions to roles.
+
         Ok(())
     }
 
@@ -300,11 +302,30 @@ impl TeamCtx {
         Ok(())
     }
 
-    async fn delete_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
+    async fn delete_all_roles(&mut self, team_id: TeamId) -> Result<()> {
         let owner = &mut self.owner.client;
+        let owner_id = owner.get_device_id().await?;
 
+        let devices = owner.queries(team_id).devices_on_team().await?;
+
+        // Revoke roles from devices.
+        for device in devices.iter() {
+            let roles = owner.queries(team_id).device_roles(*device).await?;
+            for role in roles.iter() {
+                owner.team(team_id).revoke_role(owner_id, role.id).await?;
+            }
+        }
+
+        // Revoke permissions from roles.
         let roles = &mut owner.queries(team_id).roles_on_team().await?;
-        // TODO: revoke roles perms and revoke roles from devices.
+        for role in roles.iter() {
+            let perms = owner.queries(team_id).role_perms(role.id).await?;
+            for perm in perms.iter() {
+                owner.team(team_id).revoke_role_perm(role.id, *perm).await?;
+            }
+        }
+
+        // Delete all roles.
         for role in roles.iter() {
             owner.team(team_id).delete_role(role.id).await?;
         }
@@ -499,6 +520,8 @@ async fn test_sync_now() -> Result<()> {
         .assign_role(team.operator.id, roles.operator.id)
         .await?;
 
+    team.delete_all_roles(team_id).await?;
+
     Ok(())
 }
 
@@ -589,6 +612,8 @@ async fn test_query_functions() -> Result<()> {
     }
 
     // TODO(nikki): if cfg!(feature = "aqc") { aqc_net_identifier } and have aqc on by default.
+
+    team.delete_all_roles(team_id).await?;
 
     Ok(())
 }

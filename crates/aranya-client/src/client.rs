@@ -382,6 +382,24 @@ impl Team<'_> {
             .map_err(Into::into)
     }
 
+    /// Assign permission to a role.
+    pub async fn assign_role_perm(&mut self, role: RoleId, perm: Permission) -> Result<()> {
+        self.client
+            .daemon
+            .assign_role_perm(context::current(), self.id, role, perm)
+            .await?
+            .map_err(Into::into)
+    }
+
+    /// Revoke permission from a role.
+    pub async fn revoke_role_perm(&mut self, role: RoleId, perm: Permission) -> Result<()> {
+        self.client
+            .daemon
+            .revoke_role_perm(context::current(), self.id, role, perm)
+            .await?
+            .map_err(Into::into)
+    }
+
     /// Associate a network identifier to a device for use with AFC.
     ///
     /// If the address already exists for this device, it is replaced with the new address. Capable
