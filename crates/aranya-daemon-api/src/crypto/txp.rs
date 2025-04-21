@@ -23,10 +23,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub use tarpc::tokio_util::codec::length_delimited::{Builder, LengthDelimitedCodec};
 use tarpc::{
     serde_transport::{self, Transport},
-    tokio_serde::{
-        formats::{MessagePack, SymmetricalMessagePack},
-        Deserializer, Serializer,
-    },
+    tokio_serde::{formats::MessagePack, Deserializer, Serializer},
     tokio_util::codec::Framed,
 };
 use tokio::io::{self, AsyncRead, AsyncWrite};
@@ -55,10 +52,7 @@ where
     Item: for<'de> Deserialize<'de>,
     SinkItem: Serialize,
 {
-    let inner = serde_transport::new(
-        Framed::new(io, codec.clone()),
-        SymmetricalMessagePack::default(),
-    );
+    let inner = serde_transport::new(Framed::new(io, codec.clone()), MessagePack::default());
     ClientConn {
         inner,
         rng,
@@ -78,7 +72,7 @@ where
     CS: CipherSuite,
 {
     #[pin]
-    inner: Transport<S, Msg, Msg, SymmetricalMessagePack<Msg>>,
+    inner: Transport<S, ServerMsg, ClientMsg, MessagePack<ServerMsg, ClientMsg>>,
     rng: R,
     pk: PublicApiKey<CS>,
     info: Vec<u8>,
@@ -148,8 +142,8 @@ where
             &self.info,
         )?;
         let (open_key, open_nonce) = {
-            let key = send.export(b"cryptio server seal key")?;
-            let nonce = send.export(b"cryptio server seal nonce")?;
+            let key = send.export(b"api server seal key")?;
+            let nonce = send.export(b"api server seal nonce")?;
             (key, nonce)
         };
         let (seal_key, seal_nonce) = send
@@ -179,18 +173,10 @@ where
             return Poll::Ready(None);
         };
         match msg {
-            Msg::Hello(_) => Poll::Ready(Some(Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "server cannot send `Hello`",
-            )))),
-            Msg::Data(data) => {
+            ServerMsg::Data(data) => {
                 let pt = self.decrypt(data)?;
                 Poll::Ready(Some(Ok(pt)))
             }
-            Msg::Rekey(_) => Poll::Ready(Some(Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "server cannot send `Rekey`",
-            )))),
         }
     }
 }
@@ -214,10 +200,10 @@ where
             self.as_mut()
                 .project()
                 .inner
-                .start_send(Msg::Hello(hello))?;
+                .start_send(ClientMsg::Hello(hello))?;
         }
         let data = self.encrypt(item)?;
-        self.project().inner.start_send(Msg::Data(data))
+        self.project().inner.start_send(ClientMsg::Data(data))
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -227,6 +213,30 @@ where
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.project().inner.poll_close(cx)
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
+enum ClientMsg {
+    Hello(Hello),
+    Data(Data),
+    Rekey(Rekey),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Hello {
+    enc: Bytes,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Data {
+    ciphertext: BytesMut,
+    tag: Bytes,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Rekey {
+    enc: Bytes,
 }
 
 /// Creates a server-side transport.
@@ -265,8 +275,8 @@ where
 impl<S, L, CS, Item, SinkItem> Stream for Server<L, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
-    CS: CipherSuite,
     L: TryStream<Ok = S, Error = io::Error>,
+    CS: CipherSuite,
 {
     type Item = io::Result<ServerConn<S, CS, Item, SinkItem>>;
 
@@ -274,10 +284,8 @@ where
         let Some(io) = ready!(self.as_mut().project().listener.try_poll_next(cx)?) else {
             return Poll::Ready(None);
         };
-        let inner = serde_transport::new(
-            Framed::new(io, self.codec.clone()),
-            SymmetricalMessagePack::default(),
-        );
+        let inner =
+            serde_transport::new(Framed::new(io, self.codec.clone()), MessagePack::default());
         let conn = ServerConn {
             inner,
             sk: Arc::clone(&self.sk),
@@ -298,7 +306,7 @@ where
     CS: CipherSuite,
 {
     #[pin]
-    inner: Transport<S, Msg, Msg, SymmetricalMessagePack<Msg>>,
+    inner: Transport<S, ClientMsg, ServerMsg, MessagePack<ClientMsg, ServerMsg>>,
     sk: Arc<ApiKey<CS>>,
     info: Arc<[u8]>,
     seal: Option<SealCtx<CS::Aead>>,
@@ -395,15 +403,15 @@ where
             return Poll::Ready(None);
         };
         match msg {
-            Msg::Hello(hello) => {
+            ClientMsg::Hello(hello) => {
                 self.rekey(&hello.enc).map_err(other)?;
                 Poll::Pending
             }
-            Msg::Data(data) => {
+            ClientMsg::Data(data) => {
                 let pt = self.decrypt(data)?;
                 Poll::Ready(Some(Ok(pt)))
             }
-            Msg::Rekey(rekey) => {
+            ClientMsg::Rekey(rekey) => {
                 self.rekey(&rekey.enc).map_err(other)?;
                 Poll::Pending
             }
@@ -425,7 +433,7 @@ where
 
     fn start_send(mut self: Pin<&mut Self>, item: SinkItem) -> Result<(), Self::Error> {
         let data = self.encrypt(item)?;
-        self.project().inner.start_send(Msg::Data(data))
+        self.project().inner.start_send(ServerMsg::Data(data))
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -439,26 +447,8 @@ where
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
-enum Msg {
-    Hello(Hello),
+enum ServerMsg {
     Data(Data),
-    Rekey(Rekey),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct Hello {
-    enc: Bytes,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct Data {
-    ciphertext: BytesMut,
-    tag: Bytes,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct Rekey {
-    enc: Bytes,
 }
 
 #[cfg(test)]

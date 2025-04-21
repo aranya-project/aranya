@@ -1,4 +1,4 @@
-//! TODO
+//! Cryptography.
 
 mod keys;
 mod txp;
