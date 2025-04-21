@@ -250,6 +250,8 @@ pub enum ChanOp {
 }
 
 /// Permission that can be assigned to roles.
+///
+/// Refer to `policy.md` `Permission` enum.
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Permission {
     TerminateTeam,
@@ -259,7 +261,15 @@ pub enum Permission {
     DeleteRole,
     AssignRole,
     RevokeRole,
-    // TODO
+    AssignRolePermission,
+    SetAqcNetworkName,
+    UnsetAqcNetworkName,
+    AqcCreateBidiChannel,
+    AqcCreateUniChannel,
+    CreateLabel,
+    DeleteLabel,
+    AssignLabel,
+    RevokeLabel,
 }
 
 /// A label.
@@ -320,10 +330,10 @@ pub trait DaemonApi {
     async fn create_role(team: TeamId, name: String) -> Result<Role>;
     /// Delete a role from a team.
     async fn delete_role(team: TeamId, role: RoleId) -> Result<()>;
-    /// Assign permissions to a role.
-    async fn assign_role_perms(team: TeamId, role: RoleId, perm: Permission) -> Result<()>;
-    /// Revoke permissions from a role.
-    async fn revoke_role_perms(team: TeamId, role: RoleId, perm: Permission) -> Result<()>;
+    /// Assign permission to a role.
+    async fn assign_role_perm(team: TeamId, role: RoleId, perm: Permission) -> Result<()>;
+    /// Revoke permission from a role.
+    async fn revoke_role_perm(team: TeamId, role: RoleId, perm: Permission) -> Result<()>;
     /// Assign a role to a device.
     async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
@@ -426,7 +436,7 @@ pub trait DaemonApi {
     /// Query device roles.
     async fn query_device_roles(team: TeamId, device: DeviceId) -> Result<Vec<Role>>;
     /// Query role permissions.
-    async fn query_role_permissions(team: TeamId, role: RoleId) -> Result<Vec<Permission>>;
+    async fn query_role_perms(team: TeamId, role: RoleId) -> Result<Vec<Permission>>;
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device label assignments.

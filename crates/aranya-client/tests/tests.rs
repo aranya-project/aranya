@@ -244,7 +244,9 @@ impl TeamCtx {
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
-        owner_team.add_device_to_team(self.admin.pk.clone(), 100).await?;
+        owner_team
+            .add_device_to_team(self.admin.pk.clone(), 100)
+            .await?;
         let roles = self.roles.clone().unwrap();
         owner_team
             .assign_role(self.admin.id, roles.admin.id)
@@ -299,7 +301,15 @@ impl TeamCtx {
     }
 
     async fn delete_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
-        todo!();
+        let owner = &mut self.owner.client;
+
+        let roles = &mut owner.queries(team_id).roles_on_team().await?;
+        // TODO: revoke roles perms and revoke roles from devices.
+        for role in roles.iter() {
+            owner.team(team_id).delete_role(role.id).await?;
+        }
+
+        Ok(())
     }
 }
 
@@ -466,7 +476,9 @@ async fn test_sync_now() -> Result<()> {
 
     // Add the operator as a new device, but don't give it a role.
     info!("adding operator to team");
-    owner.add_device_to_team(team.operator.pk.clone(), 100).await?;
+    owner
+        .add_device_to_team(team.operator.pk.clone(), 100)
+        .await?;
 
     // Finally, let's give the admin its role, but don't sync with peers.
     owner.assign_role(team.admin.id, roles.admin.id).await?;

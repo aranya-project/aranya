@@ -6,7 +6,7 @@ use std::{net::SocketAddr, path::Path, time::Duration};
 use aranya_daemon_api::CS;
 use aranya_daemon_api::{
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
-    Role, RoleId, TeamId,
+    Permission, Role, RoleId, TeamId,
 };
 use aranya_fast_channels::Label as AfcLabel;
 #[cfg(feature = "afc")]
@@ -71,6 +71,22 @@ impl Roles {
 
     #[doc(hidden)]
     pub fn __data(&self) -> &[Role] {
+        self.data.as_slice()
+    }
+}
+
+/// List of permissions.
+pub struct Permissions {
+    data: Vec<Permission>,
+}
+
+impl Permissions {
+    pub fn iter(&self) -> impl Iterator<Item = &Permission> {
+        self.data.iter()
+    }
+
+    #[doc(hidden)]
+    pub fn __data(&self) -> &[Permission] {
         self.data.as_slice()
     }
 }
@@ -526,6 +542,17 @@ impl Queries<'_> {
         })
     }
 
+    /// Returns the list of roles on the current team.
+    pub async fn roles_on_team(&mut self) -> Result<Roles> {
+        Ok(Roles {
+            data: self
+                .client
+                .daemon
+                .query_roles_on_team(context::current(), self.id)
+                .await??,
+        })
+    }
+
     /// Returns the role of the current device.
     pub async fn device_roles(&mut self, device: DeviceId) -> Result<Roles> {
         Ok(Roles {
@@ -553,6 +580,17 @@ impl Queries<'_> {
                 .client
                 .daemon
                 .query_device_label_assignments(context::current(), self.id, device)
+                .await??,
+        })
+    }
+
+    /// Returns a list of permissions assigned to a role.
+    pub async fn role_perms(&mut self, role: RoleId) -> Result<Permissions> {
+        Ok(Permissions {
+            data: self
+                .client
+                .daemon
+                .query_role_perms(context::current(), self.id, role)
                 .await??,
         })
     }

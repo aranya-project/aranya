@@ -25,7 +25,7 @@ use tokio::{
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
 
 use crate::{
-    policy::{ActorExt, ChanOp, Effect, KeyBundle},
+    policy::{ActorExt, ChanOp, Effect, KeyBundle, Permission},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -409,7 +409,11 @@ where
 
     /// Adds a Member instance to the team.
     #[instrument(skip_all)]
-    fn add_member(&self, keys: KeyBundle, priority: i64) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn add_member(
+        &self,
+        keys: KeyBundle,
+        priority: i64,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
             actor.add_member(keys, priority)?;
             Ok(())
@@ -473,6 +477,34 @@ where
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
             actor.revoke_role(device_id.into(), role_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Assigns a permission to a role.
+    #[instrument(skip_all)]
+    fn assign_role_perm(
+        &self,
+        role_id: RoleId,
+        perm: Permission,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.assign_role_perm(role_id.into(), perm)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Revokes permission from a role.
+    #[instrument(skip_all)]
+    fn revoke_role_perm(
+        &self,
+        role_id: RoleId,
+        perm: Permission,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.revoke_role_perm(role_id.into(), perm)?;
             Ok(())
         })
         .in_current_span()

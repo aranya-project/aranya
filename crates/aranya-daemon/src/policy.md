@@ -84,7 +84,15 @@ enum Permission {
     DeleteRole,
     AssignRole,
     RevokeRole,
-    // TODO
+    AssignRolePermission,
+    SetAqcNetworkName,
+    UnsetAqcNetworkName,
+    AqcCreateBidiChannel,
+    AqcCreateUniChannel,
+    CreateLabel,
+    DeleteLabel,
+    AssignLabel,
+    RevokeLabel,
 }
 
 // Valid channel operations for a label assignment.
@@ -758,42 +766,6 @@ command DeleteRole {
 }
 ```
 
-## AssignRolePermission
-
-Assign permission to execute a certain command to the role.
-
-```policy
-// A permission was assigned to a role on the team.
-effect RolePermissionAssigned {
-    // ID of the role.
-    role_id id,
-    // Name of the role.
-    name string,
-    // Permission assigned to the role.
-    perm enum Permission,
-    // ID of the device that assigned the permission.
-    author_id id,
-}
-```
-
-## RevokeRolePermission
-
-Revoke permission to execute a certain command from the role.
-
-```policy
-// A permission was revoked from a role on the team.
-effect RolePermissionRevoked {
-    // ID of the role.
-    role_id id,
-    // Name of the role.
-    name string,
-    // Permission revoked from the role.
-    perm enum Permission,
-    // ID of the device that revoked the permission.
-    author_id id,
-}
-```
-
 ## AssignRole
 
 Assign a role to a device.
@@ -801,7 +773,45 @@ Assign a role to a device.
 ```policy
 // Assigns the specified role to the device.
 action assign_role(device_id id, role_id id){
-    create AssignedRole[role_id: role_id, device_id: device_id]=>{}
+    publish AssignRole {
+        device_id: device_id,
+        role_id: role_id,
+    }
+}
+
+command AssignRole {
+    fields {
+        // ID of the device to assign role to.
+        device_id id,
+        // ID of the role to assign to the device.
+        role_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_valid_device(envelope::author_id(envelope))
+
+        // TODO: implement
+
+        // Query role.
+        let role = check_unwrap query Roles[role_id: this.role_id]
+
+        finish {
+            create AssignedRole[role_id: this.role_id, device_id: this.device_id]=>{}
+
+            // Return assigned role info.
+            emit RoleAssigned {
+                device_id: this.device_id,
+                role_id: role.role_id,
+                name: role.name,
+                author_id: author.device_id,
+            }
+        }
+    }
 }
 
 // A role was assigned to a device on the team.
@@ -832,7 +842,45 @@ TODO: fix these docs
 ```policy
 // Revoke a role from a device.
 action revoke_role(device_id id, role_id id){
-    delete AssignedRole[role_id: role_id, device_id: device_id]
+    publish RevokeRole {
+        device_id: device_id,
+        role_id: role_id,
+    }
+}
+
+command RevokeRole {
+    fields {
+        // ID of the device to revoke role from.
+        device_id id,
+        // ID of the role to revoke from the device.
+        role_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_valid_device(envelope::author_id(envelope))
+
+        // TODO: implement
+
+        // Query role.
+        let role = check_unwrap query Roles[role_id: this.role_id]
+
+        finish {
+            delete AssignedRole[role_id: this.role_id, device_id: this.device_id]=>{}
+
+            // Return revoked role info.
+            emit RoleRevoked {
+                device_id: this.device_id,
+                role_id: role.role_id,
+                name: role.name,
+                author_id: author.device_id,
+            }
+        }
+    }
 }
 
 // A role was revoked from a device on the team.
@@ -844,6 +892,123 @@ effect RoleRevoked {
     // Name of the role.
     name string,
     // ID of the device that revoked the role.
+    author_id id,
+}
+```
+
+## AssignRolePermission
+
+Assign permission to execute a certain command to the role.
+
+```policy
+
+action assign_role_perm(role_id id, perm enum Permission) {
+    publish AssignRolePermission{
+        role_id: role_id,
+        perm: perm,
+    }
+}
+
+command AssignRolePermission {
+    fields {
+        // ID of the role to assign permission to.
+        role_id id,
+        // Permission to assign to the role.
+        perm enum Permission,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_valid_device(envelope::author_id(envelope))
+
+        // TODO: implement
+
+        // Query role.
+        let role = check_unwrap query Roles[role_id: this.role_id]
+
+        finish {
+            // Return deleted role info.
+            emit RolePermissionAssigned {
+                role_id: role.role_id,
+                name: role.name,
+                perm: this.perm,
+                author_id: author.device_id,
+            }
+        }
+    }
+}
+
+// A permission was assigned to a role on the team.
+effect RolePermissionAssigned {
+    // ID of the role.
+    role_id id,
+    // Name of the role.
+    name string,
+    // Permission assigned to the role.
+    perm enum Permission,
+    // ID of the device that assigned the permission.
+    author_id id,
+}
+```
+
+## RevokeRolePermission
+
+Revoke permission to execute a certain command from the role.
+
+```policy
+action revoke_role_perm(role_id id, perm enum Permission) {
+    publish RevokeRolePermission{
+        role_id: role_id,
+        perm: perm,
+    }
+}
+
+command RevokeRolePermission {
+    fields {
+        // ID of the role to revoke permission from.
+        role_id id,
+        // Permission to revoke from the role.
+        perm enum Permission,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_valid_device(envelope::author_id(envelope))
+
+        // TODO: implement
+
+        // Query role.
+        let role = check_unwrap query Roles[role_id: this.role_id]
+
+        finish {
+            // Return deleted role info.
+            emit RolePermissionRevoked {
+                role_id: role.role_id,
+                name: role.name,
+                perm: this.perm,
+                author_id: author.device_id,
+            }
+        }
+    }
+}
+
+// A permission was revoked from a role on the team.
+effect RolePermissionRevoked {
+    // ID of the role.
+    role_id id,
+    // Name of the role.
+    name string,
+    // Permission revoked from the role.
+    perm enum Permission,
+    // ID of the device that revoked the permission.
     author_id id,
 }
 ```
@@ -2054,10 +2219,163 @@ command QueryAqcNetIdentifier {
 
 Queries a list of roles on the team.
 
+```policy
+// Emits `QueriedRole` for all roles.
+action query_roles() {
+    map Role[role_id: ?] as f {
+        publish QueryRole {
+            role_id: f.role_id,
+            role_name: f.name,
+            role_author_id: f.author_id,
+        }
+    }
+}
+
+command QueryRole {
+    fields {
+        role_id id,
+        role_name string,
+        role_author_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        finish {
+            emit QueriedRole {
+                label_id: this.role_id,
+                label_name: this.role_name,
+                author_id: this.role_author_id,
+            }
+        }
+    }
+}
+
+effect QueriedRole {
+    // The role's unique ID.
+    role_id id,
+    // The role name.
+    role_name string,
+    // The ID of the device that created the role.
+    author_id id,
+}
+```
+
 ### QueryDeviceRoles
 
 Queries a list of roles assigned to the device.
 
+```policy
+// Emits `QueriedRoleAssignment` for all roles the device has
+// been granted permission to use.
+action query_role_assignments(device_id id) {
+    // TODO: make this query more efficient when policy supports it.
+    // The key order is optimized for `delete AssignedRole`.
+    map AssignedRole[role_id: ?, device_id: ?] as f {
+        if f.device_id == device_id {
+            let role = check_unwrap query Role[role_id: f.role_id]
+            publish QueryRoleAssignment {
+                device_id: f.device_id,
+                role_id: f.role_id,
+                role_name: role.name,
+                role_author_id: role.author_id,
+            }
+        }
+    }
+}
+
+command QueryRoleAssignment {
+    fields {
+        device_id id,
+        role_id id,
+        role_name string,
+        role_author_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        finish {
+            emit QueriedRoleAssignment {
+                device_id: this.device_id,
+                role_id: this.role_id,
+                role_name: this.role_name,
+                role_author_id: this.role_author_id,
+            }
+        }
+    }
+}
+
+effect QueriedRoleAssignment {
+    // The device's unique ID.
+    device_id id,
+    // The role's unique ID.
+    role_id id,
+    // The role name.
+    role_name string,
+    // The ID of the device that created the role.
+    role_author_id id,
+}
+```
+
 ### QueryRolePermissions
 
 Queries a list of permissions assigned to the role.
+
+```policy
+// Emits `QueriedRolePermisions` for all roles the device has
+// been granted permission to use.
+action query_role_perms(role_id id) {
+    map AssignedPermissions[role_id: ?] as f {
+        let role = check_unwrap query Role[role_id: f.role_id]
+        publish QueryRoleAssignment {
+            role_id: role.role_id,
+            role_name: role.name,
+            perm: f.perm,
+            author_id: role.author_id,
+        }
+    }
+}
+
+command QueryRoleAssignment {
+    fields {
+        role_id id,
+        role_name string,
+        role_perm enum Permission,
+        role_author_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        finish {
+            emit QueriedRolePermission {
+                role_id: this.role_id,
+                role_name: this.role_name,
+                perm: this.perm,
+                role_author_id: this.role_author_id,
+            }
+        }
+    }
+}
+
+effect QueriedRolePermission {
+    // The role's unique ID.
+    role_id id,
+    // The role name.
+    role_name string,
+    // The role permission.
+    perm enum Permission,
+    // The ID of the device that created the role.
+    role_author_id id,
+}
+```
