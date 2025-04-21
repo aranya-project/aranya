@@ -16,7 +16,7 @@ use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_daemon_api::{self as api, DaemonApi};
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
-use aranya_runtime::GraphId;
+use aranya_runtime::{GraphId, StorageProvider};
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::BugExt;
@@ -41,9 +41,6 @@ mod afc_imports {
     pub(super) use aranya_afc_util::Handler;
     pub(super) use aranya_crypto::keystore::fs_keystore::Store;
     pub(super) use aranya_fast_channels::shm::WriteState;
-    pub(super) use aranya_runtime::StorageProvider;
-    pub(super) use bimap::BiBTreeMap;
-    pub(super) use tokio::sync::Mutex;
 
     pub(super) use crate::CE;
 }
@@ -97,19 +94,41 @@ impl DaemonApiServer {
         info!("uds path: {:?}", daemon_sock);
         let device_id = pk.ident_pk.id()?;
 
-        let afc_peers = BiBTreeMap::new();
-        let mut aranya = client.aranya.lock().await;
-        #[allow(unused_variables)]
-        if let Some(graph_id) = aranya.provider().list_graph_ids()?.next() {
+        let graph_ids = {
+            client
+                .aranya
+                .lock()
+                .await
+                .provider()
+                .list_graph_ids()?
+                .flatten()
+                .collect::<Vec<_>>()
+        };
+
+        let mut afc_peers = BTreeMap::new();
+        for graph_id in &graph_ids {
+            let graph_peers = BiBTreeMap::new();
             #[cfg(any())]
-            afc_peers.extend(
+            graph_peers.extend(
                 client
-                    .actions(&graph_id?)
+                    .actions(graph_id)
                     .query_afc_network_names_off_graph()
                     .await?,
             );
-        };
-        drop(aranya);
+            afc_peers.insert(*graph_id, graph_peers);
+        }
+
+        let mut aqc_peers = BTreeMap::new();
+        for graph_id in &graph_ids {
+            let mut graph_peers = BiBTreeMap::new();
+            graph_peers.extend(
+                client
+                    .actions(graph_id)
+                    .query_aqc_network_names_off_graph()
+                    .await?,
+            );
+            aqc_peers.insert(*graph_id, graph_peers);
+        }
 
         Ok(Self {
             daemon_sock,
@@ -127,7 +146,7 @@ impl DaemonApiServer {
                     device_id,
                     store.try_clone().context("unable to clone keystore")?,
                 ))),
-                aqc_peers: Arc::default(),
+                aqc_peers: Arc::new(Mutex::new(aqc_peers)),
             },
         })
     }
@@ -145,6 +164,30 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
     ) -> Result<Self> {
         info!("uds path: {:?}", daemon_sock);
+
+        let graph_ids = {
+            client
+                .aranya
+                .lock()
+                .await
+                .provider()
+                .list_graph_ids()?
+                .flatten()
+                .collect::<Vec<_>>()
+        };
+
+        let mut aqc_peers = BTreeMap::new();
+        for graph_id in &graph_ids {
+            let mut graph_peers = BiBTreeMap::new();
+            graph_peers.extend(
+                client
+                    .actions(graph_id)
+                    .query_aqc_network_names_off_graph()
+                    .await?,
+            );
+            aqc_peers.insert(*graph_id, graph_peers);
+        }
+
         Ok(Self {
             daemon_sock,
             recv_effects,
@@ -154,7 +197,7 @@ impl DaemonApiServer {
                 pk,
                 peers,
                 keystore_info,
-                aqc_peers: Arc::default(),
+                aqc_peers: Arc::new(Mutex::new(aqc_peers)),
             },
         })
     }
@@ -320,6 +363,7 @@ impl DaemonApiHandler {
                 Effect::QueryAqcNetIdentifierResult(_) => {}
                 Effect::QueriedLabelAssignment(_) => {}
                 Effect::QueryLabelExistsResult(_) => {}
+                Effect::QueryAqcNetworkNamesOutput(_) => {}
             }
         }
         Ok(())

@@ -5,6 +5,7 @@ use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, syn
 use anyhow::{bail, Context, Result};
 use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Rng};
+use aranya_daemon_api::NetIdentifier;
 #[cfg(any())]
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
@@ -16,7 +17,6 @@ use aranya_runtime::{
 };
 use aranya_util::Addr;
 use buggy::bug;
-#[cfg(any())]
 use futures_util::TryFutureExt as _;
 use serde::{Deserialize, Serialize};
 use tokio::{
@@ -611,7 +611,7 @@ where
         .in_current_span()
     }
 
-    /// Sets an AQC network name.
+    /// Unsets an AQC network name.
     #[instrument(skip(self), fields(device_id = %device_id))]
     fn unset_aqc_network_name(
         &self,
@@ -621,6 +621,34 @@ where
         self.with_actor(move |actor| {
             actor.unset_aqc_network_name(device_id.into())?;
             Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Queries all AQC network names off-graph.
+    #[instrument(skip(self))]
+    fn query_aqc_network_names_off_graph(
+        &self,
+    ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_aqc_network_names",
+            args: Cow::Owned(vec![]),
+        })
+        .and_then(|(_, effects)| {
+            std::future::ready(
+                effects
+                    .into_iter()
+                    .map(|eff| {
+                        let Effect::QueryAqcNetworkNamesOutput(eff) = eff else {
+                            anyhow::bail!("bad effect in query_network_names");
+                        };
+                        Ok((
+                            NetIdentifier(eff.net_identifier),
+                            DeviceId::from(eff.device_id),
+                        ))
+                    })
+                    .collect(),
+            )
         })
         .in_current_span()
     }
