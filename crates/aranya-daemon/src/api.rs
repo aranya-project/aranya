@@ -105,6 +105,7 @@ impl DaemonApiServer {
                 .collect::<Vec<_>>()
         };
 
+        #[allow(unused_mut)]
         let mut afc_peers = BTreeMap::new();
         #[cfg(any())]
         for graph_id in &graph_ids {
