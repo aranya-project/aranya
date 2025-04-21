@@ -326,13 +326,13 @@ typedef struct AranyaDeviceId {
     struct AranyaId id;
 } AranyaDeviceId;
 
-typedef struct ARANYA_ALIGNED(4) AranyaTeamConfigBuilder {
+typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[4];
+    uint8_t __for_size_only[16];
 } AranyaTeamConfigBuilder;
 
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
