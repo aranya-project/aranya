@@ -4,6 +4,7 @@ use aranya_capi_core::{
     safe::{Safe, TypeId, Typed},
     Builder, InvalidArg,
 };
+use aranya_client::ConfigError;
 
 use super::Error;
 use crate::api::defs::Duration;
@@ -45,6 +46,10 @@ pub struct ClientConfig {
     // The daemon's public API key.
     pk: Vec<u8>,
     aqc: AqcConfig,
+}
+
+impl Typed for ClientConfig {
+    const TYPE_ID: TypeId = TypeId::new(0x227DFC9E);
 }
 
 impl ClientConfig {
@@ -89,7 +94,7 @@ impl ClientConfigBuilder {
 }
 
 impl Typed for ClientConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
+    const TYPE_ID: TypeId = TypeId::new(0xAAAA611B);
 }
 
 impl Builder for ClientConfigBuilder {
@@ -204,7 +209,7 @@ pub struct AfcConfig {
 
 #[cfg(feature = "afc")]
 impl Typed for AfcConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
+    const TYPE_ID: TypeId = TypeId::new(0x1C3BE29F);
 }
 
 /// Builder for an [`AfcConfig`]
@@ -218,6 +223,11 @@ pub struct AfcConfigBuilder {
     pub max_channels: usize,
     /// Address to bind AFC server to.
     pub addr: *const c_char,
+}
+
+#[cfg(feature = "afc")]
+impl Typed for AfcConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0xB4E69EF0);
 }
 
 #[cfg(feature = "afc")]
@@ -251,7 +261,7 @@ pub struct AqcConfig {
 }
 
 impl Typed for AqcConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
+    const TYPE_ID: TypeId = TypeId::new(0x64CEB3F4);
 }
 
 /// Builder for an [`AqcConfig`]
@@ -289,11 +299,119 @@ impl Builder for AqcConfigBuilder {
 }
 
 impl Typed for AqcConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFCA0);
+    const TYPE_ID: TypeId = TypeId::new(0x153AE387);
 }
 
 impl Default for AqcConfigBuilder {
     fn default() -> Self {
         Self { addr: ptr::null() }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+/// Configuration info for syncing with a peer
+pub struct SyncPeerConfig {
+    interval: Duration,
+    sync_now: bool,
+}
+
+impl Typed for SyncPeerConfig {
+    const TYPE_ID: TypeId = TypeId::new(0x44BE85E7);
+}
+
+impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
+    fn from(value: SyncPeerConfig) -> Self {
+        Self::builder()
+            .interval(value.interval.into())
+            .sync_now(value.sync_now)
+            .build()
+            .expect("All values are set")
+    }
+}
+
+impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
+    fn from(value: &SyncPeerConfig) -> Self {
+        (*value).into()
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+/// Builder for a [`SyncPeerConfig`]
+pub struct SyncPeerConfigBuilder {
+    interval: Option<Duration>,
+    sync_now: bool,
+}
+
+impl Typed for SyncPeerConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0xFE81AF7E);
+}
+
+impl SyncPeerConfigBuilder {
+    /// Sets the interval at which syncing occurs.
+    pub fn interval(&mut self, duration: Duration) {
+        self.interval = Some(duration);
+    }
+
+    /// Configures whether the peer will be immediately synced with after being added.
+    ///
+    /// By default, the peer is immediately synced with.
+    pub fn sync_now(&mut self, sync_now: bool) {
+        self.sync_now = sync_now;
+    }
+
+    /// Attempts to construct a [`SyncPeerConfig`], returning an
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
+    pub fn build(&self) -> Result<SyncPeerConfig, super::Error> {
+        let Some(interval) = self.interval else {
+            let e = ConfigError::InvalidArg {
+                arg: "interval",
+                reason: "Tried to create a `SyncPeerConfig` without setting the interval!",
+            };
+            return Err(e.into());
+        };
+
+        Ok(SyncPeerConfig {
+            interval,
+            sync_now: self.sync_now,
+        })
+    }
+}
+
+impl Default for SyncPeerConfigBuilder {
+    fn default() -> Self {
+        Self {
+            interval: None,
+            sync_now: true,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+#[aranya_capi_core::opaque(size = 0, align = 1)]
+/// Configuration info when creating or adding a team in Aranya
+pub struct TeamConfig {}
+
+impl Typed for TeamConfig {
+    const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+#[aranya_capi_core::opaque(size = 0, align = 1)]
+/// Builder for a [`TeamConfig`]
+pub struct TeamConfigBuilder {}
+
+impl Typed for TeamConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x112905E7);
+}
+
+impl TeamConfigBuilder {
+    /// Attempts to construct a [`TeamConfig`], returning an
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
+    pub fn build(self) -> Result<TeamConfig, super::Error> {
+        Ok(TeamConfig {})
     }
 }

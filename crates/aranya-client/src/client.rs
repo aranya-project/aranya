@@ -1,7 +1,7 @@
 //! Client-daemon connection.
 
 use core::{net::SocketAddr, time::Duration};
-use std::{io, path::Path};
+use std::{io, net::SocketAddr, path::Path};
 
 use aranya_crypto::Rng;
 use aranya_daemon_api::{
@@ -29,6 +29,7 @@ use tracing::{debug, info, instrument};
 use crate::afc::{setup_afc_shm, FastChannels, FastChannelsImpl};
 use crate::{
     aqc::{AqcChannels, AqcChannelsImpl},
+    config::{SyncPeerConfig, TeamConfig},
     error::{Error, IpcError, Result},
 };
 
@@ -238,18 +239,18 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self) -> Result<TeamId> {
+    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
         self.daemon
-            .create_team(context::current())
+            .create_team(context::current(), cfg.into())
             .await
             .map_err(IpcError)?
             .map_err(Into::into)
     }
 
     /// Add a team to the local device store.
-    pub async fn add_team(&mut self, team: TeamId) -> Result<()> {
+    pub async fn add_team(&mut self, team: TeamId, cfg: TeamConfig) -> Result<()> {
         self.daemon
-            .add_team(context::current(), team)
+            .add_team(context::current(), team, cfg.into())
             .await
             .map_err(IpcError)?
             .map_err(Into::into)

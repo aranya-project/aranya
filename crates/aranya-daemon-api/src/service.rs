@@ -100,6 +100,12 @@ pub enum Role {
     Member,
 }
 
+/// A configuration for creating or adding a team to a daemon.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TeamConfig {
+    // TODO(nikki): any fields added to this should be public
+}
+
 /// A device's network identifier.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
 pub struct NetIdentifier(pub String);
@@ -295,13 +301,13 @@ pub trait DaemonApi {
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
 
     /// add a team to the local device store that was created by someone else. Not an aranya action/command.
-    async fn add_team(team: TeamId) -> Result<()>;
+    async fn add_team(team: TeamId, cfg: TeamConfig) -> Result<()>;
 
     /// remove a team from the local device store.
     async fn remove_team(team: TeamId) -> Result<()>;
 
     /// Create a new graph/team with the current device as the owner.
-    async fn create_team() -> Result<TeamId>;
+    async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 
