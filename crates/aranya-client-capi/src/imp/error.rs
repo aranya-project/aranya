@@ -41,6 +41,9 @@ pub enum Error {
 
     #[error("config error: {0}")]
     Config(#[from] aranya_client::ConfigError),
+
+    #[error("serialization errors: {0}")]
+    Serialization(#[from] postcard::Error),
 }
 
 impl From<WriteCStrError> for Error {

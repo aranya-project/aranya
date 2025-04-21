@@ -125,6 +125,8 @@ impl SyncPeers {
     }
 }
 
+type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
+
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
@@ -138,7 +140,7 @@ pub struct Syncer {
     /// Delay queue for getting the next peer to sync with.
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
-    send_effects: mpsc::Sender<Vec<EF>>,
+    send_effects: EffectSender,
 }
 
 struct PeerInfo {
@@ -150,7 +152,7 @@ struct PeerInfo {
 
 impl Syncer {
     /// Creates a new `Syncer`.
-    pub fn new(client: Arc<Client>, send_effects: mpsc::Sender<Vec<EF>>) -> (Self, SyncPeers) {
+    pub fn new(client: Arc<Client>, send_effects: EffectSender) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -233,7 +235,7 @@ impl Syncer {
         };
         let n = effects.len();
         self.send_effects
-            .send(effects)
+            .send((*id, effects))
             .await
             .context("unable to send effects")?;
         info!(?n, "completed sync");

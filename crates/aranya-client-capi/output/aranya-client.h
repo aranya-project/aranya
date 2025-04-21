@@ -193,6 +193,10 @@ enum AranyaError
      * Unable to create configuration info.
      */
     ARANYA_ERROR_CONFIG,
+    /**
+     * Serialization error.
+     */
+    ARANYA_ERROR_SERIALIZATION,
 };
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
@@ -310,36 +314,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfig {
      */
     uint8_t __for_size_only[56];
 } AranyaClientConfig;
-
-/**
- * Public Key bundle for a device.
- */
-typedef struct ARANYA_DESIGNATED_INIT AranyaKeyBundle {
-    /**
-     * Public identity key.
-     */
-    const uint8_t *ident_key;
-    /**
-     * Public identity key length.
-     */
-    size_t ident_key_len;
-    /**
-     * Public signing key.
-     */
-    const uint8_t *sign_key;
-    /**
-     * Public signing key length.
-     */
-    size_t sign_key_len;
-    /**
-     * Public encryption key.
-     */
-    const uint8_t *enc_key;
-    /**
-     * Public encryption key length.
-     */
-    size_t enc_key_len;
-} AranyaKeyBundle;
 
 typedef struct AranyaId {
     uint8_t bytes[ARANYA_ID_LEN];
@@ -819,23 +793,27 @@ AranyaError aranya_client_init_ext(struct AranyaClient *client,
  * Gets the public key bundle for this device.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param __output the client's key bundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param keybundle keybundle byte buffer `KeyBundle`.
+ * @param keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_get_key_bundle(struct AranyaClient *client,
-                                  struct AranyaKeyBundle *__output);
+                                  uint8_t *keybundle,
+                                  size_t *keybundle_len);
 
 /**
  * Gets the public key bundle for this device.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param __output the client's key bundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param keybundle keybundle byte buffer `KeyBundle`.
+ * @param keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_get_key_bundle_ext(struct AranyaClient *client,
-                                      struct AranyaKeyBundle *__output,
+                                      uint8_t *keybundle,
+                                      size_t *keybundle_len,
                                       struct AranyaExtError *__ext_err);
 
 /**
@@ -1106,13 +1084,15 @@ AranyaError aranya_close_team_ext(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param keys the device's public key bundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param keybundle_len is the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_device_to_team(struct AranyaClient *client,
                                       const struct AranyaTeamId *team,
-                                      const struct AranyaKeyBundle *keys);
+                                      const uint8_t *keybundle,
+                                      size_t keybundle_len);
 
 /**
  * Add a device to the team with the default role.
@@ -1121,13 +1101,15 @@ AranyaError aranya_add_device_to_team(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param keys the device's public key bundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param keybundle_len is the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_device_to_team_ext(struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
-                                          const struct AranyaKeyBundle *keys,
+                                          const uint8_t *keybundle,
+                                          size_t keybundle_len,
                                           struct AranyaExtError *__ext_err);
 
 /**
@@ -1690,14 +1672,16 @@ AranyaError aranya_id_from_str(const char *str, struct AranyaId *__output);
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's key bundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param keybundle keybundle byte buffer `KeyBundle`.
+ * @param keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_query_device_keybundle(struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
                                           const struct AranyaDeviceId *device,
-                                          struct AranyaKeyBundle *__output);
+                                          uint8_t *keybundle,
+                                          size_t *keybundle_len);
 
 /**
  * Query device's keybundle.
@@ -1705,14 +1689,16 @@ AranyaError aranya_query_device_keybundle(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param __output the device's key bundle [`AranyaKeyBundle`](@ref AranyaKeyBundle).
+ * @param keybundle keybundle byte buffer `KeyBundle`.
+ * @param keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
                                               const struct AranyaTeamId *team,
                                               const struct AranyaDeviceId *device,
-                                              struct AranyaKeyBundle *__output,
+                                              uint8_t *keybundle,
+                                              size_t *keybundle_len,
                                               struct AranyaExtError *__ext_err);
 
 /**

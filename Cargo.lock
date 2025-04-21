@@ -237,6 +237,7 @@ dependencies = [
  "aranya-util",
  "buggy",
  "libc",
+ "postcard",
  "quote",
  "syn 2.0.99",
  "thiserror 2.0.12",
