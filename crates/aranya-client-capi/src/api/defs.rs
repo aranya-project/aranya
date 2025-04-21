@@ -1,4 +1,4 @@
-use core::{ffi::c_char, ops::DerefMut, ptr, slice};
+use core::{ffi::c_char, ops::DerefMut, ptr};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
@@ -65,11 +65,17 @@ pub enum Error {
     #[capi(msg = "AQC library error")]
     Aqc,
 
+    /// Tokio runtime error.
     #[capi(msg = "tokio runtime error")]
     Runtime,
 
+    /// Invalid index error.
     #[capi(msg = "invalid index")]
     InvalidIndex,
+
+    /// Serialization error.
+    #[capi(msg = "serialization")]
+    Serialization,
 }
 
 impl From<&imp::Error> for Error {
@@ -95,6 +101,7 @@ impl From<&imp::Error> for Error {
             },
             imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::InvalidIndex(_) => Self::InvalidIndex,
+            imp::Error::Serialization(_) => Self::Serialization,
         }
     }
 }
@@ -472,54 +479,6 @@ impl From<Duration> for std::time::Duration {
     }
 }
 
-/// Public Key bundle for a device.
-#[repr(C)]
-#[must_use]
-#[derive(Copy, Clone, Debug)]
-pub struct KeyBundle {
-    /// Public identity key.
-    pub ident_key: *const u8,
-    /// Public identity key length.
-    pub ident_key_len: usize,
-    /// Public signing key.
-    pub sign_key: *const u8,
-    /// Public signing key length.
-    pub sign_key_len: usize,
-    /// Public encryption key.
-    pub enc_key: *const u8,
-    /// Public encryption key length.
-    pub enc_key_len: usize,
-}
-
-impl KeyBundle {
-    /// SAFETY: Must provide valid ptr/len "slices".
-    unsafe fn as_underlying(&self) -> aranya_daemon_api::KeyBundle {
-        // SAFETY: Must trust caller provides valid ptr/len.
-        unsafe {
-            aranya_daemon_api::KeyBundle {
-                identity: slice::from_raw_parts(self.ident_key, self.ident_key_len).to_vec(),
-                signing: slice::from_raw_parts(self.sign_key, self.sign_key_len).to_vec(),
-                encoding: slice::from_raw_parts(self.enc_key, self.enc_key_len).to_vec(),
-            }
-        }
-    }
-
-    fn from_underlying(keys: aranya_daemon_api::KeyBundle) -> Self {
-        // TODO: Don't leak
-        let identity = keys.identity.leak();
-        let signing = keys.signing.leak();
-        let encoding = keys.encoding.leak();
-        KeyBundle {
-            ident_key: identity.as_mut_ptr(),
-            ident_key_len: identity.len(),
-            sign_key: signing.as_mut_ptr(),
-            sign_key_len: signing.len(),
-            enc_key: encoding.as_mut_ptr(),
-            enc_key_len: encoding.len(),
-        }
-    }
-}
-
 /// Configuration info for Aranya Fast Channels.
 #[cfg(feature = "afc")]
 #[aranya_capi_core::opaque(size = 40, align = 8)]
@@ -711,13 +670,21 @@ pub unsafe fn client_init(
 /// Gets the public key bundle for this device.
 ///
 /// @param client the Aranya Client [`Client`].
-/// @param __output the client's key bundle [`KeyBundle`].
+/// @param keybundle keybundle byte buffer `KeyBundle`.
+/// @param keybundle_len returns the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.
-pub fn get_key_bundle(client: &mut Client) -> Result<KeyBundle, imp::Error> {
+pub unsafe fn get_key_bundle(
+    client: &mut Client,
+    keybundle: *mut MaybeUninit<u8>,
+    keybundle_len: &mut usize,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let keys = client.rt.block_on(client.inner.get_key_bundle())?;
-    Ok(KeyBundle::from_underlying(keys))
+    // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
+    unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
+
+    Ok(())
 }
 
 /// Gets the public device ID.
@@ -873,21 +840,21 @@ pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> 
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param keys the device's public key bundle [`KeyBundle`].
+/// @param keybundle serialized keybundle byte buffer `KeyBundle`.
+/// @param keybundle_len is the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_device_to_team(
     client: &mut Client,
     team: &TeamId,
-    keys: &KeyBundle,
+    keybundle: &[u8],
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let keys =
-        // SAFETY: Caller must provide valid keys.
-        unsafe { keys.as_underlying() };
+    let keybundle = imp::key_bundle_deserialize(keybundle)?;
+
     client
         .rt
-        .block_on(client.inner.team(team.into()).add_device_to_team(keys))?;
+        .block_on(client.inner.team(team.into()).add_device_to_team(keybundle))?;
     Ok(())
 }
 
@@ -1666,14 +1633,17 @@ pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param __output the device's key bundle [`KeyBundle`].
+/// @param keybundle keybundle byte buffer `KeyBundle`.
+/// @param keybundle_len returns the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_device_keybundle(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-) -> Result<KeyBundle, imp::Error> {
+    keybundle: *mut MaybeUninit<u8>,
+    keybundle_len: &mut usize,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let keys = client.rt.block_on(
         client
@@ -1681,7 +1651,9 @@ pub unsafe fn query_device_keybundle(
             .queries(team.into())
             .device_keybundle(device.into()),
     )?;
-    Ok(KeyBundle::from_underlying(keys))
+    // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
+    unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
+    Ok(())
 }
 
 /// Query device label assignments.
