@@ -37,6 +37,9 @@ where
     io::Error::new(io::ErrorKind::Other, err)
 }
 
+const SERVER_KEY_CTX: &[u8] = b"aranya daemon api server seal key";
+const SERVER_NONCE_CTX: &[u8] = b"aranya daemon api server seal nonce";
+
 /// Creates a client-side transport.
 pub fn client<S, R, CS, Item, SinkItem>(
     io: S,
@@ -142,8 +145,8 @@ where
             &self.info,
         )?;
         let (open_key, open_nonce) = {
-            let key = send.export(b"api server seal key")?;
-            let nonce = send.export(b"api server seal nonce")?;
+            let key = send.export(SERVER_KEY_CTX)?;
+            let nonce = send.export(SERVER_NONCE_CTX)?;
             (key, nonce)
         };
         let (seal_key, seal_nonce) = send
@@ -376,8 +379,8 @@ where
             &self.info,
         )?;
         let (seal_key, seal_nonce) = {
-            let key = recv.export(b"cryptio server seal key")?;
-            let nonce = recv.export(b"cryptio server seal nonce")?;
+            let key = recv.export(SERVER_KEY_CTX)?;
+            let nonce = recv.export(SERVER_NONCE_CTX)?;
             (key, nonce)
         };
         let (open_key, open_nonce) = recv

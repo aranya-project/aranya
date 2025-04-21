@@ -2,14 +2,12 @@
 
 use std::{io, net::SocketAddr, path::Path};
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use aranya_aqc_util::{
     BidiChannelCreated, BidiChannelReceived, Handler, UniChannelCreated, UniChannelReceived,
 };
 use aranya_crypto::{
     aqc::{BidiChannelId, BidiPeerEncap, UniChannelId, UniPeerEncap},
-    default::DefaultEngine,
-    generic_array::GenericArray,
     import::Import,
     keys::SecretKey,
     keystore::fs_keystore::Store,
