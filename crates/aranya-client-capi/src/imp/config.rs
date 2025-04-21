@@ -8,7 +8,6 @@ use buggy::bug;
 
 use crate::api::defs::Duration;
 
-#[repr(C)]
 #[derive(Debug, Copy, Clone)]
 /// Configuration values for syncing with a peer
 pub struct SyncPeerConfig {
@@ -36,9 +35,7 @@ impl From<&SyncPeerConfig> for aranya_client::client::SyncPeerConfig {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
 /// Configuration info for Aranya
 pub struct ClientConfig {
     daemon_addr: *const c_char,
@@ -62,9 +59,7 @@ impl Typed for ClientConfig {
     const TYPE_ID: TypeId = TypeId::new(0x227DFC9E);
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 56, align = 8)]
 /// Builder for a [`ClientConfig`]
 pub struct ClientConfigBuilder {
     daemon_addr: *const c_char,
@@ -131,7 +126,6 @@ impl Default for ClientConfigBuilder {
     }
 }
 
-#[repr(C)]
 #[derive(Debug, Copy, Clone)]
 /// Builder for a [`SyncPeerConfig`]
 pub struct SyncPeerConfigBuilder {
@@ -182,10 +176,8 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 #[cfg(feature = "afc")]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
 /// Configuration info for Aranya Fast Channels
 pub struct AfcConfig {
     /// Shared memory path.
@@ -203,7 +195,6 @@ impl Typed for AfcConfig {
 
 #[derive(Copy, Clone, Debug)]
 #[cfg(feature = "afc")]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
 /// Builder for an [`AfcConfig`]
 pub struct AfcConfigBuilder {
     /// Shared memory path.
@@ -235,9 +226,7 @@ impl AfcConfigBuilder {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
 /// Configuration info for Aranya Fast Channels
 pub struct AqcConfig {
     /// Address to bind AQC server to.
@@ -249,7 +238,6 @@ impl Typed for AqcConfig {
 }
 
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
 /// Builder for an [`AqcConfig`]
 pub struct AqcConfigBuilder {
     /// Address to bind AQC server to.
