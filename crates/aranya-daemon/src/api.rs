@@ -6,28 +6,30 @@
 use core::{
     future::{self, Future},
     net::SocketAddr,
-    pin::Pin,
-    task::{Context, Poll},
 };
-use std::{collections::BTreeMap, io, path::PathBuf, sync::Arc};
+use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
 use aranya_crypto::{Csprng, DeviceId, Rng};
 pub(crate) use aranya_daemon_api::crypto::{ApiKey, PublicApiKey};
-use aranya_daemon_api::{self as api, crypto::LengthDelimitedCodec, DaemonApi, CS};
+use aranya_daemon_api::{
+    self as api,
+    crypto::txp::{self, LengthDelimitedCodec},
+    DaemonApi, CS,
+};
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::BugExt;
-use futures_util::{Stream, StreamExt, TryStreamExt};
+use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,
     server::{self, Channel},
 };
 use tokio::{
-    net::{UnixListener, UnixStream},
+    net::UnixListener,
     sync::{mpsc, Mutex},
 };
 use tracing::{debug, error, info, instrument, warn};
@@ -124,7 +126,12 @@ impl DaemonApiServer {
         let codec = LengthDelimitedCodec::builder()
             .max_frame_length(usize::MAX)
             .new_codec();
-        let server = api::crypto::server(UnixListenerStream(listener), codec, self.sk, info);
+        let server = txp::server(
+            txp::unix::UnixListenerStream::from(listener),
+            codec,
+            self.sk,
+            info,
+        );
 
         // TODO: determine if there's a performance benefit to putting these branches in different threads.
         tokio::join!(
@@ -150,23 +157,6 @@ impl DaemonApiServer {
             },
         );
         Ok(())
-    }
-}
-
-#[derive(Debug)]
-struct UnixListenerStream(UnixListener);
-impl Stream for UnixListenerStream {
-    type Item = io::Result<UnixStream>;
-
-    fn poll_next(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<io::Result<UnixStream>>> {
-        match self.0.poll_accept(cx) {
-            Poll::Ready(Ok((stream, _))) => Poll::Ready(Some(Ok(stream))),
-            Poll::Ready(Err(err)) => Poll::Ready(Some(Err(err))),
-            Poll::Pending => Poll::Pending,
-        }
     }
 }
 
@@ -348,8 +338,8 @@ impl DaemonApiHandler {
 
 impl DaemonApi for DaemonApiHandler {
     #[instrument(skip(self))]
-    async fn hello(self, context: context::Context) -> api::Result<u32> {
-        Ok(42)
+    async fn version(self, context: context::Context) -> api::Result<String> {
+        Ok(env!("CARGO_PKG_VERSION").to_string())
     }
 
     #[instrument(skip(self))]

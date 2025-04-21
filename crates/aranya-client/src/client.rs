@@ -5,8 +5,10 @@ use std::{io, path::Path};
 
 use aranya_crypto::Rng;
 use aranya_daemon_api::{
-    self as api,
-    crypto::{LengthDelimitedCodec, PublicApiKey},
+    crypto::{
+        txp::{self, LengthDelimitedCodec},
+        PublicApiKey,
+    },
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
     Role, TeamId, CS,
 };
@@ -163,10 +165,22 @@ impl Client {
         let codec = LengthDelimitedCodec::builder()
             .max_frame_length(usize::MAX)
             .new_codec();
-        let transport = api::crypto::client(sock, codec, Rng, pk, info);
+        let transport = txp::client(sock, codec, Rng, pk, info);
 
         let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
         debug!("connected to daemon");
+
+        let got = daemon
+            .version(context::current())
+            .await
+            .map_err(IpcError)??;
+        let want = env!("CARGO_PKG_VERSION");
+        if got != want {
+            return Err(Error::Connecting(io::Error::new(
+                io::ErrorKind::Unsupported,
+                format!("version mismatch: `{got}` != `{want}`"),
+            )));
+        }
 
         let aqc = {
             let keystore_info = daemon

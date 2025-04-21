@@ -1,3 +1,7 @@
+//! Encrypted tarpc [`Transport`]s.
+//!
+//! [`Transport`][tarpc::Transport]
+
 use core::{
     borrow::Borrow,
     error,
@@ -55,9 +59,8 @@ where
     Item: for<'de> Deserialize<'de>,
     SinkItem: Serialize,
 {
-    let inner = serde_transport::new(Framed::new(io, codec.clone()), MessagePack::default());
     ClientConn {
-        inner,
+        inner: serde_transport::new(Framed::new(io, codec), MessagePack::default()),
         rng,
         pk,
         info: info.to_vec(),
@@ -171,8 +174,10 @@ where
     type Item = io::Result<Item>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let msg = ready!(self.as_mut().project().inner.poll_next(cx)?);
-        let Some(msg) = msg else {
+        if self.seal.is_none() {
+            return Poll::Pending;
+        }
+        let Some(msg) = ready!(self.as_mut().project().inner.poll_next(cx)?) else {
             return Poll::Ready(None);
         };
         match msg {
@@ -181,6 +186,29 @@ where
                 Poll::Ready(Some(Ok(pt)))
             }
         }
+    }
+}
+
+impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    R: Csprng,
+    CS: CipherSuite,
+    SinkItem: Serialize,
+{
+    fn maybe_rekey(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
+        if self.seal.is_some() {
+            return Ok(());
+        }
+        let hello = self.rekey().map_err(other)?;
+        self.as_mut()
+            .project()
+            .inner
+            .start_send(ClientMsg::Hello(hello))?;
+        // Each call to `start_send` must be preceeded by
+        // a call to `poll_ready`, so we have to call
+        // `poll_ready` again.
+        ready!(self.as_mut().project().inner.poll_ready(cx)?);
     }
 }
 
@@ -193,20 +221,16 @@ where
 {
     type Error = io::Error;
 
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_ready(cx)
+    fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.maybe_rekey(cx)?;
+        ready!(self.as_mut().project().inner.poll_ready(cx)?);
+        Poll::Ready(Ok(()))
     }
 
     fn start_send(mut self: Pin<&mut Self>, item: SinkItem) -> Result<(), Self::Error> {
-        if self.seal.is_none() {
-            let hello = self.rekey().map_err(other)?;
-            self.as_mut()
-                .project()
-                .inner
-                .start_send(ClientMsg::Hello(hello))?;
-        }
         let data = self.encrypt(item)?;
-        self.project().inner.start_send(ClientMsg::Data(data))
+        self.project().inner.start_send(ClientMsg::Data(data))?;
+        Ok(())
     }
 
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -287,10 +311,11 @@ where
         let Some(io) = ready!(self.as_mut().project().listener.try_poll_next(cx)?) else {
             return Poll::Ready(None);
         };
-        let inner =
-            serde_transport::new(Framed::new(io, self.codec.clone()), MessagePack::default());
         let conn = ServerConn {
-            inner,
+            inner: serde_transport::new(
+                Framed::new(io, self.codec.clone()),
+                MessagePack::default(),
+            ),
             sk: Arc::clone(&self.sk),
             info: Arc::clone(&self.info),
             seal: None,
@@ -401,22 +426,17 @@ where
     type Item = io::Result<Item>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let msg = ready!(self.as_mut().project().inner.poll_next(cx)?);
-        let Some(msg) = msg else {
-            return Poll::Ready(None);
-        };
-        match msg {
-            ClientMsg::Hello(hello) => {
-                self.rekey(&hello.enc).map_err(other)?;
-                Poll::Pending
-            }
-            ClientMsg::Data(data) => {
-                let pt = self.decrypt(data)?;
-                Poll::Ready(Some(Ok(pt)))
-            }
-            ClientMsg::Rekey(rekey) => {
-                self.rekey(&rekey.enc).map_err(other)?;
-                Poll::Pending
+        loop {
+            let Some(msg) = ready!(self.as_mut().project().inner.poll_next(cx)?) else {
+                return Poll::Ready(None);
+            };
+            match msg {
+                ClientMsg::Hello(hello) => self.rekey(&hello.enc).map_err(other)?,
+                ClientMsg::Data(data) => {
+                    let pt = self.decrypt(data)?;
+                    return Poll::Ready(Some(Ok(pt)));
+                }
+                ClientMsg::Rekey(rekey) => self.rekey(&rekey.enc).map_err(other)?,
             }
         }
     }
@@ -454,62 +474,252 @@ enum ServerMsg {
     Data(Data),
 }
 
+#[cfg(unix)]
+#[cfg_attr(docsrs, doc(cfg(unix)))]
+pub mod unix {
+    use core::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+
+    use futures_util::{ready, Stream};
+    use tokio::{
+        io,
+        net::{UnixListener, UnixStream},
+    };
+
+    /// Converts a [`UnixListener`] into a [`Stream`].
+    #[derive(Debug)]
+    pub struct UnixListenerStream(UnixListener);
+
+    impl Stream for UnixListenerStream {
+        type Item = io::Result<UnixStream>;
+
+        fn poll_next(
+            self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+        ) -> Poll<Option<io::Result<UnixStream>>> {
+            let (stream, _) = ready!(self.0.poll_accept(cx))?;
+            Poll::Ready(Some(Ok(stream)))
+        }
+    }
+
+    impl From<UnixListener> for UnixListenerStream {
+        #[inline]
+        fn from(listener: UnixListener) -> Self {
+            Self(listener)
+        }
+    }
+}
+
 #[cfg(test)]
+#[cfg(unix)]
 mod tests {
+    use std::panic;
+
     use aranya_crypto::{
         default::{DefaultCipherSuite, DefaultEngine},
         Rng,
     };
-    use futures_util::{SinkExt, StreamExt, TryStreamExt};
-    use tokio::net::{UnixListener, UnixStream};
+    use backon::{ExponentialBuilder, Retryable as _};
+    use futures_util::{SinkExt, TryStreamExt};
+    use tokio::{
+        net::{UnixListener, UnixStream},
+        task::JoinSet,
+    };
 
     use super::*;
 
+    impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
+    where
+        S: AsyncRead + AsyncWrite + Unpin,
+        CS: CipherSuite,
+    {
+        fn force_rekey(&mut self) {
+            self.seal = None;
+            self.open = None;
+        }
+    }
+
+    type CS = DefaultCipherSuite;
+
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+    struct Ping {
+        v: usize,
+    }
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+    struct Pong {
+        v: usize,
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn test_ping_pong() {
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        struct Ping {
-            v: usize,
-        }
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        struct Pong {
-            v: usize,
-        }
-
-        type CS = DefaultCipherSuite;
-
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("sock");
+        let path = Arc::new(dir.path().to_path_buf().join("sock"));
+        let info = Arc::from(path.as_os_str().as_encoded_bytes());
 
         let (mut eng, _) = DefaultEngine::from_entropy(Rng);
         let sk = ApiKey::<CS>::new(&mut eng);
         let pk = sk.public().unwrap();
 
-        let codec = LengthDelimitedCodec::builder()
-            .max_frame_length(usize::MAX)
-            .new_codec();
-        let info = path.as_os_str().as_encoded_bytes();
+        const N: usize = 100;
 
-        let listener = UnixListener::bind(&path).unwrap();
-        let server = server::<_, _, Ping, Pong>(listener, codec.clone(), sk, info);
+        let mut set = JoinSet::new();
 
-        tokio::spawn(async move {
-            server.inspect_err(|_| {});
-            while let Some(mut conn) = server.try_next().await? {
-                while let Some(Ping { v }) = conn.next().await {
-                    conn.send(Pong { v: v + 1 });
+        {
+            let path = Arc::clone(&path);
+            let info = Arc::clone(&info);
+            set.spawn(async move {
+                let listener = UnixListener::bind(&*path).unwrap();
+                let codec = LengthDelimitedCodec::builder()
+                    .max_frame_length(usize::MAX)
+                    .new_codec();
+                let mut server = server::<_, _, Ping, Pong>(
+                    unix::UnixListenerStream::from(listener),
+                    codec.clone(),
+                    sk,
+                    &*info,
+                );
+                let mut want = Ping { v: 0 };
+                let mut n = 0;
+                while let Some(mut conn) = server.try_next().await? {
+                    while let Some(got) = conn.try_next().await? {
+                        assert_eq!(got, want);
+                        let pong = Pong {
+                            v: got.v.wrapping_add(1),
+                        };
+                        conn.send(pong).await?;
+                        want = Ping { v: pong.v };
+                        n += 1;
+                        if n >= N {
+                            return Ok(());
+                        }
+                    }
                 }
-            }
-            Ok(())
-        });
-
-        let sock = UnixStream::connect(&path).await.unwrap();
-        let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, info);
-
-        for v in 0..100 {
-            client.send(Ping { v }).await.unwrap();
+                Ok::<_, io::Error>(())
+            });
         }
 
-        todo!()
+        {
+            let path = Arc::clone(&path);
+            let info = Arc::clone(&info);
+            set.spawn(async move {
+                let codec = LengthDelimitedCodec::builder()
+                    .max_frame_length(usize::MAX)
+                    .new_codec();
+                let sock = (|| UnixStream::connect(&*path))
+                    .retry(ExponentialBuilder::default())
+                    .await
+                    .unwrap();
+                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &*info);
+                for v in 0..N {
+                    client.send(Ping { v }).await.unwrap();
+                    let got = client.try_next().await.unwrap().unwrap();
+                    let want = Pong {
+                        v: v.wrapping_add(1),
+                    };
+                    assert_eq!(got, want)
+                }
+                Ok(())
+            });
+        }
+
+        while let Some(res) = set.join_next().await {
+            match res {
+                Ok(Ok(())) => {}
+                Ok(Err(err)) => {
+                    set.abort_all();
+                    panic!("{err}");
+                }
+                Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
+                Err(err) => panic!("{err}"),
+            }
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_rekey() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = Arc::new(dir.path().to_path_buf().join("sock"));
+        let info = Arc::from(path.as_os_str().as_encoded_bytes());
+
+        let (mut eng, _) = DefaultEngine::from_entropy(Rng);
+        let sk = ApiKey::<CS>::new(&mut eng);
+        let pk = sk.public().unwrap();
+
+        const N: usize = 100;
+
+        let mut set = JoinSet::new();
+
+        {
+            let path = Arc::clone(&path);
+            let info = Arc::clone(&info);
+            set.spawn(async move {
+                let listener = UnixListener::bind(&*path).unwrap();
+                let codec = LengthDelimitedCodec::builder()
+                    .max_frame_length(usize::MAX)
+                    .new_codec();
+                let mut server = server::<_, _, Ping, Pong>(
+                    unix::UnixListenerStream::from(listener),
+                    codec.clone(),
+                    sk,
+                    &*info,
+                );
+                let mut want = Ping { v: 0 };
+                let mut n = 0;
+                while let Some(mut conn) = server.try_next().await? {
+                    while let Some(got) = conn.try_next().await? {
+                        assert_eq!(got, want);
+                        let pong = Pong {
+                            v: got.v.wrapping_add(1),
+                        };
+                        conn.send(pong).await?;
+                        want = Ping { v: pong.v };
+                        n += 1;
+                        if n >= N {
+                            return Ok(());
+                        }
+                    }
+                }
+                Ok::<_, io::Error>(())
+            });
+        }
+
+        {
+            let path = Arc::clone(&path);
+            let info = Arc::clone(&info);
+            set.spawn(async move {
+                let codec = LengthDelimitedCodec::builder()
+                    .max_frame_length(usize::MAX)
+                    .new_codec();
+                let sock = (|| UnixStream::connect(&*path))
+                    .retry(ExponentialBuilder::default())
+                    .await
+                    .unwrap();
+                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &*info);
+                for v in 0..N {
+                    client.force_rekey();
+                    client.send(Ping { v }).await.unwrap();
+                    let got = client.try_next().await.unwrap().unwrap();
+                    let want = Pong {
+                        v: v.wrapping_add(1),
+                    };
+                    assert_eq!(got, want)
+                }
+                Ok(())
+            });
+        }
+
+        while let Some(res) = set.join_next().await {
+            match res {
+                Ok(Ok(())) => {}
+                Ok(Err(err)) => {
+                    set.abort_all();
+                    panic!("{err}");
+                }
+                Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
+                Err(err) => panic!("{err}"),
+            }
+        }
     }
 }

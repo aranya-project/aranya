@@ -270,8 +270,8 @@ pub struct Label {
 
 #[tarpc::service]
 pub trait DaemonApi {
-    /// Says hello to the daemon.
-    async fn hello() -> Result<u32>;
+    /// Returns the daemon's version.
+    async fn version() -> Result<String>;
 
     /// Gets the key store info.
     async fn get_keystore_info() -> Result<KeyStoreInfo>;
