@@ -106,9 +106,9 @@ impl DaemonApiServer {
         };
 
         let mut afc_peers = BTreeMap::new();
+        #[cfg(any())]
         for graph_id in &graph_ids {
             let graph_peers = BiBTreeMap::new();
-            #[cfg(any())]
             graph_peers.extend(
                 client
                     .actions(graph_id)
