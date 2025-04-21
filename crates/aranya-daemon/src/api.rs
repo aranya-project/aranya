@@ -6,22 +6,22 @@
 use core::{
     future::{self, Future},
     net::SocketAddr,
+    ops::Deref,
 };
-use std::{collections::BTreeMap, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
-use aranya_crypto::{Csprng, DeviceId, Rng};
+use aranya_crypto::{Csprng, Rng};
 pub(crate) use aranya_daemon_api::crypto::{ApiKey, PublicApiKey};
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, CS,
+    DaemonApi, CE, CS,
 };
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::Addr;
-use bimap::BiBTreeMap;
 use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
@@ -35,7 +35,9 @@ use tokio::{
 use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
+    aqc::{self, Aqc},
     aranya::Actions,
+    daemon::KS,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::SyncPeers,
     Client, EF,
@@ -69,14 +71,14 @@ macro_rules! find_effect {
 type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
 
 /// Daemon API Server.
+#[derive(Debug)]
 pub struct DaemonApiServer {
     // Used to encrypt data sent over the API.
     sk: ApiKey<CS>,
     daemon_sock: PathBuf,
     /// Channel for receiving effects from the syncer.
     recv_effects: EffectReceiver,
-    // TODO(eric): make this Arc<DaemonApiHandler>?
-    handler: DaemonApiHandler,
+    handler: Arc<DaemonApiHandler>,
 }
 
 impl DaemonApiServer {
@@ -86,26 +88,26 @@ impl DaemonApiServer {
     pub fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
-        keystore_info: api::KeyStoreInfo,
         daemon_sock: PathBuf,
         sk: ApiKey<CS>,
         pk: Arc<PublicKeys<CS>>,
         peers: SyncPeers,
         recv_effects: EffectReceiver,
-    ) -> Self {
-        Self {
+        aqc: Aqc<CE, KS>,
+    ) -> Result<Self> {
+        let handler = DaemonApiHandler {
+            client,
+            local_addr,
+            pk,
+            peers: Mutex::new(peers),
+            aqc,
+        };
+        Ok(Self {
             daemon_sock,
             sk,
             recv_effects,
-            handler: DaemonApiHandler {
-                client,
-                local_addr,
-                pk,
-                peers,
-                keystore_info,
-                aqc_peers: PeerMap::default(),
-            },
-        }
+            handler: Arc::new(handler),
+        })
     }
 
     /// Run the RPC server.
@@ -143,7 +145,7 @@ impl DaemonApiServer {
                 .map(|channel| {
                     debug!("accepted channel connection");
                     channel
-                        .execute(self.handler.clone().serve())
+                        .execute(ApiShim(Arc::clone(&self.handler)).serve())
                         .for_each(spawn)
                 })
                 .buffer_unordered(10)
@@ -160,10 +162,7 @@ impl DaemonApiServer {
     }
 }
 
-/// A mapping of `Net ID <=> Device ID`, separated by `Graph ID`.
-type PeerMap = Arc<Mutex<BTreeMap<GraphId, BiBTreeMap<api::NetIdentifier, DeviceId>>>>;
-
-#[derive(Clone)]
+#[derive(Debug)]
 struct DaemonApiHandler {
     /// Aranya client for
     client: Arc<Client>,
@@ -172,12 +171,8 @@ struct DaemonApiHandler {
     /// Public keys of current device.
     pk: Arc<PublicKeys<CS>>,
     /// Aranya sync peers,
-    peers: SyncPeers,
-    /// Key store paths.
-    keystore_info: api::KeyStoreInfo,
-
-    /// AQC peers.
-    aqc_peers: PeerMap,
+    peers: Mutex<SyncPeers>,
+    aqc: Aqc<CE, KS>,
 }
 
 impl DaemonApiHandler {
@@ -224,15 +219,11 @@ impl DaemonApiHandler {
                 Effect::LabelAssigned(_) => {}
                 Effect::LabelRevoked(_) => {}
                 Effect::AqcNetworkNameSet(e) => {
-                    self.aqc_peers
-                        .lock()
-                        .await
-                        .entry(graph)
-                        .or_default()
-                        .insert(
-                            api::NetIdentifier(e.net_identifier.clone()),
-                            e.device_id.into(),
-                        );
+                    self.aqc.add_peer(
+                        graph,
+                        api::NetIdentifier(e.net_identifier.clone()),
+                        e.device_id.into(),
+                    );
                 }
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::QueriedLabel(_) => {}
@@ -336,15 +327,22 @@ impl DaemonApiHandler {
     }
 }
 
-impl DaemonApi for DaemonApiHandler {
+/// Wraps [`DaemonApiHandler`] in [`Arc`] to make it more easily
+/// [`Clone`]able.
+#[derive(Clone)]
+struct ApiShim(Arc<DaemonApiHandler>);
+
+impl Deref for ApiShim {
+    type Target = DaemonApiHandler;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DaemonApi for ApiShim {
     #[instrument(skip(self))]
     async fn version(self, context: context::Context) -> api::Result<String> {
         Ok(env!("CARGO_PKG_VERSION").to_string())
-    }
-
-    #[instrument(skip(self))]
-    async fn get_keystore_info(self, context: context::Context) -> api::Result<api::KeyStoreInfo> {
-        Ok(self.keystore_info)
     }
 
     #[instrument(skip(self))]
@@ -373,13 +371,15 @@ impl DaemonApi for DaemonApiHandler {
 
     #[instrument(skip(self))]
     async fn add_sync_peer(
-        mut self,
+        self,
         _: context::Context,
         peer: Addr,
         team: api::TeamId,
         cfg: api::SyncPeerConfig,
     ) -> api::Result<()> {
         self.peers
+            .lock()
+            .await
             .add_peer(peer, team.into_id().into(), cfg)
             .await?;
         Ok(())
@@ -394,6 +394,8 @@ impl DaemonApi for DaemonApiHandler {
         cfg: Option<api::SyncPeerConfig>,
     ) -> api::Result<()> {
         self.peers
+            .lock()
+            .await
             .sync_now(peer, team.into_id().into(), cfg)
             .await?;
         Ok(())
@@ -401,12 +403,14 @@ impl DaemonApi for DaemonApiHandler {
 
     #[instrument(skip(self))]
     async fn remove_sync_peer(
-        mut self,
+        self,
         _: context::Context,
         peer: Addr,
         team: api::TeamId,
     ) -> api::Result<()> {
         self.peers
+            .lock()
+            .await
             .remove_peer(peer, team.into_id().into())
             .await
             .context("unable to remove sync peer")?;
@@ -820,18 +824,15 @@ impl DaemonApi for DaemonApiHandler {
         team: api::TeamId,
         peer: api::NetIdentifier,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AqcBidiChannelCreatedInfo)> {
+    ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsk)> {
         info!("create_aqc_bidi_channel");
 
         let graph = GraphId::from(team.into_id());
 
         let peer_id = self
-            .aqc_peers
-            .lock()
+            .aqc
+            .find_peer(graph, &peer)
             .await
-            .get(&graph)
-            .and_then(|map| map.get_by_left(&peer))
-            .copied()
             .context("unable to lookup peer")?;
 
         let (ctrl, effects) = self
@@ -849,21 +850,22 @@ impl DaemonApi for DaemonApiHandler {
 
         self.handle_effects(graph, &effects, None).await?;
 
-        let info = api::AqcBidiChannelCreatedInfo {
+        let info = aqc::BidiChannelCreated {
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
             peer_id: e.peer_id.into(),
-            peer_enc_pk: e.peer_enc_pk.clone(),
+            peer_enc_pk: &e.peer_enc_pk,
             label_id: e.label_id.into(),
             channel_id: e.channel_id.into(),
             author_secrets_id: e.author_secrets_id.into(),
             psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                .assume("`psk_length_in_bytes` is out of range")
-                .context("psk_length_in_bytes is out of range")?,
+                .assume("`psk_length_in_bytes` is out of range")?,
         };
+        let psk = self.aqc.bidi_channel_created(&info).await?;
+        debug!(identity = %psk.identity, "psk identity");
 
-        Ok((ctrl, info))
+        Ok((ctrl, psk))
     }
 
     #[instrument(skip_all)]
@@ -873,18 +875,15 @@ impl DaemonApi for DaemonApiHandler {
         team: api::TeamId,
         peer: api::NetIdentifier,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AqcUniChannelCreatedInfo)> {
+    ) -> api::Result<(api::AqcCtrl, api::AqcUniPsk)> {
         info!("create_aqc_uni_channel");
 
         let graph = GraphId::from(team.into_id());
 
         let peer_id = self
-            .aqc_peers
-            .lock()
+            .aqc
+            .find_peer(graph, &peer)
             .await
-            .get(&graph)
-            .and_then(|map| map.get_by_left(&peer))
-            .copied()
             .context("unable to lookup peer")?;
 
         let id = self.pk.ident_pk.id()?;
@@ -902,13 +901,13 @@ impl DaemonApi for DaemonApiHandler {
 
         self.handle_effects(graph, &effects, None).await?;
 
-        let info = api::AqcUniChannelCreatedInfo {
+        let info = aqc::UniChannelCreated {
             parent_cmd_id: e.parent_cmd_id,
             author_id: e.author_id.into(),
             author_enc_key_id: e.author_enc_key_id.into(),
             send_id: e.sender_id.into(),
             recv_id: e.receiver_id.into(),
-            peer_enc_pk: e.peer_enc_pk.clone(),
+            peer_enc_pk: &e.peer_enc_pk,
             label_id: e.label_id.into(),
             channel_id: e.channel_id.into(),
             author_secrets_id: e.author_secrets_id.into(),
@@ -916,8 +915,10 @@ impl DaemonApi for DaemonApiHandler {
                 .assume("`psk_length_in_bytes` is out of range")
                 .context("psk_length_in_bytes is out of range")?,
         };
+        let psk = self.aqc.uni_channel_created(&info).await?;
+        debug!(identity = %psk.identity, "psk identity");
 
-        Ok((ctrl, info))
+        Ok((ctrl, psk))
     }
 
     #[instrument(skip(self))]
@@ -946,65 +947,70 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AqcCtrl,
-    ) -> api::Result<(api::NetIdentifier, api::AqcChannelInfo)> {
+    ) -> api::Result<(api::NetIdentifier, api::AqcPsk)> {
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
+            let our_device_id = self.pk.ident_pk.id()?;
+
             let effects = self.client.session_receive(&mut session, &cmd).await?;
-            let id = self.pk.ident_pk.id()?;
             self.handle_effects(graph, &effects, None).await?;
-            if let Some(Effect::AqcBidiChannelReceived(e)) =
-                find_effect!(&effects, Effect::AqcBidiChannelReceived(e) if e.peer_id == id.into())
-            {
-                let aqc_info = api::AqcChannelInfo::BidiReceived(api::AqcBidiChannelReceivedInfo {
-                    parent_cmd_id: e.parent_cmd_id,
-                    author_id: e.author_id.into(),
-                    author_enc_pk: e.author_enc_pk.clone(),
-                    peer_id: e.peer_id.into(),
-                    peer_enc_key_id: e.peer_enc_key_id.into(),
-                    label_id: e.label_id.into(),
-                    encap: e.encap.clone(),
-                    psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                        .assume("`psk_length_in_bytes` is out of range")?,
-                });
 
-                let net = self
-                    .aqc_peers
-                    .lock()
-                    .await
-                    .get(&graph)
-                    .and_then(|map| map.get_by_right(&e.author_id.into()))
-                    .context("missing net identifier for channel author")?
-                    .clone();
-                return Ok((net, aqc_info));
-            };
-
-            if let Some(Effect::AqcUniChannelReceived(e)) = find_effect!(&effects, Effect::AqcUniChannelReceived(e) if (e.sender_id == id.into() || e.receiver_id == id.into()))
-            {
-                let aqc_info = api::AqcChannelInfo::UniReceived(api::AqcUniChannelReceivedInfo {
-                    parent_cmd_id: e.parent_cmd_id,
-                    send_id: e.sender_id.into(),
-                    recv_id: e.receiver_id.into(),
-                    author_id: e.author_id.into(),
-                    author_enc_pk: e.author_enc_pk.clone(),
-                    peer_enc_key_id: e.peer_enc_key_id.into(),
-                    label_id: e.label_id.into(),
-                    encap: e.encap.clone(),
-                    psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                        .assume("`psk_length_in_bytes` is out of range")?,
-                });
-                let net = self
-                    .aqc_peers
-                    .lock()
-                    .await
-                    .get(&graph)
-                    .and_then(|map| map.get_by_right(&e.author_id.into()))
-                    .context("missing net identifier for channel author")?
-                    .clone();
-                return Ok((net, aqc_info));
-            };
+            let effect = effects.iter().find(|e| match e {
+                Effect::AqcBidiChannelReceived(e) => e.peer_id == our_device_id.into(),
+                Effect::AqcUniChannelReceived(e) => {
+                    e.sender_id != our_device_id.into() && e.receiver_id != our_device_id.into()
+                }
+                _ => false,
+            });
+            match effect {
+                Some(Effect::AqcBidiChannelReceived(e)) => {
+                    let info = aqc::BidiChannelReceived {
+                        channel_id: e.channel_id.into(),
+                        parent_cmd_id: e.parent_cmd_id,
+                        author_id: e.author_id.into(),
+                        author_enc_pk: &e.author_enc_pk,
+                        peer_id: e.peer_id.into(),
+                        peer_enc_key_id: e.peer_enc_key_id.into(),
+                        label_id: e.label_id.into(),
+                        encap: &e.encap,
+                        psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
+                            .assume("`psk_length_in_bytes` is out of range")?,
+                    };
+                    let psk = self.aqc.bidi_channel_received(&info).await?;
+                    let net_id = self
+                        .aqc
+                        .find_net_id(graph, e.author_id.into())
+                        .await
+                        .context("missing net identifier for channel author")?;
+                    return Ok((net_id, api::AqcPsk::Bidi(psk)));
+                }
+                Some(Effect::AqcUniChannelReceived(e)) => {
+                    let info = aqc::UniChannelReceived {
+                        channel_id: e.channel_id.into(),
+                        parent_cmd_id: e.parent_cmd_id,
+                        send_id: e.sender_id.into(),
+                        recv_id: e.receiver_id.into(),
+                        author_id: e.author_id.into(),
+                        author_enc_pk: &e.author_enc_pk,
+                        peer_enc_key_id: e.peer_enc_key_id.into(),
+                        label_id: e.label_id.into(),
+                        encap: &e.encap,
+                        psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
+                            .assume("`psk_length_in_bytes` is out of range")?,
+                    };
+                    let psk = self.aqc.uni_channel_received(&info).await?;
+                    let net_id = self
+                        .aqc
+                        .find_net_id(graph, e.author_id.into())
+                        .await
+                        .context("missing net identifier for channel author")?;
+                    return Ok((net_id, api::AqcPsk::Uni(psk)));
+                }
+                Some(_) | None => {}
+            }
         }
-        Err(anyhow!("unable to find AqcBidiChannelReceived effect").into())
+        Err(anyhow!("unable to find AQC effect").into())
     }
 
     async fn assign_afc_net_identifier(

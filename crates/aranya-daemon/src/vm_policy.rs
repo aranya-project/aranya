@@ -115,6 +115,16 @@ where
     }
 }
 
+impl<E, KS> fmt::Debug for PolicyEngine<E, KS>
+where
+    E: fmt::Debug,
+    KS: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PolicyEngine").finish_non_exhaustive()
+    }
+}
+
 /// Converts policy [`Role`] to string.
 impl fmt::Display for Role {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -179,7 +179,7 @@ pub enum AfcError {
 #[derive(Debug, thiserror::Error)]
 pub enum AqcError {
     #[error("unable to create channel")]
-    ChannelCreation(aranya_aqc_util::Error),
+    ChannelCreation(anyhow::Error),
 
     #[error("unable to parse encap")]
     Encap(anyhow::Error),

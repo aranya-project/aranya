@@ -203,9 +203,7 @@ impl TeamCtx {
     }
 
     async fn add_all_sync_peers(&mut self, team_id: TeamId) -> Result<()> {
-        let config = SyncPeerConfig::builder()
-            .with_interval(SYNC_INTERVAL)
-            .build()?;
+        let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
         let mut devices = self.devices();
         for i in 0..devices.len() {
             let (device, peers) = devices[i..].split_first_mut().unwrap();
@@ -322,7 +320,9 @@ impl DeviceCtx {
         // give daemon time to setup UDS API.
         sleep(SLEEP_INTERVAL).await;
 
-        let pk = Daemon::load_api_pk(&cfg.daemon_api_pk_path())
+        let pk_path = cfg.daemon_api_pk_path();
+        let pk = (|| Daemon::load_api_pk(&pk_path))
+            .retry(ExponentialBuilder::default())
             .await
             .context("unable to find `ApiKeyId`")?;
 

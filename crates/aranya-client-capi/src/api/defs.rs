@@ -714,10 +714,11 @@ pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 /// @param cfg a pointer to the team config builder
 /// @param out a pointer to write the team config to
 pub fn team_config_builder_build(
-    cfg: &mut TeamConfigBuilder,
+    cfg: OwnedPtr<TeamConfigBuilder>,
     out: &mut MaybeUninit<TeamConfig>,
 ) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
     Ok(())
 }
 
@@ -792,7 +793,7 @@ pub unsafe fn add_sync_peer(
         client
             .inner
             .team(team.into())
-            .add_sync_peer(addr, (**config).into()),
+            .add_sync_peer(addr, (*config).clone().into()),
     )?;
     Ok(())
 }
@@ -826,7 +827,7 @@ pub unsafe fn sync_now(
         client
             .inner
             .team(team.into())
-            .sync_now(addr, config.map(|config| (**config).into())),
+            .sync_now(addr, config.map(|config| (*config).clone().into())),
     )?;
     Ok(())
 }

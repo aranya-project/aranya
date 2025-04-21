@@ -67,6 +67,21 @@ impl Config {
         self.work_dir.join("keystore")
     }
 
+    /// The directory where the root keystore exists.
+    ///
+    /// The Aranaya keystore contains Aranya's key material.
+    pub(crate) fn aranya_keystore_path(&self) -> PathBuf {
+        self.keystore_path().join("aranya")
+    }
+
+    /// The directory where the local keystore exists.
+    ///
+    /// The local keystore contains key material for the daemon.
+    /// E.g., its API key.
+    pub(crate) fn local_keystore_path(&self) -> PathBuf {
+        self.keystore_path().join("local")
+    }
+
     /// Path to the runtime's storage.
     pub(crate) fn storage_path(&self) -> PathBuf {
         self.work_dir.join("storage")

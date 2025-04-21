@@ -8,7 +8,7 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore, KeyStoreExt},
     Engine, Rng,
 };
-use aranya_daemon_api::{KeyStoreInfo, CS};
+use aranya_daemon_api::CS;
 #[cfg(feature = "afc")]
 use aranya_fast_channels::shm::{self, Flag, Mode, WriteState};
 use aranya_keygen::{KeyBundle, PublicKeys};
@@ -27,6 +27,7 @@ use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
     api::{ApiKey, DaemonApiServer, PublicApiKey},
+    aqc::Aqc,
     aranya,
     config::Config,
     policy,
@@ -68,28 +69,36 @@ impl Daemon {
 
         let mut set = JoinSet::new();
 
-        let store_dir = self.cfg.keystore_path();
-        aranya_util::create_dir_all(&store_dir).await?;
-        let mut root_store =
-            KS::open(store_dir.join("root")).context("unable to open root keystore")?;
+        let mut aranya_store = {
+            let dir = self.cfg.aranya_keystore_path();
+            aranya_util::create_dir_all(&dir).await?;
+            KS::open(&dir).context("unable to open root keystore")?
+        };
         let mut eng = {
             let key = load_or_gen_key(self.cfg.key_wrap_key_path()).await?;
             CE::new(&key, Rng)
         };
         let pk = self
-            .load_or_gen_public_keys(&mut eng, &mut root_store)
+            .load_or_gen_public_keys(&mut eng, &mut aranya_store)
             .await?;
 
-        let mut local_store =
-            KS::open(store_dir.join("local")).context("unable to open local keystore")?;
-        let api_sk = self.load_or_gen_api_key(&mut eng, &mut local_store).await?;
+        let api_sk = {
+            let mut store = {
+                let dir = self.cfg.local_keystore_path();
+                aranya_util::create_dir_all(&dir).await?;
+                KS::open(&dir).context("unable to open local keystore")?
+            };
+            self.load_or_gen_api_key(&mut eng, &mut store).await?
+        };
 
         // Initialize Aranya client.
         let (client, local_addr) = {
             let (client, server) = self
                 .setup_aranya(
                     eng.clone(),
-                    root_store.try_clone().context("unable to clone keystore")?,
+                    aranya_store
+                        .try_clone()
+                        .context("unable to clone keystore")?,
                     &pk,
                     self.cfg.sync_addr,
                 )
@@ -112,19 +121,17 @@ impl Daemon {
             }
         });
 
+        let aqc = Aqc::new(eng, pk.ident_pk.id()?, aranya_store);
         let api = DaemonApiServer::new(
             client,
             local_addr,
-            KeyStoreInfo {
-                path: self.cfg.keystore_path(),
-                wrapped_key: self.cfg.key_wrap_key_path(),
-            },
             self.cfg.uds_api_path.clone(),
             api_sk,
             Arc::new(pk),
             peers,
             recv_effects,
-        );
+            aqc,
+        )?;
         api.serve().await?;
 
         Ok(())

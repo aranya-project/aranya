@@ -1,3 +1,5 @@
+use core::fmt;
+
 use anyhow::{Context, Result};
 use aranya_crypto::{
     CipherSuite, DeviceId, EncryptionKey, EncryptionKeyId, EncryptionPublicKey, Engine,
@@ -8,6 +10,7 @@ use serde::{Deserialize, Serialize};
 
 /// A key bundle.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct KeyBundle {
     /// See [`IdentityKey`].
     pub device_id: DeviceId,
@@ -18,7 +21,8 @@ pub struct KeyBundle {
 }
 
 /// Public keys from key bundle.
-#[derive(Debug)]
+#[derive(Clone)]
+#[non_exhaustive]
 pub struct PublicKeys<CS: CipherSuite> {
     /// Public identity key.
     pub ident_pk: IdentityVerifyingKey<CS>,
@@ -26,6 +30,16 @@ pub struct PublicKeys<CS: CipherSuite> {
     pub enc_pk: EncryptionPublicKey<CS>,
     /// Public signing key.
     pub sign_pk: VerifyingKey<CS>,
+}
+
+impl<CS: CipherSuite> fmt::Debug for PublicKeys<CS> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PublicKeys")
+            .field("ident_pk", &self.ident_pk)
+            .field("enc_pk", &self.ident_pk)
+            .field("sign_pk", &self.sign_pk)
+            .finish()
+    }
 }
 
 impl KeyBundle {

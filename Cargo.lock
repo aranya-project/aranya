@@ -201,7 +201,6 @@ name = "aranya-client"
 version = "0.5.1"
 dependencies = [
  "anyhow",
- "aranya-aqc-util",
  "aranya-crypto",
  "aranya-daemon",
  "aranya-daemon-api",

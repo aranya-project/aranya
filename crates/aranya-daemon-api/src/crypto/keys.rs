@@ -2,14 +2,18 @@ use core::{borrow::Borrow, fmt, marker::PhantomData};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
+    aead::{Aead, AeadId},
     custom_id,
     engine::{AlgId, RawSecret, Secret, UnwrappedKey, UnwrappedSecret, WrongKeyType},
+    hash::{Hash, HashId},
     id::{Id, IdError, Identified},
     import::ImportError,
-    kem::{DecapKey as _, Kem},
+    kdf::{Kdf, KdfId},
+    kem::{DecapKey as _, Kem, KemId},
     keys::{PublicKey, SecretKey},
     keystore::KeyStore,
-    signer::PkError,
+    mac::{Mac, MacId},
+    signer::{PkError, Signer, SignerId},
     CipherSuite, Engine,
 };
 use ciborium as cbor;
@@ -233,6 +237,8 @@ enum ExportedDataType {
 #[derive(Serialize, Deserialize, MaxSize)]
 #[serde(deny_unknown_fields)]
 struct ExportedData<T> {
+    /// Uniquely idenitifies the chosen algorithms.
+    suite_id: SuiteIds,
     /// Uniquely idenitifes the type of data.
     name: ExportedDataType,
     /// The exported data.
@@ -241,13 +247,14 @@ struct ExportedData<T> {
 
 impl<T> ExportedData<T> {
     pub(crate) fn valid_context<CS: CipherSuite>(&self, name: ExportedDataType) -> bool {
-        self.name == name
+        self.suite_id == SuiteIds::from_suite::<CS>() && self.name == name
     }
 }
 
 impl<'a, K: PublicKey> ExportedData<SerdeBorrowedKey<'a, K>> {
     pub(crate) fn from_key<CS: CipherSuite>(pk: &'a K, name: ExportedDataType) -> Self {
         Self {
+            suite_id: SuiteIds::from_suite::<CS>(),
             name,
             data: SerdeBorrowedKey(pk),
         }
@@ -299,5 +306,31 @@ impl<K: PublicKey> Serialize for SerdeBorrowedKey<'_, K> {
         S: Serializer,
     {
         serializer.serialize_bytes(self.0.export().borrow())
+    }
+}
+
+/// Identifies the algorithms used by a [`CipherSuite`].
+///
+/// Used for domain separation and contextual binding.
+#[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize, MaxSize)]
+struct SuiteIds {
+    aead: AeadId,
+    hash: HashId,
+    kdf: KdfId,
+    kem: KemId,
+    mac: MacId,
+    signer: SignerId,
+}
+
+impl SuiteIds {
+    const fn from_suite<S: CipherSuite>() -> Self {
+        Self {
+            aead: S::Aead::ID,
+            hash: S::Hash::ID,
+            kdf: S::Kdf::ID,
+            kem: S::Kem::ID,
+            mac: S::Mac::ID,
+            signer: S::Signer::ID,
+        }
     }
 }

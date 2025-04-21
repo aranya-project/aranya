@@ -1,7 +1,7 @@
 //! Client-daemon connection.
 
-use core::{net::SocketAddr, time::Duration};
-use std::{io, net::SocketAddr, path::Path};
+use core::net::SocketAddr;
+use std::{io, path::Path};
 
 use aranya_crypto::Rng;
 use aranya_daemon_api::{
@@ -9,8 +9,7 @@ use aranya_daemon_api::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
-    Role, TeamId, CS,
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId, CS,
 };
 use aranya_fast_channels::Label as AfcLabel;
 #[cfg(feature = "afc")]
@@ -142,11 +141,12 @@ impl<'a> ClientBuilder<'a> {
 /// core crates.
 ///
 /// [Aranya daemon]: https://crates.io/crates/aranya-daemon
+#[derive(Debug)]
 pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
     /// Support for AQC
-    pub(crate) aqc: AqcChannelsImpl,
+    pub(crate) _aqc: AqcChannelsImpl,
 }
 
 impl Client {
@@ -183,32 +183,9 @@ impl Client {
             )));
         }
 
-        let aqc = {
-            let keystore_info = daemon
-                .get_keystore_info(context::current())
-                .await
-                .map_err(IpcError)??;
-            debug!(?keystore_info);
+        let aqc = AqcChannelsImpl::new().await?;
 
-            let device_id = daemon
-                .get_device_id(context::current())
-                .await
-                .map_err(IpcError)??;
-            debug!(?device_id);
-
-            AqcChannelsImpl::new(device_id, keystore_info).await?
-        };
-
-        Ok(Self { daemon, aqc })
-    }
-
-    /// Returns key store info.
-    pub async fn get_keystore_info(&self) -> Result<KeyStoreInfo> {
-        self.daemon
-            .get_keystore_info(context::current())
-            .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+        Ok(Self { daemon, _aqc: aqc })
     }
 
     /// Returns the address that the Aranya sync server is bound to.
@@ -648,83 +625,5 @@ impl Queries<'_> {
             .await
             .map_err(IpcError)
             .map_err(Into::into)
-    }
-}
-
-/// Configuration values for syncing with a peer
-#[derive(Debug, Clone)]
-pub struct SyncPeerConfig {
-    interval: Duration,
-    sync_now: bool,
-}
-
-impl SyncPeerConfig {
-    /// Creates a default [`SyncPeerConfigBuilder`]
-    pub fn builder() -> SyncPeerConfigBuilder {
-        Default::default()
-    }
-}
-
-impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
-    fn from(value: SyncPeerConfig) -> Self {
-        Self {
-            interval: value.interval,
-            sync_now: value.sync_now,
-        }
-    }
-}
-
-/// Builder for a [`SyncPeerConfig`]
-pub struct SyncPeerConfigBuilder {
-    interval: Option<Duration>,
-    sync_now: bool,
-}
-
-impl SyncPeerConfigBuilder {
-    /// Creates a `SyncPeerConfigBuilder`.
-    pub fn new() -> Self {
-        Default::default()
-    }
-
-    /// Build a [`SyncPeerConfig`]
-    pub fn build(self) -> Result<SyncPeerConfig> {
-        let Some(interval) = self.interval else {
-            return Err(Error::InvalidArg {
-                arg: "interval",
-                reason: "must call `SyncPeerConfigBuilder::interval`",
-            });
-        };
-
-        Ok(SyncPeerConfig {
-            interval,
-            sync_now: self.sync_now,
-        })
-    }
-
-    /// Set the interval at which syncing occurs
-    ///
-    /// By default, the interval is not set. It is an error to call
-    /// [`build`][Self::build] before setting the interval with
-    /// this method
-    pub fn with_interval(mut self, duration: Duration) -> Self {
-        self.interval = Some(duration);
-        self
-    }
-
-    /// Configures whether the peer will be immediately synced with after being added.
-    ///
-    /// By default, the peer is immediately synced with.
-    pub fn with_sync_now(mut self, sync_now: bool) -> Self {
-        self.sync_now = sync_now;
-        self
-    }
-}
-
-impl Default for SyncPeerConfigBuilder {
-    fn default() -> Self {
-        Self {
-            interval: None,
-            sync_now: true,
-        }
     }
 }

@@ -4,7 +4,7 @@
 
 use core::{
     borrow::Borrow,
-    error,
+    error, fmt,
     marker::PhantomData,
     pin::{pin, Pin},
     task::{Context, Poll},
@@ -34,6 +34,96 @@ use tokio::io::{self, AsyncRead, AsyncWrite};
 
 use crate::crypto::{ApiKey, PublicApiKey};
 
+type Encap<CS> = <<CS as CipherSuite>::Kem as Kem>::Encap;
+
+struct Ctx<CS: CipherSuite> {
+    seal: SealCtx<<CS as CipherSuite>::Aead>,
+    open: OpenCtx<<CS as CipherSuite>::Aead>,
+}
+
+impl<CS: CipherSuite> Ctx<CS> {
+    fn client<R: Csprng>(
+        rng: &mut R,
+        pk: &PublicApiKey<CS>,
+        info: &[u8],
+    ) -> Result<(Self, Encap<CS>), HpkeError> {
+        let (enc, send) =
+            Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_send(rng, Mode::Base, pk.as_inner(), info)?;
+        let (open_key, open_nonce) = {
+            let key = send.export(SERVER_KEY_CTX)?;
+            let nonce = send.export(SERVER_NONCE_CTX)?;
+            (key, nonce)
+        };
+        let (seal_key, seal_nonce) = send
+            .into_raw_parts()
+            .assume("should be able to decompose `SendCtx`")?;
+
+        let ctx = Self {
+            seal: SealCtx::new(&seal_key, &seal_nonce, Seq::ZERO)?,
+            open: OpenCtx::new(&open_key, &open_nonce, Seq::ZERO)?,
+        };
+        Ok((ctx, enc))
+    }
+
+    fn server(sk: &ApiKey<CS>, info: &[u8], enc: &[u8]) -> Result<Self, HpkeError> {
+        let enc = Encap::<CS>::import(enc)?;
+
+        let recv =
+            Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_recv(Mode::Base, &enc, sk.as_inner(), info)?;
+        let (seal_key, seal_nonce) = {
+            let key = recv.export(SERVER_KEY_CTX)?;
+            let nonce = recv.export(SERVER_NONCE_CTX)?;
+            (key, nonce)
+        };
+        let (open_key, open_nonce) = recv
+            .into_raw_parts()
+            .assume("should be able to decompose `SendCtx`")?;
+
+        Ok(Self {
+            seal: SealCtx::new(&seal_key, &seal_nonce, Seq::ZERO)?,
+            open: OpenCtx::new(&open_key, &open_nonce, Seq::ZERO)?,
+        })
+    }
+
+    fn encrypt<Item, SinkItem>(&mut self, item: SinkItem, ad: &[u8]) -> io::Result<Data>
+    where
+        SinkItem: Serialize,
+    {
+        let mut codec = MessagePack::<Item, SinkItem>::default();
+        let mut plaintext = BytesMut::from(pin!(codec).serialize(&item)?);
+        let mut tag = BytesMut::from(&*Tag::<CS::Aead>::default());
+        self.seal
+            .seal_in_place(&mut plaintext, &mut tag, ad)
+            .map_err(other)?;
+        Ok(Data {
+            ciphertext: plaintext,
+            tag: tag.freeze(),
+        })
+    }
+
+    fn decrypt<Item, SinkItem>(&mut self, data: Data, ad: &[u8]) -> io::Result<Item>
+    where
+        Item: DeserializeOwned,
+    {
+        let Data {
+            mut ciphertext,
+            tag,
+        } = data;
+        self.open
+            .open_in_place(&mut ciphertext, &tag, ad)
+            .map_err(other)?;
+        let mut codec = MessagePack::<Item, SinkItem>::default();
+        let item = pin!(codec).deserialize(&ciphertext)?;
+        Ok(item)
+    }
+}
+
+impl<CS: CipherSuite> fmt::Debug for Ctx<CS> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Ctx").finish_non_exhaustive()
+    }
+}
+
 fn other<E>(err: E) -> io::Error
 where
     E: Into<Box<dyn error::Error + Send + Sync>>,
@@ -43,6 +133,8 @@ where
 
 const SERVER_KEY_CTX: &[u8] = b"aranya daemon api server seal key";
 const SERVER_NONCE_CTX: &[u8] = b"aranya daemon api server seal nonce";
+const SERVER_SEAL_AD: &[u8] = b"server seal ad";
+const CLIENT_SEAL_AD: &[u8] = b"client seal ad";
 
 /// Creates a client-side transport.
 pub fn client<S, R, CS, Item, SinkItem>(
@@ -64,8 +156,8 @@ where
         rng,
         pk,
         info: info.to_vec(),
-        seal: None,
-        open: None,
+        ctx: None,
+        rekeys: 0,
         _marker: PhantomData,
     }
 }
@@ -80,11 +172,14 @@ where
     #[pin]
     inner: Transport<S, ServerMsg, ClientMsg, MessagePack<ServerMsg, ClientMsg>>,
     rng: R,
+    /// The server's public key.
     pk: PublicApiKey<CS>,
+    /// The "info" parameter when rekeying.
     info: Vec<u8>,
-    seal: Option<SealCtx<CS::Aead>>,
-    open: Option<OpenCtx<CS::Aead>>,
-    #[allow(clippy::type_complexity)]
+    ctx: Option<Ctx<CS>>,
+    /// The number of times we've rekeyed, including the initial
+    /// keying.
+    rekeys: usize,
     _marker: PhantomData<fn() -> (Item, SinkItem)>,
 }
 
@@ -95,19 +190,12 @@ where
     SinkItem: Serialize,
 {
     fn encrypt(&mut self, item: SinkItem) -> io::Result<Data> {
-        let mut codec = MessagePack::<Item, SinkItem>::default();
-        let mut plaintext = BytesMut::from(pin!(codec).serialize(&item)?);
-        let mut tag = BytesMut::from(&*Tag::<CS::Aead>::default());
-        self.seal
+        self.ctx
             .as_mut()
-            .assume("`self.seal` should be `Some`")
+            .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .seal_in_place(&mut plaintext, &mut tag, &[])
-            .map_err(other)?;
-        Ok(Data {
-            ciphertext: plaintext,
-            tag: tag.freeze(),
-        })
+            .encrypt::<Item, SinkItem>(item, CLIENT_SEAL_AD)
+            .map_err(other)
     }
 }
 
@@ -118,19 +206,12 @@ where
     Item: DeserializeOwned,
 {
     fn decrypt(&mut self, data: Data) -> io::Result<Item> {
-        let Data {
-            mut ciphertext,
-            tag,
-        } = data;
-        self.open
+        self.ctx
             .as_mut()
-            .assume("`self.open` should be `Some`")
+            .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .open_in_place(&mut ciphertext, &tag, &[])
-            .map_err(other)?;
-        let mut codec = MessagePack::<Item, SinkItem>::default();
-        let item = pin!(codec).deserialize(&ciphertext)?;
-        Ok(item)
+            .decrypt::<Item, SinkItem>(data, SERVER_SEAL_AD)
+            .map_err(other)
     }
 }
 
@@ -140,27 +221,22 @@ where
     R: Csprng,
     CS: CipherSuite,
 {
-    fn rekey(&mut self) -> Result<Hello, HpkeError> {
-        let (enc, send) = Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_send(
-            &mut self.rng,
-            Mode::Base,
-            self.pk.as_inner(),
-            &self.info,
-        )?;
-        let (open_key, open_nonce) = {
-            let key = send.export(SERVER_KEY_CTX)?;
-            let nonce = send.export(SERVER_NONCE_CTX)?;
-            (key, nonce)
-        };
-        let (seal_key, seal_nonce) = send
-            .into_raw_parts()
-            .assume("should be able to decompose `SendCtx`")?;
-        self.seal = Some(SealCtx::new(&seal_key, &seal_nonce, Seq::ZERO)?);
-        self.open = Some(OpenCtx::new(&open_key, &open_nonce, Seq::ZERO)?);
-
-        Ok(Hello {
+    fn update_or_init_keys(&mut self) -> Result<Option<ClientMsg>, HpkeError> {
+        if self.ctx.is_some() {
+            return Ok(None);
+        }
+        let enc = self.rekey()?;
+        let msg = ClientMsg::Rekey(Rekey {
             enc: Bytes::from(enc.borrow().to_vec()),
-        })
+        });
+        Ok(Some(msg))
+    }
+
+    fn rekey(&mut self) -> Result<<<CS as CipherSuite>::Kem as Kem>::Encap, HpkeError> {
+        let (ctx, enc) = Ctx::client(&mut self.rng, &self.pk, &self.info)?;
+        self.ctx = Some(ctx);
+        self.rekeys += 1;
+        Ok(enc)
     }
 }
 
@@ -174,7 +250,7 @@ where
     type Item = io::Result<Item>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.seal.is_none() {
+        if self.ctx.is_none() {
             return Poll::Pending;
         }
         let Some(msg) = ready!(self.as_mut().project().inner.poll_next(cx)?) else {
@@ -189,29 +265,6 @@ where
     }
 }
 
-impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
-where
-    S: AsyncRead + AsyncWrite + Unpin,
-    R: Csprng,
-    CS: CipherSuite,
-    SinkItem: Serialize,
-{
-    fn maybe_rekey(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
-        if self.seal.is_some() {
-            return Ok(());
-        }
-        let hello = self.rekey().map_err(other)?;
-        self.as_mut()
-            .project()
-            .inner
-            .start_send(ClientMsg::Hello(hello))?;
-        // Each call to `start_send` must be preceeded by
-        // a call to `poll_ready`, so we have to call
-        // `poll_ready` again.
-        ready!(self.as_mut().project().inner.poll_ready(cx)?);
-    }
-}
-
 impl<S, R, CS, Item, SinkItem> Sink<SinkItem> for ClientConn<S, R, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite + Unpin,
@@ -222,8 +275,14 @@ where
     type Error = io::Error;
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.maybe_rekey(cx)?;
         ready!(self.as_mut().project().inner.poll_ready(cx)?);
+        if let Some(msg) = self.update_or_init_keys().map_err(other)? {
+            self.as_mut().project().inner.start_send(msg)?;
+            // Each call to `start_send` must be preceeded by
+            // a call to `poll_ready`, so call `poll_ready`
+            // again.
+            ready!(self.as_mut().project().inner.poll_ready(cx)?);
+        }
         Poll::Ready(Ok(()))
     }
 
@@ -242,17 +301,26 @@ where
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[non_exhaustive]
-enum ClientMsg {
-    Hello(Hello),
-    Data(Data),
-    Rekey(Rekey),
+impl<S, R, CS, Item, SinkItem> fmt::Debug for ClientConn<S, R, CS, Item, SinkItem>
+where
+    S: AsyncRead + AsyncWrite,
+    CS: CipherSuite,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Server")
+            .field("pk", &self.pk)
+            .field("info", &self.info)
+            .field("ctx", &self.ctx)
+            .field("rekeys", &self.rekeys)
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct Hello {
-    enc: Bytes,
+#[non_exhaustive]
+enum ClientMsg {
+    Data(Data),
+    Rekey(Rekey),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -286,6 +354,7 @@ where
 }
 
 /// Creates [`ServerConn`]s.
+#[derive(Debug)]
 #[pin_project]
 pub struct Server<L, CS, Item, SinkItem>
 where
@@ -318,8 +387,7 @@ where
             ),
             sk: Arc::clone(&self.sk),
             info: Arc::clone(&self.info),
-            seal: None,
-            open: None,
+            ctx: None,
             _marker: PhantomData,
         };
         Poll::Ready(Some(Ok(conn)))
@@ -337,9 +405,7 @@ where
     inner: Transport<S, ClientMsg, ServerMsg, MessagePack<ClientMsg, ServerMsg>>,
     sk: Arc<ApiKey<CS>>,
     info: Arc<[u8]>,
-    seal: Option<SealCtx<CS::Aead>>,
-    open: Option<OpenCtx<CS::Aead>>,
-    #[allow(clippy::type_complexity)]
+    ctx: Option<Ctx<CS>>,
     _marker: PhantomData<fn() -> (Item, SinkItem)>,
 }
 
@@ -350,19 +416,12 @@ where
     SinkItem: Serialize,
 {
     fn encrypt(&mut self, item: SinkItem) -> io::Result<Data> {
-        let mut codec = MessagePack::<Item, SinkItem>::default();
-        let mut plaintext = BytesMut::from(pin!(codec).serialize(&item)?);
-        let mut tag = BytesMut::from(&*Tag::<CS::Aead>::default());
-        self.seal
+        self.ctx
             .as_mut()
-            .assume("`self.seal` should be `Some`")
+            .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .seal_in_place(&mut plaintext, &mut tag, &[])
-            .map_err(other)?;
-        Ok(Data {
-            ciphertext: plaintext,
-            tag: tag.freeze(),
-        })
+            .encrypt::<Item, SinkItem>(item, SERVER_SEAL_AD)
+            .map_err(other)
     }
 }
 
@@ -373,19 +432,12 @@ where
     Item: DeserializeOwned,
 {
     fn decrypt(&mut self, data: Data) -> io::Result<Item> {
-        let Data {
-            mut ciphertext,
-            tag,
-        } = data;
-        self.open
+        self.ctx
             .as_mut()
-            .assume("`self.open` should be `Some`")
+            .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .open_in_place(&mut ciphertext, &tag, &[])
-            .map_err(other)?;
-        let mut codec = MessagePack::<Item, SinkItem>::default();
-        let item = pin!(codec).deserialize(&ciphertext)?;
-        Ok(item)
+            .decrypt::<Item, SinkItem>(data, CLIENT_SEAL_AD)
+            .map_err(other)
     }
 }
 
@@ -395,24 +447,8 @@ where
     CS: CipherSuite,
 {
     fn rekey(&mut self, enc: &[u8]) -> Result<(), HpkeError> {
-        let enc = <<CS::Kem as Kem>::Encap as Import<_>>::import(enc)?;
-
-        let recv = Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_recv(
-            Mode::Base,
-            &enc,
-            self.sk.as_inner(),
-            &self.info,
-        )?;
-        let (seal_key, seal_nonce) = {
-            let key = recv.export(SERVER_KEY_CTX)?;
-            let nonce = recv.export(SERVER_NONCE_CTX)?;
-            (key, nonce)
-        };
-        let (open_key, open_nonce) = recv
-            .into_raw_parts()
-            .assume("should be able to decompose `SendCtx`")?;
-        self.seal = Some(SealCtx::new(&seal_key, &seal_nonce, Seq::ZERO)?);
-        self.open = Some(OpenCtx::new(&open_key, &open_nonce, Seq::ZERO)?);
+        let ctx = Ctx::server(&self.sk, &self.info, enc)?;
+        self.ctx = Some(ctx);
         Ok(())
     }
 }
@@ -431,7 +467,6 @@ where
                 return Poll::Ready(None);
             };
             match msg {
-                ClientMsg::Hello(hello) => self.rekey(&hello.enc).map_err(other)?,
                 ClientMsg::Data(data) => {
                     let pt = self.decrypt(data)?;
                     return Poll::Ready(Some(Ok(pt)));
@@ -465,6 +500,20 @@ where
 
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.project().inner.poll_close(cx)
+    }
+}
+
+impl<S, CS, Item, SinkItem> fmt::Debug for ServerConn<S, CS, Item, SinkItem>
+where
+    S: AsyncRead + AsyncWrite,
+    CS: CipherSuite,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Server")
+            .field("sk", &self.sk)
+            .field("info", &self.info)
+            .field("ctx", &self.ctx)
+            .finish_non_exhaustive()
     }
 }
 
@@ -536,8 +585,7 @@ mod tests {
         CS: CipherSuite,
     {
         fn force_rekey(&mut self) {
-            self.seal = None;
-            self.open = None;
+            self.ctx = None;
         }
     }
 
@@ -669,11 +717,23 @@ mod tests {
                 let mut n = 0;
                 while let Some(mut conn) = server.try_next().await? {
                     while let Some(got) = conn.try_next().await? {
+                        // In this test the client rekeys each
+                        // time it sends data, so our seq number
+                        // should always be zero.
+                        let ctx = conn.ctx.as_ref().map(|ctx| &ctx.seal).unwrap();
+                        assert_eq!(ctx.seq(), Seq::ZERO);
+
                         assert_eq!(got, want);
                         let pong = Pong {
                             v: got.v.wrapping_add(1),
                         };
                         conn.send(pong).await?;
+
+                        // Double check that it actually
+                        // increments.
+                        let ctx = conn.ctx.as_ref().map(|ctx| &ctx.seal).unwrap();
+                        assert_eq!(ctx.seq(), Seq::new(1));
+
                         want = Ping { v: pong.v };
                         n += 1;
                         if n >= N {

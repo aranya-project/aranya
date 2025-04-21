@@ -1,4 +1,4 @@
-use std::time::Duration;
+use core::time::Duration;
 
 use crate::{ConfigError, Result};
 
@@ -37,14 +37,14 @@ impl SyncPeerConfigBuilder {
         Default::default()
     }
 
-    /// Attempts to build a [`SyncPeerConfig`] using the provided parameters.
+    /// Build a [`SyncPeerConfig`]
     pub fn build(self) -> Result<SyncPeerConfig> {
         let Some(interval) = self.interval else {
-            let e = ConfigError::InvalidArg {
+            return Err(ConfigError::InvalidArg {
                 arg: "interval",
-                reason: "Tried to create a `SyncPeerConfig` without setting the interval!",
-            };
-            return Err(e.into());
+                reason: "must call `SyncPeerConfigBuilder::interval`",
+            }
+            .into());
         };
 
         Ok(SyncPeerConfig {
