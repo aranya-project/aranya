@@ -46,7 +46,7 @@ pub struct Client<EN, SP, CE> {
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
     /// Thread-safe Peer Cache reference.
     /// Lock must be aquired after [`Self::aranya`]
-    peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+    caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
     _eng: PhantomData<CE>,
 }
 
@@ -54,11 +54,11 @@ impl<EN, SP, CE> Client<EN, SP, CE> {
     /// Creates a new [`Client`].
     pub fn new(
         aranya: Arc<Mutex<ClientState<EN, SP>>>,
-        peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+        caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
     ) -> Self {
         Client {
             aranya,
-            peer_caches,
+            caches,
             _eng: PhantomData,
         }
     }
@@ -86,7 +86,7 @@ where
 
         let (len, _) = {
             let mut client = self.aranya.lock().await;
-            let mut peer_caches = self.peer_caches.lock().await;
+            let mut peer_caches = self.caches.lock().await;
             let peer_cache = peer_caches.entry(*addr).or_insert_with(PeerCache::new);
 
             syncer
@@ -266,7 +266,7 @@ pub struct Server<EN, SP> {
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
     /// Thread-safe Peer Cache reference.
     /// Lock must be aquired after [`Self::aranya`]
-    peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+    caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
     /// Used to receive sync requests and send responses.
     listener: TcpListener,
     /// Tracks running tasks.
@@ -278,12 +278,12 @@ impl<EN, SP> Server<EN, SP> {
     #[inline]
     pub fn new(
         aranya: Arc<Mutex<ClientState<EN, SP>>>,
-        peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+        caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
         listener: TcpListener,
     ) -> Self {
         Self {
             aranya,
-            peer_caches,
+            caches,
             listener,
             set: JoinSet::new(),
         }
@@ -316,7 +316,7 @@ where
             debug!(?addr, "received sync request");
 
             let client = Arc::clone(&self.aranya);
-            let peer_caches = Arc::clone(&self.peer_caches);
+            let peer_caches = Arc::clone(&self.caches);
             self.set.spawn(
                 async move {
                     if let Err(err) =
