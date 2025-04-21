@@ -490,8 +490,8 @@ pub type AfcConfig = Safe<imp::AfcConfig>;
 
 /// Configuration info builder for Aranya Fast Channels.
 #[cfg(feature = "afc")]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
-pub type AfcConfigBuilder = imp::AfcConfigBuilder;
+#[aranya_capi_core::opaque(size = 40, align = 8)]
+pub type AfcConfigBuilder = Safe<imp::AfcConfigBuilder>;
 
 /// Sets the shared memory path that AFC should use for storing channel data.
 ///
@@ -706,8 +706,8 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
-#[aranya_capi_core::opaque(size = 4, align = 4)]
-pub type TeamConfigBuilder = imp::TeamConfigBuilder;
+#[aranya_capi_core::opaque(size = 16, align = 8)]
+pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 
 /// Attempts to construct a [`TeamConfig`], returning an `Error::Config`
 /// if there are invalid parameters.

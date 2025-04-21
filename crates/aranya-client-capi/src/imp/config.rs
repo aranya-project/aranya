@@ -16,6 +16,10 @@ pub struct ClientConfig {
     aqc: AqcConfig,
 }
 
+impl Typed for ClientConfig {
+    const TYPE_ID: TypeId = TypeId::new(0x227DFC9E);
+}
+
 impl ClientConfig {
     pub(crate) fn daemon_addr(&self) -> *const c_char {
         self.daemon_addr
@@ -25,10 +29,6 @@ impl ClientConfig {
     pub(crate) fn afc(&self) -> &AfcConfig {
         &self.afc
     }
-}
-
-impl Typed for ClientConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9E);
 }
 
 #[repr(C)]
@@ -43,7 +43,7 @@ pub struct ClientConfigBuilder {
 }
 
 impl Typed for ClientConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
+    const TYPE_ID: TypeId = TypeId::new(0xAAAA611B);
 }
 
 impl ClientConfigBuilder {
@@ -128,7 +128,7 @@ pub struct AfcConfig {
 
 #[cfg(feature = "afc")]
 impl Typed for AfcConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
+    const TYPE_ID: TypeId = TypeId::new(0x1C3BE29F);
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -142,6 +142,11 @@ pub struct AfcConfigBuilder {
     pub max_channels: usize,
     /// Address to bind AFC server to.
     pub addr: *const c_char,
+}
+
+#[cfg(feature = "afc")]
+impl Typed for AfcConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0xB4E69EF0);
 }
 
 #[cfg(feature = "afc")]
@@ -184,7 +189,7 @@ pub struct AqcConfig {
 }
 
 impl Typed for AqcConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
+    const TYPE_ID: TypeId = TypeId::new(0x64CEB3F4);
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -196,7 +201,7 @@ pub struct AqcConfigBuilder {
 }
 
 impl Typed for AqcConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFCA0);
+    const TYPE_ID: TypeId = TypeId::new(0x153AE387);
 }
 
 impl AqcConfigBuilder {
@@ -237,7 +242,7 @@ pub struct SyncPeerConfig {
 }
 
 impl Typed for SyncPeerConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x2049E682);
+    const TYPE_ID: TypeId = TypeId::new(0x44BE85E7);
 }
 
 impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
@@ -262,6 +267,10 @@ impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
 pub struct SyncPeerConfigBuilder {
     interval: Option<Duration>,
     sync_now: bool,
+}
+
+impl Typed for SyncPeerConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0xFE81AF7E);
 }
 
 impl SyncPeerConfigBuilder {
@@ -295,10 +304,6 @@ impl SyncPeerConfigBuilder {
     }
 }
 
-impl Typed for SyncPeerConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x2049E683);
-}
-
 impl Default for SyncPeerConfigBuilder {
     fn default() -> Self {
         Self {
@@ -315,7 +320,7 @@ impl Default for SyncPeerConfigBuilder {
 pub struct TeamConfig {}
 
 impl Typed for TeamConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9E);
+    const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
 }
 
 #[repr(C)]
@@ -323,6 +328,10 @@ impl Typed for TeamConfig {
 #[aranya_capi_core::opaque(size = 0, align = 1)]
 /// Builder for a [`TeamConfig`]
 pub struct TeamConfigBuilder {}
+
+impl Typed for TeamConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x112905E7);
+}
 
 impl TeamConfigBuilder {
     /// Attempts to construct a [`TeamConfig`], returning an
