@@ -350,6 +350,8 @@ AranyaError run(Team *t) {
                                     t->clients.operator.pk_len);
     EXPECT("error adding operator to team", err);
 
+    // TODO: custom roles
+    /*
     // upgrade role to admin.
     err = aranya_assign_role(&t->clients.owner.client, &t->id,
                              &t->clients.admin.id, ARANYA_ROLE_ADMIN);
@@ -372,6 +374,7 @@ AranyaError run(Team *t) {
     err = aranya_assign_role(&t->clients.admin.client, &t->id,
                              &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
     EXPECT("error assigning operator role", err);
+    */
 
     // Initialize the builder
     struct AranyaSyncPeerConfigBuilder builder;

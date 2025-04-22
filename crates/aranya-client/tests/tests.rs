@@ -229,8 +229,7 @@ impl TeamCtx {
         let roles = RoleCtx {
             admin: owner_team.create_role("admin".into()).await?,
             operator: owner_team.create_role("operator".into()).await?,
-            membera: owner_team.create_role("membera".into()).await?,
-            memberb: owner_team.create_role("memberb".into()).await?,
+            member: owner_team.create_role("member".into()).await?,
         };
         self.roles = Some(roles);
 
@@ -283,7 +282,7 @@ impl TeamCtx {
             .await?;
         // Assign the membera its role.
         owner_team
-            .assign_role(self.operator.id, roles.membera.id)
+            .assign_role(self.operator.id, roles.member.id)
             .await?;
 
         // Add member A as a new device.
@@ -293,7 +292,7 @@ impl TeamCtx {
             .await?;
         // Assign the memberb its role.
         owner_team
-            .assign_role(self.operator.id, roles.memberb.id)
+            .assign_role(self.operator.id, roles.member.id)
             .await?;
 
         // Make sure they see the configuration change.
@@ -336,11 +335,10 @@ impl TeamCtx {
 
 #[derive(Debug, Clone)]
 struct RoleCtx {
-    // TODO: owner: Role,
+    // Note: owner role is created by policy by default.
     admin: Role,
     operator: Role,
-    membera: Role,
-    memberb: Role,
+    member: Role,
 }
 
 struct DeviceCtx {

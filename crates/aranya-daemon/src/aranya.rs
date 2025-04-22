@@ -841,6 +841,20 @@ where
         .in_current_span()
     }
 
+    /// Query device roles off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_device_roles_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_device_roles",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
     /// Query device keybundle off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]

@@ -1258,10 +1258,22 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_device_roles(
         self,
         _: context::Context,
-        _team: api::TeamId,
-        _device: api::DeviceId,
+        team: api::TeamId,
+        device: api::DeviceId,
     ) -> api::Result<Vec<api::Role>> {
-        todo!();
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_device_roles_off_graph(device.into_id().into())
+            .await
+            .context("unable to query device roles on team")?;
+        let mut roles: Vec<api::Role> = Vec::new();
+        for e in effects {
+            if let Effect::QueriedRole(e) = e {
+                roles.push(e.role.into());
+            }
+        }
+        Ok(roles)
     }
 
     /// Query roles permissions.

@@ -623,6 +623,7 @@ command AddMember {
             emit MemberAdded {
                 device_id: device_key_ids.device_id,
                 device_keys: this.device_keys,
+                priority: this.priority,
             }
         }
     }
@@ -2218,11 +2219,15 @@ command QueryRole {
     policy {
         check team_exists()
 
+        let role = Role {
+            role_id: this.role_id,
+            name: this.role_name,
+            author_id: this.role_author_id,
+        }
+
         finish {
             emit QueriedRole {
-                role_id: this.role_id,
-                role_name: this.role_name,
-                author_id: this.role_author_id,
+                role: role,
             }
         }
     }
@@ -2240,7 +2245,7 @@ Queries a list of roles assigned to the device.
 ```policy
 // Emits `QueriedRoleAssignment` for all roles the device has
 // been granted permission to use.
-action query_role_assignments(device_id id) {
+action query_device_roles(device_id id) {
     // TODO: make this query more efficient when policy supports it.
     // The key order is optimized for `delete AssignedRole`.
     map AssignedRole[role_id: ?, device_id: ?] as f {

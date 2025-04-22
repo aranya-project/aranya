@@ -203,35 +203,6 @@ typedef uint32_t AranyaError;
 #endif // __cplusplus
 
 /**
- * An enum containing team roles defined in the Aranya policy.
- */
-enum AranyaRole
-#ifdef __cplusplus
-  : uint8_t
-#endif // __cplusplus
- {
-    /**
-     * Owner role.
-     */
-    ARANYA_ROLE_OWNER,
-    /**
-     * Admin role.
-     */
-    ARANYA_ROLE_ADMIN,
-    /**
-     * Operator role.
-     */
-    ARANYA_ROLE_OPERATOR,
-    /**
-     * Member role.
-     */
-    ARANYA_ROLE_MEMBER,
-};
-#ifndef __cplusplus
-typedef uint8_t AranyaRole;
-#endif // __cplusplus
-
-/**
  * Extended error information.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaExtError {
@@ -351,6 +322,13 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
      */
     uint8_t __for_size_only[32];
 } AranyaSyncPeerConfig;
+
+/**
+ * Role ID.
+ */
+typedef struct AranyaRoleId {
+    struct AranyaId id;
+} AranyaRoleId;
 
 /**
  * A network identifier for an Aranya client.
@@ -1109,7 +1087,7 @@ AranyaError aranya_remove_device_from_team_ext(struct AranyaClient *client,
 AranyaError aranya_assign_role(struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                const struct AranyaDeviceId *device,
-                               AranyaRole role);
+                               const struct AranyaRoleId *role);
 
 /**
  * Assign a role to a device.
@@ -1128,7 +1106,7 @@ AranyaError aranya_assign_role(struct AranyaClient *client,
 AranyaError aranya_assign_role_ext(struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    const struct AranyaDeviceId *device,
-                                   AranyaRole role,
+                                   const struct AranyaRoleId *role,
                                    struct AranyaExtError *__ext_err);
 
 /**
@@ -1146,7 +1124,7 @@ AranyaError aranya_assign_role_ext(struct AranyaClient *client,
 AranyaError aranya_revoke_role(struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                const struct AranyaDeviceId *device,
-                               AranyaRole role);
+                               const struct AranyaRoleId *role);
 
 /**
  * Revoke a role from a device.
@@ -1163,7 +1141,7 @@ AranyaError aranya_revoke_role(struct AranyaClient *client,
 AranyaError aranya_revoke_role_ext(struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    const struct AranyaDeviceId *device,
-                                   AranyaRole role,
+                                   const struct AranyaRoleId *role,
                                    struct AranyaExtError *__ext_err);
 
 /**

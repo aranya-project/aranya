@@ -336,6 +336,6 @@ pub trait ActorExt {
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_roles_on_team(&mut self) -> Result<(), ClientError>;
-    fn query_role_assignments(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_device_roles(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_role_perms(&mut self, role_id: Id) -> Result<(), ClientError>;
 }
