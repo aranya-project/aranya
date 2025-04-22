@@ -4,16 +4,14 @@ use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
 use std::path::PathBuf;
 
 use aranya_crypto::{
-    afc::{BidiChannelId as AfcBidiChannelId, UniChannelId as AfcUniChannelId},
     aqc::{self, BidiAuthorSecretId, UniAuthorSecretId},
     custom_id,
     default::DefaultCipherSuite,
     EncryptionKeyId, Id,
 };
-use aranya_fast_channels::{Label as AfcLabel, NodeId};
+use aranya_fast_channels::NodeId;
 use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
-use spideroak_base58::ToBase58;
 use tracing::error;
 
 /// CS = Cipher Suite
@@ -111,49 +109,6 @@ impl fmt::Display for NetIdentifier {
         self.0.fmt(f)
     }
 }
-
-/// Uniquely identifies an AFC channel.
-///
-/// It is a [`AfcBidiChannelId`] or [`AfcUniChannelId`] truncated to
-/// 128 bits.
-#[repr(transparent)]
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct AfcId([u8; 16]);
-
-impl fmt::Display for AfcId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.to_base58())
-    }
-}
-
-fn truncate<const BIG: usize, const SMALL: usize>(arr: &[u8; BIG]) -> &[u8; SMALL] {
-    const { assert!(BIG >= SMALL) };
-    arr[..SMALL].try_into().expect("array must fit")
-}
-
-/// Convert from [`AfcBidiChannelId`] to [`AfcId`]
-impl From<AfcBidiChannelId> for AfcId {
-    fn from(value: AfcBidiChannelId) -> Self {
-        Self(*truncate(value.as_array()))
-    }
-}
-
-/// Convert from [`AfcUniChannelId`] to [`AfcId`]
-impl From<AfcUniChannelId> for AfcId {
-    fn from(value: AfcUniChannelId) -> Self {
-        Self(*truncate(value.as_array()))
-    }
-}
-
-/// Convert from [`Id`] to [`AfcId`]
-impl From<Id> for AfcId {
-    fn from(value: Id) -> Self {
-        Self(*truncate(value.as_array()))
-    }
-}
-
-// serialized command which must be passed over AFC.
-pub type AfcCtrl = Vec<Box<[u8]>>;
 
 // serialized command which must be passed over AQC.
 pub type AqcCtrl = Vec<Box<[u8]>>;
@@ -311,28 +266,6 @@ pub trait DaemonApi {
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
 
-    /// Create an AFC label.
-    async fn create_afc_label(team: TeamId, label: AfcLabel) -> Result<()>;
-    /// Delete an AFC label.
-    async fn delete_afc_label(team: TeamId, label: AfcLabel) -> Result<()>;
-    /// Assign a fast channels label to a device.
-    async fn assign_afc_label(team: TeamId, device: DeviceId, label: AfcLabel) -> Result<()>;
-    /// Revoke a fast channels label from a device.
-    async fn revoke_afc_label(team: TeamId, device: DeviceId, label: AfcLabel) -> Result<()>;
-
-    /// Assign a fast channels network identifier to a device.
-    async fn assign_afc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
-    /// Remove a fast channels network identifier from a device.
-    async fn remove_afc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
-
     /// Assign a QUIC channels network identifier to a device.
     async fn assign_aqc_net_identifier(
         team: TeamId,
@@ -359,22 +292,6 @@ pub trait DaemonApi {
     ) -> Result<()>;
     // Revoke a label from a device.
     async fn revoke_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
-
-    /// Create a fast channel.
-    async fn create_afc_bidi_channel(
-        team: TeamId,
-        peer: NetIdentifier,
-        node_id: NodeId,
-        label: AfcLabel,
-    ) -> Result<(AfcId, AfcCtrl)>;
-    /// Delete a fast channel.
-    async fn delete_afc_channel(chan: AfcId) -> Result<AfcCtrl>;
-    /// Receive a fast channel ctrl message.
-    async fn receive_afc_ctrl(
-        team: TeamId,
-        node_id: NodeId,
-        ctrl: AfcCtrl,
-    ) -> Result<(AfcId, NetIdentifier, AfcLabel)>;
 
     /// Create a bidirectional QUIC channel.
     async fn create_aqc_bidi_channel(
@@ -409,16 +326,6 @@ pub trait DaemonApi {
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device label assignments.
     async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
-    /// Query device AFC label assignments.
-    async fn query_device_afc_label_assignments(
-        team: TeamId,
-        device: DeviceId,
-    ) -> Result<Vec<AfcLabel>>;
-    /// Query AFC network ID.
-    async fn query_afc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-    ) -> Result<Option<NetIdentifier>>;
     /// Query AQC network ID.
     async fn query_aqc_net_identifier(
         team: TeamId,
@@ -428,6 +335,4 @@ pub trait DaemonApi {
     async fn query_labels(team: TeamId) -> Result<Vec<Label>>;
     /// Query whether a label exists.
     async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
-    /// Query whether an AFC label exists.
-    async fn query_afc_label_exists(team: TeamId, label: AfcLabel) -> Result<bool>;
 }
