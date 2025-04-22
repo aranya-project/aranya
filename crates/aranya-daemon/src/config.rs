@@ -29,6 +29,7 @@ pub struct Config {
     pub sync_addr: Addr,
 
     /// AFC configuration.
+    #[serde(default)]
     pub afc: Option<AfcConfig>,
 }
 
