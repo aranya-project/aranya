@@ -24,6 +24,7 @@ ciborium = { workspace = true }
 futures-util = { workspace = true }
 pin-project = { version = "1.1" }
 postcard = { workspace = true }
+semver = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
 tokio = { workspace = true }

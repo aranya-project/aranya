@@ -253,7 +253,7 @@ impl Daemon {
                     .get_key::<E, ApiKey<E::CS>>(eng, id.into())?
                     // If the public API key exists then the
                     // secret half should exist the keystore. If
-                    // not, then something deleted it frmo the
+                    // not, then something deleted it from the
                     // keystore.
                     .assume("`ApiKey` should exist")?;
                 Ok(sk)

@@ -61,12 +61,10 @@ impl<CS: CipherSuite> ApiKey<CS> {
     {
         let sk = Self::new(eng);
         let id = sk.id()?;
-        let wrapped = eng
-            .wrap(sk.clone())
-            .context(concat!("unable to wrap `ApiKey`"))?;
+        let wrapped = eng.wrap(sk.clone()).context("unable to wrap `ApiKey`")?;
         store
             .try_insert(id.into(), wrapped)
-            .context(concat!("unable to insert wrapped `ApiKey`"))?;
+            .context("unable to insert wrapped `ApiKey`")?;
         Ok(sk)
     }
 }

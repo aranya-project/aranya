@@ -12,7 +12,7 @@ use core::{
 use std::sync::Arc;
 
 use aranya_crypto::{
-    aead::Tag,
+    aead::{Aead, Tag},
     csprng::Csprng,
     hpke::{Hpke, HpkeError, Mode, OpenCtx, SealCtx, Seq},
     import::Import,
@@ -34,14 +34,28 @@ use tokio::io::{self, AsyncRead, AsyncWrite};
 
 use crate::crypto::{ApiKey, PublicApiKey};
 
+fn other<E>(err: E) -> io::Error
+where
+    E: Into<Box<dyn error::Error + Send + Sync>>,
+{
+    io::Error::new(io::ErrorKind::Other, err)
+}
+
 type Encap<CS> = <<CS as CipherSuite>::Kem as Kem>::Encap;
 
+/// HPKE encryption context.
 struct Ctx<CS: CipherSuite> {
     seal: SealCtx<<CS as CipherSuite>::Aead>,
     open: OpenCtx<<CS as CipherSuite>::Aead>,
 }
 
 impl<CS: CipherSuite> Ctx<CS> {
+    // Contextual binding for exporting the server's encryption
+    // key and nonce.
+    const SERVER_KEY_CTX: &[u8] = b"aranya daemon api server seal key";
+    const SERVER_NONCE_CTX: &[u8] = b"aranya daemon api server seal nonce";
+
+    /// Creates the HPKE encryption context for the client.
     fn client<R: Csprng>(
         rng: &mut R,
         pk: &PublicApiKey<CS>,
@@ -49,9 +63,10 @@ impl<CS: CipherSuite> Ctx<CS> {
     ) -> Result<(Self, Encap<CS>), HpkeError> {
         let (enc, send) =
             Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_send(rng, Mode::Base, pk.as_inner(), info)?;
+        // NB: These are the reverse of the server's keys.
         let (open_key, open_nonce) = {
-            let key = send.export(SERVER_KEY_CTX)?;
-            let nonce = send.export(SERVER_NONCE_CTX)?;
+            let key = send.export(Self::SERVER_KEY_CTX)?;
+            let nonce = send.export(Self::SERVER_NONCE_CTX)?;
             (key, nonce)
         };
         let (seal_key, seal_nonce) = send
@@ -65,14 +80,16 @@ impl<CS: CipherSuite> Ctx<CS> {
         Ok((ctx, enc))
     }
 
+    /// Creates the HPKE encryption context for the server.
     fn server(sk: &ApiKey<CS>, info: &[u8], enc: &[u8]) -> Result<Self, HpkeError> {
         let enc = Encap::<CS>::import(enc)?;
 
         let recv =
             Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_recv(Mode::Base, &enc, sk.as_inner(), info)?;
+        // NB: These are the reverse of the client's keys.
         let (seal_key, seal_nonce) = {
-            let key = recv.export(SERVER_KEY_CTX)?;
-            let nonce = recv.export(SERVER_NONCE_CTX)?;
+            let key = recv.export(Self::SERVER_KEY_CTX)?;
+            let nonce = recv.export(Self::SERVER_NONCE_CTX)?;
             (key, nonce)
         };
         let (open_key, open_nonce) = recv
@@ -85,22 +102,19 @@ impl<CS: CipherSuite> Ctx<CS> {
         })
     }
 
-    fn make_ad(base: &[u8; 14], seq: Seq) -> [u8; 8 + 14] {
-        // ad = seq || base_ad
-        let mut ad = [0; 8 + 14];
-        ad[..8].copy_from_slice(&seq.to_u64().to_le_bytes());
-        ad[8..].copy_from_slice(base);
-        ad
-    }
-
-    fn encrypt<Item, SinkItem>(&mut self, item: SinkItem, ad: &[u8; 14]) -> io::Result<Data>
+    /// Serializes `item`, encrypts and authenticates the
+    /// resulting bytes, and returns the ciphertext.
+    ///
+    /// `side` represents the current side performing the
+    /// encryption.
+    fn encrypt<Item, SinkItem>(&mut self, item: SinkItem, side: Side) -> io::Result<Data>
     where
         SinkItem: Serialize,
     {
         let mut codec = MessagePack::<Item, SinkItem>::default();
         let mut plaintext = BytesMut::from(pin!(codec).serialize(&item)?);
         let mut tag = BytesMut::from(&*Tag::<CS::Aead>::default());
-        let ad = Self::make_ad(ad, self.seal.seq());
+        let ad = auth_data(self.seal.seq(), side);
         let seq = self
             .seal
             .seal_in_place(&mut plaintext, &mut tag, &ad)
@@ -112,7 +126,11 @@ impl<CS: CipherSuite> Ctx<CS> {
         })
     }
 
-    fn decrypt<Item, SinkItem>(&mut self, data: Data, ad: &[u8; 14]) -> io::Result<Item>
+    /// Decrypts and authenticates `data`, then deserializes the
+    /// resulting plaintext and returns the resulting `Item`.
+    ///
+    /// `side` represents the side that created `data`.
+    fn decrypt<Item, SinkItem>(&mut self, data: Data, side: Side) -> io::Result<Item>
     where
         Item: DeserializeOwned,
     {
@@ -121,7 +139,7 @@ impl<CS: CipherSuite> Ctx<CS> {
             mut ciphertext,
             tag,
         } = data;
-        let ad = Self::make_ad(ad, Seq::new(seq));
+        let ad = auth_data(Seq::new(seq), side);
         self.open
             .open_in_place_at(&mut ciphertext, &tag, &ad, Seq::new(seq))
             .map_err(other)?;
@@ -137,17 +155,25 @@ impl<CS: CipherSuite> fmt::Debug for Ctx<CS> {
     }
 }
 
-fn other<E>(err: E) -> io::Error
-where
-    E: Into<Box<dyn error::Error + Send + Sync>>,
-{
-    io::Error::new(io::ErrorKind::Other, err)
+/// Generates the AD for encryption/decryption.
+fn auth_data(seq: Seq, side: Side) -> [u8; 8 + 14] {
+    let base = match side {
+        Side::Server => b"server base ad",
+        Side::Client => b"client base ad",
+    };
+
+    // ad = seq || base
+    let mut ad = [0; 8 + 14];
+    ad[..8].copy_from_slice(&seq.to_u64().to_le_bytes());
+    ad[8..].copy_from_slice(base);
+    ad
 }
 
-const SERVER_KEY_CTX: &[u8] = b"aranya daemon api server seal key";
-const SERVER_NONCE_CTX: &[u8] = b"aranya daemon api server seal nonce";
-const SERVER_BASE_AD: &[u8; 14] = b"server base ad";
-const CLIENT_BASE_AD: &[u8; 14] = b"client base ad";
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum Side {
+    Server,
+    Client,
+}
 
 /// Creates a client-side transport.
 pub fn client<S, R, CS, Item, SinkItem>(
@@ -204,7 +230,7 @@ where
             .as_mut()
             .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .encrypt::<Item, SinkItem>(item, CLIENT_BASE_AD)
+            .encrypt::<Item, SinkItem>(item, Side::Client)
             .map_err(other)
     }
 }
@@ -219,7 +245,7 @@ where
             .as_mut()
             .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .decrypt::<Item, SinkItem>(data, SERVER_BASE_AD)
+            .decrypt::<Item, SinkItem>(data, Side::Server)
             .map_err(other)
     }
 }
@@ -230,7 +256,7 @@ where
     CS: CipherSuite,
 {
     fn update_or_init_keys(&mut self) -> Result<Option<ClientMsg>, HpkeError> {
-        if self.ctx.is_some() {
+        if !self.need_rekey() {
             return Ok(None);
         }
         let enc = self.rekey()?;
@@ -240,9 +266,21 @@ where
         Ok(Some(msg))
     }
 
+    fn need_rekey(&self) -> bool {
+        let Some(ctx) = self.ctx.as_ref() else {
+            return true;
+        };
+        // To prevent us from reaching the end of the sequence,
+        // rekey when we're halfway there.
+        let max = Seq::max::<<CS::Aead as Aead>::NonceSize>();
+        let seq = ctx.seal.seq().to_u64();
+        seq >= max / 2
+    }
+
     fn rekey(&mut self) -> Result<<<CS as CipherSuite>::Kem as Kem>::Encap, HpkeError> {
         let (ctx, enc) = Ctx::client(&mut self.rng, &self.pk, &self.info)?;
         self.ctx = Some(ctx);
+        // This should never overflow.
         self.rekeys += 1;
         Ok(enc)
     }
@@ -323,6 +361,7 @@ where
     }
 }
 
+/// A message (request) sent by the client to the server.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
 enum ClientMsg {
@@ -330,15 +369,22 @@ enum ClientMsg {
     Rekey(Rekey),
 }
 
+/// Some encrypted data.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Data {
+    /// The position of this ciphertext in the stream of
+    /// messages.
     seq: u64,
+    /// The ciphertext.
     ciphertext: BytesMut,
+    /// The authentication tag.
     tag: Bytes,
 }
 
+/// Instructs the server to rekey.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Rekey {
+    /// The HPKE peer encapsulation.
     enc: Bytes,
 }
 
@@ -430,7 +476,7 @@ where
             .as_mut()
             .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .encrypt::<Item, SinkItem>(item, SERVER_BASE_AD)
+            .encrypt::<Item, SinkItem>(item, Side::Server)
             .map_err(other)
     }
 }
@@ -445,7 +491,7 @@ where
             .as_mut()
             .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .decrypt::<Item, SinkItem>(data, CLIENT_BASE_AD)
+            .decrypt::<Item, SinkItem>(data, Side::Client)
             .map_err(other)
     }
 }
@@ -524,6 +570,7 @@ where
     }
 }
 
+/// A message (response) sent by the server to the client.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[non_exhaustive]
 enum ServerMsg {
@@ -760,8 +807,10 @@ mod tests {
                     .unwrap();
                 let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &info);
                 for v in 0..MAX_PING_PONGS {
+                    let last = client.rekeys;
                     client.force_rekey();
                     client.send(Ping { v }).await.unwrap();
+                    assert_eq!(client.rekeys, last + 1);
                     let got = client.try_next().await?.ok_or_else(|| {
                         io::Error::new(io::ErrorKind::UnexpectedEof, "stream finished early")
                     })?;

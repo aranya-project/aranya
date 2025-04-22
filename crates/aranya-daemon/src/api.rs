@@ -226,8 +226,8 @@ impl Deref for ApiShim {
 
 impl DaemonApi for ApiShim {
     #[instrument(skip(self))]
-    async fn version(self, context: context::Context) -> api::Result<String> {
-        Ok(env!("CARGO_PKG_VERSION").to_string())
+    async fn version(self, context: context::Context) -> api::Result<api::Version> {
+        api::Version::parse(env!("CARGO_PKG_VERSION")).map_err(Into::into)
     }
 
     #[instrument(skip(self))]
@@ -604,8 +604,8 @@ impl DaemonApi for ApiShim {
                         .find_net_id(graph, e.author_id.into())
                         .await
                         .context("missing net identifier for channel author")?;
-                    // TODO(eric): Why do we ignore the remaining
-                    // commands in `ctrl`?
+                    // NB: Each action should only produce one
+                    // ephemeral command.
                     return Ok((net_id, api::AqcPsk::Bidi(psk)));
                 }
                 Some(Effect::AqcUniChannelReceived(e)) => {
@@ -628,8 +628,8 @@ impl DaemonApi for ApiShim {
                         .find_net_id(graph, e.author_id.into())
                         .await
                         .context("missing net identifier for channel author")?;
-                    // TODO(eric): Why do we ignore the remaining
-                    // commands in `ctrl`?
+                    // NB: Each action should only produce one
+                    // ephemeral command.
                     return Ok((net_id, api::AqcPsk::Uni(psk)));
                 }
                 Some(_) | None => {}

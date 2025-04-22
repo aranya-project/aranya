@@ -1,4 +1,4 @@
-use core::{fmt, future::Future};
+use core::fmt;
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;
@@ -10,7 +10,7 @@ use aranya_crypto::{DeviceId, Engine, KeyStore};
 use aranya_daemon_api::{AqcBidiPsk, AqcUniPsk, Directed, NetIdentifier, Secret};
 use aranya_runtime::GraphId;
 use bimap::BiBTreeMap;
-use tokio::sync::{Mutex, MutexGuard};
+use tokio::sync::Mutex;
 
 /// A mapping of `Net ID <=> Device ID`, separated by `Graph ID`.
 type PeerMap = Arc<Mutex<BTreeMap<GraphId, Peers>>>;
@@ -63,14 +63,13 @@ impl<E, KS> Aqc<E, KS> {
             .insert(net_id, id);
     }
 
-    async fn while_locked<'a, F, Fut, R>(&'a self, f: F) -> R
+    async fn while_locked<'a, F, R>(&'a self, f: F) -> R
     where
-        F: FnOnce(MutexGuard<'a, Handler<KS>>, MutexGuard<'a, E>) -> Fut,
-        Fut: Future<Output = R>,
+        F: for<'b> FnOnce(&'b mut Handler<KS>, &'b mut E) -> R,
     {
-        let handler = self.handler.lock().await;
-        let eng = self.eng.lock().await;
-        f(handler, eng).await
+        let mut handler = self.handler.lock().await;
+        let mut eng = self.eng.lock().await;
+        f(&mut *handler, &mut *eng)
     }
 }
 
@@ -84,9 +83,7 @@ where
         info: &BidiChannelCreated<'_>,
     ) -> Result<AqcBidiPsk> {
         let psk = self
-            .while_locked(|mut handler, mut eng| async move {
-                handler.bidi_channel_created(&mut *eng, info)
-            })
+            .while_locked(|handler, eng| handler.bidi_channel_created(eng, info))
             .await?;
         Ok(AqcBidiPsk {
             identity: psk.identity().into(),
@@ -99,9 +96,7 @@ where
         info: &BidiChannelReceived<'_>,
     ) -> Result<AqcBidiPsk> {
         let psk = self
-            .while_locked(|mut handler, mut eng| async move {
-                handler.bidi_channel_received(&mut *eng, info)
-            })
+            .while_locked(|handler, eng| handler.bidi_channel_received(eng, info))
             .await?;
         Ok(AqcBidiPsk {
             identity: psk.identity().into(),
@@ -114,9 +109,7 @@ where
         info: &UniChannelCreated<'_>,
     ) -> Result<AqcUniPsk> {
         let psk = self
-            .while_locked(|mut handler, mut eng| async move {
-                handler.uni_channel_created(&mut *eng, info)
-            })
+            .while_locked(|handler, eng| handler.uni_channel_created(eng, info))
             .await?;
         let secret = Secret::from(psk.raw_secret_bytes());
         Ok(AqcUniPsk {
@@ -134,9 +127,7 @@ where
         info: &UniChannelReceived<'_>,
     ) -> Result<AqcUniPsk> {
         let psk = self
-            .while_locked(|mut handler, mut eng| async move {
-                handler.uni_channel_received(&mut *eng, info)
-            })
+            .while_locked(|handler, eng| handler.uni_channel_received(eng, info))
             .await?;
         let secret = Secret::from(psk.raw_secret_bytes());
         Ok(AqcUniPsk {

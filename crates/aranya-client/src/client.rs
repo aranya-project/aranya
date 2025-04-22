@@ -9,7 +9,8 @@ use aranya_daemon_api::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId, CS,
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
+    Version, CS,
 };
 use aranya_util::Addr;
 use tarpc::context;
@@ -57,6 +58,7 @@ impl Labels {
 /// Builds a [`Client`].
 pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
+    #[cfg(unix)]
     uds_path: Option<&'a Path>,
     // The daemon's public key.
     pk: Option<&'a [u8]>,
@@ -149,14 +151,17 @@ impl Client {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        let want = env!("CARGO_PKG_VERSION");
-        if got != want {
+        let want = Version::parse(env!("CARGO_PKG_VERSION"))
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
+            .map_err(IpcError::new)?;
+        if got.major != want.major || got.minor != want.minor {
             return Err(IpcError::new(io::Error::new(
                 io::ErrorKind::Unsupported,
                 format!("version mismatch: `{got}` != `{want}`"),
             ))
             .into());
         }
+        debug!(client = ?want, daemon = ?got, "versions");
 
         let aqc = AqcChannelsImpl::new().await?;
 

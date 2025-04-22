@@ -38,7 +38,7 @@ impl<CS: CipherSuite> fmt::Debug for PublicKeys<CS> {
             .field("ident_pk", &self.ident_pk)
             .field("enc_pk", &self.ident_pk)
             .field("sign_pk", &self.sign_pk)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

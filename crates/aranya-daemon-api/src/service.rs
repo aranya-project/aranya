@@ -11,6 +11,7 @@ use aranya_crypto::{
 };
 use aranya_util::Addr;
 use buggy::Bug;
+pub use semver::Version;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -33,6 +34,13 @@ impl From<Bug> for Error {
 
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
+        error!(?err);
+        Self(format!("{err:?}"))
+    }
+}
+
+impl From<semver::Error> for Error {
+    fn from(err: semver::Error) -> Self {
         error!(?err);
         Self(format!("{err:?}"))
     }
@@ -304,7 +312,7 @@ pub struct Label {
 #[tarpc::service]
 pub trait DaemonApi {
     /// Returns the daemon's version.
-    async fn version() -> Result<String>;
+    async fn version() -> Result<Version>;
 
     /// Gets local address the Aranya sync server is bound to.
     async fn aranya_local_addr() -> Result<SocketAddr>;
