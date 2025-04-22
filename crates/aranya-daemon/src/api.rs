@@ -19,7 +19,7 @@ use aranya_daemon_api::{
     DaemonApi, CE, CS,
 };
 use aranya_keygen::PublicKeys;
-use aranya_runtime::GraphId;
+use aranya_runtime::{GraphId, StorageProvider};
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
@@ -205,6 +205,7 @@ impl DaemonApiHandler {
                 Effect::QueryAqcNetIdentifierResult(_) => {}
                 Effect::QueriedLabelAssignment(_) => {}
                 Effect::QueryLabelExistsResult(_) => {}
+                Effect::QueryAqcNetworkNamesOutput(_) => {}
             }
         }
         Ok(())

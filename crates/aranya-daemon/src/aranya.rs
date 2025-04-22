@@ -6,6 +6,7 @@ use std::{borrow::Cow, sync::Arc};
 use anyhow::{bail, Context, Result};
 use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Rng};
+use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
@@ -15,6 +16,7 @@ use aranya_runtime::{
 };
 use aranya_util::Addr;
 use buggy::bug;
+use futures_util::TryFutureExt as _;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -41,7 +43,7 @@ pub enum SyncResponse {
 /// Aranya client.
 pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
-    aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
     _eng: PhantomData<CE>,
 }
 
@@ -614,7 +616,7 @@ where
         .in_current_span()
     }
 
-    /// Sets an AQC network name.
+    /// Unsets an AQC network name.
     #[instrument(skip(self), fields(device_id = %device_id))]
     fn unset_aqc_network_name(
         &self,
@@ -624,6 +626,34 @@ where
         self.with_actor(move |actor| {
             actor.unset_aqc_network_name(device_id.into())?;
             Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Queries all AQC network names off-graph.
+    #[instrument(skip(self))]
+    fn query_aqc_network_names_off_graph(
+        &self,
+    ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_aqc_network_names",
+            args: Cow::Owned(vec![]),
+        })
+        .and_then(|(_, effects)| {
+            std::future::ready(
+                effects
+                    .into_iter()
+                    .map(|eff| {
+                        let Effect::QueryAqcNetworkNamesOutput(eff) = eff else {
+                            anyhow::bail!("bad effect in query_network_names");
+                        };
+                        Ok((
+                            NetIdentifier(eff.net_identifier),
+                            DeviceId::from(eff.device_id),
+                        ))
+                    })
+                    .collect(),
+            )
         })
         .in_current_span()
     }
@@ -891,6 +921,36 @@ where
         self.session_action(move || VmAction {
             name: "query_afc_label_exists",
             args: Cow::Owned(vec![Value::from(i64::from(label.to_u32()))]),
+        })
+        .in_current_span()
+    }
+
+    /// Query assigned network identifiers.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip_all)]
+    #[cfg(any())]
+    fn query_afc_network_names_off_graph(
+        &self,
+    ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_afc_network_names",
+            args: Cow::Owned(vec![]),
+        })
+        .and_then(|(_, effects)| {
+            std::future::ready(
+                effects
+                    .into_iter()
+                    .map(|eff| {
+                        let Effect::QueryAfcNetworkNamesOutput(eff) = eff else {
+                            anyhow::bail!("bad effect in query_network_names");
+                        };
+                        Ok((
+                            NetIdentifier(eff.net_identifier),
+                            DeviceId::from(eff.device_id),
+                        ))
+                    })
+                    .collect(),
+            )
         })
         .in_current_span()
     }

@@ -62,6 +62,7 @@ pub enum Effect {
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
+    QueryAqcNetworkNamesOutput(QueryAqcNetworkNamesOutput),
 }
 /// TeamCreated policy effect.
 #[effect]
@@ -252,6 +253,12 @@ pub struct QueryDeviceKeyBundleResult {
 pub struct QueryAqcNetIdentifierResult {
     pub net_identifier: String,
 }
+/// QueryAqcNetworkNamesOutput policy effect.
+#[effect]
+pub struct QueryAqcNetworkNamesOutput {
+    pub net_identifier: String,
+    pub device_id: Id,
+}
 /// Implements all supported policy actions.
 #[actions]
 pub trait ActorExt {
@@ -298,4 +305,5 @@ pub trait ActorExt {
     fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
 }
