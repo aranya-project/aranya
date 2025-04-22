@@ -255,27 +255,7 @@ pub enum ChanOp {
 }
 
 /// Permission that can be assigned to roles.
-///
-/// Refer to `policy.md` `Permission` enum.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub enum Permission {
-    TerminateTeam,
-    AddMember,
-    RemoveMember,
-    CreateRole,
-    DeleteRole,
-    AssignRole,
-    RevokeRole,
-    AssignRolePermission,
-    SetAqcNetworkName,
-    UnsetAqcNetworkName,
-    AqcCreateBidiChannel,
-    AqcCreateUniChannel,
-    CreateLabel,
-    DeleteLabel,
-    AssignLabel,
-    RevokeLabel,
-}
+pub type Permission = String;
 
 /// A label.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]

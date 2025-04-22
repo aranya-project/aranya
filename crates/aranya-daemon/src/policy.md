@@ -75,26 +75,6 @@ use perspective
 
 ```policy
 
-// Permissions that can be assigned to a role.
-enum Permission {
-    TerminateTeam,
-    AddMember,
-    RemoveMember,
-    CreateRole,
-    DeleteRole,
-    AssignRole,
-    RevokeRole,
-    AssignRolePermission,
-    SetAqcNetworkName,
-    UnsetAqcNetworkName,
-    AqcCreateBidiChannel,
-    AqcCreateUniChannel,
-    CreateLabel,
-    DeleteLabel,
-    AssignLabel,
-    RevokeLabel,
-}
-
 // Valid channel operations for a label assignment.
 enum ChanOp {
     // The device can only receive data in channels with this
@@ -169,8 +149,7 @@ fact AssignedRole[role_id id, device_id id]=>{}
 
 // Records that a role was assigned permission to execute a certain command.
 // TODO: use enum permission key.
-//fact RolePermissions[role_id id, perm enum Permission]=>{}
-fact RolePermissions[role_id id, perm int]=>{}
+fact PermRole[perm string]=>{role_id id}
 
 // Indicates that the team has been terminated.
 fact TeamEnd[]=>{}
@@ -264,6 +243,48 @@ function open_envelope(sealed_envelope struct Envelope) bytes {
         envelope::signature(sealed_envelope),
     )
     return verified_command
+}
+```
+#### RBAC Functions
+
+```policy
+finish function create_role(role struct Role) {
+    create Roles[role_id: role.role_id]=>{role: role}
+}
+
+finish function delete_role(role struct Role) {
+    delete Roles[role_id: role.role_id]
+}
+
+finish function assign_perm_role(perm string, role_id id) {
+    create PermRole[perm: perm]=>{role_id: role_id}
+}
+
+finish function revoke_perm_role(perm string) {
+    delete PermRole[perm: perm]
+}
+
+// Check if device has permission to execute the current command.
+function device_has_permission(device_id id, perm string) bool {
+    let role_perm_opt = query PermRole[perm: perm]
+    if role_perm_opt is None {
+        return false
+    }
+    let role_id = (unwrap role_perm_opt).role_id
+
+    return exists AssignedRole[role_id: role_id, device_id: device_id]
+}
+
+// Check if the author device has higher priority than the target device.
+// This means the author has permission to execute commands on the target.
+function author_dominates_target(author_id id, target_id id) bool {
+    // Check if the device has higher priority than the target device.
+    let author_device = unwrap query Devices[device_id: author_id]
+    let target_device = unwrap query Devices[device_id: target_id]
+    if author_device.device.priority > target_device.device.priority {
+        return true
+    }
+    return false
 }
 ```
 
@@ -428,7 +449,7 @@ command CreateTeam {
         // TODO: define const high priority for owner device.
         let device = Device {
             device_id: owner_key_ids.device_id,
-            priority: 1000,
+            priority: 65000,
             sign_key_id: owner_key_ids.sign_key_id,
             enc_key_id: owner_key_ids.enc_key_id,
         }
@@ -449,6 +470,13 @@ command CreateTeam {
             create_role(role)
 
             // TODO: assign default permissions to owner role.
+            assign_perm_role("AddMember", role.role_id)
+            assign_perm_role("CreateRole", role.role_id)
+            assign_perm_role("DeleteRole", role.role_id)
+            assign_perm_role("AssignRole", role.role_id)
+            assign_perm_role("RevokeRole", role.role_id)
+            assign_perm_role("AssignRolePermission", role.role_id)
+            assign_perm_role("RevokeRolePermission", role.role_id)
 
             // Assign owner role to device.
             create AssignedRole[role_id: role.role_id, device_id: author_id]=>{}
@@ -459,35 +487,6 @@ command CreateTeam {
         }
     }
 }
-
-finish function create_role(role struct Role) {
-    create Roles[role_id: role.role_id]=>{role: role}
-}
-
-finish function delete_role(role struct Role) {
-    delete Roles[role_id: role.role_id]
-}
-
-finish function assign_role_perm(role_id id, perm int) {
-    create RolePermissions[role_id: role_id, perm: perm]=>{}
-}
-
-finish function revoke_role_perm(role_id id, perm int) {
-    delete RolePermissions[role_id: role_id, perm: perm]
-}
-
-// TODO: is map allowed in function? If not, how do we check device/role permissions?
-// Check if device has permission to execute the current command.
-//function device_has_permission(device_id id, perm int) bool {
-//    map AssignedRole[role_id:?, device_id: device_id] as r {
-//        let has_perm = exists RolePermissions[role_id: r.role_id, perm: perm]
-//        if has_perm {
-//            return true
-//        }
-//    }
-//
-//    return false
-//}
 
 // Adds the device to the Team.
 finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, device struct Device) {
@@ -536,7 +535,7 @@ command TerminateTeam {
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(envelope::author_id(envelope))
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "TerminateTeam")
 
         finish {
             create TeamEnd[]=>{}
@@ -597,7 +596,7 @@ command AddMember {
         // Derive the key IDs from the provided KeyBundle.
         let device_key_ids = derive_device_key_ids(this.device_keys)
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "AddMember")
 
         // Check that the Member doesn't already exist.
         check find_existing_device(device_key_ids.device_id) is None
@@ -660,7 +659,8 @@ command RemoveMember{
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "RemoveMember")
+        check author_dominates_target(author.device_id, device.device_id)
 
         finish {
             remove_device(this.device_id)
@@ -685,6 +685,7 @@ finish function remove_device(device_id id) {
 
 - Members can only be removed by Operators and Owners.
 - Removing non-Members requires revoking their higher role so the device is made into a Member first.
+
 ## AssignPriority
 
 Assign priority to a device on a team.
@@ -715,7 +716,7 @@ command CreateRole {
 
         let author = get_valid_device(envelope::author_id(envelope))
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "CreateRole")
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
@@ -768,14 +769,14 @@ command DeleteRole {
 
         let author = get_valid_device(envelope::author_id(envelope))
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "DeleteRole")
 
         // Query role.
         let role = check_unwrap query Roles[role_id: this.role_id]
 
         finish {
             // Delete role.
-            delete Roles[role_id: this.role_id]
+            delete_role(role.role)
 
             // Return deleted role info.
             emit RoleDeleted {
@@ -819,18 +820,20 @@ command AssignRole {
         check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
+        let device = get_valid_device(this.device_id)
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "AssignRole")
+        check author_dominates_target(author.device_id, device.device_id)
 
         // Query role.
         let role = check_unwrap query Roles[role_id: this.role_id]
 
         finish {
-            create AssignedRole[role_id: this.role_id, device_id: this.device_id]=>{}
+            create AssignedRole[role_id: this.role_id, device_id: device.device_id]=>{}
 
             // Return assigned role info.
             emit RoleAssigned {
-                device_id: this.device_id,
+                device_id: device.device_id,
                 role_id: role.role.role_id,
                 name: role.role.name,
                 author_id: author.device_id,
@@ -888,18 +891,20 @@ command RevokeRole {
         check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
+        let target = get_valid_device(this.device_id)
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "RevokeRole")
+        check author_dominates_target(author.device_id, target.device_id)
 
         // Query role.
         let role = check_unwrap query Roles[role_id: this.role_id]
 
         finish {
-            delete AssignedRole[role_id: this.role_id, device_id: this.device_id]
+            delete AssignedRole[role_id: this.role_id, device_id: target.device_id]
 
             // Return revoked role info.
             emit RoleRevoked {
-                device_id: this.device_id,
+                device_id: target.device_id,
                 role_id: role.role.role_id,
                 name: role.role.name,
                 author_id: author.device_id,
@@ -924,10 +929,11 @@ effect RoleRevoked {
 ## AssignRolePermission
 
 Assign permission to execute a certain command to the role.
+Note: currently each command is only allowed to be executed by one role.
 
 ```policy
 
-action assign_role_perm(role_id id, perm int) {
+action assign_role_perm(role_id id, perm string) {
     publish AssignRolePermission{
         role_id: role_id,
         perm: perm,
@@ -939,7 +945,7 @@ command AssignRolePermission {
         // ID of the role to assign permission to.
         role_id id,
         // Permission to assign to the role.
-        perm int,
+        perm string,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -950,12 +956,14 @@ command AssignRolePermission {
 
         let author = get_valid_device(envelope::author_id(envelope))
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "AssignRolePermission")
 
         // Query role.
         let role = check_unwrap query Roles[role_id: this.role_id]
 
         finish {
+            assign_perm_role(this.perm, role.role.role_id)
+    
             // Return deleted role info.
             emit RolePermissionAssigned {
                 role_id: role.role.role_id,
@@ -974,7 +982,7 @@ effect RolePermissionAssigned {
     // Name of the role.
     name string,
     // Permission assigned to the role.
-    perm int,
+    perm string,
     // ID of the device that assigned the permission.
     author_id id,
 }
@@ -985,7 +993,7 @@ effect RolePermissionAssigned {
 Revoke permission to execute a certain command from the role.
 
 ```policy
-action revoke_role_perm(role_id id, perm int) {
+action revoke_role_perm(role_id id, perm string) {
     publish RevokeRolePermission{
         role_id: role_id,
         perm: perm,
@@ -997,7 +1005,7 @@ command RevokeRolePermission {
         // ID of the role to revoke permission from.
         role_id id,
         // Permission to revoke from the role.
-        perm int,
+        perm string,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -1008,18 +1016,22 @@ command RevokeRolePermission {
 
         let author = get_valid_device(envelope::author_id(envelope))
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "RevokeRolePermission")
 
         // Query role.
         let role = check_unwrap query Roles[role_id: this.role_id]
 
-        finish {
-            // Return deleted role info.
-            emit RolePermissionRevoked {
-                role_id: role.role.role_id,
-                name: role.role.name,
-                perm: this.perm,
-                author_id: author.device_id,
+        if this.role_id == role.role.role_id {
+            finish {
+                revoke_perm_role(this.perm)
+
+                // Return deleted role info.
+                emit RolePermissionRevoked {
+                    role_id: role.role.role_id,
+                    name: role.role.name,
+                    perm: this.perm,
+                    author_id: author.device_id,
+                }
             }
         }
     }
@@ -1032,7 +1044,7 @@ effect RolePermissionRevoked {
     // Name of the role.
     name string,
     // Permission revoked from the role.
-    perm int,
+    perm string,
     // ID of the device that revoked the permission.
     author_id id,
 }
@@ -1068,21 +1080,22 @@ command SetAqcNetworkName {
         check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
-        let device = get_valid_device(this.device_id)
+        let target = get_valid_device(this.device_id)
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "SetAqcNetworkName")
+        //check author_dominates_target(author.device_id, target.device_id)
 
-        let net_id_exists = query AqcMemberNetworkId[device_id: this.device_id]
+        let net_id_exists = query AqcMemberNetworkId[device_id: target.device_id]
 
         if net_id_exists is Some {
             let net_id = unwrap net_id_exists
             finish {
-                update AqcMemberNetworkId[device_id: this.device_id]=>{net_identifier: net_id.net_identifier} to {
+                update AqcMemberNetworkId[device_id: target.device_id]=>{net_identifier: net_id.net_identifier} to {
                     net_identifier: this.net_identifier
                 }
 
                 emit AqcNetworkNameSet {
-                    device_id: device.device_id,
+                    device_id: target.device_id,
                     net_identifier: this.net_identifier,
                 }
             }
@@ -1092,7 +1105,7 @@ command SetAqcNetworkName {
                 create AqcMemberNetworkId[device_id: this.device_id]=>{net_identifier: this.net_identifier}
 
                 emit AqcNetworkNameSet {
-                    device_id: device.device_id,
+                    device_id: target.device_id,
                     net_identifier: this.net_identifier,
                 }
             }
@@ -1133,16 +1146,17 @@ command UnsetAqcNetworkName {
         check team_exists()
 
         let author = get_valid_device(envelope::author_id(envelope))
-        let device = get_valid_device(this.device_id)
+        let target = get_valid_device(this.device_id)
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "UnsetAqcNetworkName")
+        check author_dominates_target(author.device_id, target.device_id)
 
-        check exists AqcMemberNetworkId[device_id: this.device_id]
+        check exists AqcMemberNetworkId[device_id: target.device_id]
         finish {
-            delete AqcMemberNetworkId[device_id: this.device_id]
+            delete AqcMemberNetworkId[device_id: target.device_id]
 
             emit AqcNetworkNameUnset {
-                device_id: device.device_id,
+                device_id: target.device_id,
             }
         }
     }
@@ -1283,7 +1297,7 @@ command AqcCreateBidiChannel {
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "AqcCreateBidiChannel")
 
         // Check that both devices have been assigned to the label and have correct send/recv permissions.
         check can_create_aqc_bidi_channel(author.device_id, peer.device_id, label.label_id)
@@ -1490,7 +1504,7 @@ command AqcCreateUniChannel {
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "AqcCreateUniChannel")
 
         // Check that both devices have been assigned to the label and have correct send/recv permissions.
         check can_create_aqc_uni_channel(this.sender_id, this.receiver_id, label.label_id)
@@ -1586,7 +1600,7 @@ command CreateLabel {
         // A label's ID is the ID of the command that created it.
         let label_id = envelope::command_id(envelope)
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "CreateLabel")
 
         // Verify that the label does not already exist.
         //
@@ -1650,7 +1664,8 @@ command DeleteLabel {
 
         let author = get_valid_device(envelope::author_id(envelope))
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "DeleteLabel")
+        // TODO: check dominance over devices assigned to label?
 
         // Verify that the label exists.
         //
@@ -1736,7 +1751,8 @@ command AssignLabel {
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "AssignLabel")
+        check author_dominates_target(author.device_id, target.device_id)
 
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
@@ -1820,7 +1836,8 @@ command RevokeLabel {
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
-        // TODO: check that device has permission to execute command.
+        check device_has_permission(author.device_id, "RevokeLabel")
+        check author_dominates_target(author.device_id, target.device_id)
 
         let label = check_unwrap query Label[label_id: this.label_id]
 
@@ -2290,13 +2307,15 @@ Queries a list of permissions assigned to the role.
 // Emits `QueriedRolePermision` for all permissions the role has
 // been granted permission to use.
 action query_role_perms(role_id id) {
-    map RolePermissions[role_id: role_id, perm: ?] as f {
-        let role = check_unwrap query Roles[role_id: f.role_id]
-        publish QueryRolePermissions {
-            role_id: role.role_id,
-            role_name: role.role.name,
-            perm: f.perm,
-            author_id: role.role.author_id,
+    map PermRole[perm: ?] as f {
+        if f.role_id == role_id {
+            let role = check_unwrap query Roles[role_id: f.role_id]
+            publish QueryRolePermissions {
+                role_id: role.role_id,
+                role_name: role.role.name,
+                perm: f.perm,
+                author_id: role.role.author_id,
+            }
         }
     }
 }
@@ -2305,7 +2324,7 @@ command QueryRolePermissions {
     fields {
         role_id id,
         role_name string,
-        perm int,
+        perm string,
         author_id id,
     }
 
@@ -2332,7 +2351,7 @@ effect QueriedRolePermission {
     // The role name.
     name string,
     // The role permission.
-    perm int,
+    perm string,
     // The ID of the device that created the role.
     author_id id,
 }

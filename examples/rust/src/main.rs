@@ -190,16 +190,22 @@ async fn main() -> Result<()> {
     let mut membera_team = team.membera.client.team(team_id);
     let mut memberb_team = team.memberb.client.team(team_id);
 
-    // TODO(gknopf): custom roles.
     let admin_role = owner_team.create_role("admin".into()).await?;
     let operator_role = owner_team.create_role("operator".into()).await?;
     let member_role = owner_team.create_role("member".into()).await?;
 
-    // TODO(gknopf): assign permissions to roles.
+    owner_team.assign_role_perm(operator_role.id, "SetAqcNetworkName".into()).await?;
+    owner_team.assign_role_perm(operator_role.id, "UnsetAqcNetworkName".into()).await?;
+    owner_team.assign_role_perm(operator_role.id, "CreateLabel".into()).await?;
+    owner_team.assign_role_perm(operator_role.id, "AssignLabel".into()).await?;
+    owner_team.assign_role_perm(operator_role.id, "RevokeLabel".into()).await?;
+    owner_team.assign_role_perm(admin_role.id, "DeleteLabel".into()).await?;
+    owner_team.assign_role_perm(member_role.id, "AqcCreateBidiChannel".into()).await?;
+    owner_team.assign_role_perm(member_role.id, "AqcCreateUniChannel".into()).await?;
 
     // add admin to team.
     info!("adding admin to team");
-    owner_team.add_device_to_team(team.admin.pk, 100).await?;
+    owner_team.add_device_to_team(team.admin.pk, 9000).await?;
     owner_team.assign_role(team.admin.id, admin_role.id).await?;
 
     // wait for syncing.
@@ -207,7 +213,7 @@ async fn main() -> Result<()> {
 
     // add operator to team.
     info!("adding operator to team");
-    owner_team.add_device_to_team(team.operator.pk, 100).await?;
+    owner_team.add_device_to_team(team.operator.pk, 8000).await?;
 
     // TODO(gknopf): add sync now test back in.
 
@@ -281,14 +287,14 @@ async fn main() -> Result<()> {
 
     // add membera to team.
     info!("adding membera to team");
-    operator_team.add_device_to_team(team.membera.pk, 100).await?;
+    owner_team.add_device_to_team(team.membera.pk, 7000).await?;
     owner_team
         .assign_role(team.membera.id, member_role.id)
         .await?;
 
     // add memberb to team.
     info!("adding memberb to team");
-    operator_team.add_device_to_team(team.memberb.pk, 100).await?;
+    owner_team.add_device_to_team(team.memberb.pk, 7000).await?;
     owner_team
         .assign_role(team.memberb.id, member_role.id)
         .await?;

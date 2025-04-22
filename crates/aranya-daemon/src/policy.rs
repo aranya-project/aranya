@@ -116,7 +116,7 @@ pub struct RoleRevoked {
 pub struct RolePermissionAssigned {
     pub role_id: Id,
     pub name: String,
-    pub perm: i64,
+    pub perm: String,
     pub author_id: Id,
 }
 /// RolePermissionRevoked policy effect.
@@ -124,7 +124,7 @@ pub struct RolePermissionAssigned {
 pub struct RolePermissionRevoked {
     pub role_id: Id,
     pub name: String,
-    pub perm: i64,
+    pub perm: String,
     pub author_id: Id,
 }
 /// AqcNetworkNameSet policy effect.
@@ -270,7 +270,7 @@ pub struct QueriedRole {
 pub struct QueriedRolePermission {
     pub role_id: Id,
     pub name: String,
-    pub perm: i64,
+    pub perm: String,
     pub author_id: Id,
 }
 /// Implements all supported policy actions.
@@ -292,8 +292,8 @@ pub trait ActorExt {
     fn delete_role(&mut self, role_id: Id) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
-    fn assign_role_perm(&mut self, role_id: Id, perm: i64) -> Result<(), ClientError>;
-    fn revoke_role_perm(&mut self, role_id: Id, perm: i64) -> Result<(), ClientError>;
+    fn assign_role_perm(&mut self, role_id: Id, perm: String) -> Result<(), ClientError>;
+    fn revoke_role_perm(&mut self, role_id: Id, perm: String) -> Result<(), ClientError>;
     fn set_aqc_network_name(
         &mut self,
         device_id: Id,

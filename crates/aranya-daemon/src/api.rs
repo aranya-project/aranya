@@ -597,7 +597,12 @@ impl DaemonApi for DaemonApiHandler {
         role: api::RoleId,
         perm: api::Permission,
     ) -> api::Result<()> {
-        todo!();
+        self.client
+            .actions(&team.into_id().into())
+            .assign_role_perm(role, perm)
+            .await
+            .context("unable to assign role perm")?;
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -1143,11 +1148,11 @@ impl DaemonApi for DaemonApiHandler {
             .actions(&team.into_id().into())
             .create_label(label_name)
             .await
-            .context("unable to create AQC label")?;
+            .context("unable to create label")?;
         if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
             Ok(e.label_id.into())
         } else {
-            Err(anyhow!("unable to create AQC label").into())
+            Err(anyhow!("unable to create label").into())
         }
     }
 
