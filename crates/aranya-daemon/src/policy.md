@@ -438,7 +438,7 @@ command CreateTeam {
         
         let role = Role {
             role_id: role_id,
-            name: "Owner",
+            name: "owner",
             author_id: author_id,
         }
 
@@ -451,7 +451,7 @@ command CreateTeam {
             // TODO: assign default permissions to owner role.
 
             // Assign owner role to device.
-            assign_role_to_device(author_id, role.role_id)
+            create AssignedRole[role_id: role.role_id, device_id: author_id]=>{}
 
             emit TeamCreated {
                 owner_id: author_id,
@@ -466,14 +466,6 @@ finish function create_role(role struct Role) {
 
 finish function delete_role(role struct Role) {
     delete Roles[role_id: role.role_id]
-}
-
-finish function assign_role_to_device(role_id id, device_id id) {
-    create AssignedRole[role_id: role_id, device_id: device_id]=>{}
-}
-
-finish function revoke_role_from_device(role_id id, device_id id) {
-    delete AssignedRole[role_id: role_id, device_id: device_id]
 }
 
 finish function assign_role_perm(role_id id, perm int) {
@@ -903,7 +895,7 @@ command RevokeRole {
         let role = check_unwrap query Roles[role_id: this.role_id]
 
         finish {
-            delete AssignedRole[role_id: this.role_id, device_id: this.device_id]=>{}
+            delete AssignedRole[role_id: this.role_id, device_id: this.device_id]
 
             // Return revoked role info.
             emit RoleRevoked {
@@ -2243,7 +2235,7 @@ effect QueriedRole {
 Queries a list of roles assigned to the device.
 
 ```policy
-// Emits `QueriedRoleAssignment` for all roles the device has
+// Emits `QueriedRole` for all roles the device has
 // been granted permission to use.
 action query_device_roles(device_id id) {
     // TODO: make this query more efficient when policy supports it.
@@ -2275,26 +2267,18 @@ command QueryRoleAssignment {
     policy {
         check team_exists()
 
+        let role = Role {
+            role_id: this.role_id,
+            name: this.role_name,
+            author_id: this.role_author_id,
+        }
+
         finish {
-            emit QueriedRoleAssignment {
-                device_id: this.device_id,
-                role_id: this.role_id,
-                role_name: this.role_name,
-                role_author_id: this.role_author_id,
+            emit QueriedRole {
+                role: role,
             }
         }
     }
-}
-
-effect QueriedRoleAssignment {
-    // The device's unique ID.
-    device_id id,
-    // The role's unique ID.
-    role_id id,
-    // The role name.
-    role_name string,
-    // The ID of the device that created the role.
-    role_author_id id,
 }
 ```
 

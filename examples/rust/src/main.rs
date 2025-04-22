@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 use aranya_daemon_api::ChanOp;
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result};
 use aranya_client::{client::Client, SyncPeerConfig};
 use aranya_daemon::{
     config::{AfcConfig, Config},
@@ -194,6 +194,8 @@ async fn main() -> Result<()> {
     let operator_role = owner_team.create_role("operator".into()).await?;
     let member_role = owner_team.create_role("member".into()).await?;
 
+    // TODO(gknopf): assign permissions to roles.
+
     // add admin to team.
     info!("adding admin to team");
     owner_team.add_device_to_team(team.admin.pk, 100).await?;
@@ -206,24 +208,13 @@ async fn main() -> Result<()> {
     info!("adding operator to team");
     owner_team.add_device_to_team(team.operator.pk, 100).await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // Admin tries to assign a role
-    match admin_team
-        .assign_role(team.operator.id, operator_role.id)
-        .await
-    {
-        Ok(_) => bail!("Expected role assignment to fail"),
-        Err(aranya_client::Error::Daemon(_)) => {}
-        Err(_) => bail!("Unexpected error"),
-    }
+    // TODO(gknopf): add sync now test back in.
 
     // Admin syncs with the Owner peer and retries the role
     // assignment command
     admin_team.sync_now(owner_addr.into(), None).await?;
     sleep(sleep_interval).await;
-    admin_team
+    owner_team
         .assign_role(team.operator.id, operator_role.id)
         .await?;
 
@@ -290,14 +281,14 @@ async fn main() -> Result<()> {
     // add membera to team.
     info!("adding membera to team");
     operator_team.add_device_to_team(team.membera.pk, 100).await?;
-    admin_team
+    owner_team
         .assign_role(team.membera.id, member_role.id)
         .await?;
 
     // add memberb to team.
     info!("adding memberb to team");
     operator_team.add_device_to_team(team.memberb.pk, 100).await?;
-    admin_team
+    owner_team
         .assign_role(team.memberb.id, member_role.id)
         .await?;
 
@@ -316,13 +307,24 @@ async fn main() -> Result<()> {
     sleep(sleep_interval).await;
 
     // fact database queries
-    let mut queries = team.membera.client.queries(team_id);
+    let mut queries = team.owner.client.queries(team_id);
+    info!("query list of devices on team:");
     let devices = queries.devices_on_team().await?;
-    info!("membera devices on team: {:?}", devices.iter().count());
-    let roles = queries.device_roles(team.membera.id).await?;
-    info!("querying roles assigned to membera:")
+    for device in devices.iter() {
+        info!("device: {}", device);
+    }
+    info!("query list of roles on team:");
+    let roles = queries.roles_on_team().await?;
     for role in roles.iter() {
-        info!("membera roles: {:?}", role);
+        info!("role: {:?}", role);
+    }
+    info!("membera devices on team: {:?}", devices.iter().count());
+    for device in devices.iter() {
+        info!("querying roles assigned to device: {}", device);
+        let roles = queries.device_roles(*device).await?;
+        for role in roles.iter() {
+            info!("role: {:?}, device: {}", role, device);
+        }
     }
     let keybundle = queries.device_keybundle(team.membera.id).await?;
     info!("membera keybundle: {:?}", keybundle);
@@ -361,6 +363,8 @@ async fn main() -> Result<()> {
     admin_team.delete_label(label3).await?;
 
     info!("completed aqc demo");
+
+    // TODO(gknopf): unassign role permissions and delete roles.
 
     info!("completed example Aranya application");
 

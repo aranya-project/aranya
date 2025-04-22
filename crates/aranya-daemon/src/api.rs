@@ -279,7 +279,6 @@ impl DaemonApiHandler {
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::QueriedLabel(_) => {}
                 Effect::QueriedRole(_) => {}
-                Effect::QueriedRoleAssignment(_) => {}
                 Effect::QueriedRolePermission(_) => {}
                 #[cfg(any())]
                 Effect::AfcBidiChannelCreated(v) => {
@@ -1266,7 +1265,7 @@ impl DaemonApi for DaemonApiHandler {
             .actions(&team.into_id().into())
             .query_device_roles_off_graph(device.into_id().into())
             .await
-            .context("unable to query device roles on team")?;
+            .context("unable to query device roles")?;
         let mut roles: Vec<api::Role> = Vec::new();
         for e in effects {
             if let Effect::QueriedRole(e) = e {

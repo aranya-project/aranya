@@ -571,7 +571,7 @@ impl Queries<'_> {
         })
     }
 
-    /// Returns the role of the current device.
+    /// Returns a list of roles assigned to the current device.
     pub async fn device_roles(&mut self, device: DeviceId) -> Result<Roles> {
         Ok(Roles {
             data: self

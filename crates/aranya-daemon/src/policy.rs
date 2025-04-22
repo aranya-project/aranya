@@ -61,7 +61,6 @@ pub enum Effect {
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
     QueriedRole(QueriedRole),
-    QueriedRoleAssignment(QueriedRoleAssignment),
     QueriedRolePermission(QueriedRolePermission),
 }
 /// TeamCreated policy effect.
@@ -265,14 +264,6 @@ pub struct QueryAqcNetIdentifierResult {
 #[effect]
 pub struct QueriedRole {
     pub role: Role,
-}
-/// QueriedRoleAssignment policy effect.
-#[effect]
-pub struct QueriedRoleAssignment {
-    pub device_id: Id,
-    pub role_id: Id,
-    pub role_name: String,
-    pub role_author_id: Id,
 }
 /// QueriedRolePermission policy effect.
 #[effect]
