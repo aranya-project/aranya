@@ -284,6 +284,7 @@ pub struct Label {
 pub struct Role {
     pub id: RoleId,
     pub name: String,
+    pub author_id: DeviceId,
 }
 
 #[tarpc::service]

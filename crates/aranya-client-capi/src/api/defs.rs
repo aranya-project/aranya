@@ -1642,8 +1642,6 @@ pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
         .map(Into::into)
 }
 
-// TODO: query_device_role
-
 /// Query device's keybundle.
 ///
 /// @param client the Aranya Client [`Client`].

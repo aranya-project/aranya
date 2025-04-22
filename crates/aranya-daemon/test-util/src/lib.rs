@@ -232,9 +232,9 @@ impl TestCtx {
             panic!("could not find role");
         };
         Ok(Role {
-            role_id: role_created.role_id,
-            name: role_created.name.clone(),
-            author_id: role_created.author_id,
+            role_id: role_created.role.role_id,
+            name: role_created.role.name.clone(),
+            author_id: role_created.role.author_id,
         })
     }
 

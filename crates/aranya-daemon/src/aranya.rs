@@ -5,7 +5,7 @@ use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, syn
 use anyhow::{bail, Context, Result};
 use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Rng};
-use aranya_daemon_api::RoleId;
+use aranya_daemon_api::{Permission, RoleId};
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
@@ -25,7 +25,7 @@ use tokio::{
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
 
 use crate::{
-    policy::{ActorExt, ChanOp, Effect, KeyBundle, Permission},
+    policy::{ActorExt, ChanOp, Effect, KeyBundle},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -489,8 +489,9 @@ where
         role_id: RoleId,
         perm: Permission,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        // TODO: use perm enum
         self.with_actor(move |actor| {
-            actor.assign_role_perm(role_id.into(), perm)?;
+            actor.assign_role_perm(role_id.into(), perm as i64)?;
             Ok(())
         })
         .in_current_span()
@@ -503,8 +504,9 @@ where
         role_id: RoleId,
         perm: Permission,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        // TODO: use perm enum
         self.with_actor(move |actor| {
-            actor.revoke_role_perm(role_id.into(), perm)?;
+            actor.revoke_role_perm(role_id.into(), perm as i64)?;
             Ok(())
         })
         .in_current_span()
@@ -826,16 +828,15 @@ where
         .in_current_span()
     }
 
-    /// Query device role off-graph.
+    /// Query roles on team off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_device_role_off_graph(
+    fn query_roles_on_team_off_graph(
         &self,
-        device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_device_role",
-            args: Cow::Owned(vec![Value::from(device_id)]),
+            name: "query_roles_on_team",
+            args: Cow::Owned(vec![]),
         })
         .in_current_span()
     }

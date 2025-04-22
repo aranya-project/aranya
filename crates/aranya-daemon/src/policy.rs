@@ -24,26 +24,6 @@ pub struct Role {
     pub name: String,
     pub author_id: Id,
 }
-/// Permission policy enum.
-#[value]
-pub enum Permission {
-    TerminateTeam,
-    AddMember,
-    RemoveMember,
-    CreateRole,
-    DeleteRole,
-    AssignRole,
-    RevokeRole,
-    AssignRolePermission,
-    SetAqcNetworkName,
-    UnsetAqcNetworkName,
-    AqcCreateBidiChannel,
-    AqcCreateUniChannel,
-    CreateLabel,
-    DeleteLabel,
-    AssignLabel,
-    RevokeLabel,
-}
 /// ChanOp policy enum.
 #[value]
 pub enum ChanOp {
@@ -78,7 +58,6 @@ pub enum Effect {
     QueriedLabel(QueriedLabel),
     QueriedLabelAssignment(QueriedLabelAssignment),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
-    QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
     QueriedRole(QueriedRole),
@@ -110,16 +89,12 @@ pub struct MemberRemoved {
 /// RoleCreated policy effect.
 #[effect]
 pub struct RoleCreated {
-    pub role_id: Id,
-    pub name: String,
-    pub author_id: Id,
+    pub role: Role,
 }
 /// RoleDeleted policy effect.
 #[effect]
 pub struct RoleDeleted {
-    pub role_id: Id,
-    pub name: String,
-    pub author_id: Id,
+    pub role: Role,
 }
 /// RoleAssigned policy effect.
 #[effect]
@@ -142,7 +117,7 @@ pub struct RoleRevoked {
 pub struct RolePermissionAssigned {
     pub role_id: Id,
     pub name: String,
-    pub perm: Permission,
+    pub perm: i64,
     pub author_id: Id,
 }
 /// RolePermissionRevoked policy effect.
@@ -150,7 +125,7 @@ pub struct RolePermissionAssigned {
 pub struct RolePermissionRevoked {
     pub role_id: Id,
     pub name: String,
-    pub perm: Permission,
+    pub perm: i64,
     pub author_id: Id,
 }
 /// AqcNetworkNameSet policy effect.
@@ -276,11 +251,6 @@ pub struct QueriedLabelAssignment {
 pub struct QueryDevicesOnTeamResult {
     pub device_id: Id,
 }
-/// QueryDeviceRoleResult policy effect.
-#[effect]
-pub struct QueryDeviceRoleResult {
-    pub role: Role,
-}
 /// QueryDeviceKeyBundleResult policy effect.
 #[effect]
 pub struct QueryDeviceKeyBundleResult {
@@ -294,9 +264,7 @@ pub struct QueryAqcNetIdentifierResult {
 /// QueriedRole policy effect.
 #[effect]
 pub struct QueriedRole {
-    pub role_id: Id,
-    pub role_name: String,
-    pub author_id: Id,
+    pub role: Role,
 }
 /// QueriedRoleAssignment policy effect.
 #[effect]
@@ -310,9 +278,9 @@ pub struct QueriedRoleAssignment {
 #[effect]
 pub struct QueriedRolePermission {
     pub role_id: Id,
-    pub role_name: String,
-    pub perm: Permission,
-    pub role_author_id: Id,
+    pub name: String,
+    pub perm: i64,
+    pub author_id: Id,
 }
 /// Implements all supported policy actions.
 #[actions]
@@ -333,16 +301,8 @@ pub trait ActorExt {
     fn delete_role(&mut self, role_id: Id) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
-    fn assign_role_perm(
-        &mut self,
-        role_id: Id,
-        perm: Permission,
-    ) -> Result<(), ClientError>;
-    fn revoke_role_perm(
-        &mut self,
-        role_id: Id,
-        perm: Permission,
-    ) -> Result<(), ClientError>;
+    fn assign_role_perm(&mut self, role_id: Id, perm: i64) -> Result<(), ClientError>;
+    fn revoke_role_perm(&mut self, role_id: Id, perm: i64) -> Result<(), ClientError>;
     fn set_aqc_network_name(
         &mut self,
         device_id: Id,
@@ -373,10 +333,9 @@ pub trait ActorExt {
     fn query_labels(&mut self) -> Result<(), ClientError>;
     fn query_label_assignments(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
-    fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn query_roles(&mut self) -> Result<(), ClientError>;
+    fn query_roles_on_team(&mut self) -> Result<(), ClientError>;
     fn query_role_assignments(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_role_perms(&mut self, role_id: Id) -> Result<(), ClientError>;
 }

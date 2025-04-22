@@ -31,7 +31,7 @@ use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
     aranya::Actions,
-    policy::{ChanOp, Effect, KeyBundle, Permission},
+    policy::{ChanOp, Effect, KeyBundle, Role},
     sync::SyncPeers,
     Client, EF,
 };
@@ -300,7 +300,6 @@ impl DaemonApiHandler {
                 Effect::AqcUniChannelCreated(_) => {}
                 Effect::AqcUniChannelReceived(_) => {}
                 Effect::QueryDevicesOnTeamResult(_) => {}
-                Effect::QueryDeviceRoleResult(_) => {}
                 Effect::QueryDeviceKeyBundleResult(_) => {}
                 Effect::QueryAqcNetIdentifierResult(_) => {}
                 Effect::QueriedLabelAssignment(_) => {}
@@ -521,7 +520,18 @@ impl DaemonApi for DaemonApiHandler {
         team: api::TeamId,
         name: String,
     ) -> api::Result<api::Role> {
-        todo!()
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .create_role(name)
+            .await
+            .context("unable to create role on team")?;
+        for e in effects {
+            if let Effect::RoleCreated(e) = e {
+                return Ok(e.role.into());
+            }
+        }
+        Err(anyhow!("RoleCreated effect not returned").into())
     }
 
     #[instrument(skip(self))]
@@ -592,7 +602,7 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .revoke_role_perm(role.into_id().into(), perm.into())
+            .revoke_role_perm(role.into_id().into(), perm)
             .await
             .context("unable to revoke role perm")?;
         Ok(())
@@ -1226,9 +1236,21 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_roles_on_team(
         self,
         _: context::Context,
-        _team: api::TeamId,
+        team: api::TeamId,
     ) -> api::Result<Vec<api::Role>> {
-        todo!()
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_roles_on_team_off_graph()
+            .await
+            .context("unable to query roles on team")?;
+        let mut roles: Vec<api::Role> = Vec::new();
+        for e in effects {
+            if let Effect::QueriedRole(e) = e {
+                roles.push(e.role.into());
+            }
+        }
+        Ok(roles)
     }
 
     /// Query device roles.
@@ -1504,6 +1526,26 @@ impl From<KeyBundle> for api::KeyBundle {
     }
 }
 
+impl From<api::Role> for Role {
+    fn from(value: api::Role) -> Self {
+        Role {
+            role_id: value.id.into(),
+            name: value.name,
+            author_id: value.author_id.into(),
+        }
+    }
+}
+
+impl From<Role> for api::Role {
+    fn from(value: Role) -> Self {
+        api::Role {
+            id: value.role_id.into(),
+            name: value.name,
+            author_id: value.author_id.into(),
+        }
+    }
+}
+
 impl From<api::ChanOp> for ChanOp {
     fn from(value: api::ChanOp) -> Self {
         match value {
@@ -1524,6 +1566,8 @@ impl From<ChanOp> for api::ChanOp {
     }
 }
 
+// TODO: use perm enum from policy
+/*
 impl From<api::Permission> for Permission {
     fn from(value: api::Permission) -> Self {
         match value {
@@ -1569,3 +1613,4 @@ impl From<Permission> for api::Permission {
         }
     }
 }
+*/
