@@ -11,21 +11,11 @@ use aranya_daemon_api::{
     },
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId, CS,
 };
-use aranya_fast_channels::Label as AfcLabel;
-#[cfg(feature = "afc")]
-use aranya_fast_channels::{
-    shm::ReadState,
-    {self as afc},
-};
 use aranya_util::Addr;
 use tarpc::context;
-#[cfg(feature = "afc")]
-use tokio::net::ToSocketAddrs;
 use tokio::net::UnixStream;
 use tracing::{debug, info, instrument};
 
-#[cfg(feature = "afc")]
-use crate::afc::{setup_afc_shm, FastChannels, FastChannelsImpl};
 use crate::{
     aqc::{AqcChannels, AqcChannelsImpl},
     config::{SyncPeerConfig, TeamConfig},
@@ -60,24 +50,6 @@ impl Labels {
 
     #[doc(hidden)]
     pub fn __data(&self) -> &[Label] {
-        self.data.as_slice()
-    }
-}
-
-/// List of AFC labels.
-#[cfg(feature = "afc")]
-pub struct AfcLabels {
-    data: Vec<AfcLabel>,
-}
-
-#[cfg(feature = "afc")]
-impl AfcLabels {
-    pub fn iter(&self) -> impl Iterator<Item = &AfcLabel> {
-        self.data.iter()
-    }
-
-    #[doc(hidden)]
-    pub fn __data(&self) -> &[AfcLabel] {
         self.data.as_slice()
     }
 }
@@ -138,9 +110,7 @@ impl<'a> ClientBuilder<'a> {
 /// the Aranya graph.
 ///
 /// `Client` interacts with the [Aranya daemon] over
-/// a platform-specific IPC mechanism. The client provides AFC
-/// functionality by interfacing with AFC utilities in the Aranya
-/// core crates.
+/// a platform-specific IPC mechanism.
 ///
 /// [Aranya daemon]: https://crates.io/crates/aranya-daemon
 #[derive(Debug)]
@@ -246,12 +216,6 @@ impl Client {
     /// Get an existing team.
     pub fn team(&mut self, id: TeamId) -> Team<'_> {
         Team { client: self, id }
-    }
-
-    #[cfg(feature = "afc")]
-    /// Get access to Aranya Fast Channels.
-    pub fn afc(&mut self) -> FastChannels<'_> {
-        FastChannels::new(self)
     }
 
     /// Get access to Aranya QUIC Channels.
@@ -364,40 +328,6 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Associate a network identifier to a device for use with AFC.
-    ///
-    /// If the address already exists for this device, it is replaced with the new address. Capable
-    /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
-    /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
-    #[cfg(feature = "afc")]
-    pub async fn assign_afc_net_identifier(
-        &mut self,
-        device: DeviceId,
-        net_identifier: NetIdentifier,
-    ) -> Result<()> {
-        self.client
-            .daemon
-            .assign_afc_net_identifier(context::current(), self.id, device, net_identifier)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Disassociate an AFC network identifier from a device.
-    #[cfg(feature = "afc")]
-    pub async fn remove_afc_net_identifier(
-        &mut self,
-        device: DeviceId,
-        net_identifier: NetIdentifier,
-    ) -> Result<()> {
-        self.client
-            .daemon
-            .remove_afc_net_identifier(context::current(), self.id, device, net_identifier)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
     /// Associate a network identifier to a device for use with AQC.
     ///
     /// If the address already exists for this device, it is replaced with the new address. Capable
@@ -425,49 +355,6 @@ impl Team<'_> {
         self.client
             .daemon
             .remove_aqc_net_identifier(context::current(), self.id, device, net_identifier)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Create an Aranya Fast Channels (AFC) label.
-    pub async fn create_afc_label(&mut self, label: AfcLabel) -> Result<()> {
-        self.client
-            .daemon
-            .create_afc_label(context::current(), self.id, label)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Delete an Aranya Fast Channels (AFC) label.
-    pub async fn delete_afc_label(&mut self, label: AfcLabel) -> Result<()> {
-        self.client
-            .daemon
-            .delete_afc_label(context::current(), self.id, label)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Assign an Aranya Fast Channels (AFC) label to a device.
-    ///
-    /// This grants the device permission to send/receive AFC data using that label.
-    /// A channel must be created with the label in order to send data using that label.
-    pub async fn assign_afc_label(&mut self, device: DeviceId, label: AfcLabel) -> Result<()> {
-        self.client
-            .daemon
-            .assign_afc_label(context::current(), self.id, device, label)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Revoke an Aranya Fast Channels (AFC) label from a device.
-    pub async fn revoke_afc_label(&mut self, device: DeviceId, label: AfcLabel) -> Result<()> {
-        self.client
-            .daemon
-            .revoke_afc_label(context::current(), self.id, device, label)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -569,29 +456,6 @@ impl Queries<'_> {
         Ok(Labels { data })
     }
 
-    /// Returns a list of AFC labels assiged to the current device.
-    #[cfg(feature = "afc")]
-    pub async fn device_afc_label_assignments(&mut self, device: DeviceId) -> Result<AfcLabels> {
-        let data = self
-            .client
-            .daemon
-            .query_device_afc_label_assignments(context::current(), self.id, device)
-            .await
-            .map_err(IpcError::new)??;
-        Ok(AfcLabels { data })
-    }
-
-    /// Returns the AFC network identifier assigned to the current device.
-    #[cfg(feature = "afc")]
-    pub async fn afc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
-        self.client
-            .daemon
-            .query_afc_net_identifier(context::current(), self.id, device)
-            .await
-            .map_err(IpcError::new)
-            .map_err(aranya_error)
-    }
-
     /// Returns the AQC network identifier assigned to the current device.
     pub async fn aqc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
         self.client
@@ -622,16 +486,5 @@ impl Queries<'_> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         Ok(Labels { data })
-    }
-
-    /// Returns whether an AFC label exists.
-    #[cfg(feature = "afc")]
-    pub async fn afc_label_exists(&mut self, label: AfcLabel) -> Result<bool> {
-        self.client
-            .daemon
-            .query_afc_label_exists(context::current(), self.id, label)
-            .await
-            .map_err(IpcError::new)
-            .map_err(aranya_error)
     }
 }

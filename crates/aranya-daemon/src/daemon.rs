@@ -9,8 +9,6 @@ use aranya_crypto::{
     Engine, Rng,
 };
 use aranya_daemon_api::CS;
-#[cfg(feature = "afc")]
-use aranya_fast_channels::shm::{self, Flag, Mode, WriteState};
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -21,8 +19,6 @@ use buggy::BugExt;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
-#[cfg(feature = "afc")]
-use tracing::debug;
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
@@ -187,34 +183,6 @@ impl Daemon {
         Ok((client, server))
     }
 
-    /// Creates AFC shm.
-    #[cfg(feature = "afc")]
-    fn setup_afc(&self) -> Result<WriteState<CS, Rng>> {
-        // TODO: issue stellar-tapestry#34
-        // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
-        debug!(
-            shm_path = self.cfg.afc.shm_path,
-            "setting up afc shm write side"
-        );
-        let write = {
-            let path = aranya_util::ShmPathBuf::from_str(&self.cfg.afc.shm_path)
-                .context("unable to parse AFC shared memory path")?;
-            if self.cfg.afc.unlink_on_startup && self.cfg.afc.create {
-                let _ = shm::unlink(&path);
-            }
-            WriteState::open(
-                &path,
-                Flag::Create,
-                Mode::ReadWrite,
-                self.cfg.afc.max_chans,
-                Rng,
-            )
-            .context("unable to open `WriteState`")?
-        };
-
-        Ok(write)
-    }
-
     /// Loads the [`KeyBundle`].
     async fn load_or_gen_public_keys(
         &self,
@@ -278,12 +246,6 @@ impl Daemon {
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        #[cfg(feature = "afc")]
-        if self.cfg.afc.unlink_at_exit {
-            if let Ok(path) = aranya_util::util::ShmPathBuf::from_str(&self.cfg.afc.shm_path) {
-                let _ = shm::unlink(path);
-            }
-        }
         let _ = std::fs::remove_file(&self.cfg.uds_api_path);
     }
 }

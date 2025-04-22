@@ -118,23 +118,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 
 [[package]]
-name = "aranya-afc-util"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33b9a2699ad2f756e4607b4826855146a24acca176010fefa937965cc22b1ab1"
-dependencies = [
- "aranya-crypto",
- "aranya-fast-channels",
- "aranya-policy-vm",
- "buggy",
- "postcard",
- "serde",
- "spin",
- "thiserror 2.0.12",
- "tracing",
-]
-
-[[package]]
 name = "aranya-aqc-util"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -204,14 +187,9 @@ dependencies = [
  "aranya-crypto",
  "aranya-daemon",
  "aranya-daemon-api",
- "aranya-fast-channels",
  "aranya-util",
  "backon",
  "buggy",
- "indexmap",
- "libc",
- "postcard",
- "serde",
  "serial_test",
  "spideroak-base58",
  "tarpc",
@@ -232,10 +210,8 @@ dependencies = [
  "aranya-client",
  "aranya-crypto",
  "aranya-daemon-api",
- "aranya-fast-channels",
  "aranya-util",
  "buggy",
- "libc",
  "postcard",
  "quote",
  "syn 2.0.99",
@@ -284,14 +260,12 @@ name = "aranya-daemon"
 version = "0.5.1"
 dependencies = [
  "anyhow",
- "aranya-afc-util",
  "aranya-aqc-util",
  "aranya-crypto",
  "aranya-crypto-ffi",
  "aranya-daemon-api",
  "aranya-device-ffi",
  "aranya-envelope-ffi",
- "aranya-fast-channels",
  "aranya-idam-ffi",
  "aranya-keygen",
  "aranya-perspective-ffi",
@@ -328,7 +302,6 @@ version = "0.5.1"
 dependencies = [
  "anyhow",
  "aranya-crypto",
- "aranya-fast-channels",
  "aranya-util",
  "backon",
  "buggy",
@@ -338,7 +311,6 @@ dependencies = [
  "pin-project",
  "postcard",
  "serde",
- "spideroak-base58",
  "tarpc",
  "tempfile",
  "test-log",

@@ -15,10 +15,8 @@ workspace = true
 
 [dependencies]
 aranya-crypto = { workspace = true }
-aranya-fast-channels = { workspace = true }
 aranya-util = { workspace = true }
 buggy = { workspace = true }
-spideroak-base58 = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
 bytes = { version = "1", features = ["serde"] }

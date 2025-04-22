@@ -192,64 +192,6 @@ impl Default for SyncPeerConfigBuilder {
 #[repr(C)]
 #[derive(Clone, Debug)]
 #[aranya_capi_core::opaque(size = 24, align = 8)]
-#[cfg(feature = "afc")]
-pub struct AfcConfig {
-    /// Shared memory path.
-    pub shm_path: *const c_char,
-    /// Maximum number of channels to store in shared-memory.
-    pub max_channels: usize,
-    /// Address to bind AFC server to.
-    pub addr: *const c_char,
-}
-
-#[cfg(feature = "afc")]
-impl Typed for AfcConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x1C3BE29F);
-}
-
-/// Builder for an [`AfcConfig`]
-#[derive(Clone, Debug)]
-#[cfg(feature = "afc")]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
-pub struct AfcConfigBuilder {
-    /// Shared memory path.
-    pub shm_path: *const c_char,
-    /// Maximum number of channels to store in shared-memory.
-    pub max_channels: usize,
-    /// Address to bind AFC server to.
-    pub addr: *const c_char,
-}
-
-#[cfg(feature = "afc")]
-impl Typed for AfcConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0xB4E69EF0);
-}
-
-#[cfg(feature = "afc")]
-impl AfcConfigBuilder {
-    /// Attempts to construct an [`AfcConfig`], returning an [`Error::Bug`](Error::Bug) if
-    /// there are invalid parameters.
-    pub fn build(self) -> Result<AfcConfig, Error> {
-        if self.shm_path.is_null() {
-            return Err(InvalidArg::new("shm_path", "field not set").into());
-        }
-
-        if self.addr.is_null() {
-            return Err(InvalidArg::new("addr", "field not set").into());
-        }
-
-        Ok(AfcConfig {
-            shm_path: self.shm_path,
-            max_channels: self.max_channels,
-            addr: self.addr,
-        })
-    }
-}
-
-/// Configuration info for Aranya Fast Channels
-#[repr(C)]
-#[derive(Clone, Debug)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
 pub struct AqcConfig {
     /// Address to bind AQC server to.
     addr: *const c_char,
