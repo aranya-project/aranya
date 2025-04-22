@@ -1011,7 +1011,7 @@ pub fn revoke_label(
 /// @param team the team's ID [`TeamId`].
 /// @param peer the peer's network identifier [`NetIdentifier`].
 /// @param label_id the AQC channel label ID [`LabelId`] to create the channel with.
-/// @param __output the AQC channel's ID [`ChannelId`]
+/// @param __output the AQC channel's ID [`AqcBidiChannelId`]
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_bidi_channel(
@@ -1034,7 +1034,7 @@ pub unsafe fn aqc_create_bidi_channel(
 /// Delete a bidirectional AQC channel.
 ///
 /// @param client the Aranya Client [`Client`].
-/// @param chan the AQC channel ID [`ChannelId`] of the channel to delete.
+/// @param chan the AQC channel ID [`AqcBidiChannelId`] of the channel to delete.
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_bidi_channel(
@@ -1051,7 +1051,7 @@ pub fn aqc_delete_bidi_channel(
 /// Delete a unidirectional AQC channel.
 ///
 /// @param client the Aranya Client [`Client`].
-/// @param chan the AQC channel ID [`ChannelId`] of the channel to delete.
+/// @param chan the AQC channel ID [`AqcUniChannelId`] of the channel to delete.
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_uni_channel(
