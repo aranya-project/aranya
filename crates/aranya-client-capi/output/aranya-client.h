@@ -1456,7 +1456,7 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  * @param label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param __output the AQC channel's ID [`ChannelId`]
+ * @param __output the AQC channel's ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId)
  *
  * @relates AranyaClient.
  */
@@ -1478,7 +1478,7 @@ AranyaError aranya_aqc_create_bidi_channel(struct AranyaClient *client,
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  * @param label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param __output the AQC channel's ID [`ChannelId`]
+ * @param __output the AQC channel's ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId)
  *
  * @relates AranyaClient.
  */
@@ -1493,7 +1493,7 @@ AranyaError aranya_aqc_create_bidi_channel_ext(struct AranyaClient *client,
  * Delete a bidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`ChannelId`] of the channel to delete.
+ * @param chan the AQC channel ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId) of the channel to delete.
  *
  * @relates AranyaClient.
  */
@@ -1504,7 +1504,7 @@ AranyaError aranya_aqc_delete_bidi_channel(struct AranyaClient *client,
  * Delete a bidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`ChannelId`] of the channel to delete.
+ * @param chan the AQC channel ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId) of the channel to delete.
  *
  * @relates AranyaClient.
  */
@@ -1516,7 +1516,7 @@ AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
  * Delete a unidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`ChannelId`] of the channel to delete.
+ * @param chan the AQC channel ID [`AranyaAqcUniChannelId`](@ref AranyaAqcUniChannelId) of the channel to delete.
  *
  * @relates AranyaClient.
  */
@@ -1527,7 +1527,7 @@ AranyaError aranya_aqc_delete_uni_channel(struct AranyaClient *client,
  * Delete a unidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`ChannelId`] of the channel to delete.
+ * @param chan the AQC channel ID [`AranyaAqcUniChannelId`](@ref AranyaAqcUniChannelId) of the channel to delete.
  *
  * @relates AranyaClient.
  */
