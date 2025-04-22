@@ -128,12 +128,8 @@ impl DaemonApiServer {
         let codec = LengthDelimitedCodec::builder()
             .max_frame_length(usize::MAX)
             .new_codec();
-        let server = txp::server(
-            txp::unix::UnixListenerStream::from(listener),
-            codec,
-            self.sk,
-            info,
-        );
+        let listener = txp::unix::UnixListenerStream::from(listener);
+        let server = txp::server(listener, codec, self.sk, info);
 
         // TODO: determine if there's a performance benefit to putting these branches in different threads.
         tokio::join!(
@@ -219,11 +215,13 @@ impl DaemonApiHandler {
                 Effect::LabelAssigned(_) => {}
                 Effect::LabelRevoked(_) => {}
                 Effect::AqcNetworkNameSet(e) => {
-                    self.aqc.add_peer(
-                        graph,
-                        api::NetIdentifier(e.net_identifier.clone()),
-                        e.device_id.into(),
-                    );
+                    self.aqc
+                        .add_peer(
+                            graph,
+                            api::NetIdentifier(e.net_identifier.clone()),
+                            e.device_id.into(),
+                        )
+                        .await;
                 }
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::QueriedLabel(_) => {}
@@ -983,6 +981,8 @@ impl DaemonApi for ApiShim {
                         .find_net_id(graph, e.author_id.into())
                         .await
                         .context("missing net identifier for channel author")?;
+                    // TODO(eric): Why do we ignore the remaining
+                    // commands in `ctrl`?
                     return Ok((net_id, api::AqcPsk::Bidi(psk)));
                 }
                 Some(Effect::AqcUniChannelReceived(e)) => {
@@ -1005,6 +1005,8 @@ impl DaemonApi for ApiShim {
                         .find_net_id(graph, e.author_id.into())
                         .await
                         .context("missing net identifier for channel author")?;
+                    // TODO(eric): Why do we ignore the remaining
+                    // commands in `ctrl`?
                     return Ok((net_id, api::AqcPsk::Uni(psk)));
                 }
                 Some(_) | None => {}

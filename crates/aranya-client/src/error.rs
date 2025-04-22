@@ -1,41 +1,54 @@
-use aranya_crypto::apq::Version as AqcVersion;
+use std::io;
+
+use aranya_daemon_api as api;
 #[cfg(feature = "afc")]
 use aranya_daemon_api::AfcId;
 #[cfg(feature = "afc")]
 use aranya_fast_channels::Version;
+use tarpc::client::RpcError;
+
+pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 /// Possible errors that could happen in the Aranya client.
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum Error {
-    /// Unable to connect to the daemon.
-    #[error("Unable to connect to the daemon: {0}")]
-    Connecting(#[from] std::io::Error),
-
     /// Unable to communicate with the daemon.
-    #[error("Unable to communicate with the daemon: {0}")]
+    #[error("IPC error: {0}")]
     Ipc(#[from] IpcError),
 
     /// The daemon returned an error.
-    #[error("Daemon reported error: {0}")]
-    Daemon(#[from] aranya_daemon_api::Error),
+    #[error("daemon error: {0}")]
+    Aranya(#[from] AranyaError),
 
     /// A configuration error happened.
-    #[error("Configuration error: {0}")]
+    #[error("configuration error: {0}")]
     Config(#[from] ConfigError),
 
     /// An Aranya Fast Channel error happened.
-    #[error("Fast Channel error: {0}")]
+    #[error("AFC error: {0}")]
     #[cfg(feature = "afc")]
     Afc(#[from] AfcError),
 
     /// An Aranya QUIC Channel error happened.
-    #[error("QUIC Channel error: {0}")]
+    #[error("AQC error: {0}")]
     Aqc(#[from] AqcError),
 
     /// An unexpected internal error happened.
-    #[error("Unexpected internal error: {0}")]
+    #[error("unexpected internal error: {0}")]
     Bug(#[from] buggy::Bug),
+}
+
+/// An Aranya error.
+#[derive(Debug, thiserror::Error)]
+#[error("{err}")]
+pub struct AranyaError {
+    #[from]
+    err: api::Error,
+}
+
+pub(crate) fn aranya_error(err: api::Error) -> Error {
+    Error::Aranya(err.into())
 }
 
 /// Possible errors that could happen when creating configuration info.
@@ -43,17 +56,45 @@ pub enum Error {
 #[non_exhaustive]
 pub enum ConfigError {
     /// An invalid argument was provided.
-    #[error("Invalid argument `{arg}`: {reason}")]
-    InvalidArg {
-        arg: &'static str,
-        reason: &'static str,
-    },
+    #[error("{0}")]
+    InvalidArg(#[from] InvalidArg),
+}
+
+/// An invalid argument.
+#[derive(Debug, thiserror::Error)]
+#[error("invalid argument `{arg}`: {reason}")]
+pub struct InvalidArg {
+    arg: &'static str,
+    reason: &'static str,
+}
+
+impl InvalidArg {
+    pub(crate) const fn new(arg: &'static str, reason: &'static str) -> Self {
+        Self { arg, reason }
+    }
 }
 
 /// An IPC error.
 #[derive(Debug, thiserror::Error)]
 #[error("{0}")]
-pub struct IpcError(#[from] pub(crate) tarpc::client::RpcError);
+pub struct IpcError(#[from] pub(crate) IpcRepr);
+
+impl IpcError {
+    pub(crate) fn new<E>(err: E) -> Self
+    where
+        E: Into<IpcRepr>,
+    {
+        Self(err.into())
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub(crate) enum IpcRepr {
+    InvalidArg(#[from] InvalidArg),
+    Io(#[from] io::Error),
+    Tarpc(#[from] RpcError),
+}
 
 /// Possible errors that could happen when using Aranya Fast Channels.
 #[derive(Debug, thiserror::Error)]
@@ -63,15 +104,15 @@ pub enum AfcError {
     // Connection-related errors
     /// Unable to bind a network addresss.
     #[error("unable to bind address: {0}")]
-    Bind(std::io::Error),
+    Bind(io::Error),
 
     /// DNS lookup failed.
     #[error("DNS lookup failed: {0}")]
-    DnsLookup(std::io::Error),
+    DnsLookup(io::Error),
 
     /// Local address failure.
     #[error("unable to get local address: {0}")]
-    RouterAddr(std::io::Error),
+    RouterAddr(io::Error),
 
     /// Unable to parse shm path.
     #[error("unable to parse shared memory path: {0}")]
@@ -83,31 +124,31 @@ pub enum AfcError {
 
     /// Unable to accept a TCP stream.
     #[error("unable to accept to TCP stream: {0}")]
-    StreamAccept(std::io::Error),
+    StreamAccept(io::Error),
 
     /// Unable to create a TCP stream.
     #[error("unable to connect to TCP stream: {0}")]
-    StreamConnect(std::io::Error),
+    StreamConnect(io::Error),
 
     /// Unable to read from TCP stream.
     #[error("unable to read from TCP stream: {0}")]
-    StreamRead(std::io::Error),
+    StreamRead(io::Error),
 
     /// Unable to write to TCP stream.
     #[error("unable to write to TCP stream: {0}")]
-    StreamWrite(std::io::Error),
+    StreamWrite(io::Error),
 
     /// Unable to shutdown TCP stream.
     #[error("unable to shutdown TCP stream: {0}")]
-    StreamShutdown(std::io::Error),
+    StreamShutdown(io::Error),
 
     /// Unable to get the remote peer's address.
     #[error("unable to get remote peer's address: {0}")]
-    StreamPeerAddr(std::io::Error),
+    StreamPeerAddr(io::Error),
 
     /// The stream was not found.
     #[error("stream not found: {0}")]
-    StreamNotFound(std::net::SocketAddr),
+    StreamNotFound(net::SocketAddr),
 
     // Protocol-related errors
     /// Invalid AFC header.
@@ -177,98 +218,13 @@ pub enum AfcError {
 
 /// Possible errors that could happen when using Aranya QUIC Channels.
 #[derive(Debug, thiserror::Error)]
+#[non_exhaustive]
 pub enum AqcError {
-    #[error("unable to create channel")]
-    ChannelCreation(anyhow::Error),
-
-    #[error("unable to parse encap")]
-    Encap(anyhow::Error),
-
-    // Connection-related errors
-    /// Unable to bind a network addresss.
-    #[error("unable to bind address: {0}")]
-    Bind(std::io::Error),
-
-    /// DNS lookup failed.
-    #[error("DNS lookup failed: {0}")]
-    DnsLookup(std::io::Error),
-
-    /// Local address failure.
-    #[error("unable to get local address: {0}")]
-    RouterAddr(std::io::Error),
-
-    /// Unable to parse shm path.
-    #[error("unable to parse shared memory path: {0}")]
-    ShmPathParse(aranya_fast_channels::shm::InvalidPathError),
-
-    /// Unable to open the shm read state.
-    #[error("unable to open shared memory `ReadState`: {0}")]
-    ShmReadState(anyhow::Error),
-
-    /// Unable to accept a QUIC stream.
-    #[error("unable to accept to QUIC stream: {0}")]
-    StreamAccept(std::io::Error),
-
-    /// Unable to create a QUIC stream.
-    #[error("unable to connect to QUIC stream: {0}")]
-    StreamConnect(std::io::Error),
-
-    /// Unable to read from QUIC stream.
-    #[error("unable to read from QUIC stream: {0}")]
-    StreamRead(std::io::Error),
-
-    /// Unable to write to QUIC stream.
-    #[error("unable to write to QUIC stream: {0}")]
-    StreamWrite(std::io::Error),
-
-    /// Unable to shutdown QUIC stream.
-    #[error("unable to shutdown QUIC stream: {0}")]
-    StreamShutdown(std::io::Error),
-
-    /// Unable to get the remote peer's address.
-    #[error("unable to get remote peer's address: {0}")]
-    StreamPeerAddr(std::io::Error),
-
-    /// The stream was not found.
-    #[error("stream not found: {0}")]
-    StreamNotFound(std::net::SocketAddr),
-
-    /// The message length prefix was larger than the maximum
-    /// allowed size.
-    #[error("message too large: {got} > {max}")]
-    MsgTooLarge { got: usize, max: usize },
-
-    /// Payload is too small to be ciphertext.
-    #[error("payload is too small to be ciphertext")]
-    PayloadTooSmall,
-
-    /// AQC message decryption failure.
-    #[error("decryption failure: {0}")]
-    Decryption(aranya_fast_channels::Error),
-
-    /// AQC message encryption failure.
-    #[error("encryption failure: {0}")]
-    Encryption(aranya_fast_channels::Error),
-
-    /// Serde serialization/deserialization error.
-    #[error("serialization/deserialization error: {0}")]
-    Serde(postcard::Error),
-
-    /// AQC version mismatch.
-    #[error("AQC version mismatch: got {actual:?}, expected {expected:?}")]
-    VersionMismatch {
-        expected: AqcVersion,
-        actual: AqcVersion,
-    },
-
-    // General errors
-    /// Some other error.
-    #[error("{0}")]
-    Other(#[from] anyhow::Error),
-
     /// An internal bug was discovered.
     #[error("internal bug: {0}")]
     Bug(#[from] buggy::Bug),
-}
 
-pub type Result<T, E = Error> = core::result::Result<T, E>;
+    /// Some other error.
+    #[error("{0}")]
+    Other(#[from] anyhow::Error),
+}

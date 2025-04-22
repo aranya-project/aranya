@@ -8,8 +8,8 @@ use tarpc::context;
 use tracing::{debug, instrument};
 
 use crate::{
-    error::{AqcError, IpcError},
-    Result,
+    error::{aranya_error, AqcError, IpcError},
+    Client, Result,
 };
 
 /// Sends and receives AQC messages.
@@ -33,11 +33,11 @@ impl fmt::Debug for AqcChannelsImpl {
 /// sending data between peers.
 #[derive(Debug)]
 pub struct AqcChannels<'a> {
-    client: &'a mut crate::Client,
+    client: &'a mut Client,
 }
 
 impl<'a> AqcChannels<'a> {
-    pub(crate) fn new(client: &'a mut crate::Client) -> Self {
+    pub(crate) fn new(client: &'a mut Client) -> Self {
         Self { client }
     }
 
@@ -60,7 +60,7 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> Result<(AqcBidiChannelId, AqcCtrl)> {
+    ) -> Result<AqcBidiChannelId> {
         debug!("creating bidi channel");
 
         let (ctrl, psk) = self
@@ -68,14 +68,16 @@ impl<'a> AqcChannels<'a> {
             .daemon
             .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), label_id)
             .await
-            .map_err(IpcError)??;
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
         debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
 
-        let chan_id = psk.identity;
+        let chan_id = psk.identity.into();
 
         // TODO: send ctrl msg via network.
+        let _ = ctrl;
 
-        Ok((chan_id.into(), ctrl))
+        Ok(chan_id)
     }
 
     /// Creates a unidirectional AQC channel with a peer.
@@ -92,7 +94,7 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> Result<(AqcUniChannelId, AqcCtrl)> {
+    ) -> Result<AqcUniChannelId> {
         debug!("creating aqc uni channel");
 
         let (ctrl, psk) = self
@@ -100,56 +102,60 @@ impl<'a> AqcChannels<'a> {
             .daemon
             .create_aqc_uni_channel(context::current(), team_id, peer.clone(), label_id)
             .await
-            .map_err(IpcError)??;
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
         debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
 
-        let chan_id = psk.identity;
+        let chan_id = psk.identity.into();
 
         // TODO: send ctrl msg via network.
+        let _ = ctrl;
 
-        Ok((chan_id.into(), ctrl))
+        Ok(chan_id)
     }
 
     /// Deletes an AQC bidi channel.
     // It is an error if the channel does not exist
-    #[instrument(skip_all, fields(chan = %chan))]
+    #[instrument(skip_all, fields(%chan))]
     pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannelId) -> Result<()> {
         let _ctrl = self
             .client
             .daemon
             .delete_aqc_bidi_channel(context::current(), chan)
             .await
-            .map_err(IpcError)??;
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
         // TODO(geoff): implement this
-        //self.client.aqc.remove_channel(chan).await;
-        Ok(())
+        todo!()
     }
 
     /// Deletes an AQC uni channel.
     // It is an error if the channel does not exist
-    #[instrument(skip_all, fields(chan = %chan))]
+    #[instrument(skip_all, fields(%chan))]
     pub async fn delete_uni_channel(&mut self, chan: AqcUniChannelId) -> Result<()> {
         let _ctrl = self
             .client
             .daemon
             .delete_aqc_uni_channel(context::current(), chan)
             .await
-            .map_err(IpcError)??;
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
         // TODO(geoff): implement this
-        //self.client.aqc.remove_channel(chan).await;
-        Ok(())
+        todo!()
     }
 
     /// Receives an AQC ctrl message.
     // TODO: this method is pub for testing.
     // In final AQC implementation, it will only be invoked when a ctrl msg is received via the network.
+    #[instrument(skip_all, fields(%team))]
     pub async fn receive_aqc_ctrl(&mut self, team: TeamId, ctrl: AqcCtrl) -> Result<()> {
         let (_net_id, psk) = self
             .client
             .daemon
             .receive_aqc_ctrl(context::current(), team, ctrl)
             .await
-            .map_err(IpcError)??;
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
 
         match psk {
             AqcPsk::Bidi(psk) => {
@@ -160,6 +166,6 @@ impl<'a> AqcChannels<'a> {
             }
         }
 
-        Ok(())
+        todo!()
     }
 }

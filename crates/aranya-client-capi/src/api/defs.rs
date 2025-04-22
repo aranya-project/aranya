@@ -49,17 +49,13 @@ pub enum Error {
     #[capi(msg = "invalid address")]
     InvalidAddr,
 
-    /// Error connecting to daemon.
-    #[capi(msg = "could not connect to daemon")]
-    Connecting,
-
     /// Could not send request to daemon.
     #[capi(msg = "could not send request to daemon")]
     Ipc,
 
-    /// Daemon reported error.
-    #[capi(msg = "daemon reported error")]
-    Daemon,
+    /// An Aranya error.
+    #[capi(msg = "Aranya error")]
+    Aranya,
 
     /// AFC library error.
     #[capi(msg = "AFC library error")]
@@ -94,9 +90,8 @@ impl From<&imp::Error> for Error {
             imp::Error::Addr(_) => Self::InvalidAddr,
             imp::Error::BufferTooSmall => Self::BufferTooSmall,
             imp::Error::Client(err) => match err {
-                aranya_client::Error::Connecting(_) => Self::Connecting,
                 aranya_client::Error::Ipc(_) => Self::Ipc,
-                aranya_client::Error::Daemon(_) => Self::Daemon,
+                aranya_client::Error::Aranya(_) => Self::Aranya,
                 #[cfg(feature = "afc")]
                 aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Aqc(_) => Self::Aqc,
@@ -1498,7 +1493,7 @@ pub unsafe fn aqc_create_bidi_channel(
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
-    let (chan_id, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
+    let chan_id = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
         peer,
         label_id.into(),

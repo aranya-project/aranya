@@ -85,32 +85,45 @@ impl<CS: CipherSuite> Ctx<CS> {
         })
     }
 
-    fn encrypt<Item, SinkItem>(&mut self, item: SinkItem, ad: &[u8]) -> io::Result<Data>
+    fn make_ad(base: &[u8; 14], seq: Seq) -> [u8; 8 + 14] {
+        // ad = seq || base_ad
+        let mut ad = [0; 8 + 14];
+        ad[..8].copy_from_slice(&seq.to_u64().to_le_bytes());
+        ad[8..].copy_from_slice(base);
+        ad
+    }
+
+    fn encrypt<Item, SinkItem>(&mut self, item: SinkItem, ad: &[u8; 14]) -> io::Result<Data>
     where
         SinkItem: Serialize,
     {
         let mut codec = MessagePack::<Item, SinkItem>::default();
         let mut plaintext = BytesMut::from(pin!(codec).serialize(&item)?);
         let mut tag = BytesMut::from(&*Tag::<CS::Aead>::default());
-        self.seal
-            .seal_in_place(&mut plaintext, &mut tag, ad)
+        let ad = Self::make_ad(ad, self.seal.seq());
+        let seq = self
+            .seal
+            .seal_in_place(&mut plaintext, &mut tag, &ad)
             .map_err(other)?;
         Ok(Data {
+            seq: seq.to_u64(),
             ciphertext: plaintext,
             tag: tag.freeze(),
         })
     }
 
-    fn decrypt<Item, SinkItem>(&mut self, data: Data, ad: &[u8]) -> io::Result<Item>
+    fn decrypt<Item, SinkItem>(&mut self, data: Data, ad: &[u8; 14]) -> io::Result<Item>
     where
         Item: DeserializeOwned,
     {
         let Data {
+            seq,
             mut ciphertext,
             tag,
         } = data;
+        let ad = Self::make_ad(ad, Seq::new(seq));
         self.open
-            .open_in_place(&mut ciphertext, &tag, ad)
+            .open_in_place_at(&mut ciphertext, &tag, &ad, Seq::new(seq))
             .map_err(other)?;
         let mut codec = MessagePack::<Item, SinkItem>::default();
         let item = pin!(codec).deserialize(&ciphertext)?;
@@ -133,8 +146,8 @@ where
 
 const SERVER_KEY_CTX: &[u8] = b"aranya daemon api server seal key";
 const SERVER_NONCE_CTX: &[u8] = b"aranya daemon api server seal nonce";
-const SERVER_SEAL_AD: &[u8] = b"server seal ad";
-const CLIENT_SEAL_AD: &[u8] = b"client seal ad";
+const SERVER_SEAL_AD: &[u8; 14] = b"server seal ad";
+const CLIENT_SEAL_AD: &[u8; 14] = b"client seal ad";
 
 /// Creates a client-side transport.
 pub fn client<S, R, CS, Item, SinkItem>(
@@ -146,10 +159,7 @@ pub fn client<S, R, CS, Item, SinkItem>(
 ) -> ClientConn<S, R, CS, Item, SinkItem>
 where
     S: AsyncRead + AsyncWrite,
-    R: Csprng,
     CS: CipherSuite,
-    Item: for<'de> Deserialize<'de>,
-    SinkItem: Serialize,
 {
     ClientConn {
         inner: serde_transport::new(Framed::new(io, codec), MessagePack::default()),
@@ -166,11 +176,11 @@ where
 #[pin_project]
 pub struct ClientConn<S, R, CS, Item, SinkItem>
 where
-    S: AsyncRead + AsyncWrite,
     CS: CipherSuite,
 {
     #[pin]
     inner: Transport<S, ServerMsg, ClientMsg, MessagePack<ServerMsg, ClientMsg>>,
+    /// For rekeying.
     rng: R,
     /// The server's public key.
     pk: PublicApiKey<CS>,
@@ -201,7 +211,6 @@ where
 
 impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
 where
-    S: AsyncRead + AsyncWrite,
     CS: CipherSuite,
     Item: DeserializeOwned,
 {
@@ -217,7 +226,6 @@ where
 
 impl<S, R, CS, Item, SinkItem> ClientConn<S, R, CS, Item, SinkItem>
 where
-    S: AsyncRead + AsyncWrite,
     R: Csprng,
     CS: CipherSuite,
 {
@@ -303,7 +311,6 @@ where
 
 impl<S, R, CS, Item, SinkItem> fmt::Debug for ClientConn<S, R, CS, Item, SinkItem>
 where
-    S: AsyncRead + AsyncWrite,
     CS: CipherSuite,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -325,6 +332,7 @@ enum ClientMsg {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct Data {
+    seq: u64,
     ciphertext: BytesMut,
     tag: Bytes,
 }
@@ -363,7 +371,9 @@ where
     #[pin]
     listener: L,
     codec: LengthDelimitedCodec,
+    /// The server's secret key.
     sk: Arc<ApiKey<CS>>,
+    /// The "info" parameter when rekeying.
     info: Arc<[u8]>,
     _marker: PhantomData<fn() -> (Item, SinkItem)>,
 }
@@ -398,12 +408,13 @@ where
 #[pin_project]
 pub struct ServerConn<S, CS, Item, SinkItem>
 where
-    S: AsyncRead + AsyncWrite,
     CS: CipherSuite,
 {
     #[pin]
     inner: Transport<S, ClientMsg, ServerMsg, MessagePack<ClientMsg, ServerMsg>>,
+    /// The server's secret key.
     sk: Arc<ApiKey<CS>>,
+    /// The "info" parameter when rekeying.
     info: Arc<[u8]>,
     ctx: Option<Ctx<CS>>,
     _marker: PhantomData<fn() -> (Item, SinkItem)>,
@@ -411,7 +422,6 @@ where
 
 impl<S, CS, Item, SinkItem> ServerConn<S, CS, Item, SinkItem>
 where
-    S: AsyncRead + AsyncWrite,
     CS: CipherSuite,
     SinkItem: Serialize,
 {
@@ -427,7 +437,6 @@ where
 
 impl<S, CS, Item, SinkItem> ServerConn<S, CS, Item, SinkItem>
 where
-    S: AsyncRead + AsyncWrite,
     CS: CipherSuite,
     Item: DeserializeOwned,
 {
@@ -443,7 +452,6 @@ where
 
 impl<S, CS, Item, SinkItem> ServerConn<S, CS, Item, SinkItem>
 where
-    S: AsyncRead + AsyncWrite,
     CS: CipherSuite,
 {
     fn rekey(&mut self, enc: &[u8]) -> Result<(), HpkeError> {
@@ -505,7 +513,6 @@ where
 
 impl<S, CS, Item, SinkItem> fmt::Debug for ServerConn<S, CS, Item, SinkItem>
 where
-    S: AsyncRead + AsyncWrite,
     CS: CipherSuite,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -600,6 +607,7 @@ mod tests {
         v: usize,
     }
 
+    /// Basic one client, one server ping pong test.
     #[tokio::test(flavor = "multi_thread")]
     async fn test_ping_pong() {
         let dir = tempfile::tempdir().unwrap();
@@ -610,7 +618,7 @@ mod tests {
         let sk = ApiKey::<CS>::new(&mut eng);
         let pk = sk.public().unwrap();
 
-        const N: usize = 100;
+        const MAX_PING_PONGS: usize = 100;
 
         let mut set = JoinSet::new();
 
@@ -618,7 +626,7 @@ mod tests {
             let path = Arc::clone(&path);
             let info = Arc::clone(&info);
             set.spawn(async move {
-                let listener = UnixListener::bind(&*path).unwrap();
+                let listener = UnixListener::bind(&*path)?;
                 let codec = LengthDelimitedCodec::builder()
                     .max_frame_length(usize::MAX)
                     .new_codec();
@@ -628,23 +636,19 @@ mod tests {
                     sk,
                     &*info,
                 );
-                let mut want = Ping { v: 0 };
-                let mut n = 0;
-                while let Some(mut conn) = server.try_next().await? {
-                    while let Some(got) = conn.try_next().await? {
-                        assert_eq!(got, want);
-                        let pong = Pong {
-                            v: got.v.wrapping_add(1),
-                        };
-                        conn.send(pong).await?;
-                        want = Ping { v: pong.v };
-                        n += 1;
-                        if n >= N {
-                            return Ok(());
-                        }
-                    }
+
+                let mut conn = server.try_next().await.unwrap().unwrap();
+                for v in 0..MAX_PING_PONGS {
+                    let got = conn.try_next().await?.ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::UnexpectedEof, "stream finished early")
+                    })?;
+                    assert_eq!(got, Ping { v });
+                    conn.send(Pong {
+                        v: got.v.wrapping_add(1),
+                    })
+                    .await?;
                 }
-                Ok::<_, io::Error>(())
+                io::Result::Ok(())
             });
         }
 
@@ -660,9 +664,11 @@ mod tests {
                     .await
                     .unwrap();
                 let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &*info);
-                for v in 0..N {
-                    client.send(Ping { v }).await.unwrap();
-                    let got = client.try_next().await.unwrap().unwrap();
+                for v in 0..MAX_PING_PONGS {
+                    client.send(Ping { v }).await?;
+                    let got = client.try_next().await?.ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::UnexpectedEof, "stream finished early")
+                    })?;
                     let want = Pong {
                         v: v.wrapping_add(1),
                     };
@@ -685,6 +691,7 @@ mod tests {
         }
     }
 
+    /// One client rekeys each request.
     #[tokio::test(flavor = "multi_thread")]
     async fn test_rekey() {
         let dir = tempfile::tempdir().unwrap();
@@ -695,7 +702,7 @@ mod tests {
         let sk = ApiKey::<CS>::new(&mut eng);
         let pk = sk.public().unwrap();
 
-        const N: usize = 100;
+        const MAX_PING_PONGS: usize = 100;
 
         let mut set = JoinSet::new();
 
@@ -713,35 +720,28 @@ mod tests {
                     sk,
                     &*info,
                 );
-                let mut want = Ping { v: 0 };
-                let mut n = 0;
-                while let Some(mut conn) = server.try_next().await? {
-                    while let Some(got) = conn.try_next().await? {
-                        // In this test the client rekeys each
-                        // time it sends data, so our seq number
-                        // should always be zero.
-                        let ctx = conn.ctx.as_ref().map(|ctx| &ctx.seal).unwrap();
-                        assert_eq!(ctx.seq(), Seq::ZERO);
+                let mut conn = server.try_next().await.unwrap().unwrap();
+                for v in 0..MAX_PING_PONGS {
+                    let got = conn.try_next().await?.ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::UnexpectedEof, "stream finished early")
+                    })?;
+                    // In this test the client rekeys each time
+                    // it sends data, so our seq number should
+                    // always be zero.
+                    let ctx = conn.ctx.as_ref().map(|ctx| &ctx.seal).unwrap();
+                    assert_eq!(ctx.seq(), Seq::ZERO);
 
-                        assert_eq!(got, want);
-                        let pong = Pong {
-                            v: got.v.wrapping_add(1),
-                        };
-                        conn.send(pong).await?;
+                    assert_eq!(got, Ping { v });
+                    conn.send(Pong {
+                        v: got.v.wrapping_add(1),
+                    })
+                    .await?;
 
-                        // Double check that it actually
-                        // increments.
-                        let ctx = conn.ctx.as_ref().map(|ctx| &ctx.seal).unwrap();
-                        assert_eq!(ctx.seq(), Seq::new(1));
-
-                        want = Ping { v: pong.v };
-                        n += 1;
-                        if n >= N {
-                            return Ok(());
-                        }
-                    }
+                    // Double check that it actually increments.
+                    let ctx = conn.ctx.as_ref().map(|ctx| &ctx.seal).unwrap();
+                    assert_eq!(ctx.seq(), Seq::new(1));
                 }
-                Ok::<_, io::Error>(())
+                io::Result::Ok(())
             });
         }
 
@@ -757,14 +757,114 @@ mod tests {
                     .await
                     .unwrap();
                 let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &*info);
-                for v in 0..N {
+                for v in 0..MAX_PING_PONGS {
                     client.force_rekey();
                     client.send(Ping { v }).await.unwrap();
-                    let got = client.try_next().await.unwrap().unwrap();
+                    let got = client.try_next().await?.ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::UnexpectedEof, "stream finished early")
+                    })?;
                     let want = Pong {
                         v: v.wrapping_add(1),
                     };
                     assert_eq!(got, want)
+                }
+                Ok(())
+            });
+        }
+
+        while let Some(res) = set.join_next().await {
+            match res {
+                Ok(Ok(())) => {}
+                Ok(Err(err)) => {
+                    set.abort_all();
+                    panic!("{err}");
+                }
+                Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
+                Err(err) => panic!("{err}"),
+            }
+        }
+    }
+
+    /// N clients make repeated requests to one server.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_multi_client() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = Arc::new(dir.path().to_path_buf().join("sock"));
+        let info = Arc::from(path.as_os_str().as_encoded_bytes());
+
+        let (mut eng, _) = DefaultEngine::from_entropy(Rng);
+        let sk = ApiKey::<CS>::new(&mut eng);
+        let pk = sk.public().unwrap();
+
+        const MAX_PING_PONGS: usize = 2;
+        const MAX_CLIENTS: usize = 10;
+
+        let mut set = JoinSet::new();
+
+        {
+            let path = Arc::clone(&path);
+            let info = Arc::clone(&info);
+            set.spawn(async move {
+                let listener = UnixListener::bind(&*path).unwrap();
+                let codec = LengthDelimitedCodec::builder()
+                    .max_frame_length(usize::MAX)
+                    .new_codec();
+                let mut server = server::<_, _, Ping, Pong>(
+                    unix::UnixListenerStream::from(listener),
+                    codec.clone(),
+                    sk,
+                    &*info,
+                );
+                let mut set = JoinSet::new();
+                for _ in 0..MAX_CLIENTS {
+                    let mut conn = server.try_next().await?.unwrap();
+                    set.spawn(async move {
+                        for v in 0..MAX_PING_PONGS {
+                            let got = conn.try_next().await?.ok_or_else(|| {
+                                io::Error::new(
+                                    io::ErrorKind::UnexpectedEof,
+                                    "client stream finished early",
+                                )
+                            })?;
+                            assert_eq!(got, Ping { v });
+                            conn.send(Pong {
+                                v: got.v.wrapping_add(1),
+                            })
+                            .await?;
+                        }
+                        io::Result::Ok(())
+                    });
+                }
+                set.join_all()
+                    .await
+                    .into_iter()
+                    .find(|v| v.is_err())
+                    .unwrap_or(Ok(()))
+            });
+        }
+
+        for _ in 0..10 {
+            let path = Arc::clone(&path);
+            let info = Arc::clone(&info);
+            let pk = pk.clone();
+            set.spawn(async move {
+                let codec = LengthDelimitedCodec::builder()
+                    .max_frame_length(usize::MAX)
+                    .new_codec();
+                let sock = (|| UnixStream::connect(&*path))
+                    .retry(ExponentialBuilder::default())
+                    .await
+                    .unwrap();
+                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &*info);
+                for v in 0..MAX_PING_PONGS {
+                    client.send(Ping { v }).await?;
+                    let got = client.try_next().await?.ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::UnexpectedEof, "server stream finished early")
+                    })?;
+                    let want = Pong {
+                        v: v.wrapping_add(1),
+                    };
+                    assert_eq!(got, want);
                 }
                 Ok(())
             });

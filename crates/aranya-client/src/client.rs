@@ -29,7 +29,7 @@ use crate::afc::{setup_afc_shm, FastChannels, FastChannelsImpl};
 use crate::{
     aqc::{AqcChannels, AqcChannelsImpl},
     config::{SyncPeerConfig, TeamConfig},
-    error::{Error, IpcError, Result},
+    error::{aranya_error, InvalidArg, IpcError, Result},
 };
 
 /// List of device IDs.
@@ -101,16 +101,18 @@ impl ClientBuilder<'_> {
     /// Connects to the daemon.
     pub async fn connect(self) -> Result<Client> {
         let Some(sock) = self.uds_path else {
-            return Err(Error::Connecting(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "UDS socket not specified",
-            )));
+            return Err(IpcError::new(InvalidArg::new(
+                "with_daemon_uds_path",
+                "must specify the daemon's UDS path",
+            ))
+            .into());
         };
         let Some(pk) = &self.pk else {
-            return Err(Error::Connecting(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "UDS socket not specified",
-            )));
+            return Err(IpcError::new(InvalidArg::new(
+                "with_daemon_api_pk",
+                "must specify the daemon's public key",
+            ))
+            .into());
         };
         Client::connect(sock, pk).await
     }
@@ -159,9 +161,10 @@ impl Client {
     async fn connect(path: &Path, pk: &[u8]) -> Result<Self> {
         info!("starting Aranya client");
 
-        let sock = UnixStream::connect(path).await?;
+        let sock = UnixStream::connect(path).await.map_err(IpcError::new)?;
         let pk = PublicApiKey::<CS>::decode(pk)
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
+            .map_err(IpcError::new)?;
         let info = path.as_os_str().as_encoded_bytes();
         let codec = LengthDelimitedCodec::builder()
             .max_frame_length(usize::MAX)
@@ -174,13 +177,15 @@ impl Client {
         let got = daemon
             .version(context::current())
             .await
-            .map_err(IpcError)??;
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
         let want = env!("CARGO_PKG_VERSION");
         if got != want {
-            return Err(Error::Connecting(io::Error::new(
+            return Err(IpcError::new(io::Error::new(
                 io::ErrorKind::Unsupported,
                 format!("version mismatch: `{got}` != `{want}`"),
-            )));
+            ))
+            .into());
         }
 
         let aqc = AqcChannelsImpl::new().await?;
@@ -193,8 +198,8 @@ impl Client {
         self.daemon
             .aranya_local_addr(context::current())
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Gets the public key bundle for this device.
@@ -202,8 +207,8 @@ impl Client {
         self.daemon
             .get_key_bundle(context::current())
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Gets the public device ID for this device.
@@ -211,8 +216,8 @@ impl Client {
         self.daemon
             .get_device_id(context::current())
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Create a new graph/team with the current device as the owner.
@@ -220,8 +225,8 @@ impl Client {
         self.daemon
             .create_team(context::current(), cfg.into())
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Add a team to the local device store.
@@ -229,8 +234,8 @@ impl Client {
         self.daemon
             .add_team(context::current(), team, cfg.into())
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Remove a team from the local device store.
@@ -282,8 +287,8 @@ impl Team<'_> {
             .daemon
             .add_sync_peer(context::current(), addr, self.id, config.into())
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Immediately syncs with the peer.
@@ -295,8 +300,8 @@ impl Team<'_> {
             .daemon
             .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Removes a peer from automatic Aranya state syncing.
@@ -305,8 +310,8 @@ impl Team<'_> {
             .daemon
             .remove_sync_peer(context::current(), addr, self.id)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Close the team and stop all operations on the graph.
@@ -315,8 +320,8 @@ impl Team<'_> {
             .daemon
             .close_team(context::current(), self.id)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Add a device to the team with the default `Member` role.
@@ -325,8 +330,8 @@ impl Team<'_> {
             .daemon
             .add_device_to_team(context::current(), self.id, keys)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Remove a device from the team.
@@ -335,8 +340,8 @@ impl Team<'_> {
             .daemon
             .remove_device_from_team(context::current(), self.id, device)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Assign a role to a device.
@@ -345,8 +350,8 @@ impl Team<'_> {
             .daemon
             .assign_role(context::current(), self.id, device, role)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Revoke a role from a device. This sets the device's role back to the default `Member` role.
@@ -355,8 +360,8 @@ impl Team<'_> {
             .daemon
             .revoke_role(context::current(), self.id, device, role)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Associate a network identifier to a device for use with AFC.
@@ -374,8 +379,8 @@ impl Team<'_> {
             .daemon
             .assign_afc_net_identifier(context::current(), self.id, device, net_identifier)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Disassociate an AFC network identifier from a device.
@@ -389,8 +394,8 @@ impl Team<'_> {
             .daemon
             .remove_afc_net_identifier(context::current(), self.id, device, net_identifier)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Associate a network identifier to a device for use with AQC.
@@ -407,8 +412,8 @@ impl Team<'_> {
             .daemon
             .assign_aqc_net_identifier(context::current(), self.id, device, net_identifier)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Disassociate an AQC network identifier from a device.
@@ -421,8 +426,8 @@ impl Team<'_> {
             .daemon
             .remove_aqc_net_identifier(context::current(), self.id, device, net_identifier)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Create an Aranya Fast Channels (AFC) label.
@@ -431,8 +436,8 @@ impl Team<'_> {
             .daemon
             .create_afc_label(context::current(), self.id, label)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Delete an Aranya Fast Channels (AFC) label.
@@ -441,8 +446,8 @@ impl Team<'_> {
             .daemon
             .delete_afc_label(context::current(), self.id, label)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Assign an Aranya Fast Channels (AFC) label to a device.
@@ -454,8 +459,8 @@ impl Team<'_> {
             .daemon
             .assign_afc_label(context::current(), self.id, device, label)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Revoke an Aranya Fast Channels (AFC) label from a device.
@@ -464,8 +469,8 @@ impl Team<'_> {
             .daemon
             .revoke_afc_label(context::current(), self.id, device, label)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Create a label.
@@ -474,8 +479,8 @@ impl Team<'_> {
             .daemon
             .create_label(context::current(), self.id, label_name)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Delete a label.
@@ -484,8 +489,8 @@ impl Team<'_> {
             .daemon
             .delete_label(context::current(), self.id, label_id)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Assign a label to a device.
@@ -499,8 +504,8 @@ impl Team<'_> {
             .daemon
             .assign_label(context::current(), self.id, device, label_id, op)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Revoke a label from a device.
@@ -509,8 +514,8 @@ impl Team<'_> {
             .daemon
             .revoke_label(context::current(), self.id, device, label_id)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 }
 
@@ -527,7 +532,8 @@ impl Queries<'_> {
             .daemon
             .query_devices_on_team(context::current(), self.id)
             .await
-            .map_err(IpcError)??;
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
         Ok(Devices { data })
     }
 
@@ -537,8 +543,8 @@ impl Queries<'_> {
             .daemon
             .query_device_role(context::current(), self.id, device)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Returns the keybundle of the current device.
@@ -547,8 +553,8 @@ impl Queries<'_> {
             .daemon
             .query_device_keybundle(context::current(), self.id, device)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Returns a list of labels assiged to the current device.
@@ -558,7 +564,8 @@ impl Queries<'_> {
             .daemon
             .query_device_label_assignments(context::current(), self.id, device)
             .await
-            .map_err(IpcError)??;
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
         Ok(Labels { data })
     }
 
@@ -570,7 +577,7 @@ impl Queries<'_> {
             .daemon
             .query_device_afc_label_assignments(context::current(), self.id, device)
             .await
-            .map_err(IpcError)??;
+            .map_err(IpcError::new)??;
         Ok(AfcLabels { data })
     }
 
@@ -581,8 +588,8 @@ impl Queries<'_> {
             .daemon
             .query_afc_net_identifier(context::current(), self.id, device)
             .await
-            .map_err(IpcError)
-            .map_err(Into::into)
+            .map_err(IpcError::new)
+            .map_err(aranya_error)
     }
 
     /// Returns the AQC network identifier assigned to the current device.
@@ -591,8 +598,8 @@ impl Queries<'_> {
             .daemon
             .query_aqc_net_identifier(context::current(), self.id, device)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Returns whether a label exists.
@@ -601,8 +608,8 @@ impl Queries<'_> {
             .daemon
             .query_label_exists(context::current(), self.id, label_id)
             .await
-            .map_err(IpcError)?
-            .map_err(Into::into)
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Returns a list of labels on the team.
@@ -612,7 +619,8 @@ impl Queries<'_> {
             .daemon
             .query_labels(context::current(), self.id)
             .await
-            .map_err(IpcError)??;
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
         Ok(Labels { data })
     }
 
@@ -623,7 +631,7 @@ impl Queries<'_> {
             .daemon
             .query_afc_label_exists(context::current(), self.id, label)
             .await
-            .map_err(IpcError)
-            .map_err(Into::into)
+            .map_err(IpcError::new)
+            .map_err(aranya_error)
     }
 }

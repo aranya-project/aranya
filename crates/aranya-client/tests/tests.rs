@@ -424,7 +424,7 @@ async fn test_sync_now() -> Result<()> {
     // Now, we try to assign a role using the admin, which is expected to fail.
     match admin.assign_role(team.operator.id, Role::Operator).await {
         Ok(_) => bail!("Expected role assignment to fail"),
-        Err(aranya_client::Error::Daemon(_)) => {}
+        Err(aranya_client::Error::Aranya(_)) => {}
         Err(_) => bail!("Unexpected error"),
     }
 
