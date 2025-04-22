@@ -35,7 +35,6 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
-aranya-afc-util = { version = "0.7.0", features = ["alloc"] }
 aranya-aqc-util = { version = "0.2.0", features = ["alloc"] }
 aranya-capi-core = { version = "0.3.0" }
 aranya-capi-codegen = { version = "0.2.3" }
@@ -45,7 +44,6 @@ aranya-device-ffi = { version = "0.7.0" }
 aranya-envelope-ffi = { version = "0.7.0" }
 aranya-fast-channels = { version = "0.6.0", features = ["posix", "std", "memory"] }
 aranya-idam-ffi = { version = "0.7.0" }
-aranya-libc = { version = "0.2.0" }
 aranya-perspective-ffi = { version = "0.7.0" }
 aranya-policy-compiler = { version = "0.7.0" }
 aranya-policy-ifgen = { version = "0.7.0", features = ["serde"] }
@@ -54,7 +52,6 @@ aranya-policy-lang = { version = "0.4.0" }
 aranya-policy-vm = { version = "0.7.0", features = ["std"] }
 aranya-runtime = { version = "0.7.0", features = ["std", "libc"] }
 
-spideroak-base58 = { version = "0.1.0" }
 buggy = { version = "0.1.0" }
 
 aranya-client = { version = "0.5.1", path = "crates/aranya-client" }
@@ -68,7 +65,6 @@ backon = { version = "1.2.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 futures-util = { version = "0.3.30" }
-libc = { version = "0.2" }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
 semver = { version = "1", features = ["serde"] }
