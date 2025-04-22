@@ -61,6 +61,7 @@ pub enum Effect {
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
     QueriedRole(QueriedRole),
+    QueryAqcNetworkNamesOutput(QueryAqcNetworkNamesOutput),
     QueriedRolePermission(QueriedRolePermission),
 }
 /// TeamCreated policy effect.
@@ -265,6 +266,12 @@ pub struct QueryAqcNetIdentifierResult {
 pub struct QueriedRole {
     pub role: Role,
 }
+/// QueryAqcNetworkNamesOutput policy effect.
+#[effect]
+pub struct QueryAqcNetworkNamesOutput {
+    pub net_identifier: String,
+    pub device_id: Id,
+}
 /// QueriedRolePermission policy effect.
 #[effect]
 pub struct QueriedRolePermission {
@@ -327,6 +334,7 @@ pub trait ActorExt {
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_roles_on_team(&mut self) -> Result<(), ClientError>;
+    fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
     fn query_device_roles(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_role_perms(&mut self, role_id: Id) -> Result<(), ClientError>;
 }

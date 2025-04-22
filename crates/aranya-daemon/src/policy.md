@@ -2248,6 +2248,48 @@ effect QueriedRole {
 }
 ```
 
+## QueryAqcNetworkNames
+
+Queries all associated AQC network names from the fact database.
+
+```policy
+action query_aqc_network_names() {
+    map AqcMemberNetworkId[device_id: ?] as f {
+        publish QueryAqcNetworkNamesCommand {
+            net_identifier: f.net_identifier,
+            device_id: f.device_id,
+        }
+    }
+}
+
+command QueryAqcNetworkNamesCommand {
+    fields {
+        net_identifier string,
+        device_id id,
+    }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+    policy {
+        finish {
+            emit QueryAqcNetworkNamesOutput {
+                net_identifier: this.net_identifier,
+                device_id: this.device_id,
+            }
+        }
+    }
+}
+
+effect QueryAqcNetworkNamesOutput {
+    net_identifier string,
+    device_id id,
+}
+```
+
+**Invariants**:
+
+- A device's net identifier will only be returned if it was created by `SetAqcNetworkName` and
+ wasn't yet removed by `UnsetAqcNetworkName`.
+
 ### QueryDeviceRoles
 
 Queries a list of roles assigned to the device.
