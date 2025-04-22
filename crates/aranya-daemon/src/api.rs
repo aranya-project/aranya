@@ -16,7 +16,7 @@ use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_daemon_api::{self as api, DaemonApi};
 use aranya_fast_channels::{Label, NodeId};
 use aranya_keygen::PublicKeys;
-use aranya_runtime::GraphId;
+use aranya_runtime::{GraphId, StorageProvider};
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::BugExt;
@@ -79,7 +79,7 @@ impl DaemonApiServer {
     #[allow(clippy::too_many_arguments)]
     #[instrument(skip_all)]
     #[cfg(feature = "afc")]
-    pub fn new(
+    pub async fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
         afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
@@ -93,6 +93,44 @@ impl DaemonApiServer {
     ) -> Result<Self> {
         info!("uds path: {:?}", daemon_sock);
         let device_id = pk.ident_pk.id()?;
+
+        let graph_ids = {
+            client
+                .aranya
+                .lock()
+                .await
+                .provider()
+                .list_graph_ids()?
+                .flatten()
+                .collect::<Vec<_>>()
+        };
+
+        #[allow(unused_mut)]
+        let mut afc_peers = BTreeMap::new();
+        #[cfg(any())]
+        for graph_id in &graph_ids {
+            let graph_peers = BiBTreeMap::new();
+            graph_peers.extend(
+                client
+                    .actions(graph_id)
+                    .query_afc_network_names_off_graph()
+                    .await?,
+            );
+            afc_peers.insert(*graph_id, graph_peers);
+        }
+
+        let mut aqc_peers = BTreeMap::new();
+        for graph_id in &graph_ids {
+            let mut graph_peers = BiBTreeMap::new();
+            graph_peers.extend(
+                client
+                    .actions(graph_id)
+                    .query_aqc_network_names_off_graph()
+                    .await?,
+            );
+            aqc_peers.insert(*graph_id, graph_peers);
+        }
+
         Ok(Self {
             daemon_sock,
             recv_effects,
@@ -104,12 +142,12 @@ impl DaemonApiServer {
                 pk,
                 peers,
                 keystore_info,
-                afc_peers: Arc::default(),
+                afc_peers: Arc::new(Mutex::new(afc_peers)),
                 afc_handler: Arc::new(Mutex::new(Handler::new(
                     device_id,
                     store.try_clone().context("unable to clone keystore")?,
                 ))),
-                aqc_peers: Arc::default(),
+                aqc_peers: Arc::new(Mutex::new(aqc_peers)),
             },
         })
     }
@@ -117,7 +155,7 @@ impl DaemonApiServer {
     /// Create new RPC server.
     #[instrument(skip_all)]
     #[cfg(not(feature = "afc"))]
-    pub fn new(
+    pub async fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
         keystore_info: api::KeyStoreInfo,
@@ -127,6 +165,30 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
     ) -> Result<Self> {
         info!("uds path: {:?}", daemon_sock);
+
+        let graph_ids = {
+            client
+                .aranya
+                .lock()
+                .await
+                .provider()
+                .list_graph_ids()?
+                .flatten()
+                .collect::<Vec<_>>()
+        };
+
+        let mut aqc_peers = BTreeMap::new();
+        for graph_id in &graph_ids {
+            let mut graph_peers = BiBTreeMap::new();
+            graph_peers.extend(
+                client
+                    .actions(graph_id)
+                    .query_aqc_network_names_off_graph()
+                    .await?,
+            );
+            aqc_peers.insert(*graph_id, graph_peers);
+        }
+
         Ok(Self {
             daemon_sock,
             recv_effects,
@@ -136,7 +198,7 @@ impl DaemonApiServer {
                 pk,
                 peers,
                 keystore_info,
-                aqc_peers: Arc::default(),
+                aqc_peers: Arc::new(Mutex::new(aqc_peers)),
             },
         })
     }
@@ -302,6 +364,7 @@ impl DaemonApiHandler {
                 Effect::QueryAqcNetIdentifierResult(_) => {}
                 Effect::QueriedLabelAssignment(_) => {}
                 Effect::QueryLabelExistsResult(_) => {}
+                Effect::QueryAqcNetworkNamesOutput(_) => {}
             }
         }
         Ok(())
