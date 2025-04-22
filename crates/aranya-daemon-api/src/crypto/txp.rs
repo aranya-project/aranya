@@ -44,6 +44,13 @@ where
 type Encap<CS> = <<CS as CipherSuite>::Kem as Kem>::Encap;
 
 /// HPKE encryption context.
+///
+/// The client creates one the first time it tries to write to
+/// the server. It sends the HPKE peer encapsulation to the
+/// server, then begins sending ciphertext.
+///
+/// The server creates one the first time it receives a HPKE peer
+/// encapsulation from the client.
 struct Ctx<CS: CipherSuite> {
     seal: SealCtx<<CS as CipherSuite>::Aead>,
     open: OpenCtx<<CS as CipherSuite>::Aead>,
@@ -156,6 +163,11 @@ impl<CS: CipherSuite> fmt::Debug for Ctx<CS> {
 }
 
 /// Generates the AD for encryption/decryption.
+///
+/// We include the sequence number in the AD per the advice in
+/// [RFC 9180] section 9.7.1.
+///
+/// [RFC 9180]: https://www.rfc-editor.org/rfc/rfc9180.html
 fn auth_data(seq: Seq, side: Side) -> [u8; 8 + 14] {
     let base = match side {
         Side::Server => b"server base ad",
@@ -198,12 +210,15 @@ where
     }
 }
 
-/// An encrypted [`Transport`][tarpc::Transport].
+/// An encrypted [`Transport`][tarpc::Transport] for the client.
+///
+/// It is created by [`client`].
 #[pin_project]
 pub struct ClientConn<S, R, CS, Item, SinkItem>
 where
     CS: CipherSuite,
 {
+    /// The underlying transport.
     #[pin]
     inner: Transport<S, ServerMsg, ClientMsg, MessagePack<ServerMsg, ClientMsg>>,
     /// For rekeying.
@@ -212,9 +227,16 @@ where
     pk: PublicApiKey<CS>,
     /// The "info" parameter when rekeying.
     info: Box<[u8]>,
+    /// This is set to `Some` the first time the conn (as
+    /// a `Sink`) is polled for readiness.
+    ///
+    /// It is periodically updated via rekeying in order to keep
+    /// the keys fresh.
     ctx: Option<Ctx<CS>>,
     /// The number of times we've rekeyed, including the initial
     /// keying.
+    ///
+    /// Mostly for debugging purposes.
     rekeys: usize,
     _marker: PhantomData<fn() -> (Item, SinkItem)>,
 }
@@ -225,6 +247,11 @@ where
     CS: CipherSuite,
     SinkItem: Serialize,
 {
+    /// Serializes `item`, encrypts and authenticates the
+    /// resulting bytes, and returns the ciphertext.
+    ///
+    /// It is an error if `self.ctx` has not yet been
+    /// initialized.
     fn encrypt(&mut self, item: SinkItem) -> io::Result<Data> {
         self.ctx
             .as_mut()
@@ -240,6 +267,11 @@ where
     CS: CipherSuite,
     Item: DeserializeOwned,
 {
+    /// Decrypts and authenticates `data`, then deserializes the
+    /// resulting plaintext and returns the resulting `Item`.
+    ///
+    /// It is an error if `self.ctx` has not yet been
+    /// initialized.
     fn decrypt(&mut self, data: Data) -> io::Result<Item> {
         self.ctx
             .as_mut()
@@ -255,7 +287,9 @@ where
     R: Csprng,
     CS: CipherSuite,
 {
-    fn update_or_init_keys(&mut self) -> Result<Option<ClientMsg>, HpkeError> {
+    /// Returns `Some` with the `Rekey` message to send to the
+    /// server if we need to rekey, or `None` otherwise.
+    fn try_rekey(&mut self) -> Result<Option<ClientMsg>, HpkeError> {
         if !self.need_rekey() {
             return Ok(None);
         }
@@ -266,6 +300,8 @@ where
         Ok(Some(msg))
     }
 
+    /// Reports whether we need to generate a new HPKE encryption
+    /// context.
     fn need_rekey(&self) -> bool {
         let Some(ctx) = self.ctx.as_ref() else {
             return true;
@@ -277,10 +313,13 @@ where
         seq >= max / 2
     }
 
-    fn rekey(&mut self) -> Result<<<CS as CipherSuite>::Kem as Kem>::Encap, HpkeError> {
+    /// Generates a new HPKE encryption context and returns the
+    /// resulting peer encapsulation.
+    fn rekey(&mut self) -> Result<Encap<CS>, HpkeError> {
         let (ctx, enc) = Ctx::client(&mut self.rng, &self.pk, &self.info)?;
         self.ctx = Some(ctx);
-        // This should never overflow.
+        // Rekeying takes so long (relatively speaking, anyway)
+        // that this should never overflow.
         self.rekeys += 1;
         Ok(enc)
     }
@@ -297,6 +336,10 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if self.ctx.is_none() {
+            // In tarpc the client always writes first. We create
+            // our encryption context the first time we write, so
+            // if we get here we haven't written yet.
+            // TODO(eric): should we return an error instead?
             return Poll::Pending;
         }
         let Some(msg) = ready!(self.as_mut().project().inner.poll_next(cx)?) else {
@@ -322,13 +365,19 @@ where
 
     fn poll_ready(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         ready!(self.as_mut().project().inner.poll_ready(cx)?);
-        if let Some(msg) = self.update_or_init_keys().map_err(other)? {
+
+        // Do we need to rekey?
+        if let Some(msg) = self.try_rekey().map_err(other)? {
+            // We updated our keys, so forward the message on to
+            // the server.
             self.as_mut().project().inner.start_send(msg)?;
+
             // Each call to `start_send` must be preceeded by
             // a call to `poll_ready`, so call `poll_ready`
             // again.
             ready!(self.as_mut().project().inner.poll_ready(cx)?);
         }
+
         Poll::Ready(Ok(()))
     }
 
@@ -408,6 +457,8 @@ where
 }
 
 /// Creates [`ServerConn`]s.
+///
+/// It is created by [`server`]
 #[derive(Debug)]
 #[pin_project]
 pub struct Server<L, CS, Item, SinkItem>
@@ -450,18 +501,29 @@ where
     }
 }
 
-/// An encrypted [`Transport`][tarpc::Transport].
+/// An encrypted [`Transport`][tarpc::Transport] for the server.
+///
+/// It is created by reading from [`Server`], which is
+/// a [`Stream`].
 #[pin_project]
 pub struct ServerConn<S, CS, Item, SinkItem>
 where
     CS: CipherSuite,
 {
+    /// The underlying transport.
     #[pin]
     inner: Transport<S, ClientMsg, ServerMsg, MessagePack<ClientMsg, ServerMsg>>,
     /// The server's secret key.
     sk: Arc<ApiKey<CS>>,
     /// The "info" parameter when rekeying.
     info: Arc<[u8]>,
+    /// The HPKE encryption context.
+    ///
+    /// This is set to `Some` after the client sends the first
+    /// `Rekey` message.
+    ///
+    /// It is periodically updated via rekeying in order to keep
+    /// the keys fresh.
     ctx: Option<Ctx<CS>>,
     _marker: PhantomData<fn() -> (Item, SinkItem)>,
 }
@@ -471,6 +533,11 @@ where
     CS: CipherSuite,
     SinkItem: Serialize,
 {
+    /// Serializes `item`, encrypts and authenticates the
+    /// resulting bytes, and returns the ciphertext.
+    ///
+    /// It is an error if `self.ctx` has not yet been
+    /// initialized.
     fn encrypt(&mut self, item: SinkItem) -> io::Result<Data> {
         self.ctx
             .as_mut()
@@ -486,6 +553,11 @@ where
     CS: CipherSuite,
     Item: DeserializeOwned,
 {
+    /// Decrypts and authenticates `data`, then deserializes the
+    /// resulting plaintext and returns the resulting `Item`.
+    ///
+    /// It is an error if `self.ctx` has not yet been
+    /// initialized.
     fn decrypt(&mut self, data: Data) -> io::Result<Item> {
         self.ctx
             .as_mut()
@@ -500,8 +572,10 @@ impl<S, CS, Item, SinkItem> ServerConn<S, CS, Item, SinkItem>
 where
     CS: CipherSuite,
 {
-    fn rekey(&mut self, enc: &[u8]) -> Result<(), HpkeError> {
-        let ctx = Ctx::server(&self.sk, &self.info, enc)?;
+    /// Updates the HPKE encryption context per the peer's
+    /// encapsulation.
+    fn rekey(&mut self, msg: Rekey) -> Result<(), HpkeError> {
+        let ctx = Ctx::server(&self.sk, &self.info, &msg.enc)?;
         self.ctx = Some(ctx);
         Ok(())
     }
@@ -516,6 +590,7 @@ where
     type Item = io::Result<Item>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        // Skip past control (i.e., non-`Data`) messages.
         loop {
             let Some(msg) = ready!(self.as_mut().project().inner.poll_next(cx)?) else {
                 return Poll::Ready(None);
@@ -525,7 +600,7 @@ where
                     let pt = self.decrypt(data)?;
                     return Poll::Ready(Some(Ok(pt)));
                 }
-                ClientMsg::Rekey(rekey) => self.rekey(&rekey.enc).map_err(other)?,
+                ClientMsg::Rekey(rekey) => self.rekey(rekey).map_err(other)?,
             }
         }
     }
@@ -577,6 +652,7 @@ enum ServerMsg {
     Data(Data),
 }
 
+/// Unix utilities.
 #[cfg(unix)]
 #[cfg_attr(docsrs, doc(cfg(unix)))]
 pub mod unix {
