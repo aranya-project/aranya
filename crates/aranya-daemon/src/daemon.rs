@@ -1,4 +1,4 @@
-use std::{io, path::Path, sync::Arc};
+use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -12,9 +12,10 @@ use aranya_daemon_api::CS;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState,
+    ClientState, StorageProvider,
 };
 use aranya_util::Addr;
+use bimap::BiBTreeMap;
 use buggy::BugExt;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
@@ -24,7 +25,7 @@ use tracing::{error, info, info_span, Instrument as _};
 use crate::{
     api::{ApiKey, DaemonApiServer, PublicApiKey},
     aqc::Aqc,
-    aranya,
+    aranya::{self, Actions},
     config::Config,
     policy,
     sync::Syncer,
@@ -117,7 +118,32 @@ impl Daemon {
             }
         });
 
-        let aqc = Aqc::new(eng, pk.ident_pk.id()?, aranya_store);
+        let graph_ids = client
+            .aranya
+            .lock()
+            .await
+            .provider()
+            .list_graph_ids()?
+            .flatten()
+            .collect::<Vec<_>>();
+
+        let aqc = {
+            let peers = {
+                let mut peers = BTreeMap::new();
+                for graph_id in &graph_ids {
+                    let graph_peers = BiBTreeMap::from_iter(
+                        client
+                            .actions(graph_id)
+                            .query_aqc_network_names_off_graph()
+                            .await?,
+                    );
+                    peers.insert(*graph_id, graph_peers);
+                }
+                peers
+            };
+            Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
+        };
+
         let api = DaemonApiServer::new(
             client,
             local_addr,

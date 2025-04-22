@@ -19,7 +19,7 @@ use aranya_daemon_api::{
     DaemonApi, CE, CS,
 };
 use aranya_keygen::PublicKeys;
-use aranya_runtime::{GraphId, StorageProvider};
+use aranya_runtime::GraphId;
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
@@ -72,7 +72,7 @@ impl DaemonApiServer {
     /// Create new `DaemonApiServer`.
     #[instrument(skip_all)]
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
         daemon_sock: PathBuf,

@@ -13,7 +13,8 @@ use bimap::BiBTreeMap;
 use tokio::sync::{Mutex, MutexGuard};
 
 /// A mapping of `Net ID <=> Device ID`, separated by `Graph ID`.
-type PeerMap = Arc<Mutex<BTreeMap<GraphId, BiBTreeMap<NetIdentifier, DeviceId>>>>;
+type PeerMap = Arc<Mutex<BTreeMap<GraphId, Peers>>>;
+type Peers = BiBTreeMap<NetIdentifier, DeviceId>;
 
 pub(crate) struct Aqc<E, KS> {
     device_id: DeviceId,
@@ -23,10 +24,13 @@ pub(crate) struct Aqc<E, KS> {
 }
 
 impl<E, KS> Aqc<E, KS> {
-    pub(crate) fn new(eng: E, device_id: DeviceId, store: KS) -> Self {
+    pub(crate) fn new<I>(eng: E, device_id: DeviceId, store: KS, peers: I) -> Self
+    where
+        I: IntoIterator<Item = (GraphId, Peers)>,
+    {
         Self {
             device_id,
-            peers: PeerMap::default(),
+            peers: Arc::new(Mutex::new(BTreeMap::from_iter(peers))),
             handler: Mutex::new(Handler::new(device_id, store)),
             eng: Mutex::new(eng),
         }
