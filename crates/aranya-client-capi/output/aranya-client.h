@@ -166,17 +166,13 @@ enum AranyaError
      */
     ARANYA_ERROR_INVALID_ADDR,
     /**
-     * Error connecting to daemon.
-     */
-    ARANYA_ERROR_CONNECTING,
-    /**
      * Could not send request to daemon.
      */
-    ARANYA_ERROR_RPC,
+    ARANYA_ERROR_IPC,
     /**
-     * Daemon reported error.
+     * An Aranya error.
      */
-    ARANYA_ERROR_DAEMON,
+    ARANYA_ERROR_ARANYA,
     /**
      * AFC library error.
      */
@@ -708,23 +704,44 @@ AranyaError aranya_client_config_builder_cleanup_ext(struct AranyaClientConfigBu
                                                      struct AranyaExtError *__ext_err);
 
 /**
- * Sets the daemon address that the Client should try to connect to.
+ * Sets UDS path that the daemon is listening on.
  *
  * @param cfg a pointer to the client config builder
  * @param address a string containing the address
  */
-AranyaError aranya_client_config_builder_set_daemon_addr(struct AranyaClientConfigBuilder *cfg,
-                                                         const char *address);
+AranyaError aranya_client_config_builder_set_daemon_uds_path(struct AranyaClientConfigBuilder *cfg,
+                                                             const char *address);
 
 /**
- * Sets the daemon address that the Client should try to connect to.
+ * Sets UDS path that the daemon is listening on.
  *
  * @param cfg a pointer to the client config builder
  * @param address a string containing the address
  */
-AranyaError aranya_client_config_builder_set_daemon_addr_ext(struct AranyaClientConfigBuilder *cfg,
-                                                             const char *address,
-                                                             struct AranyaExtError *__ext_err);
+AranyaError aranya_client_config_builder_set_daemon_uds_path_ext(struct AranyaClientConfigBuilder *cfg,
+                                                                 const char *address,
+                                                                 struct AranyaExtError *__ext_err);
+
+/**
+ * Sets the daemon's public API key.
+ *
+ * @param cfg a pointer to the client config builder
+ * @param address a string containing the address
+ */
+AranyaError aranya_client_config_builder_set_daemon_api_pk(struct AranyaClientConfigBuilder *cfg,
+                                                           const uint8_t *pk,
+                                                           size_t pk_len);
+
+/**
+ * Sets the daemon's public API key.
+ *
+ * @param cfg a pointer to the client config builder
+ * @param address a string containing the address
+ */
+AranyaError aranya_client_config_builder_set_daemon_api_pk_ext(struct AranyaClientConfigBuilder *cfg,
+                                                               const uint8_t *pk,
+                                                               size_t pk_len,
+                                                               struct AranyaExtError *__ext_err);
 
 /**
  * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Config`
@@ -1598,7 +1615,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  *
  * @param cfg a pointer to the builder for a sync config
  */
-AranyaError aranya_sync_peer_config_builder_build(const struct AranyaSyncPeerConfigBuilder *cfg,
+AranyaError aranya_sync_peer_config_builder_build(struct AranyaSyncPeerConfigBuilder *cfg,
                                                   struct AranyaSyncPeerConfig *out);
 
 /**
@@ -1606,7 +1623,7 @@ AranyaError aranya_sync_peer_config_builder_build(const struct AranyaSyncPeerCon
  *
  * @param cfg a pointer to the builder for a sync config
  */
-AranyaError aranya_sync_peer_config_builder_build_ext(const struct AranyaSyncPeerConfigBuilder *cfg,
+AranyaError aranya_sync_peer_config_builder_build_ext(struct AranyaSyncPeerConfigBuilder *cfg,
                                                       struct AranyaSyncPeerConfig *out,
                                                       struct AranyaExtError *__ext_err);
 
