@@ -339,7 +339,45 @@ AranyaError run(Team *t) {
     err = init_team(t);
     EXPECT("error initializing team", err);
 
-    // TODO(gknopf): custom roles.
+    // Create custom roles.
+    AranyaRoleId admin_role;
+    err = aranya_create_role(&t->clients.owner.client, &t->id, "admin",
+                             &admin_role);
+    EXPECT("error creating admin role", err);
+    AranyaRoleId operator_role;
+    err = aranya_create_role(&t->clients.owner.client, &t->id, "operator",
+                             &operator_role);
+    EXPECT("error creating operator role", err);
+    AranyaRoleId member_role;
+    err = aranya_create_role(&t->clients.owner.client, &t->id, "member",
+                             &member_role);
+    EXPECT("error creating member role", err);
+
+    // Assign role permissions.
+    err = aranya_assign_role_perm(&t->clients.owner.client, &t->id,
+                                  &operator_role, "SetAqcNetworkName");
+    EXPECT("error assigning SetAqcNetworkName perm", err);
+    err = aranya_assign_role_perm(&t->clients.owner.client, &t->id,
+                                  &operator_role, "UnsetAqcNetworkName");
+    EXPECT("error assigning UnsetAqcNetworkName perm", err);
+    err = aranya_assign_role_perm(&t->clients.owner.client, &t->id,
+                                  &operator_role, "CreateLabel");
+    EXPECT("error assigning CreateLabel perm", err);
+    err = aranya_assign_role_perm(&t->clients.owner.client, &t->id,
+                                  &operator_role, "AssignLabel");
+    EXPECT("error assigning AssignLabel perm", err);
+    err = aranya_assign_role_perm(&t->clients.owner.client, &t->id,
+                                  &operator_role, "RevokeLabel");
+    EXPECT("error assigning RevokeLabel perm", err);
+    err = aranya_assign_role_perm(&t->clients.owner.client, &t->id, &admin_role,
+                                  "DeleteLabel");
+    EXPECT("error assigning DeleteLabel perm", err);
+    err = aranya_assign_role_perm(&t->clients.owner.client, &t->id,
+                                  &member_role, "AqcCreateBidiChannel");
+    EXPECT("error assigning AqcCreateBidiChannel perm", err);
+    err = aranya_assign_role_perm(&t->clients.owner.client, &t->id,
+                                  &member_role, "AqcCreateUniChannel");
+    EXPECT("error assigning AqcCreateUniChannel perm", err);
 
     // add admin to team.
     AranyaPriority priority = 9000;
@@ -355,31 +393,21 @@ AranyaError run(Team *t) {
                                     t->clients.operator.pk_len);
     EXPECT("error adding operator to team", err);
 
-    // TODO: custom roles
-    /*
     // upgrade role to admin.
     err = aranya_assign_role(&t->clients.owner.client, &t->id,
-                             &t->clients.admin.id, ARANYA_ROLE_ADMIN);
+                             &t->clients.admin.id, &admin_role);
     EXPECT("error assigning admin role", err);
 
     // upgrade role to operator.
-    err = aranya_assign_role(&t->clients.admin.client, &t->id,
-                             &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
+    err = aranya_assign_role(&t->clients.owner.client, &t->id,
+                             &t->clients.operator.id, &operator_role);
 
-    if (err == ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "application failed: expected role assignment to fail");
-        return EXIT_FAILURE;
-    }
-
-    err = aranya_sync_now(&t->clients.admin.client, &t->id, sync_addrs[OWNER],
-                          NULL);
-    EXPECT("error calling `sync_now` to sync with peer", err);
+    // TODO: add sync now test back
 
     sleep(1);
-    err = aranya_assign_role(&t->clients.admin.client, &t->id,
-                             &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
+    err = aranya_assign_role(&t->clients.owner.client, &t->id,
+                             &t->clients.operator.id, &operator_role);
     EXPECT("error assigning operator role", err);
-    */
 
     // Initialize the builder
     struct AranyaSyncPeerConfigBuilder builder;
@@ -420,12 +448,18 @@ AranyaError run(Team *t) {
                                     t->clients.membera.pk,
                                     t->clients.membera.pk_len);
     EXPECT("error adding membera to team", err);
+    err = aranya_assign_role(&t->clients.owner.client, &t->id,
+                             &t->clients.membera.id, &member_role);
+    EXPECT("error assigning membera the member role", err);
 
     // add memberb to team.
     err = aranya_add_device_to_team(&t->clients.owner.client, &t->id, &priority,
                                     t->clients.memberb.pk,
                                     t->clients.memberb.pk_len);
     EXPECT("error adding memberb to team", err);
+    err = aranya_assign_role(&t->clients.owner.client, &t->id,
+                             &t->clients.memberb.id, &member_role);
+    EXPECT("error assigning memberb the member role", err);
 
     sleep(1);
 
