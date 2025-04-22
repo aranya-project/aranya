@@ -431,6 +431,36 @@ impl NetIdentifier {
     }
 }
 
+/// A role name.
+///
+/// E.g. "owner"
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct RoleName(*const c_char);
+
+impl RoleName {
+    unsafe fn as_underlying(self) -> Result<String, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
+        Ok(String::from(cstr.to_str()?))
+    }
+}
+
+/// A role permission.
+///
+/// E.g. "CreateLabel"
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct RolePerm(*const c_char);
+
+impl RolePerm {
+    unsafe fn as_underlying(self) -> Result<String, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
+        Ok(String::from(cstr.to_str()?))
+    }
+}
+
 /// An AQC label name.
 ///
 /// E.g. "TELEMETRY_LABEL"
@@ -879,17 +909,110 @@ pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> 
     Ok(())
 }
 
-// TODO: create_role
+/// Create a custom role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param name role name string [`RoleName`].
+///
+/// @relates AranyaClient.
+pub fn create_role(
+    client: &mut Client,
+    team: &TeamId,
+    name: RoleName,
+) -> Result<RoleId, imp::Error> {
+    let client = client.deref_mut();
 
-// TODO: delete_role
+    // SAFETY: Caller must ensure `name` is a valid C String.
+    let name = unsafe { name.as_underlying() }?;
 
-// TODO: assign_role
+    let role = client
+        .rt
+        .block_on(client.inner.team(team.into()).create_role(name))?;
+    Ok(RoleId {
+        id: role.id.into_id().into(),
+    })
+}
 
-// TODO: revoke_role
+/// Delete a custom role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param role_id the role ID [`RoleId`] to delete.
+///
+/// @relates AranyaClient.
+pub fn delete_role(client: &mut Client, team: &TeamId, role_id: &RoleId) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
 
-// TODO: assign_role_perm
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).delete_role(role_id.into()))?;
+    Ok(())
+}
 
-// TODO: revoke_role_perm
+/// Assign role permission.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param role_id the role ID [`RoleId`] to assign a permission to.
+/// @param perm the permission to assign to the role [`RolePerm`].
+///
+/// @relates AranyaClient.
+pub fn assign_role_perm(
+    client: &mut Client,
+    team: &TeamId,
+    role_id: &RoleId,
+    perm: RolePerm,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+
+    // SAFETY: Caller must ensure `perm` is a valid C String.
+    let perm = unsafe { perm.as_underlying() }?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .assign_role_perm(role_id.into(), perm),
+    )?;
+    Ok(())
+}
+
+/// Revoke role permission.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param role_id the role ID [`RoleId`] to revoke a permission from.
+/// @param perm the permission to revoke from the role [`RolePerm`].
+///
+/// @relates AranyaClient.
+pub fn revoke_role_perm(
+    client: &mut Client,
+    team: &TeamId,
+    role_id: &RoleId,
+    perm: RolePerm,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+
+    // SAFETY: Caller must ensure `perm` is a valid C String.
+    let perm = unsafe { perm.as_underlying() }?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .revoke_role_perm(role_id.into(), perm),
+    )?;
+    Ok(())
+}
 
 /// Add a device to the team with the default role.
 ///
@@ -1956,8 +2079,92 @@ pub unsafe fn query_afc_label_exists(
     Ok(exists)
 }
 
-// TODO: query_roles_on_team
+/// Query for list of roles on team.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+/// The application can use `roles_len` to allocate a larger buffer.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+///
+/// Output params:
+/// @param roles returns a list of roles [`RoleId`].
+/// @param roles_len returns the length of the roles list [`RoleId`].
+///
+/// @relates AranyaClient.
+// TODO: return role strings.
+pub fn query_roles_on_team(
+    client: &mut Client,
+    team: &TeamId,
+    roles: Option<&mut MaybeUninit<RoleId>>,
+    roles_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let data = client
+        .rt
+        .block_on(client.inner.queries(team.into()).roles_on_team())?;
+    let data = data.__data();
+    let Some(roles) = roles else {
+        *roles_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    };
+    let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src.id.into());
+    }
+    if *roles_len < data.len() {
+        *roles_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *roles_len = data.len();
+    Ok(())
+}
 
-// TODO: query_device_roles
+/// Query for list of roles assigned to a device.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+/// The application can use `roles_len` to allocate a larger buffer.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+///
+/// Output params:
+/// @param roles returns a list of roles [`RoleId`].
+/// @param roles_len returns the length of the roles list [`RoleId`].
+///
+/// @relates AranyaClient.
+// TODO: return role strings.
+pub fn query_device_roles(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    roles: Option<&mut MaybeUninit<RoleId>>,
+    roles_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let data = client.rt.block_on(
+        client
+            .inner
+            .queries(team.into())
+            .device_roles(device.into()),
+    )?;
+    let data = data.__data();
+    let Some(roles) = roles else {
+        *roles_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    };
+    let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src.id.into());
+    }
+    if *roles_len < data.len() {
+        *roles_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *roles_len = data.len();
+    Ok(())
+}
 
-// TODO: query_role_perms
+// TODO: query_role_perms. Requires returning an array of perm strings.
