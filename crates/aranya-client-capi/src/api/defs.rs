@@ -879,6 +879,18 @@ pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> 
     Ok(())
 }
 
+// TODO: create_role
+
+// TODO: delete_role
+
+// TODO: assign_role
+
+// TODO: revoke_role
+
+// TODO: assign_role_perm
+
+// TODO: revoke_role_perm
+
 /// Add a device to the team with the default role.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
@@ -1943,3 +1955,9 @@ pub unsafe fn query_afc_label_exists(
     )?;
     Ok(exists)
 }
+
+// TODO: query_roles_on_team
+
+// TODO: query_device_roles
+
+// TODO: query_role_perms
