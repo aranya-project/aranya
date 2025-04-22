@@ -23,7 +23,6 @@ aranya-daemon-api = { workspace = true }
 aranya-crypto = { workspace = true }
 aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
-spideroak-base58 = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
 tarpc = { workspace = true }

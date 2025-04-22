@@ -29,7 +29,7 @@ pub struct Config {
     pub sync_addr: Addr,
 
     /// AFC configuration.
-    pub afc: AfcConfig,
+    pub afc: Option<AfcConfig>,
 
     /// AQC configuration.
     pub aqc: AqcConfig,
@@ -143,13 +143,13 @@ mod tests {
             uds_api_path: "/var/run/uds.sock".parse()?,
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
-            afc: AfcConfig {
+            afc: Some(AfcConfig {
                 shm_path: "/afc".to_owned(),
                 unlink_on_startup: false,
                 unlink_at_exit: false,
                 create: true,
                 max_chans: 100,
-            },
+            }),
             aqc: AqcConfig {},
         };
         assert_eq!(got, want);

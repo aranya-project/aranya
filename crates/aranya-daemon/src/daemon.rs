@@ -323,13 +323,13 @@ mod tests {
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
-            afc: AfcConfig {
+            afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,
                 unlink_at_exit: true,
                 create: true,
                 max_chans: 100,
-            },
+            }),
             aqc: AqcConfig {},
         };
 

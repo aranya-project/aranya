@@ -146,8 +146,8 @@ where
 
 const SERVER_KEY_CTX: &[u8] = b"aranya daemon api server seal key";
 const SERVER_NONCE_CTX: &[u8] = b"aranya daemon api server seal nonce";
-const SERVER_SEAL_AD: &[u8; 14] = b"server seal ad";
-const CLIENT_SEAL_AD: &[u8; 14] = b"client seal ad";
+const SERVER_BASE_AD: &[u8; 14] = b"server base ad";
+const CLIENT_BASE_AD: &[u8; 14] = b"client base ad";
 
 /// Creates a client-side transport.
 pub fn client<S, R, CS, Item, SinkItem>(
@@ -165,7 +165,7 @@ where
         inner: serde_transport::new(Framed::new(io, codec), MessagePack::default()),
         rng,
         pk,
-        info: info.to_vec(),
+        info: Box::from(info),
         ctx: None,
         rekeys: 0,
         _marker: PhantomData,
@@ -185,7 +185,7 @@ where
     /// The server's public key.
     pk: PublicApiKey<CS>,
     /// The "info" parameter when rekeying.
-    info: Vec<u8>,
+    info: Box<[u8]>,
     ctx: Option<Ctx<CS>>,
     /// The number of times we've rekeyed, including the initial
     /// keying.
@@ -204,7 +204,7 @@ where
             .as_mut()
             .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .encrypt::<Item, SinkItem>(item, CLIENT_SEAL_AD)
+            .encrypt::<Item, SinkItem>(item, CLIENT_BASE_AD)
             .map_err(other)
     }
 }
@@ -219,7 +219,7 @@ where
             .as_mut()
             .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .decrypt::<Item, SinkItem>(data, SERVER_SEAL_AD)
+            .decrypt::<Item, SinkItem>(data, SERVER_BASE_AD)
             .map_err(other)
     }
 }
@@ -430,7 +430,7 @@ where
             .as_mut()
             .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .encrypt::<Item, SinkItem>(item, SERVER_SEAL_AD)
+            .encrypt::<Item, SinkItem>(item, SERVER_BASE_AD)
             .map_err(other)
     }
 }
@@ -445,7 +445,7 @@ where
             .as_mut()
             .assume("`self.ctx` should be `Some`")
             .map_err(other)?
-            .decrypt::<Item, SinkItem>(data, CLIENT_SEAL_AD)
+            .decrypt::<Item, SinkItem>(data, CLIENT_BASE_AD)
             .map_err(other)
     }
 }
@@ -570,6 +570,7 @@ pub mod unix {
 
 #[cfg(test)]
 #[cfg(unix)]
+#[allow(clippy::panic)]
 mod tests {
     use std::panic;
 
@@ -602,6 +603,7 @@ mod tests {
     struct Ping {
         v: usize,
     }
+
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
     struct Pong {
         v: usize,
@@ -634,7 +636,7 @@ mod tests {
                     unix::UnixListenerStream::from(listener),
                     codec.clone(),
                     sk,
-                    &*info,
+                    &info,
                 );
 
                 let mut conn = server.try_next().await.unwrap().unwrap();
@@ -663,7 +665,7 @@ mod tests {
                     .retry(ExponentialBuilder::default())
                     .await
                     .unwrap();
-                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &*info);
+                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &info);
                 for v in 0..MAX_PING_PONGS {
                     client.send(Ping { v }).await?;
                     let got = client.try_next().await?.ok_or_else(|| {
@@ -718,7 +720,7 @@ mod tests {
                     unix::UnixListenerStream::from(listener),
                     codec.clone(),
                     sk,
-                    &*info,
+                    &info,
                 );
                 let mut conn = server.try_next().await.unwrap().unwrap();
                 for v in 0..MAX_PING_PONGS {
@@ -756,7 +758,7 @@ mod tests {
                     .retry(ExponentialBuilder::default())
                     .await
                     .unwrap();
-                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &*info);
+                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &info);
                 for v in 0..MAX_PING_PONGS {
                     client.force_rekey();
                     client.send(Ping { v }).await.unwrap();
@@ -813,7 +815,7 @@ mod tests {
                     unix::UnixListenerStream::from(listener),
                     codec.clone(),
                     sk,
-                    &*info,
+                    &info,
                 );
                 let mut set = JoinSet::new();
                 for _ in 0..MAX_CLIENTS {
@@ -855,7 +857,7 @@ mod tests {
                     .retry(ExponentialBuilder::default())
                     .await
                     .unwrap();
-                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &*info);
+                let mut client = client::<_, _, _, Pong, Ping>(sock, codec, Rng, pk, &info);
                 for v in 0..MAX_PING_PONGS {
                     client.send(Ping { v }).await?;
                     let got = client.try_next().await?.ok_or_else(|| {
