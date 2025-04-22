@@ -119,9 +119,9 @@ checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 
 [[package]]
 name = "aranya-afc-util"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "33b9a2699ad2f756e4607b4826855146a24acca176010fefa937965cc22b1ab1"
+checksum = "9c7b3306315b4019fb1a48f41eed8b35e49d63327aa6a9de6ba4c98a47b05171"
 dependencies = [
  "aranya-crypto",
  "aranya-fast-channels",
@@ -136,9 +136,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-aqc-util"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c0e98f03e9487727f3ce83d558bbe73f88c6a7862ad2c786b1e3dca092248c9"
+checksum = "6ecb1a7d1a4e0052f2e6a84daf013f64292dbde2225b4a23d298ab7c6842962e"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -170,9 +170,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-capi-core"
-version = "0.2.3"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d2d2b6c96c6654a3847da44ce1d8389ec5a4cefe76af2da72ad533c7a3ff1370"
+checksum = "c8f57f8686eff6ff7d3052167b71a0316f6b1a86d8a1f5bb61065160648fc0ce"
 dependencies = [
  "aranya-capi-macro",
  "aranya-libc",
@@ -269,9 +269,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-crypto-ffi"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "562583233c57ba43bc1476d5596c56e1044662f198226a775f6a4c32eca94293"
+checksum = "66e8952076d6d27bfe18788e0f0071852a7112dfb616845d93580c1d231ac652"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -340,9 +340,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-device-ffi"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f161357c2c9d798a0251349919be5c8b5846b5097af031cea9a69a4d5c24e35d"
+checksum = "26e29e195e269b55d3f4c98ac137150123fe8c672da36a35affd799d8c115b81"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -350,9 +350,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-envelope-ffi"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99c19af5c631317bf54e714b451e09f52a206f09d8c4a37e39d34e25ded5fd1f"
+checksum = "a65bdb44fdd0f61d8e42109b8f8afc17b01f03479d56775c36766cbe8bb91095"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -379,9 +379,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-idam-ffi"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db7553bf7ac51842264eb9eb6990c125e5488f898a7c0ed56fa44f7d4ac62df2"
+checksum = "60958065407d2d8fa0f07005d9dc113b336a1961b31c7939d5698ec30dcaf330"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -401,9 +401,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-libc"
-version = "0.1.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3014003bd1c0fad20bd014370899786df8686501fa9e6928d7150f524e7b94f7"
+checksum = "81d3fc92aad8cb2e51fdd17dfa4dd51c3e39da8d22bacfc59527b491740c328c"
 dependencies = [
  "cfg-if",
  "libc",
@@ -414,9 +414,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-perspective-ffi"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4004e350bb79bc9a7b6884d630efca699b9e5807d562d93aac2d678c61568fc"
+checksum = "9c530731494d4e19445ed7667ce689eab31a221bbe6dd36bd0d6d999611d69ae"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -424,9 +424,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-ast"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c57e91cfbcd2e81e841ee15ec5961cdf16c8bd01be52b220e9f8f502e1bfd0ed"
+checksum = "ef3e426ebe678b951d24166496be091abb185618267b8518c2b7e4c67903b010"
 dependencies = [
  "serde",
  "thiserror 2.0.12",
@@ -434,9 +434,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-compiler"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "270f7256f6757feede5bcefda9da4543d5f3731ba7646fa6ebe515f6265d6af8"
+checksum = "18ad002df786230ef36a9409792610b7ccab5ff362eac555e778f3a15ef98d8c"
 dependencies = [
  "aranya-policy-ast",
  "aranya-policy-lang",
@@ -449,9 +449,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-derive"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a872f484a9d8209ab9e2e00331244f66a6b3062a893d815969c234ae1dab2033"
+checksum = "3dee310dbf9e5f60688d1e6a847a5da8e39a52a7ecf9f36a9e2c7a1fcc25503b"
 dependencies = [
  "aranya-policy-lang",
  "prettyplease",
@@ -462,9 +462,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-ifgen"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4284ff1ead7dc3ae8f0a1dd3ca68c98257b6e0f639f4cafc62648c0ca43f4f77"
+checksum = "13b9b0b9f9bc74ae1f518721499107241ed6c2fd4533fbecf11bcc39604f4765"
 dependencies = [
  "aranya-policy-ifgen-macro",
  "aranya-policy-vm",
@@ -475,9 +475,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-ifgen-build"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcfcb69277ac05835a2b5be133f5d6304ad78c38ae69d829e5d0b6a885356fa6"
+checksum = "270551af0e503d605ac6ea5449ea90f0dbcc564c502c981d98d922af4bbd5203"
 dependencies = [
  "anyhow",
  "aranya-policy-ast",
@@ -501,9 +501,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-lang"
-version = "0.3.0"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ee025e25ccf7f065689d6619ffca08dd04993aca3df5015c24f78616842448d"
+checksum = "ec3b81ecba74dd8f727f08dcda5fd637355e4213340ed23dbe7679d73c13625f"
 dependencies = [
  "anyhow",
  "aranya-policy-ast",
@@ -518,9 +518,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-module"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21050a4b0408be1a6d61ed2d5e96f335cb6c6e3cb66785ba316ab203d2a93c9b"
+checksum = "203184cdae36b30647955b8b899534f24fb069d1567077ba5782dd405cb2358e"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-ast",
@@ -530,9 +530,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-vm"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f132342f7dc4bc9c8b4a91286c793835912bb92c7fa3683328657b3a299bb170"
+checksum = "d0e2265b29ed11c9684521e7bd60736939d89c393df49cdb3305953584929af1"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-ast",
@@ -546,9 +546,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-runtime"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef5cbd774eb566a6119d6e369eeacff855de6af7dd9fa1581bb93905cd227101"
+checksum = "ccc634876c5310e7b57c4d1c47052e0546574db958abbf2ea92e037891344876"
 dependencies = [
  "aranya-crypto",
  "aranya-libc",
