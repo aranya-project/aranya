@@ -42,7 +42,7 @@ async fn test_remove_members() -> Result<()> {
     let devices = TestDevices::new(&team.devices);
 
     let effects = devices
-        .operator
+        .owner
         .actions()
         .remove_member(devices.membera.pk.ident_pk.id()?)
         .await
@@ -52,7 +52,7 @@ async fn test_remove_members() -> Result<()> {
         panic!("expected MemberRemoved effect: {:?}", effects)
     }
     let effects = devices
-        .operator
+        .owner
         .actions()
         .remove_member(devices.memberb.pk.ident_pk.id()?)
         .await

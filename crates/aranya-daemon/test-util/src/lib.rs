@@ -290,7 +290,7 @@ impl TestCtx {
         // TODO: assign a different priority to each device.
         owner
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&admin.pk)?, 100)
+            .add_member(DeviceKeyBundle::try_from(&admin.pk)?, 9000)
             .await
             .context("unable to add admin member")?;
         owner
@@ -301,7 +301,7 @@ impl TestCtx {
         admin.sync(owner).await?;
         owner
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&operator.pk)?, 100)
+            .add_member(DeviceKeyBundle::try_from(&operator.pk)?, 8000)
             .await
             .context("unable to add operator member")?;
         owner
@@ -310,9 +310,9 @@ impl TestCtx {
             .await
             .context("unable to elevate operator role")?;
         operator.sync(owner).await?;
-        operator
+        owner
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&membera.pk)?, 100)
+            .add_member(DeviceKeyBundle::try_from(&membera.pk)?, 7000)
             .await
             .context("unable to add membera member")?;
         owner
@@ -321,9 +321,9 @@ impl TestCtx {
             .await
             .context("unable to elevate membera role")?;
         membera.sync(admin).await?;
-        operator
+        owner
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&memberb.pk)?, 100)
+            .add_member(DeviceKeyBundle::try_from(&memberb.pk)?, 6000)
             .await
             .context("unable to add memberb member")?;
         owner

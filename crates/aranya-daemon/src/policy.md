@@ -281,7 +281,7 @@ function author_dominates_target(author_id id, target_id id) bool {
     // Check if the device has higher priority than the target device.
     let author_device = unwrap query Devices[device_id: author_id]
     let target_device = unwrap query Devices[device_id: target_id]
-    if author_device.device.priority > target_device.device.priority {
+    if author_device.device.priority >= target_device.device.priority {
         return true
     }
     return false
@@ -471,6 +471,7 @@ command CreateTeam {
 
             // TODO: assign default permissions to owner role.
             assign_perm_role("AddMember", role.role_id)
+            assign_perm_role("RemoveMember", role.role_id)
             assign_perm_role("CreateRole", role.role_id)
             assign_perm_role("DeleteRole", role.role_id)
             assign_perm_role("AssignRole", role.role_id)
@@ -1083,7 +1084,7 @@ command SetAqcNetworkName {
         let target = get_valid_device(this.device_id)
 
         check device_has_permission(author.device_id, "SetAqcNetworkName")
-        //check author_dominates_target(author.device_id, target.device_id)
+        check author_dominates_target(author.device_id, target.device_id)
 
         let net_id_exists = query AqcMemberNetworkId[device_id: target.device_id]
 

@@ -841,6 +841,20 @@ where
         .in_current_span()
     }
 
+    /// Query role permissions off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_role_perms_off_graph(
+        &self,
+        role_id: RoleId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_role_perms",
+            args: Cow::Owned(vec![Value::from(role_id.into_id())]),
+        })
+        .in_current_span()
+    }
+
     /// Query device roles off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]

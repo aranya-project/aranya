@@ -1293,10 +1293,22 @@ impl DaemonApi for DaemonApiHandler {
     async fn query_role_perms(
         self,
         _: context::Context,
-        _team: api::TeamId,
-        _role: api::RoleId,
+        team: api::TeamId,
+        role: api::RoleId,
     ) -> api::Result<Vec<api::Permission>> {
-        todo!();
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_role_perms_off_graph(role.into_id().into())
+            .await
+            .context("unable to query role permissions")?;
+        let mut roles: Vec<api::Permission> = Vec::new();
+        for e in effects {
+            if let Effect::QueriedRolePermission(e) = e {
+                roles.push(e.perm);
+            }
+        }
+        Ok(roles)
     }
 
     /// Query device keybundle.
@@ -1590,52 +1602,3 @@ impl From<ChanOp> for api::ChanOp {
         }
     }
 }
-
-// TODO: use perm enum from policy
-/*
-impl From<api::Permission> for Permission {
-    fn from(value: api::Permission) -> Self {
-        match value {
-            api::Permission::TerminateTeam => Permission::TerminateTeam,
-            api::Permission::AddMember => Permission::AddMember,
-            api::Permission::RemoveMember => Permission::RemoveMember,
-            api::Permission::CreateRole => Permission::CreateRole,
-            api::Permission::DeleteRole => Permission::DeleteRole,
-            api::Permission::AssignRole => Permission::AssignRole,
-            api::Permission::RevokeRole => Permission::RevokeRole,
-            api::Permission::AssignRolePermission => Permission::AssignRolePermission,
-            api::Permission::SetAqcNetworkName => Permission::SetAqcNetworkName,
-            api::Permission::UnsetAqcNetworkName => Permission::UnsetAqcNetworkName,
-            api::Permission::AqcCreateBidiChannel => Permission::AqcCreateBidiChannel,
-            api::Permission::AqcCreateUniChannel => Permission::AqcCreateUniChannel,
-            api::Permission::CreateLabel => Permission::CreateLabel,
-            api::Permission::DeleteLabel => Permission::DeleteLabel,
-            api::Permission::AssignLabel => Permission::AssignLabel,
-            api::Permission::RevokeLabel => Permission::RevokeLabel,
-        }
-    }
-}
-
-impl From<Permission> for api::Permission {
-    fn from(value: Permission) -> Self {
-        match value {
-            Permission::TerminateTeam => api::Permission::TerminateTeam,
-            Permission::AddMember => api::Permission::AddMember,
-            Permission::RemoveMember => api::Permission::RemoveMember,
-            Permission::CreateRole => api::Permission::CreateRole,
-            Permission::DeleteRole => api::Permission::DeleteRole,
-            Permission::AssignRole => api::Permission::AssignRole,
-            Permission::RevokeRole => api::Permission::RevokeRole,
-            Permission::AssignRolePermission => api::Permission::AssignRolePermission,
-            Permission::SetAqcNetworkName => api::Permission::SetAqcNetworkName,
-            Permission::UnsetAqcNetworkName => api::Permission::UnsetAqcNetworkName,
-            Permission::AqcCreateBidiChannel => api::Permission::AqcCreateBidiChannel,
-            Permission::AqcCreateUniChannel => api::Permission::AqcCreateUniChannel,
-            Permission::CreateLabel => api::Permission::CreateLabel,
-            Permission::DeleteLabel => api::Permission::DeleteLabel,
-            Permission::AssignLabel => api::Permission::AssignLabel,
-            Permission::RevokeLabel => api::Permission::RevokeLabel,
-        }
-    }
-}
-*/
