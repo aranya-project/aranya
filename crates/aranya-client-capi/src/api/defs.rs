@@ -360,20 +360,6 @@ impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
 #[cfg(feature = "afc")]
 pub struct ChannelId(aranya_daemon_api::AfcId);
 
-/// An enum containing team roles defined in the Aranya policy.
-#[repr(u8)]
-#[derive(Copy, Clone, Debug)]
-pub enum Role {
-    /// Owner role.
-    Owner,
-    /// Admin role.
-    Admin,
-    /// Operator role.
-    Operator,
-    /// Member role.
-    Member,
-}
-
 /// Valid channel operations for a label assignment.
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
@@ -461,6 +447,21 @@ impl RolePerm {
     }
 }
 
+impl From<String> for RolePerm {
+    fn from(value: String) -> Self {
+        let str = value.leak();
+        Self(str.as_ptr() as *const i8)
+    }
+}
+
+/// A device priority.
+///
+/// Determines whether the author of a graph command has permission
+/// to execute a command on a target device with lower priority.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct Priority(i64);
+
 /// An AQC label name.
 ///
 /// E.g. "TELEMETRY_LABEL"
@@ -476,23 +477,51 @@ impl LabelName {
     }
 }
 
+/// A role.
+#[repr(C)]
+#[derive(Debug)]
+#[aranya_capi_core::opaque(size = 88, align = 8)]
+pub struct Role {
+    id: RoleId,
+    name: RoleName,
+}
+
+impl From<aranya_daemon_api::Role> for Role {
+    fn from(value: aranya_daemon_api::Role) -> Self {
+        let str = value.name.leak();
+        Self {
+            id: value.id.into(),
+            name: RoleName(str.as_ptr() as *const i8),
+        }
+    }
+}
+
+/// A label.
+#[repr(C)]
+#[derive(Debug)]
+#[aranya_capi_core::opaque(size = 88, align = 8)]
+pub struct Label {
+    id: LabelId,
+    name: LabelName,
+}
+
 /// An AFC label.
 ///
 /// It identifies the policy rules that govern the AFC channel.
 #[cfg(feature = "afc")]
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-pub struct Label(u32);
+pub struct AfcLabel(u32);
 
 #[cfg(feature = "afc")]
-impl From<Label> for aranya_fast_channels::Label {
-    fn from(value: Label) -> Self {
+impl From<AfcLabel> for aranya_fast_channels::AfcLabel {
+    fn from(value: AfcLabel) -> Self {
         Self::new(value.0)
     }
 }
 
 #[cfg(feature = "afc")]
-impl From<aranya_fast_channels::Label> for Label {
+impl From<aranya_fast_channels::Label> for AfcLabel {
     fn from(value: aranya_fast_channels::Label) -> Self {
         Self(value.to_u32())
     }
@@ -1020,6 +1049,7 @@ pub fn revoke_role_perm(
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
+/// @param priority is the device's priority [`Priority`].
 /// @param keybundle serialized keybundle byte buffer `KeyBundle`.
 /// @param keybundle_len is the length of the serialized keybundle.
 ///
@@ -1027,17 +1057,17 @@ pub fn revoke_role_perm(
 pub unsafe fn add_device_to_team(
     client: &mut Client,
     team: &TeamId,
+    priority: &Priority,
     keybundle: &[u8],
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
-    // TODO: add priority arg.
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .add_device_to_team(keybundle, 100),
+            .add_device_to_team(keybundle, priority.0),
     )?;
     Ok(())
 }
@@ -1186,14 +1216,14 @@ pub unsafe fn aqc_remove_net_identifier(
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param label the AFC channel label [`Label`] to create.
+/// @param label the AFC channel label [`AfcLabel`] to create.
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
 pub fn create_afc_label(
     client: &mut Client,
     team: &TeamId,
-    label: Label,
+    label: AfcLabel,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client.rt.block_on(
@@ -1211,14 +1241,14 @@ pub fn create_afc_label(
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param label the channel label [`Label`] to delete.
+/// @param label the channel label [`AfcLabel`] to delete.
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
 pub fn delete_afc_label(
     client: &mut Client,
     team: &TeamId,
-    label: Label,
+    label: AfcLabel,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client.rt.block_on(
@@ -1237,7 +1267,7 @@ pub fn delete_afc_label(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device ID [`DeviceId`] of the device to assign the label to.
-/// @param label the AFC channel label [`Label`].
+/// @param label the AFC channel label [`AfcLabel`].
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
@@ -1245,7 +1275,7 @@ pub fn assign_afc_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    label: Label,
+    label: AfcLabel,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client.rt.block_on(
@@ -1264,7 +1294,7 @@ pub fn assign_afc_label(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device ID [`DeviceId`] of the device to revoke the label from.
-/// @param label the AFC channel label [`Label`].
+/// @param label the AFC channel label [`AfcLabel`].
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "afc")]
@@ -1272,7 +1302,7 @@ pub fn revoke_afc_label(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    label: Label,
+    label: AfcLabel,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     client.rt.block_on(
@@ -1356,7 +1386,7 @@ pub unsafe fn afc_remove_net_identifier(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param peer the peer's network identifier [`NetIdentifier`].
-/// @param label the AFC channel label [`Label`] to create the channel with.
+/// @param label the AFC channel label [`AfcLabel`] to create the channel with.
 /// @param __output the channel's ID [`ChannelId`]
 ///
 /// @relates AranyaClient.
@@ -1365,7 +1395,7 @@ pub unsafe fn afc_create_bidi_channel(
     client: &mut Client,
     team: &TeamId,
     peer: NetIdentifier,
-    label: Label,
+    label: AfcLabel,
 ) -> Result<ChannelId, imp::Error> {
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `peer` is a valid C String.
@@ -1436,7 +1466,7 @@ pub struct AfcMsgInfo {
     /// Uniquely (globally) identifies the channel.
     pub channel: ChannelId,
     /// The label applied to the channel.
-    pub label: Label,
+    pub label: AfcLabel,
     /// Identifies the position of the message in the channel.
     ///
     /// This can be used to sort out-of-order messages.
@@ -1570,6 +1600,40 @@ pub fn delete_label(
         .rt
         .block_on(client.inner.team(team.into()).delete_label(label_id.into()))?;
     Ok(())
+}
+
+/// Get ID of role.
+///
+/// @param role the role [`Role`].
+///
+/// Returns the role's ID [`RoleId`].
+pub fn get_role_id(role: &Role) -> Result<RoleId, imp::Error> {
+    Ok(role.id)
+}
+
+/// Get name of role.
+///
+/// Returns a C string pointer to the role's name.
+pub fn get_role_name(role: &Role) -> Result<*const c_char, imp::Error> {
+    Ok(role.name.0)
+}
+
+/// Get ID of role.
+///
+/// @param label the label [`Label`].
+///
+/// Returns the label's ID [`LabelId`].
+pub fn get_label_id(label: &Label) -> Result<LabelId, imp::Error> {
+    Ok(label.id)
+}
+
+/// Get name of label.
+///
+/// @param label the label [`Label`].
+///
+/// Returns a C string pointer to the label's name.
+pub fn get_label_name(label: &Label) -> Result<*const c_char, imp::Error> {
+    Ok(label.name.0)
 }
 
 /// Assign a label to a device so that it can be used for a channel.
@@ -2089,15 +2153,15 @@ pub unsafe fn query_afc_label_exists(
 /// @param team the team's ID [`TeamId`].
 ///
 /// Output params:
-/// @param roles returns a list of roles [`RoleId`].
-/// @param roles_len returns the length of the roles list [`RoleId`].
+/// @param roles returns a list of roles [`Role`].
+/// @param roles_len returns the length of the roles list [`Role`].
 ///
 /// @relates AranyaClient.
 // TODO: return role strings.
 pub fn query_roles_on_team(
     client: &mut Client,
     team: &TeamId,
-    roles: Option<&mut MaybeUninit<RoleId>>,
+    roles: Option<&mut MaybeUninit<Role>>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
@@ -2111,7 +2175,7 @@ pub fn query_roles_on_team(
     };
     let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.id.into());
+        dst.write(src.clone().into());
     }
     if *roles_len < data.len() {
         *roles_len = data.len();
@@ -2129,18 +2193,18 @@ pub fn query_roles_on_team(
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
 ///
 /// Output params:
 /// @param roles returns a list of roles [`RoleId`].
 /// @param roles_len returns the length of the roles list [`RoleId`].
 ///
 /// @relates AranyaClient.
-// TODO: return role strings.
 pub fn query_device_roles(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    roles: Option<&mut MaybeUninit<RoleId>>,
+    roles: Option<&mut MaybeUninit<Role>>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
@@ -2157,7 +2221,7 @@ pub fn query_device_roles(
     };
     let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.id.into());
+        dst.write(src.clone().into());
     }
     if *roles_len < data.len() {
         *roles_len = data.len();
@@ -2167,4 +2231,45 @@ pub fn query_device_roles(
     Ok(())
 }
 
-// TODO: query_role_perms. Requires returning an array of perm strings.
+/// Query for list of permissions assigned to the role.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the permissions.
+/// Writes the number of roles that would have been returned to `perm_len`.
+/// The application can use `perm_len` to allocate a larger buffer.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param role the role's ID [`RoleId`].
+///
+/// Output params:
+/// @param perms returns a list of permissions [`RoleId`].
+/// @param perms_len returns the length of the permissions list [`RoleId`].
+///
+/// @relates AranyaClient.
+pub fn query_role_perms(
+    client: &mut Client,
+    team: &TeamId,
+    role: &RoleId,
+    perms: Option<&mut MaybeUninit<RolePerm>>,
+    perms_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let data = client
+        .rt
+        .block_on(client.inner.queries(team.into()).role_perms(role.into()))?;
+    let data = data.__data();
+    let Some(perms) = perms else {
+        *perms_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    };
+    let out = aranya_capi_core::try_as_mut_slice!(perms, *perms_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src.clone().into());
+    }
+    if *perms_len < data.len() {
+        *perms_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *perms_len = data.len();
+    Ok(())
+}
