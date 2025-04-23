@@ -917,6 +917,8 @@ AranyaError run_aqc_example(Team *t) {
 AranyaError init_roles(Team *t) {
     AranyaError err;
 
+    printf("initializing roles\r\n");
+
     // Create custom roles.
     err = aranya_create_role(&t->clients.owner.client, &t->id, "admin",
                              &t->roles.admin);
@@ -953,10 +955,65 @@ AranyaError init_roles(Team *t) {
     err = aranya_assign_role_perm(&t->clients.owner.client, &t->id,
                                   &t->roles.member, "AqcCreateUniChannel");
     EXPECT("error assigning AqcCreateUniChannel perm", err);
+
+    return err;
 }
 
 AranyaError cleanup_roles(Team *t) {
-    // TODO(gknopf): unassign role permissions and delete roles.
+    AranyaError err;
+
+    printf("cleaning up roles\r\n");
+
+    // Revoke roles permissions
+    // TODO: obtain perms from query.
+    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
+                                  &t->roles.operator, "SetAqcNetworkName");
+    EXPECT("error revoking SetAqcNetworkName perm", err);
+    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
+                                  &t->roles.operator, "UnsetAqcNetworkName");
+    EXPECT("error revoking UnsetAqcNetworkName perm", err);
+    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
+                                  &t->roles.operator, "CreateLabel");
+    EXPECT("error revoking CreateLabel perm", err);
+    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
+                                  &t->roles.operator, "AssignLabel");
+    EXPECT("error revoking AssignLabel perm", err);
+    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
+                                  &t->roles.operator, "RevokeLabel");
+    EXPECT("error revoking RevokeLabel perm", err);
+    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
+                                  &t->roles.admin, "DeleteLabel");
+    EXPECT("error revoking DeleteLabel perm", err);
+    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
+                                  &t->roles.member, "AqcCreateBidiChannel");
+    EXPECT("error revoking AqcCreateBidiChannel perm", err);
+    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
+                                  &t->roles.member, "AqcCreateUniChannel");
+    EXPECT("error revoking AqcCreateUniChannel perm", err);
+
+    // Unassign role from devices
+    // TODO: obtain role assignments from query.
+    err = aranya_revoke_role(&t->clients.owner.client, &t->id,
+                             &t->clients.admin.id, &t->roles.admin);
+    EXPECT("error revoking admin role", err);
+    err = aranya_revoke_role(&t->clients.owner.client, &t->id,
+                             &t->clients.operator.id, &t->roles.operator);
+    EXPECT("error revoking operator role", err);
+    err = aranya_revoke_role(&t->clients.owner.client, &t->id,
+                             &t->clients.membera.id, &t->roles.member);
+    EXPECT("error revoking member role", err);
+    err = aranya_revoke_role(&t->clients.owner.client, &t->id,
+                             &t->clients.memberb.id, &t->roles.member);
+    EXPECT("error revoking member role", err);
+
+    // Delete roles
+    for (int i = 0; i < NUM_ROLES; i++) {
+        err = aranya_delete_role(&t->clients.owner.client, &t->id,
+                                 &t->roles_arr[i]);
+        EXPECT("unable to delete role", err);
+    }
+
+    return err;
 }
 
 int main(void) {
