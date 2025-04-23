@@ -1,8 +1,8 @@
 use aranya_daemon_api::ChanOp;
 use anyhow::{Context as _, Result};
-use aranya_client::{client::Client, SyncPeerConfig, TeamConfig};
+use aranya_client::{DEFAULT_PERMS, client::Client, SyncPeerConfig, TeamConfig};
 use aranya_daemon::{
-    config::{AfcConfig, Config},
+    config::Config,
     Daemon,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier};
@@ -177,14 +177,16 @@ async fn main() -> Result<()> {
     let operator_role = owner_team.create_role("operator".into()).await?;
     let member_role = owner_team.create_role("member".into()).await?;
 
-    owner_team.assign_role_perm(operator_role.id, "SetAqcNetworkName".into()).await?;
-    owner_team.assign_role_perm(operator_role.id, "UnsetAqcNetworkName".into()).await?;
-    owner_team.assign_role_perm(operator_role.id, "CreateLabel".into()).await?;
-    owner_team.assign_role_perm(operator_role.id, "AssignLabel".into()).await?;
-    owner_team.assign_role_perm(operator_role.id, "RevokeLabel".into()).await?;
-    owner_team.assign_role_perm(admin_role.id, "DeleteLabel".into()).await?;
-    owner_team.assign_role_perm(member_role.id, "AqcCreateBidiChannel".into()).await?;
-    owner_team.assign_role_perm(member_role.id, "AqcCreateUniChannel".into()).await?;
+    let role_list = [&admin_role, &operator_role, &member_role];
+    for (perm, role_name) in DEFAULT_PERMS.iter() {
+        for role in &role_list {
+            if *role_name == role.name {
+                owner_team
+                    .assign_role_perm(role.id, perm.to_string())
+                    .await?;
+            }
+        }
+    }
 
     // add admin to team.
     info!("adding admin to team");

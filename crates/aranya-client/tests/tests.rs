@@ -9,10 +9,10 @@
     rust_2018_idioms
 )]
 
-use std::{collections::BTreeMap, fmt, net::SocketAddr, path::PathBuf, sync::LazyLock, time::Duration};
+use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
-use aranya_client::{Client, SyncPeerConfig, TeamConfig};
+use aranya_client::{client::DEFAULT_PERMS, Client, SyncPeerConfig, TeamConfig};
 use aranya_daemon::{config::Config, Daemon};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
@@ -28,20 +28,6 @@ use tracing::{debug, info, instrument};
 const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
 const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
-
-// Default role permisisons.
-static DEFAULT_PERMS: LazyLock<BTreeMap<&str, &str>> = LazyLock::new(|| {
-    let mut m = BTreeMap::new();
-    m.insert("SetAqcNetworkName", "operator");
-    m.insert("UnsetAqcNetworkName", "operator");
-    m.insert("CreateLabel", "operator");
-    m.insert("AssignLabel", "operator");
-    m.insert("RevokeLabel", "operator");
-    m.insert("DeleteLabel", "admin");
-    m.insert("AqcCreateBidiChannel", "member");
-    m.insert("AqcCreateUniChannel", "member");
-    m
-});
 
 #[instrument(skip_all, fields(%duration = FmtDuration(d)))]
 fn sleep(d: Duration) -> Sleep {

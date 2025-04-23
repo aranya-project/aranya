@@ -1,6 +1,6 @@
 //! Client-daemon connection.
 
-use std::{net::SocketAddr, path::Path};
+use std::{collections::BTreeMap, net::SocketAddr, path::Path, sync::LazyLock};
 
 use aranya_daemon_api::{
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
@@ -79,6 +79,21 @@ impl Permissions {
         self.data.as_slice()
     }
 }
+
+// Default role permisisons.
+pub static DEFAULT_PERMS: LazyLock<BTreeMap<&str, &str>> = LazyLock::new(|| {
+    let mut m = BTreeMap::new();
+    m.insert("SetAqcNetworkName", "operator");
+    m.insert("UnsetAqcNetworkName", "operator");
+    m.insert("CreateLabel", "operator");
+    m.insert("AssignLabel", "operator");
+    m.insert("RevokeLabel", "operator");
+    m.insert("DeleteLabel", "admin");
+    m.insert("AqcCreateBidiChannel", "member");
+    m.insert("AqcCreateUniChannel", "member");
+    m
+});
+
 /// A client for invoking actions on and processing effects from
 /// the Aranya graph.
 ///
