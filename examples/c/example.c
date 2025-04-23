@@ -549,6 +549,69 @@ AranyaError run(Team *t) {
     }
     free(devices);
 
+    size_t roles_len  = BUF_LEN;
+    AranyaRole *roles = malloc(roles_len * sizeof(AranyaRole));
+    err = aranya_query_roles_on_team(&t->clients.operator.client, &t->id, roles,
+                                     &roles_len);
+    EXPECT("error querying roles on team", err);
+    if (roles == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+    // TODO: heap buffer overflow
+    /*
+    for (size_t i = 0; i < roles_len; i++) {
+        AranyaRole role_result = roles[i];
+        const char *role_str   = NULL;
+        err                    = aranya_get_role_name(&role_result, &role_str);
+        EXPECT("unable to get role name", err);
+        printf("role: %s at index: %zu/%zu \r\n", role_str, i, roles_len);
+
+        // TODO: get_role_id()
+    }
+    */
+
+    err = aranya_query_device_roles(&t->clients.operator.client, &t->id,
+                                    &t->clients.admin.id, roles, &roles_len);
+    EXPECT("error querying device roles", err);
+    if (roles == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+    // TODO: heap buffer overflow
+    /*
+    for (size_t i = 0; i < roles_len; i++) {
+        AranyaRole role_result = roles[i];
+        const char *role_str   = NULL;
+        err                    = aranya_get_role_name(&role_result, &role_str);
+        EXPECT("unable to get role name", err);
+        printf("role: %s at index: %zu/%zu \r\n", role_str, i, roles_len);
+
+        // TODO: get_role_id()
+    }
+    */
+
+    free(roles);
+
+    size_t perms_len      = BUF_LEN;
+    AranyaRolePerm *perms = malloc(perms_len * sizeof(AranyaRolePerm));
+    err = aranya_query_role_perms(&t->clients.operator.client, &t->id,
+                                  &admin_role, perms, &perms_len);
+    EXPECT("error querying role perms", err);
+    if (roles == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+    // TODO: heap buffer overflow
+    /*
+    for (size_t i = 0; i < roles_len; i++) {
+        AranyaRole perm_result = perms[i];
+        const char *perm_str   = NULL;
+        err                    = aranya_get_perm_name(&perm_result, &perm_str);
+        EXPECT("unable to get role name", err);
+        printf("perm: %s at index: %zu/%zu \r\n", perm_str, i, perms_len);
+    }
+    */
+
+    free(perms);
+
     size_t memberb_keybundle_len = 255;
     uint8_t *memberb_keybundle   = malloc(memberb_keybundle_len);
     err                          = aranya_query_device_keybundle(

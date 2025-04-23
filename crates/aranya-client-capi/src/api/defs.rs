@@ -2091,6 +2091,7 @@ pub unsafe fn query_label_exists(
 /// @param labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
+// TODO: return label name strings.
 pub fn query_labels(
     client: &mut Client,
     team: &TeamId,
