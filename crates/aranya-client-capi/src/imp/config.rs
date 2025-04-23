@@ -39,7 +39,6 @@ impl From<&SyncPeerConfig> for aranya_client::config::SyncPeerConfig {
 /// Configuration info for Aranya
 #[repr(C)]
 #[derive(Clone, Debug)]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
 pub struct ClientConfig {
     daemon_addr: *const c_char,
     // The daemon's public API key.
@@ -64,7 +63,6 @@ impl Typed for ClientConfig {
 /// Builder for a [`ClientConfig`]
 #[repr(C)]
 #[derive(Clone, Debug)]
-#[aranya_capi_core::opaque(size = 56, align = 8)]
 pub struct ClientConfigBuilder {
     daemon_addr: *const c_char,
     pk: Option<Vec<u8>>,
@@ -191,7 +189,6 @@ impl Default for SyncPeerConfigBuilder {
 /// Configuration info for Aranya Fast Channels
 #[repr(C)]
 #[derive(Clone, Debug)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
 pub struct AqcConfig {
     /// Address to bind AQC server to.
     addr: *const c_char,
@@ -203,7 +200,6 @@ impl Typed for AqcConfig {
 
 /// Builder for an [`AqcConfig`]
 #[derive(Clone, Debug)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
 pub struct AqcConfigBuilder {
     /// Address to bind AQC server to.
     addr: *const c_char,
@@ -248,7 +244,6 @@ impl Default for AqcConfigBuilder {
 /// Configuration info when creating or adding a team in Aranya
 #[repr(C)]
 #[derive(Clone, Debug)]
-#[aranya_capi_core::opaque(size = 0, align = 1)]
 pub struct TeamConfig {}
 
 impl Typed for TeamConfig {
@@ -258,7 +253,6 @@ impl Typed for TeamConfig {
 /// Builder for a [`TeamConfig`]
 #[repr(C)]
 #[derive(Clone, Debug)]
-#[aranya_capi_core::opaque(size = 0, align = 1)]
 pub struct TeamConfigBuilder {}
 
 impl Typed for TeamConfigBuilder {
