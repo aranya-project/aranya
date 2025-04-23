@@ -1663,7 +1663,7 @@ command AssignLabel {
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
-        // Only Owners and Operators can assign AFC labels to Members.
+        // Only Owners and Operators can assign labels to Members.
         check is_owner(author.role) || is_operator(author.role)
 
         // The label must exist.
