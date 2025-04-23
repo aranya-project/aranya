@@ -5,13 +5,11 @@ use aranya_client::ConfigError;
 
 use crate::api::defs::Duration;
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
 /// Configuration info for Aranya
 pub struct ClientConfig {
     daemon_addr: *const c_char,
-    aqc: AqcConfig,
+    _aqc: AqcConfig,
 }
 
 impl Typed for ClientConfig {
@@ -24,9 +22,7 @@ impl ClientConfig {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 56, align = 8)]
 /// Builder for a [`ClientConfig`]
 pub struct ClientConfigBuilder {
     daemon_addr: *const c_char,
@@ -69,7 +65,7 @@ impl ClientConfigBuilder {
 
         Ok(ClientConfig {
             daemon_addr: self.daemon_addr,
-            aqc,
+            _aqc: aqc,
         })
     }
 }
@@ -83,13 +79,11 @@ impl Default for ClientConfigBuilder {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
 /// Configuration info for Aranya Fast Channels
 pub struct AqcConfig {
     /// Address to bind AQC server to.
-    addr: *const c_char,
+    _addr: *const c_char,
 }
 
 impl Typed for AqcConfig {
@@ -97,7 +91,6 @@ impl Typed for AqcConfig {
 }
 
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
 /// Builder for an [`AqcConfig`]
 pub struct AqcConfigBuilder {
     /// Address to bind AQC server to.
@@ -125,7 +118,7 @@ impl AqcConfigBuilder {
             return Err(e.into());
         }
 
-        Ok(AqcConfig { addr: self.addr })
+        Ok(AqcConfig { _addr: self.addr })
     }
 }
 
@@ -137,7 +130,6 @@ impl Default for AqcConfigBuilder {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 /// Configuration info for syncing with a peer
 pub struct SyncPeerConfig {
@@ -165,7 +157,6 @@ impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 /// Builder for a [`SyncPeerConfig`]
 pub struct SyncPeerConfigBuilder {
@@ -217,9 +208,7 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 0, align = 1)]
 /// Configuration info when creating or adding a team in Aranya
 pub struct TeamConfig {}
 
@@ -227,9 +216,7 @@ impl Typed for TeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 0, align = 1)]
 /// Builder for a [`TeamConfig`]
 pub struct TeamConfigBuilder {}
 
