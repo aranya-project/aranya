@@ -281,7 +281,7 @@ function author_dominates_target(author_id id, target_id id) bool {
     // Check if the device has higher priority than the target device.
     let author_device = unwrap query Devices[device_id: author_id]
     let target_device = unwrap query Devices[device_id: target_id]
-    if author_device.device.priority >= target_device.device.priority {
+    if author_device.device.priority > target_device.device.priority {
         return true
     }
     return false

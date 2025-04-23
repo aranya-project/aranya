@@ -303,8 +303,6 @@ impl TeamCtx {
             }
         }
 
-        // TODO: revoke owner roles/permissions last.
-
         // Delete all roles.
         for role in roles.iter() {
             owner.team(team_id).delete_role(role.id).await?;
