@@ -19,12 +19,14 @@ use aranya_daemon_api::{
     AqcChannelInfo::*, AqcCtrl, DeviceId, KeyStoreInfo, LabelId, NetIdentifier, TeamId, CS,
 };
 use aranya_fast_channels::NodeId;
+use buggy::BugExt;
+use s2n_quic::{provider::congestion_controller::Bbr, Server};
 use tarpc::context;
-use tokio::{fs, sync::mpsc};
+use tokio::fs;
 use tracing::{debug, instrument, Instrument as _};
 
 use crate::{
-    aqc_net::{AqcBidirectionalChannel, AqcChannelType, AqcClient},
+    aqc_net::{run_channels, AqcBidirectionalChannel, AqcChannelType, AqcClient},
     error::AqcError,
 };
 
@@ -34,16 +36,16 @@ pub(crate) type CE = DefaultEngine;
 /// KS = Key Store
 pub(crate) type KS = Store;
 
+/// TODO: remove this.
 /// NOTE: this certificate is to be used for demonstration purposes only!
 pub static CERT_PEM: &str = include_str!("./cert.pem");
+/// TODO: remove this.
 /// NOTE: this certificate is to be used for demonstration purposes only!
 pub static KEY_PEM: &str = include_str!("./key.pem");
 
 /// Sends and receives AQC messages.
 pub(crate) struct AqcChannelsImpl {
     client: AqcClient,
-    client_sender: mpsc::Sender<AqcChannelType>,
-    // TODO: add Aqc fields.
     handler: Handler<Store>,
     eng: CE,
 }
@@ -53,6 +55,7 @@ impl AqcChannelsImpl {
     pub(crate) async fn new(
         device_id: DeviceId,
         keystore_info: KeyStoreInfo,
+        aqc_address: NetIdentifier,
     ) -> Result<Self, AqcError> {
         debug!("device ID: {:?}", device_id);
         debug!("keystore path: {:?}", keystore_info.path);
@@ -68,17 +71,26 @@ impl AqcChannelsImpl {
         };
 
         let (client, sender) = AqcClient::new(CERT_PEM)?;
+
+        let server_addr = aqc_address
+            .0
+            .parse::<SocketAddr>()
+            .map_err(AqcError::AddrParse)?;
+        let server = Server::builder()
+            .with_tls((CERT_PEM, KEY_PEM))
+            .map_err(|e| AqcError::TlsConfig(e.to_string()))?
+            .with_io(server_addr)
+            .map_err(|e| AqcError::IoConfig(e.to_string()))?
+            .with_congestion_controller(Bbr::default())
+            .map_err(|e| AqcError::CongestionConfig(e.to_string()))?
+            .start()
+            .map_err(|e| AqcError::ServerStart(e.to_string()))?;
+        tokio::spawn(run_channels(server, sender));
         Ok(Self {
             client,
-            client_sender: sender,
             handler,
             eng,
         })
-    }
-
-    /// Returns the sender for the client.
-    pub fn get_client_sender(&self) -> mpsc::Sender<AqcChannelType> {
-        self.client_sender.clone()
     }
 
     /// Returns the local address that AQC is bound to.
@@ -93,9 +105,9 @@ impl AqcChannelsImpl {
     ) -> Result<AqcBidirectionalChannel, AqcError> {
         let peer_addr = tokio::net::lookup_host(peer.as_ref())
             .await
-            .map_err(anyhow::Error::new)?
+            .map_err(AqcError::AddrResolution)?
             .next()
-            .ok_or_else(|| anyhow!("No addresses found for {}", peer))?;
+            .assume("invalid peer address")?;
 
         self.client
             .create_bidirectional_channel(peer_addr, label_id)
@@ -125,11 +137,6 @@ impl<'a> AqcChannels<'a> {
         self.client.aqc.local_addr().await
     }
 
-    /// Returns the sender for the client.
-    pub fn get_client_sender(&self) -> mpsc::Sender<AqcChannelType> {
-        self.client.aqc.get_client_sender()
-    }
-
     /// Creates a bidirectional AQC channel with a peer.
     ///
     /// `label` associates the channel with a set of policy rules that govern
@@ -143,7 +150,6 @@ impl<'a> AqcChannels<'a> {
         &mut self,
         team_id: TeamId,
         peer: NetIdentifier,
-        peer_addr: NetIdentifier,
         label_id: LabelId,
     ) -> crate::Result<(AqcBidirectionalChannel, AqcCtrl)> {
         debug!("creating bidi channel");
@@ -183,13 +189,13 @@ impl<'a> AqcChannels<'a> {
             let channel = self
                 .client
                 .aqc
-                .create_bidirectional_channel(peer_addr, label_id)
+                .create_bidirectional_channel(peer, label_id)
                 .await?;
             // TODO: for testing only. Send ctrl via network instead of returning.
             Ok((channel, aqc_ctrl))
         } else {
             Err(crate::Error::Aqc(AqcError::Other(anyhow!(
-                "unable to create uni channel"
+                "unable to create bidi channel"
             ))))
         }
     }

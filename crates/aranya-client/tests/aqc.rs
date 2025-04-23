@@ -1,18 +1,13 @@
-use std::{
-    net::{Ipv4Addr, SocketAddr},
-    ops::DerefMut as _,
-    sync::Arc,
-    time::Duration,
-};
+use std::{net::SocketAddr, ops::DerefMut as _, sync::Arc, time::Duration};
 
 mod common;
 use anyhow::Result;
 use aranya_client::{
     aqc_net::{run_channels, AqcChannelType, AqcClient},
-    SyncPeerConfig,
+    SyncPeerConfig, TeamConfig,
 };
 use aranya_crypto::csprng::rand;
-use aranya_daemon_api::{ChanOp, LabelId, NetIdentifier, Role};
+use aranya_daemon_api::{ChanOp, LabelId, Role};
 use aranya_runtime::{
     protocol::{TestActions, TestEngine, TestSink},
     storage::memory::MemStorageProvider,
@@ -188,23 +183,17 @@ async fn test_aqc_chans() -> Result<()> {
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_one_way_two_chans".into(), work_dir).await?;
+    let mut team = TeamCtx::new("test_aqc_chans", work_dir).await?;
 
+    let cfg = TeamConfig::builder().build()?;
     // create team.
     let team_id = team
         .owner
         .client
-        .create_team()
+        .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
-    // TODO: implement add_team.
-    /*
-    team.admin.client.add_team(team_id).await?;
-    team.operator.client.add_team(team_id).await?;
-    team.membera.client.add_team(team_id).await?;
-    team.memberb.client.add_team(team_id).await?;
-    */
 
     // get sync addresses.
     let owner_addr = team.owner.aranya_local_addr().await?;
@@ -315,27 +304,12 @@ async fn test_aqc_chans() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // get aqc addresses.
-    // TODO: use aqc_local_addr()
-    let membera_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 8000);
-    let memberb_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 8001);
-
-    // TODO: use aqc addr
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_aqc_addr.to_string()))
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_addr.clone())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_aqc_addr.to_string()))
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_addr.clone())
         .await?;
-
-    let membera_addr = run_aqc_server(
-        membera_aqc_addr,
-        team.membera.client.aqc().get_client_sender(),
-    )?;
-    let memberb_addr = run_aqc_server(
-        memberb_aqc_addr,
-        team.memberb.client.aqc().get_client_sender(),
-    )?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -355,10 +329,7 @@ async fn test_aqc_chans() -> Result<()> {
         .aqc_net_identifier(team.membera.id)
         .await?
         .expect("expected net identifier");
-    assert_eq!(
-        aqc_net_identifier,
-        NetIdentifier(membera_aqc_addr.to_string())
-    );
+    assert_eq!(aqc_net_identifier, team.membera.aqc_addr);
     debug!("membera aqc_net_identifer: {:?}", aqc_net_identifier);
 
     // wait for ctrl message to be sent.
@@ -381,12 +352,7 @@ async fn test_aqc_chans() -> Result<()> {
         .membera
         .client
         .aqc()
-        .create_bidi_channel(
-            team_id,
-            NetIdentifier(memberb_aqc_addr.to_string()),
-            NetIdentifier(memberb_addr.to_string()),
-            label1,
-        )
+        .create_bidi_channel(team_id, team.memberb.aqc_addr.clone(), label1)
         .await?;
     // memberb received aqc bidi channel ctrl message
     // TODO: receiving AQC ctrl messages will happen via the network.
@@ -491,19 +457,4 @@ async fn test_aqc_chans() -> Result<()> {
     assert_eq!(&target[..total_len], &big_data[..]);
 
     Ok(())
-}
-
-fn run_aqc_server(
-    aqc_addr: SocketAddr,
-    sender: mpsc::Sender<AqcChannelType>,
-) -> Result<SocketAddr> {
-    let server = Server::builder()
-        .with_tls((CERT_PEM, KEY_PEM))?
-        // .with_io(aqc_addr)?
-        .with_io("127.0.0.1:0")?
-        .with_congestion_controller(Bbr::default())?
-        .start()?;
-    let addr = server.local_addr()?;
-    tokio::spawn(run_channels(server, sender));
-    Ok(addr)
 }

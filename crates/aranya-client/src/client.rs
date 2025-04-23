@@ -15,7 +15,6 @@ use aranya_fast_channels::{
     {self as afc},
 };
 use aranya_util::Addr;
-use s2n_quic::{provider::congestion_controller::Bbr, Server};
 use tarpc::{context, tokio_serde::formats::Json};
 #[cfg(feature = "afc")]
 use tokio::net::ToSocketAddrs;
@@ -25,7 +24,6 @@ use tracing::{debug, info, instrument};
 use crate::afc::{setup_afc_shm, FastChannels, FastChannelsImpl};
 use crate::{
     aqc::{AqcChannels, AqcChannelsImpl},
-    aqc_net::run_channels,
     config::{SyncPeerConfig, TeamConfig},
     error::{Error, Result},
 };
@@ -164,7 +162,7 @@ impl Client {
     /// - `daemon_socket`: The socket path to communicate with the daemon.
     #[cfg(not(feature = "afc"))]
     #[instrument(skip_all, fields(?daemon_socket))]
-    pub async fn connect(daemon_socket: &Path) -> Result<Self> {
+    pub async fn connect(daemon_socket: &Path, aqc_address: NetIdentifier) -> Result<Self> {
         info!("starting Aranya client");
 
         let transport = tarpc::serde_transport::unix::connect(daemon_socket, Json::default)
@@ -177,7 +175,7 @@ impl Client {
         debug!(?keystore_info);
         let device_id = daemon.get_device_id(context::current()).await??;
         debug!(?device_id);
-        let aqc = AqcChannelsImpl::new(device_id, keystore_info).await?;
+        let aqc = AqcChannelsImpl::new(device_id, keystore_info, aqc_address).await?;
 
         Ok(Self { daemon, aqc })
     }
@@ -392,19 +390,6 @@ impl Team<'_> {
             .assign_aqc_net_identifier(context::current(), self.id, device, net_identifier.clone())
             .await?
             .map_err(Error::from)?;
-
-        let server_addr = net_identifier.0.parse::<SocketAddr>().unwrap();
-        println!("server_addr: {:?}", server_addr);
-        let server = Server::builder()
-            .with_tls((CERT_PEM, KEY_PEM))
-            .map_err(anyhow::Error::from)?
-            .with_io(server_addr)
-            .map_err(anyhow::Error::from)?
-            .with_congestion_controller(Bbr::default())
-            .map_err(anyhow::Error::from)?
-            .start()
-            .map_err(anyhow::Error::from)?;
-        tokio::spawn(run_channels(server, self.client.aqc.get_client_sender()));
         Ok(())
     }
 

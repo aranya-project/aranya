@@ -657,7 +657,11 @@ pub unsafe fn client_init(
         afc_addr,
     ))?;
     #[cfg(not(feature = "afc"))]
-    let inner = rt.block_on(aranya_client::Client::connect(daemon_socket))?;
+    let inner = rt.block_on(aranya_client::Client::connect(
+        daemon_socket,
+        // SAFETY: Caller ensures config.aqc().addr is valid
+        unsafe { NetIdentifier(config.aqc().addr).as_underlying()? },
+    ))?;
 
     Safe::init(
         client,
@@ -1500,7 +1504,6 @@ pub unsafe fn aqc_create_bidi_channel(
     let peer = unsafe { peer.as_underlying() }?;
     let (chan, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
-        peer.clone(),
         peer,
         label_id.into(),
     ))?;

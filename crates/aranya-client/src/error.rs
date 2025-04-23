@@ -209,6 +209,10 @@ pub enum AqcError {
     AddrResolution(std::io::Error),
 
     /// Address not found.
+    #[error("unable to parse address: {0}")]
+    AddrParse(std::net::AddrParseError),
+
+    /// Address not found.
     #[error("address not found: {0}")]
     AddrNotFound(String),
 

@@ -25,6 +25,10 @@ impl ClientConfig {
         self.daemon_addr
     }
 
+    pub(crate) fn aqc(&self) -> &AqcConfig {
+        &self.aqc
+    }
+
     #[cfg(feature = "afc")]
     pub(crate) fn afc(&self) -> &AfcConfig {
         &self.afc
@@ -185,7 +189,7 @@ impl AfcConfigBuilder {
 /// Configuration info for Aranya Fast Channels
 pub struct AqcConfig {
     /// Address to bind AQC server to.
-    addr: *const c_char,
+    pub addr: *const c_char,
 }
 
 impl Typed for AqcConfig {
