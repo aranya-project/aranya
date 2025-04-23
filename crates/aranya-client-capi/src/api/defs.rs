@@ -435,22 +435,21 @@ impl RoleName {
 /// A role permission.
 ///
 /// E.g. "CreateLabel"
+#[aranya_capi_core::opaque(size = 96, align = 8)]
+pub type Perm = Safe<imp::Perm>;
+
+/// A role permission name.
+///
+/// E.g. "CreateLabel"
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-pub struct RolePerm(*const c_char);
+pub struct PermName(*const c_char);
 
-impl RolePerm {
+impl PermName {
     unsafe fn as_underlying(self) -> Result<String, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
         Ok(String::from(cstr.to_str()?))
-    }
-}
-
-impl From<String> for RolePerm {
-    fn from(value: String) -> Self {
-        let str = value.leak();
-        Self(str.as_ptr() as *const c_char)
     }
 }
 
@@ -478,32 +477,12 @@ impl LabelName {
 }
 
 /// A role.
-#[repr(C)]
-#[derive(Debug)]
-#[aranya_capi_core::opaque(size = 88, align = 8)]
-pub struct Role {
-    id: RoleId,
-    name: RoleName,
-}
-
-impl From<aranya_daemon_api::Role> for Role {
-    fn from(value: aranya_daemon_api::Role) -> Self {
-        let str = value.name.leak();
-        Self {
-            id: value.id.into(),
-            name: RoleName(str.as_ptr() as *const c_char),
-        }
-    }
-}
+#[aranya_capi_core::opaque(size = 96, align = 8)]
+pub type Role = Safe<imp::Role>;
 
 /// A label.
-#[repr(C)]
-#[derive(Debug)]
-#[aranya_capi_core::opaque(size = 88, align = 8)]
-pub struct Label {
-    id: LabelId,
-    name: LabelName,
-}
+#[aranya_capi_core::opaque(size = 96, align = 8)]
+pub type Label = Safe<imp::Label>;
 
 /// An AFC label.
 ///
@@ -990,17 +969,16 @@ pub fn delete_role(client: &mut Client, team: &TeamId, role_id: &RoleId) -> Resu
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param role_id the role ID [`RoleId`] to assign a permission to.
-/// @param perm the permission to assign to the role [`RolePerm`].
+/// @param perm the permission to assign to the role [`Perm`].
 ///
 /// @relates AranyaClient.
 pub fn assign_role_perm(
     client: &mut Client,
     team: &TeamId,
     role_id: &RoleId,
-    perm: RolePerm,
+    perm: PermName,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-
     // SAFETY: Caller must ensure `perm` is a valid C String.
     let perm = unsafe { perm.as_underlying() }?;
 
@@ -1008,7 +986,7 @@ pub fn assign_role_perm(
         client
             .inner
             .team(team.into())
-            .assign_role_perm(role_id.into(), perm),
+            .assign_role_perm(role_id.into(), perm.into()),
     )?;
     Ok(())
 }
@@ -1020,17 +998,16 @@ pub fn assign_role_perm(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param role_id the role ID [`RoleId`] to revoke a permission from.
-/// @param perm the permission to revoke from the role [`RolePerm`].
+/// @param perm the permission to revoke from the role [`Perm`].
 ///
 /// @relates AranyaClient.
 pub fn revoke_role_perm(
     client: &mut Client,
     team: &TeamId,
     role_id: &RoleId,
-    perm: RolePerm,
+    perm: PermName,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-
     // SAFETY: Caller must ensure `perm` is a valid C String.
     let perm = unsafe { perm.as_underlying() }?;
 
@@ -1567,6 +1544,7 @@ pub unsafe fn afc_recv_data(
 /// @param name label name string [`LabelName`].
 ///
 /// @relates AranyaClient.
+// TODO: return `Label`
 pub fn create_label(
     client: &mut Client,
     team: &TeamId,
@@ -1608,14 +1586,15 @@ pub fn delete_label(
 ///
 /// Returns the role's ID [`RoleId`].
 pub fn get_role_id(role: &Role) -> Result<RoleId, imp::Error> {
-    Ok(role.id)
+    Ok(role.get_id().into())
 }
 
 /// Get name of role.
 ///
 /// Returns a C string pointer to the role's name.
-pub fn get_role_name(role: &Role) -> Result<*const c_char, imp::Error> {
-    Ok(role.name.0)
+#[aranya_capi_core::no_ext_error]
+pub fn get_role_name(role: &Role) -> *const c_char {
+    role.get_name()
 }
 
 /// Get ID of role.
@@ -1624,7 +1603,7 @@ pub fn get_role_name(role: &Role) -> Result<*const c_char, imp::Error> {
 ///
 /// Returns the label's ID [`LabelId`].
 pub fn get_label_id(label: &Label) -> Result<LabelId, imp::Error> {
-    Ok(label.id)
+    Ok(label.get_id().into())
 }
 
 /// Get name of label.
@@ -1632,8 +1611,17 @@ pub fn get_label_id(label: &Label) -> Result<LabelId, imp::Error> {
 /// @param label the label [`Label`].
 ///
 /// Returns a C string pointer to the label's name.
-pub fn get_label_name(label: &Label) -> Result<*const c_char, imp::Error> {
-    Ok(label.name.0)
+#[aranya_capi_core::no_ext_error]
+pub fn get_label_name(label: &Label) -> *const c_char {
+    label.get_name()
+}
+
+/// Get name of permission.
+///
+/// Returns a C string pointer to the role's name.
+#[aranya_capi_core::no_ext_error]
+pub fn get_perm_name(perm: &Perm) -> *const c_char {
+    perm.get_name()
 }
 
 /// Assign a label to a device so that it can be used for a channel.
@@ -1921,7 +1909,7 @@ pub fn query_device_label_assignments(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    labels: Option<&mut MaybeUninit<LabelId>>,
+    labels: Option<&mut MaybeUninit<Label>>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
@@ -1942,7 +1930,7 @@ pub fn query_device_label_assignments(
         return Err(imp::Error::BufferTooSmall);
     }
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.id.into());
+        Safe::init(dst, src.clone().into())
     }
     *labels_len = data.len();
     Ok(())
@@ -2091,11 +2079,10 @@ pub unsafe fn query_label_exists(
 /// @param labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
-// TODO: return label name strings.
 pub fn query_labels(
     client: &mut Client,
     team: &TeamId,
-    labels: Option<&mut MaybeUninit<LabelId>>,
+    labels: Option<&mut MaybeUninit<Label>>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
@@ -2109,7 +2096,7 @@ pub fn query_labels(
     };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.id.into());
+        Safe::init(dst, src.clone().into());
     }
     if *labels_len < data.len() {
         *labels_len = data.len();
@@ -2158,7 +2145,6 @@ pub unsafe fn query_afc_label_exists(
 /// @param roles_len returns the length of the roles list [`Role`].
 ///
 /// @relates AranyaClient.
-// TODO: return role strings.
 pub fn query_roles_on_team(
     client: &mut Client,
     team: &TeamId,
@@ -2176,7 +2162,7 @@ pub fn query_roles_on_team(
     };
     let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.clone().into());
+        Safe::init(dst, src.clone().into());
     }
     if *roles_len < data.len() {
         *roles_len = data.len();
@@ -2222,7 +2208,7 @@ pub fn query_device_roles(
     };
     let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.clone().into());
+        Safe::init(dst, src.clone().into());
     }
     if *roles_len < data.len() {
         *roles_len = data.len();
@@ -2251,7 +2237,7 @@ pub fn query_role_perms(
     client: &mut Client,
     team: &TeamId,
     role: &RoleId,
-    perms: Option<&mut MaybeUninit<RolePerm>>,
+    perms: Option<&mut MaybeUninit<Perm>>,
     perms_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
@@ -2265,7 +2251,7 @@ pub fn query_role_perms(
     };
     let out = aranya_capi_core::try_as_mut_slice!(perms, *perms_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.clone().into());
+        Safe::init(dst, src.clone().into())
     }
     if *perms_len < data.len() {
         *perms_len = data.len();

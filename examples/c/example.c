@@ -498,6 +498,7 @@ AranyaError run(Team *t) {
 
     // Queries
     printf("running factdb queries\r\n");
+    printf("querying devices on team\r\n");
     size_t devices_len      = BUF_LEN;
     AranyaDeviceId *devices = malloc(devices_len * sizeof(AranyaDeviceId));
     err = aranya_query_devices_on_team(&t->clients.operator.client, &t->id,
@@ -528,6 +529,7 @@ AranyaError run(Team *t) {
     }
     free(devices);
 
+    printf("querying roles on team\r\n");
     size_t roles_len  = BUF_LEN;
     AranyaRole *roles = malloc(roles_len * sizeof(AranyaRole));
     err = aranya_query_roles_on_team(&t->clients.operator.client, &t->id, roles,
@@ -536,8 +538,7 @@ AranyaError run(Team *t) {
     if (roles == NULL) {
         return ARANYA_ERROR_BUG;
     }
-    // TODO: heap buffer overflow
-    /*
+    printf("found %zu roles on team\r\n", roles_len);
     for (size_t i = 0; i < roles_len; i++) {
         AranyaRole role_result = roles[i];
         const char *role_str   = NULL;
@@ -547,7 +548,6 @@ AranyaError run(Team *t) {
 
         // TODO: get_role_id()
     }
-    */
 
     err = aranya_query_device_roles(&t->clients.operator.client, &t->id,
                                     &t->clients.admin.id, roles, &roles_len);
@@ -555,8 +555,6 @@ AranyaError run(Team *t) {
     if (roles == NULL) {
         return ARANYA_ERROR_BUG;
     }
-    // TODO: heap buffer overflow
-    /*
     for (size_t i = 0; i < roles_len; i++) {
         AranyaRole role_result = roles[i];
         const char *role_str   = NULL;
@@ -566,28 +564,25 @@ AranyaError run(Team *t) {
 
         // TODO: get_role_id()
     }
-    */
 
     free(roles);
 
-    size_t perms_len      = BUF_LEN;
-    AranyaRolePerm *perms = malloc(perms_len * sizeof(AranyaRolePerm));
+    printf("querying admin role permissions\r\n");
+    size_t perms_len  = BUF_LEN;
+    AranyaPerm *perms = malloc(perms_len * sizeof(AranyaPerm));
     err = aranya_query_role_perms(&t->clients.operator.client, &t->id,
                                   &t->roles.admin, perms, &perms_len);
     EXPECT("error querying role perms", err);
     if (roles == NULL) {
         return ARANYA_ERROR_BUG;
     }
-    // TODO: heap buffer overflow
-    /*
     for (size_t i = 0; i < roles_len; i++) {
-        AranyaRole perm_result = perms[i];
+        AranyaPerm perm_result = perms[i];
         const char *perm_str   = NULL;
         err                    = aranya_get_perm_name(&perm_result, &perm_str);
-        EXPECT("unable to get role name", err);
+        EXPECT("unable to get perm name", err);
         printf("perm: %s at index: %zu/%zu \r\n", perm_str, i, perms_len);
     }
-    */
 
     free(perms);
 
@@ -835,14 +830,14 @@ AranyaError run_aqc_example(Team *t) {
     printf("query labels assigned to device: %s\r\n", device_str);
     // `labels_len` is intentionally set to 1 when there are 2 labels to test
     // `ARANYA_ERROR_BUFFER_TOO_SMALL` error handling.
-    size_t labels_len     = 1;
-    AranyaLabelId *labels = malloc(labels_len * sizeof(AranyaLabelId));
+    size_t labels_len   = 1;
+    AranyaLabel *labels = malloc(labels_len * sizeof(AranyaLabel));
     err = aranya_query_device_label_assignments(&t->clients.operator.client,
                                                 &t->id, &t->clients.memberb.id,
                                                 labels, &labels_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error\r\n");
-        labels = realloc(labels, labels_len * sizeof(AranyaLabelId));
+        labels = realloc(labels, labels_len * sizeof(AranyaLabel));
         err = aranya_query_labels(&t->clients.operator.client, &t->id, labels,
                                   &labels_len);
     }
@@ -851,12 +846,10 @@ AranyaError run_aqc_example(Team *t) {
         return ARANYA_ERROR_BUG;
     }
     for (size_t i = 0; i < labels_len; i++) {
-        AranyaLabelId label_result = labels[i];
-        size_t label_str_len       = ARANYA_ID_STR_LEN;
-        char *label_str            = malloc(ARANYA_ID_STR_LEN);
-        aranya_id_to_str(&label_result.id, label_str, &label_str_len);
-        printf("label_id: %s at index: %zu/%zu \r\n", label_str, i, labels_len);
-        free(label_str);
+        AranyaLabel label_result = labels[i];
+        const char *label_str    = NULL;
+        aranya_get_label_name(&label_result, &label_str);
+        printf("label: %s at index: %zu/%zu \r\n", label_str, i, labels_len);
     }
     free(device_str);
 
@@ -871,7 +864,7 @@ AranyaError run_aqc_example(Team *t) {
                               &labels_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error\r\n");
-        labels = realloc(labels, labels_len * sizeof(AranyaLabelId));
+        labels = realloc(labels, labels_len * sizeof(AranyaLabel));
         err = aranya_query_labels(&t->clients.operator.client, &t->id, labels,
                                   &labels_len);
     }
@@ -880,12 +873,10 @@ AranyaError run_aqc_example(Team *t) {
         return ARANYA_ERROR_BUG;
     }
     for (size_t i = 0; i < labels_len; i++) {
-        AranyaLabelId label_result = labels[i];
-        size_t label_str_len       = ARANYA_ID_STR_LEN;
-        char *label_str            = malloc(ARANYA_ID_STR_LEN);
-        aranya_id_to_str(&label_result.id, label_str, &label_str_len);
-        printf("label_id: %s at index: %zu/%zu \r\n", label_str, i, labels_len);
-        free(label_str);
+        AranyaLabel label_result = labels[i];
+        const char *label_str    = NULL;
+        aranya_get_label_name(&label_result, &label_str);
+        printf("label: %s at index: %zu/%zu \r\n", label_str, i, labels_len);
     }
     free(labels);
     free(team_str);
