@@ -1007,6 +1007,7 @@ AranyaError cleanup_roles(Team *t) {
     EXPECT("error revoking member role", err);
 
     // Delete roles
+    // TODO: obtain team roles from query.
     for (int i = 0; i < NUM_ROLES; i++) {
         err = aranya_delete_role(&t->clients.owner.client, &t->id,
                                  &t->roles_arr[i]);
