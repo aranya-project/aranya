@@ -450,7 +450,7 @@ impl RolePerm {
 impl From<String> for RolePerm {
     fn from(value: String) -> Self {
         let str = value.leak();
-        Self(str.as_ptr() as *const i8)
+        Self(str.as_ptr() as *const c_char)
     }
 }
 
@@ -491,7 +491,7 @@ impl From<aranya_daemon_api::Role> for Role {
         let str = value.name.leak();
         Self {
             id: value.id.into(),
-            name: RoleName(str.as_ptr() as *const i8),
+            name: RoleName(str.as_ptr() as *const c_char),
         }
     }
 }
@@ -514,7 +514,7 @@ pub struct Label {
 pub struct AfcLabel(u32);
 
 #[cfg(feature = "afc")]
-impl From<AfcLabel> for aranya_fast_channels::AfcLabel {
+impl From<AfcLabel> for aranya_fast_channels::Label {
     fn from(value: AfcLabel) -> Self {
         Self::new(value.0)
     }
@@ -2132,7 +2132,7 @@ pub fn query_labels(
 pub unsafe fn query_afc_label_exists(
     client: &mut Client,
     team: &TeamId,
-    label: &Label,
+    label: &AfcLabel,
 ) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
     let exists = client.rt.block_on(
