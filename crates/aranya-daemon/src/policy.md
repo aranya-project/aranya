@@ -104,7 +104,7 @@ struct KeyIds {
 }
 
 // Defines a device on the team.
-struct Device {
+struct DeviceInfo {
     // ID of the device.
     device_id id,
     // Device priority.
@@ -129,8 +129,8 @@ struct Role {
 ### Facts
 
 ```policy
-// Devices on the team.
-fact Devices[device_id id]=>{device struct Device}
+// Device on the team.
+fact Device[device_id id]=>{device struct DeviceInfo}
 
 // A device's public IdentityKey
 fact DeviceIdentKey[device_id id]=>{key bytes}
@@ -162,8 +162,8 @@ fact AqcMemberNetworkId[device_id id]=>{net_identifier string}
 
 ```policy
 // Returns a device if one exists.
-function find_existing_device(device_id id) optional struct Devices {
-    let device = query Devices[device_id: device_id]
+function find_existing_device(device_id id) optional struct Device {
+    let device = query Device[device_id: device_id]
     let has_ident = exists DeviceIdentKey[device_id: device_id]
     let has_sign = exists DeviceSignKey[device_id: device_id]
     let has_enc = exists DeviceEncKey[device_id: device_id]
@@ -192,7 +192,7 @@ function team_exists() bool {
 }
 
 // Returns a valid Device after performing sanity checks per the stated invariants.
-function get_valid_device(device_id id) struct Devices {
+function get_valid_device(device_id id) struct Device {
     // Get and return device info.
     let device = check_unwrap find_existing_device(device_id)
     return device
@@ -279,8 +279,8 @@ function device_has_permission(device_id id, perm string) bool {
 // This means the author has permission to execute commands on the target.
 function author_dominates_target(author_id id, target_id id) bool {
     // Check if the device has higher priority than the target device.
-    let author_device = unwrap query Devices[device_id: author_id]
-    let target_device = unwrap query Devices[device_id: target_id]
+    let author_device = unwrap query Device[device_id: author_id]
+    let target_device = unwrap query Device[device_id: target_id]
     if author_device.device.priority > target_device.device.priority {
         return true
     }
@@ -447,7 +447,7 @@ command CreateTeam {
         check author_id == owner_key_ids.device_id
 
         // TODO: define const high priority for owner device.
-        let device = Device {
+        let device = DeviceInfo {
             device_id: owner_key_ids.device_id,
             priority: 65000,
             sign_key_id: owner_key_ids.sign_key_id,
@@ -490,8 +490,8 @@ command CreateTeam {
 }
 
 // Adds the device to the Team.
-finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, device struct Device) {
-    create Devices[device_id: key_ids.device_id]=>{device: device}
+finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, device struct DeviceInfo) {
+    create Device[device_id: key_ids.device_id]=>{device: device}
 
     create DeviceIdentKey[device_id: key_ids.device_id]=>{key: key_bundle.ident_key}
     create DeviceSignKey[device_id: key_ids.device_id]=>{
@@ -602,7 +602,7 @@ command AddMember {
         // Check that the Member doesn't already exist.
         check find_existing_device(device_key_ids.device_id) is None
 
-        let device = Device {
+        let device = DeviceInfo {
             device_id: device_key_ids.device_id,
             priority: this.priority,
             sign_key_id: device_key_ids.sign_key_id,
@@ -675,7 +675,7 @@ command RemoveMember{
 
 // Removes the device from the Team.
 finish function remove_device(device_id id) {
-    delete Devices[device_id: device_id]
+    delete Device[device_id: device_id]
     delete DeviceIdentKey[device_id: device_id]
     delete DeviceSignKey[device_id: device_id]
     delete DeviceEncKey[device_id: device_id]
@@ -2055,7 +2055,7 @@ Queries for a list devices on the team.
 
 ```policy
 action query_devices_on_team() {
-    map Devices[device_id:?] as f {
+    map Device[device_id:?] as f {
         publish QueryDevicesOnTeam { device_id: f.device_id }
     }
 }
