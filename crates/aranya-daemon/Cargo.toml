@@ -46,6 +46,7 @@ ciborium = { workspace = true }
 clap = { workspace = true }
 deser-hjson = { version = "2" }
 futures-util = { workspace = true }
+hex = { version = "0.4" }
 postcard = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }

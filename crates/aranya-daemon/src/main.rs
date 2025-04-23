@@ -40,9 +40,16 @@ fn main() -> Result<()> {
     rt.block_on(async {
         let daemon = Daemon::load(cfg).await.context("unable to load daemon")?;
         info!("loaded Aranya daemon");
+
+        if flags.print_api_pk {
+            let pk = daemon.public_api_key().await?.encode()?;
+            println!("{}", hex::encode(pk));
+            return Ok(());
+        }
+
         daemon.run().await
     })
-    .inspect_err(|err| error!(err = ?err))
+    .inspect_err(|err| error!(?err))
 }
 
 #[derive(Debug, Parser)]
@@ -50,6 +57,8 @@ fn main() -> Result<()> {
 struct Args {
     /// Configuration file
     cfg: PathBuf,
+    /// Print the public API key in hexadecimal format.
+    print_api_pk: bool,
 }
 
 /// A PID file.

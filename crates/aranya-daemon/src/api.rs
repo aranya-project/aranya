@@ -34,7 +34,7 @@ use tokio::{
 use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
-    aqc::{self, Aqc},
+    aqc::Aqc,
     aranya::Actions,
     daemon::KS,
     policy::{ChanOp, Effect, KeyBundle, Role},
@@ -452,7 +452,7 @@ impl DaemonApi for ApiShim {
 
         let peer_id = self
             .aqc
-            .find_peer(graph, &peer)
+            .find_device_id(graph, &peer)
             .await
             .context("unable to lookup peer")?;
 
@@ -471,19 +471,7 @@ impl DaemonApi for ApiShim {
 
         self.handle_effects(graph, &effects).await?;
 
-        let info = aqc::BidiChannelCreated {
-            parent_cmd_id: e.parent_cmd_id,
-            author_id: e.author_id.into(),
-            author_enc_key_id: e.author_enc_key_id.into(),
-            peer_id: e.peer_id.into(),
-            peer_enc_pk: &e.peer_enc_pk,
-            label_id: e.label_id.into(),
-            channel_id: e.channel_id.into(),
-            author_secrets_id: e.author_secrets_id.into(),
-            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                .assume("`psk_length_in_bytes` is out of range")?,
-        };
-        let psk = self.aqc.bidi_channel_created(&info).await?;
+        let psk = self.aqc.bidi_channel_created(e).await?;
         debug!(identity = %psk.identity, "psk identity");
 
         Ok((ctrl, psk))
@@ -503,7 +491,7 @@ impl DaemonApi for ApiShim {
 
         let peer_id = self
             .aqc
-            .find_peer(graph, &peer)
+            .find_device_id(graph, &peer)
             .await
             .context("unable to lookup peer")?;
 
@@ -522,21 +510,7 @@ impl DaemonApi for ApiShim {
 
         self.handle_effects(graph, &effects).await?;
 
-        let info = aqc::UniChannelCreated {
-            parent_cmd_id: e.parent_cmd_id,
-            author_id: e.author_id.into(),
-            author_enc_key_id: e.author_enc_key_id.into(),
-            send_id: e.sender_id.into(),
-            recv_id: e.receiver_id.into(),
-            peer_enc_pk: &e.peer_enc_pk,
-            label_id: e.label_id.into(),
-            channel_id: e.channel_id.into(),
-            author_secrets_id: e.author_secrets_id.into(),
-            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                .assume("`psk_length_in_bytes` is out of range")
-                .context("psk_length_in_bytes is out of range")?,
-        };
-        let psk = self.aqc.uni_channel_created(&info).await?;
+        let psk = self.aqc.uni_channel_created(e).await?;
         debug!(identity = %psk.identity, "psk identity");
 
         Ok((ctrl, psk))
@@ -586,19 +560,7 @@ impl DaemonApi for ApiShim {
             });
             match effect {
                 Some(Effect::AqcBidiChannelReceived(e)) => {
-                    let info = aqc::BidiChannelReceived {
-                        channel_id: e.channel_id.into(),
-                        parent_cmd_id: e.parent_cmd_id,
-                        author_id: e.author_id.into(),
-                        author_enc_pk: &e.author_enc_pk,
-                        peer_id: e.peer_id.into(),
-                        peer_enc_key_id: e.peer_enc_key_id.into(),
-                        label_id: e.label_id.into(),
-                        encap: &e.encap,
-                        psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                            .assume("`psk_length_in_bytes` is out of range")?,
-                    };
-                    let psk = self.aqc.bidi_channel_received(&info).await?;
+                    let psk = self.aqc.bidi_channel_received(e).await?;
                     let net_id = self
                         .aqc
                         .find_net_id(graph, e.author_id.into())
@@ -609,20 +571,7 @@ impl DaemonApi for ApiShim {
                     return Ok((net_id, api::AqcPsk::Bidi(psk)));
                 }
                 Some(Effect::AqcUniChannelReceived(e)) => {
-                    let info = aqc::UniChannelReceived {
-                        channel_id: e.channel_id.into(),
-                        parent_cmd_id: e.parent_cmd_id,
-                        send_id: e.sender_id.into(),
-                        recv_id: e.receiver_id.into(),
-                        author_id: e.author_id.into(),
-                        author_enc_pk: &e.author_enc_pk,
-                        peer_enc_key_id: e.peer_enc_key_id.into(),
-                        label_id: e.label_id.into(),
-                        encap: &e.encap,
-                        psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
-                            .assume("`psk_length_in_bytes` is out of range")?,
-                    };
-                    let psk = self.aqc.uni_channel_received(&info).await?;
+                    let psk = self.aqc.uni_channel_received(e).await?;
                     let net_id = self
                         .aqc
                         .find_net_id(graph, e.author_id.into())

@@ -2,41 +2,53 @@ use core::fmt;
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;
-use aranya_aqc_util::Handler;
-pub(crate) use aranya_aqc_util::{
-    BidiChannelCreated, BidiChannelReceived, UniChannelCreated, UniChannelReceived,
+use aranya_aqc_util::{
+    BidiChannelCreated, BidiChannelReceived, Handler, UniChannelCreated, UniChannelReceived,
 };
 use aranya_crypto::{DeviceId, Engine, KeyStore};
 use aranya_daemon_api::{AqcBidiPsk, AqcUniPsk, Directed, NetIdentifier, Secret};
 use aranya_runtime::GraphId;
 use bimap::BiBTreeMap;
+use buggy::{bug, BugExt};
 use tokio::sync::Mutex;
+use tracing::{debug, error, info, instrument, warn};
 
-/// A mapping of `Net ID <=> Device ID`, separated by `Graph ID`.
-type PeerMap = Arc<Mutex<BTreeMap<GraphId, Peers>>>;
+use crate::{
+    keystore::AranyaStore,
+    policy::{
+        AqcBidiChannelCreated, AqcBidiChannelReceived, AqcUniChannelCreated, AqcUniChannelReceived,
+    },
+};
+
+type PeerMap = BTreeMap<GraphId, Peers>;
 type Peers = BiBTreeMap<NetIdentifier, DeviceId>;
 
 pub(crate) struct Aqc<E, KS> {
+    /// Our device ID.
     device_id: DeviceId,
-    peers: PeerMap,
-    handler: Mutex<Handler<KS>>,
+    /// All the peers that we have channels with.
+    peers: Arc<Mutex<PeerMap>>,
+    handler: Mutex<Handler<AranyaStore<KS>>>,
     eng: Mutex<E>,
 }
 
 impl<E, KS> Aqc<E, KS> {
-    pub(crate) fn new<I>(eng: E, device_id: DeviceId, store: KS, peers: I) -> Self
+    pub(crate) fn new<I>(eng: E, device_id: DeviceId, store: AranyaStore<KS>, peers: I) -> Self
     where
         I: IntoIterator<Item = (GraphId, Peers)>,
     {
         Self {
             device_id,
-            peers: Arc::new(Mutex::new(BTreeMap::from_iter(peers))),
+            peers: Arc::new(Mutex::new(PeerMap::from_iter(peers))),
             handler: Mutex::new(Handler::new(device_id, store)),
             eng: Mutex::new(eng),
         }
     }
 
-    pub(crate) async fn find_peer(&self, graph: GraphId, net_id: &str) -> Option<DeviceId> {
+    /// Returns the peer's device ID that corresponds to
+    /// `net_id`.
+    #[instrument(skip_all, fields(%graph, %net_id))]
+    pub(crate) async fn find_device_id(&self, graph: GraphId, net_id: &str) -> Option<DeviceId> {
         self.peers
             .lock()
             .await
@@ -45,6 +57,8 @@ impl<E, KS> Aqc<E, KS> {
             .copied()
     }
 
+    /// Returns the peer's net ID that corresponds with `id`.
+    #[instrument(skip_all, fields(%graph, %id))]
     pub(crate) async fn find_net_id(&self, graph: GraphId, id: DeviceId) -> Option<NetIdentifier> {
         self.peers
             .lock()
@@ -54,6 +68,8 @@ impl<E, KS> Aqc<E, KS> {
             .cloned()
     }
 
+    /// Adds a peer.
+    #[instrument(skip_all, fields(%graph, %net_id, %id))]
     pub(crate) async fn add_peer(&self, graph: GraphId, net_id: NetIdentifier, id: DeviceId) {
         self.peers
             .lock()
@@ -65,7 +81,7 @@ impl<E, KS> Aqc<E, KS> {
 
     async fn while_locked<'a, F, R>(&'a self, f: F) -> R
     where
-        F: for<'b> FnOnce(&'b mut Handler<KS>, &'b mut E) -> R,
+        F: for<'b> FnOnce(&'b mut Handler<AranyaStore<KS>>, &'b mut E) -> R,
     {
         let mut handler = self.handler.lock().await;
         let mut eng = self.eng.lock().await;
@@ -78,39 +94,103 @@ where
     E: Engine,
     KS: KeyStore,
 {
+    /// Handles the [`AqcBidiChannelCreated`] effect, returning
+    /// the channel's PSK.
+    #[instrument(skip_all, fields(id = %e.channel_id))]
     pub(crate) async fn bidi_channel_created(
         &self,
-        info: &BidiChannelCreated<'_>,
+        e: &AqcBidiChannelCreated,
     ) -> Result<AqcBidiPsk> {
+        if e.author_id != self.device_id.into() {
+            bug!("not the author of the bidi channel");
+        }
+
+        let info = BidiChannelCreated {
+            parent_cmd_id: e.parent_cmd_id,
+            author_id: e.author_id.into(),
+            author_enc_key_id: e.author_enc_key_id.into(),
+            peer_id: e.peer_id.into(),
+            peer_enc_pk: &e.peer_enc_pk,
+            label_id: e.label_id.into(),
+            channel_id: e.channel_id.into(),
+            author_secrets_id: e.author_secrets_id.into(),
+            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
+                .assume("`psk_length_in_bytes` is out of range")?,
+        };
         let psk = self
-            .while_locked(|handler, eng| handler.bidi_channel_created(eng, info))
+            .while_locked(|handler, eng| handler.bidi_channel_created(eng, &info))
             .await?;
+        debug_assert_eq!(e.channel_id, psk.identity().into());
+
         Ok(AqcBidiPsk {
             identity: psk.identity().into(),
             secret: Secret::from(psk.raw_secret_bytes()),
         })
     }
 
+    /// Handles the [`AqcBidiChannelReceived`] effect, returning
+    /// the channel's PSK.
+    #[instrument(skip_all, fields(id = %e.channel_id))]
     pub(crate) async fn bidi_channel_received(
         &self,
-        info: &BidiChannelReceived<'_>,
+        e: &AqcBidiChannelReceived,
     ) -> Result<AqcBidiPsk> {
+        if e.peer_id != self.device_id.into() {
+            bug!("not the peer of the bidi channel");
+        }
+
+        let info = BidiChannelReceived {
+            channel_id: e.channel_id.into(),
+            parent_cmd_id: e.parent_cmd_id,
+            author_id: e.author_id.into(),
+            author_enc_pk: &e.author_enc_pk,
+            peer_id: e.peer_id.into(),
+            peer_enc_key_id: e.peer_enc_key_id.into(),
+            label_id: e.label_id.into(),
+            encap: &e.encap,
+            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
+                .assume("`psk_length_in_bytes` is out of range")?,
+        };
         let psk = self
-            .while_locked(|handler, eng| handler.bidi_channel_received(eng, info))
+            .while_locked(|handler, eng| handler.bidi_channel_received(eng, &info))
             .await?;
+        debug_assert_eq!(e.channel_id, psk.identity().into());
+
         Ok(AqcBidiPsk {
             identity: psk.identity().into(),
             secret: Secret::from(psk.raw_secret_bytes()),
         })
     }
 
-    pub(crate) async fn uni_channel_created(
-        &self,
-        info: &UniChannelCreated<'_>,
-    ) -> Result<AqcUniPsk> {
+    /// Handles the [`AqcUniChannelCreated`] effect, returning
+    /// the channel's PSK.
+    #[instrument(skip_all, fields(id = %e.channel_id))]
+    pub(crate) async fn uni_channel_created(&self, e: &AqcUniChannelCreated) -> Result<AqcUniPsk> {
+        if e.author_id != self.device_id.into() {
+            bug!("not the author of the uni channel");
+        }
+        if e.sender_id != self.device_id.into() && e.receiver_id != self.device_id.into() {
+            bug!("not a member of this uni channel");
+        }
+
+        let info = UniChannelCreated {
+            parent_cmd_id: e.parent_cmd_id,
+            author_id: e.author_id.into(),
+            author_enc_key_id: e.author_enc_key_id.into(),
+            send_id: e.sender_id.into(),
+            recv_id: e.receiver_id.into(),
+            peer_enc_pk: &e.peer_enc_pk,
+            label_id: e.label_id.into(),
+            channel_id: e.channel_id.into(),
+            author_secrets_id: e.author_secrets_id.into(),
+            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
+                .assume("`psk_length_in_bytes` is out of range")?,
+        };
         let psk = self
-            .while_locked(|handler, eng| handler.uni_channel_created(eng, info))
+            .while_locked(|handler, eng| handler.uni_channel_created(eng, &info))
             .await?;
+        debug_assert_eq!(e.channel_id, psk.identity().into());
+
         let secret = Secret::from(psk.raw_secret_bytes());
         Ok(AqcUniPsk {
             identity: psk.identity().into(),
@@ -122,13 +202,38 @@ where
         })
     }
 
+    /// Handles the [`AqcUniChannelReceived`] effect, returning
+    /// the channel's PSK.
+    #[instrument(skip_all, fields(id = %e.channel_id))]
     pub(crate) async fn uni_channel_received(
         &self,
-        info: &UniChannelReceived<'_>,
+        e: &AqcUniChannelReceived,
     ) -> Result<AqcUniPsk> {
+        if e.author_id == self.device_id.into() {
+            bug!("not the peer of the uni channel");
+        }
+        if e.sender_id != self.device_id.into() && e.receiver_id != self.device_id.into() {
+            bug!("not a member of this uni channel");
+        }
+
+        let info = UniChannelReceived {
+            channel_id: e.channel_id.into(),
+            parent_cmd_id: e.parent_cmd_id,
+            send_id: e.sender_id.into(),
+            recv_id: e.receiver_id.into(),
+            author_id: e.author_id.into(),
+            author_enc_pk: &e.author_enc_pk,
+            peer_enc_key_id: e.peer_enc_key_id.into(),
+            label_id: e.label_id.into(),
+            encap: &e.encap,
+            psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
+                .assume("`psk_length_in_bytes` is out of range")?,
+        };
         let psk = self
-            .while_locked(|handler, eng| handler.uni_channel_received(eng, info))
+            .while_locked(|handler, eng| handler.uni_channel_received(eng, &info))
             .await?;
+        debug_assert_eq!(e.channel_id, psk.identity().into());
+
         let secret = Secret::from(psk.raw_secret_bytes());
         Ok(AqcUniPsk {
             identity: psk.identity().into(),
@@ -144,6 +249,7 @@ where
 impl<E, KS> fmt::Debug for Aqc<E, KS> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Aqc")
+            .field("device_id", &self.device_id)
             .field("peers", &self.peers)
             .finish_non_exhaustive()
     }

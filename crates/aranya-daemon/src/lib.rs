@@ -38,6 +38,7 @@ pub mod vm_policy;
 mod api;
 mod aqc;
 mod daemon;
+mod keystore;
 mod sync;
 
 pub use daemon::*;

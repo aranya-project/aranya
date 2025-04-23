@@ -27,6 +27,7 @@ use crate::{
     aqc::Aqc,
     aranya::{self, Actions},
     config::Config,
+    keystore::{AranyaStore, LocalStore},
     policy,
     sync::Syncer,
     vm_policy::{PolicyEngine, TEST_POLICY_1},
@@ -58,6 +59,16 @@ impl Daemon {
         Ok(Self { cfg })
     }
 
+    /// Returns the daemon's public API key.
+    pub async fn public_api_key(self) -> Result<PublicApiKey<CS>> {
+        self.setup_env().await?;
+
+        let mut eng = self.load_crypto_engine().await?;
+        let mut store = self.load_local_keystore().await?;
+        let sk = self.load_or_gen_api_sk(&mut eng, &mut store).await?;
+        sk.public().map_err(Into::into)
+    }
+
     /// The daemon's entrypoint.
     pub async fn run(self) -> Result<()> {
         // Setup environment for daemon's working directory.
@@ -66,27 +77,14 @@ impl Daemon {
 
         let mut set = JoinSet::new();
 
-        let mut aranya_store = {
-            let dir = self.cfg.aranya_keystore_path();
-            aranya_util::create_dir_all(&dir).await?;
-            KS::open(&dir).context("unable to open root keystore")?
-        };
-        let mut eng = {
-            let key = load_or_gen_key(self.cfg.key_wrap_key_path()).await?;
-            CE::new(&key, Rng)
-        };
+        let mut aranya_store = self.load_aranya_keystore().await?;
+        let mut eng = self.load_crypto_engine().await?;
         let pk = self
             .load_or_gen_public_keys(&mut eng, &mut aranya_store)
             .await?;
 
-        let api_sk = {
-            let mut store = {
-                let dir = self.cfg.local_keystore_path();
-                aranya_util::create_dir_all(&dir).await?;
-                KS::open(&dir).context("unable to open local keystore")?
-            };
-            self.load_or_gen_api_key(&mut eng, &mut store).await?
-        };
+        let mut local_store = self.load_local_keystore().await?;
+        let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
 
         // Initialize Aranya client.
         let (client, local_addr) = {
@@ -209,7 +207,36 @@ impl Daemon {
         Ok((client, server))
     }
 
-    /// Loads the [`KeyBundle`].
+    /// Loads the crypto engine.
+    async fn load_crypto_engine(&self) -> Result<CE> {
+        let key = load_or_gen_key(self.cfg.key_wrap_key_path()).await?;
+        Ok(CE::new(&key, Rng))
+    }
+
+    /// Loads the Aranya keystore.
+    ///
+    /// The Aranaya keystore contains Aranya's key material.
+    async fn load_aranya_keystore(&self) -> Result<AranyaStore<KS>> {
+        let dir = self.cfg.aranya_keystore_path();
+        aranya_util::create_dir_all(&dir).await?;
+        KS::open(&dir)
+            .context("unable to open Aranya keystore")
+            .map(AranyaStore::new)
+    }
+
+    /// Loads the local keystore.
+    ///
+    /// The local keystore contains key material for the daemon.
+    /// E.g., its API key.
+    async fn load_local_keystore(&self) -> Result<LocalStore<KS>> {
+        let dir = self.cfg.local_keystore_path();
+        aranya_util::create_dir_all(&dir).await?;
+        KS::open(&dir)
+            .context("unable to open local keystore")
+            .map(LocalStore::new)
+    }
+
+    /// Loads the daemon's [`PublicKeys`].
     async fn load_or_gen_public_keys(
         &self,
         eng: &mut CE,
@@ -232,6 +259,8 @@ impl Daemon {
     }
 
     /// Loads the daemmon's public API key.
+    ///
+    /// For testing purposes only.
     pub async fn load_api_pk(path: &Path) -> Result<Vec<u8>> {
         let pk = try_read_cbor::<PublicApiKey<CS>>(&path)
             .await?
@@ -240,7 +269,11 @@ impl Daemon {
     }
 
     /// Loads or generates the [`ApiKey`].
-    async fn load_or_gen_api_key<E, S>(&self, eng: &mut E, store: &mut S) -> Result<ApiKey<E::CS>>
+    async fn load_or_gen_api_sk<E, S>(
+        &self,
+        eng: &mut E,
+        store: &mut LocalStore<S>,
+    ) -> Result<ApiKey<E::CS>>
     where
         E: Engine,
         S: KeyStore,
