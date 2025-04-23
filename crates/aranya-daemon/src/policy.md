@@ -469,7 +469,7 @@ command CreateTeam {
             // Create a new owner role.
             create_role(role)
 
-            // TODO: assign default permissions to owner role.
+            // Assign default permissions to owner role.
             assign_perm_role("AddMember", role.role_id)
             assign_perm_role("RemoveMember", role.role_id)
             assign_perm_role("CreateRole", role.role_id)
