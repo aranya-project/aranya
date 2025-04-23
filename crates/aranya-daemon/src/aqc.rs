@@ -11,7 +11,7 @@ use aranya_runtime::GraphId;
 use bimap::BiBTreeMap;
 use buggy::{bug, BugExt};
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, instrument, warn};
+use tracing::instrument;
 
 use crate::{
     keystore::AranyaStore,
