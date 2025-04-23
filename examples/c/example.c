@@ -670,6 +670,8 @@ AranyaError init_roles(Team *t) {
 
     printf("initializing roles\r\n");
 
+    // TODO: provide method to configure default permissions.
+
     // Create custom roles.
     err = aranya_create_role(&t->clients.owner.client, &t->id, "admin",
                              &t->roles.admin);

@@ -9,7 +9,7 @@
     rust_2018_idioms
 )]
 
-use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{collections::BTreeMap, fmt, net::SocketAddr, path::PathBuf, sync::LazyLock, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_client::{Client, SyncPeerConfig, TeamConfig};
@@ -28,6 +28,20 @@ use tracing::{debug, info, instrument};
 const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
 const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
+
+// Default role permisisons.
+static DEFAULT_PERMS: LazyLock<BTreeMap<&str, &str>> = LazyLock::new(|| {
+    let mut m = BTreeMap::new();
+    m.insert("SetAqcNetworkName", "operator");
+    m.insert("UnsetAqcNetworkName", "operator");
+    m.insert("CreateLabel", "operator");
+    m.insert("AssignLabel", "operator");
+    m.insert("RevokeLabel", "operator");
+    m.insert("DeleteLabel", "admin");
+    m.insert("AqcCreateBidiChannel", "member");
+    m.insert("AqcCreateUniChannel", "member");
+    m
+});
 
 #[instrument(skip_all, fields(%duration = FmtDuration(d)))]
 fn sleep(d: Duration) -> Sleep {
@@ -179,31 +193,18 @@ impl TeamCtx {
             operator: owner_team.create_role("operator".into()).await?,
             member: owner_team.create_role("member".into()).await?,
         };
+        let role_list = [&roles.admin, &roles.operator, &roles.member];
 
-        owner_team
-            .assign_role_perm(roles.operator.id, "SetAqcNetworkName".into())
-            .await?;
-        owner_team
-            .assign_role_perm(roles.operator.id, "UnsetAqcNetworkName".into())
-            .await?;
-        owner_team
-            .assign_role_perm(roles.operator.id, "CreateLabel".into())
-            .await?;
-        owner_team
-            .assign_role_perm(roles.operator.id, "AssignLabel".into())
-            .await?;
-        owner_team
-            .assign_role_perm(roles.operator.id, "RevokeLabel".into())
-            .await?;
-        owner_team
-            .assign_role_perm(roles.admin.id, "DeleteLabel".into())
-            .await?;
-        owner_team
-            .assign_role_perm(roles.member.id, "AqcCreateBidiChannel".into())
-            .await?;
-        owner_team
-            .assign_role_perm(roles.member.id, "AqcCreateUniChannel".into())
-            .await?;
+        // Assign permissions to roles.
+        for (perm, role_name) in DEFAULT_PERMS.iter() {
+            for role in &role_list {
+                if *role_name == role.name {
+                    owner_team
+                        .assign_role_perm(role.id, perm.to_string())
+                        .await?;
+                }
+            }
+        }
 
         self.roles = Some(roles);
 
