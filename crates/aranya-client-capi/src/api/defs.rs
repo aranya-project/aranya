@@ -986,7 +986,7 @@ pub fn assign_role_perm(
         client
             .inner
             .team(team.into())
-            .assign_role_perm(role_id.into(), perm.into()),
+            .assign_role_perm(role_id.into(), perm),
     )?;
     Ok(())
 }
