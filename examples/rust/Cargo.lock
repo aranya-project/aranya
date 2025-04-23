@@ -118,23 +118,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 
 [[package]]
-name = "aranya-afc-util"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c7b3306315b4019fb1a48f41eed8b35e49d63327aa6a9de6ba4c98a47b05171"
-dependencies = [
- "aranya-crypto",
- "aranya-fast-channels",
- "aranya-policy-vm",
- "buggy",
- "postcard",
- "serde",
- "spin",
- "thiserror 2.0.12",
- "tracing",
-]
-
-[[package]]
 name = "aranya-aqc-util"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -161,11 +144,7 @@ dependencies = [
  "aranya-fast-channels",
  "aranya-util",
  "buggy",
- "indexmap",
- "libc",
  "postcard",
- "serde",
- "spideroak-base58",
  "tarpc",
  "thiserror 2.0.12",
  "tokio",
@@ -211,7 +190,6 @@ name = "aranya-daemon"
 version = "0.5.1"
 dependencies = [
  "anyhow",
- "aranya-afc-util",
  "aranya-aqc-util",
  "aranya-crypto",
  "aranya-crypto-ffi",
@@ -254,7 +232,6 @@ dependencies = [
  "aranya-util",
  "postcard",
  "serde",
- "spideroak-base58",
  "tarpc",
  "tracing",
 ]

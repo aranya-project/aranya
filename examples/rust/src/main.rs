@@ -1,9 +1,3 @@
-use std::{
-    net::SocketAddr,
-    net::Ipv4Addr,
-    path::PathBuf,
-    time::Duration,
-};
 use aranya_daemon_api::ChanOp;
 use anyhow::{Context as _, Result};
 use aranya_client::{client::Client, SyncPeerConfig, TeamConfig};
@@ -14,6 +8,7 @@ use aranya_daemon::{
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
+use std::{net::Ipv4Addr, net::SocketAddr, path::PathBuf, time::Duration};
 use tempfile::tempdir;
 use tokio::{fs, task, time::sleep};
 use tracing::{info, Metadata};
@@ -59,27 +54,19 @@ struct UserCtx {
 }
 
 impl UserCtx {
-    pub async fn new(team_name: String, name: String, work_dir: PathBuf) -> Result<Self> {
+    pub async fn new(_team_name: String, _name: String, work_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(work_dir.clone()).await?;
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
-        let afc_shm_path = format!("/afc_{}_{}", team_name, name).to_string();
-        let max_chans = 100;
         let cfg = Config {
             name: "daemon".into(),
             work_dir: work_dir.clone(),
             uds_api_path: uds_api_path.clone(),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
-            afc: AfcConfig {
-                shm_path: afc_shm_path.clone(),
-                unlink_on_startup: true,
-                unlink_at_exit: true,
-                create: true,
-                max_chans,
-            },
+            afc: None,
         };
         // Load daemon from config.
         // TODO: start daemons from binary rather than objects.
@@ -97,14 +84,10 @@ impl UserCtx {
         sleep(Duration::from_millis(100)).await;
 
         // Initialize the user library.
-        let mut client = (|| {
-            Client::connect(
-                &cfg.uds_api_path,
-            )
-        })
-        .retry(ExponentialBuilder::default())
-        .await
-        .context("unable to initialize client")?;
+        let mut client = (|| Client::connect(&cfg.uds_api_path))
+            .retry(ExponentialBuilder::default())
+            .await
+            .context("unable to initialize client")?;
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");
@@ -237,8 +220,8 @@ async fn main() -> Result<()> {
         .await?;
 
     admin_team
-         .add_sync_peer(owner_addr.into(), sync_cfg.clone())
-         .await?;
+        .add_sync_peer(owner_addr.into(), sync_cfg.clone())
+        .await?;
     admin_team
         .add_sync_peer(operator_addr.into(), sync_cfg.clone())
         .await?;
@@ -336,9 +319,15 @@ async fn main() -> Result<()> {
     let keybundle = queries.device_keybundle(team.membera.id).await?;
     info!("membera keybundle: {:?}", keybundle);
     let queried_membera_net_ident = queries.aqc_net_identifier(team.membera.id).await?;
-    info!("membera queried_membera_net_ident: {:?}", queried_membera_net_ident);
+    info!(
+        "membera queried_membera_net_ident: {:?}",
+        queried_membera_net_ident
+    );
     let queried_memberb_net_ident = queries.aqc_net_identifier(team.memberb.id).await?;
-    info!("memberb queried_memberb_net_ident: {:?}", queried_memberb_net_ident);
+    info!(
+        "memberb queried_memberb_net_ident: {:?}",
+        queried_memberb_net_ident
+    );
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -348,19 +337,32 @@ async fn main() -> Result<()> {
     let label3 = operator_team.create_label("label3".to_string()).await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
-    operator_team.assign_label(team.membera.id, label3, op).await?;
+    operator_team
+        .assign_label(team.membera.id, label3, op)
+        .await?;
     info!("assigning label to memberb");
-    operator_team.assign_label(team.memberb.id, label3, op).await?;
-    
+    operator_team
+        .assign_label(team.memberb.id, label3, op)
+        .await?;
+
     // wait for syncing.
     sleep(sleep_interval).await;
 
     // TODO: send AQC ctrl via network
     info!("creating acq bidi channel");
-    let (_aqc_id1, aqc_bidi_ctrl) = team.membera.client.aqc().create_bidi_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label3).await?;
+    let (_aqc_id1, aqc_bidi_ctrl) = team
+        .membera
+        .client
+        .aqc()
+        .create_bidi_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label3)
+        .await?;
     info!("receiving acq bidi channel");
-    team.memberb.client.aqc().receive_aqc_ctrl(team_id, aqc_bidi_ctrl).await?;
-    
+    team.memberb
+        .client
+        .aqc()
+        .receive_aqc_ctrl(team_id, aqc_bidi_ctrl)
+        .await?;
+
     // TODO: send AQC data.
     info!("revoking label from membera");
     operator_team.revoke_label(team.membera.id, label3).await?;

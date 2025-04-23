@@ -15,15 +15,12 @@ workspace = true
 
 [features]
 default = []
-# Aranya Fast Channels are currently an experimental opt-in feature
-afc = []
 
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
 aranya-keygen = { workspace = true }
 
-aranya-afc-util = { workspace = true }
 aranya-aqc-util = { workspace = true }
 aranya-crypto = { workspace = true }
 aranya-crypto-ffi = { workspace = true }
