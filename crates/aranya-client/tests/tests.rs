@@ -217,7 +217,7 @@ impl TeamCtx {
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
         owner_team
-            .add_device_to_team(self.admin.pk.clone(), 100)
+            .add_device_to_team(self.admin.pk.clone(), 9000)
             .await?;
         let roles = self.roles.clone().unwrap();
         owner_team
@@ -227,12 +227,10 @@ impl TeamCtx {
         // Make sure it sees the configuration change.
         sleep(SLEEP_INTERVAL).await;
 
-        // TODO: use different priority for each device.
-
         // Add the operator as a new device.
         info!("adding operator to team");
         owner_team
-            .add_device_to_team(self.operator.pk.clone(), 100)
+            .add_device_to_team(self.operator.pk.clone(), 8000)
             .await?;
 
         // Make sure it sees the configuration change.
@@ -249,7 +247,7 @@ impl TeamCtx {
         // Add member A as a new device.
         info!("adding membera to team");
         owner_team
-            .add_device_to_team(self.membera.pk.clone(), 100)
+            .add_device_to_team(self.membera.pk.clone(), 7000)
             .await?;
         // Assign the membera its role.
         owner_team
@@ -259,7 +257,7 @@ impl TeamCtx {
         // Add member A as a new device.
         info!("adding memberb to team");
         owner_team
-            .add_device_to_team(self.memberb.pk.clone(), 100)
+            .add_device_to_team(self.memberb.pk.clone(), 6000)
             .await?;
         // Assign the memberb its role.
         owner_team

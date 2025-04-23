@@ -490,7 +490,6 @@ where
         role_id: RoleId,
         perm: Permission,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        // TODO: use perm enum
         self.with_actor(move |actor| {
             actor.assign_role_perm(role_id.into(), perm)?;
             Ok(())
@@ -505,7 +504,6 @@ where
         role_id: RoleId,
         perm: Permission,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        // TODO: use perm enum
         self.with_actor(move |actor| {
             actor.revoke_role_perm(role_id.into(), perm)?;
             Ok(())

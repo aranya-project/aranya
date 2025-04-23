@@ -1,5 +1,3 @@
-// TODO(gknopf): can this code in lib.rs be moved to tests.rs?
-
 #![allow(clippy::expect_used, clippy::indexing_slicing, rust_2018_idioms)]
 
 use std::{
@@ -287,7 +285,6 @@ impl TestCtx {
         let memberb_role = self.create_role(owner, "memberb".into()).await?;
 
         // add members to team.
-        // TODO: assign a different priority to each device.
         owner
             .actions()
             .add_member(DeviceKeyBundle::try_from(&admin.pk)?, 9000)

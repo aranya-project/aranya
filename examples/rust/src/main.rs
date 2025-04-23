@@ -198,8 +198,6 @@ async fn main() -> Result<()> {
     info!("adding operator to team");
     owner_team.add_device_to_team(team.operator.pk, 8000).await?;
 
-    // TODO(gknopf): add sync now test back in.
-
     // Admin syncs with the Owner peer and retries the role
     // assignment command
     admin_team.sync_now(owner_addr.into(), None).await?;
@@ -372,8 +370,6 @@ async fn main() -> Result<()> {
     admin_team.delete_label(label3).await?;
 
     info!("completed aqc demo");
-
-    // TODO(gknopf): unassign role permissions and delete roles.
 
     info!("completed example Aranya application");
 
