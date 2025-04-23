@@ -1,6 +1,9 @@
 //! Aranya.
 
-use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
+use std::{
+    borrow::Cow, collections::BTreeMap, future::Future, marker::PhantomData, net::SocketAddr,
+    sync::Arc,
+};
 
 use anyhow::{bail, Context, Result};
 use aranya_aqc_util::LabelId;
@@ -43,14 +46,21 @@ pub enum SyncResponse {
 pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
     pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
+    /// Lock must be aquired after [`Self::aranya`]
+    caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
     _eng: PhantomData<CE>,
 }
 
 impl<EN, SP, CE> Client<EN, SP, CE> {
     /// Creates a new [`Client`].
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Self {
+    pub fn new(
+        aranya: Arc<Mutex<ClientState<EN, SP>>>,
+        caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+    ) -> Self {
         Client {
             aranya,
+            caches,
             _eng: PhantomData,
         }
     }
@@ -78,9 +88,11 @@ where
 
         let (len, _) = {
             let mut client = self.aranya.lock().await;
-            // TODO: save PeerCache somewhere.
+            let mut peer_caches = self.caches.lock().await;
+            let peer_cache = peer_caches.entry(*addr).or_default();
+
             syncer
-                .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
+                .poll(&mut send_buf, client.provider(), peer_cache)
                 .context("sync poll failed")?
         };
         debug!(?len, "sync poll finished");
@@ -119,7 +131,7 @@ where
             if !cmds.is_empty() {
                 let mut client = self.aranya.lock().await;
                 let mut trx = client.transaction(id);
-                // TODO: save PeerCache somewhere.
+
                 client
                     .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
@@ -254,6 +266,9 @@ where
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
+    /// Lock must be aquired after [`Self::aranya`]
+    caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
     /// Used to receive sync requests and send responses.
     listener: TcpListener,
     /// Tracks running tasks.
@@ -263,9 +278,14 @@ pub struct Server<EN, SP> {
 impl<EN, SP> Server<EN, SP> {
     /// Creates a new `Server`.
     #[inline]
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>, listener: TcpListener) -> Self {
+    pub fn new(
+        aranya: Arc<Mutex<ClientState<EN, SP>>>,
+        caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+        listener: TcpListener,
+    ) -> Self {
         Self {
             aranya,
+            caches,
             listener,
             set: JoinSet::new(),
         }
@@ -298,9 +318,12 @@ where
             debug!(?addr, "received sync request");
 
             let client = Arc::clone(&self.aranya);
+            let peer_caches = Arc::clone(&self.caches);
             self.set.spawn(
                 async move {
-                    if let Err(err) = Self::sync(client, &mut stream, addr).await {
+                    if let Err(err) =
+                        Self::sync(client, peer_caches, &mut stream, addr.into()).await
+                    {
                         error!(%err, "request failure");
                     }
                 }
@@ -313,8 +336,9 @@ where
     #[instrument(skip_all, fields(addr = %addr))]
     async fn sync(
         client: Arc<Mutex<ClientState<EN, SP>>>,
+        peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
         stream: &mut TcpStream,
-        addr: SocketAddr,
+        addr: Addr,
     ) -> Result<()> {
         let mut recv = Vec::new();
         stream
@@ -324,7 +348,7 @@ where
         debug!(n = recv.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let resp = match Self::sync_respond(client, &recv).await {
+        let resp = match Self::sync_respond(client, peer_caches, addr, &recv).await {
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
                 error!(?err, "error responding to sync request");
@@ -346,6 +370,8 @@ where
     #[instrument(skip_all)]
     async fn sync_respond(
         client: Arc<Mutex<ClientState<EN, SP>>>,
+        peer_caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+        addr: Addr,
         request: &[u8],
     ) -> Result<Box<[u8]>> {
         // TODO: Use real server address
@@ -363,12 +389,12 @@ where
         resp.receive(request).context("sync recv failed")?;
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
-        // TODO: save PeerCache somewhere.
+
         let len = resp
             .poll(
                 &mut buf,
                 client.lock().await.provider(),
-                &mut PeerCache::new(),
+                peer_caches.lock().await.entry(addr).or_default(),
             )
             .context("sync resp poll failed")?;
         debug!(len = len, "sync poll finished");
