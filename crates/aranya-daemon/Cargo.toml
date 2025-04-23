@@ -16,9 +16,6 @@ workspace = true
 [features]
 default = []
 
-# For internal use only. Do not use.
-internal-tests = []
-
 
 [dependencies]
 aranya-daemon-api = { workspace = true }

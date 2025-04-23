@@ -1,11 +1,11 @@
 {
-	// The daemon's name.
-	"name": "name",
+    // The daemon's name.
+    "name": "name",
 
-	// The daemon's working directory.
-	//
-	// Must already exist.
-	"work_dir": "/var/lib/work_dir",
+    // The daemon's working directory.
+    //
+    // Must already exist.
+    "work_dir": "/var/lib/work_dir",
 
     // Used to receive API requests from the user library client.
     "uds_api_path": "/var/run/uds.sock",
