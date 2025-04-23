@@ -2,7 +2,7 @@
 
 use std::{io, net::SocketAddr, path::Path};
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use aranya_aqc_util::{
     BidiChannelCreated, BidiChannelReceived, Handler, UniChannelCreated, UniChannelReceived,
 };
@@ -22,7 +22,7 @@ use aranya_fast_channels::NodeId;
 use buggy::BugExt;
 use s2n_quic::{provider::congestion_controller::Bbr, Server};
 use tarpc::context;
-use tokio::{fs, sync::mpsc};
+use tokio::fs;
 use tracing::{debug, instrument, Instrument as _};
 
 use crate::{

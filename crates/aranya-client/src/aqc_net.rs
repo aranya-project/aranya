@@ -1,6 +1,6 @@
 #![warn(missing_docs)]
 
-//! An implementation of the syncer using QUIC.
+//! The AQC network implementation.
 
 use std::net::SocketAddr;
 
@@ -17,38 +17,6 @@ use s2n_quic::{
 };
 use tokio::sync::mpsc::{self};
 use tracing::{debug, error};
-
-/// An error running the AQC client
-#[derive(Debug, thiserror::Error)]
-pub enum AqcError {
-    /// A channel was closed.
-    #[error("channel closed")]
-    ChannelClosed,
-    /// An error creating a quic connection.
-    #[error("connect error: {0}")]
-    Connect(#[from] connection::Error),
-    /// An error using a stream.
-    #[error("stream error: {0}")]
-    Stream(#[from] stream::Error),
-    /// An error starting an s2n quic client.
-    #[error("start error: {0}")]
-    Start(#[from] StartError),
-    /// An infallible error.
-    #[error("infallible error: {0}")]
-    Infallible(#[from] std::convert::Infallible),
-    /// An io error.
-    #[error("io error: {0}")]
-    Io(#[from] std::io::Error),
-    /// An internal AQC error.
-    #[error("internal error: {0}")]
-    Internal(#[from] anyhow::Error),
-    /// A std error.
-    #[error("std error: {0}")]
-    Std(#[from] Box<dyn std::error::Error>),
-    /// A buggy error.
-    #[error("buggy error: {0}")]
-    Buggy(#[from] buggy::Bug),
-}
 
 /// Runs a server listening for quic channel requests from other peers.
 pub async fn run_channels(mut server: Server, sender: mpsc::Sender<AqcChannelType>) {
