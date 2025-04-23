@@ -48,14 +48,6 @@ pub enum ConfigError {
         arg: &'static str,
         reason: &'static str,
     },
-
-    /// Error originating from the daemon API.
-    #[error("daemon api error: {0}")]
-    Api(aranya_daemon_api::Error),
-
-    /// Wrapper for anyhow errors.
-    #[error(transparent)]
-    Anyhow(#[from] anyhow::Error),
 }
 
 /// Possible errors that could happen when using Aranya Fast Channels.

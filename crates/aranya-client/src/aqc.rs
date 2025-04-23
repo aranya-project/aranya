@@ -22,7 +22,7 @@ use aranya_fast_channels::NodeId;
 use buggy::BugExt;
 use s2n_quic::{provider::congestion_controller::Bbr, Server};
 use tarpc::context;
-use tokio::fs;
+use tokio::{fs, sync::mpsc};
 use tracing::{debug, instrument, Instrument as _};
 
 use crate::{
@@ -194,9 +194,7 @@ impl<'a> AqcChannels<'a> {
             // TODO: for testing only. Send ctrl via network instead of returning.
             Ok((channel, aqc_ctrl))
         } else {
-            Err(crate::Error::Aqc(AqcError::Other(anyhow!(
-                "unable to create bidi channel"
-            ))))
+            Err(crate::Error::Aqc(AqcError::ChannelNotFound))
         }
     }
 
@@ -256,9 +254,7 @@ impl<'a> AqcChannels<'a> {
         }
 
         // TODO: clean up error-handling
-        Err(crate::Error::Aqc(AqcError::Other(anyhow!(
-            "unable to create uni channel"
-        ))))
+        Err(crate::Error::Aqc(AqcError::ChannelNotFound))
     }
 
     /// Deletes an AQC bidi channel.

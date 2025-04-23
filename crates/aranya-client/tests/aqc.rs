@@ -456,5 +456,8 @@ async fn test_aqc_chans() -> Result<()> {
     assert_eq!(total_len, big_data.len());
     assert_eq!(&target[..total_len], &big_data[..]);
 
+    bidi_chan1.close()?;
+    bidi_chan2.close()?;
+
     Ok(())
 }

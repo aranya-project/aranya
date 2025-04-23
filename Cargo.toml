@@ -72,6 +72,7 @@ heapless = { version = "0.8", default-features = false }
 libc = { version = "0.2" }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
+# TODO: Remove this after PSK integration
 rcgen = { version = "0.13", default-features = false, features = ["pem", "aws_lc_rs"] }
 s2n-quic = { version = "1.51.0", default-features = false, features = ["provider-address-token-default", "provider-tls-s2n"] }
 serde = "1"
