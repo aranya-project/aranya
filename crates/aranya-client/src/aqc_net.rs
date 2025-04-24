@@ -18,16 +18,21 @@ use s2n_quic::{
 use tokio::sync::mpsc::{self};
 use tracing::{debug, error};
 
-/// Runs a server listening for quic channel requests from other peers.
+/// Runs a server listening for QUIC Channel requests from other peers.
 pub async fn run_channels(mut server: Server, sender: mpsc::Sender<AqcChannelType>) {
     loop {
         match server.accept().await {
             Some(conn) => {
+                // Once we accept a valid connection, let's turn it into an AQC Channel that we can
+                // then open an arbitrary number of streams on.
                 let (channel, (bi_sender, uni_sender)) = AqcBidirectionalChannel::new(
                     LabelId::default(),
                     AqcBidiChannelId::from(Id::default()),
                     conn.handle(),
                 );
+
+                // Notify the AfcClient that we've accepted a new connection, which the user will
+                // have to call receive_channel() on in order to use.
                 if sender
                     .send(AqcChannelType::Bidirectional { channel })
                     .await
@@ -36,6 +41,8 @@ pub async fn run_channels(mut server: Server, sender: mpsc::Sender<AqcChannelTyp
                     error!("Sender closed. Unable to send channel");
                     return;
                 } else {
+                    // Spawn a new task so that we can receive any future streams that are opened
+                    // over the connection.
                     tokio::spawn(handle_streams(conn, bi_sender, uni_sender));
                 }
             }
