@@ -82,7 +82,7 @@ impl Builder for ClientConfigBuilder {
 
         let cfg = ClientConfig {
             daemon_addr: self.daemon_addr,
-            pk,
+            pk: pk.clone(),
             _aqc: aqc,
         };
         Safe::init(out, cfg);
@@ -263,5 +263,11 @@ impl Builder for TeamConfigBuilder {
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
         Safe::init(out, TeamConfig {});
         Ok(())
+    }
+}
+
+impl Default for TeamConfigBuilder {
+    fn default() -> Self {
+        Self {}
     }
 }

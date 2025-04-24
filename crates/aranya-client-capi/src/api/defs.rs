@@ -5,9 +5,10 @@ use core::{
 };
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
+use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use aranya_crypto::hex;
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::imp;
 
@@ -29,10 +30,6 @@ pub enum Error {
     /// Timed out.
     #[capi(msg = "timed out")]
     Timeout,
-
-    /// Logging initialization failure.
-    #[capi(msg = "logging initialization failure")]
-    LogInit,
 
     /// Invalid argument.
     #[capi(msg = "invalid argument")]
@@ -62,10 +59,6 @@ pub enum Error {
     #[capi(msg = "AQC library error")]
     Aqc,
 
-    /// Failed trying to construct a new tokio runtime.
-    #[capi(msg = "tokio runtime error")]
-    Runtime,
-
     /// Unable to create configuration info.
     #[capi(msg = "invalid config")]
     Config,
@@ -73,15 +66,18 @@ pub enum Error {
     /// Serialization error.
     #[capi(msg = "serialization")]
     Serialization,
+
+    /// Some other error occurred.
+    #[capi(msg = "other")]
+    Other,
 }
 
 impl From<&imp::Error> for Error {
     fn from(err: &imp::Error) -> Self {
-        debug!(?err);
+        error!(?err);
         match err {
             imp::Error::Bug(_) => Self::Bug,
             imp::Error::Timeout(_) => Self::Timeout,
-            imp::Error::LogInit(_) => Self::LogInit,
             imp::Error::InvalidArg(_) => Self::InvalidArgument,
             imp::Error::Utf8(_) => Self::InvalidUtf8,
             imp::Error::Addr(_) => Self::InvalidAddr,
@@ -92,14 +88,15 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Aqc(_) => Self::Aqc,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::Config(_) => Self::Config,
+                aranya_client::Error::Other(_) => Self::Other,
                 _ => {
-                    error!("Forgot to implement an error variant!");
+                    error!("forgot to implement an error variant");
                     Self::Bug
                 }
             },
-            imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
+            imp::Error::Other(_) => Self::Other,
         }
     }
 }
@@ -166,12 +163,14 @@ pub fn ext_error_msg(
 ///
 /// Assumes the `ARANYA_CAPI` environment variable has been set to the desired tracing log level.
 /// E.g. `ARANYA_CAPI=debug`.
+// TODO(eric): don't make users use env vars.
 pub fn init_logging() -> Result<(), imp::Error> {
     use tracing_subscriber::{prelude::*, EnvFilter};
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(EnvFilter::from_env("ARANYA_CAPI"))
-        .try_init()?;
+        .try_init()
+        .context("unable to initialize logging")?;
     Ok(())
 }
 
@@ -485,8 +484,10 @@ pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *cons
     cfg.addr(address);
 }
 
-/// Attempts to construct an [`AqcConfig`], returning an `Error::Config`
-/// if there are invalid parameters.
+/// Attempts to construct an [`AqcConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the aqc config builder
 /// @param out a pointer to write the aqc config to
@@ -535,8 +536,10 @@ pub fn client_config_builder_set_daemon_api_pk(cfg: &mut ClientConfigBuilder, pk
     cfg.daemon_pk(pk);
 }
 
-/// Attempts to construct a [`ClientConfig`], returning an `Error::Config`
-/// if there are invalid parameters.
+/// Attempts to construct a [`ClientConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the client config builder
 /// @param out a pointer to write the client config to
@@ -574,7 +577,7 @@ pub unsafe fn client_init(
     )
     .as_ref();
 
-    let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
+    let rt = tokio::runtime::Runtime::new().context("unable to construct tokio runtime")?;
 
     let inner = rt.block_on({
         aranya_client::Client::builder()
@@ -622,11 +625,14 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
+#[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 16, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 
-/// Attempts to construct a [`TeamConfig`], returning an `Error::Config`
-/// if there are invalid parameters.
+/// Attempts to construct a [`TeamConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the team config builder
 /// @param out a pointer to write the team config to
@@ -1144,7 +1150,10 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
     cfg.deref_mut().sync_now(false);
 }
 
-/// Build a sync config from a sync config builder
+/// Attempts to build a [`SyncPeerConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the builder for a sync config
 pub fn sync_peer_config_builder_build(

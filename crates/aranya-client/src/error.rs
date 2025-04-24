@@ -28,6 +28,25 @@ pub enum Error {
     /// An unexpected internal error happened.
     #[error("unexpected internal error: {0}")]
     Bug(#[from] buggy::Bug),
+
+    /// Some other error occurred.
+    #[error("{0}")]
+    Other(#[from] OtherError),
+}
+
+/// Some other error occurred.
+#[derive(Debug, thiserror::Error)]
+#[error("{err}")]
+pub struct OtherError {
+    #[from]
+    err: anyhow::Error,
+}
+
+pub(crate) fn other<E>(err: E) -> OtherError
+where
+    E: Into<anyhow::Error>,
+{
+    OtherError { err: err.into() }
 }
 
 /// An Aranya error.
@@ -85,6 +104,7 @@ pub(crate) enum IpcRepr {
     InvalidArg(#[from] InvalidArg),
     Io(#[from] io::Error),
     Tarpc(#[from] RpcError),
+    Other(#[from] anyhow::Error),
 }
 
 /// Possible errors that could happen when using Aranya QUIC Channels.

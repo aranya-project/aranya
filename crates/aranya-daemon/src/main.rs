@@ -24,8 +24,8 @@ fn main() -> Result<()> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer()
+                .with_writer(io::stderr)
                 .with_file(false)
-                .with_target(false)
                 .compact()
                 .with_filter(EnvFilter::from_env("ARANYA_DAEMON")),
         )
@@ -43,7 +43,7 @@ fn main() -> Result<()> {
 
         if flags.print_api_pk {
             let pk = daemon.public_api_key().await?.encode()?;
-            println!("{}", hex::encode(pk));
+            print!("{}", hex::encode(pk));
             return Ok(());
         }
 

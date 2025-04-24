@@ -47,7 +47,7 @@ impl<E, KS> Aqc<E, KS> {
 
     /// Returns the peer's device ID that corresponds to
     /// `net_id`.
-    #[instrument(skip_all, fields(%graph, %net_id))]
+    #[instrument(skip(self))]
     pub(crate) async fn find_device_id(&self, graph: GraphId, net_id: &str) -> Option<DeviceId> {
         self.peers
             .lock()
@@ -58,7 +58,7 @@ impl<E, KS> Aqc<E, KS> {
     }
 
     /// Returns the peer's net ID that corresponds with `id`.
-    #[instrument(skip_all, fields(%graph, %id))]
+    #[instrument(skip(self))]
     pub(crate) async fn find_net_id(&self, graph: GraphId, id: DeviceId) -> Option<NetIdentifier> {
         self.peers
             .lock()
@@ -69,7 +69,7 @@ impl<E, KS> Aqc<E, KS> {
     }
 
     /// Adds a peer.
-    #[instrument(skip_all, fields(%graph, %net_id, %id))]
+    #[instrument(skip(self))]
     pub(crate) async fn add_peer(&self, graph: GraphId, net_id: NetIdentifier, id: DeviceId) {
         self.peers
             .lock()
@@ -80,7 +80,7 @@ impl<E, KS> Aqc<E, KS> {
     }
 
     /// Removes a peer.
-    #[instrument(skip_all, fields(%graph, %id))]
+    #[instrument(skip(self))]
     pub(crate) async fn remove_peer(&self, graph: GraphId, id: DeviceId) {
         self.peers.lock().await.entry(graph).and_modify(|entry| {
             entry.remove_by_right(&id);

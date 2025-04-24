@@ -3,6 +3,7 @@
 use core::net::SocketAddr;
 use std::{io, path::Path};
 
+use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::{
     crypto::{
@@ -20,7 +21,7 @@ use tracing::{debug, info, instrument};
 use crate::{
     aqc::{AqcChannels, AqcChannelsImpl},
     config::{SyncPeerConfig, TeamConfig},
-    error::{aranya_error, InvalidArg, IpcError, Result},
+    error::{self, aranya_error, InvalidArg, IpcError, Result},
 };
 
 /// List of device IDs.
@@ -134,27 +135,33 @@ impl Client {
     async fn connect(path: &Path, pk: &[u8]) -> Result<Self> {
         info!("starting Aranya client");
 
-        let sock = UnixStream::connect(path).await.map_err(IpcError::new)?;
-        let pk = PublicApiKey::<CS>::decode(pk)
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
-            .map_err(IpcError::new)?;
-        let info = path.as_os_str().as_encoded_bytes();
-        let codec = LengthDelimitedCodec::builder()
-            .max_frame_length(usize::MAX)
-            .new_codec();
-        let transport = txp::client(sock, codec, Rng, pk, info);
+        let daemon = {
+            let sock = UnixStream::connect(path)
+                .await
+                .context("unable to connect to UDS path")
+                .map_err(IpcError::new)?;
+            let pk = PublicApiKey::<CS>::decode(pk)
+                .context("unable to decode public API key")
+                .map_err(IpcError::new)?;
+            let info = path.as_os_str().as_encoded_bytes();
+            let codec = LengthDelimitedCodec::builder()
+                .max_frame_length(usize::MAX)
+                .new_codec();
+            let transport = txp::client(sock, codec, Rng, pk, info);
 
-        let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
+            DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn()
+        };
         debug!("connected to daemon");
 
         let got = daemon
             .version(context::current())
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
+            .context("unable to retrieve daemon version")
+            .map_err(error::other)?;
         let want = Version::parse(env!("CARGO_PKG_VERSION"))
-            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
-            .map_err(IpcError::new)?;
+            .context("unable to parse `CARGO_PKG_VERSION`")
+            .map_err(error::other)?;
         if got.major != want.major || got.minor != want.minor {
             return Err(IpcError::new(io::Error::new(
                 io::ErrorKind::Unsupported,

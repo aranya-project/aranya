@@ -146,10 +146,6 @@ enum AranyaError
      */
     ARANYA_ERROR_TIMEOUT,
     /**
-     * Logging initialization failure.
-     */
-    ARANYA_ERROR_LOG_INIT,
-    /**
      * Invalid argument.
      */
     ARANYA_ERROR_INVALID_ARGUMENT,
@@ -178,10 +174,6 @@ enum AranyaError
      */
     ARANYA_ERROR_AQC,
     /**
-     * Failed trying to construct a new tokio runtime.
-     */
-    ARANYA_ERROR_RUNTIME,
-    /**
      * Unable to create configuration info.
      */
     ARANYA_ERROR_CONFIG,
@@ -189,6 +181,10 @@ enum AranyaError
      * Serialization error.
      */
     ARANYA_ERROR_SERIALIZATION,
+    /**
+     * Some other error occurred.
+     */
+    ARANYA_ERROR_OTHER,
 };
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
@@ -676,8 +672,10 @@ AranyaError aranya_aqc_config_builder_set_address_ext(struct AranyaAqcConfigBuil
                                                       struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Config`
- * if there are invalid parameters.
+ * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the aqc config builder
  * @param out a pointer to write the aqc config to
@@ -686,8 +684,10 @@ AranyaError aranya_aqc_config_builder_build(struct AranyaAqcConfigBuilder *cfg,
                                             struct AranyaAqcConfig *out);
 
 /**
- * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Config`
- * if there are invalid parameters.
+ * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the aqc config builder
  * @param out a pointer to write the aqc config to
@@ -737,7 +737,7 @@ AranyaError aranya_client_config_builder_cleanup_ext(struct AranyaClientConfigBu
                                                      struct AranyaExtError *__ext_err);
 
 /**
- * Sets UDS path that the daemon is listening on.
+ * Sets Unix Domain Socket path that the daemon is listening on.
  *
  * @param cfg a pointer to the client config builder
  * @param address a string containing the address
@@ -746,7 +746,7 @@ AranyaError aranya_client_config_builder_set_daemon_uds_path(struct AranyaClient
                                                              const char *address);
 
 /**
- * Sets UDS path that the daemon is listening on.
+ * Sets Unix Domain Socket path that the daemon is listening on.
  *
  * @param cfg a pointer to the client config builder
  * @param address a string containing the address
@@ -793,8 +793,10 @@ AranyaError aranya_client_config_builder_set_daemon_api_pk_ext(struct AranyaClie
                                                                struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Config`
- * if there are invalid parameters.
+ * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the client config builder
  * @param out a pointer to write the client config to
@@ -803,8 +805,10 @@ AranyaError aranya_client_config_builder_build(struct AranyaClientConfigBuilder 
                                                struct AranyaClientConfig *out);
 
 /**
- * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Config`
- * if there are invalid parameters.
+ * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the client config builder
  * @param out a pointer to write the client config to
@@ -906,8 +910,50 @@ AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`
- * if there are invalid parameters.
+ * Initializes `AranyaTeamConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaTeamConfigBuilder
+ */
+AranyaError aranya_team_config_builder_init(struct AranyaTeamConfigBuilder *out);
+
+/**
+ * Initializes `AranyaTeamConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaTeamConfigBuilder
+ */
+AranyaError aranya_team_config_builder_init_ext(struct AranyaTeamConfigBuilder *out,
+                                                struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_team_config_builder_init`.
+ *
+ * @relates AranyaTeamConfigBuilder
+ */
+AranyaError aranya_team_config_builder_cleanup(struct AranyaTeamConfigBuilder *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_team_config_builder_init`.
+ *
+ * @relates AranyaTeamConfigBuilder
+ */
+AranyaError aranya_team_config_builder_cleanup_ext(struct AranyaTeamConfigBuilder *ptr,
+                                                   struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the team config builder
  * @param out a pointer to write the team config to
@@ -916,8 +962,10 @@ AranyaError aranya_team_config_builder_build(struct AranyaTeamConfigBuilder *cfg
                                              struct AranyaTeamConfig *out);
 
 /**
- * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`
- * if there are invalid parameters.
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the team config builder
  * @param out a pointer to write the team config to
@@ -1660,7 +1708,10 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
                                                                struct AranyaExtError *__ext_err);
 
 /**
- * Build a sync config from a sync config builder
+ * Attempts to build a [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the builder for a sync config
  */
@@ -1668,7 +1719,10 @@ AranyaError aranya_sync_peer_config_builder_build(struct AranyaSyncPeerConfigBui
                                                   struct AranyaSyncPeerConfig *out);
 
 /**
- * Build a sync config from a sync config builder
+ * Attempts to build a [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the builder for a sync config
  */

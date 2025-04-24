@@ -185,11 +185,12 @@ struct EffectHandler {
 impl EffectHandler {
     /// Handles effects resulting from invoking an Aranya action.
     #[instrument(skip_all, fields(%graph, effects = effects.len()))]
-    #[allow(unused_variables)]
     async fn handle_effects(&self, graph: GraphId, effects: &[Effect]) -> Result<()> {
+        debug!("handling effects");
+
         use Effect::*;
         for effect in effects {
-            trace!(?effect, "handling effect");
+            debug!(?effect, "handling effect");
             match effect {
                 TeamCreated(_team_created) => {}
                 TeamTerminated(_team_terminated) => {}
@@ -483,7 +484,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[instrument(skip_all)]
+    #[instrument(skip(self))]
     async fn create_aqc_bidi_channel(
         self,
         _: context::Context,
@@ -491,7 +492,7 @@ impl DaemonApi for Api {
         peer: api::NetIdentifier,
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsk)> {
-        info!("create_aqc_bidi_channel");
+        info!("creating bidi channel");
 
         let graph = GraphId::from(team.into_id());
 
@@ -499,7 +500,7 @@ impl DaemonApi for Api {
             .aqc
             .find_device_id(graph, &peer)
             .await
-            .context("unable to lookup peer")?;
+            .context("did not find peer")?;
 
         let (ctrl, effects) = self
             .client
@@ -517,12 +518,12 @@ impl DaemonApi for Api {
         self.handler.handle_effects(graph, &effects).await?;
 
         let psk = self.aqc.bidi_channel_created(e).await?;
-        debug!(identity = %psk.identity, "psk identity");
+        info!(identity = %psk.identity, "psk identity");
 
         Ok((ctrl, psk))
     }
 
-    #[instrument(skip_all)]
+    #[instrument(skip(self))]
     async fn create_aqc_uni_channel(
         self,
         _: context::Context,
@@ -530,7 +531,7 @@ impl DaemonApi for Api {
         peer: api::NetIdentifier,
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcUniPsk)> {
-        info!("create_aqc_uni_channel");
+        info!("creating uni channel");
 
         let graph = GraphId::from(team.into_id());
 
@@ -538,7 +539,7 @@ impl DaemonApi for Api {
             .aqc
             .find_device_id(graph, &peer)
             .await
-            .context("unable to lookup peer")?;
+            .context("did not find peer")?;
 
         let id = self.pk.ident_pk.id()?;
         let (ctrl, effects) = self
@@ -556,7 +557,7 @@ impl DaemonApi for Api {
         self.handler.handle_effects(graph, &effects).await?;
 
         let psk = self.aqc.uni_channel_created(e).await?;
-        debug!(identity = %psk.identity, "psk identity");
+        info!(identity = %psk.identity, "psk identity");
 
         Ok((ctrl, psk))
     }
@@ -581,7 +582,7 @@ impl DaemonApi for Api {
         todo!();
     }
 
-    #[instrument(skip_all)]
+    #[instrument(skip(self))]
     async fn receive_aqc_ctrl(
         self,
         _: context::Context,
@@ -633,6 +634,7 @@ impl DaemonApi for Api {
     }
 
     /// Create a label.
+    #[instrument(skip(self))]
     async fn create_label(
         self,
         _: context::Context,
@@ -653,6 +655,7 @@ impl DaemonApi for Api {
     }
 
     /// Delete a label.
+    #[instrument(skip(self))]
     async fn delete_label(
         self,
         _: context::Context,
@@ -673,6 +676,7 @@ impl DaemonApi for Api {
     }
 
     /// Assign a label.
+    #[instrument(skip(self))]
     async fn assign_label(
         self,
         _: context::Context,
@@ -699,6 +703,7 @@ impl DaemonApi for Api {
     }
 
     /// Revoke a label.
+    #[instrument(skip(self))]
     async fn revoke_label(
         self,
         _: context::Context,
@@ -836,6 +841,7 @@ impl DaemonApi for Api {
     }
 
     /// Query label exists.
+    #[instrument(skip(self))]
     async fn query_label_exists(
         self,
         _: context::Context,
@@ -858,6 +864,7 @@ impl DaemonApi for Api {
     }
 
     /// Query list of labels.
+    #[instrument(skip(self))]
     async fn query_labels(
         self,
         _: context::Context,
