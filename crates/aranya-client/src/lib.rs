@@ -18,7 +18,7 @@ pub mod error;
 
 #[doc(inline)]
 pub use crate::{
-    client::{Client, Team, DEFAULT_PERMS},
+    client::{Client, Team, DEFAULT_CMDS},
     config::{SyncPeerConfig, SyncPeerConfigBuilder, TeamConfig, TeamConfigBuilder},
     error::{ConfigError, Error, Result},
 };

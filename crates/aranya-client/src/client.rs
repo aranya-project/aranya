@@ -3,8 +3,8 @@
 use std::{collections::BTreeMap, net::SocketAddr, path::Path, sync::LazyLock};
 
 use aranya_daemon_api::{
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
-    Permission, Role, RoleId, TeamId,
+    ChanOp, Cmd, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
+    Role, RoleId, TeamId,
 };
 use aranya_util::Addr;
 use tarpc::{context, tokio_serde::formats::Json};
@@ -64,24 +64,24 @@ impl Roles {
     }
 }
 
-/// List of permissions.
-pub struct Permissions {
-    data: Vec<Permission>,
+/// List of commands.
+pub struct Cmds {
+    data: Vec<Cmd>,
 }
 
-impl Permissions {
-    pub fn iter(&self) -> impl Iterator<Item = &Permission> {
+impl Cmds {
+    pub fn iter(&self) -> impl Iterator<Item = &Cmd> {
         self.data.iter()
     }
 
     #[doc(hidden)]
-    pub fn __data(&self) -> &[Permission] {
+    pub fn __data(&self) -> &[Cmd] {
         self.data.as_slice()
     }
 }
 
-// Default role permisisons.
-pub static DEFAULT_PERMS: LazyLock<BTreeMap<&str, &str>> = LazyLock::new(|| {
+// Default role commands.
+pub static DEFAULT_CMDS: LazyLock<BTreeMap<&str, &str>> = LazyLock::new(|| {
     let mut m = BTreeMap::new();
     m.insert("SetAqcNetworkName", "operator");
     m.insert("UnsetAqcNetworkName", "operator");
@@ -311,20 +311,20 @@ impl Team<'_> {
             .map_err(Into::into)
     }
 
-    /// Assign permission to a role.
-    pub async fn assign_role_perm(&mut self, role: RoleId, perm: Permission) -> Result<()> {
+    /// Assign command to a role.
+    pub async fn assign_role_cmd(&mut self, role: RoleId, cmd: Cmd) -> Result<()> {
         self.client
             .daemon
-            .assign_role_perm(context::current(), self.id, role, perm)
+            .assign_role_cmd(context::current(), self.id, role, cmd)
             .await?
             .map_err(Into::into)
     }
 
-    /// Revoke permission from a role.
-    pub async fn revoke_role_perm(&mut self, role: RoleId, perm: Permission) -> Result<()> {
+    /// Revoke command from a role.
+    pub async fn revoke_role_cmd(&mut self, role: RoleId, cmd: Cmd) -> Result<()> {
         self.client
             .daemon
-            .revoke_role_perm(context::current(), self.id, role, perm)
+            .revoke_role_cmd(context::current(), self.id, role, cmd)
             .await?
             .map_err(Into::into)
     }
@@ -459,13 +459,13 @@ impl Queries<'_> {
         })
     }
 
-    /// Returns a list of permissions assigned to a role.
-    pub async fn role_perms(&mut self, role: RoleId) -> Result<Permissions> {
-        Ok(Permissions {
+    /// Returns a list of commands assigned to a role.
+    pub async fn role_cmds(&mut self, role: RoleId) -> Result<Cmds> {
+        Ok(Cmds {
             data: self
                 .client
                 .daemon
-                .query_role_perms(context::current(), self.id, role)
+                .query_role_cmds(context::current(), self.id, role)
                 .await??,
         })
     }

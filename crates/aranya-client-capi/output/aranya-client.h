@@ -352,25 +352,25 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
 typedef const char *AranyaRoleName;
 
 /**
- * A role permission name.
+ * A role command name.
  *
  * E.g. "CreateLabel"
  */
-typedef const char *AranyaPermName;
+typedef const char *AranyaCmdName;
 
 /**
- * A role permission.
+ * A role command.
  *
  * E.g. "CreateLabel"
  */
-typedef struct ARANYA_ALIGNED(8) AranyaPerm {
+typedef struct ARANYA_ALIGNED(8) AranyaCmd {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
     uint8_t __for_size_only[32];
-} AranyaPerm;
+} AranyaCmd;
 
 /**
  * A device priority.
@@ -1234,74 +1234,74 @@ AranyaError aranya_delete_role_ext(struct AranyaClient *client,
                                    struct AranyaExtError *__ext_err);
 
 /**
- * Assign role permission.
+ * Assign role command.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param role_id the role ID [`AranyaRoleId`](@ref AranyaRoleId) to assign a permission to.
- * @param perm the permission to assign to the role [`AranyaPerm`](@ref AranyaPerm).
+ * @param role_id the role ID [`AranyaRoleId`](@ref AranyaRoleId) to assign a command to.
+ * @param cmd the command to assign to the role [`AranyaCmd`](@ref AranyaCmd).
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_role_perm(struct AranyaClient *client,
-                                    const struct AranyaTeamId *team,
-                                    const struct AranyaRoleId *role_id,
-                                    AranyaPermName perm);
+AranyaError aranya_assign_role_cmd(struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   const struct AranyaRoleId *role_id,
+                                   AranyaCmdName cmd);
 
 /**
- * Assign role permission.
+ * Assign role command.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param role_id the role ID [`AranyaRoleId`](@ref AranyaRoleId) to assign a permission to.
- * @param perm the permission to assign to the role [`AranyaPerm`](@ref AranyaPerm).
+ * @param role_id the role ID [`AranyaRoleId`](@ref AranyaRoleId) to assign a command to.
+ * @param cmd the command to assign to the role [`AranyaCmd`](@ref AranyaCmd).
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_role_perm_ext(struct AranyaClient *client,
-                                        const struct AranyaTeamId *team,
-                                        const struct AranyaRoleId *role_id,
-                                        AranyaPermName perm,
-                                        struct AranyaExtError *__ext_err);
+AranyaError aranya_assign_role_cmd_ext(struct AranyaClient *client,
+                                       const struct AranyaTeamId *team,
+                                       const struct AranyaRoleId *role_id,
+                                       AranyaCmdName cmd,
+                                       struct AranyaExtError *__ext_err);
 
 /**
- * Revoke role permission.
+ * Revoke role command.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param role_id the role ID [`AranyaRoleId`](@ref AranyaRoleId) to revoke a permission from.
- * @param perm the permission to revoke from the role [`AranyaPerm`](@ref AranyaPerm).
+ * @param role_id the role ID [`AranyaRoleId`](@ref AranyaRoleId) to revoke a command from.
+ * @param cmd the command to revoke from the role [`AranyaCmd`](@ref AranyaCmd).
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_revoke_role_perm(struct AranyaClient *client,
-                                    const struct AranyaTeamId *team,
-                                    const struct AranyaRoleId *role_id,
-                                    const struct AranyaPerm *perm);
+AranyaError aranya_revoke_role_cmd(struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   const struct AranyaRoleId *role_id,
+                                   const struct AranyaCmd *cmd);
 
 /**
- * Revoke role permission.
+ * Revoke role command.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param role_id the role ID [`AranyaRoleId`](@ref AranyaRoleId) to revoke a permission from.
- * @param perm the permission to revoke from the role [`AranyaPerm`](@ref AranyaPerm).
+ * @param role_id the role ID [`AranyaRoleId`](@ref AranyaRoleId) to revoke a command from.
+ * @param cmd the command to revoke from the role [`AranyaCmd`](@ref AranyaCmd).
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_revoke_role_perm_ext(struct AranyaClient *client,
-                                        const struct AranyaTeamId *team,
-                                        const struct AranyaRoleId *role_id,
-                                        const struct AranyaPerm *perm,
-                                        struct AranyaExtError *__ext_err);
+AranyaError aranya_revoke_role_cmd_ext(struct AranyaClient *client,
+                                       const struct AranyaTeamId *team,
+                                       const struct AranyaRoleId *role_id,
+                                       const struct AranyaCmd *cmd,
+                                       struct AranyaExtError *__ext_err);
 
 /**
  * Add a device to the team with the default role.
@@ -1650,12 +1650,12 @@ AranyaError aranya_get_label_name(const struct AranyaLabel *label,
                                   const char **__output);
 
 /**
- * Get name of permission.
+ * Get name of command.
  *
- * Returns a C string pointer to the permission's name.
+ * Returns a C string pointer to the command's name.
  */
-AranyaError aranya_get_perm_name(const struct AranyaPerm *perm,
-                                 const char **__output);
+AranyaError aranya_get_cmd_name(const struct AranyaCmd *cmd,
+                                const char **__output);
 
 /**
  * Assign a label to a device so that it can be used for a channel.
@@ -2248,51 +2248,51 @@ AranyaError aranya_query_device_roles_ext(struct AranyaClient *client,
                                           struct AranyaExtError *__ext_err);
 
 /**
- * Query for list of permissions assigned to the role.
+ * Query for list of commands assigned to the role.
  *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the permissions.
- * Writes the number of roles that would have been returned to `perm_len`.
- * The application can use `perm_len` to allocate a larger buffer.
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the commands.
+ * Writes the number of roles that would have been returned to `cmd_len`.
+ * The application can use `cmd_len` to allocate a larger buffer.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param role the role's ID [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * Output params:
- * @param perms returns a list of permissions [`AranyaRoleId`](@ref AranyaRoleId).
- * @param perms_len returns the length of the permissions list [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param cmds returns a list of commands [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param cmds_len returns the length of the commands list [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_role_perms(struct AranyaClient *client,
-                                    const struct AranyaTeamId *team,
-                                    const struct AranyaRoleId *role,
-                                    struct AranyaPerm *perms,
-                                    size_t *perms_len);
+AranyaError aranya_query_role_cmds(struct AranyaClient *client,
+                                   const struct AranyaTeamId *team,
+                                   const struct AranyaRoleId *role,
+                                   struct AranyaCmd *cmds,
+                                   size_t *cmds_len);
 
 /**
- * Query for list of permissions assigned to the role.
+ * Query for list of commands assigned to the role.
  *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the permissions.
- * Writes the number of roles that would have been returned to `perm_len`.
- * The application can use `perm_len` to allocate a larger buffer.
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the commands.
+ * Writes the number of roles that would have been returned to `cmd_len`.
+ * The application can use `cmd_len` to allocate a larger buffer.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param role the role's ID [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * Output params:
- * @param perms returns a list of permissions [`AranyaRoleId`](@ref AranyaRoleId).
- * @param perms_len returns the length of the permissions list [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param cmds returns a list of commands [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param cmds_len returns the length of the commands list [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_role_perms_ext(struct AranyaClient *client,
-                                        const struct AranyaTeamId *team,
-                                        const struct AranyaRoleId *role,
-                                        struct AranyaPerm *perms,
-                                        size_t *perms_len,
-                                        struct AranyaExtError *__ext_err);
+AranyaError aranya_query_role_cmds_ext(struct AranyaClient *client,
+                                       const struct AranyaTeamId *team,
+                                       const struct AranyaRoleId *role,
+                                       struct AranyaCmd *cmds,
+                                       size_t *cmds_len,
+                                       struct AranyaExtError *__ext_err);
 
 #ifdef __cplusplus
 }  // extern "C"

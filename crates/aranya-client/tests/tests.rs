@@ -12,7 +12,7 @@
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
-use aranya_client::{client::DEFAULT_PERMS, Client, SyncPeerConfig, TeamConfig};
+use aranya_client::{client::DEFAULT_CMDS, Client, SyncPeerConfig, TeamConfig};
 use aranya_daemon::{config::Config, Daemon};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
@@ -181,13 +181,11 @@ impl TeamCtx {
         };
         let role_list = [&roles.admin, &roles.operator, &roles.member];
 
-        // Assign permissions to roles.
-        for (perm, role_name) in DEFAULT_PERMS.iter() {
+        // Assign commands to roles.
+        for (cmd, role_name) in DEFAULT_CMDS.iter() {
             for role in &role_list {
                 if *role_name == role.name {
-                    owner_team
-                        .assign_role_perm(role.id, perm.to_string())
-                        .await?;
+                    owner_team.assign_role_cmd(role.id, cmd.to_string()).await?;
                 }
             }
         }
@@ -274,15 +272,15 @@ impl TeamCtx {
             }
         }
 
-        // Revoke permissions from roles.
+        // Revoke commands from roles.
         let roles = &mut owner.queries(team_id).roles_on_team().await?;
         for role in roles.iter() {
             if role.id != owner_role.id {
-                let perms = owner.queries(team_id).role_perms(role.id).await?;
-                for perm in perms.iter() {
+                let cmds = owner.queries(team_id).role_cmds(role.id).await?;
+                for cmd in cmds.iter() {
                     owner
                         .team(team_id)
-                        .revoke_role_perm(role.id, perm.clone())
+                        .revoke_role_cmd(role.id, cmd.clone())
                         .await?;
                 }
             }

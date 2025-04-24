@@ -419,21 +419,21 @@ impl RoleName {
     }
 }
 
-/// A role permission.
+/// A role command.
 ///
 /// E.g. "CreateLabel"
 #[aranya_capi_core::opaque(size = 32, align = 8)]
-pub type Perm = Safe<imp::Perm>;
-const _: [(); 32] = [(); size_of::<Perm>()];
+pub type Cmd = Safe<imp::Cmd>;
+const _: [(); 32] = [(); size_of::<Cmd>()];
 
-/// A role permission name.
+/// A role command name.
 ///
 /// E.g. "CreateLabel"
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-pub struct PermName(*const c_char);
+pub struct CmdName(*const c_char);
 
-impl PermName {
+impl CmdName {
     unsafe fn as_underlying(self) -> Result<String, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
@@ -862,50 +862,50 @@ pub fn delete_role(client: &mut Client, team: &TeamId, role_id: &RoleId) -> Resu
     Ok(())
 }
 
-/// Assign role permission.
+/// Assign role command.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param role_id the role ID [`RoleId`] to assign a permission to.
-/// @param perm the permission to assign to the role [`Perm`].
+/// @param role_id the role ID [`RoleId`] to assign a command to.
+/// @param cmd the command to assign to the role [`Cmd`].
 ///
 /// @relates AranyaClient.
-pub fn assign_role_perm(
+pub fn assign_role_cmd(
     client: &mut Client,
     team: &TeamId,
     role_id: &RoleId,
-    perm: PermName,
+    cmd: CmdName,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    // SAFETY: Caller must ensure `perm` is a valid C String.
-    let perm = unsafe { perm.as_underlying() }?;
+    // SAFETY: Caller must ensure `cmd` is a valid C String.
+    let cmd = unsafe { cmd.as_underlying() }?;
 
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .assign_role_perm(role_id.into(), perm),
+            .assign_role_cmd(role_id.into(), cmd),
     )?;
     Ok(())
 }
 
-/// Revoke role permission.
+/// Revoke role command.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param role_id the role ID [`RoleId`] to revoke a permission from.
-/// @param perm the permission to revoke from the role [`Perm`].
+/// @param role_id the role ID [`RoleId`] to revoke a command from.
+/// @param cmd the command to revoke from the role [`Cmd`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn revoke_role_perm(
+pub unsafe fn revoke_role_cmd(
     client: &mut Client,
     team: &TeamId,
     role_id: &RoleId,
-    perm: &Perm,
+    cmd: &Cmd,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
 
@@ -913,7 +913,7 @@ pub unsafe fn revoke_role_perm(
         client
             .inner
             .team(team.into())
-            .revoke_role_perm(role_id.into(), perm.to_string()),
+            .revoke_role_cmd(role_id.into(), cmd.to_string()),
     )?;
     Ok(())
 }
@@ -1166,12 +1166,12 @@ pub fn get_label_name(label: &Label) -> *const c_char {
     label.get_name()
 }
 
-/// Get name of permission.
+/// Get name of command.
 ///
-/// Returns a C string pointer to the permission's name.
+/// Returns a C string pointer to the command's name.
 #[aranya_capi_core::no_ext_error]
-pub fn get_perm_name(perm: &Perm) -> *const c_char {
-    perm.get_name()
+pub fn get_cmd_name(cmd: &Cmd) -> *const c_char {
+    cmd.get_name()
 }
 
 /// Assign a label to a device so that it can be used for a channel.
@@ -1665,45 +1665,45 @@ pub fn query_device_roles(
     Ok(())
 }
 
-/// Query for list of permissions assigned to the role.
+/// Query for list of commands assigned to the role.
 ///
-/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the permissions.
-/// Writes the number of roles that would have been returned to `perm_len`.
-/// The application can use `perm_len` to allocate a larger buffer.
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the commands.
+/// Writes the number of roles that would have been returned to `cmd_len`.
+/// The application can use `cmd_len` to allocate a larger buffer.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param role the role's ID [`RoleId`].
 ///
 /// Output params:
-/// @param perms returns a list of permissions [`RoleId`].
-/// @param perms_len returns the length of the permissions list [`RoleId`].
+/// @param cmds returns a list of commands [`RoleId`].
+/// @param cmds_len returns the length of the commands list [`RoleId`].
 ///
 /// @relates AranyaClient.
-pub fn query_role_perms(
+pub fn query_role_cmds(
     client: &mut Client,
     team: &TeamId,
     role: &RoleId,
-    perms: Option<&mut MaybeUninit<Perm>>,
-    perms_len: &mut usize,
+    cmds: Option<&mut MaybeUninit<Cmd>>,
+    cmds_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let data = client
         .rt
-        .block_on(client.inner.queries(team.into()).role_perms(role.into()))?;
+        .block_on(client.inner.queries(team.into()).role_cmds(role.into()))?;
     let data = data.__data();
-    let Some(perms) = perms else {
-        *perms_len = data.len();
+    let Some(cmds) = cmds else {
+        *cmds_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     };
-    let out = aranya_capi_core::try_as_mut_slice!(perms, *perms_len);
+    let out = aranya_capi_core::try_as_mut_slice!(cmds, *cmds_len);
     for (dst, src) in out.iter_mut().zip(data) {
         Safe::init(dst, src.clone().into())
     }
-    if *perms_len < data.len() {
-        *perms_len = data.len();
+    if *cmds_len < data.len() {
+        *cmds_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
-    *perms_len = data.len();
+    *cmds_len = data.len();
     Ok(())
 }

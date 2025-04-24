@@ -1,6 +1,6 @@
 use aranya_daemon_api::ChanOp;
 use anyhow::{Context as _, Result};
-use aranya_client::{DEFAULT_PERMS, client::Client, SyncPeerConfig, TeamConfig};
+use aranya_client::{DEFAULT_CMDS, client::Client, SyncPeerConfig, TeamConfig};
 use aranya_daemon::{
     config::Config,
     Daemon,
@@ -178,11 +178,11 @@ async fn main() -> Result<()> {
     let member_role = owner_team.create_role("member".into()).await?;
 
     let role_list = [&admin_role, &operator_role, &member_role];
-    for (perm, role_name) in DEFAULT_PERMS.iter() {
+    for (perm, role_name) in DEFAULT_CMDS.iter() {
         for role in &role_list {
             if *role_name == role.name {
                 owner_team
-                    .assign_role_perm(role.id, perm.to_string())
+                    .assign_role_cmd(role.id, perm.to_string())
                     .await?;
             }
         }

@@ -203,8 +203,8 @@ impl DaemonApiHandler {
                 Effect::RoleDeleted(_) => {}
                 Effect::RoleAssigned(_) => {}
                 Effect::RoleRevoked(_) => {}
-                Effect::RolePermissionAssigned(_) => {}
-                Effect::RolePermissionRevoked(_) => {}
+                Effect::RoleCmdAssigned(_) => {}
+                Effect::RoleCmdRevoked(_) => {}
                 Effect::LabelCreated(_) => {}
                 Effect::LabelDeleted(_) => {}
                 Effect::LabelAssigned(_) => {}
@@ -223,7 +223,7 @@ impl DaemonApiHandler {
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::QueriedLabel(_) => {}
                 Effect::QueriedRole(_) => {}
-                Effect::QueriedRolePermission(_) => {}
+                Effect::QueriedRoleCmd(_) => {}
                 Effect::AqcBidiChannelCreated(_) => {}
                 Effect::AqcBidiChannelReceived(_) => {}
                 Effect::AqcUniChannelCreated(_) => {}
@@ -454,34 +454,34 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn assign_role_perm(
+    async fn assign_role_cmd(
         self,
         _: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-        perm: api::Permission,
+        cmd: api::Cmd,
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .assign_role_perm(role, perm.clone())
+            .assign_role_cmd(role, cmd.clone())
             .await
-            .context(format!("unable to assign role perm: {}", perm))?;
+            .context(format!("unable to assign role cmd: {}", cmd))?;
         Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn revoke_role_perm(
+    async fn revoke_role_cmd(
         self,
         _: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-        perm: api::Permission,
+        cmd: api::Cmd,
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .revoke_role_perm(role.into_id().into(), perm.clone())
+            .revoke_role_cmd(role.into_id().into(), cmd.clone())
             .await
-            .context(format!("unable to revoke role perm: {}", perm))?;
+            .context(format!("unable to revoke role cmd: {}", cmd))?;
         Ok(())
     }
     #[instrument(skip(self))]
@@ -868,23 +868,23 @@ impl DaemonApi for DaemonApiHandler {
         Ok(roles)
     }
 
-    /// Query roles permissions.
-    async fn query_role_perms(
+    /// Query role commands.
+    async fn query_role_cmds(
         self,
         _: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-    ) -> api::Result<Vec<api::Permission>> {
+    ) -> api::Result<Vec<api::Cmd>> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
-            .query_role_perms_off_graph(role.into_id().into())
+            .query_role_cmds_off_graph(role.into_id().into())
             .await
-            .context("unable to query role permissions")?;
-        let mut roles: Vec<api::Permission> = Vec::new();
+            .context("unable to query role commands")?;
+        let mut roles: Vec<api::Cmd> = Vec::new();
         for e in effects {
-            if let Effect::QueriedRolePermission(e) = e {
-                roles.push(e.perm);
+            if let Effect::QueriedRoleCmd(e) = e {
+                roles.push(e.cmd);
             }
         }
         Ok(roles)

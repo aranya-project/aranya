@@ -209,8 +209,8 @@ pub enum ChanOp {
     SendRecv,
 }
 
-/// Permission that can be assigned to roles.
-pub type Permission = String;
+/// Cmd that can be assigned to roles.
+pub type Cmd = String;
 
 /// A label.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
@@ -271,10 +271,10 @@ pub trait DaemonApi {
     async fn create_role(team: TeamId, name: String) -> Result<Role>;
     /// Delete a role from a team.
     async fn delete_role(team: TeamId, role: RoleId) -> Result<()>;
-    /// Assign permission to a role.
-    async fn assign_role_perm(team: TeamId, role: RoleId, perm: Permission) -> Result<()>;
-    /// Revoke permission from a role.
-    async fn revoke_role_perm(team: TeamId, role: RoleId, perm: Permission) -> Result<()>;
+    /// Assign command to a role.
+    async fn assign_role_cmd(team: TeamId, role: RoleId, perm: Cmd) -> Result<()>;
+    /// Revoke command from a role.
+    async fn revoke_role_cmd(team: TeamId, role: RoleId, perm: Cmd) -> Result<()>;
     /// Assign a role to a device.
     async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
@@ -338,8 +338,8 @@ pub trait DaemonApi {
     async fn query_roles_on_team(team: TeamId) -> Result<Vec<Role>>;
     /// Query device roles.
     async fn query_device_roles(team: TeamId, device: DeviceId) -> Result<Vec<Role>>;
-    /// Query role permissions.
-    async fn query_role_perms(team: TeamId, role: RoleId) -> Result<Vec<Permission>>;
+    /// Query role commands.
+    async fn query_role_cmds(team: TeamId, role: RoleId) -> Result<Vec<Cmd>>;
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device label assignments.

@@ -42,8 +42,8 @@ pub enum Effect {
     RoleDeleted(RoleDeleted),
     RoleAssigned(RoleAssigned),
     RoleRevoked(RoleRevoked),
-    RolePermissionAssigned(RolePermissionAssigned),
-    RolePermissionRevoked(RolePermissionRevoked),
+    RoleCmdAssigned(RoleCmdAssigned),
+    RoleCmdRevoked(RoleCmdRevoked),
     AqcNetworkNameSet(AqcNetworkNameSet),
     AqcNetworkNameUnset(AqcNetworkNameUnset),
     AqcBidiChannelCreated(AqcBidiChannelCreated),
@@ -62,7 +62,7 @@ pub enum Effect {
     QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
     QueriedRole(QueriedRole),
     QueryAqcNetworkNamesOutput(QueryAqcNetworkNamesOutput),
-    QueriedRolePermission(QueriedRolePermission),
+    QueriedRoleCmd(QueriedRoleCmd),
 }
 /// TeamCreated policy effect.
 #[effect]
@@ -112,20 +112,20 @@ pub struct RoleRevoked {
     pub name: String,
     pub author_id: Id,
 }
-/// RolePermissionAssigned policy effect.
+/// RoleCmdAssigned policy effect.
 #[effect]
-pub struct RolePermissionAssigned {
+pub struct RoleCmdAssigned {
     pub role_id: Id,
     pub name: String,
-    pub perm: String,
+    pub cmd: String,
     pub author_id: Id,
 }
-/// RolePermissionRevoked policy effect.
+/// RoleCmdRevoked policy effect.
 #[effect]
-pub struct RolePermissionRevoked {
+pub struct RoleCmdRevoked {
     pub role_id: Id,
     pub name: String,
-    pub perm: String,
+    pub cmd: String,
     pub author_id: Id,
 }
 /// AqcNetworkNameSet policy effect.
@@ -272,12 +272,12 @@ pub struct QueryAqcNetworkNamesOutput {
     pub net_identifier: String,
     pub device_id: Id,
 }
-/// QueriedRolePermission policy effect.
+/// QueriedRoleCmd policy effect.
 #[effect]
-pub struct QueriedRolePermission {
+pub struct QueriedRoleCmd {
     pub role_id: Id,
     pub name: String,
-    pub perm: String,
+    pub cmd: String,
     pub author_id: Id,
 }
 /// Implements all supported policy actions.
@@ -299,8 +299,8 @@ pub trait ActorExt {
     fn delete_role(&mut self, role_id: Id) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
-    fn assign_role_perm(&mut self, role_id: Id, perm: String) -> Result<(), ClientError>;
-    fn revoke_role_perm(&mut self, role_id: Id, perm: String) -> Result<(), ClientError>;
+    fn assign_role_cmd(&mut self, role_id: Id, cmd: String) -> Result<(), ClientError>;
+    fn revoke_role_cmd(&mut self, role_id: Id, cmd: String) -> Result<(), ClientError>;
     fn set_aqc_network_name(
         &mut self,
         device_id: Id,
@@ -336,5 +336,5 @@ pub trait ActorExt {
     fn query_roles_on_team(&mut self) -> Result<(), ClientError>;
     fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
     fn query_device_roles(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn query_role_perms(&mut self, role_id: Id) -> Result<(), ClientError>;
+    fn query_role_cmds(&mut self, role_id: Id) -> Result<(), ClientError>;
 }

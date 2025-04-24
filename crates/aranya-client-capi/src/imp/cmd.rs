@@ -6,18 +6,18 @@ use std::{
 
 use aranya_capi_core::safe::{TypeId, Typed};
 
-/// A permission that can be assigned to a role.
+/// A command that can be assigned to a role.
 #[derive(Clone, Debug)]
-pub struct Perm {
+pub struct Cmd {
     name: CString,
     _pad: MaybeUninit<[u8; 2 * (8 - size_of::<usize>())]>,
 }
 
-impl Typed for Perm {
+impl Typed for Cmd {
     const TYPE_ID: TypeId = TypeId::new(0xecafb41c);
 }
 
-impl Perm {
+impl Cmd {
     pub fn set_name(&mut self, name: String) {
         self.name = CString::new(name).expect("expected to create string");
     }
@@ -27,8 +27,8 @@ impl Perm {
     }
 }
 
-impl From<aranya_daemon_api::Permission> for Perm {
-    fn from(value: aranya_daemon_api::Permission) -> Self {
+impl From<aranya_daemon_api::Cmd> for Cmd {
+    fn from(value: aranya_daemon_api::Cmd) -> Self {
         Self {
             name: CString::new(value).expect("expected to create string"),
             _pad: MaybeUninit::uninit(),
@@ -36,8 +36,8 @@ impl From<aranya_daemon_api::Permission> for Perm {
     }
 }
 
-impl From<Perm> for String {
-    fn from(value: Perm) -> Self {
+impl From<Cmd> for String {
+    fn from(value: Cmd) -> Self {
         value
             .name
             .into_string()
@@ -45,7 +45,7 @@ impl From<Perm> for String {
     }
 }
 
-impl fmt::Display for Perm {
+impl fmt::Display for Cmd {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,

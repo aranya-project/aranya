@@ -5,7 +5,7 @@ use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, syn
 use anyhow::{bail, Context, Result};
 use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Rng};
-use aranya_daemon_api::{NetIdentifier, Permission, RoleId};
+use aranya_daemon_api::{Cmd, NetIdentifier, RoleId};
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
@@ -485,13 +485,13 @@ where
 
     /// Assigns a permission to a role.
     #[instrument(skip_all)]
-    fn assign_role_perm(
+    fn assign_role_cmd(
         &self,
         role_id: RoleId,
-        perm: Permission,
+        perm: Cmd,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_role_perm(role_id.into(), perm)?;
+            actor.assign_role_cmd(role_id.into(), perm)?;
             Ok(())
         })
         .in_current_span()
@@ -499,13 +499,13 @@ where
 
     /// Revokes permission from a role.
     #[instrument(skip_all)]
-    fn revoke_role_perm(
+    fn revoke_role_cmd(
         &self,
         role_id: RoleId,
-        perm: Permission,
+        perm: Cmd,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.revoke_role_perm(role_id.into(), perm)?;
+            actor.revoke_role_cmd(role_id.into(), perm)?;
             Ok(())
         })
         .in_current_span()
@@ -711,12 +711,12 @@ where
     /// Query role permissions off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_role_perms_off_graph(
+    fn query_role_cmds_off_graph(
         &self,
         role_id: RoleId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_role_perms",
+            name: "query_role_cmds",
             args: Cow::Owned(vec![Value::from(role_id.into_id())]),
         })
         .in_current_span()
