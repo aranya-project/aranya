@@ -37,7 +37,7 @@ impl SyncPeerConfigBuilder {
         Default::default()
     }
 
-    /// Build a [`SyncPeerConfig`]
+    /// Attempts to build a [`SyncPeerConfig`] using the provided parameters.
     pub fn build(self) -> Result<SyncPeerConfig> {
         let Some(interval) = self.interval else {
             return Err(ConfigError::InvalidArg(InvalidArg::new(

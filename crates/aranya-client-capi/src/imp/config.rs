@@ -8,40 +8,13 @@ use aranya_capi_core::{
 use super::Error;
 use crate::api::defs::Duration;
 
-/// Configuration values for syncing with a peer
-#[derive(Clone, Debug)]
-pub struct SyncPeerConfig {
-    interval: Duration,
-    sync_now: bool,
-}
-
-impl Typed for SyncPeerConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x2049e682);
-}
-
-impl From<SyncPeerConfig> for aranya_client::config::SyncPeerConfig {
-    fn from(value: SyncPeerConfig) -> Self {
-        Self::builder()
-            .interval(value.interval.into())
-            .sync_now(value.sync_now)
-            .build()
-            .expect("All values are set")
-    }
-}
-
-impl From<&SyncPeerConfig> for aranya_client::config::SyncPeerConfig {
-    fn from(value: &SyncPeerConfig) -> Self {
-        value.clone().into()
-    }
-}
-
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
     daemon_addr: *const c_char,
     // The daemon's public API key.
     pk: Vec<u8>,
-    aqc: AqcConfig,
+    _aqc: AqcConfig,
 }
 
 impl ClientConfig {
@@ -68,17 +41,17 @@ pub struct ClientConfigBuilder {
 
 impl ClientConfigBuilder {
     /// Set the address for the daemon
-    pub fn set_daemon_addr(&mut self, addr: *const c_char) {
+    pub fn daemon_addr(&mut self, addr: *const c_char) {
         self.daemon_addr = addr;
     }
 
     /// Sets the daemon's public API key.
-    pub fn set_daemon_pk(&mut self, pk: &[u8]) {
+    pub fn daemon_pk(&mut self, pk: &[u8]) {
         self.pk = Some(pk.to_vec());
     }
 
     /// Set the config to be used for AQC
-    pub fn set_aqc(&mut self, cfg: AqcConfig) {
+    pub fn aqc(&mut self, cfg: AqcConfig) {
         self.aqc = Some(cfg);
     }
 }
@@ -110,7 +83,7 @@ impl Builder for ClientConfigBuilder {
         let cfg = ClientConfig {
             daemon_addr: self.daemon_addr,
             pk,
-            aqc,
+            _aqc: aqc,
         };
         Safe::init(out, cfg);
         Ok(())
@@ -124,6 +97,88 @@ impl Default for ClientConfigBuilder {
             pk: None,
             aqc: None,
         }
+    }
+}
+
+/// AQC configuration.
+#[derive(Clone, Debug)]
+pub struct AqcConfig {
+    /// Address to bind AQC server to.
+    addr: *const c_char,
+}
+
+impl Typed for AqcConfig {
+    const TYPE_ID: TypeId = TypeId::new(0x64CEB3F4);
+}
+
+/// Builder for an [`AqcConfig`]
+#[derive(Clone, Debug)]
+pub struct AqcConfigBuilder {
+    /// Address to bind AQC server to.
+    addr: *const c_char,
+}
+
+impl AqcConfigBuilder {
+    /// Sets the network address that the AQC server should
+    /// listen on.
+    pub fn addr(&mut self, addr: *const c_char) {
+        self.addr = addr;
+    }
+}
+
+impl Builder for AqcConfigBuilder {
+    type Output = Safe<AqcConfig>;
+    type Error = Error;
+
+    /// # Safety
+    ///
+    /// No special considerations.
+    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
+        if self.addr.is_null() {
+            return Err(InvalidArg::new("addr", "field not set").into());
+        }
+
+        let cfg = AqcConfig { addr: self.addr };
+
+        Safe::init(out, cfg);
+        Ok(())
+    }
+}
+
+impl Typed for AqcConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x153AE387);
+}
+
+impl Default for AqcConfigBuilder {
+    fn default() -> Self {
+        Self { addr: ptr::null() }
+    }
+}
+
+/// Configuration values for syncing with a peer
+#[derive(Clone, Debug)]
+pub struct SyncPeerConfig {
+    interval: Duration,
+    sync_now: bool,
+}
+
+impl Typed for SyncPeerConfig {
+    const TYPE_ID: TypeId = TypeId::new(0x2049e682);
+}
+
+impl From<SyncPeerConfig> for aranya_client::config::SyncPeerConfig {
+    fn from(value: SyncPeerConfig) -> Self {
+        Self::builder()
+            .interval(value.interval.into())
+            .sync_now(value.sync_now)
+            .build()
+            .expect("All values are set")
+    }
+}
+
+impl From<&SyncPeerConfig> for aranya_client::config::SyncPeerConfig {
+    fn from(value: &SyncPeerConfig) -> Self {
+        value.clone().into()
     }
 }
 
@@ -179,60 +234,6 @@ impl Default for SyncPeerConfigBuilder {
             interval: None,
             sync_now: true,
         }
-    }
-}
-
-/// Configuration info for Aranya Fast Channels
-#[derive(Clone, Debug)]
-pub struct AqcConfig {
-    /// Address to bind AQC server to.
-    addr: *const c_char,
-}
-
-impl Typed for AqcConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x64CEB3F4);
-}
-
-/// Builder for an [`AqcConfig`]
-#[derive(Clone, Debug)]
-pub struct AqcConfigBuilder {
-    /// Address to bind AQC server to.
-    addr: *const c_char,
-}
-
-impl AqcConfigBuilder {
-    /// Set the Address to bind AQC server to
-    pub fn set_addr(&mut self, addr: *const c_char) {
-        self.addr = addr;
-    }
-}
-
-impl Builder for AqcConfigBuilder {
-    type Output = Safe<AqcConfig>;
-    type Error = Error;
-
-    /// # Safety
-    ///
-    /// No special considerations.
-    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        if self.addr.is_null() {
-            return Err(InvalidArg::new("addr", "field not set").into());
-        }
-
-        let cfg = AqcConfig { addr: self.addr };
-
-        Safe::init(out, cfg);
-        Ok(())
-    }
-}
-
-impl Typed for AqcConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x153AE387);
-}
-
-impl Default for AqcConfigBuilder {
-    fn default() -> Self {
-        Self { addr: ptr::null() }
     }
 }
 

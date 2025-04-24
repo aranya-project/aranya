@@ -152,7 +152,7 @@ mod tests {
                 create: true,
                 max_chans: 100,
             }),
-            aqc: AqcConfig {},
+            aqc: None,
         };
         assert_eq!(got, want);
         Ok(())

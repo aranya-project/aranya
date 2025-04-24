@@ -456,12 +456,13 @@ pub type AqcConfig = Safe<imp::AqcConfig>;
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
 
-/// Sets the address that the AQC server should bind to for listening.
+/// Sets the network address that the AQC server should listen
+/// on.
 ///
 /// @param cfg a pointer to the aqc config builder
 /// @param address a string with the address to bind to
 pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *const c_char) {
-    cfg.set_addr(address);
+    cfg.addr(address);
 }
 
 /// Attempts to construct an [`AqcConfig`], returning an `Error::Config`
