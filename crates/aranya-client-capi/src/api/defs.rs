@@ -257,7 +257,7 @@ impl From<&DeviceId> for aranya_daemon_api::DeviceId {
 
 /// Role ID.
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct RoleId {
     id: Id,
 }
@@ -638,6 +638,18 @@ pub fn cmp_device_ids(device_id_a: &DeviceId, device_id_b: &DeviceId) -> bool {
     device_id_a.id == device_id_b.id
 }
 
+/// Compare two role IDs.
+///
+/// @param role_id_a first role ID to compare [`RoleId`].
+/// @param role_id_b second role ID to compare [`RoleId`].
+///
+/// @param __output boolean representing whether the device IDs are equal.
+///
+/// Returns true if device IDs match. Returns false otherwise.
+pub fn cmp_role_ids(role_id_a: &RoleId, role_id_b: &RoleId) -> bool {
+    role_id_a.id == role_id_b.id
+}
+
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
@@ -886,21 +898,19 @@ pub fn assign_role_perm(
 /// @param perm the permission to revoke from the role [`Perm`].
 ///
 /// @relates AranyaClient.
-pub fn revoke_role_perm(
+pub unsafe fn revoke_role_perm(
     client: &mut Client,
     team: &TeamId,
     role_id: &RoleId,
-    perm: PermName,
+    perm: &Perm,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    // SAFETY: Caller must ensure `perm` is a valid C String.
-    let perm = unsafe { perm.as_underlying() }?;
 
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .revoke_role_perm(role_id.into(), perm),
+            .revoke_role_perm(role_id.into(), perm.to_string()),
     )?;
     Ok(())
 }
@@ -1155,7 +1165,7 @@ pub fn get_label_name(label: &Label) -> *const c_char {
 
 /// Get name of permission.
 ///
-/// Returns a C string pointer to the role's name.
+/// Returns a C string pointer to the permission's name.
 #[aranya_capi_core::no_ext_error]
 pub fn get_perm_name(perm: &Perm) -> *const c_char {
     perm.get_name()

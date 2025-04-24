@@ -293,6 +293,13 @@ typedef struct AranyaDeviceId {
     struct AranyaId id;
 } AranyaDeviceId;
 
+/**
+ * Role ID.
+ */
+typedef struct AranyaRoleId {
+    struct AranyaId id;
+} AranyaRoleId;
+
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
     /**
      * This field only exists for size purposes. It is
@@ -345,18 +352,25 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
 typedef const char *AranyaRoleName;
 
 /**
- * Role ID.
- */
-typedef struct AranyaRoleId {
-    struct AranyaId id;
-} AranyaRoleId;
-
-/**
  * A role permission name.
  *
  * E.g. "CreateLabel"
  */
 typedef const char *AranyaPermName;
+
+/**
+ * A role permission.
+ *
+ * E.g. "CreateLabel"
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaPerm {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[96];
+} AranyaPerm;
 
 /**
  * A device priority.
@@ -410,20 +424,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaLabel {
      */
     uint8_t __for_size_only[96];
 } AranyaLabel;
-
-/**
- * A role permission.
- *
- * E.g. "CreateLabel"
- */
-typedef struct ARANYA_ALIGNED(8) AranyaPerm {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[96];
-} AranyaPerm;
 
 /**
  * Channel ID for AQC bidi channel.
@@ -903,6 +903,35 @@ AranyaError aranya_cmp_device_ids_ext(const struct AranyaDeviceId *device_id_a,
                                       struct AranyaExtError *__ext_err);
 
 /**
+ * Compare two role IDs.
+ *
+ * @param role_id_a first role ID to compare [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param role_id_b second role ID to compare [`AranyaRoleId`](@ref AranyaRoleId).
+ *
+ * @param __output boolean representing whether the device IDs are equal.
+ *
+ * Returns true if device IDs match. Returns false otherwise.
+ */
+AranyaError aranya_cmp_role_ids(const struct AranyaRoleId *role_id_a,
+                                const struct AranyaRoleId *role_id_b,
+                                bool *__output);
+
+/**
+ * Compare two role IDs.
+ *
+ * @param role_id_a first role ID to compare [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param role_id_b second role ID to compare [`AranyaRoleId`](@ref AranyaRoleId).
+ *
+ * @param __output boolean representing whether the device IDs are equal.
+ *
+ * Returns true if device IDs match. Returns false otherwise.
+ */
+AranyaError aranya_cmp_role_ids_ext(const struct AranyaRoleId *role_id_a,
+                                    const struct AranyaRoleId *role_id_b,
+                                    bool *__output,
+                                    struct AranyaExtError *__ext_err);
+
+/**
  * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
@@ -1254,7 +1283,7 @@ AranyaError aranya_assign_role_perm_ext(struct AranyaClient *client,
 AranyaError aranya_revoke_role_perm(struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     const struct AranyaRoleId *role_id,
-                                    AranyaPermName perm);
+                                    const struct AranyaPerm *perm);
 
 /**
  * Revoke role permission.
@@ -1271,7 +1300,7 @@ AranyaError aranya_revoke_role_perm(struct AranyaClient *client,
 AranyaError aranya_revoke_role_perm_ext(struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
                                         const struct AranyaRoleId *role_id,
-                                        AranyaPermName perm,
+                                        const struct AranyaPerm *perm,
                                         struct AranyaExtError *__ext_err);
 
 /**
@@ -1623,7 +1652,7 @@ AranyaError aranya_get_label_name(const struct AranyaLabel *label,
 /**
  * Get name of permission.
  *
- * Returns a C string pointer to the role's name.
+ * Returns a C string pointer to the permission's name.
  */
 AranyaError aranya_get_perm_name(const struct AranyaPerm *perm,
                                  const char **__output);

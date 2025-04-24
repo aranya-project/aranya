@@ -1,8 +1,12 @@
-use std::ffi::{c_char, CString};
+use std::{
+    ffi::{c_char, CString},
+    fmt,
+};
 
 use aranya_capi_core::safe::{TypeId, Typed};
 
 /// A permission that can be assigned to a role.
+#[derive(Clone, Debug)]
 pub struct Perm {
     name: CString,
 }
@@ -35,5 +39,15 @@ impl From<Perm> for String {
             .name
             .into_string()
             .expect("expected to convert to string")
+    }
+}
+
+impl fmt::Display for Perm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.name.to_str().expect("expected to convert to string")
+        )
     }
 }

@@ -136,8 +136,11 @@ AranyaError cleanup_roles(Team *t);
 // Query functions.
 AranyaError query_devices_on_team(Team *t, AranyaDeviceId **devices,
                                   size_t *devices_len);
+AranyaError query_roles_on_team(Team *t, AranyaRole **roles, size_t *roles_len);
 AranyaError query_device_roles(Team *t, AranyaDeviceId *device,
                                AranyaRole **roles, size_t *roles_len);
+AranyaError query_role_perms(Team *t, AranyaRoleId *role, AranyaPerm **perms,
+                             size_t *perms_len);
 
 // Initialize an Aranya client.
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
@@ -723,6 +726,7 @@ AranyaError cleanup_roles(Team *t) {
 
     printf("cleaning up roles\r\n");
 
+    AranyaRoleId owner_role_id;
     size_t devices_len      = 0;
     AranyaDeviceId *devices = NULL;
     err                     = query_devices_on_team(t, &devices, &devices_len);
@@ -734,11 +738,14 @@ AranyaError cleanup_roles(Team *t) {
         err = query_device_roles(t, &devices[i], &roles, &roles_len);
         EXPECT("error querying device roles", err);
         for (size_t j = 0; j < roles_len; j++) {
+            AranyaRoleId role_id;
+            err     = aranya_get_role_id(&roles[j], &role_id);
             bool eq = false;
             aranya_cmp_device_ids(&t->clients.owner.id, &devices[i], &eq);
+            if (eq) {
+                owner_role_id = role_id;
+            }
             if (!eq) {
-                AranyaRoleId role_id;
-                err = aranya_get_role_id(&roles[j], &role_id);
                 const char *role_str;
                 err = aranya_get_role_name(&roles[j], &role_str);
                 printf("revoking role: %s\r\n", role_str);
@@ -754,31 +761,40 @@ AranyaError cleanup_roles(Team *t) {
     free(devices);
 
     // Revoke permissions from roles.
-    // TODO: obtain perms from query.
-    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
-                                  &t->roles.operator, "SetAqcNetworkName");
-    EXPECT("error revoking SetAqcNetworkName perm", err);
-    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
-                                  &t->roles.operator, "UnsetAqcNetworkName");
-    EXPECT("error revoking UnsetAqcNetworkName perm", err);
-    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
-                                  &t->roles.operator, "CreateLabel");
-    EXPECT("error revoking CreateLabel perm", err);
-    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
-                                  &t->roles.operator, "AssignLabel");
-    EXPECT("error revoking AssignLabel perm", err);
-    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
-                                  &t->roles.operator, "RevokeLabel");
-    EXPECT("error revoking RevokeLabel perm", err);
-    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
-                                  &t->roles.admin, "DeleteLabel");
-    EXPECT("error revoking DeleteLabel perm", err);
-    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
-                                  &t->roles.member, "AqcCreateBidiChannel");
-    EXPECT("error revoking AqcCreateBidiChannel perm", err);
-    err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
-                                  &t->roles.member, "AqcCreateUniChannel");
-    EXPECT("error revoking AqcCreateUniChannel perm", err);
+    size_t roles_len  = 0;
+    AranyaRole *roles = NULL;
+    err               = query_roles_on_team(t, &roles, &roles_len);
+    EXPECT("error querying roles on team", err);
+
+    for (size_t i = 0; i < roles_len; i++) {
+        AranyaRoleId role_id;
+        err = aranya_get_role_id(&roles[i], &role_id);
+        EXPECT("error getting role ID", err);
+        const char *role_str;
+        err = aranya_get_role_name(&roles[i], &role_str);
+        printf("revoking perms for role: %s\r\n", role_str);
+
+        size_t perms_len  = 0;
+        AranyaPerm *perms = NULL;
+        err               = query_role_perms(t, &role_id, &perms, &perms_len);
+        printf("perms_len: %zu\r\n", perms_len);
+        EXPECT("error querying role permissions", err);
+        for (size_t j = 0; j < perms_len; j++) {
+            bool eq = false;
+            aranya_cmp_role_ids(&owner_role_id, &role_id, &eq);
+            if (!eq) {
+                err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
+                                              &role_id, &perms[j]);
+                EXPECT("error revoking role perm", err);
+                const char *perm_str;
+                err = aranya_get_perm_name(&perms[j], &perm_str);
+                EXPECT("error getting perm name", err);
+                printf("revoked role perm: %s\r\n", perm_str);
+            }
+        }
+        free(perms);
+    }
+    free(roles);
 
     // Delete roles
     // TODO: obtain team roles from query.
@@ -808,7 +824,24 @@ AranyaError query_devices_on_team(Team *t, AranyaDeviceId **devices,
     return err;
 }
 
-// Query device roles. Returns `roles` ptr must be freed.
+// Query roles on team. Returned `roles` ptr must be freed.
+AranyaError query_roles_on_team(Team *t, AranyaRole **roles,
+                                size_t *roles_len) {
+    AranyaError err;
+
+    *roles_len = BUF_LEN;
+    *roles     = malloc(*roles_len * sizeof(AranyaRole));
+    err        = aranya_query_roles_on_team(&t->clients.operator.client, &t->id,
+                                            *roles, roles_len);
+    EXPECT("error querying roles on team", err);
+    if (roles == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+
+    return err;
+}
+
+// Query device roles. Returned `roles` ptr must be freed.
 AranyaError query_device_roles(Team *t, AranyaDeviceId *device,
                                AranyaRole **roles, size_t *roles_len) {
     AranyaError err;
@@ -819,6 +852,23 @@ AranyaError query_device_roles(Team *t, AranyaDeviceId *device,
                                     *roles, roles_len);
     EXPECT("error querying device roles", err);
     if (roles == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+
+    return err;
+}
+
+// Query role permissions. Returned `perms` ptr must be freed.
+AranyaError query_role_perms(Team *t, AranyaRoleId *role, AranyaPerm **perms,
+                             size_t *perms_len) {
+    AranyaError err;
+
+    *perms_len = BUF_LEN;
+    *perms     = malloc(*perms_len * sizeof(AranyaPerm));
+    err = aranya_query_role_perms(&t->clients.operator.client, &t->id, role,
+                                  *perms, perms_len);
+    EXPECT("error querying role perms", err);
+    if (perms == NULL) {
         return ARANYA_ERROR_BUG;
     }
 
