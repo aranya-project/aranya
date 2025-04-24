@@ -9,111 +9,14 @@
     rust_2018_idioms
 )]
 
-use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
-
-use anyhow::{bail, Context, Result};
-use aranya_client::{Client, SyncPeerConfig, TeamConfig};
-use aranya_daemon::{config::Config, Daemon};
-use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
-use aranya_util::Addr;
-use backon::{ExponentialBuilder, Retryable as _};
+use anyhow::{bail, Result};
+use aranya_client::TeamConfig;
+use aranya_daemon_api::Role;
 use test_log::test;
-use tokio::{
-    fs,
-    task::{self, AbortHandle},
-    time::{self, Sleep},
-};
-use tracing::{debug, info, instrument};
+use tracing::{debug, info};
 
-const SYNC_INTERVAL: Duration = Duration::from_millis(100);
-// Allow for one missed sync and a misaligned sync rate, while keeping run times low.
-const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
-
-#[instrument(skip_all, fields(%duration = FmtDuration(d)))]
-fn sleep(d: Duration) -> Sleep {
-    debug!("sleeping");
-
-    time::sleep(d)
-}
-
-/// Formats a [`Duration`], using the same syntax as Go's `time.Duration`.
-struct FmtDuration(Duration);
-
-impl fmt::Display for FmtDuration {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0 < Duration::ZERO {
-            write!(f, "-")?;
-        }
-
-        let mut d = self.0.abs_diff(Duration::ZERO);
-
-        // Small number, format it with small units.
-        if d < Duration::from_secs(1) {
-            if d.is_zero() {
-                return write!(f, "0s");
-            }
-
-            const MICROSECOND: u128 = 1000;
-            const MILLISECOND: u128 = 1000 * MICROSECOND;
-
-            // NB: the unwrap and error cases should never happen since `d` is less than one second.
-            let ns = d.as_nanos();
-            if ns < MICROSECOND {
-                return write!(f, "{ns}ns");
-            }
-
-            let (v, width, fmt) = if ns < MILLISECOND {
-                (MICROSECOND, 3, "µs")
-            } else {
-                (MILLISECOND, 6, "ms")
-            };
-
-            let quo = ns / v;
-            let rem = ns % v;
-            write!(f, "{quo}")?;
-            if rem > 0 {
-                let (rem, width) = trim(rem, width);
-                write!(f, ".{rem:0width$}")?;
-            }
-            return write!(f, "{fmt}");
-        }
-
-        let hours = d.as_secs() / 3600;
-        if hours > 0 {
-            write!(f, "{hours}h")?;
-            d -= Duration::from_secs(hours * 3600);
-        }
-
-        let mins = d.as_secs() / 60;
-        if mins > 0 {
-            write!(f, "{mins}m")?;
-            d -= Duration::from_secs(mins * 60);
-        }
-
-        let secs = d.as_secs();
-        write!(f, "{secs}")?;
-        d -= Duration::from_secs(secs);
-
-        if !d.is_zero() {
-            // NB: the unwrap and error cases should never happen since `d` is less than one second.
-            let (ns, width) = trim(d.as_nanos(), 9);
-            write!(f, ".{ns:0width$}")?;
-        }
-        write!(f, "s")
-    }
-}
-
-/// Trim up to `width` trailing zeros from `d`.
-fn trim(mut d: u128, mut width: usize) -> (u128, usize) {
-    while width > 0 {
-        if d % 10 != 0 {
-            break;
-        }
-        d /= 10;
-        width -= 1;
-    }
-    (d, width)
-}
+mod common;
+use common::{sleep, TeamCtx, SLEEP_INTERVAL}; // Import from common
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]

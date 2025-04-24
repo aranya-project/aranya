@@ -109,7 +109,7 @@ impl Client {
     }
 
     /// Returns the address that the AQC server is bound to.
-    pub async fn aqc_local_addr(&mut self) -> Result<SocketAddr> {
+    pub async fn aqc_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.aqc.local_addr().await?)
     }
 

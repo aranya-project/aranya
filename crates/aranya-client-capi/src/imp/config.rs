@@ -9,7 +9,7 @@ use crate::api::defs::Duration;
 /// Configuration info for Aranya
 pub struct ClientConfig {
     daemon_addr: *const c_char,
-    _aqc: AqcConfig,
+    aqc: AqcConfig,
 }
 
 impl Typed for ClientConfig {
@@ -69,7 +69,7 @@ impl ClientConfigBuilder {
 
         Ok(ClientConfig {
             daemon_addr: self.daemon_addr,
-            _aqc: aqc,
+            aqc,
         })
     }
 }
@@ -122,7 +122,7 @@ impl AqcConfigBuilder {
             return Err(e.into());
         }
 
-        Ok(AqcConfig { _addr: self.addr })
+        Ok(AqcConfig { addr: self.addr })
     }
 }
 

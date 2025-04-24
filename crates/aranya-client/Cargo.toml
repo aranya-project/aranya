@@ -27,7 +27,6 @@ aranya-runtime = { workspace = true, features = ["std"] }
 aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
-heapless = { workspace = true, features = ["serde"] }
 s2n-quic = { workspace = true }
 
 anyhow = { workspace = true }

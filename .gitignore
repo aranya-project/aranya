@@ -3,5 +3,6 @@
 .DS_Store
 *.zip
 *.tar.gz
+*.pem
 
 .vscode

@@ -200,7 +200,6 @@ dependencies = [
  "backon",
  "buggy",
  "bytes",
- "heapless 0.8.0",
  "postcard",
  "rcgen",
  "s2n-quic",
