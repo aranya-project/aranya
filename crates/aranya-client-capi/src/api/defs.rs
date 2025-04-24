@@ -1136,7 +1136,7 @@ pub fn delete_label(
 ///
 /// Returns the role's ID [`RoleId`].
 pub fn get_role_id(role: &Role) -> Result<RoleId, imp::Error> {
-    Ok(role.get_id().into())
+    Ok(role.id.into())
 }
 
 /// Get name of role.
@@ -1144,7 +1144,7 @@ pub fn get_role_id(role: &Role) -> Result<RoleId, imp::Error> {
 /// Returns a C string pointer to the role's name.
 #[aranya_capi_core::no_ext_error]
 pub fn get_role_name(role: &Role) -> *const c_char {
-    role.get_name()
+    role.name.as_ptr()
 }
 
 /// Get ID of role.
@@ -1153,7 +1153,7 @@ pub fn get_role_name(role: &Role) -> *const c_char {
 ///
 /// Returns the label's ID [`LabelId`].
 pub fn get_label_id(label: &Label) -> Result<LabelId, imp::Error> {
-    Ok(label.get_id().into())
+    Ok(label.id.into())
 }
 
 /// Get name of label.
@@ -1163,7 +1163,7 @@ pub fn get_label_id(label: &Label) -> Result<LabelId, imp::Error> {
 /// Returns a C string pointer to the label's name.
 #[aranya_capi_core::no_ext_error]
 pub fn get_label_name(label: &Label) -> *const c_char {
-    label.get_name()
+    label.name.as_ptr()
 }
 
 /// Get name of command.
