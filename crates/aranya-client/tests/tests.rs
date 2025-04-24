@@ -236,7 +236,7 @@ impl TeamCtx {
             .await?;
         // Assign the membera its role.
         owner_team
-            .assign_role(self.operator.id, roles.member.id)
+            .assign_role(self.membera.id, roles.member.id)
             .await?;
 
         // Add member A as a new device.
@@ -246,7 +246,7 @@ impl TeamCtx {
             .await?;
         // Assign the memberb its role.
         owner_team
-            .assign_role(self.operator.id, roles.member.id)
+            .assign_role(self.memberb.id, roles.member.id)
             .await?;
 
         // Make sure they see the configuration change.
@@ -478,9 +478,10 @@ async fn test_query_functions() -> Result<()> {
     debug!("membera devices on team: {:?}", devices.iter().count());
 
     // Check the specific role(s) a device has.
-    let _roles = queries.device_roles(team.membera.id).await?;
-    // TODO: assert_eq!(role, Role::Member);
-    //debug!("membera role: {:?}", role);
+    let roles = queries.device_roles(team.membera.id).await?;
+    let role = roles.iter().next().unwrap();
+    assert_eq!(role.name, "member");
+    debug!("membera role: {:?}", role.name);
 
     // Make sure that we have the correct keybundle.
     let keybundle = queries.device_keybundle(team.membera.id).await?;
