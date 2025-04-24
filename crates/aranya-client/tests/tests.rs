@@ -407,7 +407,6 @@ async fn test_sync_now() -> Result<()> {
 
     // Grab the shorthand for the teams we need to operate on.
     let mut owner = team.owner.client.team(team_id);
-    let mut admin = team.admin.client.team(team_id);
 
     // Add the admin as a new device, but don't give it a role.
     info!("adding admin to team");
@@ -422,18 +421,29 @@ async fn test_sync_now() -> Result<()> {
     // Finally, let's give the admin its role, but don't sync with peers.
     owner.assign_role(team.admin.id, roles.admin.id).await?;
 
-    // TODO: add sync now test back
-
-    // Let's sync immediately, which will propagate the role change.
-    admin.sync_now(owner_addr.into(), None).await?;
-    sleep(SLEEP_INTERVAL).await;
-
     // Now we should be able to successfully assign a role.
     owner
         .assign_role(team.operator.id, roles.operator.id)
         .await?;
 
-    team.delete_all_roles(team_id).await?;
+    // Try to query admin role before syncing
+    {
+        let mut queries = team.admin.client.queries(team_id);
+        let admin_roles = queries.device_roles(team.admin.id).await?;
+        assert_eq!(admin_roles.iter().count(), 0);
+    }
+
+    // Let's sync immediately, which will propagate the role assignment.
+    let mut admin = team.admin.client.team(team_id);
+    admin.sync_now(owner_addr.into(), None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    // Try to query operator role after syncing
+    {
+        let mut queries = team.admin.client.queries(team_id);
+        let admin_roles = queries.device_roles(team.admin.id).await?;
+        assert_eq!(admin_roles.iter().count(), 1);
+    }
 
     Ok(())
 }
