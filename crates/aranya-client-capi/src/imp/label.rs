@@ -1,4 +1,7 @@
-use std::ffi::{c_char, CString};
+use std::{
+    ffi::{c_char, CString},
+    mem::MaybeUninit,
+};
 
 use aranya_capi_core::safe::{TypeId, Typed};
 use aranya_daemon_api::LabelId;
@@ -7,6 +10,7 @@ use aranya_daemon_api::LabelId;
 pub struct Label {
     id: LabelId,
     name: CString,
+    _pad: MaybeUninit<[u8; 2 * (8 - size_of::<usize>())]>,
 }
 
 impl Typed for Label {
@@ -36,6 +40,7 @@ impl From<aranya_daemon_api::Label> for Label {
         Self {
             id: value.id,
             name: CString::new(value.name).expect("expected to create string"),
+            _pad: MaybeUninit::uninit(),
         }
     }
 }

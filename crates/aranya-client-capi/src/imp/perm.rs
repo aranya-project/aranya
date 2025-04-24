@@ -1,6 +1,7 @@
 use std::{
     ffi::{c_char, CString},
     fmt,
+    mem::MaybeUninit,
 };
 
 use aranya_capi_core::safe::{TypeId, Typed};
@@ -9,6 +10,7 @@ use aranya_capi_core::safe::{TypeId, Typed};
 #[derive(Clone, Debug)]
 pub struct Perm {
     name: CString,
+    _pad: MaybeUninit<[u8; 2 * (8 - size_of::<usize>())]>,
 }
 
 impl Typed for Perm {
@@ -29,6 +31,7 @@ impl From<aranya_daemon_api::Permission> for Perm {
     fn from(value: aranya_daemon_api::Permission) -> Self {
         Self {
             name: CString::new(value).expect("expected to create string"),
+            _pad: MaybeUninit::uninit(),
         }
     }
 }

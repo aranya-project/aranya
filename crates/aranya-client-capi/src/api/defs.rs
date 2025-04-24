@@ -422,8 +422,9 @@ impl RoleName {
 /// A role permission.
 ///
 /// E.g. "CreateLabel"
-#[aranya_capi_core::opaque(size = 96, align = 8)]
+#[aranya_capi_core::opaque(size = 32, align = 8)]
 pub type Perm = Safe<imp::Perm>;
+const _: [(); 32] = [(); size_of::<Perm>()];
 
 /// A role permission name.
 ///
@@ -466,10 +467,12 @@ impl LabelName {
 /// A role.
 #[aranya_capi_core::opaque(size = 96, align = 8)]
 pub type Role = Safe<imp::Role>;
+const _: [(); 96] = [(); size_of::<Role>()];
 
 /// A label.
 #[aranya_capi_core::opaque(size = 96, align = 8)]
 pub type Label = Safe<imp::Label>;
+const _: [(); 96] = [(); size_of::<Label>()];
 
 /// Sync Peer config.
 #[aranya_capi_core::opaque(size = 32, align = 8)]
