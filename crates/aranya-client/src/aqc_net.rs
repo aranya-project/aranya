@@ -10,22 +10,25 @@ use aranya_daemon_api::{AqcBidiChannelId, LabelId};
 use bytes::Bytes;
 use s2n_quic::{
     client::Connect,
-    connection::{self, Handle},
-    provider::{self, StartError},
-    stream::{self, BidirectionalStream, PeerStream, ReceiveStream, SendStream},
+    connection::Handle,
+    provider::{self},
+    stream::{PeerStream, ReceiveStream, SendStream},
     Client, Connection, Server,
 };
 use tokio::sync::mpsc::{self};
 use tracing::{debug, error};
 
-/// Runs a server listening for QUIC Channel requests from other peers.
+/// The maximum number of channels that haven't been received.
+const MAXIMUM_UNRECEIVED_CHANNELS: usize = 20;
+
+/// Runs a server listening for quic channel requests from other peers.
 pub async fn run_channels(mut server: Server, sender: mpsc::Sender<AqcChannelType>) {
     loop {
         match server.accept().await {
             Some(conn) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let (channel, (bi_sender, uni_sender)) = AqcBidirectionalChannel::new(
+                let (channel, bi_sender) = AqcBidirectionalChannel::new(
                     LabelId::default(),
                     AqcBidiChannelId::from(Id::default()),
                     conn.handle(),
@@ -43,7 +46,7 @@ pub async fn run_channels(mut server: Server, sender: mpsc::Sender<AqcChannelTyp
                 } else {
                     // Spawn a new task so that we can receive any future streams that are opened
                     // over the connection.
-                    tokio::spawn(handle_streams(conn, bi_sender, uni_sender));
+                    tokio::spawn(handle_streams(conn, bi_sender));
                 }
             }
             None => {
@@ -56,19 +59,21 @@ pub async fn run_channels(mut server: Server, sender: mpsc::Sender<AqcChannelTyp
 
 async fn handle_streams(
     mut conn: Connection,
-    bi_sender: mpsc::Sender<BidirectionalStream>,
-    uni_sender: mpsc::Sender<ReceiveStream>,
+    sender: mpsc::Sender<(Option<SendStream>, ReceiveStream)>,
 ) {
     loop {
         match conn.accept().await {
             Ok(Some(stream)) => match stream {
                 PeerStream::Bidirectional(stream) => {
-                    if bi_sender.send(stream).await.is_err() {
+                    println!("bidirectional stream");
+                    let (recv, send) = stream.split();
+                    if sender.send((Some(send), recv)).await.is_err() {
                         error!("error sending bi stream");
                     }
                 }
-                PeerStream::Receive(stream) => {
-                    if uni_sender.send(stream).await.is_err() {
+                PeerStream::Receive(recv) => {
+                    println!("unidirectional stream");
+                    if sender.send((None, recv)).await.is_err() {
                         error!("error sending uni stream");
                     }
                 }
@@ -85,11 +90,11 @@ async fn handle_streams(
 }
 
 /// Indicates whether the channel is unidirectional or bidirectional
-pub enum AqcChannelDirection {
+enum AqcChannelDirection {
     /// Data can only be sent in one direction.
-    UNIDIRECTIONAL,
+    Unidirectional,
     /// Data can be sent in either direction
-    BIDIRECTIONAL,
+    Bidirectional,
 }
 
 /// Indicates the type of channel
@@ -194,8 +199,7 @@ pub struct AqcBidirectionalChannel {
     label_id: LabelId,
     aqc_id: AqcBidiChannelId,
     handle: Handle,
-    uni_receiver: mpsc::Receiver<ReceiveStream>,
-    bi_receiver: mpsc::Receiver<BidirectionalStream>,
+    receiver: mpsc::Receiver<(Option<SendStream>, ReceiveStream)>,
 }
 
 impl AqcBidirectionalChannel {
@@ -204,24 +208,16 @@ impl AqcBidirectionalChannel {
         label_id: LabelId,
         aqc_id: AqcBidiChannelId,
         handle: Handle,
-    ) -> (
-        Self,
-        (
-            mpsc::Sender<BidirectionalStream>,
-            mpsc::Sender<ReceiveStream>,
-        ),
-    ) {
-        let (bi_sender, bi_receiver) = mpsc::channel(10);
-        let (uni_sender, uni_receiver) = mpsc::channel(10);
+    ) -> (Self, mpsc::Sender<(Option<SendStream>, ReceiveStream)>) {
+        let (sender, receiver) = mpsc::channel(10);
         (
             Self {
                 label_id,
                 aqc_id,
                 handle,
-                uni_receiver,
-                bi_receiver,
+                receiver,
             },
-            (bi_sender, uni_sender),
+            sender,
         )
     }
 
@@ -235,26 +231,17 @@ impl AqcBidirectionalChannel {
         self.aqc_id
     }
 
-    /// Returns a bidirectional stream if one has been received.
+    /// Returns a stream if one has been received.
+    /// If the stream is bidirectional, return a tuple of the send and receive streams.
+    /// If the stream is unidirectional, return a tuple of None and the receive stream.
     /// If no stream has been received return None.
-    pub async fn receive_bidirectional_stream(
-        &mut self,
-    ) -> Option<(AqcSendStream, AqcReceiveStream)> {
-        match self.bi_receiver.recv().await {
-            Some(stream) => {
-                let (receive, send) = stream.split();
-                Some((AqcSendStream { send }, AqcReceiveStream { receive }))
+    pub async fn receive_stream(&mut self) -> Option<(Option<AqcSendStream>, AqcReceiveStream)> {
+        match self.receiver.recv().await {
+            Some((Some(send), receive)) => {
+                Some((Some(AqcSendStream { send }), AqcReceiveStream { receive }))
             }
+            Some((None, receive)) => Some((None, AqcReceiveStream { receive })),
             None => None,
-        }
-    }
-
-    /// Returns a unidirectional stream if one has been received.
-    /// If no stream has been received return None.
-    pub async fn receive_unidirectional_stream(&mut self) -> Result<Option<AqcReceiveStream>> {
-        match self.uni_receiver.recv().await {
-            Some(stream) => Ok(Some(AqcReceiveStream { receive: stream })),
-            None => Ok(None),
         }
     }
 
@@ -324,9 +311,6 @@ impl AqcSendStream {
     }
 }
 
-/// The maximum number of channels that haven't been received.
-const MAXIMUM_UNRECEIVED_CHANNELS: usize = 20;
-
 /// An AQC client. Used to create and receive channels.
 #[derive(Debug)]
 pub struct AqcClient {
@@ -379,16 +363,16 @@ impl AqcClient {
             .await?;
         conn.keep_alive(true)?;
         let channel = match direction {
-            AqcChannelDirection::UNIDIRECTIONAL => AqcChannelType::Sender {
+            AqcChannelDirection::Unidirectional => AqcChannelType::Sender {
                 sender: AqcChannelSender::new(label_id, conn.handle()),
             },
-            AqcChannelDirection::BIDIRECTIONAL => {
-                let (channel, (bi_sender, uni_sender)) = AqcBidirectionalChannel::new(
+            AqcChannelDirection::Bidirectional => {
+                let (channel, sender) = AqcBidirectionalChannel::new(
                     label_id,
                     AqcBidiChannelId::from(Id::default()),
                     conn.handle(),
                 );
-                tokio::spawn(handle_streams(conn, bi_sender, uni_sender));
+                tokio::spawn(handle_streams(conn, sender));
                 AqcChannelType::Bidirectional { channel }
             }
         };
@@ -402,7 +386,7 @@ impl AqcClient {
         label_id: LabelId,
     ) -> Result<AqcChannelSender> {
         match self
-            .create_channel(addr, label_id, AqcChannelDirection::UNIDIRECTIONAL)
+            .create_channel(addr, label_id, AqcChannelDirection::Unidirectional)
             .await?
         {
             AqcChannelType::Sender { sender } => Ok(sender),
@@ -417,7 +401,7 @@ impl AqcClient {
         label_id: LabelId,
     ) -> Result<AqcBidirectionalChannel> {
         match self
-            .create_channel(addr, label_id, AqcChannelDirection::BIDIRECTIONAL)
+            .create_channel(addr, label_id, AqcChannelDirection::Bidirectional)
             .await?
         {
             AqcChannelType::Bidirectional { channel } => Ok(channel),
