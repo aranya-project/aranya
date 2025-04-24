@@ -776,6 +776,13 @@ command DeleteRole {
         let role = check_unwrap query Roles[role_id: this.role_id]
 
         finish {
+            // Revoke role from all devices.
+            delete AssignedRole[role_id: role.role.role_id, device_id: ?]
+
+            // TODO: revoke role permissions.
+            // Not strictly required because a role cannot be used if it's been deleted and has no devices assigned to it.
+            // Cleans up unused data from the factdb.
+
             // Delete role.
             delete_role(role.role)
 
@@ -901,7 +908,7 @@ command RevokeRole {
         let role = check_unwrap query Roles[role_id: this.role_id]
 
         finish {
-            delete AssignedRole[role_id: this.role_id, device_id: target.device_id]
+            delete AssignedRole[role_id: role.role.role_id, device_id: target.device_id]
 
             // Return revoked role info.
             emit RoleRevoked {

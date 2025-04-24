@@ -783,7 +783,6 @@ AranyaError cleanup_roles(Team *t) {
             bool eq = false;
             aranya_cmp_role_ids(&owner_role_id, &role_id, &eq);
             if (!eq) {
-                // TODO: capacity overflow error
                 err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
                                               &role_id, &perms[j]);
                 EXPECT("error revoking role perm", err);
@@ -795,15 +794,20 @@ AranyaError cleanup_roles(Team *t) {
         }
         free(perms);
     }
-    free(roles);
 
     // Delete roles
-    // TODO: obtain team roles from query.
-    for (int i = 0; i < NUM_ROLES; i++) {
-        err = aranya_delete_role(&t->clients.owner.client, &t->id,
-                                 &t->roles_arr[i]);
+    for (size_t i = 0; i < roles_len; i++) {
+        AranyaRoleId role_id;
+        err = aranya_get_role_id(&roles[i], &role_id);
+        EXPECT("error getting role ID", err);
+        const char *role_str;
+        err = aranya_get_role_name(&roles[i], &role_str);
+        printf("deleting role: %s\r\n", role_str);
+        err = aranya_delete_role(&t->clients.owner.client, &t->id, &role_id);
         EXPECT("unable to delete role", err);
     }
+
+    free(roles);
 
     return err;
 }
