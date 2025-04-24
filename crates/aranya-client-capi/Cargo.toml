@@ -19,8 +19,6 @@ crate-type = ["rlib", "cdylib"]
 
 [features]
 default = []
-# Aranya Fast Channels are currently an experimental opt-in feature
-afc = ["aranya-client/afc"]
 
 
 [dependencies]
@@ -30,10 +28,8 @@ aranya-util = { workspace = true }
 
 aranya-capi-core = { workspace = true }
 aranya-crypto = { workspace = true }
-aranya-fast-channels = { workspace = true }
 buggy = { workspace = true }
 
-libc = { workspace = true, features = ["extra_traits"] }
 postcard = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

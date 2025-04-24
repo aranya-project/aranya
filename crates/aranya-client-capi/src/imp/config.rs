@@ -5,15 +5,11 @@ use aranya_client::ConfigError;
 
 use crate::api::defs::Duration;
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
 /// Configuration info for Aranya
 pub struct ClientConfig {
     daemon_addr: *const c_char,
-    #[cfg(feature = "afc")]
-    afc: AfcConfig,
-    aqc: AqcConfig,
+    _aqc: AqcConfig,
 }
 
 impl Typed for ClientConfig {
@@ -28,21 +24,12 @@ impl ClientConfig {
     pub(crate) fn aqc(&self) -> &AqcConfig {
         &self.aqc
     }
-
-    #[cfg(feature = "afc")]
-    pub(crate) fn afc(&self) -> &AfcConfig {
-        &self.afc
-    }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 56, align = 8)]
 /// Builder for a [`ClientConfig`]
 pub struct ClientConfigBuilder {
     daemon_addr: *const c_char,
-    #[cfg(feature = "afc")]
-    afc: Option<AfcConfig>,
     aqc: Option<AqcConfig>,
 }
 
@@ -61,12 +48,6 @@ impl ClientConfigBuilder {
         self.aqc = Some(cfg);
     }
 
-    #[cfg(feature = "afc")]
-    /// Set the config to be used for AFC
-    pub fn afc(&mut self, cfg: AfcConfig) {
-        self.afc = Some(cfg);
-    }
-
     /// Attempts to construct a [`ClientConfig`], returning an
     /// [`Error::Config`](super::error::Error::Config) if invalid.
     pub fn build(self) -> Result<ClientConfig, super::Error> {
@@ -78,16 +59,6 @@ impl ClientConfigBuilder {
             return Err(e.into());
         }
 
-        #[cfg(feature = "afc")]
-        let Some(afc) = self.afc
-        else {
-            let e = ConfigError::InvalidArg {
-                arg: "afc_config",
-                reason: "Tried to create a `ClientConfig` without setting a valid `AfcConfig`!",
-            };
-            return Err(e.into());
-        };
-
         let Some(aqc) = self.aqc else {
             let e = ConfigError::InvalidArg {
                 arg: "aqc_config",
@@ -98,9 +69,7 @@ impl ClientConfigBuilder {
 
         Ok(ClientConfig {
             daemon_addr: self.daemon_addr,
-            #[cfg(feature = "afc")]
-            afc,
-            aqc,
+            _aqc: aqc,
         })
     }
 }
@@ -110,82 +79,11 @@ impl Default for ClientConfigBuilder {
         Self {
             daemon_addr: std::ptr::null(),
             aqc: None,
-            #[cfg(feature = "afc")]
-            afc: None,
         }
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[cfg(feature = "afc")]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
-/// Configuration info for Aranya Fast Channels
-pub struct AfcConfig {
-    /// Shared memory path.
-    pub shm_path: *const c_char,
-    /// Maximum number of channels to store in shared-memory.
-    pub max_channels: usize,
-    /// Address to bind AFC server to.
-    pub addr: *const c_char,
-}
-
-#[cfg(feature = "afc")]
-impl Typed for AfcConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x1C3BE29F);
-}
-
-#[derive(Copy, Clone, Debug)]
-#[cfg(feature = "afc")]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
-/// Builder for an [`AfcConfig`]
-pub struct AfcConfigBuilder {
-    /// Shared memory path.
-    pub shm_path: *const c_char,
-    /// Maximum number of channels to store in shared-memory.
-    pub max_channels: usize,
-    /// Address to bind AFC server to.
-    pub addr: *const c_char,
-}
-
-#[cfg(feature = "afc")]
-impl Typed for AfcConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0xB4E69EF0);
-}
-
-#[cfg(feature = "afc")]
-impl AfcConfigBuilder {
-    /// Attempts to construct an [`AfcConfig`], returning an
-    /// [`Error::Config`](super::error::Error::Config) if invalid.
-    pub fn build(self) -> Result<AfcConfig, super::Error> {
-        if self.shm_path.is_null() {
-            let e = ConfigError::InvalidArg {
-                arg: "shm_path",
-                reason:
-                    "Tried to create an `AfcConfig` without setting a valid shared memory path!",
-            };
-            return Err(e.into());
-        }
-
-        if self.addr.is_null() {
-            let e = ConfigError::InvalidArg {
-                arg: "address",
-                reason: "Tried to create an `AfcConfig` without setting a valid address!",
-            };
-            return Err(e.into());
-        }
-
-        Ok(AfcConfig {
-            shm_path: self.shm_path,
-            max_channels: self.max_channels,
-            addr: self.addr,
-        })
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
 /// Configuration info for Aranya Fast Channels
 pub struct AqcConfig {
     /// Address to bind AQC server to.
@@ -197,7 +95,6 @@ impl Typed for AqcConfig {
 }
 
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
 /// Builder for an [`AqcConfig`]
 pub struct AqcConfigBuilder {
     /// Address to bind AQC server to.
@@ -225,7 +122,7 @@ impl AqcConfigBuilder {
             return Err(e.into());
         }
 
-        Ok(AqcConfig { addr: self.addr })
+        Ok(AqcConfig { _addr: self.addr })
     }
 }
 
@@ -237,7 +134,6 @@ impl Default for AqcConfigBuilder {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 /// Configuration info for syncing with a peer
 pub struct SyncPeerConfig {
@@ -265,7 +161,6 @@ impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 /// Builder for a [`SyncPeerConfig`]
 pub struct SyncPeerConfigBuilder {
@@ -317,9 +212,7 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 0, align = 1)]
 /// Configuration info when creating or adding a team in Aranya
 pub struct TeamConfig {}
 
@@ -327,9 +220,7 @@ impl Typed for TeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 0, align = 1)]
 /// Builder for a [`TeamConfig`]
 pub struct TeamConfigBuilder {}
 

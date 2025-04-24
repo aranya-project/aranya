@@ -13,8 +13,6 @@ workspace = true
 
 [features]
 default = []
-# Aranya Fast Channels are currently an experimental opt-in feature
-afc = ["aranya-daemon/afc"]
 
 # Enable debugging.
 debug = []
@@ -31,14 +29,9 @@ buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
 heapless = { workspace = true, features = ["serde"] }
 s2n-quic = { workspace = true }
-spideroak-base58 = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
-indexmap = { version = "2.7" }
-# TODO: gate behind `target_family = unix`
-libc = { workspace = true }
 postcard = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
