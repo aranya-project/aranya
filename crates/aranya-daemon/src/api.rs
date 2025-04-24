@@ -106,7 +106,7 @@ impl DaemonApiServer {
                 client,
                 local_addr,
                 pk,
-                peers,
+                peers: Arc::new(Mutex::new(peers)),
                 keystore_info,
                 aqc_peers: Arc::new(Mutex::new(aqc_peers)),
             },
@@ -171,7 +171,7 @@ struct DaemonApiHandler {
     /// Public keys of current device.
     pk: Arc<PublicKeys<api::CS>>,
     /// Aranya sync peers,
-    peers: SyncPeers,
+    peers: Arc<Mutex<SyncPeers>>,
     /// Key store paths.
     keystore_info: api::KeyStoreInfo,
     /// AQC peers.
@@ -271,13 +271,15 @@ impl DaemonApi for DaemonApiHandler {
 
     #[instrument(skip(self))]
     async fn add_sync_peer(
-        mut self,
+        self,
         _: context::Context,
         peer: Addr,
         team: api::TeamId,
         cfg: api::SyncPeerConfig,
     ) -> api::Result<()> {
         self.peers
+            .lock()
+            .await
             .add_peer(peer, team.into_id().into(), cfg)
             .await?;
         Ok(())
@@ -292,6 +294,8 @@ impl DaemonApi for DaemonApiHandler {
         cfg: Option<api::SyncPeerConfig>,
     ) -> api::Result<()> {
         self.peers
+            .lock()
+            .await
             .sync_now(peer, team.into_id().into(), cfg)
             .await?;
         Ok(())
@@ -299,12 +303,14 @@ impl DaemonApi for DaemonApiHandler {
 
     #[instrument(skip(self))]
     async fn remove_sync_peer(
-        mut self,
+        self,
         _: context::Context,
         peer: Addr,
         team: api::TeamId,
     ) -> api::Result<()> {
         self.peers
+            .lock()
+            .await
             .remove_peer(peer, team.into_id().into())
             .await
             .context("unable to remove sync peer")?;
