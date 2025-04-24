@@ -14,12 +14,14 @@ impl Typed for Role {
     const TYPE_ID: TypeId = TypeId::new(0xbcafb41c);
 }
 
-impl From<aranya_daemon_api::Role> for Role {
-    fn from(value: aranya_daemon_api::Role) -> Self {
-        Self {
+impl TryFrom<aranya_daemon_api::Role> for Role {
+    type Error = crate::imp::Error;
+
+    fn try_from(value: aranya_daemon_api::Role) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: value.id,
-            name: CString::new(value.name).expect("expected to create string"),
+            name: CString::new(value.name).map_err(crate::imp::Error::CString)?,
             _pad: MaybeUninit::uninit(),
-        }
+        })
     }
 }

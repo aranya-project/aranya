@@ -72,6 +72,10 @@ pub enum Error {
     /// Serialization error.
     #[capi(msg = "serialization")]
     Serialization,
+
+    /// CString error.
+    #[capi(msg = "CString")]
+    CString,
 }
 
 impl From<&imp::Error> for Error {
@@ -100,6 +104,7 @@ impl From<&imp::Error> for Error {
             imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
+            imp::Error::CString(_) => Self::CString,
         }
     }
 }
@@ -1480,7 +1485,7 @@ pub fn query_device_label_assignments(
         return Err(imp::Error::BufferTooSmall);
     }
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.clone().into())
+        Safe::init(dst, src.clone().try_into()?)
     }
     *labels_len = data.len();
     Ok(())
@@ -1568,7 +1573,7 @@ pub fn query_labels(
     };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.clone().into());
+        Safe::init(dst, src.clone().try_into()?);
     }
     if *labels_len < data.len() {
         *labels_len = data.len();
@@ -1609,7 +1614,7 @@ pub fn query_roles_on_team(
     };
     let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.clone().into());
+        Safe::init(dst, src.clone().try_into()?);
     }
     if *roles_len < data.len() {
         *roles_len = data.len();
@@ -1655,7 +1660,7 @@ pub fn query_device_roles(
     };
     let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.clone().into());
+        Safe::init(dst, src.clone().try_into()?);
     }
     if *roles_len < data.len() {
         *roles_len = data.len();

@@ -1,4 +1,5 @@
 use core::{ffi::c_char, mem::MaybeUninit};
+use std::ffi::NulError;
 
 use aranya_capi_core::{
     safe::{TypeId, Typed},
@@ -44,6 +45,10 @@ pub enum Error {
 
     #[error("serialization errors: {0}")]
     Serialization(#[from] postcard::Error),
+
+    /// CString allocation error.
+    #[error("CString allocation: {0}")]
+    CString(#[from] NulError),
 }
 
 impl From<WriteCStrError> for Error {

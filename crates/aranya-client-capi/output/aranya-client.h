@@ -193,6 +193,10 @@ enum AranyaError
      * Serialization error.
      */
     ARANYA_ERROR_SERIALIZATION,
+    /**
+     * CString error.
+     */
+    ARANYA_ERROR_C_STRING,
 };
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
