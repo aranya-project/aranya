@@ -14,7 +14,7 @@ use aranya_crypto::{
 };
 use aranya_daemon::{
     aranya::{self, Actions},
-    policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
+    policy::{Effect, KeyBundle as DeviceKeyBundle, RoleInfo},
     vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
 };
 use aranya_keygen::{KeyBundle, PublicKeys};
@@ -118,10 +118,10 @@ impl DerefMut for TestDevice {
 }
 
 pub struct TestRoles {
-    pub admin: Role,
-    pub operator: Role,
-    pub membera: Role,
-    pub memberb: Role,
+    pub admin: RoleInfo,
+    pub operator: RoleInfo,
+    pub membera: RoleInfo,
+    pub memberb: RoleInfo,
 }
 
 pub struct TestTeam {
@@ -216,7 +216,7 @@ impl TestCtx {
     }
 
     /// Creates a new role
-    async fn create_role(&self, owner: &TestDevice, name: String) -> Result<Role> {
+    async fn create_role(&self, owner: &TestDevice, name: String) -> Result<RoleInfo> {
         // TODO: simplify this logic.
         let effects = owner
             .actions()
@@ -229,7 +229,7 @@ impl TestCtx {
         let Effect::RoleCreated(ref role_created) = effects[0] else {
             panic!("could not find role");
         };
-        Ok(Role {
+        Ok(RoleInfo {
             role_id: role_created.role.role_id,
             name: role_created.role.name.clone(),
             author_id: role_created.role.author_id,

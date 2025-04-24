@@ -116,7 +116,7 @@ struct DeviceInfo {
 }
 
 // Defines a role on the team.
-struct Role {
+struct RoleInfo {
     // ID of the role.
     role_id id,
     // Name of the role.
@@ -142,7 +142,7 @@ fact DeviceSignKey[device_id id]=>{key_id id, key bytes}
 fact DeviceEncKey[device_id id]=>{key_id id, key bytes}
 
 // A ID-based role on the team.
-fact Roles[role_id id]=>{role struct Role}
+fact Role[role_id id]=>{role struct RoleInfo}
 
 // Records that a role was assigned to a device.
 fact AssignedRole[role_id id, device_id id]=>{}
@@ -253,12 +253,12 @@ A role may be assigned to multiple devices.
 A device may be assigned multiple roles.
 
 ```policy
-finish function create_role(role struct Role) {
-    create Roles[role_id: role.role_id]=>{role: role}
+finish function create_role(role struct RoleInfo) {
+    create Role[role_id: role.role_id]=>{role: role}
 }
 
-finish function delete_role(role struct Role) {
-    delete Roles[role_id: role.role_id]
+finish function delete_role(role struct RoleInfo) {
+    delete Role[role_id: role.role_id]
 }
 
 finish function assign_cmd_role(cmd string, role_id id) {
@@ -462,7 +462,7 @@ command CreateTeam {
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
         
-        let role = Role {
+        let role = RoleInfo {
             role_id: role_id,
             name: "owner",
             author_id: author_id,
@@ -727,7 +727,7 @@ command CreateRole {
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
 
-        let role = Role {
+        let role = RoleInfo {
             role_id: role_id,
             name: this.name,
             author_id: author.device_id,
@@ -745,7 +745,7 @@ command CreateRole {
 
 // A role was created on the team.
 effect RoleCreated {
-    role struct Role,
+    role struct RoleInfo,
 }
 ```
 
@@ -778,7 +778,7 @@ command DeleteRole {
         check device_can_publish_cmd(author.device_id, "DeleteRole")
 
         // Query role.
-        let role = check_unwrap query Roles[role_id: this.role_id]
+        let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
             // Revoke role from all devices.
@@ -801,7 +801,7 @@ command DeleteRole {
 
 // A role was deleted from the team.
 effect RoleDeleted {
-    role struct Role
+    role struct RoleInfo
 }
 ```
 
@@ -839,7 +839,7 @@ command AssignRole {
         check author_dominates_target(author.device_id, device.device_id)
 
         // Query role.
-        let role = check_unwrap query Roles[role_id: this.role_id]
+        let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
             create AssignedRole[role_id: this.role_id, device_id: device.device_id]=>{}
@@ -910,7 +910,7 @@ command RevokeRole {
         check author_dominates_target(author.device_id, target.device_id)
 
         // Query role.
-        let role = check_unwrap query Roles[role_id: this.role_id]
+        let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
             delete AssignedRole[role_id: role.role.role_id, device_id: target.device_id]
@@ -972,7 +972,7 @@ command AssignRoleCommand {
         check device_can_publish_cmd(author.device_id, "AssignRoleCommand")
 
         // Query role.
-        let role = check_unwrap query Roles[role_id: this.role_id]
+        let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
             assign_cmd_role(this.cmd, role.role.role_id)
@@ -1032,7 +1032,7 @@ command RevokeRoleCmd {
         check device_can_publish_cmd(author.device_id, "RevokeRoleCmd")
 
         // Query role.
-        let role = check_unwrap query Roles[role_id: this.role_id]
+        let role = check_unwrap query Role[role_id: this.role_id]
 
         if this.role_id == role.role.role_id {
             finish {
@@ -2219,7 +2219,7 @@ Queries a list of roles on the team.
 ```policy
 // Emits `QueriedRole` for all roles.
 action query_roles_on_team() {
-    map Roles[role_id: ?] as f {
+    map Role[role_id: ?] as f {
         publish QueryRole {
             role_id: f.role.role_id,
             role_name: f.role.name,
@@ -2241,7 +2241,7 @@ command QueryRole {
     policy {
         check team_exists()
 
-        let role = Role {
+        let role = RoleInfo {
             role_id: this.role_id,
             name: this.role_name,
             author_id: this.role_author_id,
@@ -2256,7 +2256,7 @@ command QueryRole {
 }
 
 effect QueriedRole {
-    role struct Role
+    role struct RoleInfo
 }
 ```
 
@@ -2314,7 +2314,7 @@ action query_device_roles(device_id id) {
     // The key order is optimized for `delete AssignedRole`.
     map AssignedRole[role_id: ?, device_id: ?] as f {
         if f.device_id == device_id {
-            let role = check_unwrap query Roles[role_id: f.role_id]
+            let role = check_unwrap query Role[role_id: f.role_id]
             publish QueryRoleAssignment {
                 device_id: f.device_id,
                 role_id: role.role_id,
@@ -2339,7 +2339,7 @@ command QueryRoleAssignment {
     policy {
         check team_exists()
 
-        let role = Role {
+        let role = RoleInfo {
             role_id: this.role_id,
             name: this.role_name,
             author_id: this.role_author_id,
@@ -2364,7 +2364,7 @@ Queries a list of commands assigned to the role.
 action query_role_cmds(role_id id) {
     map CmdRequiresRole[cmd: ?] as f {
         if f.role_id == role_id {
-            let role = check_unwrap query Roles[role_id: f.role_id]
+            let role = check_unwrap query Role[role_id: f.role_id]
             publish QueryRoleCmds {
                 role_id: role.role_id,
                 role_name: role.role.name,

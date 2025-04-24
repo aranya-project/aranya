@@ -31,7 +31,7 @@ use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
     aranya::Actions,
-    policy::{ChanOp, Effect, KeyBundle, Role},
+    policy::{ChanOp, Effect, KeyBundle, RoleInfo},
     sync::SyncPeers,
     Client, EF,
 };
@@ -1031,9 +1031,9 @@ impl From<KeyBundle> for api::KeyBundle {
     }
 }
 
-impl From<api::Role> for Role {
+impl From<api::Role> for RoleInfo {
     fn from(value: api::Role) -> Self {
-        Role {
+        RoleInfo {
             role_id: value.id.into(),
             name: value.name,
             author_id: value.author_id.into(),
@@ -1041,8 +1041,8 @@ impl From<api::Role> for Role {
     }
 }
 
-impl From<Role> for api::Role {
-    fn from(value: Role) -> Self {
+impl From<RoleInfo> for api::Role {
+    fn from(value: RoleInfo) -> Self {
         api::Role {
             id: value.role_id.into(),
             name: value.name,

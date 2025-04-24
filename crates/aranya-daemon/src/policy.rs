@@ -17,9 +17,9 @@ pub struct KeyBundle {
     pub sign_key: Vec<u8>,
     pub enc_key: Vec<u8>,
 }
-/// Role policy struct.
+/// RoleInfo policy struct.
 #[value]
-pub struct Role {
+pub struct RoleInfo {
     pub role_id: Id,
     pub name: String,
     pub author_id: Id,
@@ -89,12 +89,12 @@ pub struct MemberRemoved {
 /// RoleCreated policy effect.
 #[effect]
 pub struct RoleCreated {
-    pub role: Role,
+    pub role: RoleInfo,
 }
 /// RoleDeleted policy effect.
 #[effect]
 pub struct RoleDeleted {
-    pub role: Role,
+    pub role: RoleInfo,
 }
 /// RoleAssigned policy effect.
 #[effect]
@@ -264,7 +264,7 @@ pub struct QueryAqcNetIdentifierResult {
 /// QueriedRole policy effect.
 #[effect]
 pub struct QueriedRole {
-    pub role: Role,
+    pub role: RoleInfo,
 }
 /// QueryAqcNetworkNamesOutput policy effect.
 #[effect]
