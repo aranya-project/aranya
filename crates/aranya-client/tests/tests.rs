@@ -243,7 +243,7 @@ impl DeviceCtx {
             pid_file: work_dir.join("pid"),
             sync_addr: Addr::new("localhost", 0)?,
             afc: None,
-            aqc: AqcConfig {},
+            aqc: None,
         };
 
         // Load daemon from config.

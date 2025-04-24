@@ -33,7 +33,8 @@ pub struct Config {
     pub afc: Option<AfcConfig>,
 
     /// AQC configuration.
-    pub aqc: AqcConfig,
+    #[serde(default)]
+    pub aqc: Option<AqcConfig>,
 }
 
 impl Config {

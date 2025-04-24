@@ -19,7 +19,7 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 fn main() -> Result<()> {
     let flags = Args::parse();
 
-    let cfg = Config::load(&flags.cfg)?;
+    let cfg = Config::load(&flags.config)?;
 
     tracing_subscriber::registry()
         .with(
@@ -55,9 +55,13 @@ fn main() -> Result<()> {
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Configuration file
-    cfg: PathBuf,
-    /// Print the public API key in hexadecimal format.
+    /// Path to the configuration file.
+    #[arg(long)]
+    config: PathBuf,
+
+    /// Print the public API key in hexadecimal format, then
+    /// exit.
+    #[arg(long)]
     print_api_pk: bool,
 }
 

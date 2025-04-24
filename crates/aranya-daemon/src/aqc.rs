@@ -79,6 +79,14 @@ impl<E, KS> Aqc<E, KS> {
             .insert(net_id, id);
     }
 
+    /// Removes a peer.
+    #[instrument(skip_all, fields(%graph, %id))]
+    pub(crate) async fn remove_peer(&self, graph: GraphId, id: DeviceId) {
+        self.peers.lock().await.entry(graph).and_modify(|entry| {
+            entry.remove_by_right(&id);
+        });
+    }
+
     async fn while_locked<'a, F, R>(&'a self, f: F) -> R
     where
         F: for<'b> FnOnce(&'b mut Handler<AranyaStore<KS>>, &'b mut E) -> R,

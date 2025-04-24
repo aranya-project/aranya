@@ -3,11 +3,7 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-use core::{
-    future::{self, Future},
-    net::SocketAddr,
-    ops::Deref,
-};
+use core::{future, net::SocketAddr, ops::Deref};
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
@@ -22,16 +18,17 @@ use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::Addr;
 use buggy::BugExt;
-use futures_util::{StreamExt, TryStreamExt};
+use futures_util::{pin_mut, StreamExt, TryStreamExt};
 use tarpc::{
     context,
-    server::{self, Channel},
+    server::{incoming::Incoming, BaseChannel, Channel},
 };
 use tokio::{
     net::UnixListener,
     sync::{mpsc, Mutex},
+    task::JoinSet,
 };
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
     aqc::Aqc,
@@ -41,10 +38,6 @@ use crate::{
     sync::SyncPeers,
     Client, EF,
 };
-
-async fn spawn(fut: impl Future<Output = ()> + Send + 'static) {
-    tokio::spawn(fut);
-}
 
 /// returns first effect matching a particular type.
 /// returns None if there are no matching effects.
@@ -59,132 +52,160 @@ type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
 
 /// Daemon API Server.
 #[derive(Debug)]
-pub struct DaemonApiServer {
-    // Used to encrypt data sent over the API.
+pub(crate) struct DaemonApiServer {
+    /// Used to encrypt data sent over the API.
     sk: ApiKey<CS>,
-    daemon_sock: PathBuf,
+    /// The UDS path we serve the API on.
+    uds_path: PathBuf,
+
+    client: Arc<Client>,
+    /// The local network address for the `Client`'s sync server.
+    local_addr: SocketAddr,
+    /// Public keys of current device.
+    pk: PublicKeys<CS>,
+    /// Aranya sync peers,
+    peers: SyncPeers,
+    aqc: Aqc<CE, KS>,
+
     /// Channel for receiving effects from the syncer.
     recv_effects: EffectReceiver,
-    handler: Arc<DaemonApiHandler>,
 }
 
 impl DaemonApiServer {
-    /// Create new `DaemonApiServer`.
+    /// Creates a `DaemonApiServer`.
     #[instrument(skip_all)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
-        daemon_sock: PathBuf,
+        uds_path: PathBuf,
         sk: ApiKey<CS>,
-        pk: Arc<PublicKeys<CS>>,
+        pk: PublicKeys<CS>,
         peers: SyncPeers,
         recv_effects: EffectReceiver,
         aqc: Aqc<CE, KS>,
     ) -> Result<Self> {
-        let handler = DaemonApiHandler {
+        Ok(Self {
+            uds_path,
+            sk,
+            recv_effects,
             client,
             local_addr,
             pk,
-            peers: Mutex::new(peers),
+            peers,
             aqc,
-        };
-        Ok(Self {
-            daemon_sock,
-            sk,
-            recv_effects,
-            handler: Arc::new(handler),
         })
     }
 
-    /// Run the RPC server.
+    /// Runs the server.
     #[instrument(skip_all)]
     #[allow(clippy::disallowed_macros)]
     pub async fn serve(mut self) -> Result<()> {
-        let listener = UnixListener::bind(&self.daemon_sock)?;
-        info!(
-            addr = ?listener
-                .local_addr()
-                .assume("should be able to retrieve local addr")?
-                .as_pathname()
-                .assume("addr should be a pathname")?,
-            "listening"
-        );
+        let aqc = Arc::new(self.aqc);
 
-        let info = self.daemon_sock.as_os_str().as_encoded_bytes();
-        let codec = LengthDelimitedCodec::builder()
-            .max_frame_length(usize::MAX)
-            .new_codec();
-        let listener = txp::unix::UnixListenerStream::from(listener);
-        let server = txp::server(listener, codec, self.sk, info);
-
-        // TODO: determine if there's a performance benefit to putting these branches in different threads.
-        tokio::join!(
-            server
-                .inspect_err(|err| warn!(%err, "accept error"))
-                // Ignore accept errors.
-                .filter_map(|r| future::ready(r.ok()))
-                .map(server::BaseChannel::with_defaults)
-                .map(|channel| {
-                    debug!("accepted channel connection");
-                    channel
-                        .execute(ApiShim(Arc::clone(&self.handler)).serve())
-                        .for_each(spawn)
-                })
-                .buffer_unordered(10)
-                .for_each(|_| async {}),
-            async {
+        let _handler = {
+            let handler = EffectHandler {
+                aqc: Arc::clone(&aqc),
+            };
+            tokio::spawn(async move {
                 while let Some((graph, effects)) = self.recv_effects.recv().await {
-                    if let Err(e) = self.handler.handle_effects(graph, &effects).await {
-                        error!(?e, "error handling effects");
+                    if let Err(err) = handler.handle_effects(graph, &effects).await {
+                        error!(?err, "error handling effects");
                     }
                 }
+                info!("effect handler exiting");
+            })
+        };
+
+        let api = Api(Arc::new(ApiInner {
+            client: self.client,
+            local_addr: self.local_addr,
+            pk: self.pk,
+            peers: Mutex::new(self.peers),
+            aqc: Arc::clone(&aqc),
+            handler: EffectHandler {
+                aqc: Arc::clone(&aqc),
             },
-        );
+        }));
+
+        let server = {
+            let listener = UnixListener::bind(&self.uds_path)?;
+            info!(
+                addr = ?listener
+                    .local_addr()
+                    .assume("should be able to retrieve local addr")?
+                    .as_pathname()
+                    .assume("addr should be a pathname")?,
+                "listening"
+            );
+
+            let info = self.uds_path.as_os_str().as_encoded_bytes();
+            let codec = LengthDelimitedCodec::builder()
+                .max_frame_length(usize::MAX)
+                .new_codec();
+            let listener = txp::unix::UnixListenerStream::from(listener);
+            txp::server(listener, codec, self.sk, info)
+        };
+
+        let mut chans = JoinSet::new();
+        let mut incoming = server
+            .inspect_err(|err| warn!(?err, "accept error"))
+            .filter_map(|r| future::ready(r.ok()))
+            .map(BaseChannel::with_defaults)
+            .max_concurrent_requests_per_channel(10);
+        while let Some(ch) = incoming.next().await {
+            let api = api.clone();
+            chans.spawn(async move {
+                let mut reqs = JoinSet::new();
+                let requests = ch
+                    .requests()
+                    .inspect_err(|err| warn!(?err, "channel failure"))
+                    .take_while(|r| future::ready(r.is_ok()))
+                    .filter_map(|r| async { r.ok() });
+                pin_mut!(requests);
+                while let Some(req) = requests.next().await {
+                    reqs.spawn(req.execute(api.clone().serve()));
+                }
+                reqs.join_all().await
+            });
+        }
+        let _ = chans.join_all().await;
+
+        info!("server exiting");
         Ok(())
     }
 }
 
-#[derive(Debug)]
-struct DaemonApiHandler {
-    /// Aranya client for
-    client: Arc<Client>,
-    /// Local socket address of the API.
-    local_addr: SocketAddr,
-    /// Public keys of current device.
-    pk: Arc<PublicKeys<CS>>,
-    /// Aranya sync peers,
-    peers: Mutex<SyncPeers>,
-    aqc: Aqc<CE, KS>,
+/// Handles effects from an Aranya action.
+#[derive(Clone, Debug)]
+struct EffectHandler {
+    aqc: Arc<Aqc<CE, KS>>,
 }
 
-impl DaemonApiHandler {
-    fn get_pk(&self) -> api::Result<KeyBundle> {
-        Ok(KeyBundle::try_from(&*self.pk).context("bad key bundle")?)
-    }
-
+impl EffectHandler {
     /// Handles effects resulting from invoking an Aranya action.
     #[instrument(skip_all)]
     #[allow(unused_variables)]
     async fn handle_effects(&self, graph: GraphId, effects: &[Effect]) -> Result<()> {
+        use Effect::*;
         for effect in effects {
-            debug!(?effect, "handling effect");
+            trace!(?effect, "handling effect");
             match effect {
-                Effect::TeamCreated(_team_created) => {}
-                Effect::TeamTerminated(_team_terminated) => {}
-                Effect::MemberAdded(_member_added) => {}
-                Effect::MemberRemoved(_member_removed) => {}
-                Effect::OwnerAssigned(_owner_assigned) => {}
-                Effect::AdminAssigned(_admin_assigned) => {}
-                Effect::OperatorAssigned(_operator_assigned) => {}
-                Effect::OwnerRevoked(_owner_revoked) => {}
-                Effect::AdminRevoked(_admin_revoked) => {}
-                Effect::OperatorRevoked(_operator_revoked) => {}
-                Effect::LabelCreated(_) => {}
-                Effect::LabelDeleted(_) => {}
-                Effect::LabelAssigned(_) => {}
-                Effect::LabelRevoked(_) => {}
-                Effect::AqcNetworkNameSet(e) => {
+                TeamCreated(_team_created) => {}
+                TeamTerminated(_team_terminated) => {}
+                MemberAdded(_member_added) => {}
+                MemberRemoved(_member_removed) => {}
+                OwnerAssigned(_owner_assigned) => {}
+                AdminAssigned(_admin_assigned) => {}
+                OperatorAssigned(_operator_assigned) => {}
+                OwnerRevoked(_owner_revoked) => {}
+                AdminRevoked(_admin_revoked) => {}
+                OperatorRevoked(_operator_revoked) => {}
+                LabelCreated(_) => {}
+                LabelDeleted(_) => {}
+                LabelAssigned(_) => {}
+                LabelRevoked(_) => {}
+                AqcNetworkNameSet(e) => {
                     self.aqc
                         .add_peer(
                             graph,
@@ -193,38 +214,63 @@ impl DaemonApiHandler {
                         )
                         .await;
                 }
-                Effect::AqcNetworkNameUnset(_network_name_unset) => {}
-                Effect::QueriedLabel(_) => {}
-                Effect::AqcBidiChannelCreated(_) => {}
-                Effect::AqcBidiChannelReceived(_) => {}
-                Effect::AqcUniChannelCreated(_) => {}
-                Effect::AqcUniChannelReceived(_) => {}
-                Effect::QueryDevicesOnTeamResult(_) => {}
-                Effect::QueryDeviceRoleResult(_) => {}
-                Effect::QueryDeviceKeyBundleResult(_) => {}
-                Effect::QueryAqcNetIdentifierResult(_) => {}
-                Effect::QueriedLabelAssignment(_) => {}
-                Effect::QueryLabelExistsResult(_) => {}
-                Effect::QueryAqcNetworkNamesOutput(_) => {}
+                AqcNetworkNameUnset(e) => self.aqc.remove_peer(graph, e.device_id.into()).await,
+                QueriedLabel(_) => {}
+                AqcBidiChannelCreated(_) => {}
+                AqcBidiChannelReceived(_) => {}
+                AqcUniChannelCreated(_) => {}
+                AqcUniChannelReceived(_) => {}
+                QueryDevicesOnTeamResult(_) => {}
+                QueryDeviceRoleResult(_) => {}
+                QueryDeviceKeyBundleResult(_) => {}
+                QueryAqcNetIdentifierResult(_) => {}
+                QueriedLabelAssignment(_) => {}
+                QueryLabelExistsResult(_) => {}
+                QueryAqcNetworkNamesOutput(_) => {}
             }
         }
         Ok(())
     }
 }
 
-/// Wraps [`DaemonApiHandler`] in [`Arc`] to make it more easily
-/// [`Clone`]able.
-#[derive(Clone)]
-struct ApiShim(Arc<DaemonApiHandler>);
+impl Effect {}
 
-impl Deref for ApiShim {
-    type Target = DaemonApiHandler;
+/// The guts of [`Api`].
+///
+/// This is separated out so we only have to clone one [`Arc`]
+/// (inside [`Api`]).
+#[derive(Debug)]
+struct ApiInner {
+    client: Arc<Client>,
+    /// Local socket address of the API.
+    local_addr: SocketAddr,
+    /// Public keys of current device.
+    pk: PublicKeys<CS>,
+    /// Aranya sync peers,
+    peers: Mutex<SyncPeers>,
+    handler: EffectHandler,
+    aqc: Arc<Aqc<CE, KS>>,
+}
+
+impl ApiInner {
+    fn get_pk(&self) -> api::Result<KeyBundle> {
+        Ok(KeyBundle::try_from(&self.pk).context("bad key bundle")?)
+    }
+}
+
+/// Implements [`DaemonApi`].
+#[derive(Clone, Debug)]
+struct Api(Arc<ApiInner>);
+
+impl Deref for Api {
+    type Target = ApiInner;
+
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DaemonApi for ApiShim {
+impl DaemonApi for Api {
     #[instrument(skip(self))]
     async fn version(self, context: context::Context) -> api::Result<api::Version> {
         api::Version::parse(env!("CARGO_PKG_VERSION")).map_err(Into::into)
@@ -417,7 +463,8 @@ impl DaemonApi for ApiShim {
             .set_aqc_network_name(device.into_id().into(), name.0)
             .await
             .context("unable to assign aqc network identifier")?;
-        self.handle_effects(GraphId::from(team.into_id()), &effects)
+        self.handler
+            .handle_effects(GraphId::from(team.into_id()), &effects)
             .await?;
         Ok(())
     }
@@ -466,10 +513,10 @@ impl DaemonApi for ApiShim {
         let Some(Effect::AqcBidiChannelCreated(e)) =
             find_effect!(&effects, Effect::AqcBidiChannelCreated(e) if e.author_id == id.into())
         else {
-            return Err(anyhow::anyhow!("unable to find AqcBidiChannelCreated effect").into());
+            return Err(anyhow!("unable to find AqcBidiChannelCreated effect").into());
         };
 
-        self.handle_effects(graph, &effects).await?;
+        self.handler.handle_effects(graph, &effects).await?;
 
         let psk = self.aqc.bidi_channel_created(e).await?;
         debug!(identity = %psk.identity, "psk identity");
@@ -505,10 +552,10 @@ impl DaemonApi for ApiShim {
         let Some(Effect::AqcUniChannelCreated(e)) =
             find_effect!(&effects, Effect::AqcUniChannelCreated(e) if e.author_id == id.into())
         else {
-            return Err(anyhow::anyhow!("unable to find AqcUniChannelCreated effect").into());
+            return Err(anyhow!("unable to find AqcUniChannelCreated effect").into());
         };
 
-        self.handle_effects(graph, &effects).await?;
+        self.handler.handle_effects(graph, &effects).await?;
 
         let psk = self.aqc.uni_channel_created(e).await?;
         debug!(identity = %psk.identity, "psk identity");
@@ -549,7 +596,7 @@ impl DaemonApi for ApiShim {
             let our_device_id = self.pk.ident_pk.id()?;
 
             let effects = self.client.session_receive(&mut session, &cmd).await?;
-            self.handle_effects(graph, &effects).await?;
+            self.handler.handle_effects(graph, &effects).await?;
 
             let effect = effects.iter().find(|e| match e {
                 Effect::AqcBidiChannelReceived(e) => e.peer_id == our_device_id.into(),

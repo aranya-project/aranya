@@ -147,7 +147,7 @@ impl Daemon {
             local_addr,
             self.cfg.uds_api_path.clone(),
             api_sk,
-            Arc::new(pk),
+            pk,
             peers,
             recv_effects,
             aqc,
@@ -367,7 +367,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::{AfcConfig, AqcConfig};
+    use crate::config::AfcConfig;
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -389,7 +389,7 @@ mod tests {
                 create: true,
                 max_chans: 100,
             }),
-            aqc: AqcConfig {},
+            aqc: None,
         };
 
         let daemon = Daemon::load(cfg)
