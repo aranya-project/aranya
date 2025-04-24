@@ -286,10 +286,7 @@ impl TeamCtx {
             }
         }
 
-        // Delete all roles.
-        for role in roles.iter() {
-            owner.team(team_id).delete_role(role.id).await?;
-        }
+        // TODO: delete all roles.
 
         Ok(())
     }

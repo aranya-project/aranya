@@ -284,15 +284,6 @@ impl Team<'_> {
             .map_err(Into::into)
     }
 
-    /// Delete role.
-    pub async fn delete_role(&mut self, role: RoleId) -> Result<()> {
-        self.client
-            .daemon
-            .delete_role(context::current(), self.id, role)
-            .await?
-            .map_err(Into::into)
-    }
-
     /// Assign a role to a device.
     pub async fn assign_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
@@ -363,15 +354,6 @@ impl Team<'_> {
         self.client
             .daemon
             .create_label(context::current(), self.id, label_name)
-            .await?
-            .map_err(Into::into)
-    }
-
-    /// Delete a label.
-    pub async fn delete_label(&mut self, label_id: LabelId) -> Result<()> {
-        self.client
-            .daemon
-            .delete_label(context::current(), self.id, label_id)
             .await?
             .map_err(Into::into)
     }

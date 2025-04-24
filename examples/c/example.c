@@ -668,8 +668,8 @@ AranyaError run_aqc_example(Team *t) {
     err = aranya_revoke_label(&t->clients.operator.client, &t->id,
                               &t->clients.memberb.id, &label1_id);
     EXPECT("error revoking label from memberb", err);
-    err = aranya_delete_label(&t->clients.admin.client, &t->id, &label1_id);
-    EXPECT("error deleting label", err);
+
+    // TODO: delete label.
 
     return err;
 }
@@ -795,17 +795,7 @@ AranyaError cleanup_roles(Team *t) {
         free(cmds);
     }
 
-    // Delete roles
-    for (size_t i = 0; i < roles_len; i++) {
-        AranyaRoleId role_id;
-        err = aranya_get_role_id(&roles[i], &role_id);
-        EXPECT("error getting role ID", err);
-        const char *role_str;
-        err = aranya_get_role_name(&roles[i], &role_str);
-        printf("deleting role: %s\r\n", role_str);
-        err = aranya_delete_role(&t->clients.owner.client, &t->id, &role_id);
-        EXPECT("unable to delete role", err);
-    }
+    // TODO: delete roles.
 
     free(roles);
 

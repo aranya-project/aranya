@@ -849,24 +849,6 @@ pub fn create_role(
     })
 }
 
-/// Delete a custom role.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param role_id the role ID [`RoleId`] to delete.
-///
-/// @relates AranyaClient.
-pub fn delete_role(client: &mut Client, team: &TeamId, role_id: &RoleId) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).delete_role(role_id.into()))?;
-    Ok(())
-}
-
 /// Assign role command.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
@@ -1112,27 +1094,6 @@ pub fn create_label(
         .rt
         .block_on(client.inner.team(team.into()).create_label(name))?;
     Ok(label_id.into())
-}
-
-/// Delete a channel label.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param label_id the channel label ID [`LabelId`] to delete.
-///
-/// @relates AranyaClient.
-pub fn delete_label(
-    client: &mut Client,
-    team: &TeamId,
-    label_id: &LabelId,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).delete_label(label_id.into()))?;
-    Ok(())
 }
 
 /// Get ID of role.

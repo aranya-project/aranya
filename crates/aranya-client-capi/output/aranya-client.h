@@ -1207,37 +1207,6 @@ AranyaError aranya_create_role_ext(struct AranyaClient *client,
                                    struct AranyaExtError *__ext_err);
 
 /**
- * Delete a custom role.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param role_id the role ID [`AranyaRoleId`](@ref AranyaRoleId) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_delete_role(struct AranyaClient *client,
-                               const struct AranyaTeamId *team,
-                               const struct AranyaRoleId *role_id);
-
-/**
- * Delete a custom role.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param role_id the role ID [`AranyaRoleId`](@ref AranyaRoleId) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_delete_role_ext(struct AranyaClient *client,
-                                   const struct AranyaTeamId *team,
-                                   const struct AranyaRoleId *role_id,
-                                   struct AranyaExtError *__ext_err);
-
-/**
  * Assign role command.
  *
  * Permission to perform this operation is checked against the Aranya policy.
@@ -1560,37 +1529,6 @@ AranyaError aranya_create_label_ext(struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     AranyaLabelName name,
                                     struct AranyaLabelId *__output,
-                                    struct AranyaExtError *__ext_err);
-
-/**
- * Delete a channel label.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param label_id the channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_delete_label(struct AranyaClient *client,
-                                const struct AranyaTeamId *team,
-                                const struct AranyaLabelId *label_id);
-
-/**
- * Delete a channel label.
- *
- * Permission to perform this operation is checked against the Aranya policy.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param label_id the channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_delete_label_ext(struct AranyaClient *client,
-                                    const struct AranyaTeamId *team,
-                                    const struct AranyaLabelId *label_id,
                                     struct AranyaExtError *__ext_err);
 
 /**
