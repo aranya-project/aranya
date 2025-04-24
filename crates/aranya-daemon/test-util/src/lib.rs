@@ -16,6 +16,7 @@ use aranya_daemon::{
     aranya::{self, Actions},
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
+    AranyaStore,
 };
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
@@ -166,7 +167,7 @@ impl TestCtx {
             let mut store = {
                 let path = root.join("keystore");
                 fs::create_dir_all(&path)?;
-                Store::open(path)?
+                Store::open(path).map(AranyaStore::new)?
             };
             let (mut eng, _) = DefaultEngine::<Rng>::from_entropy(Rng);
             let bundle = KeyBundle::generate(&mut eng, &mut store)

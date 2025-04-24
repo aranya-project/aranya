@@ -178,14 +178,14 @@ impl Daemon {
     async fn setup_aranya(
         &self,
         eng: CE,
-        root_store: KS,
+        store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
     ) -> Result<(Client, Server)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
-            EN::new(TEST_POLICY_1, eng, root_store, device_id)?,
+            EN::new(TEST_POLICY_1, eng, store, device_id)?,
             SP::new(
                 FileManager::new(self.cfg.storage_path())
                     .context("unable to create `FileManager`")?,

@@ -15,30 +15,4 @@
 
     // Aranya sync server address.
     "sync_addr": "0.0.0.0:4321",
-
-    // AFC configuration.
-    "afc": {
-        // Shared memory path.
-        "shm_path": "/afc",
-
-        // Unlink `shm_path` before creating the shared memory?
-        //
-        // Ignored if `afc.create` is false.
-        "unlink_on_startup": false,
-
-        // Unlink `shm_path` when the daemon exits?
-        //
-        // If false, the shared memory will persist across daemon
-        // restarts.
-        "unlink_at_exit": false,
-
-        // Create the shared memory?
-        "create": true,
-
-		// Maximum number of channels AFC should support.
-		"max_chans": 100
-	},
-
-    // AQC configuration.
-    "aqc": {}
 }

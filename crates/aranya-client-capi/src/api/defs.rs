@@ -508,7 +508,7 @@ pub type ClientConfig = Safe<imp::ClientConfig>;
 #[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
 
-/// Sets UDS path that the daemon is listening on.
+/// Sets Unix Domain Socket path that the daemon is listening on.
 ///
 /// @param cfg a pointer to the client config builder
 /// @param address a string containing the address

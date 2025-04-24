@@ -115,7 +115,7 @@ impl<'a> AqcChannels<'a> {
     }
 
     /// Deletes an AQC bidi channel.
-    // It is an error if the channel does not exist
+    /// It is an error if the channel does not exist
     #[instrument(skip_all, fields(%chan))]
     pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannelId) -> Result<()> {
         let _ctrl = self
@@ -130,7 +130,7 @@ impl<'a> AqcChannels<'a> {
     }
 
     /// Deletes an AQC uni channel.
-    // It is an error if the channel does not exist
+    /// It is an error if the channel does not exist
     #[instrument(skip_all, fields(%chan))]
     pub async fn delete_uni_channel(&mut self, chan: AqcUniChannelId) -> Result<()> {
         let _ctrl = self
@@ -148,7 +148,7 @@ impl<'a> AqcChannels<'a> {
     // TODO: this method is pub for testing.
     // In final AQC implementation, it will only be invoked when a ctrl msg is received via the network.
     #[instrument(skip_all, fields(%team))]
-    pub async fn receive_aqc_ctrl(&mut self, team: TeamId, ctrl: AqcCtrl) -> Result<()> {
+    async fn receive_aqc_ctrl(&mut self, team: TeamId, ctrl: AqcCtrl) -> Result<()> {
         let (_net_id, psk) = self
             .client
             .daemon

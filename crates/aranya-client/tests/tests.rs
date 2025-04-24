@@ -13,10 +13,7 @@ use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{Client, SyncPeerConfig, TeamConfig};
-use aranya_daemon::{
-    config::{AqcConfig, Config},
-    Daemon,
-};
+use aranya_daemon::{config::Config, Daemon};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};

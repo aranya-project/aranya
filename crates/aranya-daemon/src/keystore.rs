@@ -1,8 +1,9 @@
 use core::ops::{Deref, DerefMut};
 
+use anyhow::Result;
 use aranya_crypto::{
     engine::WrappedKey,
-    keystore::{self, KeyStore, Occupied, Vacant},
+    keystore::{self, fs_keystore, KeyStore, Occupied, Vacant},
     Id,
 };
 
@@ -16,7 +17,10 @@ macro_rules! impl_typed_keystore {
         $vis struct $name<S>(S);
 
         impl<S> $name<S> {
-            $vis fn new(store: S) -> Self {
+            /// Creates a new
+            #[doc = concat!("`", stringify!($name), "`.")]
+            #[inline]
+            pub fn new(store: S) -> Self {
                 Self(store)
             }
         }
@@ -26,6 +30,7 @@ macro_rules! impl_typed_keystore {
             type Vacant<'a, T: WrappedKey> = VacantEntry<<S as KeyStore>::Vacant<'a, T>>;
             type Occupied<'a, T: WrappedKey> = OccupiedEntry<<S as KeyStore>::Occupied<'a, T>>;
 
+            #[inline]
             fn entry<T: WrappedKey>(
                 &mut self,
                 id: Id,
@@ -37,10 +42,12 @@ macro_rules! impl_typed_keystore {
                 })
             }
 
+            #[inline]
             fn get<T: WrappedKey>(&self, id: Id) -> Result<Option<T>, Self::Error> {
                 self.0.get(id)
             }
 
+            #[inline]
             fn try_insert<T: WrappedKey>(
                 &mut self,
                 id: Id,
@@ -49,6 +56,7 @@ macro_rules! impl_typed_keystore {
                 self.0.try_insert(id, key)
             }
 
+            #[inline]
             fn remove<T: WrappedKey>(
                 &mut self,
                 id: Id,
@@ -60,14 +68,26 @@ macro_rules! impl_typed_keystore {
         impl<S> Deref for $name<S> {
             type Target = S;
 
+            #[inline]
             fn deref(&self) -> &Self::Target {
                 &self.0
             }
         }
 
         impl<S> DerefMut for $name<S> {
+            #[inline]
             fn deref_mut(&mut self) -> &mut Self::Target {
                 &mut self.0
+            }
+        }
+
+        impl $name<fs_keystore::Store> {
+            /// Attempts to clone the keystore.
+            #[allow(dead_code, reason = "Depends on the impl")]
+            #[inline]
+            pub fn try_clone(&self) -> Result<Self> {
+                let store = self.0.try_clone()?;
+                Ok(Self(store))
             }
         }
     };
@@ -77,7 +97,7 @@ impl_typed_keystore! {
     /// The Aranya keystore.
     ///
     /// The Aranaya keystore contains Aranya's key material.
-    pub(crate) struct AranyaStore;
+    pub struct AranyaStore;
 }
 
 impl_typed_keystore! {
@@ -90,7 +110,7 @@ impl_typed_keystore! {
 
 /// A vacant entry.
 #[derive(Debug)]
-pub(crate) struct VacantEntry<E>(E);
+pub struct VacantEntry<E>(E);
 
 impl<E> VacantEntry<E> {
     pub(crate) fn new(entry: E) -> Self {
@@ -112,7 +132,7 @@ where
 
 /// An occupied entry.
 #[derive(Debug)]
-pub(crate) struct OccupiedEntry<E>(E);
+pub struct OccupiedEntry<E>(E);
 
 impl<E> OccupiedEntry<E> {
     pub(crate) fn new(entry: E) -> Self {

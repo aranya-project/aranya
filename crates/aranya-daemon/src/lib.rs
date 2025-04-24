@@ -42,3 +42,4 @@ mod keystore;
 mod sync;
 
 pub use daemon::*;
+pub use keystore::AranyaStore;

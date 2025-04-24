@@ -124,6 +124,7 @@ pub struct Client {
 }
 
 impl Client {
+    /// Returns a builder for `Client`.
     pub fn builder<'a>() -> ClientBuilder<'a> {
         ClientBuilder::new()
     }
@@ -314,7 +315,6 @@ impl Team<'_> {
     }
 
     /// Assign a role to a device.
-    #[instrument(skip_all, fields(%device, ?role))]
     pub async fn assign_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
         self.client
             .daemon

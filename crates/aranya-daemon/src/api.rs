@@ -184,7 +184,7 @@ struct EffectHandler {
 
 impl EffectHandler {
     /// Handles effects resulting from invoking an Aranya action.
-    #[instrument(skip_all)]
+    #[instrument(skip_all, fields(%graph, effects = effects.len()))]
     #[allow(unused_variables)]
     async fn handle_effects(&self, graph: GraphId, effects: &[Effect]) -> Result<()> {
         use Effect::*;
@@ -232,8 +232,6 @@ impl EffectHandler {
         Ok(())
     }
 }
-
-impl Effect {}
 
 /// The guts of [`Api`].
 ///
