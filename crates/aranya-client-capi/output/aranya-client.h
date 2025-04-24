@@ -874,6 +874,35 @@ AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
+ * Compare two device IDs.
+ *
+ * @param device_id_a first device ID to compare [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param device_id_b second device ID to compare [`AranyaDeviceId`](@ref AranyaDeviceId).
+ *
+ * @param __output boolean representing whether the device IDs are equal.
+ *
+ * Returns true if device IDs match. Returns false otherwise.
+ */
+AranyaError aranya_cmp_device_ids(const struct AranyaDeviceId *device_id_a,
+                                  const struct AranyaDeviceId *device_id_b,
+                                  bool *__output);
+
+/**
+ * Compare two device IDs.
+ *
+ * @param device_id_a first device ID to compare [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param device_id_b second device ID to compare [`AranyaDeviceId`](@ref AranyaDeviceId).
+ *
+ * @param __output boolean representing whether the device IDs are equal.
+ *
+ * Returns true if device IDs match. Returns false otherwise.
+ */
+AranyaError aranya_cmp_device_ids_ext(const struct AranyaDeviceId *device_id_a,
+                                      const struct AranyaDeviceId *device_id_b,
+                                      bool *__output,
+                                      struct AranyaExtError *__ext_err);
+
+/**
  * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *

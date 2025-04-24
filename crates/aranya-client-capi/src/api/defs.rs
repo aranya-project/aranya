@@ -189,7 +189,7 @@ const _: () = {
 
 // Aranya ID
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Id {
     bytes: [u8; ARANYA_ID_LEN],
 }
@@ -234,7 +234,7 @@ impl From<&TeamId> for aranya_daemon_api::TeamId {
 
 /// Device ID.
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct DeviceId {
     id: Id,
 }
@@ -624,6 +624,18 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
     let client = client.deref_mut();
     let id = client.rt.block_on(client.inner.get_device_id())?;
     Ok(id.into())
+}
+
+/// Compare two device IDs.
+///
+/// @param device_id_a first device ID to compare [`DeviceId`].
+/// @param device_id_b second device ID to compare [`DeviceId`].
+///
+/// @param __output boolean representing whether the device IDs are equal.
+///
+/// Returns true if device IDs match. Returns false otherwise.
+pub fn cmp_device_ids(device_id_a: &DeviceId, device_id_b: &DeviceId) -> bool {
+    device_id_a.id == device_id_b.id
 }
 
 #[aranya_capi_core::opaque(size = 24, align = 8)]

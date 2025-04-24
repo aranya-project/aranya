@@ -392,9 +392,9 @@ impl DaemonApi for DaemonApiHandler {
         let effects = self
             .client
             .actions(&team.into_id().into())
-            .create_role(name)
+            .create_role(name.clone())
             .await
-            .context("unable to create role on team")?;
+            .context(format!("unable to create role on team: {}", name))?;
         for e in effects {
             if let Effect::RoleCreated(e) = e {
                 return Ok(e.role.into());
@@ -410,6 +410,7 @@ impl DaemonApi for DaemonApiHandler {
         team: api::TeamId,
         role: api::RoleId,
     ) -> api::Result<()> {
+        // TODO: include role name in error context.
         self.client
             .actions(&team.into_id().into())
             .delete_role(role)
@@ -426,6 +427,7 @@ impl DaemonApi for DaemonApiHandler {
         device: api::DeviceId,
         role: api::RoleId,
     ) -> api::Result<()> {
+        // TODO: include role name in error context.
         self.client
             .actions(&team.into_id().into())
             .assign_role(device.into_id().into(), role)
@@ -442,11 +444,12 @@ impl DaemonApi for DaemonApiHandler {
         device: api::DeviceId,
         role: api::RoleId,
     ) -> api::Result<()> {
+        // TODO: include role name in error context.
         self.client
             .actions(&team.into_id().into())
             .revoke_role(device.into_id().into(), role)
             .await
-            .context("unable to revoke device role")?;
+            .context("unable to revoke role")?;
         Ok(())
     }
 
@@ -460,9 +463,9 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .assign_role_perm(role, perm)
+            .assign_role_perm(role, perm.clone())
             .await
-            .context("unable to assign role perm")?;
+            .context(format!("unable to assign role perm: {}", perm))?;
         Ok(())
     }
 
@@ -476,9 +479,9 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .revoke_role_perm(role.into_id().into(), perm)
+            .revoke_role_perm(role.into_id().into(), perm.clone())
             .await
-            .context("unable to revoke role perm")?;
+            .context(format!("unable to revoke role perm: {}", perm))?;
         Ok(())
     }
     #[instrument(skip(self))]
