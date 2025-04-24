@@ -237,11 +237,15 @@ impl Daemon {
     }
 
     /// Loads the daemon's [`PublicKeys`].
-    async fn load_or_gen_public_keys(
+    async fn load_or_gen_public_keys<E, S>(
         &self,
-        eng: &mut CE,
-        store: &mut KS,
-    ) -> Result<PublicKeys<CS>> {
+        eng: &mut E,
+        store: &mut AranyaStore<S>,
+    ) -> Result<PublicKeys<E::CS>>
+    where
+        E: Engine,
+        S: KeyStore,
+    {
         let path = self.cfg.key_bundle_path();
         let bundle = match try_read_cbor(&path).await? {
             Some(bundle) => bundle,
