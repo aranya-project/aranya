@@ -1,5 +1,10 @@
 #![allow(dead_code)]
-use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    fmt,
+    net::{IpAddr, SocketAddr},
+    path::PathBuf,
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 use aranya_client::{Client, SyncPeerConfig};
@@ -114,11 +119,11 @@ pub struct TeamCtx {
 
 impl TeamCtx {
     pub async fn new(name: &str, work_dir: PathBuf) -> Result<Self> {
-        let owner = DeviceCtx::new(name, "owner", work_dir.join("owner")).await?;
-        let admin = DeviceCtx::new(name, "admin", work_dir.join("admin")).await?;
-        let operator = DeviceCtx::new(name, "operator", work_dir.join("operator")).await?;
-        let membera = DeviceCtx::new(name, "membera", work_dir.join("membera")).await?;
-        let memberb = DeviceCtx::new(name, "memberb", work_dir.join("memberb")).await?;
+        let owner = DeviceCtx::new(name, "owner", work_dir.join("owner"), 9001).await?;
+        let admin = DeviceCtx::new(name, "admin", work_dir.join("admin"), 9002).await?;
+        let operator = DeviceCtx::new(name, "operator", work_dir.join("operator"), 9003).await?;
+        let membera = DeviceCtx::new(name, "membera", work_dir.join("membera"), 9004).await?;
+        let memberb = DeviceCtx::new(name, "memberb", work_dir.join("memberb"), 9005).await?;
 
         Ok(Self {
             owner,
@@ -215,11 +220,13 @@ pub struct DeviceCtx {
     pub id: DeviceId,
     pub daemon: AbortHandle,
     pub aqc_addr: NetIdentifier,
+    pub port: u16,
 }
 
 impl DeviceCtx {
-    async fn new(_team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
-        let identifier = NetIdentifier(name.to_string());
+    async fn new(_team_name: &str, _name: &str, work_dir: PathBuf, port: u16) -> Result<Self> {
+        let aqc_addr =
+            NetIdentifier(SocketAddr::new(IpAddr::from([127, 0, 0, 1]), port).to_string());
         fs::create_dir_all(work_dir.clone()).await?;
 
         // Setup daemon config.
@@ -250,7 +257,7 @@ impl DeviceCtx {
         sleep(SLEEP_INTERVAL).await;
 
         // Initialize the user library.
-        let mut client = (|| Client::connect(&uds_api_path, identifier.clone()))
+        let mut client = (|| Client::connect(&uds_api_path, aqc_addr.clone()))
             .retry(ExponentialBuilder::default())
             .await
             .context("unable to init client")?;
@@ -264,7 +271,8 @@ impl DeviceCtx {
             pk,
             id,
             daemon: handle,
-            aqc_addr: identifier,
+            aqc_addr,
+            port,
         })
     }
 
