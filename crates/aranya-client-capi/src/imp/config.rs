@@ -104,7 +104,7 @@ impl Default for ClientConfigBuilder {
 #[derive(Clone, Debug)]
 pub struct AqcConfig {
     /// Address to bind AQC server to.
-    addr: *const c_char,
+    _addr: *const c_char,
 }
 
 impl Typed for AqcConfig {
@@ -138,7 +138,7 @@ impl Builder for AqcConfigBuilder {
             return Err(InvalidArg::new("addr", "field not set").into());
         }
 
-        let cfg = AqcConfig { addr: self.addr };
+        let cfg = AqcConfig { _addr: self.addr };
 
         Safe::init(out, cfg);
         Ok(())
@@ -163,10 +163,10 @@ pub struct SyncPeerConfig {
 }
 
 impl Typed for SyncPeerConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x2049e682);
+    const TYPE_ID: TypeId = TypeId::new(0x44BE85E7);
 }
 
-impl From<SyncPeerConfig> for aranya_client::config::SyncPeerConfig {
+impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
     fn from(value: SyncPeerConfig) -> Self {
         Self::builder()
             .interval(value.interval.into())
@@ -176,7 +176,7 @@ impl From<SyncPeerConfig> for aranya_client::config::SyncPeerConfig {
     }
 }
 
-impl From<&SyncPeerConfig> for aranya_client::config::SyncPeerConfig {
+impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
     fn from(value: &SyncPeerConfig) -> Self {
         value.clone().into()
     }
@@ -225,7 +225,7 @@ impl Builder for SyncPeerConfigBuilder {
 }
 
 impl Typed for SyncPeerConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x2049e683);
+    const TYPE_ID: TypeId = TypeId::new(0xFE81AF7E);
 }
 
 impl Default for SyncPeerConfigBuilder {

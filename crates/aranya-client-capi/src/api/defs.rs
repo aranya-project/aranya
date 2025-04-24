@@ -6,6 +6,7 @@ use core::{
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
+use aranya_crypto::hex;
 use tracing::{debug, error};
 
 use crate::imp;
@@ -172,6 +173,25 @@ pub fn init_logging() -> Result<(), imp::Error> {
         .with(EnvFilter::from_env("ARANYA_CAPI"))
         .try_init()?;
     Ok(())
+}
+
+/// Decodes the hexadecimal string `src` into `dst` and returns
+/// the number of bytes written to `dst`.
+///
+/// If `src` is a valid hexadecimal string, the number of bytes
+/// written to `dst` will be exactly half the length of `src`.
+/// Therefore, `dst` must be at least half as long as `src`.
+///
+/// @param dst the output buffer
+/// @param src the input hexadecimal string
+pub fn decode_hex(dst: &mut [u8], src: &[u8]) -> Result<usize, imp::Error> {
+    hex::ct_decode(dst, src).map_err(|err| match err {
+        hex::Error::InvalidLength => imp::Error::BufferTooSmall,
+        hex::Error::InvalidEncoding => {
+            imp::Error::InvalidArg(InvalidArg::new("src", "not a valid hexadecimal string"))
+        }
+        hex::Error::Bug(err) => imp::Error::Bug(err),
+    })
 }
 
 /// A handle to an Aranya Client.
@@ -496,15 +516,23 @@ pub fn client_config_builder_set_daemon_uds_path(
     cfg: &mut ClientConfigBuilder,
     address: *const c_char,
 ) {
-    cfg.set_daemon_addr(address);
+    cfg.daemon_addr(address);
 }
 
 /// Sets the daemon's public API key.
 ///
+/// `pk` must not be encoded; it must be the raw key bytes.
+///
+/// The daemon's public API key can be retrieved by invoking the
+/// daemon with the `--print-api-pk` flag. The output will be
+/// hexadecimal encoded and must be decoded before being passed
+/// to this function. You can use [`decode_hex`] for this
+/// purpose.
+///
 /// @param cfg a pointer to the client config builder
-/// @param address a string containing the address
+/// @param pk the daemon's raw (not encoded) public API key bytes
 pub fn client_config_builder_set_daemon_api_pk(cfg: &mut ClientConfigBuilder, pk: &[u8]) {
-    cfg.set_daemon_pk(pk);
+    cfg.daemon_pk(pk);
 }
 
 /// Attempts to construct a [`ClientConfig`], returning an `Error::Config`
@@ -526,7 +554,7 @@ pub fn client_config_builder_build(
 /// @param cfg a pointer to the client config builder
 /// @param aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
 pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
-    cfg.set_aqc(aqc_config.deref().clone());
+    cfg.aqc(aqc_config.deref().clone());
 }
 
 /// Initializes a new client instance.
