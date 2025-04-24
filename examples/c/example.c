@@ -783,6 +783,7 @@ AranyaError cleanup_roles(Team *t) {
             bool eq = false;
             aranya_cmp_role_ids(&owner_role_id, &role_id, &eq);
             if (!eq) {
+                // TODO: capacity overflow error
                 err = aranya_revoke_role_perm(&t->clients.owner.client, &t->id,
                                               &role_id, &perms[j]);
                 EXPECT("error revoking role perm", err);
