@@ -47,7 +47,10 @@ impl fmt::Display for Perm {
         write!(
             f,
             "{}",
-            self.name.clone().into_string().expect("expected to convert to string")
+            self.name
+                .clone()
+                .into_string()
+                .expect("expected to convert to string")
         )
     }
 }
