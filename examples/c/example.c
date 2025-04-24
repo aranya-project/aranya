@@ -848,7 +848,7 @@ AranyaError query_device_roles(Team *t, AranyaDeviceId *device,
     AranyaError err;
 
     *roles_len = BUF_LEN;
-    *roles     = malloc(*roles_len * sizeof(AranyaDeviceId));
+    *roles     = malloc(*roles_len * sizeof(**roles));
     err = aranya_query_device_roles(&t->clients.operator.client, &t->id, device,
                                     *roles, roles_len);
     EXPECT("error querying device roles", err);
