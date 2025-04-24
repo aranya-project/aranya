@@ -417,5 +417,3 @@ async fn test_query_functions() -> Result<()> {
 
     Ok(())
 }
-
-// TODO(nikki): aqc testing variants.

@@ -9,7 +9,6 @@ use super::Error;
 use crate::api::defs::Duration;
 
 /// Configuration values for syncing with a peer
-#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct SyncPeerConfig {
     interval: Duration,
@@ -37,7 +36,6 @@ impl From<&SyncPeerConfig> for aranya_client::config::SyncPeerConfig {
 }
 
 /// Configuration info for Aranya
-#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
     daemon_addr: *const c_char,
@@ -61,7 +59,6 @@ impl Typed for ClientConfig {
 }
 
 /// Builder for a [`ClientConfig`]
-#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct ClientConfigBuilder {
     daemon_addr: *const c_char,
@@ -131,7 +128,6 @@ impl Default for ClientConfigBuilder {
 }
 
 /// Builder for a [`SyncPeerConfig`]
-#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct SyncPeerConfigBuilder {
     interval: Option<Duration>,
@@ -187,7 +183,6 @@ impl Default for SyncPeerConfigBuilder {
 }
 
 /// Configuration info for Aranya Fast Channels
-#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct AqcConfig {
     /// Address to bind AQC server to.
@@ -242,7 +237,6 @@ impl Default for AqcConfigBuilder {
 }
 
 /// Configuration info when creating or adding a team in Aranya
-#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct TeamConfig {}
 
@@ -251,7 +245,6 @@ impl Typed for TeamConfig {
 }
 
 /// Builder for a [`TeamConfig`]
-#[repr(C)]
 #[derive(Clone, Debug)]
 pub struct TeamConfigBuilder {}
 
