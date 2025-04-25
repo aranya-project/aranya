@@ -73,9 +73,13 @@ pub enum Error {
     #[capi(msg = "serialization")]
     Serialization,
 
-    /// CString error.
+    /// CString allocation error.
     #[capi(msg = "CString")]
     CString,
+
+    /// CString conversion error.
+    #[capi(msg = "IntoString")]
+    IntoString,
 }
 
 impl From<&imp::Error> for Error {
@@ -105,6 +109,7 @@ impl From<&imp::Error> for Error {
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
             imp::Error::CString(_) => Self::CString,
+            imp::Error::IntoString(_) => Self::IntoString,
         }
     }
 }
@@ -895,12 +900,17 @@ pub unsafe fn revoke_role_cmd(
     cmd: &Cmd,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
+    let cmd = cmd
+        .name
+        .clone()
+        .into_string()
+        .map_err(imp::Error::IntoString)?;
 
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .revoke_role_cmd(role_id.into(), cmd.to_string()),
+            .revoke_role_cmd(role_id.into(), cmd),
     )?;
     Ok(())
 }
@@ -1137,7 +1147,7 @@ pub fn get_label_name(label: &Label) -> *const c_char {
 /// Returns a C string pointer to the command's name.
 #[aranya_capi_core::no_ext_error]
 pub fn get_cmd_name(cmd: &Cmd) -> *const c_char {
-    cmd.get_name()
+    cmd.name.as_ptr()
 }
 
 /// Assign a label to a device so that it can be used for a channel.
@@ -1664,7 +1674,7 @@ pub fn query_role_cmds(
     };
     let out = aranya_capi_core::try_as_mut_slice!(cmds, *cmds_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.clone().into())
+        Safe::init(dst, src.clone().try_into()?)
     }
     if *cmds_len < data.len() {
         *cmds_len = data.len();

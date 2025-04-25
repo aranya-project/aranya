@@ -194,9 +194,13 @@ enum AranyaError
      */
     ARANYA_ERROR_SERIALIZATION,
     /**
-     * CString error.
+     * CString allocation error.
      */
     ARANYA_ERROR_C_STRING,
+    /**
+     * CString conversion error.
+     */
+    ARANYA_ERROR_INTO_STRING,
 };
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
