@@ -610,37 +610,6 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
     Ok(id.into())
 }
 
-/// Add a team to the local device store.
-///
-/// NOTE: this function is unfinished and will panic if called.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param cfg the Team Configuration [`TeamConfig`].
-///
-/// @relates AranyaClient.
-#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    let cfg = aranya_client::TeamConfig::builder().build()?;
-    client
-        .rt
-        .block_on(client.inner.add_team(team.into(), cfg))?;
-    Ok(())
-}
-
-/// Remove a team from the local device store.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-///
-/// @relates AranyaClient.
-pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client.rt.block_on(client.inner.remove_team(team.into()))?;
-    Ok(())
-}
-
 /// Add the peer for automatic periodic Aranya state syncing.
 ///
 /// If a peer is not reachable on the network, sync errors
