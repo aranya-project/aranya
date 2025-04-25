@@ -203,26 +203,14 @@ impl<'a> AqcChannels<'a> {
     // It is an error if the channel does not exist
     #[instrument(skip_all, fields(chan = %chan))]
     pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannelId) -> crate::Result<()> {
-        let _ctrl = self
-            .client
-            .daemon
-            .delete_aqc_bidi_channel(context::current(), chan)
-            .await??;
-        //self.client.aqc.remove_channel(chan).await;
-        Ok(())
+        todo!()
     }
 
     /// Deletes an AQC uni channel.
     // It is an error if the channel does not exist
     #[instrument(skip_all, fields(chan = %chan))]
     pub async fn delete_uni_channel(&mut self, chan: AqcUniChannelId) -> crate::Result<()> {
-        let _ctrl = self
-            .client
-            .daemon
-            .delete_aqc_uni_channel(context::current(), chan)
-            .await??;
-        //self.client.aqc.remove_channel(chan).await;
-        Ok(())
+        todo!()
     }
 
     /// Receives an AQC ctrl message.

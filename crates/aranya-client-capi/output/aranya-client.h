@@ -997,29 +997,6 @@ AranyaError aranya_remove_sync_peer_ext(struct AranyaClient *client,
                                         struct AranyaExtError *__ext_err);
 
 /**
- * Close the team and stop all operations on the graph.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_close_team(struct AranyaClient *client,
-                              const struct AranyaTeamId *team);
-
-/**
- * Close the team and stop all operations on the graph.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_close_team_ext(struct AranyaClient *client,
-                                  const struct AranyaTeamId *team,
-                                  struct AranyaExtError *__ext_err);
-
-/**
  * Add a device to the team with the default role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
