@@ -695,20 +695,6 @@ pub unsafe fn remove_sync_peer(
     Ok(())
 }
 
-/// Close the team and stop all operations on the graph.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-///
-/// @relates AranyaClient.
-pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).close_team())?;
-    Ok(())
-}
-
 /// Add a device to the team with the default role.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.

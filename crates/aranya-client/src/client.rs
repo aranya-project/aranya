@@ -189,15 +189,6 @@ impl Team<'_> {
             .map_err(Into::into)
     }
 
-    /// Close the team and stop all operations on the graph.
-    pub async fn close_team(&mut self) -> Result<()> {
-        self.client
-            .daemon
-            .close_team(context::current(), self.id)
-            .await?
-            .map_err(Into::into)
-    }
-
     /// Add a device to the team with the default `Member` role.
     pub async fn add_device_to_team(&mut self, keys: KeyBundle) -> Result<()> {
         self.client
