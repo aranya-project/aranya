@@ -555,24 +555,6 @@ impl DaemonApi for DaemonApiHandler {
         Ok((ctrl, aqc_info))
     }
 
-    #[instrument(skip(self))]
-    async fn delete_aqc_bidi_channel(
-        self,
-        _: context::Context,
-        chan: api::AqcBidiChannelId,
-    ) -> api::Result<api::AqcCtrl> {
-        // TODO: remove AQC bidi channel from Aranya.
-        todo!();
-    }
-    #[instrument(skip(self))]
-    async fn delete_aqc_uni_channel(
-        self,
-        _: context::Context,
-        chan: api::AqcUniChannelId,
-    ) -> api::Result<api::AqcCtrl> {
-        // TODO: remove AQC uni channel from Aranya.
-        todo!();
-    }
     #[instrument(skip_all)]
     async fn receive_aqc_ctrl(
         self,

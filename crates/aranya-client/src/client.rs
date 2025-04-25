@@ -127,19 +127,6 @@ impl Client {
             .map_err(Into::into)
     }
 
-    /// Add a team to the local device store.
-    pub async fn add_team(&mut self, team: TeamId, cfg: TeamConfig) -> Result<()> {
-        self.daemon
-            .add_team(context::current(), team, cfg.into())
-            .await?
-            .map_err(Into::into)
-    }
-
-    /// Remove a team from the local device store.
-    pub async fn remove_team(&mut self, _team: TeamId) -> Result<()> {
-        todo!()
-    }
-
     /// Get an existing team.
     pub fn team(&mut self, id: TeamId) -> Team<'_> {
         Team { client: self, id }
@@ -198,15 +185,6 @@ impl Team<'_> {
         self.client
             .daemon
             .remove_sync_peer(context::current(), addr, self.id)
-            .await?
-            .map_err(Into::into)
-    }
-
-    /// Close the team and stop all operations on the graph.
-    pub async fn close_team(&mut self) -> Result<()> {
-        self.client
-            .daemon
-            .close_team(context::current(), self.id)
             .await?
             .map_err(Into::into)
     }
