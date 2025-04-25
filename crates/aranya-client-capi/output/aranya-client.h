@@ -884,60 +884,6 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
                                    struct AranyaExtError *__ext_err);
 
 /**
- * Add a team to the local device store.
- *
- * NOTE: this function is unfinished and will panic if called.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_add_team(struct AranyaClient *client,
-                            const struct AranyaTeamId *team,
-                            const struct AranyaTeamConfig *cfg);
-
-/**
- * Add a team to the local device store.
- *
- * NOTE: this function is unfinished and will panic if called.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_add_team_ext(struct AranyaClient *client,
-                                const struct AranyaTeamId *team,
-                                const struct AranyaTeamConfig *cfg,
-                                struct AranyaExtError *__ext_err);
-
-/**
- * Remove a team from the local device store.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_remove_team(struct AranyaClient *client,
-                               const struct AranyaTeamId *team);
-
-/**
- * Remove a team from the local device store.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_remove_team_ext(struct AranyaClient *client,
-                                   const struct AranyaTeamId *team,
-                                   struct AranyaExtError *__ext_err);
-
-/**
  * Add the peer for automatic periodic Aranya state syncing.
  *
  * If a peer is not reachable on the network, sync errors
