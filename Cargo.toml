@@ -71,7 +71,7 @@ postcard = { version = "1", default-features = false, features = ["use-std", "he
 pretty_assertions = { version = "1.4" }
 # TODO: Remove this after PSK integration
 rcgen = { version = "0.13", default-features = false, features = ["pem", "aws_lc_rs"] }
-s2n-quic = { version = "1.51.0", default-features = false, features = ["provider-address-token-default", "provider-tls-s2n"] }
+s2n-quic = { version = "1.51.0", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"] }
 serde = "1"
 serial_test = { version = "3" }
 tarpc = { version = "0.35.0", features = ["unix", "serde-transport", "serde-transport-json"] }
@@ -82,6 +82,8 @@ tokio = { version = "1.40" }
 tokio-util = { version = "0.7.12" }
 tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+rustls-pemfile = "2.1.2"
+rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "648a02550dd319360664f9af79862716be2879ff" } 
 
 
 [profile.dev]
@@ -98,3 +100,6 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
+
+[patch.crates-io]
+rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "648a02550dd319360664f9af79862716be2879ff" }

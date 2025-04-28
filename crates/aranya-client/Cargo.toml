@@ -28,9 +28,12 @@ aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
 s2n-quic = { workspace = true }
+rustls-pemfile = { workspace = true }
+rustls = { workspace = true }
 
 anyhow = { workspace = true }
 postcard = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }

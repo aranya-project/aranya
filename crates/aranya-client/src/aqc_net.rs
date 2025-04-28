@@ -2,51 +2,244 @@
 
 //! The AQC network implementation.
 
-use std::net::SocketAddr;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use anyhow::Result;
-use aranya_crypto::Id;
-use aranya_daemon_api::{AqcBidiChannelId, LabelId};
+use anyhow::{Context, Result};
+use aranya_aqc_util::{BidiChannelReceived, Handler, UniChannelReceived};
+use aranya_crypto::{
+    aqc::{BidiChannelId, BidiPeerEncap, UniChannelId, UniPeerEncap},
+    keystore::fs_keystore::Store,
+};
+use aranya_daemon_api::{AqcChannelInfo, AqcCtrl, DaemonApiClient, LabelId, TeamId, CS};
+use aranya_fast_channels::NodeId;
+use buggy::BugExt;
 use bytes::Bytes;
 use s2n_quic::{
     client::Connect,
     connection::Handle,
-    provider::{self},
+    provider::{self, tls::rustls::rustls::crypto::PresharedKey},
     stream::{PeerStream, ReceiveStream, SendStream},
     Client, Connection, Server,
 };
-use tokio::sync::mpsc::{self};
+use tarpc::context;
+use tokio::sync::{
+    mpsc::{self},
+    Mutex,
+};
 use tracing::{debug, error};
+
+use crate::{
+    aqc::{AqcChannel, ClientPresharedKeys, CE, PSK_BYTES_CTRL, PSK_IDENTITY_CTRL},
+    error::AqcError,
+};
 
 /// The maximum number of channels that haven't been received.
 const MAXIMUM_UNRECEIVED_CHANNELS: usize = 20;
 
-/// Runs a server listening for quic channel requests from other peers.
-pub async fn run_channels(mut server: Server, sender: mpsc::Sender<AqcChannelType>) {
-    loop {
-        match server.accept().await {
-            Some(conn) => {
-                // Once we accept a valid connection, let's turn it into an AQC Channel that we can
-                // then open an arbitrary number of streams on.
-                let (channel, bi_sender) = AqcBidirectionalChannel::new(
-                    LabelId::default(),
-                    AqcBidiChannelId::from(Id::default()),
-                    conn.handle(),
-                );
+/// An AQC control message.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct AqcCtrlMessage {
+    /// The team id.
+    pub team_id: TeamId,
+    /// The control message.
+    pub ctrl: AqcCtrl,
+}
 
-                // Notify the AfcClient that we've accepted a new connection, which the user will
-                // have to call receive_channel() on in order to use.
-                if sender
-                    .send(AqcChannelType::Bidirectional { channel })
-                    .await
-                    .is_err()
-                {
-                    error!("Sender closed. Unable to send channel");
-                    return;
+/// Receives an AQC ctrl message.
+async fn receive_aqc_ctrl(
+    daemon: Arc<DaemonApiClient>,
+    team: TeamId,
+    ctrl: AqcCtrl,
+    handler: Arc<Mutex<Handler<Store>>>,
+    eng: CE,
+    channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
+) -> crate::Result<()> {
+    // TODO: use correct node ID
+    let node_id: NodeId = 0.into();
+
+    let (_peer, aqc_info) = daemon
+        .receive_aqc_ctrl(context::current(), team, node_id, ctrl)
+        .await??;
+
+    match aqc_info {
+        AqcChannelInfo::BidiReceived(v) => {
+            let encap = BidiPeerEncap::<CS>::from_bytes(&v.encap)
+                .context("unable to get encap")
+                .map_err(AqcError::Encap)?;
+            let channel_id: BidiChannelId = encap.id();
+            let effect = BidiChannelReceived {
+                parent_cmd_id: v.parent_cmd_id,
+                author_id: v.author_id.into_id().into(),
+                author_enc_pk: &v.author_enc_pk,
+                peer_id: v.peer_id.into_id().into(),
+                peer_enc_key_id: v.peer_enc_key_id,
+                label_id: v.label_id.into_id().into(),
+                encap: &v.encap,
+                channel_id,
+                psk_length_in_bytes: v.psk_length_in_bytes,
+            };
+            let psk = handler
+                .lock()
+                .await
+                .bidi_channel_received(&mut eng.clone(), &effect)
+                .map_err(AqcError::ChannelCreation)?;
+            debug!("psk id: {:?}", psk.identity());
+            println!("writing to channel map psk id: {:?}", psk.identity());
+            channel_map.insert(
+                psk.identity().as_bytes().to_vec(),
+                AqcChannel::Bidirectional { id: channel_id },
+            );
+        }
+        AqcChannelInfo::UniReceived(v) => {
+            let encap = UniPeerEncap::<CS>::from_bytes(&v.encap)
+                .context("unable to get encap")
+                .map_err(AqcError::Encap)?;
+            let channel_id: UniChannelId = encap.id();
+            let effect = UniChannelReceived {
+                parent_cmd_id: v.parent_cmd_id,
+                author_id: v.author_id.into_id().into(),
+                author_enc_pk: &v.author_enc_pk,
+                send_id: v.send_id.into_id().into(),
+                recv_id: v.recv_id.into_id().into(),
+                peer_enc_key_id: v.peer_enc_key_id,
+                label_id: v.label_id.into_id().into(),
+                encap: &v.encap,
+                channel_id,
+                psk_length_in_bytes: v.psk_length_in_bytes,
+            };
+            let psk = handler
+                .lock()
+                .await
+                .uni_channel_received(&mut eng.clone(), &effect)
+                .map_err(AqcError::ChannelCreation)?;
+            debug!("psk id: {:?}", psk.identity());
+            channel_map.insert(
+                psk.identity().as_bytes().to_vec(),
+                AqcChannel::Unidirectional { id: channel_id },
+            );
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+/// Runs a server listening for quic channel requests from other peers.
+pub async fn run_channels(
+    mut server: Server,
+    sender: mpsc::Sender<AqcChannelType>,
+    mut identity_rx: mpsc::Receiver<Vec<u8>>,
+    daemon: Arc<DaemonApiClient>,
+    handler: Arc<Mutex<Handler<Store>>>,
+    eng: CE,
+) {
+    let mut channel_map = HashMap::new();
+    loop {
+        println!("waiting for connection");
+        match server.accept().await {
+            Some(mut conn) => {
+                println!("connection accepted");
+                let identity = match identity_rx.try_recv() {
+                    Ok(identity) => {
+                        tracing::debug!("Received new PSK identity hint: {:02x?}", identity);
+                        Some(identity)
+                    }
+                    Err(mpsc::error::TryRecvError::Empty) => None,
+                    Err(mpsc::error::TryRecvError::Disconnected) => {
+                        // Sender was dropped, likely AqcChannelsImpl was dropped.
+                        error!("PSK Identity channel disconnected.");
+                        // break; // Exit the loop if the sender is gone
+                        None
+                    }
+                };
+                println!("identity: {:02x?}", identity);
+                if let Some(ref identity) = identity {
+                    println!("processing connection accepted after seeing PSK identity hint");
+                    tracing::debug!(
+                        "Processing connection accepted after seeing PSK identity hint: {:02x?}",
+                        identity
+                    );
+                    if identity == PSK_IDENTITY_CTRL {
+                        println!("PSK identity hint received");
+                        match conn.accept_receive_stream().await {
+                            Ok(Some(mut receive)) => {
+                                println!("received aqc ctrl stream");
+                                if let Ok(Some(ctrl)) = receive.receive().await {
+                                    let ctrl: AqcCtrlMessage = postcard::from_bytes(&ctrl).unwrap();
+                                    if let Err(e) = receive_aqc_ctrl(
+                                        daemon.clone(),
+                                        ctrl.team_id,
+                                        ctrl.ctrl,
+                                        handler.clone(),
+                                        eng.clone(),
+                                        &mut channel_map,
+                                    )
+                                    .await
+                                    {
+                                        error!("Failed to receive AQC ctrl: {}", e);
+                                    }
+                                    println!("received aqc ctrl");
+                                }
+                                // TODO: else handle receive error?
+                            }
+                            Ok(None) => {
+                                error!("Receive stream closed unexpectedly");
+                                continue;
+                            }
+                            Err(e) => {
+                                error!("Failed to accept receive stream: {}", e);
+                                continue;
+                            }
+                        }
+                    } else if let Some(channel_info) = channel_map.get(identity) {
+                        println!("found channel info");
+                        tracing::debug!(
+                            "Found channel info in map for identity hint {:02x?}: {:?}",
+                            identity,
+                            channel_info
+                        );
+                        match channel_info {
+                            AqcChannel::Bidirectional { id } => {
+                                println!("found bidirectional channel");
+                                // Once we accept a valid connection, let's turn it into an AQC Channel that we can
+                                // then open an arbitrary number of streams on.
+                                let (channel, bi_sender) = AqcBidirectionalChannel::new(
+                                    LabelId::default(),
+                                    *id,
+                                    conn.handle(),
+                                );
+
+                                // Notify the AfcClient that we've accepted a new connection, which the user will
+                                // have to call receive_channel() on in order to use.
+                                if sender
+                                    .send(AqcChannelType::Bidirectional { channel })
+                                    .await
+                                    .is_err()
+                                {
+                                    error!("Sender closed. Unable to send channel");
+                                    return;
+                                } else {
+                                    // Spawn a new task so that we can receive any future streams that are opened
+                                    // over the connection.
+                                    tokio::spawn(handle_streams(conn, bi_sender));
+                                }
+                                // TODO: Use channel
+                            }
+                            AqcChannel::Unidirectional { id } => {
+                                // TODO: Use sender
+                            }
+                        }
+                    } else {
+                        println!("no channel info found");
+                        tracing::debug!(
+                            "No channel info found in map for identity hint {:02x?}",
+                            identity
+                        );
+                        continue;
+                    }
                 } else {
-                    // Spawn a new task so that we can receive any future streams that are opened
-                    // over the connection.
-                    tokio::spawn(handle_streams(conn, bi_sender));
+                    // Could use .read().await for blocking read if preferred
+                    tracing::warn!("Could not acquire read lock on channel_map immediately.");
                 }
             }
             None => {
@@ -123,6 +316,7 @@ pub enum AqcChannelType {
 pub struct AqcChannelSender {
     label_id: LabelId,
     handle: Handle,
+    id: UniChannelId,
 }
 
 impl AqcChannelSender {
@@ -130,8 +324,12 @@ impl AqcChannelSender {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub fn new(label_id: LabelId, handle: Handle) -> Self {
-        Self { label_id, handle }
+    pub fn new(label_id: LabelId, id: UniChannelId, handle: Handle) -> Self {
+        Self {
+            label_id,
+            id,
+            handle,
+        }
     }
 
     /// Get the channel label id.
@@ -197,7 +395,7 @@ impl AqcChannelReceiver {
 #[derive(Debug)]
 pub struct AqcBidirectionalChannel {
     label_id: LabelId,
-    aqc_id: AqcBidiChannelId,
+    aqc_id: BidiChannelId,
     handle: Handle,
     receiver: mpsc::Receiver<(Option<SendStream>, ReceiveStream)>,
 }
@@ -206,7 +404,7 @@ impl AqcBidirectionalChannel {
     /// Create a new bidirectional channel with the given id and conection handle.
     pub fn new(
         label_id: LabelId,
-        aqc_id: AqcBidiChannelId,
+        aqc_id: BidiChannelId,
         handle: Handle,
     ) -> (Self, mpsc::Sender<(Option<SendStream>, ReceiveStream)>) {
         let (sender, receiver) = mpsc::channel(10);
@@ -227,7 +425,7 @@ impl AqcBidirectionalChannel {
     }
 
     /// Get the aqc id.
-    pub fn aqc_id(&self) -> AqcBidiChannelId {
+    pub fn aqc_id(&self) -> BidiChannelId {
         self.aqc_id
     }
 
@@ -313,16 +511,18 @@ impl AqcSendStream {
 
 /// An AQC client. Used to create and receive channels.
 #[derive(Debug)]
-pub struct AqcClient {
+pub(crate) struct AqcClient {
     quic_client: Client,
     /// Holds channels that have created, but not yet been received.
     receiver: mpsc::Receiver<AqcChannelType>,
+    client_keys: Arc<ClientPresharedKeys>,
 }
 
 impl AqcClient {
     /// Create an Aqc client with the given certificate chain.
     pub fn new<T: provider::tls::Provider>(
         cert: T,
+        client_keys: Arc<ClientPresharedKeys>,
     ) -> Result<(AqcClient, mpsc::Sender<AqcChannelType>)> {
         let (sender, receiver) = mpsc::channel(MAXIMUM_UNRECEIVED_CHANNELS);
         let quic_client = Client::builder()
@@ -333,6 +533,7 @@ impl AqcClient {
             AqcClient {
                 quic_client,
                 receiver,
+                client_keys,
             },
             sender,
         ))
@@ -354,24 +555,21 @@ impl AqcClient {
         &mut self,
         addr: SocketAddr,
         label_id: LabelId,
-        direction: AqcChannelDirection,
+        channel: AqcChannel,
+        psk: PresharedKey,
     ) -> Result<AqcChannelType> {
-        // TODO: Create the channel in the graph.
+        self.client_keys.set_key(psk);
         let mut conn = self
             .quic_client
             .connect(Connect::new(addr).with_server_name("localhost"))
             .await?;
         conn.keep_alive(true)?;
-        let channel = match direction {
-            AqcChannelDirection::Unidirectional => AqcChannelType::Sender {
-                sender: AqcChannelSender::new(label_id, conn.handle()),
+        let channel = match channel {
+            AqcChannel::Unidirectional { id } => AqcChannelType::Sender {
+                sender: AqcChannelSender::new(label_id, id, conn.handle()),
             },
-            AqcChannelDirection::Bidirectional => {
-                let (channel, sender) = AqcBidirectionalChannel::new(
-                    label_id,
-                    AqcBidiChannelId::from(Id::default()),
-                    conn.handle(),
-                );
+            AqcChannel::Bidirectional { id } => {
+                let (channel, sender) = AqcBidirectionalChannel::new(label_id, id, conn.handle());
                 tokio::spawn(handle_streams(conn, sender));
                 AqcChannelType::Bidirectional { channel }
             }
@@ -384,9 +582,11 @@ impl AqcClient {
         &mut self,
         addr: SocketAddr,
         label_id: LabelId,
+        id: UniChannelId,
+        psk: PresharedKey,
     ) -> Result<AqcChannelSender> {
         match self
-            .create_channel(addr, label_id, AqcChannelDirection::Unidirectional)
+            .create_channel(addr, label_id, AqcChannel::Unidirectional { id }, psk)
             .await?
         {
             AqcChannelType::Sender { sender } => Ok(sender),
@@ -399,9 +599,11 @@ impl AqcClient {
         &mut self,
         addr: SocketAddr,
         label_id: LabelId,
+        id: BidiChannelId,
+        psk: PresharedKey,
     ) -> Result<AqcBidirectionalChannel> {
         match self
-            .create_channel(addr, label_id, AqcChannelDirection::Bidirectional)
+            .create_channel(addr, label_id, AqcChannel::Bidirectional { id }, psk)
             .await?
         {
             AqcChannelType::Bidirectional { channel } => Ok(channel),
@@ -409,5 +611,29 @@ impl AqcClient {
                 "Invalid channel type: expected Bidirectional for bidirectional channel"
             ),
         }
+    }
+
+    /// Send a control message to the given address.
+    pub async fn send_ctrl(
+        &mut self,
+        addr: SocketAddr,
+        ctrl: AqcCtrl,
+        team_id: TeamId,
+    ) -> Result<()> {
+        println!("sending aqc ctrl");
+        let psk = PresharedKey::external(PSK_IDENTITY_CTRL, PSK_BYTES_CTRL)
+            .assume("unable to create psk")?;
+        self.client_keys.set_key(psk);
+        let mut conn = self
+            .quic_client
+            .connect(Connect::new(addr).with_server_name("localhost"))
+            .await?;
+        conn.keep_alive(true)?;
+        let mut send = conn.open_send_stream().await?;
+        let msg = AqcCtrlMessage { team_id, ctrl };
+        let msg_bytes = postcard::to_stdvec(&msg)?;
+        send.send(Bytes::copy_from_slice(msg_bytes.as_slice()))
+            .await?;
+        Ok(())
     }
 }
