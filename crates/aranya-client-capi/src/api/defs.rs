@@ -1122,7 +1122,7 @@ pub fn label_get_name(label: &Label) -> *const c_char {
 ///
 /// Returns a C string pointer to the command's name.
 #[aranya_capi_core::no_ext_error]
-pub fn get_cmd_name(cmd: &Cmd) -> *const c_char {
+pub fn cmd_get_name(cmd: &Cmd) -> *const c_char {
     cmd.name.as_ptr()
 }
 

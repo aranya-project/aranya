@@ -488,7 +488,7 @@ AranyaError run(Team *t) {
     for (size_t i = 0; i < cmds_len; i++) {
         AranyaCmd cmd_result = cmds[i];
         const char *cmd_str  = NULL;
-        err                  = aranya_get_cmd_name(&cmd_result, &cmd_str);
+        err                  = aranya_cmd_get_name(&cmd_result, &cmd_str);
         EXPECT("unable to get cmd name", err);
         printf("cmd: %s at index: %zu/%zu \r\n", cmd_str, i, cmds_len);
     }
@@ -783,7 +783,7 @@ AranyaError cleanup_roles(Team *t) {
                                              &role_id, &cmds[j]);
                 EXPECT("error revoking role cmd", err);
                 const char *cmd_str;
-                err = aranya_get_cmd_name(&cmds[j], &cmd_str);
+                err = aranya_cmd_get_name(&cmds[j], &cmd_str);
                 EXPECT("error getting cmd name", err);
                 printf("revoked role cmd: %s\r\n", cmd_str);
             }

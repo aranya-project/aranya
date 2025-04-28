@@ -1542,7 +1542,7 @@ AranyaError aranya_label_get_name(const struct AranyaLabel *label,
  *
  * Returns a C string pointer to the command's name.
  */
-AranyaError aranya_get_cmd_name(const struct AranyaCmd *cmd,
+AranyaError aranya_cmd_get_name(const struct AranyaCmd *cmd,
                                 const char **__output);
 
 /**
