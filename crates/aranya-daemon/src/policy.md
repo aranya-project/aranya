@@ -1155,17 +1155,15 @@ command RevokeRoleCmd {
         // Query role.
         let role = check_unwrap query Role[role_id: this.role_id]
 
-        if this.role_id == role.role.role_id {
-            finish {
-                revoke_cmd_role(this.cmd)
+        finish {
+            revoke_cmd_role(this.cmd)
 
-                // Return deleted role info.
-                emit RoleCmdRevoked {
-                    role_id: role.role.role_id,
-                    name: role.role.name,
-                    cmd: this.cmd,
-                    author_id: author.device_id,
-                }
+            // Return deleted role info.
+            emit RoleCmdRevoked {
+                role_id: role.role.role_id,
+                name: role.role.name,
+                cmd: this.cmd,
+                author_id: author.device_id,
             }
         }
     }
