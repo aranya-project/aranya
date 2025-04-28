@@ -639,30 +639,6 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
     Ok(id.into())
 }
 
-/// Compare two device IDs.
-///
-/// @param device_id_a first device ID to compare [`DeviceId`].
-/// @param device_id_b second device ID to compare [`DeviceId`].
-///
-/// @param __output boolean representing whether the device IDs are equal.
-///
-/// Returns true if device IDs match. Returns false otherwise.
-pub fn cmp_device_ids(device_id_a: &DeviceId, device_id_b: &DeviceId) -> bool {
-    device_id_a.id == device_id_b.id
-}
-
-/// Compare two role IDs.
-///
-/// @param role_id_a first role ID to compare [`RoleId`].
-/// @param role_id_b second role ID to compare [`RoleId`].
-///
-/// @param __output boolean representing whether the device IDs are equal.
-///
-/// Returns true if device IDs match. Returns false otherwise.
-pub fn cmp_role_ids(role_id_a: &RoleId, role_id_b: &RoleId) -> bool {
-    role_id_a.id == role_id_b.id
-}
-
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 

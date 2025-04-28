@@ -301,13 +301,6 @@ typedef struct AranyaDeviceId {
     struct AranyaId id;
 } AranyaDeviceId;
 
-/**
- * Role ID.
- */
-typedef struct AranyaRoleId {
-    struct AranyaId id;
-} AranyaRoleId;
-
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
     /**
      * This field only exists for size purposes. It is
@@ -358,6 +351,13 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
  * E.g. "owner"
  */
 typedef const char *AranyaRoleName;
+
+/**
+ * Role ID.
+ */
+typedef struct AranyaRoleId {
+    struct AranyaId id;
+} AranyaRoleId;
 
 /**
  * A role command name.
@@ -880,64 +880,6 @@ AranyaError aranya_get_device_id(struct AranyaClient *client,
 AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
                                      struct AranyaDeviceId *__output,
                                      struct AranyaExtError *__ext_err);
-
-/**
- * Compare two device IDs.
- *
- * @param device_id_a first device ID to compare [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param device_id_b second device ID to compare [`AranyaDeviceId`](@ref AranyaDeviceId).
- *
- * @param __output boolean representing whether the device IDs are equal.
- *
- * Returns true if device IDs match. Returns false otherwise.
- */
-AranyaError aranya_cmp_device_ids(const struct AranyaDeviceId *device_id_a,
-                                  const struct AranyaDeviceId *device_id_b,
-                                  bool *__output);
-
-/**
- * Compare two device IDs.
- *
- * @param device_id_a first device ID to compare [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param device_id_b second device ID to compare [`AranyaDeviceId`](@ref AranyaDeviceId).
- *
- * @param __output boolean representing whether the device IDs are equal.
- *
- * Returns true if device IDs match. Returns false otherwise.
- */
-AranyaError aranya_cmp_device_ids_ext(const struct AranyaDeviceId *device_id_a,
-                                      const struct AranyaDeviceId *device_id_b,
-                                      bool *__output,
-                                      struct AranyaExtError *__ext_err);
-
-/**
- * Compare two role IDs.
- *
- * @param role_id_a first role ID to compare [`AranyaRoleId`](@ref AranyaRoleId).
- * @param role_id_b second role ID to compare [`AranyaRoleId`](@ref AranyaRoleId).
- *
- * @param __output boolean representing whether the device IDs are equal.
- *
- * Returns true if device IDs match. Returns false otherwise.
- */
-AranyaError aranya_cmp_role_ids(const struct AranyaRoleId *role_id_a,
-                                const struct AranyaRoleId *role_id_b,
-                                bool *__output);
-
-/**
- * Compare two role IDs.
- *
- * @param role_id_a first role ID to compare [`AranyaRoleId`](@ref AranyaRoleId).
- * @param role_id_b second role ID to compare [`AranyaRoleId`](@ref AranyaRoleId).
- *
- * @param __output boolean representing whether the device IDs are equal.
- *
- * Returns true if device IDs match. Returns false otherwise.
- */
-AranyaError aranya_cmp_role_ids_ext(const struct AranyaRoleId *role_id_a,
-                                    const struct AranyaRoleId *role_id_b,
-                                    bool *__output,
-                                    struct AranyaExtError *__ext_err);
 
 /**
  * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`

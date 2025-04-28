@@ -739,13 +739,11 @@ AranyaError cleanup_roles(Team *t) {
         EXPECT("error querying device roles", err);
         for (size_t j = 0; j < roles_len; j++) {
             AranyaRoleId role_id;
-            err     = aranya_get_role_id(&roles[j], &role_id);
-            bool eq = false;
-            aranya_cmp_device_ids(&t->clients.owner.id, &devices[i], &eq);
-            if (eq) {
+            err = aranya_get_role_id(&roles[j], &role_id);
+            if (!memcmp(&t->clients.owner.id, &devices[i],
+                        sizeof(AranyaDeviceId))) {
                 owner_role_id = role_id;
-            }
-            if (!eq) {
+            } else {
                 const char *role_str;
                 err = aranya_get_role_name(&roles[j], &role_str);
                 printf("revoking role: %s\r\n", role_str);
@@ -780,9 +778,7 @@ AranyaError cleanup_roles(Team *t) {
         printf("cmds_len: %zu\r\n", cmds_len);
         EXPECT("error querying role permissions", err);
         for (size_t j = 0; j < cmds_len; j++) {
-            bool eq = false;
-            aranya_cmp_role_ids(&owner_role_id, &role_id, &eq);
-            if (!eq) {
+            if (memcmp(&owner_role_id, &role_id, sizeof(AranyaRoleId))) {
                 err = aranya_revoke_role_cmd(&t->clients.owner.client, &t->id,
                                              &role_id, &cmds[j]);
                 EXPECT("error revoking role cmd", err);
