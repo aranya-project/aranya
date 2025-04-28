@@ -904,10 +904,13 @@ command DeleteRole {
         let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
-            // Revoke role from all devices.
+            // Cascade deleting the role assignments.
             delete AssignedRole[role_id: role.role.role_id, device_id: ?]
 
             // TODO: revoke command permissions.
+            // There isn't currently a way to lookup the fact to delete from the role ID
+            // because the role ID is not part of the key:
+            // `fact CmdRequiresRole[cmd string]=>{role_id id}`
             // Not strictly required because a role cannot be used if it's been deleted and has no devices assigned to it.
             // Cleans up unused data from the factdb.
 
