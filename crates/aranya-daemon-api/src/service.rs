@@ -10,16 +10,14 @@ use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
 use std::path::PathBuf;
 
 use aranya_crypto::{
-    afc::{BidiChannelId as AfcBidiChannelId, UniChannelId as AfcUniChannelId},
     aqc::{self, BidiAuthorSecretId, UniAuthorSecretId},
     custom_id,
     default::DefaultCipherSuite,
     EncryptionKeyId, Id,
 };
-use aranya_fast_channels::{Label as AfcLabel, NodeId};
+use aranya_fast_channels::NodeId;
 use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
-use spideroak_base58::ToBase58;
 use tracing::error;
 
 /// Cipher Suite type alias for the cryptographic operations used in the daemon API.
@@ -103,7 +101,7 @@ custom_id! {
 /// This structure contains the public keys needed for cryptographic operations
 /// when communicating with a device, including identity verification, signature
 /// verification, message encryption, and data integrity.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KeyBundle {
     /// The identity public key used to verify the device's identity
     pub identity: Vec<u8>,
@@ -135,6 +133,12 @@ pub enum Role {
     Member,
 }
 
+/// A configuration for creating or adding a team to a daemon.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TeamConfig {
+    // TODO(nikki): any fields added to this should be public
+}
+
 /// A device's network identifier.
 ///
 /// This identifier is used for networking purposes to uniquely identify
@@ -153,57 +157,6 @@ impl fmt::Display for NetIdentifier {
         self.0.fmt(f)
     }
 }
-
-/// Uniquely identifies an AFC channel.
-///
-/// It is a [`AfcBidiChannelId`] or [`AfcUniChannelId`] truncated to
-/// 128 bits. This identifier is used to reference specific AFC channels
-/// when performing operations such as sending messages or managing channel state.
-#[repr(transparent)]
-#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct AfcId([u8; 16]);
-
-impl fmt::Display for AfcId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.to_base58())
-    }
-}
-
-// Helper function to truncate a larger array to a smaller one.
-//
-// This function is used internally to convert between different ID types
-// when creating an [`AfcId`] from other ID types.
-fn truncate<const BIG: usize, const SMALL: usize>(arr: &[u8; BIG]) -> &[u8; SMALL] {
-    const { assert!(BIG >= SMALL) };
-    arr[..SMALL].try_into().expect("array must fit")
-}
-
-/// Convert from [`AfcBidiChannelId`] to [`AfcId`]
-impl From<AfcBidiChannelId> for AfcId {
-    fn from(value: AfcBidiChannelId) -> Self {
-        Self(*truncate(value.as_array()))
-    }
-}
-
-/// Convert from [`AfcUniChannelId`] to [`AfcId`]
-impl From<AfcUniChannelId> for AfcId {
-    fn from(value: AfcUniChannelId) -> Self {
-        Self(*truncate(value.as_array()))
-    }
-}
-
-/// Convert from [`Id`] to [`AfcId`]
-impl From<Id> for AfcId {
-    fn from(value: Id) -> Self {
-        Self(*truncate(value.as_array()))
-    }
-}
-
-/// Serialized command which must be passed over AFC.
-///
-/// This type represents control messages sent through AFC.
-/// to manage channel state and operations.
-pub type AfcCtrl = Vec<Box<[u8]>>;
 
 // serialized command which must be passed over AQC.
 pub type AqcCtrl = Vec<Box<[u8]>>;
@@ -398,10 +351,11 @@ pub trait DaemonApi {
     ///
     /// # Parameters
     /// - `team` - The ID of the team to add.
+    /// - `cfg` - The configuration of the team to add.
     ///
     /// # Returns
     /// - `Result<()>` - Success or an error if the team cannot be added.
-    async fn add_team(team: TeamId) -> Result<()>;
+    async fn add_team(team: TeamId, cfg: TeamConfig) -> Result<()>;
 
     /// Removes a team from the local device store.
     ///
@@ -416,9 +370,12 @@ pub trait DaemonApi {
     ///
     /// Initializes a new team and assigns the current device as the owner.
     ///
+    /// # Parameters
+    /// - `cfg` - The configuration of the team to create.
+    ///
     /// # Returns
     /// - `Result<TeamId>` - The ID of the newly created team on success, or an error if the team cannot be created.
-    async fn create_team() -> Result<TeamId>;
+    async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
 
     /// Closes the team so that it cannot be used anymore.
     ///
@@ -476,45 +433,6 @@ pub trait DaemonApi {
     /// # Returns
     /// - `Result<()>` - Success or an error if the role cannot be revoked.
     async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
-
-    /// Create an AFC label.
-    async fn create_afc_label(team: TeamId, label: AfcLabel) -> Result<()>;
-    /// Delete an AFC label.
-    async fn delete_afc_label(team: TeamId, label: AfcLabel) -> Result<()>;
-    /// Assign an AFC label to a device.
-    async fn assign_afc_label(team: TeamId, device: DeviceId, label: AfcLabel) -> Result<()>;
-    /// Revoke an AFC label from a device.
-    async fn revoke_afc_label(team: TeamId, device: DeviceId, label: AfcLabel) -> Result<()>;
-
-    /// Assign an AFC network identifier to a device.
-    ///
-    /// # Parameters
-    /// - `team` - The ID of the team.
-    /// - `device` - The ID of the device to assign the identifier to.
-    /// - `name` - The network identifier to assign.
-    ///
-    /// # Returns
-    /// - `Result<()>` - Success or an error if the identifier cannot be assigned.
-    async fn assign_afc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
-
-    /// Remove an AFC network identifier from a device.
-    ///
-    /// # Parameters
-    /// - `team` - The ID of the team.
-    /// - `device` - The ID of the device to remove the identifier from.
-    /// - `name` - The network identifier to remove.
-    ///
-    /// # Returns
-    /// - `Result<()>` - Success or an error if the identifier cannot be removed.
-    async fn remove_afc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
 
     /// Assign a QUIC channels network identifier to a device.
     ///
@@ -604,54 +522,6 @@ pub trait DaemonApi {
     /// - `Result<()>` - Success or an error if the label cannot be revoked.
     async fn revoke_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
 
-    /// Creates an AFC channel.
-    ///
-    /// Establishes a bidirectional communication channel with a peer.
-    ///
-    /// # Parameters
-    /// - `team` - The ID of the team.
-    /// - `peer` - The network identifier of the peer to create the channel with.
-    /// - `node_id` - The node ID associated with the peer for this channel.
-    /// - `label` - The label to associate with this channel.
-    ///
-    /// # Returns
-    /// - `Result<(AfcId, AfcCtrl)>` - The channel ID and control message on success, or an error if the channel cannot be created.
-    async fn create_afc_bidi_channel(
-        team: TeamId,
-        peer: NetIdentifier,
-        node_id: NodeId,
-        label: AfcLabel,
-    ) -> Result<(AfcId, AfcCtrl)>;
-
-    /// Deletes an AFC channel.
-    ///
-    /// Tears down an existing communication channel.
-    ///
-    /// # Parameters
-    /// - `chan` - The ID of the channel to delete.
-    ///
-    /// # Returns
-    /// - `Result<AfcCtrl>` - The control message to send on success, or an error if the channel cannot be deleted.
-    async fn delete_afc_channel(chan: AfcId) -> Result<AfcCtrl>;
-
-    /// Receives an AFC control message.
-    ///
-    /// Processes an incoming control message related to an AFC channel.
-    ///
-    /// # Parameters
-    /// - `team` - The ID of the team.
-    /// - `node_id` - The node ID associated with the peer that authored message.
-    /// - `ctrl` - The control message to process.
-    ///
-    /// # Returns
-    /// - `Result<(AfcId, NetIdentifier, Label)>` - The channel ID, peer identifier, and label on success,
-    ///   or an error if the message cannot be processed.
-    async fn receive_afc_ctrl(
-        team: TeamId,
-        node_id: NodeId,
-        ctrl: AfcCtrl,
-    ) -> Result<(AfcId, NetIdentifier, AfcLabel)>;
-
     /// Create a bidirectional QUIC channel.
     async fn create_aqc_bidi_channel(
         team: TeamId,
@@ -685,16 +555,6 @@ pub trait DaemonApi {
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device label assignments.
     async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
-    /// Query device AFC label assignments.
-    async fn query_device_afc_label_assignments(
-        team: TeamId,
-        device: DeviceId,
-    ) -> Result<Vec<AfcLabel>>;
-    /// Query AFC network ID.
-    async fn query_afc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-    ) -> Result<Option<NetIdentifier>>;
     /// Query AQC network ID.
     async fn query_aqc_net_identifier(
         team: TeamId,
@@ -704,6 +564,4 @@ pub trait DaemonApi {
     async fn query_labels(team: TeamId) -> Result<Vec<Label>>;
     /// Query whether a label exists.
     async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
-    /// Query whether an AFC label exists.
-    async fn query_afc_label_exists(team: TeamId, label: AfcLabel) -> Result<bool>;
 }

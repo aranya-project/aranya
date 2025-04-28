@@ -53,15 +53,16 @@ pub enum Effect {
     AqcUniChannelReceived(AqcUniChannelReceived),
     LabelCreated(LabelCreated),
     LabelDeleted(LabelDeleted),
-    QueryLabelExistsResult(QueryLabelExistsResult),
-    QueriedLabel(QueriedLabel),
     LabelAssigned(LabelAssigned),
     LabelRevoked(LabelRevoked),
+    QueryLabelExistsResult(QueryLabelExistsResult),
+    QueriedLabel(QueriedLabel),
     QueriedLabelAssignment(QueriedLabelAssignment),
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
     QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
+    QueryAqcNetworkNamesOutput(QueryAqcNetworkNamesOutput),
 }
 /// TeamCreated policy effect.
 #[effect]
@@ -194,20 +195,6 @@ pub struct LabelDeleted {
     pub label_id: Id,
     pub author_id: Id,
 }
-/// QueryLabelExistsResult policy effect.
-#[effect]
-pub struct QueryLabelExistsResult {
-    pub label_id: Id,
-    pub label_name: String,
-    pub label_author_id: Id,
-}
-/// QueriedLabel policy effect.
-#[effect]
-pub struct QueriedLabel {
-    pub label_id: Id,
-    pub label_name: String,
-    pub label_author_id: Id,
-}
 /// LabelAssigned policy effect.
 #[effect]
 pub struct LabelAssigned {
@@ -223,6 +210,20 @@ pub struct LabelRevoked {
     pub label_name: String,
     pub label_author_id: Id,
     pub author_id: Id,
+}
+/// QueryLabelExistsResult policy effect.
+#[effect]
+pub struct QueryLabelExistsResult {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+}
+/// QueriedLabel policy effect.
+#[effect]
+pub struct QueriedLabel {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
 }
 /// QueriedLabelAssignment policy effect.
 #[effect]
@@ -251,6 +252,12 @@ pub struct QueryDeviceKeyBundleResult {
 #[effect]
 pub struct QueryAqcNetIdentifierResult {
     pub net_identifier: String,
+}
+/// QueryAqcNetworkNamesOutput policy effect.
+#[effect]
+pub struct QueryAqcNetworkNamesOutput {
+    pub net_identifier: String,
+    pub device_id: Id,
 }
 /// Implements all supported policy actions.
 #[actions]
@@ -284,8 +291,6 @@ pub trait ActorExt {
     ) -> Result<(), ClientError>;
     fn create_label(&mut self, name: String) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: Id) -> Result<(), ClientError>;
-    fn query_label_exists(&mut self, label_id: Id) -> Result<(), ClientError>;
-    fn query_labels(&mut self) -> Result<(), ClientError>;
     fn assign_label(
         &mut self,
         device_id: Id,
@@ -293,9 +298,12 @@ pub trait ActorExt {
         op: ChanOp,
     ) -> Result<(), ClientError>;
     fn revoke_label(&mut self, device_id: Id, label_id: Id) -> Result<(), ClientError>;
+    fn query_label_exists(&mut self, label_id: Id) -> Result<(), ClientError>;
+    fn query_labels(&mut self) -> Result<(), ClientError>;
     fn query_label_assignments(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
     fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
 }

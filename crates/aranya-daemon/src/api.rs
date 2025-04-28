@@ -4,6 +4,7 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use std::{
+    collections::BTreeMap,
     future::{self, Future},
     net::SocketAddr,
     path::PathBuf,
@@ -13,8 +14,9 @@ use std::{
 use anyhow::{anyhow, Context, Result};
 use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_daemon_api::{self as api, DaemonApi};
-use aranya_fast_channels::{Label, NodeId};
+use aranya_fast_channels::NodeId;
 use aranya_keygen::PublicKeys;
+use aranya_runtime::{GraphId, StorageProvider};
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::BugExt;
@@ -34,18 +36,6 @@ use crate::{
     Client, EF,
 };
 
-#[cfg(feature = "afc")]
-mod afc_imports {
-    pub(super) use aranya_afc_util::Handler;
-    pub(super) use aranya_crypto::keystore::fs_keystore::Store;
-    pub(super) use aranya_fast_channels::shm::WriteState;
-
-    pub(super) use crate::CE;
-}
-#[cfg(feature = "afc")]
-#[allow(clippy::wildcard_imports)]
-use afc_imports::*;
-
 async fn spawn(fut: impl Future<Output = ()> + Send + 'static) {
     tokio::spawn(fut);
 }
@@ -59,6 +49,8 @@ macro_rules! find_effect {
     }
 }
 
+type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
+
 /// Daemon API Server.
 ///
 /// Hosts a `tarpc` server listening on a UDS socket path.
@@ -66,63 +58,47 @@ macro_rules! find_effect {
 pub struct DaemonApiServer {
     daemon_sock: PathBuf,
     /// Channel for receiving effects from the syncer.
-    recv_effects: mpsc::Receiver<Vec<EF>>,
+    recv_effects: EffectReceiver,
     handler: DaemonApiHandler,
 }
 
 impl DaemonApiServer {
     /// Create new RPC server.
-    #[allow(clippy::too_many_arguments)]
     #[instrument(skip_all)]
-    #[cfg(feature = "afc")]
-    pub fn new(
+    pub async fn new(
         client: Arc<Client>,
         local_addr: SocketAddr,
-        afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
-        eng: CE,
         keystore_info: api::KeyStoreInfo,
-        store: Store,
         daemon_sock: PathBuf,
         pk: Arc<PublicKeys<api::CS>>,
         peers: SyncPeers,
-        recv_effects: mpsc::Receiver<Vec<EF>>,
+        recv_effects: EffectReceiver,
     ) -> Result<Self> {
         info!("uds path: {:?}", daemon_sock);
-        let device_id = pk.ident_pk.id()?;
-        Ok(Self {
-            daemon_sock,
-            recv_effects,
-            handler: DaemonApiHandler {
-                client,
-                local_addr,
-                afc,
-                eng,
-                pk,
-                peers,
-                keystore_info,
-                afc_peers: Arc::default(),
-                afc_handler: Arc::new(Mutex::new(Handler::new(
-                    device_id,
-                    store.try_clone().context("unable to clone keystore")?,
-                ))),
-                aqc_peers: Arc::default(),
-            },
-        })
-    }
 
-    /// Create new RPC server.
-    #[instrument(skip_all)]
-    #[cfg(not(feature = "afc"))]
-    pub fn new(
-        client: Arc<Client>,
-        local_addr: SocketAddr,
-        keystore_info: api::KeyStoreInfo,
-        daemon_sock: PathBuf,
-        pk: Arc<PublicKeys<api::CS>>,
-        peers: SyncPeers,
-        recv_effects: mpsc::Receiver<Vec<EF>>,
-    ) -> Result<Self> {
-        info!("uds path: {:?}", daemon_sock);
+        let graph_ids = {
+            client
+                .aranya
+                .lock()
+                .await
+                .provider()
+                .list_graph_ids()?
+                .flatten()
+                .collect::<Vec<_>>()
+        };
+
+        let mut aqc_peers = BTreeMap::new();
+        for graph_id in &graph_ids {
+            let mut graph_peers = BiBTreeMap::new();
+            graph_peers.extend(
+                client
+                    .actions(graph_id)
+                    .query_aqc_network_names_off_graph()
+                    .await?,
+            );
+            aqc_peers.insert(*graph_id, graph_peers);
+        }
+
         Ok(Self {
             daemon_sock,
             recv_effects,
@@ -132,7 +108,7 @@ impl DaemonApiServer {
                 pk,
                 peers,
                 keystore_info,
-                aqc_peers: Arc::default(),
+                aqc_peers: Arc::new(Mutex::new(aqc_peers)),
             },
         })
     }
@@ -171,9 +147,9 @@ impl DaemonApiServer {
                 .for_each(|_| async {}),
             async {
                 // receive effects from syncer.
-                while let Some(effects) = self.recv_effects.recv().await {
+                while let Some((graph, effects)) = self.recv_effects.recv().await {
                     // handle effects.
-                    if let Err(e) = self.handler.handle_effects(&effects, None).await {
+                    if let Err(e) = self.handler.handle_effects(graph, &effects, None).await {
                         error!(?e, "error handling effects");
                     }
                 }
@@ -182,6 +158,9 @@ impl DaemonApiServer {
         Ok(())
     }
 }
+
+/// A mapping of `Net ID <=> Device ID`, separated by `Graph ID`.
+type PeerMap = Arc<Mutex<BTreeMap<GraphId, BiBTreeMap<api::NetIdentifier, DeviceId>>>>;
 
 #[derive(Clone)]
 struct DaemonApiHandler {
@@ -195,24 +174,8 @@ struct DaemonApiHandler {
     peers: SyncPeers,
     /// Key store paths.
     keystore_info: api::KeyStoreInfo,
-    /// AFC shm write.
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    afc: Arc<Mutex<WriteState<api::CS, Rng>>>,
-    /// AFC peers.
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    afc_peers: Arc<Mutex<BiBTreeMap<api::NetIdentifier, DeviceId>>>,
-    /// Handles AFC effects.
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    afc_handler: Arc<Mutex<Handler<Store>>>,
     /// AQC peers.
-    aqc_peers: Arc<Mutex<BiBTreeMap<api::NetIdentifier, DeviceId>>>,
-    /// An implementation of [`Engine`][crypto::Engine].
-    #[cfg(feature = "afc")]
-    #[allow(dead_code)]
-    eng: CE,
+    aqc_peers: PeerMap,
 }
 
 impl DaemonApiHandler {
@@ -223,7 +186,12 @@ impl DaemonApiHandler {
     /// Handles effects resulting from invoking an Aranya action.
     #[instrument(skip_all)]
     #[allow(unused_variables)]
-    async fn handle_effects(&self, effects: &[Effect], node_id: Option<NodeId>) -> Result<()> {
+    async fn handle_effects(
+        &self,
+        graph: GraphId,
+        effects: &[Effect],
+        node_id: Option<NodeId>,
+    ) -> Result<()> {
         for effect in effects {
             debug!(?effect, "handling effect");
             match effect {
@@ -237,39 +205,23 @@ impl DaemonApiHandler {
                 Effect::OwnerRevoked(_owner_revoked) => {}
                 Effect::AdminRevoked(_admin_revoked) => {}
                 Effect::OperatorRevoked(_operator_revoked) => {}
-                #[cfg(any())]
-                Effect::AfcNetworkNameSet(e) => {
-                    self.afc_peers.lock().await.insert(
-                        api::NetIdentifier(e.net_identifier.clone()),
-                        e.device_id.into(),
-                    );
-                }
                 Effect::LabelCreated(_) => {}
                 Effect::LabelDeleted(_) => {}
                 Effect::LabelAssigned(_) => {}
                 Effect::LabelRevoked(_) => {}
                 Effect::AqcNetworkNameSet(e) => {
-                    self.aqc_peers.lock().await.insert(
-                        api::NetIdentifier(e.net_identifier.clone()),
-                        e.device_id.into(),
-                    );
+                    self.aqc_peers
+                        .lock()
+                        .await
+                        .entry(graph)
+                        .or_default()
+                        .insert(
+                            api::NetIdentifier(e.net_identifier.clone()),
+                            e.device_id.into(),
+                        );
                 }
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::QueriedLabel(_) => {}
-                #[cfg(any())]
-                Effect::AfcBidiChannelCreated(v) => {
-                    debug!("received AfcBidiChannelCreated effect");
-                    if let Some(node_id) = node_id {
-                        self.afc_bidi_channel_created(v, node_id).await?
-                    }
-                }
-                #[cfg(any())]
-                Effect::AfcBidiChannelReceived(v) => {
-                    debug!("received AfcBidiChannelReceived effect");
-                    if let Some(node_id) = node_id {
-                        self.afc_bidi_channel_received(v, node_id).await?
-                    }
-                }
                 Effect::AqcBidiChannelCreated(_) => {}
                 Effect::AqcBidiChannelReceived(_) => {}
                 Effect::AqcUniChannelCreated(_) => {}
@@ -280,78 +232,9 @@ impl DaemonApiHandler {
                 Effect::QueryAqcNetIdentifierResult(_) => {}
                 Effect::QueriedLabelAssignment(_) => {}
                 Effect::QueryLabelExistsResult(_) => {}
+                Effect::QueryAqcNetworkNamesOutput(_) => {}
             }
         }
-        Ok(())
-    }
-
-    /// Reacts to a bidirectional AFC channel being created.
-    #[instrument(skip(self), fields(effect = ?v))]
-    #[cfg(any())]
-    async fn afc_bidi_channel_created(
-        &self,
-        v: &AfcBidiChannelCreatedEffect,
-        node_id: NodeId,
-    ) -> Result<()> {
-        debug!("received BidiChannelCreated effect");
-        // NB: this shouldn't happen because the policy should
-        // ensure that label fits inside a `u32`.
-        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
-        // TODO: don't clone the eng.
-        let AfcBidiKeys { seal, open } = self.afc_handler.lock().await.bidi_channel_created(
-            &mut self.eng.clone(),
-            &AfcBidiChannelCreated {
-                parent_cmd_id: v.parent_cmd_id,
-                author_id: v.author_id.into(),
-                author_enc_key_id: v.author_enc_key_id.into(),
-                peer_id: v.peer_id.into(),
-                peer_enc_pk: &v.peer_enc_pk,
-                label,
-                key_id: v.channel_key_id.into(),
-            },
-        )?;
-        let label = Label::new(v.label.try_into().expect("expected label conversion"));
-        let channel_id = ChannelId::new(node_id, label);
-        debug!(%channel_id, "created AFC bidi channel `ChannelId`");
-        self.afc
-            .lock()
-            .await
-            .add(channel_id, Directed::Bidirectional { seal, open })
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
-        Ok(())
-    }
-
-    /// Reacts to a bidirectional AFC channel being created.
-    #[instrument(skip_all)]
-    #[cfg(any())]
-    async fn afc_bidi_channel_received(
-        &self,
-        v: &AfcBidiChannelReceivedEffect,
-        node_id: NodeId,
-    ) -> Result<()> {
-        // NB: this shouldn't happen because the policy should
-        // ensure that label fits inside a `u32`.
-        let label = Label::new(u32::try_from(v.label).assume("`label` is out of range")?);
-        let AfcBidiKeys { seal, open } = self.afc_handler.lock().await.bidi_channel_received(
-            &mut self.eng.clone(),
-            &AfcBidiChannelReceived {
-                parent_cmd_id: v.parent_cmd_id,
-                author_id: v.author_id.into(),
-                author_enc_pk: &v.author_enc_pk,
-                peer_id: v.peer_id.into(),
-                peer_enc_key_id: v.peer_enc_key_id.into(),
-                label,
-                encap: &v.encap,
-            },
-        )?;
-        let label = Label::new(v.label.try_into().expect("expected label conversion"));
-        let channel_id = ChannelId::new(node_id, label);
-        debug!(?channel_id, "received AFC bidi channel `ChannelId`");
-        self.afc
-            .lock()
-            .await
-            .add(channel_id, Directed::Bidirectional { seal, open })
-            .map_err(|err| anyhow!("unable to add AFC channel: {err}"))?;
         Ok(())
     }
 }
@@ -429,7 +312,12 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn add_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+    async fn add_team(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        cfg: api::TeamConfig,
+    ) -> api::Result<()> {
         todo!()
     }
 
@@ -439,7 +327,11 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn create_team(self, _: context::Context) -> api::Result<api::TeamId> {
+    async fn create_team(
+        self,
+        _: context::Context,
+        cfg: api::TeamConfig,
+    ) -> api::Result<api::TeamId> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
@@ -520,42 +412,6 @@ impl DaemonApi for DaemonApiHandler {
         Ok(())
     }
 
-    #[cfg(any())]
-    #[instrument(skip(self))]
-    async fn assign_afc_net_identifier(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        name: api::NetIdentifier,
-    ) -> api::Result<()> {
-        let effects = self
-            .client
-            .actions(&team.into_id().into())
-            .set_afc_network_name(device.into_id().into(), name.0)
-            .await
-            .context("unable to assign afc network identifier")?;
-        self.handle_effects(&effects, None).await?;
-        Ok(())
-    }
-
-    #[cfg(any())]
-    #[instrument(skip(self))]
-    async fn remove_afc_net_identifier(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        name: api::NetIdentifier,
-    ) -> api::Result<()> {
-        self.client
-            .actions(&team.into_id().into())
-            .unset_afc_network_name(device.into_id().into())
-            .await
-            .context("unable to remove afc network identifier")?;
-        Ok(())
-    }
-
     #[instrument(skip(self))]
     async fn assign_aqc_net_identifier(
         self,
@@ -570,7 +426,8 @@ impl DaemonApi for DaemonApiHandler {
             .set_aqc_network_name(device.into_id().into(), name.0)
             .await
             .context("unable to assign aqc network identifier")?;
-        self.handle_effects(&effects, None).await?;
+        self.handle_effects(GraphId::from(team.into_id()), &effects, None)
+            .await?;
         Ok(())
     }
 
@@ -590,229 +447,6 @@ impl DaemonApi for DaemonApiHandler {
         Ok(())
     }
 
-    #[cfg(any())]
-    #[instrument(skip(self))]
-    async fn create_afc_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        label: Label,
-    ) -> api::Result<()> {
-        self.client
-            .actions(&team.into_id().into())
-            .define_afc_label(label)
-            .await
-            .context("unable to create label")?;
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
-    async fn create_afc_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        label: Label,
-    ) -> api::Result<()> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
-    }
-
-    #[cfg(any())]
-    #[instrument(skip(self))]
-    async fn delete_afc_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        label: Label,
-    ) -> api::Result<()> {
-        self.client
-            .actions(&team.into_id().into())
-            .undefine_afc_label(label)
-            .await
-            .context("unable to delete label")?;
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
-    async fn delete_afc_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        label: Label,
-    ) -> api::Result<()> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
-    }
-
-    #[cfg(any())]
-    #[instrument(skip(self))]
-    async fn assign_afc_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        label: Label,
-    ) -> api::Result<()> {
-        // TODO: support other channel permissions.
-        self.client
-            .actions(&team.into_id().into())
-            .assign_afc_label(device.into_id().into(), label, ChanOp::SendRecv)
-            .await
-            .context("unable to assign label")?;
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
-    async fn assign_afc_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        label: Label,
-    ) -> api::Result<()> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
-    }
-
-    #[cfg(any())]
-    #[instrument(skip(self))]
-    async fn revoke_afc_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        label: Label,
-    ) -> api::Result<()> {
-        let id = self.pk.ident_pk.id()?;
-        self.client
-            .actions(&team.into_id().into())
-            .revoke_afc_label(id, label)
-            .await
-            .context("unable to revoke label")?;
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
-    async fn revoke_afc_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        label: Label,
-    ) -> api::Result<()> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
-    }
-
-    #[cfg(any())]
-    #[instrument(skip_all)]
-    async fn create_afc_bidi_channel(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        peer: api::NetIdentifier,
-        node_id: NodeId,
-        label: Label,
-    ) -> api::Result<(AfcId, AfcCtrl)> {
-        info!("create_afc_bidi_channel");
-
-        let peer_id = self
-            .afc_peers
-            .lock()
-            .await
-            .get_by_left(&peer)
-            .copied()
-            .context("unable to lookup peer")?;
-
-        let (ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .create_afc_bidi_channel_off_graph(peer_id, label)
-            .await?;
-        let id = self.pk.ident_pk.id()?;
-
-        let Some(Effect::AfcBidiChannelCreated(e)) =
-            find_effect!(&effects, Effect::AfcBidiChannelCreated(e) if e.author_id == id.into())
-        else {
-            return Err(anyhow::anyhow!("unable to find AfcBidiChannelCreated effect").into());
-        };
-        let afc_id: AfcId = e.channel_key_id.into();
-        debug!(?afc_id, "processed afc ID");
-
-        self.handle_effects(&effects, Some(node_id)).await?;
-        Ok((afc_id, ctrl))
-    }
-
-    #[instrument(skip_all)]
-    async fn create_afc_bidi_channel(
-        self,
-        _: context::Context,
-        _: api::TeamId,
-        _: api::NetIdentifier,
-        _: NodeId,
-        _: Label,
-    ) -> api::Result<(api::AfcId, api::AfcCtrl)> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
-    }
-
-    #[cfg(any())]
-    #[instrument(skip(self))]
-    async fn delete_afc_channel(self, _: context::Context, chan: AfcId) -> api::Result<AfcCtrl> {
-        // TODO: remove AFC channel from Aranya.
-        todo!();
-    }
-
-    #[instrument(skip(self))]
-    async fn delete_afc_channel(
-        self,
-        _: context::Context,
-        _: api::AfcId,
-    ) -> api::Result<api::AfcCtrl> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
-    }
-
-    #[cfg(any())]
-    #[instrument(skip_all)]
-    async fn receive_afc_ctrl(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        node_id: api::NodeId,
-        ctrl: api::AfcCtrl,
-    ) -> api::Result<(AfcId, NetIdentifier, Label)> {
-        let mut session = self.client.session_new(&team.into_id().into()).await?;
-        for cmd in ctrl {
-            let effects = self.client.session_receive(&mut session, &cmd).await?;
-            let id = self.pk.ident_pk.id()?;
-            self.handle_effects(&effects, Some(node_id)).await?;
-            let Some(Effect::AfcBidiChannelReceived(e)) =
-                find_effect!(&effects, Effect::AfcBidiChannelReceived(e) if e.peer_id == id.into())
-            else {
-                continue;
-            };
-            let encap =
-                BidiPeerEncap::<api::CS>::from_bytes(&e.encap).context("unable to get encap")?;
-            let afc_id: AfcId = encap.id().into();
-            debug!(?afc_id, "processed afc ID");
-            let label = Label::new(e.label.try_into().expect("expected label conversion"));
-            let net = self
-                .afc_peers
-                .lock()
-                .await
-                .get_by_right(&e.author_id.into())
-                .context("missing net identifier for channel author")?
-                .clone();
-            return Ok((afc_id, net, label));
-        }
-        Err(anyhow!("unable to find AfcBidiChannelReceived effect").into())
-    }
-
-    async fn receive_afc_ctrl(
-        self,
-        _: context::Context,
-        _: api::TeamId,
-        _: NodeId,
-        _: api::AfcCtrl,
-    ) -> api::Result<(api::AfcId, api::NetIdentifier, Label)> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
-    }
-
     #[instrument(skip_all)]
     async fn create_aqc_bidi_channel(
         self,
@@ -824,17 +458,20 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<(api::AqcCtrl, api::AqcChannelInfo)> {
         info!("create_aqc_bidi_channel");
 
+        let graph = GraphId::from(team.into_id());
+
         let peer_id = self
             .aqc_peers
             .lock()
             .await
-            .get_by_left(&peer)
+            .get(&graph)
+            .and_then(|map| map.get_by_left(&peer))
             .copied()
             .context("unable to lookup peer")?;
 
         let (ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(&graph)
             .create_aqc_bidi_channel_off_graph(peer_id, label.into_id().into())
             .await?;
         let id = self.pk.ident_pk.id()?;
@@ -845,7 +482,7 @@ impl DaemonApi for DaemonApiHandler {
             return Err(anyhow::anyhow!("unable to find AqcBidiChannelCreated effect").into());
         };
 
-        self.handle_effects(&effects, Some(node_id)).await?;
+        self.handle_effects(graph, &effects, Some(node_id)).await?;
 
         let aqc_info = api::AqcChannelInfo::BidiCreated(api::AqcBidiChannelCreatedInfo {
             parent_cmd_id: e.parent_cmd_id,
@@ -874,18 +511,21 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<(api::AqcCtrl, api::AqcChannelInfo)> {
         info!("create_aqc_uni_channel");
 
+        let graph = GraphId::from(team.into_id());
+
         let peer_id = self
             .aqc_peers
             .lock()
             .await
-            .get_by_left(&peer)
+            .get(&graph)
+            .and_then(|map| map.get_by_left(&peer))
             .copied()
             .context("unable to lookup peer")?;
 
         let id = self.pk.ident_pk.id()?;
         let (ctrl, effects) = self
             .client
-            .actions(&team.into_id().into())
+            .actions(&graph)
             .create_aqc_uni_channel_off_graph(id, peer_id, label.into_id().into())
             .await?;
 
@@ -895,7 +535,7 @@ impl DaemonApi for DaemonApiHandler {
             return Err(anyhow::anyhow!("unable to find AqcUniChannelCreated effect").into());
         };
 
-        self.handle_effects(&effects, Some(node_id)).await?;
+        self.handle_effects(graph, &effects, Some(node_id)).await?;
 
         let aqc_info = api::AqcChannelInfo::UniCreated(api::AqcUniChannelCreatedInfo {
             parent_cmd_id: e.parent_cmd_id,
@@ -941,11 +581,12 @@ impl DaemonApi for DaemonApiHandler {
         node_id: NodeId,
         ctrl: api::AqcCtrl,
     ) -> api::Result<(api::NetIdentifier, api::AqcChannelInfo)> {
-        let mut session = self.client.session_new(&team.into_id().into()).await?;
+        let graph = GraphId::from(team.into_id());
+        let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
             let effects = self.client.session_receive(&mut session, &cmd).await?;
             let id = self.pk.ident_pk.id()?;
-            self.handle_effects(&effects, Some(node_id)).await?;
+            self.handle_effects(graph, &effects, Some(node_id)).await?;
             if let Some(Effect::AqcBidiChannelReceived(e)) =
                 find_effect!(&effects, Effect::AqcBidiChannelReceived(e) if e.peer_id == id.into())
             {
@@ -966,7 +607,8 @@ impl DaemonApi for DaemonApiHandler {
                     .aqc_peers
                     .lock()
                     .await
-                    .get_by_right(&e.author_id.into())
+                    .get(&graph)
+                    .and_then(|map| map.get_by_right(&e.author_id.into()))
                     .context("missing net identifier for channel author")?
                     .clone();
                 return Ok((net, aqc_info));
@@ -991,33 +633,14 @@ impl DaemonApi for DaemonApiHandler {
                     .aqc_peers
                     .lock()
                     .await
-                    .get_by_right(&e.author_id.into())
+                    .get(&graph)
+                    .and_then(|map| map.get_by_right(&e.author_id.into()))
                     .context("missing net identifier for channel author")?
                     .clone();
                 return Ok((net, aqc_info));
             };
         }
         Err(anyhow!("unable to find AqcBidiChannelReceived effect").into())
-    }
-
-    async fn assign_afc_net_identifier(
-        self,
-        _: context::Context,
-        _: api::TeamId,
-        _: api::DeviceId,
-        _: api::NetIdentifier,
-    ) -> api::Result<()> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
-    }
-
-    async fn remove_afc_net_identifier(
-        self,
-        _: context::Context,
-        _: api::TeamId,
-        _: api::DeviceId,
-        _: api::NetIdentifier,
-    ) -> api::Result<()> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
     /// Create a label.
@@ -1200,82 +823,6 @@ impl DaemonApi for DaemonApiHandler {
         return Ok(labels);
     }
 
-    #[cfg(any())]
-    /// Query device AFC label assignments.
-    #[instrument(skip(self))]
-    async fn query_device_afc_label_assignments(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-    ) -> api::Result<Vec<Label>> {
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_device_afc_label_assignments_off_graph(device.into_id().into())
-            .await
-            .context("unable to query device label assignments")?;
-        let mut labels = Vec::new();
-        for e in effects {
-            if let Effect::QueryDeviceAfcLabelAssignmentsResult(e) = e {
-                let label = Label::new(
-                    u32::try_from(e.label)
-                        .assume("`label` is out of range")
-                        .context("label is out of range")?,
-                );
-                debug!("found label: {} assigned to device: {}", label, device);
-                labels.push(label);
-            }
-        }
-        return Ok(labels);
-    }
-
-    /// Query device AFC label assignments.
-    #[instrument(skip(self))]
-    async fn query_device_afc_label_assignments(
-        self,
-        _: context::Context,
-        _: api::TeamId,
-        _: api::DeviceId,
-    ) -> api::Result<Vec<Label>> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
-    }
-
-    /// Query AFC network ID.
-    #[cfg(any())]
-    #[instrument(skip(self))]
-    async fn query_afc_net_identifier(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-    ) -> api::Result<Option<api::NetIdentifier>> {
-        if let Ok((_ctrl, effects)) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_afc_net_identifier_off_graph(device.into_id().into())
-            .await
-        {
-            if let Some(Effect::QueryAfcNetIdentifierResult(e)) =
-                find_effect!(effects, Effect::QueryAfcNetIdentifierResult(_e))
-            {
-                return Ok(Some(api::NetIdentifier(e.net_identifier)));
-            }
-        }
-        Ok(None)
-    }
-
-    /// Query AFC network ID.
-    #[instrument(skip(self))]
-    async fn query_afc_net_identifier(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-    ) -> api::Result<Option<api::NetIdentifier>> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
-    }
-
     /// Query AQC network ID.
     #[instrument(skip(self))]
     async fn query_aqc_net_identifier(
@@ -1319,41 +866,6 @@ impl DaemonApi for DaemonApiHandler {
         } else {
             Err(anyhow!("unable to query whether label exists").into())
         }
-    }
-
-    /// Query AFC label exists.
-    #[cfg(any())]
-    #[instrument(skip(self))]
-    async fn query_afc_label_exists(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        label: Label,
-    ) -> api::Result<bool> {
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_afc_label_exists_off_graph(label)
-            .await
-            .context("unable to query label")?;
-        if let Some(Effect::QueryLabelExistsResult(e)) =
-            find_effect!(&effects, Effect::QueryLabelExistsResult(_e))
-        {
-            Ok(e.label_exists)
-        } else {
-            Err(anyhow!("unable to query whether afc label exists").into())
-        }
-    }
-
-    /// Query AFC label exists.
-    #[instrument(skip(self))]
-    async fn query_afc_label_exists(
-        self,
-        _: context::Context,
-        _: api::TeamId,
-        _: Label,
-    ) -> api::Result<bool> {
-        Err(anyhow!("Aranya Fast Channels is disabled for this daemon!").into())
     }
 
     /// Query list of labels.

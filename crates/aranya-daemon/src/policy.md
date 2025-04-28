@@ -44,12 +44,11 @@ higher role back down to `Member`.
   * Set/unset AQC address&name.
 
 * Member:
-  * Create/delete AFC channel.
   * Create/delete AQC channel.
 
 **Invariants**:
 
-- Owner is the "root device" (has all permissions except sending data on AFC channel).
+- Owner is the "root device" (has all permissions except sending data on AQC channels).
 - A device can only have one role at a time.
 - If the `Device` fact exists, then so will the `DeviceIdentKey`, `DeviceSignKey`, and `DeviceEncKey`
   facts. Similarly, the latter three facts are predicated on the device fact.
@@ -64,7 +63,6 @@ higher role back down to `Member`.
 ### Imports & Global Constants
 
 ```policy
-use afc
 use aqc
 use crypto
 use device
@@ -78,6 +76,7 @@ use perspective
 ```policy
 
 // Defines the roles a team member may have.
+// TODO: implement custom ID-based roles.
 enum Role {
     Owner,
     Admin,
@@ -87,11 +86,14 @@ enum Role {
 
 // Valid channel operations for a label assignment.
 enum ChanOp {
-    // The device can only receive data in channels with this label.
+    // The device can only receive data in channels with this
+    // label.
     RecvOnly,
-    // The device can only send data in channels with this label.
+    // The device can only send data in channels with this
+    // label.
     SendOnly,
-    // The device can send and receive data in channels with this label.
+    // The device can send and receive data in channels with this
+    // label.
     SendRecv,
 }
 
@@ -157,11 +159,17 @@ function find_existing_device(device_id id) optional struct Device {
     return device
 }
 
+// Returns whether the team exists.
+// Returns true if the team exists, returns false otherwise.
+// This should always be the first thing that is checked before executing a command on a team.
+// The only command that doesn't run this check first is `CreateTeam`.
+function team_exists() bool {
+    // Check to see if team is active.
+    return !exists TeamEnd[]=> {}
+}
+
 // Returns a valid Device after performing sanity checks per the stated invariants.
 function get_valid_device(device_id id) struct Device {
-    // Check to see if team is active.
-    check !exists TeamEnd[]=> {}
-
     // Get and return device info.
     let device = check_unwrap find_existing_device(device_id)
     return device
@@ -247,7 +255,7 @@ function is_valid_psk_length(size int) bool {
 
 // Returns the channel operation for a particular label.
 function get_allowed_op(device_id id, label_id id) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedLabel[device_id: device_id, label_id: label_id]
+    let assigned_label = check_unwrap query AssignedLabel[label_id: label_id, device_id: device_id]
     return assigned_label.op
 }
 
@@ -326,6 +334,7 @@ function can_create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) b
 ```
 
 ## CreateTeam
+
 The `CreateTeam` command is the initial command in the graph. It creates the Team and establishes
 the author as the sole Owner of the Team.
 
@@ -428,6 +437,7 @@ finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyId
 - Only an Owner will create this event.
 
 ## TerminateTeam
+
 The `TerminateTeam` terminates a Team. It can only be done by the Owner.
 
 ```policy
@@ -447,6 +457,8 @@ command TerminateTeam {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(envelope::author_id(envelope))
         // Only the Owner can close the Team
@@ -471,6 +483,8 @@ command TerminateTeam {
 
 
 ## AddMember
+
+Add a member to a team.
 
 ```policy
 // Adds a Member to the Team.
@@ -498,6 +512,8 @@ command AddMember {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
         // Derive the key IDs from the provided KeyBundle.
         let device_key_ids = derive_device_key_ids(this.device_keys)
@@ -527,6 +543,8 @@ command AddMember {
 
 ## RemoveMember
 
+Remove a member from a team.
+
 ```policy
 // Removes a Member from the Team.
 action remove_member(device_id id){
@@ -550,8 +568,10 @@ command RemoveMember{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
-        let device = check_unwrap find_existing_device(this.device_id)
+        let device = get_valid_device(this.device_id)
 
         // Only Operators and Owners can remove a Member
         check is_operator(author.role) || is_owner(author.role)
@@ -585,6 +605,8 @@ finish function remove_device(device_id id) {
 
 ## AssignRole
 
+Assign a role to a device.
+
 ```policy
 // Assigns the specified role to the device.
 action assign_role(device_id id, role enum Role){
@@ -614,6 +636,8 @@ action assign_role(device_id id, role enum Role){
 
 ### AssignOwner
 
+Assign the `Owner` role to a device.
+
 ```policy
 // A device was assigned with the Owner role.
 effect OwnerAssigned {
@@ -630,8 +654,10 @@ command AssignOwner{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
-        let device = check_unwrap find_existing_device(this.device_id)
+        let device = get_valid_device(this.device_id)
 
         // Only an Owner can assign the Owner role.
         check is_owner(author.role)
@@ -664,6 +690,8 @@ finish function assign_role(device struct Device, role enum Role) {
 
 ### AssignAdmin
 
+Assign the `Admin` role to a device.
+
 ```policy
 // A device was assigned with the Admin role.
 effect AdminAssigned {
@@ -680,8 +708,10 @@ command AssignAdmin{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
-        let device = check_unwrap find_existing_device(this.device_id)
+        let device = get_valid_device(this.device_id)
 
         // Only an Owner can assign the Admin role.
         check is_owner(author.role)
@@ -699,8 +729,9 @@ command AssignAdmin{
 }
 ```
 
-
 ### AssignOperator
+
+Assign the `Operator` role to a device.
 
 ```policy
 // A device was assigned with the Operator role.
@@ -718,8 +749,10 @@ command AssignOperator{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
-        let device = check_unwrap find_existing_device(this.device_id)
+        let device = get_valid_device(this.device_id)
 
         // Only Owners and Admins can assign the Operator role.
         check is_owner(author.role) || is_admin(author.role)
@@ -737,7 +770,6 @@ command AssignOperator{
 }
 ```
 
-
 **Invariants**:
 
 - devices cannot assign roles to themselves.
@@ -747,6 +779,8 @@ command AssignOperator{
 
 
 ## RevokeRole
+
+Revoke a role from a device. The set's the device role back to the default `Member` role.
 
 ```policy
 // Revokes the specified role from the device.
@@ -777,6 +811,8 @@ action revoke_role(device_id id, role enum Role){
 
 ### RevokeOwner
 
+Revoke the `Owner` role from a device.
+
 ```policy
 // The Owner role was revoked from A device.
 effect OwnerRevoked {
@@ -793,8 +829,10 @@ command RevokeOwner{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
-        let device = check_unwrap find_existing_device(this.device_id)
+        let device = get_valid_device(this.device_id)
 
         // Owner can only revoke the role from itself.
         check author.device_id == this.device_id
@@ -827,6 +865,8 @@ finish function revoke_role(device struct Device) {
 
 ### RevokeAdmin
 
+Revoke the `Admin` role from a device.
+
 ```policy
 // The Admin role was revoke from A device.
 effect AdminRevoked {
@@ -843,8 +883,10 @@ command RevokeAdmin{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
-        let device = check_unwrap find_existing_device(this.device_id)
+        let device = get_valid_device(this.device_id)
 
         // Only Owners can revoke the Admin role.
         check is_owner(author.role)
@@ -864,6 +906,8 @@ command RevokeAdmin{
 
 ### RevokeOperator
 
+Revoke the `Operator` role from a device.
+
 ```policy
 // The Operator role was revoke from A device.
 effect OperatorRevoked {
@@ -880,8 +924,10 @@ command RevokeOperator{
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
-        let device = check_unwrap find_existing_device(this.device_id)
+        let device = get_valid_device(this.device_id)
 
         // Only Owners and Admins can revoke the Operator role.
         check is_owner(author.role) || is_admin(author.role)
@@ -901,15 +947,16 @@ command RevokeOperator{
 
 **Invariants**:
 
-- Revoking a role from A device will assign them with the Member role.
-- If all Owners revoke their own role, it is possible for the team to be left without any Owners.
+- Revoking a role from a device will assign them with the `Member` role.
+- If all `Owners` revoke their own role, it is possible for the team to be left without any `Owners`.
 - As long as there is at least one Owner in the team, new devices can continue to be added and
   assigned to the different roles.
-- Only Owners can revoke the Admin role.
-- Only Owners and Admins can revoke the Operator role.
+- Only `Owners` can revoke the Admin role.
+- Only `Owners` and `Admins` can revoke the `Operator` role.
 
 ## SetAqcNetworkName
-Associates a network name and address to a Member for use in AQC.
+
+Associates a network name and address to a `Member` for use in AQC.
 
 ```policy
 action set_aqc_network_name (device_id id, net_identifier string) {
@@ -934,15 +981,16 @@ command SetAqcNetworkName {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
-        let device = check_unwrap find_existing_device(this.device_id)
+        let device = get_valid_device(this.device_id)
 
         // Only Owners and Operators can associate a network name.
         check is_owner(author.role) || is_operator(author.role)
         // Only Members can be associated a network name.
         check is_member(device.role)
 
-        // TODO: check that the network identifier is valid.
         let net_id_exists = query AqcMemberNetworkId[device_id: this.device_id]
 
         if net_id_exists is Some {
@@ -978,7 +1026,8 @@ command SetAqcNetworkName {
 - Members can only be assigned to one AQC network name.
 
 ## UnsetAqcNetworkName
-Dissociates an AQC network name and address from a Member.
+
+Dissociates an AQC network name and address from a `Member`.
 
 ```policy
 action unset_aqc_network_name (device_id id) {
@@ -1000,8 +1049,10 @@ command UnsetAqcNetworkName {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
-        let device = check_unwrap find_existing_device(this.device_id)
+        let device = get_valid_device(this.device_id)
 
         // Only Owners, Admins, and Operators can unset a Member's network name.
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
@@ -1028,6 +1079,7 @@ command UnsetAqcNetworkName {
 ### AqcCreateChannel
 
 #### AqcCreateBidiChannel
+
 Creates a bidirectional AQC channel for off-graph messaging.
 This is an ephemeral command, which means that it can only be
 emitted within an ephemeral session so that it is not added to
@@ -1142,19 +1194,22 @@ command AqcCreateBidiChannel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
-        let peer = check_unwrap find_existing_device(this.peer_id)
+        let peer = get_valid_device(this.peer_id)
 
         check is_valid_psk_length(this.psk_length_in_bytes)
 
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
 
-        // Check that both devices are allowed to participate in
-        // this bidirectional channel.
-        check can_create_aqc_bidi_channel(author.device_id, peer.device_id, label.label_id)
+        // Only Members can create AQC channels with other peer Members
+        check is_member(author.role)
+        check is_member(peer.role)
 
-        // NB: Check roles, other ACLs here.
+        // Check that both devices have been assigned to the label and have correct send/recv permissions.
+        check can_create_aqc_bidi_channel(author.device_id, peer.device_id, label.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
@@ -1337,6 +1392,8 @@ command AqcCreateUniChannel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
 
         // Ensure that the author is one of the channel
@@ -1356,11 +1413,12 @@ command AqcCreateUniChannel {
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
 
-        // Check that both devices are allowed to participate in
-        // this unidirectional channel.
-        check can_create_aqc_uni_channel(this.sender_id, this.receiver_id, label.label_id)
+        // Only Members can create AQC channels with other peer Members
+        check is_member(author.role)
+        check is_member(peer.role)
 
-        // NB: Check roles, other ACLs here.
+        // Check that both devices have been assigned to the label and have correct send/recv permissions.
+        check can_create_aqc_uni_channel(this.sender_id, this.receiver_id, label.label_id)
 
         let parent_cmd_id = envelope::parent_id(envelope)
         let current_device_id = device::current_device_id()
@@ -1419,6 +1477,10 @@ command AqcCreateUniChannel {
 
 #### Labels
 
+##### CreateLabel
+
+Establishes a whitelist of labels that can be assigned to Members.
+
 ```policy
 // Records a label.
 //
@@ -1442,12 +1504,15 @@ command CreateLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
 
         // A label's ID is the ID of the command that created it.
         let label_id = envelope::command_id(envelope)
 
-        // NB: Check roles, other ACLs here.
+        // Owners, Admins and Operators can create labels.
+        check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
 
         // Verify that the label does not already exist.
         //
@@ -1484,7 +1549,19 @@ action delete_label(label_id id) {
         label_id: label_id,
     }
 }
+```
 
+**Invariants**:
+
+- Only Members cannot define labels.
+- Owners, Admins and Operators are allowed to define labels.
+- Label IDs must be cryptographically secure 32 byte Aranya IDs.
+
+##### DeleteLabel
+
+Removes a label from the whitelist. This operation will result in the label revocation across all Members that were assigned to it.
+
+```policy
 command DeleteLabel {
     fields {
         // The unique ID of the label being deleted.
@@ -1495,9 +1572,12 @@ command DeleteLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
 
-        // NB: Check roles, other ACLs here.
+        // Only Owners and Admins can delete labels.
+        check is_owner(author.role) || is_admin(author.role)
 
         // Verify that the label exists.
         //
@@ -1508,7 +1588,7 @@ command DeleteLabel {
 
         finish {
             // Cascade deleting the label assignments.
-            delete AssignedLabel[device_id: ?, label_id: label.label_id]
+            delete AssignedLabel[label_id: label.label_id, device_id: ?]
 
             delete Label[label_id: label.label_id]
 
@@ -1534,90 +1614,20 @@ effect LabelDeleted {
     // The ID of the device that deleted the label.
     author_id id,
 }
+```
 
-// Emits `LabelExistsResult` for label if it exists.
-action query_label_exists(label_id id) {
-    publish QueryLabelExists {
-        label_id: label_id,
-    }
-}
+**Invariants**:
 
-command QueryLabelExists {
-    fields {
-        label_id id,
-    }
+- Only Owners and Admins are allowed to delete labels.
 
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
+##### Assign Label
 
-    policy {
+Assigns a label to a Member.
 
-        // Get label if it exists
-        let label = check_unwrap query Label[label_id: this.label_id]
-
-        finish {
-            emit QueryLabelExistsResult {
-                label_id: label.label_id,
-                label_name: label.name,
-                label_author_id: label.author_id,
-            }
-        }
-    }
-}
-
-effect QueryLabelExistsResult {
-    // The label's unique ID.
-    label_id id,
-    // The label name.
-    label_name string,
-    // The ID of the device that created the label.
-    label_author_id id,
-}
-
-// Emits `QueriedLabel` for all labels.
-action query_labels() {
-    map Label[label_id: ?] as f {
-        publish QueryLabel {
-            label_id: f.label_id,
-            label_name: f.name,
-            label_author_id: f.author_id,
-        }
-    }
-}
-
-command QueryLabel {
-    fields {
-        label_id id,
-        label_name string,
-        label_author_id id,
-    }
-
-    seal { return seal_command(serialize(this)) }
-    open { return deserialize(open_envelope(envelope)) }
-
-    policy {
-        finish {
-            emit QueriedLabel {
-                label_id: this.label_id,
-                label_name: this.label_name,
-                label_author_id: this.label_author_id,
-            }
-        }
-    }
-}
-
-effect QueriedLabel {
-    // The label's unique ID.
-    label_id id,
-    // The label name.
-    label_name string,
-    // The ID of the device that created the label.
-    label_author_id id,
-}
-
+```policy
 // Records that a device was granted permission to use a label
 // for certain channel operations.
-fact AssignedLabel[device_id id, label_id id]=>{op enum ChanOp}
+fact AssignedLabel[label_id id, device_id id]=>{op enum ChanOp}
 
 // Grants the device permission to use the label.
 //
@@ -1648,11 +1658,15 @@ command AssignLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
-        // NB: Check roles, other ACLs here.
+        // Only Owners and Operators can assign labels to Members.
+        check is_owner(author.role) || is_operator(author.role)
 
+        // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
 
         // Verify that the device has not already been granted
@@ -1661,10 +1675,10 @@ command AssignLabel {
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        check !exists AssignedLabel[device_id: target.device_id, label_id: label.label_id]
+        check !exists AssignedLabel[label_id: label.label_id, device_id: target.device_id]
 
         finish {
-            create AssignedLabel[device_id: target.device_id, label_id: label.label_id]=>{op: this.op}
+            create AssignedLabel[label_id: label.label_id, device_id: target.device_id]=>{op: this.op}
 
             emit LabelAssigned {
                 label_id: label.label_id,
@@ -1688,7 +1702,22 @@ effect LabelAssigned {
     // The ID of the device that assigned the label.
     author_id id,
 }
+```
 
+**Invariants**:
+
+- Label IDs must be cryptographically secure 32 byte Aranya IDs.
+- Only Owners and Operators are allowed to assign labels.
+- Only Members can be assigned to labels.
+- Only labels that are defined are allowed to be assigned.
+
+##### Revoke Label
+
+Revokes a label from a Member. Note that peers communicating with this Member over a secure
+channel under the revoked label should delete their channel once the label revocation command is
+received.
+
+```policy
 // Revokes permission to use a label from a device.
 //
 // - It is an error if the device does not exist.
@@ -1714,10 +1743,14 @@ command RevokeLabel {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
-        // NB: Check roles, other ACLs here.
+        // Only Owners, Admins, and Operators are allowed to revoke a label from a Member.
+        check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
+        check is_member(target.role)
 
         let label = check_unwrap query Label[label_id: this.label_id]
 
@@ -1727,10 +1760,10 @@ command RevokeLabel {
         // This will happen in the `finish` block if we try to
         // create an already true label, but checking first
         // results in a nicer error (I think?).
-        check exists AssignedLabel[device_id: target.device_id, label_id: label.label_id]
+        check exists AssignedLabel[label_id: label.label_id, device_id: target.device_id]
 
         finish {
-            delete AssignedLabel[device_id: target.device_id, label_id: label.label_id]
+            delete AssignedLabel[label_id: label.label_id, device_id: target.device_id]
 
             emit LabelRevoked {
                 label_id: label.label_id,
@@ -1754,17 +1787,134 @@ effect LabelRevoked {
     // The ID of the device that revoked the label.
     author_id id,
 }
+```
 
+**Invariants**:
+
+- Only Owners and Operators can revoke labels from Members.
+- Only a label that was assigned can be revoked.
+
+##### Label Queries
+
+###### Query Label Exists
+
+Queries whether a label exists.
+
+```policy
+// Emits `LabelExistsResult` for label if it exists.
+action query_label_exists(label_id id) {
+    publish QueryLabelExists {
+        label_id: label_id,
+    }
+}
+
+command QueryLabelExists {
+    fields {
+        label_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        // Get label if it exists
+        let label = check_unwrap query Label[label_id: this.label_id]
+
+        finish {
+            emit QueryLabelExistsResult {
+                label_id: label.label_id,
+                label_name: label.name,
+                label_author_id: label.author_id,
+            }
+        }
+    }
+}
+
+effect QueryLabelExistsResult {
+    // The label's unique ID.
+    label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
+}
+```
+
+**Invariants**:
+
+- For a label to exist, it must have been created with the `CreateLabel` command.
+- If a label has been deleted with the `DeleteLabel` command, this query will fail.
+
+###### Query Labels
+
+Queries for a list of all created labels.
+
+```policy
+// Emits `QueriedLabel` for all labels.
+action query_labels() {
+    map Label[label_id: ?] as f {
+        publish QueryLabel {
+            label_id: f.label_id,
+            label_name: f.name,
+            label_author_id: f.author_id,
+        }
+    }
+}
+
+command QueryLabel {
+    fields {
+        label_id id,
+        label_name string,
+        label_author_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        finish {
+            emit QueriedLabel {
+                label_id: this.label_id,
+                label_name: this.label_name,
+                label_author_id: this.label_author_id,
+            }
+        }
+    }
+}
+
+effect QueriedLabel {
+    // The label's unique ID.
+    label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
+}
+```
+
+###### Query Label Assignments
+
+Queries for a list labels assigned to a device.
+
+```policy
 // Emits `QueriedLabelAssignment` for all labels the device has
 // been granted permission to use.
 action query_label_assignments(device_id id) {
-    map AssignedLabel[device_id: device_id, label_id: ?] as f {
-        let label = check_unwrap query Label[label_id: f.label_id]
-        publish QueryLabelAssignment {
-            device_id: f.device_id,
-            label_id: f.label_id,
-            label_name: label.name,
-            label_author_id: label.author_id,
+    // TODO: make this query more efficient when policy supports it.
+    // The key order is optimized for `delete AssignedLabel`.
+    map AssignedLabel[label_id: ?, device_id: ?] as f {
+        if f.device_id == device_id {
+            let label = check_unwrap query Label[label_id: f.label_id]
+            publish QueryLabelAssignment {
+                device_id: f.device_id,
+                label_id: f.label_id,
+                label_name: label.name,
+                label_author_id: label.author_id,
+            }
         }
     }
 }
@@ -1781,6 +1931,8 @@ command QueryLabelAssignment {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         finish {
             emit QueriedLabelAssignment {
                 device_id: this.device_id,
@@ -1804,8 +1956,14 @@ effect QueriedLabelAssignment {
 }
 ```
 
+**Invariants**:
+
+- Returns a list of labels assigned to the device via the `AssignLabel` command.
+- A label that has been revoked from a device via the `RevokeLabel` command will not be returned.
+
 ### QueryDevicesOnTeam
-Queries devices on team.
+
+Queries for a list devices on the team.
 
 ```policy
 action query_devices_on_team() {
@@ -1827,6 +1985,8 @@ command QueryDevicesOnTeam {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         finish {
             emit QueryDevicesOnTeamResult {
                 device_id: this.device_id,
@@ -1836,7 +1996,14 @@ command QueryDevicesOnTeam {
 }
 ```
 
+**Invariants**:
+
+- The `Owner` device is automatically added to the team when the team is created.
+- The rest of the devices listed have been added via the `AddMember` command.
+- Devices in the list have not been removed from the team via a `RemoveMember` command.
+
 ### QueryDeviceRole
+
 Queries device role.
 
 ```policy
@@ -1859,6 +2026,8 @@ command QueryDeviceRole {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(this.device_id)
 
@@ -1871,7 +2040,14 @@ command QueryDeviceRole {
 }
 ```
 
+**Invariants**:
+
+- The owner is automatically assigned the role of `Owner` when it creates the team.
+- Other devices added to the team will have the role assigned via the `assign_role` action.
+- A device's default role is `Member`.
+
 ### QueryDeviceKeyBundle
+
 Queries device KeyBundle.
 
 ```policy
@@ -1908,6 +2084,8 @@ command QueryDeviceKeyBundle {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(this.device_id)
         let device_keys = get_device_keybundle(author.device_id)
@@ -1921,7 +2099,13 @@ command QueryDeviceKeyBundle {
 }
 ```
 
+**Invariants**:
+
+- The owner will have a key bundle associated with it after creating the team.
+- Each device that has been added to the team will have a key bundle associated with it.
+
 ### QueryAqcNetIdentifier
+
 Queries AQC network identifier.
 
 ```policy
@@ -1952,6 +2136,8 @@ command QueryAqcNetIdentifier {
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
+        check team_exists()
+
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(this.device_id)
         let net_identifier = get_aqc_net_identifier(author.device_id)
@@ -1964,3 +2150,50 @@ command QueryAqcNetIdentifier {
     }
 }
 ```
+
+**Invariants**:
+
+- For a net identifier to be returned, it must have been created with the `SetAqcNetworkName` command.
+- If `UnsetAqcNetworkName` has been invoked for the device, no network identifier will be returned.
+
+## QueryAqcNetworkNames
+
+Queries all associated AQC network names from the fact database.
+
+```policy
+action query_aqc_network_names() {
+    map AqcMemberNetworkId[device_id: ?] as f {
+        publish QueryAqcNetworkNamesCommand {
+            net_identifier: f.net_identifier,
+            device_id: f.device_id,
+        }
+    }
+}
+
+effect QueryAqcNetworkNamesOutput {
+    net_identifier string,
+    device_id id,
+}
+
+command QueryAqcNetworkNamesCommand {
+    fields {
+        net_identifier string,
+        device_id id,
+    }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+    policy {
+        finish {
+            emit QueryAqcNetworkNamesOutput {
+                net_identifier: this.net_identifier,
+                device_id: this.device_id,
+            }
+        }
+    }
+}
+```
+
+**Invariants**:
+
+- A device's net identifier will only be returned if it was created by `SetAqcNetworkName` and
+ wasn't yet removed by `UnsetAqcNetworkName`.
