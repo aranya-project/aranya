@@ -993,12 +993,10 @@ effect RoleAssigned {
 
 **Invariants**:
 
-TODO: fix these docs
-- devices cannot assign roles to themselves.
-- Only Owners can assign the Owner role.
-- Only Owners can assign the Admin role.
-- Only Owners and Admins can assign the Operator role.
-
+- Only the Owner device can assign roles to other devices.
+- The Owner must have higher priority than the target device.
+- A device may have many roles assigned to it.
+- The Owner cannot assign new roles to itself after team creation.
 
 ## RevokeRole
 
