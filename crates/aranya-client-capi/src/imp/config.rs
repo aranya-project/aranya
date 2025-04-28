@@ -1,80 +1,36 @@
 use std::ffi::c_char;
 
-use aranya_capi_core::{
-    safe::{TypeId, Typed},
-    InvalidArg,
-};
-use buggy::bug;
+use aranya_capi_core::safe::{TypeId, Typed};
+use aranya_client::ConfigError;
 
 use crate::api::defs::Duration;
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-/// Configuration values for syncing with a peer
-pub struct SyncPeerConfig {
-    interval: Duration,
-    sync_now: bool,
-}
-
-impl Typed for SyncPeerConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x2049e682);
-}
-
-impl From<SyncPeerConfig> for aranya_client::client::SyncPeerConfig {
-    fn from(value: SyncPeerConfig) -> Self {
-        Self::builder()
-            .interval(value.interval.into())
-            .sync_now(value.sync_now)
-            .build()
-            .expect("All values are set")
-    }
-}
-
-impl From<&SyncPeerConfig> for aranya_client::client::SyncPeerConfig {
-    fn from(value: &SyncPeerConfig) -> Self {
-        (*value).into()
-    }
-}
-
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
 /// Configuration info for Aranya
 pub struct ClientConfig {
     daemon_addr: *const c_char,
-    #[cfg(feature = "afc")]
-    afc: AfcConfig,
-    aqc: AqcConfig,
-}
-
-impl ClientConfig {
-    pub(crate) fn daemon_addr(&self) -> *const c_char {
-        self.daemon_addr
-    }
-
-    #[cfg(feature = "afc")]
-    pub(crate) fn afc(&self) -> &AfcConfig {
-        &self.afc
-    }
+    _aqc: AqcConfig,
 }
 
 impl Typed for ClientConfig {
     const TYPE_ID: TypeId = TypeId::new(0x227DFC9E);
 }
 
-#[repr(C)]
+impl ClientConfig {
+    pub(crate) fn daemon_addr(&self) -> *const c_char {
+        self.daemon_addr
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 56, align = 8)]
 /// Builder for a [`ClientConfig`]
 pub struct ClientConfigBuilder {
     daemon_addr: *const c_char,
-    #[cfg(feature = "afc")]
-    afc: Option<AfcConfig>,
     aqc: Option<AqcConfig>,
 }
 
 impl Typed for ClientConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
+    const TYPE_ID: TypeId = TypeId::new(0xAAAA611B);
 }
 
 impl ClientConfigBuilder {
@@ -88,34 +44,28 @@ impl ClientConfigBuilder {
         self.aqc = Some(cfg);
     }
 
-    #[cfg(feature = "afc")]
-    /// Set the config to be used for AFC
-    pub fn afc(&mut self, cfg: AfcConfig) {
-        self.afc = Some(cfg);
-    }
-
-    /// Attempts to construct a [`ClientConfig`], returning an [`Error::Bug`](super::Error::Bug) if
-    /// there are invalid parameters.
+    /// Attempts to construct a [`ClientConfig`], returning an
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
     pub fn build(self) -> Result<ClientConfig, super::Error> {
         if self.daemon_addr.is_null() {
-            bug!("Tried to create a ClientConfig without a valid address!");
+            let e = ConfigError::InvalidArg {
+                arg: "daemon_addr",
+                reason: "Tried to create a `ClientConfig` without setting the daemon address!",
+            };
+            return Err(e.into());
         }
 
-        #[cfg(feature = "afc")]
-        let Some(afc) = self.afc
-        else {
-            bug!("Tried to create a ClientConfig without a valid AfcConfig!");
-        };
-
         let Some(aqc) = self.aqc else {
-            bug!("Tried to create a ClientConfig without a valid AqcConfig!");
+            let e = ConfigError::InvalidArg {
+                arg: "aqc_config",
+                reason: "Tried to create a `ClientConfig` without setting a valid `AqcConfig`!",
+            };
+            return Err(e.into());
         };
 
         Ok(ClientConfig {
             daemon_addr: self.daemon_addr,
-            #[cfg(feature = "afc")]
-            afc,
-            aqc,
+            _aqc: aqc,
         })
     }
 }
@@ -125,22 +75,101 @@ impl Default for ClientConfigBuilder {
         Self {
             daemon_addr: std::ptr::null(),
             aqc: None,
-            #[cfg(feature = "afc")]
-            afc: None,
         }
     }
 }
 
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
+/// Configuration info for Aranya Fast Channels
+pub struct AqcConfig {
+    /// Address to bind AQC server to.
+    _addr: *const c_char,
+}
+
+impl Typed for AqcConfig {
+    const TYPE_ID: TypeId = TypeId::new(0x64CEB3F4);
+}
+
+#[derive(Copy, Clone, Debug)]
+/// Builder for an [`AqcConfig`]
+pub struct AqcConfigBuilder {
+    /// Address to bind AQC server to.
+    addr: *const c_char,
+}
+
+impl Typed for AqcConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x153AE387);
+}
+
+impl AqcConfigBuilder {
+    /// Set the Address to bind AQC server to
+    pub fn addr(&mut self, addr: *const c_char) {
+        self.addr = addr;
+    }
+
+    /// Attempts to construct an [`AqcConfig`], returning an
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
+    pub fn build(self) -> Result<AqcConfig, super::Error> {
+        if self.addr.is_null() {
+            let e = ConfigError::InvalidArg {
+                arg: "address",
+                reason: "Tried to create an `AqcConfig` without setting a valid address!",
+            };
+            return Err(e.into());
+        }
+
+        Ok(AqcConfig { _addr: self.addr })
+    }
+}
+
+impl Default for AqcConfigBuilder {
+    fn default() -> Self {
+        Self {
+            addr: std::ptr::null(),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+/// Configuration info for syncing with a peer
+pub struct SyncPeerConfig {
+    interval: Duration,
+    sync_now: bool,
+}
+
+impl Typed for SyncPeerConfig {
+    const TYPE_ID: TypeId = TypeId::new(0x44BE85E7);
+}
+
+impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
+    fn from(value: SyncPeerConfig) -> Self {
+        Self::builder()
+            .interval(value.interval.into())
+            .sync_now(value.sync_now)
+            .build()
+            .expect("All values are set")
+    }
+}
+
+impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
+    fn from(value: &SyncPeerConfig) -> Self {
+        (*value).into()
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 /// Builder for a [`SyncPeerConfig`]
 pub struct SyncPeerConfigBuilder {
     interval: Option<Duration>,
     sync_now: bool,
 }
 
+impl Typed for SyncPeerConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0xFE81AF7E);
+}
+
 impl SyncPeerConfigBuilder {
-    /// Set the interval at which syncing occurs
+    /// Sets the interval at which syncing occurs.
     pub fn interval(&mut self, duration: Duration) {
         self.interval = Some(duration);
     }
@@ -152,14 +181,15 @@ impl SyncPeerConfigBuilder {
         self.sync_now = sync_now;
     }
 
-    /// Build a [`SyncPeerConfig`]
+    /// Attempts to construct a [`SyncPeerConfig`], returning an
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
     pub fn build(&self) -> Result<SyncPeerConfig, super::Error> {
         let Some(interval) = self.interval else {
-            let e = Into::into(InvalidArg::new(
-                "interval",
-                "Tried to create a `SyncPeerConfig` without setting the interval!",
-            ));
-            return Err(e);
+            let e = ConfigError::InvalidArg {
+                arg: "interval",
+                reason: "Tried to create a `SyncPeerConfig` without setting the interval!",
+            };
+            return Err(e.into());
         };
 
         Ok(SyncPeerConfig {
@@ -167,10 +197,6 @@ impl SyncPeerConfigBuilder {
             sync_now: self.sync_now,
         })
     }
-}
-
-impl Typed for SyncPeerConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x2049e683);
 }
 
 impl Default for SyncPeerConfigBuilder {
@@ -182,105 +208,26 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
-#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-#[cfg(feature = "afc")]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
-/// Configuration info for Aranya Fast Channels
-pub struct AfcConfig {
-    /// Shared memory path.
-    pub shm_path: *const c_char,
-    /// Maximum number of channels to store in shared-memory.
-    pub max_channels: usize,
-    /// Address to bind AFC server to.
-    pub addr: *const c_char,
-}
+/// Configuration info when creating or adding a team in Aranya
+pub struct TeamConfig {}
 
-#[cfg(feature = "afc")]
-impl Typed for AfcConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
+impl Typed for TeamConfig {
+    const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
 }
 
 #[derive(Copy, Clone, Debug)]
-#[cfg(feature = "afc")]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
-/// Builder for an [`AfcConfig`]
-pub struct AfcConfigBuilder {
-    /// Shared memory path.
-    pub shm_path: *const c_char,
-    /// Maximum number of channels to store in shared-memory.
-    pub max_channels: usize,
-    /// Address to bind AFC server to.
-    pub addr: *const c_char,
+/// Builder for a [`TeamConfig`]
+pub struct TeamConfigBuilder {}
+
+impl Typed for TeamConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x112905E7);
 }
 
-#[cfg(feature = "afc")]
-impl AfcConfigBuilder {
-    /// Attempts to construct an [`AfcConfig`], returning an [`Error::Bug`](super::Error::Bug) if
-    /// there are invalid parameters.
-    pub fn build(self) -> Result<AfcConfig, super::Error> {
-        if self.shm_path.is_null() {
-            bug!("Tried to create an AfcConfig without a valid shm_path!");
-        }
-
-        if self.addr.is_null() {
-            bug!("Tried to create an AfcConfig without a valid address!");
-        }
-
-        Ok(AfcConfig {
-            shm_path: self.shm_path,
-            max_channels: self.max_channels,
-            addr: self.addr,
-        })
-    }
-}
-
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
-/// Configuration info for Aranya Fast Channels
-pub struct AqcConfig {
-    /// Address to bind AQC server to.
-    addr: *const c_char,
-}
-
-impl Typed for AqcConfig {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFC9F);
-}
-
-#[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
-/// Builder for an [`AqcConfig`]
-pub struct AqcConfigBuilder {
-    /// Address to bind AQC server to.
-    addr: *const c_char,
-}
-
-impl Typed for AqcConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x227DFCA0);
-}
-
-impl AqcConfigBuilder {
-    /// Set the Address to bind AQC server to
-    pub fn addr(&mut self, addr: *const c_char) {
-        self.addr = addr;
-    }
-
-    /// Attempts to construct an [`AqcConfig`], returning an [`Error::Bug`](super::Error::Bug) if
-    /// there are invalid parameters.
-    pub fn build(self) -> Result<AqcConfig, super::Error> {
-        if self.addr.is_null() {
-            bug!("Tried to create an AqcConfig without a valid address!");
-        }
-
-        Ok(AqcConfig { addr: self.addr })
-    }
-}
-
-impl Default for AqcConfigBuilder {
-    fn default() -> Self {
-        Self {
-            addr: std::ptr::null(),
-        }
+impl TeamConfigBuilder {
+    /// Attempts to construct a [`TeamConfig`], returning an
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
+    pub fn build(self) -> Result<TeamConfig, super::Error> {
+        Ok(TeamConfig {})
     }
 }

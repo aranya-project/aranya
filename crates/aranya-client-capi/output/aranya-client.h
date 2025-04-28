@@ -178,21 +178,17 @@ enum AranyaError
      */
     ARANYA_ERROR_DAEMON,
     /**
-     * AFC library error.
-     */
-    ARANYA_ERROR_AFC,
-    /**
      * AQC library error.
      */
     ARANYA_ERROR_AQC,
     /**
-     * Tokio runtime error.
+     * Failed trying to construct a new tokio runtime.
      */
     ARANYA_ERROR_RUNTIME,
     /**
-     * Invalid index error.
+     * Unable to create configuration info.
      */
-    ARANYA_ERROR_INVALID_INDEX,
+    ARANYA_ERROR_CONFIG,
     /**
      * Serialization error.
      */
@@ -325,6 +321,24 @@ typedef struct AranyaId {
 typedef struct AranyaDeviceId {
     struct AranyaId id;
 } AranyaDeviceId;
+
+typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[16];
+} AranyaTeamConfigBuilder;
+
+typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[24];
+} AranyaTeamConfig;
 
 /**
  * Team ID.
@@ -629,7 +643,7 @@ AranyaError aranya_aqc_config_builder_set_address_ext(struct AranyaAqcConfigBuil
                                                       struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Bug`
+ * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the aqc config builder
@@ -639,7 +653,7 @@ AranyaError aranya_aqc_config_builder_build(struct AranyaAqcConfigBuilder *cfg,
                                             struct AranyaAqcConfig *out);
 
 /**
- * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Bug`
+ * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the aqc config builder
@@ -709,7 +723,7 @@ AranyaError aranya_client_config_builder_set_daemon_addr_ext(struct AranyaClient
                                                              struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Bug`
+ * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the client config builder
@@ -719,7 +733,7 @@ AranyaError aranya_client_config_builder_build(struct AranyaClientConfigBuilder 
                                                struct AranyaClientConfig *out);
 
 /**
- * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Bug`
+ * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
  * @param cfg a pointer to the client config builder
@@ -822,49 +836,82 @@ AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`
+ * if there are invalid parameters.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_team_config_builder_build(struct AranyaTeamConfigBuilder *cfg,
+                                             struct AranyaTeamConfig *out);
+
+/**
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`
+ * if there are invalid parameters.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_team_config_builder_build_ext(struct AranyaTeamConfigBuilder *cfg,
+                                                 struct AranyaTeamConfig *out,
+                                                 struct AranyaExtError *__ext_err);
+
+/**
  * Create a new graph/team with the current device as the owner.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  * @param __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team(struct AranyaClient *client,
+                               const struct AranyaTeamConfig *cfg,
                                struct AranyaTeamId *__output);
 
 /**
  * Create a new graph/team with the current device as the owner.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  * @param __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team_ext(struct AranyaClient *client,
+                                   const struct AranyaTeamConfig *cfg,
                                    struct AranyaTeamId *__output,
                                    struct AranyaExtError *__ext_err);
 
 /**
  * Add a team to the local device store.
  *
+ * NOTE: this function is unfinished and will panic if called.
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_team(struct AranyaClient *client,
-                            const struct AranyaTeamId *team);
+                            const struct AranyaTeamId *team,
+                            const struct AranyaTeamConfig *cfg);
 
 /**
  * Add a team to the local device store.
  *
+ * NOTE: this function is unfinished and will panic if called.
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_team_ext(struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
+                                const struct AranyaTeamConfig *cfg,
                                 struct AranyaExtError *__ext_err);
 
 /**
@@ -1392,7 +1439,7 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  * @param label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param __output the AQC channel's ID [`AranyaChannelId`](@ref AranyaChannelId)
+ * @param __output the AQC channel's ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId)
  *
  * @relates AranyaClient.
  */
@@ -1414,7 +1461,7 @@ AranyaError aranya_aqc_create_bidi_channel(struct AranyaClient *client,
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  * @param label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param __output the AQC channel's ID [`AranyaChannelId`](@ref AranyaChannelId)
+ * @param __output the AQC channel's ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId)
  *
  * @relates AranyaClient.
  */
@@ -1429,7 +1476,7 @@ AranyaError aranya_aqc_create_bidi_channel_ext(struct AranyaClient *client,
  * Delete a bidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaChannelId`](@ref AranyaChannelId) of the channel to delete.
+ * @param chan the AQC channel ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId) of the channel to delete.
  *
  * @relates AranyaClient.
  */
@@ -1440,7 +1487,7 @@ AranyaError aranya_aqc_delete_bidi_channel(struct AranyaClient *client,
  * Delete a bidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaChannelId`](@ref AranyaChannelId) of the channel to delete.
+ * @param chan the AQC channel ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId) of the channel to delete.
  *
  * @relates AranyaClient.
  */
@@ -1452,7 +1499,7 @@ AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
  * Delete a unidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaChannelId`](@ref AranyaChannelId) of the channel to delete.
+ * @param chan the AQC channel ID [`AranyaAqcUniChannelId`](@ref AranyaAqcUniChannelId) of the channel to delete.
  *
  * @relates AranyaClient.
  */
@@ -1463,7 +1510,7 @@ AranyaError aranya_aqc_delete_uni_channel(struct AranyaClient *client,
  * Delete a unidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaChannelId`](@ref AranyaChannelId) of the channel to delete.
+ * @param chan the AQC channel ID [`AranyaAqcUniChannelId`](@ref AranyaAqcUniChannelId) of the channel to delete.
  *
  * @relates AranyaClient.
  */

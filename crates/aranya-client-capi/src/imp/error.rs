@@ -35,11 +35,12 @@ pub enum Error {
     #[error("client error: {0}")]
     Client(#[from] aranya_client::Error),
 
+    /// Failed trying to construct a new tokio runtime.
     #[error("tokio runtime error: {0}")]
     Runtime(#[source] std::io::Error),
 
-    #[error("invalid index: {0}")]
-    InvalidIndex(usize),
+    #[error("config error: {0}")]
+    Config(#[from] aranya_client::ConfigError),
 
     #[error("serialization errors: {0}")]
     Serialization(#[from] postcard::Error),

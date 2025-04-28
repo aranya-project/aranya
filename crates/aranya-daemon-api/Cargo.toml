@@ -17,7 +17,6 @@ workspace = true
 aranya-crypto = { workspace = true }
 aranya-fast-channels = { workspace = true }
 aranya-util = { workspace = true }
-spideroak-base58 = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
 postcard = { workspace = true }
