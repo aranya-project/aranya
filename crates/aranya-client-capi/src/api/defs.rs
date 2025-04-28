@@ -1087,7 +1087,7 @@ pub fn create_label(
 /// @param role the role [`Role`].
 ///
 /// Returns the role's ID [`RoleId`].
-pub fn get_role_id(role: &Role) -> Result<RoleId, imp::Error> {
+pub fn role_get_id(role: &Role) -> Result<RoleId, imp::Error> {
     Ok(role.id.into())
 }
 
@@ -1095,7 +1095,7 @@ pub fn get_role_id(role: &Role) -> Result<RoleId, imp::Error> {
 ///
 /// Returns a C string pointer to the role's name.
 #[aranya_capi_core::no_ext_error]
-pub fn get_role_name(role: &Role) -> *const c_char {
+pub fn role_get_name(role: &Role) -> *const c_char {
     role.name.as_ptr()
 }
 
@@ -1104,7 +1104,7 @@ pub fn get_role_name(role: &Role) -> *const c_char {
 /// @param label the label [`Label`].
 ///
 /// Returns the label's ID [`LabelId`].
-pub fn get_label_id(label: &Label) -> Result<LabelId, imp::Error> {
+pub fn label_get_id(label: &Label) -> Result<LabelId, imp::Error> {
     Ok(label.id.into())
 }
 
@@ -1114,7 +1114,7 @@ pub fn get_label_id(label: &Label) -> Result<LabelId, imp::Error> {
 ///
 /// Returns a C string pointer to the label's name.
 #[aranya_capi_core::no_ext_error]
-pub fn get_label_name(label: &Label) -> *const c_char {
+pub fn label_get_name(label: &Label) -> *const c_char {
     label.name.as_ptr()
 }
 
@@ -1628,7 +1628,7 @@ pub fn query_device_roles(
 /// @param role the role's ID [`RoleId`].
 ///
 /// Output params:
-/// @param cmds returns a list of commands [`RoleId`].
+/// @param cmds returns a list of commands [`Cmd`].
 /// @param cmds_len returns the length of the commands list [`RoleId`].
 ///
 /// @relates AranyaClient.

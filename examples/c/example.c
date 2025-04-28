@@ -449,11 +449,11 @@ AranyaError run(Team *t) {
     for (size_t i = 0; i < roles_len; i++) {
         AranyaRole role_result = roles[i];
         const char *role_str   = NULL;
-        err                    = aranya_get_role_name(&role_result, &role_str);
+        err                    = aranya_role_get_name(&role_result, &role_str);
         EXPECT("unable to get role name", err);
         printf("role: %s at index: %zu/%zu \r\n", role_str, i, roles_len);
 
-        // TODO: get_role_id()
+        // TODO: role_get_id()
     }
     free(roles);
 
@@ -466,12 +466,12 @@ AranyaError run(Team *t) {
     for (size_t i = 0; i < device_roles_len; i++) {
         AranyaRole role_result = device_roles[i];
         const char *role_str   = NULL;
-        err                    = aranya_get_role_name(&role_result, &role_str);
+        err                    = aranya_role_get_name(&role_result, &role_str);
         EXPECT("unable to get role name", err);
         printf("role: %s at index: %zu/%zu \r\n", role_str, i,
                device_roles_len);
 
-        // TODO: get_role_id()
+        // TODO: role_get_id()
     }
 
     free(device_roles);
@@ -617,7 +617,7 @@ AranyaError run_aqc_example(Team *t) {
     for (size_t i = 0; i < labels_len; i++) {
         AranyaLabel label_result = labels[i];
         const char *label_str    = NULL;
-        aranya_get_label_name(&label_result, &label_str);
+        aranya_label_get_name(&label_result, &label_str);
         printf("label: %s at index: %zu/%zu \r\n", label_str, i, labels_len);
     }
     free(device_str);
@@ -644,7 +644,7 @@ AranyaError run_aqc_example(Team *t) {
     for (size_t i = 0; i < labels_len; i++) {
         AranyaLabel label_result = labels[i];
         const char *label_str    = NULL;
-        aranya_get_label_name(&label_result, &label_str);
+        aranya_label_get_name(&label_result, &label_str);
         printf("label: %s at index: %zu/%zu \r\n", label_str, i, labels_len);
     }
     free(labels);
@@ -739,13 +739,13 @@ AranyaError cleanup_roles(Team *t) {
         EXPECT("error querying device roles", err);
         for (size_t j = 0; j < roles_len; j++) {
             AranyaRoleId role_id;
-            err = aranya_get_role_id(&roles[j], &role_id);
+            err = aranya_role_get_id(&roles[j], &role_id);
             if (!memcmp(&t->clients.owner.id, &devices[i],
                         sizeof(AranyaDeviceId))) {
                 owner_role_id = role_id;
             } else {
                 const char *role_str;
-                err = aranya_get_role_name(&roles[j], &role_str);
+                err = aranya_role_get_name(&roles[j], &role_str);
                 printf("revoking role: %s\r\n", role_str);
 
                 EXPECT("error getting role ID", err);
@@ -766,10 +766,10 @@ AranyaError cleanup_roles(Team *t) {
 
     for (size_t i = 0; i < roles_len; i++) {
         AranyaRoleId role_id;
-        err = aranya_get_role_id(&roles[i], &role_id);
+        err = aranya_role_get_id(&roles[i], &role_id);
         EXPECT("error getting role ID", err);
         const char *role_str;
-        err = aranya_get_role_name(&roles[i], &role_str);
+        err = aranya_role_get_name(&roles[i], &role_str);
         printf("revoking cmds for role: %s\r\n", role_str);
 
         size_t cmds_len = 0;

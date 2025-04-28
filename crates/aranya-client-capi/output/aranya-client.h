@@ -1484,7 +1484,7 @@ AranyaError aranya_create_label_ext(struct AranyaClient *client,
  *
  * Returns the role's ID [`AranyaRoleId`](@ref AranyaRoleId).
  */
-AranyaError aranya_get_role_id(const struct AranyaRole *role,
+AranyaError aranya_role_get_id(const struct AranyaRole *role,
                                struct AranyaRoleId *__output);
 
 /**
@@ -1494,7 +1494,7 @@ AranyaError aranya_get_role_id(const struct AranyaRole *role,
  *
  * Returns the role's ID [`AranyaRoleId`](@ref AranyaRoleId).
  */
-AranyaError aranya_get_role_id_ext(const struct AranyaRole *role,
+AranyaError aranya_role_get_id_ext(const struct AranyaRole *role,
                                    struct AranyaRoleId *__output,
                                    struct AranyaExtError *__ext_err);
 
@@ -1503,7 +1503,7 @@ AranyaError aranya_get_role_id_ext(const struct AranyaRole *role,
  *
  * Returns a C string pointer to the role's name.
  */
-AranyaError aranya_get_role_name(const struct AranyaRole *role,
+AranyaError aranya_role_get_name(const struct AranyaRole *role,
                                  const char **__output);
 
 /**
@@ -1513,7 +1513,7 @@ AranyaError aranya_get_role_name(const struct AranyaRole *role,
  *
  * Returns the label's ID [`AranyaLabelId`](@ref AranyaLabelId).
  */
-AranyaError aranya_get_label_id(const struct AranyaLabel *label,
+AranyaError aranya_label_get_id(const struct AranyaLabel *label,
                                 struct AranyaLabelId *__output);
 
 /**
@@ -1523,7 +1523,7 @@ AranyaError aranya_get_label_id(const struct AranyaLabel *label,
  *
  * Returns the label's ID [`AranyaLabelId`](@ref AranyaLabelId).
  */
-AranyaError aranya_get_label_id_ext(const struct AranyaLabel *label,
+AranyaError aranya_label_get_id_ext(const struct AranyaLabel *label,
                                     struct AranyaLabelId *__output,
                                     struct AranyaExtError *__ext_err);
 
@@ -1534,7 +1534,7 @@ AranyaError aranya_get_label_id_ext(const struct AranyaLabel *label,
  *
  * Returns a C string pointer to the label's name.
  */
-AranyaError aranya_get_label_name(const struct AranyaLabel *label,
+AranyaError aranya_label_get_name(const struct AranyaLabel *label,
                                   const char **__output);
 
 /**
