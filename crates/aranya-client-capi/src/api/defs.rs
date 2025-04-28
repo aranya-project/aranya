@@ -1127,8 +1127,8 @@ pub fn create_label(
 /// @param role the role [`Role`].
 ///
 /// Returns the role's ID [`RoleId`].
-pub fn role_get_id(role: &Role) -> Result<RoleId, imp::Error> {
-    Ok(role.id.into())
+pub fn role_get_id(role: &Role) -> RoleId {
+    role.id.into()
 }
 
 /// Get name of role.
@@ -1144,8 +1144,8 @@ pub fn role_get_name(role: &Role) -> *const c_char {
 /// @param label the label [`Label`].
 ///
 /// Returns the label's ID [`LabelId`].
-pub fn label_get_id(label: &Label) -> Result<LabelId, imp::Error> {
-    Ok(label.id.into())
+pub fn label_get_id(label: &Label) -> LabelId {
+    label.id.into()
 }
 
 /// Get name of label.
