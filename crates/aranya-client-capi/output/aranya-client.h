@@ -353,6 +353,18 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
 typedef const char *AranyaRoleName;
 
 /**
+ * A role.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaRole {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[96];
+} AranyaRole;
+
+/**
  * Role ID.
  */
 typedef struct AranyaRoleId {
@@ -381,18 +393,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaCmd {
 } AranyaCmd;
 
 /**
- * A role.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaRole {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[96];
-} AranyaRole;
-
-/**
  * A device priority.
  *
  * Determines whether the author of a graph command has permission
@@ -415,13 +415,6 @@ typedef const char *AranyaNetIdentifier;
 typedef const char *AranyaLabelName;
 
 /**
- * Label ID.
- */
-typedef struct AranyaLabelId {
-    struct AranyaId id;
-} AranyaLabelId;
-
-/**
  * A label.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaLabel {
@@ -432,6 +425,13 @@ typedef struct ARANYA_ALIGNED(8) AranyaLabel {
      */
     uint8_t __for_size_only[96];
 } AranyaLabel;
+
+/**
+ * Label ID.
+ */
+typedef struct AranyaLabelId {
+    struct AranyaId id;
+} AranyaLabelId;
 
 /**
  * Channel ID for AQC bidi channel.
@@ -1128,12 +1128,15 @@ AranyaError aranya_close_team_ext(struct AranyaClient *client,
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param name role name string [`AranyaRoleName`](@ref AranyaRoleName).
  *
+ * Output params:
+ * @param role returns the created role [`AranyaRole`](@ref AranyaRole).
+ *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_role(struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                AranyaRoleName name,
-                               struct AranyaRoleId *__output);
+                               struct AranyaRole *role);
 
 /**
  * Create a custom role.
@@ -1144,12 +1147,15 @@ AranyaError aranya_create_role(struct AranyaClient *client,
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param name role name string [`AranyaRoleName`](@ref AranyaRoleName).
  *
+ * Output params:
+ * @param role returns the created role [`AranyaRole`](@ref AranyaRole).
+ *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_role_ext(struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    AranyaRoleName name,
-                                   struct AranyaRoleId *__output,
+                                   struct AranyaRole *role,
                                    struct AranyaExtError *__ext_err);
 
 /**
@@ -1479,13 +1485,15 @@ AranyaError aranya_aqc_remove_net_identifier_ext(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * Output params:
+ * @param role returns the created label [`AranyaLabel`](@ref AranyaLabel).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_label(struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaLabelName name,
-                                struct AranyaLabelId *__output);
+                                struct AranyaLabel *label);
 
 /**
  * Create a channel label.
@@ -1495,13 +1503,15 @@ AranyaError aranya_create_label(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * Output params:
+ * @param role returns the created label [`AranyaLabel`](@ref AranyaLabel).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_label_ext(struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     AranyaLabelName name,
-                                    struct AranyaLabelId *__output,
+                                    struct AranyaLabel *label,
                                     struct AranyaExtError *__ext_err);
 
 /**
@@ -1534,7 +1544,7 @@ AranyaError aranya_role_get_name(const struct AranyaRole *role,
                                  const char **__output);
 
 /**
- * Get ID of role.
+ * Get ID of label.
  *
  * @param label the label [`AranyaLabel`](@ref AranyaLabel).
  *
@@ -1544,7 +1554,7 @@ AranyaError aranya_label_get_id(const struct AranyaLabel *label,
                                 struct AranyaLabelId *__output);
 
 /**
- * Get ID of role.
+ * Get ID of label.
  *
  * @param label the label [`AranyaLabel`](@ref AranyaLabel).
  *

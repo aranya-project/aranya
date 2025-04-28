@@ -115,6 +115,16 @@ struct DeviceInfo {
     enc_key_id id,
 }
 
+// Defines a label on the team.
+struct LabelInfo {
+    // ID of the label.
+    label_id id,
+    // Name of the label.
+    name string,
+    // ID of device that created the label.
+    author_id id,
+}
+
 // Defines a role on the team.
 struct RoleInfo {
     // ID of the role.
@@ -1735,13 +1745,17 @@ command CreateLabel {
         // results in a nicer error (I think?).
         check !exists Label[label_id: label_id]
 
+        let label = LabelInfo {
+            label_id: label_id,
+            name: this.label_name,
+            author_id: author.device_id,
+        }
+
         finish {
             create Label[label_id: label_id]=>{name: this.label_name, author_id: author.device_id}
 
             emit LabelCreated {
-                label_id: label_id,
-                label_name: this.label_name,
-                label_author_id: author.device_id,
+                label: label,
             }
         }
     }
@@ -1750,12 +1764,8 @@ command CreateLabel {
 // The effect emitted when the `CreateLabel` command is
 // successfully processed.
 effect LabelCreated {
-    // Uniquely identifies the label.
-    label_id id,
-    // The label name.
-    label_name string,
-    // The ID of the device that created the label.
-    label_author_id id,
+    // Label info.
+    label struct LabelInfo,
 }
 ```
 
@@ -2089,23 +2099,23 @@ command QueryLabel {
     policy {
         check team_exists()
 
+        let label = LabelInfo {
+            label_id: this.label_id,
+            name: this.label_name,
+            author_id: this.label_author_id,
+        }
+
         finish {
             emit QueriedLabel {
-                label_id: this.label_id,
-                label_name: this.label_name,
-                label_author_id: this.label_author_id,
+                label: label,
             }
         }
     }
 }
 
 effect QueriedLabel {
-    // The label's unique ID.
-    label_id id,
-    // The label name.
-    label_name string,
-    // The ID of the device that created the label.
-    label_author_id id,
+    // The label info.
+    label struct LabelInfo,
 }
 ```
 
@@ -2146,12 +2156,16 @@ command QueryLabelAssignment {
     policy {
         check team_exists()
 
+        let label = LabelInfo {
+            label_id: this.label_id,
+            name: this.label_name,
+            author_id: this.label_author_id,
+        }
+
         finish {
             emit QueriedLabelAssignment {
                 device_id: this.device_id,
-                label_id: this.label_id,
-                label_name: this.label_name,
-                label_author_id: this.label_author_id,
+                label: label,
             }
         }
     }
@@ -2160,12 +2174,8 @@ command QueryLabelAssignment {
 effect QueriedLabelAssignment {
     // The device's unique ID.
     device_id id,
-    // The label's unique ID.
-    label_id id,
-    // The label name.
-    label_name string,
-    // The ID of the device that created the label.
-    label_author_id id,
+    // The label's info.
+    label struct LabelInfo,
 }
 ```
 

@@ -811,23 +811,26 @@ pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> 
 /// @param team the team's ID [`TeamId`].
 /// @param name role name string [`RoleName`].
 ///
+/// Output params:
+/// @param role returns the created role [`Role`].
+///
 /// @relates AranyaClient.
 pub fn create_role(
     client: &mut Client,
     team: &TeamId,
     name: RoleName,
-) -> Result<RoleId, imp::Error> {
+    role: &mut MaybeUninit<Role>,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
 
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
 
-    let role = client
+    let r = client
         .rt
         .block_on(client.inner.team(team.into()).create_role(name))?;
-    Ok(RoleId {
-        id: role.id.into_id().into(),
-    })
+    Safe::init(role, r.clone().try_into()?);
+    Ok(())
 }
 
 /// Assign role command.
@@ -1099,21 +1102,24 @@ pub unsafe fn aqc_remove_net_identifier(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param name label name string [`LabelName`].
+/// Output params:
+/// @param role returns the created label [`Label`].
 ///
 /// @relates AranyaClient.
-// TODO: return `Label`
 pub fn create_label(
     client: &mut Client,
     team: &TeamId,
     name: LabelName,
-) -> Result<LabelId, imp::Error> {
+    label: &mut MaybeUninit<Label>,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
-    let label_id = client
+    let l = client
         .rt
         .block_on(client.inner.team(team.into()).create_label(name))?;
-    Ok(label_id.into())
+    Safe::init(label, l.clone().try_into()?);
+    Ok(())
 }
 
 /// Get ID of role.
@@ -1133,7 +1139,7 @@ pub fn role_get_name(role: &Role) -> *const c_char {
     role.name.as_ptr()
 }
 
-/// Get ID of role.
+/// Get ID of label.
 ///
 /// @param label the label [`Label`].
 ///

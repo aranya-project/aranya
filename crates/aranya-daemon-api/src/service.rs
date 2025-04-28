@@ -217,6 +217,7 @@ pub type Cmd = String;
 pub struct Label {
     pub id: LabelId,
     pub name: String,
+    pub author_id: DeviceId,
 }
 
 /// A role.
@@ -297,7 +298,7 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     // Create a label.
-    async fn create_label(team: TeamId, name: String) -> Result<LabelId>;
+    async fn create_label(team: TeamId, name: String) -> Result<Label>;
     // Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     // Assign a label to a device.

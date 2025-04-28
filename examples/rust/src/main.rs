@@ -333,11 +333,11 @@ async fn main() -> Result<()> {
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
     operator_team
-        .assign_label(team.membera.id, label3, op)
+        .assign_label(team.membera.id, label3.id, op)
         .await?;
     info!("assigning label to memberb");
     operator_team
-        .assign_label(team.memberb.id, label3, op)
+        .assign_label(team.memberb.id, label3.id, op)
         .await?;
 
     // wait for syncing.
@@ -349,7 +349,7 @@ async fn main() -> Result<()> {
         .membera
         .client
         .aqc()
-        .create_bidi_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label3)
+        .create_bidi_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label3.id)
         .await?;
     info!("receiving acq bidi channel");
     team.memberb
@@ -360,9 +360,9 @@ async fn main() -> Result<()> {
 
     // TODO: send AQC data.
     info!("revoking label from membera");
-    operator_team.revoke_label(team.membera.id, label3).await?;
+    operator_team.revoke_label(team.membera.id, label3.id).await?;
     info!("revoking label from memberb");
-    operator_team.revoke_label(team.memberb.id, label3).await?;
+    operator_team.revoke_label(team.memberb.id, label3.id).await?;
     // TODO: delete label.
 
     info!("completed aqc demo");

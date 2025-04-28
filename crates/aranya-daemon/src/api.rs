@@ -31,7 +31,7 @@ use tracing::{debug, error, info, instrument, warn};
 
 use crate::{
     aranya::Actions,
-    policy::{ChanOp, Effect, KeyBundle, RoleInfo},
+    policy::{ChanOp, Effect, KeyBundle, LabelInfo, RoleInfo},
     sync::SyncPeers,
     Client, EF,
 };
@@ -742,7 +742,7 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: api::TeamId,
         label_name: String,
-    ) -> api::Result<api::LabelId> {
+    ) -> api::Result<api::Label> {
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -750,7 +750,7 @@ impl DaemonApi for DaemonApiHandler {
             .await
             .context("unable to create label")?;
         if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
-            Ok(e.label_id.into())
+            Ok(e.label.clone().into())
         } else {
             Err(anyhow!("unable to create label").into())
         }
@@ -951,11 +951,8 @@ impl DaemonApi for DaemonApiHandler {
         let mut labels: Vec<api::Label> = Vec::new();
         for e in effects {
             if let Effect::QueriedLabelAssignment(e) = e {
-                debug!("found label: {}", e.label_id);
-                labels.push(api::Label {
-                    id: e.label_id.into(),
-                    name: e.label_name,
-                });
+                debug!("found label: {}", e.label.name);
+                labels.push(e.label.into());
             }
         }
         return Ok(labels);
@@ -1021,11 +1018,8 @@ impl DaemonApi for DaemonApiHandler {
         let mut labels: Vec<api::Label> = Vec::new();
         for e in effects {
             if let Effect::QueriedLabel(e) = e {
-                debug!("found label: {}", e.label_id);
-                labels.push(api::Label {
-                    id: e.label_id.into(),
-                    name: e.label_name,
-                });
+                debug!("found label: {}", e.label.name);
+                labels.push(e.label.into());
             }
         }
         Ok(labels)
@@ -1048,6 +1042,26 @@ impl From<KeyBundle> for api::KeyBundle {
             identity: value.ident_key,
             signing: value.sign_key,
             encoding: value.enc_key,
+        }
+    }
+}
+
+impl From<api::Label> for LabelInfo {
+    fn from(value: api::Label) -> Self {
+        LabelInfo {
+            label_id: value.id.into(),
+            name: value.name,
+            author_id: value.author_id.into(),
+        }
+    }
+}
+
+impl From<LabelInfo> for api::Label {
+    fn from(value: LabelInfo) -> Self {
+        api::Label {
+            id: value.label_id.into(),
+            name: value.name,
+            author_id: value.author_id.into(),
         }
     }
 }

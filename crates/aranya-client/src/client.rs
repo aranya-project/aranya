@@ -347,7 +347,7 @@ impl Team<'_> {
     }
 
     /// Create a label.
-    pub async fn create_label(&mut self, label_name: String) -> Result<LabelId> {
+    pub async fn create_label(&mut self, label_name: String) -> Result<Label> {
         self.client
             .daemon
             .create_label(context::current(), self.id, label_name)

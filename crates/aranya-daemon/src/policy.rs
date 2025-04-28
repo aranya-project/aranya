@@ -17,6 +17,13 @@ pub struct KeyBundle {
     pub sign_key: Vec<u8>,
     pub enc_key: Vec<u8>,
 }
+/// LabelInfo policy struct.
+#[value]
+pub struct LabelInfo {
+    pub label_id: Id,
+    pub name: String,
+    pub author_id: Id,
+}
 /// RoleInfo policy struct.
 #[value]
 pub struct RoleInfo {
@@ -196,9 +203,7 @@ pub struct AqcUniChannelReceived {
 /// LabelCreated policy effect.
 #[effect]
 pub struct LabelCreated {
-    pub label_id: Id,
-    pub label_name: String,
-    pub label_author_id: Id,
+    pub label: LabelInfo,
 }
 /// LabelDeleted policy effect.
 #[effect]
@@ -234,17 +239,13 @@ pub struct QueryLabelExistsResult {
 /// QueriedLabel policy effect.
 #[effect]
 pub struct QueriedLabel {
-    pub label_id: Id,
-    pub label_name: String,
-    pub label_author_id: Id,
+    pub label: LabelInfo,
 }
 /// QueriedLabelAssignment policy effect.
 #[effect]
 pub struct QueriedLabelAssignment {
     pub device_id: Id,
-    pub label_id: Id,
-    pub label_name: String,
-    pub label_author_id: Id,
+    pub label: LabelInfo,
 }
 /// QueryDevicesOnTeamResult policy effect.
 #[effect]

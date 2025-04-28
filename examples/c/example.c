@@ -453,8 +453,6 @@ AranyaError run(Team *t) {
         err                    = aranya_role_get_name(&role_result, &role_str);
         EXPECT("unable to get role name", err);
         printf("role: %s at index: %zu/%zu \r\n", role_str, i, roles_len);
-
-        // TODO: role_get_id()
     }
     free(roles);
 
@@ -471,8 +469,6 @@ AranyaError run(Team *t) {
         EXPECT("unable to get role name", err);
         printf("role: %s at index: %zu/%zu \r\n", role_str, i,
                device_roles_len);
-
-        // TODO: role_get_id()
     }
 
     free(device_roles);
@@ -557,18 +553,34 @@ AranyaError run_aqc_example(Team *t) {
 
     printf("running AQC demo \r\n");
 
-    // Create label and assign it to members
+    // Create label1 and assign it to members
     printf("creating label \r\n");
     const char *label1_name = "label1";
-    AranyaLabelId label1_id;
+    AranyaLabel label1;
     err = aranya_create_label(&t->clients.operator.client, &t->id, label1_name,
-                              &label1_id);
+                              &label1);
     EXPECT("error creating label1", err);
+    AranyaLabelId label1_id;
+    err = aranya_label_get_id(&label1, &label1_id);
+    EXPECT("error getting label1 ID", err);
+    const char *label1_str = NULL;
+    err                    = aranya_label_get_name(&label1, &label1_str);
+    EXPECT("error getting label1 name", err);
+    printf("label1 name: %s \r\n", label1_str);
+
+    // Create label2 and assign it to members
     const char *label2_name = "label2";
-    AranyaLabelId label2_id;
+    AranyaLabel label2;
     err = aranya_create_label(&t->clients.operator.client, &t->id, label2_name,
-                              &label2_id);
+                              &label2);
     EXPECT("error creating label2", err);
+    AranyaLabelId label2_id;
+    err = aranya_label_get_id(&label2, &label2_id);
+    EXPECT("error getting label2 ID", err);
+    const char *label2_str = NULL;
+    err                    = aranya_label_get_name(&label2, &label2_str);
+    EXPECT("error getting label2 name", err);
+    printf("label2 name: %s \r\n", label2_str);
     printf("assigning label to members \r\n");
     AranyaChanOp op = ARANYA_CHAN_OP_SEND_RECV;
     err             = aranya_assign_label(&t->clients.operator.client, &t->id,
@@ -709,6 +721,17 @@ AranyaError init_roles(Team *t) {
         }
     }
     free(roles);
+
+    // create a dummy role and assign it a dummy cmd.
+    AranyaRole role;
+    err = aranya_create_role(&t->clients.owner.client, &t->id, "dummy", &role);
+    EXPECT("expected to be able to create role", err);
+    AranyaRoleId role_id;
+    err = aranya_role_get_id(&role, &role_id);
+    EXPECT("error getting dummy role id", err);
+    err = aranya_assign_role_cmd(&t->clients.owner.client, &t->id, &role_id,
+                                 "DummyCmd");
+    EXPECT("error assigning DummyCmd cmd", err);
 
     return err;
 }
