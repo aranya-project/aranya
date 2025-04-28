@@ -1,6 +1,6 @@
 //! Client-daemon connection.
 
-use std::{collections::BTreeMap, net::SocketAddr, path::Path, sync::LazyLock};
+use std::{net::SocketAddr, path::Path};
 
 use aranya_daemon_api::{
     ChanOp, Cmd, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
@@ -79,20 +79,6 @@ impl Cmds {
         self.data.as_slice()
     }
 }
-
-// Default role commands.
-pub static DEFAULT_CMDS: LazyLock<BTreeMap<&str, &str>> = LazyLock::new(|| {
-    let mut m = BTreeMap::new();
-    m.insert("SetAqcNetworkName", "operator");
-    m.insert("UnsetAqcNetworkName", "operator");
-    m.insert("CreateLabel", "operator");
-    m.insert("AssignLabel", "operator");
-    m.insert("RevokeLabel", "operator");
-    m.insert("DeleteLabel", "admin");
-    m.insert("AqcCreateBidiChannel", "member");
-    m.insert("AqcCreateUniChannel", "member");
-    m
-});
 
 /// A client for invoking actions on and processing effects from
 /// the Aranya graph.
@@ -255,6 +241,17 @@ impl Team<'_> {
             .close_team(context::current(), self.id)
             .await?
             .map_err(Into::into)
+    }
+
+    /// Setup default roles on team.
+    pub async fn setup_default_roles(&mut self) -> Result<Roles> {
+        Ok(Roles {
+            data: self
+                .client
+                .daemon
+                .setup_default_roles(context::current(), self.id)
+                .await??,
+        })
     }
 
     /// Add a device to the team with the default `Member` role.

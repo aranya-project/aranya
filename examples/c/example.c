@@ -132,6 +132,7 @@ AranyaError run(Team *t);
 AranyaError run_aqc_example(Team *t);
 AranyaError init_roles(Team *t);
 AranyaError cleanup_roles(Team *t);
+AranyaError setup_default_roles(Team *t, AranyaRole **roles, size_t *roles_len);
 
 // Query functions.
 AranyaError query_devices_on_team(Team *t, AranyaDeviceId **devices,
@@ -679,44 +680,35 @@ AranyaError init_roles(Team *t) {
 
     printf("initializing roles\r\n");
 
-    // TODO: provide method to configure default command permissions.
+    // Create default roles.
+    size_t roles_len  = 0;
+    AranyaRole *roles = NULL;
+    err               = setup_default_roles(t, &roles, &roles_len);
 
-    // Create custom roles.
-    err = aranya_create_role(&t->clients.owner.client, &t->id, "admin",
-                             &t->roles.admin);
-    EXPECT("error creating admin role", err);
-    err = aranya_create_role(&t->clients.owner.client, &t->id, "operator",
-                             &t->roles.operator);
-    EXPECT("error creating operator role", err);
-    err = aranya_create_role(&t->clients.owner.client, &t->id, "member",
-                             &t->roles.member);
-    EXPECT("error creating member role", err);
-
-    // Assign role permissions.
-    err = aranya_assign_role_cmd(&t->clients.owner.client, &t->id,
-                                 &t->roles.operator, "SetAqcNetworkName");
-    EXPECT("error assigning SetAqcNetworkName cmd", err);
-    err = aranya_assign_role_cmd(&t->clients.owner.client, &t->id,
-                                 &t->roles.operator, "UnsetAqcNetworkName");
-    EXPECT("error assigning UnsetAqcNetworkName cmd", err);
-    err = aranya_assign_role_cmd(&t->clients.owner.client, &t->id,
-                                 &t->roles.operator, "CreateLabel");
-    EXPECT("error assigning CreateLabel cmd", err);
-    err = aranya_assign_role_cmd(&t->clients.owner.client, &t->id,
-                                 &t->roles.operator, "AssignLabel");
-    EXPECT("error assigning AssignLabel cmd", err);
-    err = aranya_assign_role_cmd(&t->clients.owner.client, &t->id,
-                                 &t->roles.operator, "RevokeLabel");
-    EXPECT("error assigning RevokeLabel cmd", err);
-    err = aranya_assign_role_cmd(&t->clients.owner.client, &t->id,
-                                 &t->roles.admin, "DeleteLabel");
-    EXPECT("error assigning DeleteLabel cmd", err);
-    err = aranya_assign_role_cmd(&t->clients.owner.client, &t->id,
-                                 &t->roles.member, "AqcCreateBidiChannel");
-    EXPECT("error assigning AqcCreateBidiChannel cmd", err);
-    err = aranya_assign_role_cmd(&t->clients.owner.client, &t->id,
-                                 &t->roles.member, "AqcCreateUniChannel");
-    EXPECT("error assigning AqcCreateUniChannel cmd", err);
+    if (roles_len != 3) {
+        free(roles);
+        fprintf(stderr,
+                "expected 3 default roles: admin, operator, member\r\n");
+        return ARANYA_ERROR_BUG;
+    }
+    for (size_t i = 0; i < roles_len; i++) {
+        AranyaRoleId role_id;
+        err = aranya_role_get_id(&roles[i], &role_id);
+        EXPECT("error getting role ID", err);
+        const char *role_str;
+        err = aranya_role_get_name(&roles[i], &role_str);
+        printf("setup role: %s\r\n", role_str);
+        if (!strncmp("admin", role_str, strnlen(role_str, 255))) {
+            t->roles.admin = role_id;
+        }
+        if (!strncmp("operator", role_str, strnlen(role_str, 255))) {
+            t->roles.operator= role_id;
+        }
+        if (!strncmp("member", role_str, strnlen(role_str, 255))) {
+            t->roles.member = role_id;
+        }
+    }
+    free(roles);
 
     return err;
 }
@@ -809,6 +801,23 @@ AranyaError query_devices_on_team(Team *t, AranyaDeviceId **devices,
                                        *devices, devices_len);
     EXPECT("error querying devices on team", err);
     if (devices == NULL) {
+        return ARANYA_ERROR_BUG;
+    }
+
+    return err;
+}
+
+// Setup default roles on team. Returned `roles` ptr must be freed.
+AranyaError setup_default_roles(Team *t, AranyaRole **roles,
+                                size_t *roles_len) {
+    AranyaError err;
+
+    *roles_len = BUF_LEN;
+    *roles     = malloc(*roles_len * sizeof(AranyaRole));
+    err = aranya_setup_default_roles(&t->clients.owner.client, &t->id, *roles,
+                                     roles_len);
+    EXPECT("error setting up default roles on team", err);
+    if (roles == NULL) {
         return ARANYA_ERROR_BUG;
     }
 

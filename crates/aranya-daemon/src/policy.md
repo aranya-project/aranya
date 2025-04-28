@@ -560,6 +560,119 @@ command TerminateTeam {
 - Only an Owner can create this event.
 - Once terminated, no further communication will occur over the team graph.
 
+## SetupDefaultRoles
+
+The `SetupDefaultRoles` command sets up default roles on the team.
+Command can only be invoked by the device the team owner.
+
+```policy
+// Setup default roles on a team.
+action setup_default_roles() {
+    publish SetupAdminRole {}
+    publish SetupOperatorRole {}
+    publish SetupMemberRole {}
+}
+
+command SetupAdminRole {
+    fields {}
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // Get author of command
+        let author_id = envelope::author_id(envelope)
+
+        // A role's ID is the ID of the command that created it.
+        let role_id = envelope::command_id(envelope)
+        
+        let role = RoleInfo {
+            role_id: role_id,
+            name: "admin",
+            author_id: author_id,
+        }
+
+        finish {
+            create_role(role)
+            assign_cmd_role("DeleteLabel", role.role_id)
+
+            emit QueriedRole {
+                role: role
+            }
+        }
+    }
+}
+
+command SetupOperatorRole {
+    fields {}
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // Get author of command
+        let author_id = envelope::author_id(envelope)
+
+        // A role's ID is the ID of the command that created it.
+        let role_id = envelope::command_id(envelope)
+        
+        let role = RoleInfo {
+            role_id: role_id,
+            name: "operator",
+            author_id: author_id,
+        }
+
+        finish {
+            create_role(role)
+            assign_cmd_role("SetAqcNetworkName", role.role_id)
+            assign_cmd_role("UnsetAqcNetworkName", role.role_id)
+            assign_cmd_role("CreateLabel", role.role_id)
+            assign_cmd_role("AssignLabel", role.role_id)
+            assign_cmd_role("RevokeLabel", role.role_id)
+
+            emit QueriedRole {
+                role: role
+            }
+        }
+    }
+}
+
+command SetupMemberRole {
+    fields {}
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        // Get author of command
+        let author_id = envelope::author_id(envelope)
+
+        // A role's ID is the ID of the command that created it.
+        let role_id = envelope::command_id(envelope)
+        
+        let role = RoleInfo {
+            role_id: role_id,
+            name: "member",
+            author_id: author_id,
+        }
+
+        finish {
+            create_role(role)
+            assign_cmd_role("AqcCreateBidiChannel", role.role_id)
+            assign_cmd_role("AqcCreateUniChannel", role.role_id)
+
+            emit QueriedRole {
+                role: role
+            }
+        }
+    }
+}
+```
+
+**Invariants:**
+
+- This is the initial command in the graph.
+- Only an Owner will create this event.
 
 ## AddMember
 

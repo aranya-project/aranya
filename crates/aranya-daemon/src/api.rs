@@ -352,6 +352,27 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
+    async fn setup_default_roles(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+    ) -> api::Result<Vec<api::Role>> {
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .setup_default_roles()
+            .await
+            .context("unable to setup default roles on team")?;
+        let mut roles: Vec<api::Role> = Vec::new();
+        for e in effects {
+            if let Effect::QueriedRole(e) = e {
+                roles.push(e.role.into());
+            }
+        }
+        Ok(roles)
+    }
+
+    #[instrument(skip(self))]
     async fn add_device_to_team(
         self,
         _: context::Context,

@@ -891,6 +891,40 @@ pub unsafe fn revoke_role_cmd(
     Ok(())
 }
 
+/// Setup default roles on team.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+///
+/// @relates AranyaClient.
+pub unsafe fn setup_default_roles(
+    client: &mut Client,
+    team: &TeamId,
+    roles: Option<&mut MaybeUninit<Role>>,
+    roles_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+
+    let data = client
+        .rt
+        .block_on(client.inner.team(team.into()).setup_default_roles())?;
+    let data = data.__data();
+    let Some(roles) = roles else {
+        *roles_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    };
+    let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        Safe::init(dst, src.clone().try_into()?);
+    }
+    if *roles_len < data.len() {
+        *roles_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    *roles_len = data.len();
+    Ok(())
+}
+
 /// Add a device to the team with the default role.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.

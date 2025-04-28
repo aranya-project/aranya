@@ -289,6 +289,7 @@ pub trait ActorExt {
         nonce: Vec<u8>,
     ) -> Result<(), ClientError>;
     fn terminate_team(&mut self) -> Result<(), ClientError>;
+    fn setup_default_roles(&mut self) -> Result<(), ClientError>;
     fn add_member(
         &mut self,
         device_keys: KeyBundle,

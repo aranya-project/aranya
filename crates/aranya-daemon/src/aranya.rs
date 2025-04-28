@@ -408,6 +408,16 @@ where
         .in_current_span()
     }
 
+    /// Sets up default roles on the team.
+    #[instrument(skip_all)]
+    fn setup_default_roles(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.setup_default_roles()?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
     /// Adds a Member instance to the team.
     #[instrument(skip_all)]
     fn add_member(

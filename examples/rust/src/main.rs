@@ -1,6 +1,6 @@
 use aranya_daemon_api::ChanOp;
 use anyhow::{Context as _, Result};
-use aranya_client::{DEFAULT_CMDS, client::Client, SyncPeerConfig, TeamConfig};
+use aranya_client::{client::Client, SyncPeerConfig, TeamConfig};
 use aranya_daemon::{
     config::Config,
     Daemon,
@@ -173,20 +173,15 @@ async fn main() -> Result<()> {
     let mut membera_team = team.membera.client.team(team_id);
     let mut memberb_team = team.memberb.client.team(team_id);
 
-    let admin_role = owner_team.create_role("admin".into()).await?;
-    let operator_role = owner_team.create_role("operator".into()).await?;
-    let member_role = owner_team.create_role("member".into()).await?;
-
-    let role_list = [&admin_role, &operator_role, &member_role];
-    for (perm, role_name) in DEFAULT_CMDS.iter() {
-        for role in &role_list {
-            if *role_name == role.name {
-                owner_team
-                    .assign_role_cmd(role.id, perm.to_string())
-                    .await?;
-            }
-        }
-    }
+    let roles = owner_team.setup_default_roles().await?;
+    assert_eq!(roles.iter().count(), 3);
+    let mut roles_iter = roles.iter();
+    let admin_role = roles_iter.next().expect("expected admin role");
+    assert_eq!(admin_role.name, "admin");
+    let operator_role = roles_iter.next().expect("expected operator role");
+    assert_eq!(operator_role.name, "operator");
+    let member_role = roles_iter.next().expect("expected member role");
+    assert_eq!(member_role.name, "member");
 
     // add admin to team.
     info!("adding admin to team");

@@ -381,6 +381,18 @@ typedef struct ARANYA_ALIGNED(8) AranyaCmd {
 } AranyaCmd;
 
 /**
+ * A role.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaRole {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[96];
+} AranyaRole;
+
+/**
  * A device priority.
  *
  * Determines whether the author of a graph command has permission
@@ -408,18 +420,6 @@ typedef const char *AranyaLabelName;
 typedef struct AranyaLabelId {
     struct AranyaId id;
 } AranyaLabelId;
-
-/**
- * A role.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaRole {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[96];
-} AranyaRole;
 
 /**
  * A label.
@@ -1221,6 +1221,33 @@ AranyaError aranya_revoke_role_cmd_ext(struct AranyaClient *client,
                                        const struct AranyaRoleId *role_id,
                                        const struct AranyaCmd *cmd,
                                        struct AranyaExtError *__ext_err);
+
+/**
+ * Setup default roles on team.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_setup_default_roles(struct AranyaClient *client,
+                                       const struct AranyaTeamId *team,
+                                       struct AranyaRole *roles,
+                                       size_t *roles_len);
+
+/**
+ * Setup default roles on team.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
+                                           const struct AranyaTeamId *team,
+                                           struct AranyaRole *roles,
+                                           size_t *roles_len,
+                                           struct AranyaExtError *__ext_err);
 
 /**
  * Add a device to the team with the default role.
@@ -2147,7 +2174,7 @@ AranyaError aranya_query_device_roles_ext(struct AranyaClient *client,
  * @param role the role's ID [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * Output params:
- * @param cmds returns a list of commands [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param cmds returns a list of commands [`AranyaCmd`](@ref AranyaCmd).
  * @param cmds_len returns the length of the commands list [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * @relates AranyaClient.
@@ -2170,7 +2197,7 @@ AranyaError aranya_query_role_cmds(struct AranyaClient *client,
  * @param role the role's ID [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * Output params:
- * @param cmds returns a list of commands [`AranyaRoleId`](@ref AranyaRoleId).
+ * @param cmds returns a list of commands [`AranyaCmd`](@ref AranyaCmd).
  * @param cmds_len returns the length of the commands list [`AranyaRoleId`](@ref AranyaRoleId).
  *
  * @relates AranyaClient.
