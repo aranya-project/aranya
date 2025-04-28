@@ -193,7 +193,9 @@ impl TeamCtx {
 
         // Create a dummy role and assign a dummy command to it.
         let dummy_role = owner_team.create_role("dummy".to_string()).await?;
-        owner_team.assign_role_cmd(dummy_role.id, "dummy_cmd".to_string()).await?;
+        owner_team
+            .assign_role_cmd(dummy_role.id, "dummy_cmd".to_string())
+            .await?;
 
         self.roles = Some(default_roles);
 
