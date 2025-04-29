@@ -1,5 +1,3 @@
-#[cfg(feature = "afc")]
-use std::str::FromStr;
 use std::{io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -7,8 +5,6 @@ use aranya_crypto::{
     default::DefaultEngine, import::Import, keys::SecretKey, keystore::fs_keystore::Store, Rng,
 };
 use aranya_daemon_api::{KeyStoreInfo, CS};
-#[cfg(feature = "afc")]
-use aranya_fast_channels::shm::{self, Flag, Mode, WriteState};
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -18,8 +14,6 @@ use aranya_util::Addr;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
-#[cfg(feature = "afc")]
-use tracing::debug;
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
@@ -102,44 +96,20 @@ impl Daemon {
             }
         });
 
-        let api = {
-            #[cfg(feature = "afc")]
-            {
-                let afc = self.setup_afc()?;
-                DaemonApiServer::new(
-                    client,
-                    local_addr,
-                    Arc::new(Mutex::new(afc)),
-                    eng,
-                    KeyStoreInfo {
-                        path: self.cfg.keystore_path(),
-                        wrapped_key: self.cfg.key_wrap_key_path(),
-                    },
-                    store,
-                    self.cfg.uds_api_path.clone(),
-                    Arc::new(pk),
-                    peers,
-                    recv_effects,
-                )
-                .context("Unable to start daemon API!")?
-            }
-            #[cfg(not(feature = "afc"))]
-            {
-                DaemonApiServer::new(
-                    client,
-                    local_addr,
-                    KeyStoreInfo {
-                        path: self.cfg.keystore_path(),
-                        wrapped_key: self.cfg.key_wrap_key_path(),
-                    },
-                    self.cfg.uds_api_path.clone(),
-                    Arc::new(pk),
-                    peers,
-                    recv_effects,
-                )
-                .context("Unable to start daemon API!")?
-            }
-        };
+        let api = DaemonApiServer::new(
+            client,
+            local_addr,
+            KeyStoreInfo {
+                path: self.cfg.keystore_path(),
+                wrapped_key: self.cfg.key_wrap_key_path(),
+            },
+            self.cfg.uds_api_path.clone(),
+            Arc::new(pk),
+            peers,
+            recv_effects,
+        )
+        .await
+        .context("Unable to start daemon API!")?;
         api.serve().await?;
 
         Ok(())
@@ -195,34 +165,6 @@ impl Daemon {
         Ok((client, server))
     }
 
-    /// Creates AFC shm.
-    #[cfg(feature = "afc")]
-    fn setup_afc(&self) -> Result<WriteState<CS, Rng>> {
-        // TODO: issue stellar-tapestry#34
-        // afc::shm{ReadState, WriteState} doesn't work on linux/arm64
-        debug!(
-            shm_path = self.cfg.afc.shm_path,
-            "setting up afc shm write side"
-        );
-        let write = {
-            let path = aranya_util::ShmPathBuf::from_str(&self.cfg.afc.shm_path)
-                .context("unable to parse AFC shared memory path")?;
-            if self.cfg.afc.unlink_on_startup && self.cfg.afc.create {
-                let _ = shm::unlink(&path);
-            }
-            WriteState::open(
-                &path,
-                Flag::Create,
-                Mode::ReadWrite,
-                self.cfg.afc.max_chans,
-                Rng,
-            )
-            .context("unable to open `WriteState`")?
-        };
-
-        Ok(write)
-    }
-
     /// Loads the [`KeyBundle`].
     async fn load_or_gen_public_keys(
         &self,
@@ -248,12 +190,6 @@ impl Daemon {
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        #[cfg(feature = "afc")]
-        if self.cfg.afc.unlink_at_exit {
-            if let Ok(path) = aranya_util::util::ShmPathBuf::from_str(&self.cfg.afc.shm_path) {
-                let _ = shm::unlink(path);
-            }
-        }
         let _ = std::fs::remove_file(&self.cfg.uds_api_path);
     }
 }
@@ -316,7 +252,6 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::AfcConfig;
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -331,13 +266,7 @@ mod tests {
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
-            afc: AfcConfig {
-                shm_path: "/test_daemon1".to_owned(),
-                unlink_on_startup: true,
-                unlink_at_exit: true,
-                create: true,
-                max_chans: 100,
-            },
+            afc: None,
         };
 
         let daemon = Daemon::load(cfg)
