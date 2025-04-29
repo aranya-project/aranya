@@ -423,13 +423,23 @@ async fn test_add_team() -> Result<()> {
     info!(?team_id);
     info!(?init_command);
 
-    let team_cfg = TeamConfigBuilder::default().init_command(&init_command).build()?;
+    let team_cfg = TeamConfigBuilder::default()
+        .init_command(&init_command)
+        .build()?;
 
-    team.admin.client.add_team(team_id, team_cfg.clone()).await?;
-    team.operator.client.add_team(team_id, team_cfg.clone()).await?;
-    team.membera.client.add_team(team_id, team_cfg.clone()).await?;
+    team.admin
+        .client
+        .add_team(team_id, team_cfg.clone())
+        .await?;
+    team.operator
+        .client
+        .add_team(team_id, team_cfg.clone())
+        .await?;
+    team.membera
+        .client
+        .add_team(team_id, team_cfg.clone())
+        .await?;
     team.memberb.client.add_team(team_id, team_cfg).await?;
-
 
     Ok(())
 }
