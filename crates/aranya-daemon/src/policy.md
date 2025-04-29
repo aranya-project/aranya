@@ -815,9 +815,74 @@ finish function remove_device(device_id id) {
 - Members can only be removed by Operators and Owners.
 - Removing non-Members requires revoking their higher role so the device is made into a Member first.
 
-## AssignPriority
+## AssignDevicePrecedence
 
-TODO: assign precedence to a device on a team.
+Assign device precedence to a device on a team.
+The device precedence is used to determine if the author of a command has precedence to execute commands on a target device.
+
+```policy
+// Assigns the specified precedence value to the device.
+action assign_device_precedence(device_id id, precedence int){
+    publish AssignDevicePrecedence {
+        device_id: device_id,
+        precedence: precedence,
+    }
+}
+
+command AssignDevicePrecedence {
+    fields {
+        // ID of the device to assign a precedence value to.
+        device_id id,
+        // Precedence value to assign to the device.
+        precedence int,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = get_valid_device(this.device_id)
+
+        check device_can_execute_op(author.device_id, "AssignDevicePrecedence")
+        check author_dominates_target(author.device_id, device.device_id)
+
+        let new_device = DeviceInfo {
+            device_id: device.device_id,
+            precedence: this.precedence,
+            sign_key_id: device.device.sign_key_id,
+            enc_key_id: device.device.enc_key_id,
+        }
+
+        finish {
+            update Device[device_id: device.device_id]=>{device: device.device} to {
+                device: new_device
+            }
+
+            // Return information about precedence assigned to device.
+            emit DevicePrecedenceAssigned {
+                device_id: device.device_id,
+                precedence: this.precedence,
+            }
+        }
+    }
+}
+
+// A precedence value to a device on the team.
+effect DevicePrecedenceAssigned {
+    // ID of device the role was assigned to.
+    device_id id,
+    // Precedence value assigned to the device.
+    precedence int,
+}
+```
+
+**Invariants**:
+
+- A device may be assigned a single precedence value.
+- A device with higher precedence may execute operations on a device with lower precedence.
 
 ## CreateRole
 

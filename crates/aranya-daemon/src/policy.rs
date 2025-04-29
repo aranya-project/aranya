@@ -45,6 +45,7 @@ pub enum Effect {
     TeamTerminated(TeamTerminated),
     MemberAdded(MemberAdded),
     MemberRemoved(MemberRemoved),
+    DevicePrecedenceAssigned(DevicePrecedenceAssigned),
     RoleCreated(RoleCreated),
     RoleDeleted(RoleDeleted),
     RoleAssigned(RoleAssigned),
@@ -92,6 +93,12 @@ pub struct MemberAdded {
 #[effect]
 pub struct MemberRemoved {
     pub device_id: Id,
+}
+/// DevicePrecedenceAssigned policy effect.
+#[effect]
+pub struct DevicePrecedenceAssigned {
+    pub device_id: Id,
+    pub precedence: i64,
 }
 /// RoleCreated policy effect.
 #[effect]
@@ -297,6 +304,11 @@ pub trait ActorExt {
         precedence: i64,
     ) -> Result<(), ClientError>;
     fn remove_member(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn assign_device_precedence(
+        &mut self,
+        device_id: Id,
+        precedence: i64,
+    ) -> Result<(), ClientError>;
     fn create_role(&mut self, name: String) -> Result<(), ClientError>;
     fn delete_role(&mut self, role_id: Id) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;

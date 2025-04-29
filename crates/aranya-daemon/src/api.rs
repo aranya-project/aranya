@@ -199,6 +199,7 @@ impl DaemonApiHandler {
                 Effect::TeamTerminated(_team_terminated) => {}
                 Effect::MemberAdded(_member_added) => {}
                 Effect::MemberRemoved(_member_removed) => {}
+                Effect::DevicePrecedenceAssigned(_) => {}
                 Effect::RoleCreated(_) => {}
                 Effect::RoleDeleted(_) => {}
                 Effect::RoleAssigned(_) => {}
