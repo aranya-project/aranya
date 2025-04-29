@@ -14,6 +14,7 @@ use crate::{
     aqc::{AqcChannels, AqcChannelsImpl},
     config::{SyncPeerConfig, TeamConfig},
     error::{Error, Result},
+    ConfigError,
 };
 
 /// List of device IDs.
@@ -129,6 +130,13 @@ impl Client {
 
     /// Add a team to the local device store.
     pub async fn add_team(&mut self, team: TeamId, cfg: TeamConfig) -> Result<()> {
+        if !cfg.has_init_command() {
+            Err(ConfigError::InvalidArg {
+                arg: "cfg",
+                reason: "Init command not set",
+            })?;
+        }
+
         self.daemon
             .add_team(context::current(), team, cfg.into())
             .await?

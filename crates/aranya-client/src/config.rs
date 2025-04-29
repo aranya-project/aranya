@@ -86,6 +86,13 @@ pub struct TeamConfig {
 }
 
 impl TeamConfig {
+    #[inline]
+    pub fn has_init_command(&self) -> bool {
+        self.init_command.is_some()
+    }
+}
+
+impl TeamConfig {
     /// Creates a default [`TeamConfigBuilder`].
     pub fn builder() -> TeamConfigBuilder {
         Default::default()

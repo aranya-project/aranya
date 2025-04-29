@@ -318,7 +318,16 @@ impl DaemonApi for DaemonApiHandler {
         team: api::TeamId,
         cfg: api::TeamConfig,
     ) -> api::Result<()> {
-        todo!()
+        let mut client = self.client.aranya.lock().await;
+        let init_command = cfg
+            .init_command
+            .context("Team config did not have an init command")?;
+
+        client
+            .add_graph(&init_command)
+            .context("Unable to add team")?;
+
+        Ok(())
     }
 
     #[instrument(skip(self))]

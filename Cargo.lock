@@ -120,7 +120,7 @@ checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 [[package]]
 name = "aranya-aqc-util"
 version = "0.2.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -225,7 +225,7 @@ dependencies = [
 [[package]]
 name = "aranya-crypto"
 version = "0.5.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "buggy",
  "byteorder",
@@ -245,7 +245,7 @@ dependencies = [
 [[package]]
 name = "aranya-crypto-ffi"
 version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -313,7 +313,7 @@ dependencies = [
 [[package]]
 name = "aranya-device-ffi"
 version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -322,7 +322,7 @@ dependencies = [
 [[package]]
 name = "aranya-envelope-ffi"
 version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -350,7 +350,7 @@ dependencies = [
 [[package]]
 name = "aranya-idam-ffi"
 version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -384,7 +384,7 @@ dependencies = [
 [[package]]
 name = "aranya-libc"
 version = "0.2.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "cfg-if",
  "libc",
@@ -396,7 +396,7 @@ dependencies = [
 [[package]]
 name = "aranya-perspective-ffi"
 version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -405,7 +405,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-ast"
 version = "0.4.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "serde",
  "thiserror 2.0.12",
@@ -429,7 +429,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-derive"
 version = "0.5.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "aranya-policy-lang 0.4.0 (git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph)",
  "prettyplease",
@@ -497,7 +497,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-lang"
 version = "0.4.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "anyhow",
  "aranya-policy-ast",
@@ -513,7 +513,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-module"
 version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-ast",
@@ -524,7 +524,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-vm"
 version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-ast",
@@ -539,7 +539,7 @@ dependencies = [
 [[package]]
 name = "aranya-runtime"
 version = "0.7.0"
-source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#c1598cb036fca149d2c9dfd16eaac557ca0d4268"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph#7ee25e696c1404c682adad2c7dff41b0c57baebe"
 dependencies = [
  "aranya-crypto",
  "aranya-libc 0.2.0 (git+https://github.com/aranya-project/aranya-core.git?branch=init-command-from-new-graph)",
