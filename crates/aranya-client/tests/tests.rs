@@ -296,13 +296,14 @@ async fn test_sync_now() -> Result<()> {
 
     // Create the initial team, and get our TeamId.
     let cfg = TeamConfig::builder().build()?;
-    let team_id = team
+    let (team_id, init_command) = team
         .owner
         .client
         .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
+    info!(?init_command);
 
     // TODO(geoff): implement add_team.
     /*
@@ -359,13 +360,14 @@ async fn test_query_functions() -> Result<()> {
 
     // Create the initial team, and get our TeamId.
     let cfg = TeamConfig::builder().build()?;
-    let team_id = team
+    let (team_id, init_command) = team
         .owner
         .client
         .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
+    info!(?init_command);
 
     /*
     team.admin.client.add_team(team_id).await?;

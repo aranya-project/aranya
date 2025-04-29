@@ -331,18 +331,19 @@ impl DaemonApi for DaemonApiHandler {
         self,
         _: context::Context,
         cfg: api::TeamConfig,
-    ) -> api::Result<api::TeamId> {
+    ) -> api::Result<(api::TeamId, Vec<u8>)> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
         let pk = self.get_pk()?;
-        let (graph_id, _) = self
+        let (graph_id, init_command, _) = self
             .client
             .create_team(pk, Some(nonce))
             .await
             .context("unable to create team")?;
         debug!(?graph_id);
-        Ok(graph_id.into_id().into())
+        debug!(?init_command);
+        Ok((graph_id.into_id().into(), init_command))
     }
 
     #[instrument(skip(self))]

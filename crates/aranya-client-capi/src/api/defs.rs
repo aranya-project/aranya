@@ -606,7 +606,8 @@ pub fn team_config_builder_build(
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.deref_mut();
     let cfg = aranya_client::TeamConfig::builder().build()?;
-    let id = client.rt.block_on(client.inner.create_team(cfg))?;
+    // TODO(Steve): Use init command
+    let (id, init_command) = client.rt.block_on(client.inner.create_team(cfg))?;
     Ok(id.into())
 }
 

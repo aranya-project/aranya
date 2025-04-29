@@ -145,9 +145,9 @@ where
         &self,
         owner_keys: KeyBundle,
         nonce: Option<&[u8]>,
-    ) -> Result<(GraphId, Vec<Effect>)> {
+    ) -> Result<(GraphId, Vec<u8>, Vec<Effect>)> {
         let mut sink = VecSink::new();
-        let id = self
+        let (id, init_command) = self
             .aranya
             .lock()
             .await
@@ -160,7 +160,7 @@ where
                 &mut sink,
             )
             .context("unable to create new team")?;
-        Ok((id, sink.collect()?))
+        Ok((id, init_command, sink.collect()?))
     }
 
     /// Returns an implementation of [`Actions`] for a particular
