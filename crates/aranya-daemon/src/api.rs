@@ -378,11 +378,11 @@ impl DaemonApi for DaemonApiHandler {
         _: context::Context,
         team: api::TeamId,
         keys: api::KeyBundle,
-        priority: i64,
+        precedence: i64,
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .add_member(keys.into(), priority)
+            .add_member(keys.into(), precedence)
             .await
             .context("unable to add device to team")?;
         Ok(())

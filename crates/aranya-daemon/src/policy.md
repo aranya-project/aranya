@@ -107,8 +107,8 @@ struct KeyIds {
 struct DeviceInfo {
     // ID of the device.
     device_id id,
-    // Device priority.
-    priority int,
+    // Device precedence.
+    precedence int,
     // Signing key id.
     sign_key_id id,
     // Encryption key id.
@@ -290,13 +290,13 @@ function device_can_publish_cmd(device_id id, cmd string) bool {
     return exists AssignedRole[role_id: role_id, device_id: device_id]
 }
 
-// Check if the author device has higher priority than the target device.
+// Check if the author device has higher precedence than the target device.
 // This means the author has permission to execute commands on the target.
 function author_dominates_target(author_id id, target_id id) bool {
-    // Check if the device has higher priority than the target device.
+    // Check if the device has higher precedence than the target device.
     let author_device = unwrap query Device[device_id: author_id]
     let target_device = unwrap query Device[device_id: target_id]
-    if author_device.device.priority > target_device.device.priority {
+    if author_device.device.precedence > target_device.device.precedence {
         return true
     }
     return false
@@ -461,10 +461,10 @@ command CreateTeam {
         // Check that author_id matches the device_id being created
         check author_id == owner_key_ids.device_id
 
-        // TODO: define const high priority for owner device.
+        // TODO: define const high precedence for owner device.
         let device = DeviceInfo {
             device_id: owner_key_ids.device_id,
-            priority: 65000,
+            precedence: 65000,
             sign_key_id: owner_key_ids.sign_key_id,
             enc_key_id: owner_key_ids.enc_key_id,
         }
@@ -690,10 +690,10 @@ Add a member to a team.
 
 ```policy
 // Adds a Member to the Team.
-action add_member(device_keys struct KeyBundle, priority int){
+action add_member(device_keys struct KeyBundle, precedence int){
     publish AddMember {
         device_keys: device_keys,
-        priority: priority,
+        precedence: precedence,
     }
 }
 
@@ -703,16 +703,16 @@ effect MemberAdded {
     device_id id,
     // The device's set of public DeviceKeys.
     device_keys struct KeyBundle,
-    // Priority of the device.
-    priority int,
+    // Precedence of the device.
+    precedence int,
 }
 
 command AddMember {
     fields {
         // The new device's public DeviceKeys.
         device_keys struct KeyBundle,
-        // Priority of the device.
-        priority int,
+        // Precedence of the device.
+        precedence int,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -732,7 +732,7 @@ command AddMember {
 
         let device = DeviceInfo {
             device_id: device_key_ids.device_id,
-            priority: this.priority,
+            precedence: this.precedence,
             sign_key_id: device_key_ids.sign_key_id,
             enc_key_id: device_key_ids.enc_key_id,
         }
@@ -743,7 +743,7 @@ command AddMember {
             emit MemberAdded {
                 device_id: device_key_ids.device_id,
                 device_keys: this.device_keys,
-                priority: this.priority,
+                precedence: this.precedence,
             }
         }
     }
@@ -817,7 +817,7 @@ finish function remove_device(device_id id) {
 
 ## AssignPriority
 
-Assign priority to a device on a team.
+TODO: assign precedence to a device on a team.
 
 ## CreateRole
 
@@ -997,7 +997,7 @@ effect RoleAssigned {
 **Invariants**:
 
 - Only the Owner device can assign roles to other devices.
-- The Owner must have higher priority than the target device.
+- The Owner must have a higher device precedence than the target device.
 - A device may have many roles assigned to it.
 - The Owner cannot assign new roles to itself after team creation.
 

@@ -254,11 +254,11 @@ impl Team<'_> {
         })
     }
 
-    /// Add a device to the team with the default `Member` role.
-    pub async fn add_device_to_team(&mut self, keys: KeyBundle, priority: i64) -> Result<()> {
+    /// Add a device to the team with key bundle and device precedence.
+    pub async fn add_device_to_team(&mut self, keys: KeyBundle, precedence: i64) -> Result<()> {
         self.client
             .daemon
-            .add_device_to_team(context::current(), self.id, keys, priority)
+            .add_device_to_team(context::current(), self.id, keys, precedence)
             .await?
             .map_err(Into::into)
     }
@@ -290,7 +290,7 @@ impl Team<'_> {
             .map_err(Into::into)
     }
 
-    /// Revoke a role from a device. This sets the device's role back to the default `Member` role.
+    /// Revoke a role from a device.
     pub async fn revoke_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
             .daemon

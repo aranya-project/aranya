@@ -423,10 +423,10 @@ where
     fn add_member(
         &self,
         keys: KeyBundle,
-        priority: i64,
+        precedence: i64,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.add_member(keys, priority)?;
+            actor.add_member(keys, precedence)?;
             Ok(())
         })
         .in_current_span()

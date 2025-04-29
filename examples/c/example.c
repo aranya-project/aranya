@@ -310,17 +310,17 @@ AranyaError run(Team *t) {
     EXPECT("error initializing roles", err);
 
     // add admin to team.
-    AranyaPriority priority = 9000;
+    AranyaDevicePrecedence precedence = 9000;
     err =
-        aranya_add_device_to_team(&t->clients.owner.client, &t->id, &priority,
+        aranya_add_device_to_team(&t->clients.owner.client, &t->id, &precedence,
                                   t->clients.admin.pk, t->clients.admin.pk_len);
     EXPECT("error adding admin to team", err);
 
     // add operator to team.
-    priority = 8000;
-    err = aranya_add_device_to_team(&t->clients.owner.client, &t->id, &priority,
-                                    t->clients.operator.pk,
-                                    t->clients.operator.pk_len);
+    precedence = 8000;
+    err        = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
+                                           &precedence, t->clients.operator.pk,
+                                           t->clients.operator.pk_len);
     EXPECT("error adding operator to team", err);
 
     // upgrade role to admin.
@@ -373,18 +373,18 @@ AranyaError run(Team *t) {
     // something like `scp`.
 
     // add membera to team.
-    priority = 7000;
-    err = aranya_add_device_to_team(&t->clients.owner.client, &t->id, &priority,
-                                    t->clients.membera.pk,
-                                    t->clients.membera.pk_len);
+    precedence = 7000;
+    err        = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
+                                           &precedence, t->clients.membera.pk,
+                                           t->clients.membera.pk_len);
     EXPECT("error adding membera to team", err);
     err = aranya_assign_role(&t->clients.owner.client, &t->id,
                              &t->clients.membera.id, &t->roles.member);
     EXPECT("error assigning membera the member role", err);
 
     // add memberb to team.
-    err = aranya_add_device_to_team(&t->clients.owner.client, &t->id, &priority,
-                                    t->clients.memberb.pk,
+    err = aranya_add_device_to_team(&t->clients.owner.client, &t->id,
+                                    &precedence, t->clients.memberb.pk,
                                     t->clients.memberb.pk_len);
     EXPECT("error adding memberb to team", err);
     err = aranya_assign_role(&t->clients.owner.client, &t->id,

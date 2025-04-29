@@ -266,8 +266,8 @@ pub trait DaemonApi {
     /// Setup default roles on team.
     async fn setup_default_roles(team: TeamId) -> Result<Vec<Role>>;
 
-    /// Add device to the team.
-    async fn add_device_to_team(team: TeamId, keys: KeyBundle, priority: i64) -> Result<()>;
+    /// Add device to the team with a key bundle and operation precedence.
+    async fn add_device_to_team(team: TeamId, keys: KeyBundle, precedence: i64) -> Result<()>;
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
 

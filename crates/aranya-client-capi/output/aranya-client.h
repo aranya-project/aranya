@@ -393,12 +393,12 @@ typedef struct ARANYA_ALIGNED(8) AranyaCmd {
 } AranyaCmd;
 
 /**
- * A device priority.
+ * A device precedence.
  *
  * Determines whether the author of a graph command has permission
  * to execute a command on a target device with lower priority.
  */
-typedef int64_t AranyaPriority;
+typedef int64_t AranyaDevicePrecedence;
 
 /**
  * A network identifier for an Aranya client.
@@ -1231,6 +1231,10 @@ AranyaError aranya_revoke_role_cmd_ext(struct AranyaClient *client,
 /**
  * Setup default roles on team.
  *
+ * This sets up the admin, operator, and member roles with default permissions as defined in the Aranya policy.
+ * The caller should invoke this method right after team creation in order to use default RBAC from the policy.
+ * If this method is not invoked, the application must manually create roles and assign permissions to them.
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
@@ -1243,6 +1247,10 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
 
 /**
  * Setup default roles on team.
+ *
+ * This sets up the admin, operator, and member roles with default permissions as defined in the Aranya policy.
+ * The caller should invoke this method right after team creation in order to use default RBAC from the policy.
+ * If this method is not invoked, the application must manually create roles and assign permissions to them.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -1262,7 +1270,7 @@ AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param priority is the device's priority [`AranyaPriority`](@ref AranyaPriority).
+ * @param priority is the device's priority [`AranyaDevicePrecedence`](@ref AranyaDevicePrecedence).
  * @param keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param keybundle_len is the length of the serialized keybundle.
  *
@@ -1270,7 +1278,7 @@ AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
  */
 AranyaError aranya_add_device_to_team(struct AranyaClient *client,
                                       const struct AranyaTeamId *team,
-                                      const AranyaPriority *priority,
+                                      const AranyaDevicePrecedence *precedence,
                                       const uint8_t *keybundle,
                                       size_t keybundle_len);
 
@@ -1281,7 +1289,7 @@ AranyaError aranya_add_device_to_team(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param priority is the device's priority [`AranyaPriority`](@ref AranyaPriority).
+ * @param priority is the device's priority [`AranyaDevicePrecedence`](@ref AranyaDevicePrecedence).
  * @param keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param keybundle_len is the length of the serialized keybundle.
  *
@@ -1289,7 +1297,7 @@ AranyaError aranya_add_device_to_team(struct AranyaClient *client,
  */
 AranyaError aranya_add_device_to_team_ext(struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
-                                          const AranyaPriority *priority,
+                                          const AranyaDevicePrecedence *precedence,
                                           const uint8_t *keybundle,
                                           size_t keybundle_len,
                                           struct AranyaExtError *__ext_err);

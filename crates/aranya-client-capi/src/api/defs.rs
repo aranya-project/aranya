@@ -451,13 +451,13 @@ impl CmdName {
     }
 }
 
-/// A device priority.
+/// A device precedence.
 ///
 /// Determines whether the author of a graph command has permission
 /// to execute a command on a target device with lower priority.
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-pub struct Priority(i64);
+pub struct DevicePrecedence(i64);
 
 /// An AQC label name.
 ///
@@ -896,6 +896,10 @@ pub unsafe fn revoke_role_cmd(
 
 /// Setup default roles on team.
 ///
+/// This sets up the admin, operator, and member roles with default permissions as defined in the Aranya policy.
+/// The caller should invoke this method right after team creation in order to use default RBAC from the policy.
+/// If this method is not invoked, the application must manually create roles and assign permissions to them.
+///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 ///
@@ -934,7 +938,7 @@ pub unsafe fn setup_default_roles(
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param priority is the device's priority [`Priority`].
+/// @param priority is the device's priority [`DevicePrecedence`].
 /// @param keybundle serialized keybundle byte buffer `KeyBundle`.
 /// @param keybundle_len is the length of the serialized keybundle.
 ///
@@ -942,7 +946,7 @@ pub unsafe fn setup_default_roles(
 pub unsafe fn add_device_to_team(
     client: &mut Client,
     team: &TeamId,
-    priority: &Priority,
+    precedence: &DevicePrecedence,
     keybundle: &[u8],
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
@@ -952,7 +956,7 @@ pub unsafe fn add_device_to_team(
         client
             .inner
             .team(team.into())
-            .add_device_to_team(keybundle, priority.0),
+            .add_device_to_team(keybundle, precedence.0),
     )?;
     Ok(())
 }

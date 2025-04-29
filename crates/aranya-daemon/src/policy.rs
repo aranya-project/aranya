@@ -86,7 +86,7 @@ pub struct TeamTerminated {
 pub struct MemberAdded {
     pub device_id: Id,
     pub device_keys: KeyBundle,
-    pub priority: i64,
+    pub precedence: i64,
 }
 /// MemberRemoved policy effect.
 #[effect]
@@ -294,7 +294,7 @@ pub trait ActorExt {
     fn add_member(
         &mut self,
         device_keys: KeyBundle,
-        priority: i64,
+        precedence: i64,
     ) -> Result<(), ClientError>;
     fn remove_member(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn create_role(&mut self, name: String) -> Result<(), ClientError>;
