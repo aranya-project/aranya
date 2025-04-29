@@ -81,6 +81,7 @@ impl Default for SyncPeerConfigBuilder {
 }
 
 /// Configuration info for adding and creating teams.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TeamConfig {
     init_command: Option<Vec<u8>>,
 }
