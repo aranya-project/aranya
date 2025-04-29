@@ -1133,10 +1133,22 @@ pub fn role_get_id(role: &Role) -> RoleId {
 
 /// Get name of role.
 ///
+/// @param role the role [`Role`].
+///
 /// Returns a C string pointer to the role's name.
 #[aranya_capi_core::no_ext_error]
 pub fn role_get_name(role: &Role) -> *const c_char {
     role.name.as_ptr()
+}
+
+/// Cleanup dynamically allocated strings in role.
+///
+/// @param role the role [`Role`].
+pub unsafe fn role_cleanup(role: OwnedPtr<Role>) {
+    // SAFETY: Caller must ensure `role` is a valid object.
+    unsafe {
+        role.drop_in_place();
+    }
 }
 
 /// Get ID of label.
@@ -1158,12 +1170,32 @@ pub fn label_get_name(label: &Label) -> *const c_char {
     label.name.as_ptr()
 }
 
+/// Cleanup dynamically allocated strings in label.
+///
+/// @param label the label [`Label`].
+pub unsafe fn label_cleanup(label: OwnedPtr<Label>) {
+    // SAFETY: Caller must ensure `label` is a valid object.
+    unsafe {
+        label.drop_in_place();
+    }
+}
+
 /// Get name of command.
 ///
 /// Returns a C string pointer to the command's name.
 #[aranya_capi_core::no_ext_error]
 pub fn cmd_get_name(cmd: &Cmd) -> *const c_char {
     cmd.name.as_ptr()
+}
+
+/// Cleanup dynamically allocated strings in cmd.
+///
+/// @param cmd the cmd [`Cmd`].
+pub unsafe fn cmd_cleanup(cmd: OwnedPtr<Cmd>) {
+    // SAFETY: Caller must ensure `cmd` is a valid object.
+    unsafe {
+        cmd.drop_in_place();
+    }
 }
 
 /// Assign a label to a device so that it can be used for a channel.

@@ -453,6 +453,8 @@ AranyaError run(Team *t) {
         err                    = aranya_role_get_name(&role_result, &role_str);
         EXPECT("unable to get role name", err);
         printf("role: %s at index: %zu/%zu \r\n", role_str, i, roles_len);
+        err = aranya_role_cleanup(&roles[i]);
+        EXPECT("unable to cleanup role", err);
     }
     free(roles);
 
@@ -469,8 +471,9 @@ AranyaError run(Team *t) {
         EXPECT("unable to get role name", err);
         printf("role: %s at index: %zu/%zu \r\n", role_str, i,
                device_roles_len);
+        err = aranya_role_cleanup(&device_roles[i]);
+        EXPECT("unable to cleanup role", err);
     }
-
     free(device_roles);
 
     printf("querying admin role permissions\r\n");
@@ -488,8 +491,9 @@ AranyaError run(Team *t) {
         err                  = aranya_cmd_get_name(&cmd_result, &cmd_str);
         EXPECT("unable to get cmd name", err);
         printf("cmd: %s at index: %zu/%zu \r\n", cmd_str, i, cmds_len);
+        err = aranya_cmd_cleanup(&cmds[i]);
+        EXPECT("unable to cleanup cmd", err);
     }
-
     free(cmds);
 
     size_t memberb_keybundle_len = 255;
@@ -659,6 +663,8 @@ AranyaError run_aqc_example(Team *t) {
         const char *label_str    = NULL;
         aranya_label_get_name(&label_result, &label_str);
         printf("label: %s at index: %zu/%zu \r\n", label_str, i, labels_len);
+        err = aranya_label_cleanup(&labels[i]);
+        EXPECT("unable to cleanup label", err);
     }
     free(labels);
     free(team_str);
@@ -698,6 +704,10 @@ AranyaError init_roles(Team *t) {
     err               = setup_default_roles(t, &roles, &roles_len);
 
     if (roles_len != 3) {
+        for (size_t i = 0; i < roles_len; i++) {
+            err = aranya_role_cleanup(&roles[i]);
+            EXPECT("unable to cleanup role", err);
+        }
         free(roles);
         fprintf(stderr,
                 "expected 3 default roles: admin, operator, member\r\n");
@@ -719,6 +729,8 @@ AranyaError init_roles(Team *t) {
         if (!strncmp("member", role_str, strnlen(role_str, 255))) {
             t->roles.member = role_id;
         }
+        err = aranya_role_cleanup(&roles[i]);
+        EXPECT("unable to cleanup role", err);
     }
     free(roles);
 
@@ -768,6 +780,8 @@ AranyaError cleanup_roles(Team *t) {
                                          &devices[i], &role_id);
                 EXPECT("error revoking role", err);
             }
+            err = aranya_role_cleanup(&roles[j]);
+            EXPECT("unable to cleanup role", err);
         }
         free(roles);
     }
@@ -802,13 +816,16 @@ AranyaError cleanup_roles(Team *t) {
                 EXPECT("error getting cmd name", err);
                 printf("revoked role cmd: %s\r\n", cmd_str);
             }
+            err = aranya_cmd_cleanup(&cmds[j]);
+            EXPECT("unable to cleanup cmd", err);
         }
         free(cmds);
+        err = aranya_role_cleanup(&roles[i]);
+        EXPECT("unable to cleanup role", err);
     }
+    free(roles);
 
     // TODO: delete roles.
-
-    free(roles);
 
     return err;
 }

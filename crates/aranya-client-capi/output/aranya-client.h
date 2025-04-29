@@ -1538,10 +1538,27 @@ AranyaError aranya_role_get_id_ext(const struct AranyaRole *role,
 /**
  * Get name of role.
  *
+ * @param role the role [`AranyaRole`](@ref AranyaRole).
+ *
  * Returns a C string pointer to the role's name.
  */
 AranyaError aranya_role_get_name(const struct AranyaRole *role,
                                  const char **__output);
+
+/**
+ * Cleanup dynamically allocated strings in role.
+ *
+ * @param role the role [`AranyaRole`](@ref AranyaRole).
+ */
+AranyaError aranya_role_cleanup(struct AranyaRole *role);
+
+/**
+ * Cleanup dynamically allocated strings in role.
+ *
+ * @param role the role [`AranyaRole`](@ref AranyaRole).
+ */
+AranyaError aranya_role_cleanup_ext(struct AranyaRole *role,
+                                    struct AranyaExtError *__ext_err);
 
 /**
  * Get ID of label.
@@ -1575,12 +1592,42 @@ AranyaError aranya_label_get_name(const struct AranyaLabel *label,
                                   const char **__output);
 
 /**
+ * Cleanup dynamically allocated strings in label.
+ *
+ * @param label the label [`AranyaLabel`](@ref AranyaLabel).
+ */
+AranyaError aranya_label_cleanup(struct AranyaLabel *label);
+
+/**
+ * Cleanup dynamically allocated strings in label.
+ *
+ * @param label the label [`AranyaLabel`](@ref AranyaLabel).
+ */
+AranyaError aranya_label_cleanup_ext(struct AranyaLabel *label,
+                                     struct AranyaExtError *__ext_err);
+
+/**
  * Get name of command.
  *
  * Returns a C string pointer to the command's name.
  */
 AranyaError aranya_cmd_get_name(const struct AranyaCmd *cmd,
                                 const char **__output);
+
+/**
+ * Cleanup dynamically allocated strings in cmd.
+ *
+ * @param cmd the cmd [`AranyaCmd`](@ref AranyaCmd).
+ */
+AranyaError aranya_cmd_cleanup(struct AranyaCmd *cmd);
+
+/**
+ * Cleanup dynamically allocated strings in cmd.
+ *
+ * @param cmd the cmd [`AranyaCmd`](@ref AranyaCmd).
+ */
+AranyaError aranya_cmd_cleanup_ext(struct AranyaCmd *cmd,
+                                   struct AranyaExtError *__ext_err);
 
 /**
  * Assign a label to a device so that it can be used for a channel.
