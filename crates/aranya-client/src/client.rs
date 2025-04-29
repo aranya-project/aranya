@@ -3,7 +3,7 @@
 use std::{net::SocketAddr, path::Path};
 
 use aranya_daemon_api::{
-    ChanOp, Cmd, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier, Op,
     Role, RoleId, TeamId,
 };
 use aranya_util::Addr;
@@ -64,18 +64,18 @@ impl Roles {
     }
 }
 
-/// List of commands.
-pub struct Cmds {
-    data: Vec<Cmd>,
+/// List of operations.
+pub struct Ops {
+    data: Vec<Op>,
 }
 
-impl Cmds {
-    pub fn iter(&self) -> impl Iterator<Item = &Cmd> {
+impl Ops {
+    pub fn iter(&self) -> impl Iterator<Item = &Op> {
         self.data.iter()
     }
 
     #[doc(hidden)]
-    pub fn __data(&self) -> &[Cmd] {
+    pub fn __data(&self) -> &[Op] {
         self.data.as_slice()
     }
 }
@@ -299,20 +299,20 @@ impl Team<'_> {
             .map_err(Into::into)
     }
 
-    /// Assign command to a role.
-    pub async fn assign_role_cmd(&mut self, role: RoleId, cmd: Cmd) -> Result<()> {
+    /// Assign operation to a role.
+    pub async fn assign_role_operation(&mut self, role: RoleId, op: Op) -> Result<()> {
         self.client
             .daemon
-            .assign_role_cmd(context::current(), self.id, role, cmd)
+            .assign_role_operation(context::current(), self.id, role, op)
             .await?
             .map_err(Into::into)
     }
 
-    /// Revoke command from a role.
-    pub async fn revoke_role_cmd(&mut self, role: RoleId, cmd: Cmd) -> Result<()> {
+    /// Revoke operation from a role.
+    pub async fn revoke_role_operation(&mut self, role: RoleId, op: Op) -> Result<()> {
         self.client
             .daemon
-            .revoke_role_cmd(context::current(), self.id, role, cmd)
+            .revoke_role_operation(context::current(), self.id, role, op)
             .await?
             .map_err(Into::into)
     }
@@ -427,7 +427,7 @@ impl Queries<'_> {
             .map_err(Into::into)
     }
 
-    /// Returns a list of labels assiged to the current device.
+    /// Returns a list of labels assigned to the current device.
     pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
         Ok(Labels {
             data: self
@@ -438,13 +438,13 @@ impl Queries<'_> {
         })
     }
 
-    /// Returns a list of commands assigned to a role.
-    pub async fn role_cmds(&mut self, role: RoleId) -> Result<Cmds> {
-        Ok(Cmds {
+    /// Returns a list of operations assigned to a role.
+    pub async fn role_ops(&mut self, role: RoleId) -> Result<Ops> {
+        Ok(Ops {
             data: self
                 .client
                 .daemon
-                .query_role_cmds(context::current(), self.id, role)
+                .query_role_operations(context::current(), self.id, role)
                 .await??,
         })
     }

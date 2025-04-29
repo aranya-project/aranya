@@ -429,21 +429,21 @@ impl RoleName {
     }
 }
 
-/// A role command.
+/// A role operation.
 ///
 /// E.g. "CreateLabel"
 #[aranya_capi_core::opaque(size = 32, align = 8)]
-pub type Cmd = Safe<imp::Cmd>;
-const _: [(); 32] = [(); size_of::<Cmd>()];
+pub type Op = Safe<imp::Op>;
+const _: [(); 32] = [(); size_of::<Op>()];
 
-/// A role command name.
+/// A role operation name.
 ///
 /// E.g. "CreateLabel"
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-pub struct CmdName(*const c_char);
+pub struct OpName(*const c_char);
 
-impl CmdName {
+impl OpName {
     unsafe fn as_underlying(self) -> Result<String, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
@@ -833,53 +833,53 @@ pub fn create_role(
     Ok(())
 }
 
-/// Assign role command.
+/// Assign role operation.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param role_id the role ID [`RoleId`] to assign a command to.
-/// @param cmd the command to assign to the role [`Cmd`].
+/// @param role_id the role ID [`RoleId`] to assign an operation to.
+/// @param op the operation to assign to the role [`Op`].
 ///
 /// @relates AranyaClient.
-pub fn assign_role_cmd(
+pub fn assign_role_operation(
     client: &mut Client,
     team: &TeamId,
     role_id: &RoleId,
-    cmd: CmdName,
+    op: OpName,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    // SAFETY: Caller must ensure `cmd` is a valid C String.
-    let cmd = unsafe { cmd.as_underlying() }?;
+    // SAFETY: Caller must ensure `op` is a valid C String.
+    let op = unsafe { op.as_underlying() }?;
 
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .assign_role_cmd(role_id.into(), cmd),
+            .assign_role_operation(role_id.into(), op),
     )?;
     Ok(())
 }
 
-/// Revoke role command.
+/// Revoke role operation.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param role_id the role ID [`RoleId`] to revoke a command from.
-/// @param cmd the command to revoke from the role [`Cmd`].
+/// @param role_id the role ID [`RoleId`] to revoke an operation from.
+/// @param op the operation to revoke from the role [`Op`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn revoke_role_cmd(
+pub unsafe fn revoke_role_operation(
     client: &mut Client,
     team: &TeamId,
     role_id: &RoleId,
-    cmd: &Cmd,
+    op: &Op,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let cmd = cmd
+    let op = op
         .name
         .clone()
         .into_string()
@@ -889,7 +889,7 @@ pub unsafe fn revoke_role_cmd(
         client
             .inner
             .team(team.into())
-            .revoke_role_cmd(role_id.into(), cmd),
+            .revoke_role_operation(role_id.into(), op),
     )?;
     Ok(())
 }
@@ -1184,21 +1184,21 @@ pub unsafe fn label_cleanup(label: OwnedPtr<Label>) {
     }
 }
 
-/// Get name of command.
+/// Get name of operation.
 ///
-/// Returns a C string pointer to the command's name.
+/// Returns a C string pointer to the operation's name.
 #[aranya_capi_core::no_ext_error]
-pub fn cmd_get_name(cmd: &Cmd) -> *const c_char {
-    cmd.name.as_ptr()
+pub fn op_get_name(op: &Op) -> *const c_char {
+    op.name.as_ptr()
 }
 
-/// Cleanup dynamically allocated strings in cmd.
+/// Cleanup dynamically allocated strings in op.
 ///
-/// @param cmd the cmd [`Cmd`].
-pub unsafe fn cmd_cleanup(cmd: OwnedPtr<Cmd>) {
-    // SAFETY: Caller must ensure `cmd` is a valid object.
+/// @param op the operation [`Op`].
+pub unsafe fn op_cleanup(op: OwnedPtr<Op>) {
+    // SAFETY: Caller must ensure `op` is a valid object.
     unsafe {
-        cmd.drop_in_place();
+        op.drop_in_place();
     }
 }
 
@@ -1693,45 +1693,45 @@ pub fn query_device_roles(
     Ok(())
 }
 
-/// Query for list of commands assigned to the role.
+/// Query for list of operations assigned to the role.
 ///
-/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the commands.
-/// Writes the number of roles that would have been returned to `cmd_len`.
-/// The application can use `cmd_len` to allocate a larger buffer.
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the operations.
+/// Writes the number of roles that would have been returned to `op_len`.
+/// The application can use `op_len` to allocate a larger buffer.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param role the role's ID [`RoleId`].
 ///
 /// Output params:
-/// @param cmds returns a list of commands [`Cmd`].
-/// @param cmds_len returns the length of the commands list [`RoleId`].
+/// @param ops returns a list of operations [`Op`].
+/// @param ops_len returns the length of the operations list [`RoleId`].
 ///
 /// @relates AranyaClient.
-pub fn query_role_cmds(
+pub fn query_role_operations(
     client: &mut Client,
     team: &TeamId,
     role: &RoleId,
-    cmds: Option<&mut MaybeUninit<Cmd>>,
-    cmds_len: &mut usize,
+    ops: Option<&mut MaybeUninit<Op>>,
+    ops_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let data = client
         .rt
-        .block_on(client.inner.queries(team.into()).role_cmds(role.into()))?;
+        .block_on(client.inner.queries(team.into()).role_ops(role.into()))?;
     let data = data.__data();
-    let Some(cmds) = cmds else {
-        *cmds_len = data.len();
+    let Some(ops) = ops else {
+        *ops_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     };
-    let out = aranya_capi_core::try_as_mut_slice!(cmds, *cmds_len);
+    let out = aranya_capi_core::try_as_mut_slice!(ops, *ops_len);
     for (dst, src) in out.iter_mut().zip(data) {
         Safe::init(dst, src.clone().try_into()?)
     }
-    if *cmds_len < data.len() {
-        *cmds_len = data.len();
+    if *ops_len < data.len() {
+        *ops_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
-    *cmds_len = data.len();
+    *ops_len = data.len();
     Ok(())
 }

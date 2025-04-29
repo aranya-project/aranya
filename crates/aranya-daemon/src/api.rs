@@ -203,8 +203,8 @@ impl DaemonApiHandler {
                 Effect::RoleDeleted(_) => {}
                 Effect::RoleAssigned(_) => {}
                 Effect::RoleRevoked(_) => {}
-                Effect::RoleCmdAssigned(_) => {}
-                Effect::RoleCmdRevoked(_) => {}
+                Effect::RoleOpAssigned(_) => {}
+                Effect::RoleOpRevoked(_) => {}
                 Effect::LabelCreated(_) => {}
                 Effect::LabelDeleted(_) => {}
                 Effect::LabelAssigned(_) => {}
@@ -223,7 +223,7 @@ impl DaemonApiHandler {
                 Effect::AqcNetworkNameUnset(_network_name_unset) => {}
                 Effect::QueriedLabel(_) => {}
                 Effect::QueriedRole(_) => {}
-                Effect::QueriedRoleCmd(_) => {}
+                Effect::QueriedRoleOp(_) => {}
                 Effect::AqcBidiChannelCreated(_) => {}
                 Effect::AqcBidiChannelReceived(_) => {}
                 Effect::AqcUniChannelCreated(_) => {}
@@ -475,34 +475,34 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn assign_role_cmd(
+    async fn assign_role_operation(
         self,
         _: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-        cmd: api::Cmd,
+        op: api::Op,
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .assign_role_cmd(role, cmd.clone())
+            .assign_role_operation(role, op.clone())
             .await
-            .context(format!("unable to assign role cmd: {}", cmd))?;
+            .context(format!("unable to assign role operation: {}", op))?;
         Ok(())
     }
 
     #[instrument(skip(self))]
-    async fn revoke_role_cmd(
+    async fn revoke_role_operation(
         self,
         _: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-        cmd: api::Cmd,
+        op: api::Op,
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .revoke_role_cmd(role.into_id().into(), cmd.clone())
+            .revoke_role_operation(role.into_id().into(), op.clone())
             .await
-            .context(format!("unable to revoke role cmd: {}", cmd))?;
+            .context(format!("unable to revoke role operation: {}", op))?;
         Ok(())
     }
     #[instrument(skip(self))]
@@ -889,23 +889,23 @@ impl DaemonApi for DaemonApiHandler {
         Ok(roles)
     }
 
-    /// Query role commands.
-    async fn query_role_cmds(
+    /// Query role operations.
+    async fn query_role_operations(
         self,
         _: context::Context,
         team: api::TeamId,
         role: api::RoleId,
-    ) -> api::Result<Vec<api::Cmd>> {
+    ) -> api::Result<Vec<api::Op>> {
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
-            .query_role_cmds_off_graph(role.into_id().into())
+            .query_role_ops_off_graph(role.into_id().into())
             .await
-            .context("unable to query role commands")?;
-        let mut roles: Vec<api::Cmd> = Vec::new();
+            .context("unable to query role operations")?;
+        let mut roles: Vec<api::Op> = Vec::new();
         for e in effects {
-            if let Effect::QueriedRoleCmd(e) = e {
-                roles.push(e.cmd);
+            if let Effect::QueriedRoleOp(e) = e {
+                roles.push(e.op);
             }
         }
         Ok(roles)

@@ -194,7 +194,7 @@ impl TeamCtx {
         // Create a dummy role and assign a dummy command to it.
         let dummy_role = owner_team.create_role("dummy".to_string()).await?;
         owner_team
-            .assign_role_cmd(dummy_role.id, "dummy_cmd".to_string())
+            .assign_role_operation(dummy_role.id, "dummy_cmd".to_string())
             .await?;
 
         self.roles = Some(default_roles);
@@ -283,11 +283,11 @@ impl TeamCtx {
         let roles = &mut owner.queries(team_id).roles_on_team().await?;
         for role in roles.iter() {
             if role.id != owner_role.id {
-                let cmds = owner.queries(team_id).role_cmds(role.id).await?;
-                for cmd in cmds.iter() {
+                let ops = owner.queries(team_id).role_ops(role.id).await?;
+                for op in ops.iter() {
                     owner
                         .team(team_id)
-                        .revoke_role_cmd(role.id, cmd.clone())
+                        .revoke_role_operation(role.id, op.clone())
                         .await?;
                 }
             }

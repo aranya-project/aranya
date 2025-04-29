@@ -140,8 +140,8 @@ AranyaError query_devices_on_team(Team *t, AranyaDeviceId **devices,
 AranyaError query_roles_on_team(Team *t, AranyaRole **roles, size_t *roles_len);
 AranyaError query_device_roles(Team *t, AranyaDeviceId *device,
                                AranyaRole **roles, size_t *roles_len);
-AranyaError query_role_cmds(Team *t, AranyaRoleId *role, AranyaCmd **cmds,
-                            size_t *cmds_len);
+AranyaError query_role_operations(Team *t, AranyaRoleId *role, AranyaOp **ops,
+                                  size_t *ops_len);
 
 // Initialize an Aranya client.
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
@@ -477,24 +477,24 @@ AranyaError run(Team *t) {
     free(device_roles);
 
     printf("querying admin role permissions\r\n");
-    size_t cmds_len = BUF_LEN;
-    AranyaCmd *cmds = malloc(cmds_len * sizeof(AranyaCmd));
-    err = aranya_query_role_cmds(&t->clients.operator.client, &t->id,
-                                 &t->roles.admin, cmds, &cmds_len);
-    EXPECT("error querying role cmds", err);
+    size_t ops_len = BUF_LEN;
+    AranyaOp *ops  = malloc(ops_len * sizeof(AranyaOp));
+    err = aranya_query_role_operations(&t->clients.operator.client, &t->id,
+                                       &t->roles.admin, ops, &ops_len);
+    EXPECT("error querying role ops", err);
     if (roles == NULL) {
         return ARANYA_ERROR_BUG;
     }
-    for (size_t i = 0; i < cmds_len; i++) {
-        AranyaCmd cmd_result = cmds[i];
-        const char *cmd_str  = NULL;
-        err                  = aranya_cmd_get_name(&cmd_result, &cmd_str);
-        EXPECT("unable to get cmd name", err);
-        printf("cmd: %s at index: %zu/%zu \r\n", cmd_str, i, cmds_len);
-        err = aranya_cmd_cleanup(&cmds[i]);
-        EXPECT("unable to cleanup cmd", err);
+    for (size_t i = 0; i < ops_len; i++) {
+        AranyaOp op_result = ops[i];
+        const char *op_str = NULL;
+        err                = aranya_op_get_name(&op_result, &op_str);
+        EXPECT("unable to get op name", err);
+        printf("op: %s at index: %zu/%zu \r\n", op_str, i, ops_len);
+        err = aranya_op_cleanup(&ops[i]);
+        EXPECT("unable to cleanup op", err);
     }
-    free(cmds);
+    free(ops);
 
     size_t memberb_keybundle_len = 255;
     uint8_t *memberb_keybundle   = malloc(memberb_keybundle_len);
@@ -734,16 +734,16 @@ AranyaError init_roles(Team *t) {
     }
     free(roles);
 
-    // create a dummy role and assign it a dummy cmd.
+    // create a dummy role and assign it a dummy op.
     AranyaRole role;
     err = aranya_create_role(&t->clients.owner.client, &t->id, "dummy", &role);
     EXPECT("expected to be able to create role", err);
     AranyaRoleId role_id;
     err = aranya_role_get_id(&role, &role_id);
     EXPECT("error getting dummy role id", err);
-    err = aranya_assign_role_cmd(&t->clients.owner.client, &t->id, &role_id,
-                                 "DummyCmd");
-    EXPECT("error assigning DummyCmd cmd", err);
+    err = aranya_assign_role_operation(&t->clients.owner.client, &t->id,
+                                       &role_id, "DummyOp");
+    EXPECT("error assigning DummyOp op", err);
 
     return err;
 }
@@ -787,7 +787,7 @@ AranyaError cleanup_roles(Team *t) {
     }
     free(devices);
 
-    // Revoke command permissions from roles.
+    // Revoke operation permissions from roles.
     size_t roles_len  = 0;
     AranyaRole *roles = NULL;
     err               = query_roles_on_team(t, &roles, &roles_len);
@@ -799,27 +799,27 @@ AranyaError cleanup_roles(Team *t) {
         EXPECT("error getting role ID", err);
         const char *role_str;
         err = aranya_role_get_name(&roles[i], &role_str);
-        printf("revoking cmds for role: %s\r\n", role_str);
+        printf("revoking ops for role: %s\r\n", role_str);
 
-        size_t cmds_len = 0;
-        AranyaCmd *cmds = NULL;
-        err             = query_role_cmds(t, &role_id, &cmds, &cmds_len);
-        printf("cmds_len: %zu\r\n", cmds_len);
+        size_t ops_len = 0;
+        AranyaOp *ops  = NULL;
+        err            = query_role_operations(t, &role_id, &ops, &ops_len);
+        printf("ops_len: %zu\r\n", ops_len);
         EXPECT("error querying role permissions", err);
-        for (size_t j = 0; j < cmds_len; j++) {
+        for (size_t j = 0; j < ops_len; j++) {
             if (memcmp(&owner_role_id, &role_id, sizeof(AranyaRoleId))) {
-                err = aranya_revoke_role_cmd(&t->clients.owner.client, &t->id,
-                                             &role_id, &cmds[j]);
-                EXPECT("error revoking role cmd", err);
-                const char *cmd_str;
-                err = aranya_cmd_get_name(&cmds[j], &cmd_str);
-                EXPECT("error getting cmd name", err);
-                printf("revoked role cmd: %s\r\n", cmd_str);
+                err = aranya_revoke_role_operation(&t->clients.owner.client,
+                                                   &t->id, &role_id, &ops[j]);
+                EXPECT("error revoking role op", err);
+                const char *op_str;
+                err = aranya_op_get_name(&ops[j], &op_str);
+                EXPECT("error getting op name", err);
+                printf("revoked role op: %s\r\n", op_str);
             }
-            err = aranya_cmd_cleanup(&cmds[j]);
-            EXPECT("unable to cleanup cmd", err);
+            err = aranya_op_cleanup(&ops[j]);
+            EXPECT("unable to cleanup op", err);
         }
-        free(cmds);
+        free(ops);
         err = aranya_role_cleanup(&roles[i]);
         EXPECT("unable to cleanup role", err);
     }
@@ -898,17 +898,17 @@ AranyaError query_device_roles(Team *t, AranyaDeviceId *device,
     return err;
 }
 
-// Query role permissions. Returned `cmds` ptr must be freed.
-AranyaError query_role_cmds(Team *t, AranyaRoleId *role, AranyaCmd **cmds,
-                            size_t *cmds_len) {
+// Query role permissions. Returned `ops` ptr must be freed.
+AranyaError query_role_operations(Team *t, AranyaRoleId *role, AranyaOp **ops,
+                                  size_t *ops_len) {
     AranyaError err;
 
-    *cmds_len = BUF_LEN;
-    *cmds     = malloc(*cmds_len * sizeof(AranyaCmd));
-    err = aranya_query_role_cmds(&t->clients.operator.client, &t->id, role,
-                                 *cmds, cmds_len);
-    EXPECT("error querying role cmds", err);
-    if (cmds == NULL) {
+    *ops_len = BUF_LEN;
+    *ops     = malloc(*ops_len * sizeof(AranyaOp));
+    err      = aranya_query_role_operations(&t->clients.operator.client, &t->id,
+                                            role, *ops, ops_len);
+    EXPECT("error querying role ops", err);
+    if (ops == NULL) {
         return ARANYA_ERROR_BUG;
     }
 
