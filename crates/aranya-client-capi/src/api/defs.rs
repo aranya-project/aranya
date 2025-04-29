@@ -57,11 +57,7 @@ pub enum Error {
     #[capi(msg = "daemon reported error")]
     Daemon,
 
-    /// AFC library error.
-    #[capi(msg = "AFC library error")]
-    Afc,
-
-    /// AQC library error.
+    /// An error occurred inside the AQC library.
     #[capi(msg = "AQC library error")]
     Aqc,
 
@@ -93,8 +89,6 @@ impl From<&imp::Error> for Error {
                 aranya_client::Error::Connecting(_) => Self::Connecting,
                 aranya_client::Error::Rpc(_) => Self::Rpc,
                 aranya_client::Error::Daemon(_) => Self::Daemon,
-                #[cfg(feature = "afc")]
-                aranya_client::Error::Afc(_) => Self::Afc,
                 aranya_client::Error::Aqc(_) => Self::Aqc,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::Config(_) => Self::Config,
@@ -168,16 +162,50 @@ pub fn ext_error_msg(
     err.copy_msg(msg, msg_len)
 }
 
-/// Initializes logging.
+/// A type to represent a span of time in nanoseconds.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct Duration {
+    pub nanos: u64,
+}
+
+pub const ARANYA_DURATION_SECONDS: u64 = 1000 * ARANYA_DURATION_MILLISECONDS;
+pub const ARANYA_DURATION_MILLISECONDS: u64 = 1000 * ARANYA_DURATION_MICROSECONDS;
+pub const ARANYA_DURATION_MICROSECONDS: u64 = 1000 * ARANYA_DURATION_NANOSECONDS;
+pub const ARANYA_DURATION_NANOSECONDS: u64 = 1;
+
+impl From<Duration> for std::time::Duration {
+    fn from(value: Duration) -> Self {
+        std::time::Duration::from_nanos(value.nanos)
+    }
+}
+
+/// Initializes a new client instance.
 ///
-/// Assumes the `ARANYA_CAPI` environment variable has been set to the desired tracing log level.
-/// E.g. `ARANYA_CAPI=debug`.
-pub fn init_logging() -> Result<(), imp::Error> {
-    use tracing_subscriber::{prelude::*, EnvFilter};
-    tracing_subscriber::registry()
-        .with(tracing_subscriber::fmt::layer())
-        .with(EnvFilter::from_env("ARANYA_CAPI"))
-        .try_init()?;
+/// @param client the uninitialized Aranya Client [`Client`].
+/// @param config the client's configuration [`ClientConfig`].
+///
+/// @relates AranyaClient.
+pub unsafe fn client_init(
+    client: &mut MaybeUninit<Client>,
+    config: &ClientConfig,
+) -> Result<(), imp::Error> {
+    // TODO: Clean this up.
+
+    let daemon_socket = OsStr::from_bytes(
+        // SAFETY: Caller must ensure pointer is a valid C String.
+        unsafe { std::ffi::CStr::from_ptr(config.daemon_addr()) }.to_bytes(),
+    )
+    .as_ref();
+
+    let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
+    let inner = rt.block_on(aranya_client::Client::connect(
+        daemon_socket,
+        // SAFETY: Caller ensures config.aqc().addr is valid
+        unsafe { NetIdentifier(config.aqc().addr).as_underlying()? },
+    ))?;
+
+    Safe::init(client, imp::Client { rt, inner });
     Ok(())
 }
 
@@ -261,6 +289,31 @@ impl From<&DeviceId> for aranya_daemon_api::DeviceId {
     }
 }
 
+/// An enum containing team roles defined in the Aranya policy.
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+pub enum Role {
+    /// Owner role.
+    Owner,
+    /// Admin role.
+    Admin,
+    /// Operator role.
+    Operator,
+    /// Member role.
+    Member,
+}
+
+impl From<Role> for aranya_daemon_api::Role {
+    fn from(value: Role) -> Self {
+        match value {
+            Role::Owner => Self::Owner,
+            Role::Admin => Self::Admin,
+            Role::Operator => Self::Operator,
+            Role::Member => Self::Member,
+        }
+    }
+}
+
 /// Label ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -284,81 +337,18 @@ impl From<&LabelId> for aranya_daemon_api::LabelId {
     }
 }
 
-/// Channel ID for AQC bidi channel.
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct AqcBidiChannelId {
-    id: Id,
-}
-
-impl From<aranya_daemon_api::AqcBidiChannelId> for AqcBidiChannelId {
-    fn from(value: aranya_daemon_api::AqcBidiChannelId) -> Self {
-        Self {
-            id: Id {
-                bytes: value.into(),
-            },
-        }
-    }
-}
-
-impl From<&AqcBidiChannelId> for aranya_daemon_api::AqcBidiChannelId {
-    fn from(value: &AqcBidiChannelId) -> Self {
-        value.id.bytes.into()
-    }
-}
-
-/// Channel ID for AQC uni channel.
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct AqcUniChannelId {
-    id: Id,
-}
-
-impl From<aranya_daemon_api::AqcUniChannelId> for AqcUniChannelId {
-    fn from(value: aranya_daemon_api::AqcUniChannelId) -> Self {
-        Self {
-            id: Id {
-                bytes: value.into(),
-            },
-        }
-    }
-}
-
-impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
-    fn from(value: &AqcUniChannelId) -> Self {
-        value.id.bytes.into()
-    }
-}
-
-/// Channel ID for a fast channel.
+/// An AQC label name.
+///
+/// E.g. "TELEMETRY_LABEL"
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-#[aranya_capi_core::opaque(size = 16, align = 1)]
-#[cfg(feature = "afc")]
-pub struct ChannelId(aranya_daemon_api::AfcId);
+pub struct LabelName(*const c_char);
 
-/// An enum containing team roles defined in the Aranya policy.
-#[repr(u8)]
-#[derive(Copy, Clone, Debug)]
-pub enum Role {
-    /// Owner role.
-    Owner,
-    /// Admin role.
-    Admin,
-    /// Operator role.
-    Operator,
-    /// Member role.
-    Member,
-}
-
-impl From<Role> for aranya_daemon_api::Role {
-    fn from(value: Role) -> Self {
-        match value {
-            Role::Owner => Self::Owner,
-            Role::Admin => Self::Admin,
-            Role::Operator => Self::Operator,
-            Role::Member => Self::Member,
-        }
+impl LabelName {
+    unsafe fn as_underlying(self) -> Result<String, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
+        Ok(String::from(cstr.to_str()?))
     }
 }
 
@@ -419,256 +409,104 @@ impl NetIdentifier {
     }
 }
 
-/// An AQC label name.
-///
-/// E.g. "TELEMETRY_LABEL"
-#[repr(transparent)]
+/// Channel ID for AQC bidi channel.
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-pub struct LabelName(*const c_char);
+pub struct AqcBidiChannelId {
+    id: Id,
+}
 
-impl LabelName {
-    unsafe fn as_underlying(self) -> Result<String, imp::Error> {
-        // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
-        Ok(String::from(cstr.to_str()?))
+impl From<aranya_daemon_api::AqcBidiChannelId> for AqcBidiChannelId {
+    fn from(value: aranya_daemon_api::AqcBidiChannelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
     }
 }
 
-/// An AFC label.
-///
-/// It identifies the policy rules that govern the AFC channel.
-#[cfg(feature = "afc")]
-#[repr(transparent)]
+impl From<&AqcBidiChannelId> for aranya_daemon_api::AqcBidiChannelId {
+    fn from(value: &AqcBidiChannelId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
+/// Channel ID for AQC uni channel.
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-pub struct Label(u32);
+pub struct AqcUniChannelId {
+    id: Id,
+}
 
-#[cfg(feature = "afc")]
-impl From<Label> for aranya_fast_channels::Label {
-    fn from(value: Label) -> Self {
-        Self::new(value.0)
+impl From<aranya_daemon_api::AqcUniChannelId> for AqcUniChannelId {
+    fn from(value: aranya_daemon_api::AqcUniChannelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
     }
 }
 
-#[cfg(feature = "afc")]
-impl From<aranya_fast_channels::Label> for Label {
-    fn from(value: aranya_fast_channels::Label) -> Self {
-        Self(value.to_u32())
+impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
+    fn from(value: &AqcUniChannelId) -> Self {
+        value.id.bytes.into()
     }
 }
 
-/// Sync Peer config.
-#[aranya_capi_core::opaque(size = 32, align = 8)]
-pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
-
-/// Builder for a Sync Peer config.
-#[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
-pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
-
-/// A type to represent a span of time in nanoseconds.
-#[repr(transparent)]
-#[derive(Copy, Clone, Debug)]
-pub struct Duration {
-    pub nanos: u64,
-}
-
-pub const ARANYA_DURATION_SECONDS: u64 = 1000 * ARANYA_DURATION_MILLISECONDS;
-pub const ARANYA_DURATION_MILLISECONDS: u64 = 1000 * ARANYA_DURATION_MICROSECONDS;
-pub const ARANYA_DURATION_MICROSECONDS: u64 = 1000 * ARANYA_DURATION_NANOSECONDS;
-pub const ARANYA_DURATION_NANOSECONDS: u64 = 1;
-
-impl From<Duration> for std::time::Duration {
-    fn from(value: Duration) -> Self {
-        std::time::Duration::from_nanos(value.nanos)
-    }
-}
-
-/// Configuration info for Aranya Fast Channels.
-#[cfg(feature = "afc")]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
-pub type AfcConfig = Safe<imp::AfcConfig>;
-
-/// Configuration info builder for Aranya Fast Channels.
-#[cfg(feature = "afc")]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
-pub type AfcConfigBuilder = Safe<imp::AfcConfigBuilder>;
-
-/// Sets the shared memory path that AFC should use for storing channel data.
+/// Initializes logging.
 ///
-/// @param cfg a pointer to the afc config builder
-/// @param shm_path a string with the shared memory path
-#[cfg(feature = "afc")]
-pub fn afc_config_builder_set_shm_path(cfg: &mut AfcConfigBuilder, shm_path: *const c_char) {
-    cfg.shm_path = shm_path;
-}
+/// Assumes the `ARANYA_CAPI` environment variable has been set to the desired tracing log level.
+/// E.g. `ARANYA_CAPI=debug`.
+pub fn init_logging() -> Result<(), imp::Error> {
+    use tracing_subscriber::{prelude::*, EnvFilter};
 
-/// Sets the maximum number of channels that are stored in shared memory.
-///
-/// @param cfg a pointer to the afc config builder
-/// @param max_channels the maximum number of channels allowed
-#[cfg(feature = "afc")]
-pub fn afc_config_builder_set_max_channels(cfg: &mut AfcConfigBuilder, max_channels: usize) {
-    cfg.max_channels = max_channels;
-}
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::fmt::layer())
+        .with(EnvFilter::from_env("ARANYA_CAPI"))
+        .try_init()?;
 
-/// Sets the address that the AFC server should bind to for listening.
-///
-/// @param cfg a pointer to the afc config builder
-/// @param address a string with the address to bind to
-#[cfg(feature = "afc")]
-pub fn afc_config_builder_set_address(cfg: &mut AfcConfigBuilder, address: *const c_char) {
-    cfg.addr = address;
-}
-
-/// Attempts to construct an [`AfcConfig`], returning an `Error::Config`
-/// if there are invalid parameters.
-///
-/// @param cfg a pointer to the afc config builder
-/// @param out a pointer to write the afc config to
-#[cfg(feature = "afc")]
-pub fn afc_config_builder_build(
-    cfg: &mut AfcConfigBuilder,
-    out: &mut MaybeUninit<AfcConfig>,
-) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
     Ok(())
 }
 
-/// Sets the configuration for Aranya Fast Channels.
+/// The size in bytes of an ID converted to a human-readable base58 string.
+pub const ARANYA_ID_STR_LEN: usize = (ARANYA_ID_LEN * 1375) / 1000 + 1;
+
+/// Writes the human-readable encoding of `id` to `str`.
 ///
-/// @param cfg a pointer to the client config builder
-/// @param afc_config a pointer to a valid AFC config (see [`AfcConfigBuilder`])
-#[cfg(feature = "afc")]
-pub fn client_config_builder_set_afc_config(
-    cfg: &mut ClientConfigBuilder,
-    afc_config: &mut AfcConfig,
-) {
-    cfg.afc(**afc_config);
-}
-
-/// Configuration info for Aranya QUIC Channels.
-#[aranya_capi_core::opaque(size = 40, align = 8)]
-pub type AqcConfig = Safe<imp::AqcConfig>;
-
-/// Configuration info builder for Aranya QUIC Channels.
-#[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 24, align = 8)]
-pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
-
-/// Sets the address that the AQC server should bind to for listening.
+/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
 ///
-/// @param cfg a pointer to the aqc config builder
-/// @param address a string with the address to bind to
-pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *const c_char) {
-    cfg.addr(address);
-}
-
-/// Attempts to construct an [`AqcConfig`], returning an `Error::Config`
-/// if there are invalid parameters.
+/// @param device ID [`Id`].
+/// @param str ID string [`Id`].
+/// @param str_len returns the length of `str`
 ///
-/// @param cfg a pointer to the aqc config builder
-/// @param out a pointer to write the aqc config to
-pub fn aqc_config_builder_build(
-    cfg: &mut AqcConfigBuilder,
-    out: &mut MaybeUninit<AqcConfig>,
+/// @relates AranyaId.
+#[aranya_capi_core::no_ext_error]
+pub fn id_to_str(
+    id: &Id,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    aranya_capi_core::write_c_str(str, id.as_ref(), str_len)?;
     Ok(())
 }
 
-/// Configuration info for Aranya.
-#[aranya_capi_core::opaque(size = 56, align = 8)]
-pub type ClientConfig = Safe<imp::ClientConfig>;
-
-/// Configuration info builder for Aranya.
-#[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 72, align = 8)]
-pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
-
-/// Sets the daemon address that the Client should try to connect to.
+/// Decodes `str` into an [`Id`].
 ///
-/// @param cfg a pointer to the client config builder
-/// @param address a string containing the address
-pub fn client_config_builder_set_daemon_addr(
-    cfg: &mut ClientConfigBuilder,
-    address: *const c_char,
-) {
-    cfg.daemon_addr(address);
-}
-
-/// Attempts to construct a [`ClientConfig`], returning an `Error::Config`
-/// if there are invalid parameters.
 ///
-/// @param cfg a pointer to the client config builder
-/// @param out a pointer to write the client config to
-pub fn client_config_builder_build(
-    cfg: &mut ClientConfigBuilder,
-    out: &mut MaybeUninit<ClientConfig>,
-) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
-    Ok(())
-}
-
-/// Sets the configuration for Aranya QUIC Channels.
+/// @param str pointer to a null-terminated string.
 ///
-/// @param cfg a pointer to the client config builder
-/// @param aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
-pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
-    cfg.aqc(**aqc_config);
-}
+/// @relates AranyaId.
+#[aranya_capi_core::no_ext_error]
+pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
+    // SAFETY: Caller must ensure the pointer is a valid C String.
+    let cstr = unsafe { std::ffi::CStr::from_ptr(str) };
 
-/// Initializes a new client instance.
-///
-/// @param client the uninitialized Aranya Client [`Client`].
-/// @param config the client's configuration [`ClientConfig`].
-///
-/// @relates AranyaClient.
-pub unsafe fn client_init(
-    client: &mut MaybeUninit<Client>,
-    config: &ClientConfig,
-) -> Result<(), imp::Error> {
-    // TODO: Clean this up.
-    let daemon_socket = OsStr::from_bytes(
-        // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.daemon_addr()) }.to_bytes(),
-    )
-    .as_ref();
-
-    #[cfg(feature = "afc")]
-    let afc_shm_path = OsStr::from_bytes(
-        // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.afc().shm_path) }.to_bytes(),
-    )
-    .as_ref();
-
-    #[cfg(feature = "afc")]
-    let afc_addr =
-        // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.afc().addr) }
-        .to_str()?;
-
-    let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
-
-    #[cfg(feature = "afc")]
-    let inner = rt.block_on(aranya_client::Client::connect(
-        daemon_socket,
-        afc_shm_path,
-        config.afc().max_channels,
-        afc_addr,
-    ))?;
-    #[cfg(not(feature = "afc"))]
-    let inner = rt.block_on(aranya_client::Client::connect(daemon_socket))?;
-
-    Safe::init(
-        client,
-        imp::Client {
-            rt,
-            inner,
-            #[cfg(feature = "afc")]
-            msg: None,
-        },
-    );
-    Ok(())
+    aranya_crypto::Id::decode(cstr.to_bytes())
+        .map_err(|_| InvalidArg::new("str", "unable to decode ID from bytes").into())
+        .map(Into::into)
 }
 
 /// Gets the public key bundle for this device.
@@ -685,6 +523,7 @@ pub unsafe fn get_key_bundle(
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
     let keys = client.rt.block_on(client.inner.get_key_bundle())?;
+
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
     unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
 
@@ -703,6 +542,79 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
     Ok(id.into())
 }
 
+/// Configuration info for Aranya.
+#[aranya_capi_core::opaque(size = 56, align = 8)]
+pub type ClientConfig = Safe<imp::ClientConfig>;
+
+/// Configuration info builder for Aranya.
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 72, align = 8)]
+pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
+
+/// Attempts to construct a [`ClientConfig`], returning an `Error::Config`
+/// if there are invalid parameters.
+///
+/// @param cfg a pointer to the client config builder
+/// @param out a pointer to write the client config to
+pub fn client_config_build(
+    cfg: &mut ClientConfigBuilder,
+    out: &mut MaybeUninit<ClientConfig>,
+) -> Result<(), imp::Error> {
+    Safe::init(out, cfg.build()?);
+    Ok(())
+}
+
+/// Sets the daemon address that the Client should try to connect to.
+///
+/// @param cfg a pointer to the client config builder
+/// @param address a string containing the address
+pub fn client_config_builder_set_daemon_addr(
+    cfg: &mut ClientConfigBuilder,
+    address: *const c_char,
+) {
+    cfg.daemon_addr(address);
+}
+
+/// Configuration info for Aranya QUIC Channels.
+#[aranya_capi_core::opaque(size = 24, align = 8)]
+pub type AqcConfig = Safe<imp::AqcConfig>;
+
+/// Configuration info builder for Aranya QUIC Channels.
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 24, align = 8)]
+pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
+
+/// Attempts to construct an [`AqcConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param cfg a pointer to the AQC config builder [`AqcConfigBuilder`]
+/// @param out a pointer to write the aqc config to
+pub fn aqc_config_build(
+    cfg: &mut AqcConfigBuilder,
+    out: &mut MaybeUninit<AqcConfig>,
+) -> Result<(), imp::Error> {
+    Safe::init(out, cfg.build()?);
+    Ok(())
+}
+
+/// Sets the address that the AQC server should bind to for listening.
+///
+/// @param cfg a pointer to the AQC config builder [`AqcConfigBuilder`]
+/// @param address a string with the address to bind to
+pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *const c_char) {
+    cfg.address(address);
+}
+
+/// Sets the configuration info for Aranya QUIC Channels.
+///
+/// @param cfg a pointer to the client config builder
+/// @param aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
+pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
+    cfg.aqc(**aqc_config);
+}
+
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
@@ -714,7 +626,7 @@ pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 ///
 /// @param cfg a pointer to the team config builder
 /// @param out a pointer to write the team config to
-pub fn team_config_builder_build(
+pub fn team_config_build(
     cfg: &mut TeamConfigBuilder,
     out: &mut MaybeUninit<TeamConfig>,
 ) -> Result<(), imp::Error> {
@@ -722,197 +634,59 @@ pub fn team_config_builder_build(
     Ok(())
 }
 
-/// Create a new graph/team with the current device as the owner.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param cfg the Team Configuration [`TeamConfig`].
-/// @param __output the team's ID [`TeamId`].
-///
-/// @relates AranyaClient.
-#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
-    let client = client.deref_mut();
-    let cfg = aranya_client::TeamConfig::builder().build()?;
-    let id = client.rt.block_on(client.inner.create_team(cfg))?;
-    Ok(id.into())
-}
+/// Sync Peer config.
+#[aranya_capi_core::opaque(size = 32, align = 8)]
+pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
 
-/// Add a team to the local device store.
-///
-/// NOTE: this function is unfinished and will panic if called.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param cfg the Team Configuration [`TeamConfig`].
-///
-/// @relates AranyaClient.
-#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    let cfg = aranya_client::TeamConfig::builder().build()?;
-    client
-        .rt
-        .block_on(client.inner.add_team(team.into(), cfg))?;
-    Ok(())
-}
+/// Builder for a Sync Peer config.
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
+pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
 
-/// Remove a team from the local device store.
+/// Build a sync config from a sync config builder
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-///
-/// @relates AranyaClient.
-pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client.rt.block_on(client.inner.remove_team(team.into()))?;
-    Ok(())
-}
-
-/// Add the peer for automatic periodic Aranya state syncing.
-///
-/// If a peer is not reachable on the network, sync errors
-/// will appear in the tracing logs and
-/// Aranya will be unable to sync state with that peer.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param addr the peer's Aranya network address [`Addr`].
-/// @param config configuration values for syncing with a peer.
-///
-/// @relates AranyaClient.
-pub unsafe fn add_sync_peer(
-    client: &mut Client,
-    team: &TeamId,
-    addr: Addr,
-    config: &SyncPeerConfig,
+/// @param cfg a pointer to the builder for a sync config
+pub fn sync_peer_config_build(
+    cfg: &SyncPeerConfigBuilder,
+    out: &mut MaybeUninit<SyncPeerConfig>,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `addr` is a valid C String.
-    let addr = unsafe { addr.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .add_sync_peer(addr, (**config).into()),
-    )?;
+    Safe::init(out, cfg.build()?);
     Ok(())
 }
 
-/// Sync with peer immediately.
+/// Configures how often the peer will be synced with.
 ///
-/// If a peer is not reachable on the network, sync errors
-/// will appear in the tracing logs and
-/// Aranya will be unable to sync state with that peer.
+/// By default, the interval is not set. It is an error to call
+/// [`sync_peer_config_build`] before setting the interval with
+/// this function
 ///
-///
-/// This function ignores [`sync_peer_config_builder_set_interval`] and
-/// [`sync_peer_config_builder_set_sync_later`], if set.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param addr the peer's Aranya network address [`Addr`].
-/// @param config configuration values for syncing with a peer.
-/// Default values for a sync config will be used if `config` is `NULL`
-/// @relates AranyaClient.
-pub unsafe fn sync_now(
-    client: &mut Client,
-    team: &TeamId,
-    addr: Addr,
-    config: Option<&SyncPeerConfig>,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `addr` is a valid C String.
-    let addr = unsafe { addr.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .sync_now(addr, config.map(|config| (**config).into())),
-    )?;
-    Ok(())
+/// @param cfg a pointer to the builder for a sync config
+/// @param interval Set the interval at which syncing occurs
+pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
+    cfg.deref_mut().interval(interval);
 }
 
-/// Remove the peer from automatic Aranya state syncing.
+/// Updates the config to enable immediate syncing with the peer.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param addr the peer's Aranya network address [`Addr`].
+/// Overrides [`sync_peer_config_builder_set_sync_later`] if invoked afterward.
 ///
-/// @relates AranyaClient.
-pub unsafe fn remove_sync_peer(
-    client: &mut Client,
-    team: &TeamId,
-    addr: Addr,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `addr` is a valid C String.
-    let addr = unsafe { addr.as_underlying() }?;
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).remove_sync_peer(addr))?;
-    Ok(())
+/// By default, the peer is synced with immediately.
+///
+/// @param cfg a pointer to the builder for a sync config
+// TODO: aranya-core#129
+pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
+    cfg.deref_mut().sync_now(true);
 }
 
-/// Close the team and stop all operations on the graph.
+/// Updates the config to disable immediate syncing with the peer.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
+/// Overrides [`sync_peer_config_builder_set_sync_now`] if invoked afterward.
 ///
-/// @relates AranyaClient.
-pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).close_team())?;
-    Ok(())
-}
-
-/// Add a device to the team with the default role.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param keybundle serialized keybundle byte buffer `KeyBundle`.
-/// @param keybundle_len is the length of the serialized keybundle.
-///
-/// @relates AranyaClient.
-pub unsafe fn add_device_to_team(
-    client: &mut Client,
-    team: &TeamId,
-    keybundle: &[u8],
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    let keybundle = imp::key_bundle_deserialize(keybundle)?;
-
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).add_device_to_team(keybundle))?;
-    Ok(())
-}
-
-/// Remove a device from the team.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-///
-/// @relates AranyaClient.
-pub fn remove_device_from_team(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .remove_device_from_team(device.into()),
-    )?;
-    Ok(())
+/// By default, the peer is synced with immediately.
+/// @param cfg a pointer to the builder for a sync config
+// TODO: aranya-core#129
+pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
+    cfg.deref_mut().sync_now(false);
 }
 
 /// Assign a role to a device.
@@ -969,415 +743,7 @@ pub fn revoke_role(
     Ok(())
 }
 
-/// Associate a network identifier to a device for use with AQC.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// If the address already exists for this device, it is replaced with the new address. Capable
-/// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
-/// OpenChannel and receiving messages. Can take either DNS name or IPV4.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
-///
-/// @relates AranyaClient.
-pub unsafe fn aqc_assign_net_identifier(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-    net_identifier: NetIdentifier,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
-    let net_identifier = unsafe { net_identifier.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .assign_aqc_net_identifier(device.into(), net_identifier),
-    )?;
-    Ok(())
-}
-
-/// Disassociate an AQC network identifier from a device.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
-///
-/// @relates AranyaClient.
-pub unsafe fn aqc_remove_net_identifier(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-    net_identifier: NetIdentifier,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
-    let net_identifier = unsafe { net_identifier.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .remove_aqc_net_identifier(device.into(), net_identifier),
-    )?;
-    Ok(())
-}
-
-/// Create an AFC channel label.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param label the AFC channel label [`Label`] to create.
-///
-/// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub fn create_afc_label(
-    client: &mut Client,
-    team: &TeamId,
-    label: Label,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .create_afc_label(label.into()),
-    )?;
-    Ok(())
-}
-
-/// Delete an AFC channel label.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param label the channel label [`Label`] to delete.
-///
-/// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub fn delete_afc_label(
-    client: &mut Client,
-    team: &TeamId,
-    label: Label,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .delete_afc_label(label.into()),
-    )?;
-    Ok(())
-}
-
-/// Assign an AFC label to a device so that it can be used for an AFC channel.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to assign the label to.
-/// @param label the AFC channel label [`Label`].
-///
-/// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub fn assign_afc_label(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-    label: Label,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .assign_afc_label(device.into(), label.into()),
-    )?;
-    Ok(())
-}
-
-/// Revoke an AFC label from a device.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to revoke the label from.
-/// @param label the AFC channel label [`Label`].
-///
-/// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub fn revoke_afc_label(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-    label: Label,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .revoke_afc_label(device.into(), label.into()),
-    )?;
-    Ok(())
-}
-
-/// Associate an AFC network identifier to a device.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// If the address already exists for this device, it is replaced with the new address. Capable
-/// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
-/// OpenChannel and receiving messages. Can take either DNS name or IPV4.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
-///
-/// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub unsafe fn afc_assign_net_identifier(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-    net_identifier: NetIdentifier,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
-    let net_identifier = unsafe { net_identifier.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .assign_afc_net_identifier(device.into(), net_identifier),
-    )?;
-    Ok(())
-}
-
-/// Disassociate an AFC network identifier from a device.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
-///
-/// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub unsafe fn afc_remove_net_identifier(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-    net_identifier: NetIdentifier,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
-    let net_identifier = unsafe { net_identifier.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .remove_afc_net_identifier(device.into(), net_identifier),
-    )?;
-    Ok(())
-}
-
-/// Create an Aranya Fast Channel (AFC).
-///
-/// Creates a bidirectional AFC channel between the current device
-/// and another peer.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param peer the peer's network identifier [`NetIdentifier`].
-/// @param label the AFC channel label [`Label`] to create the channel with.
-/// @param __output the channel's ID [`ChannelId`]
-///
-/// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub unsafe fn afc_create_bidi_channel(
-    client: &mut Client,
-    team: &TeamId,
-    peer: NetIdentifier,
-    label: Label,
-) -> Result<ChannelId, imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `peer` is a valid C String.
-    let peer = unsafe { peer.as_underlying() }?;
-    let id = client.rt.block_on(client.inner.afc().create_bidi_channel(
-        team.into(),
-        peer,
-        label.into(),
-    ))?;
-    Ok(ChannelId(id))
-}
-
-/// Delete an Aranya Fast Channel (AFC).
-///
-/// @param client the Aranya Client [`Client`].
-/// @param chan the AFC channel ID [`ChannelId`] of the channel to delete.
-///
-/// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub fn afc_delete_channel(client: &mut Client, chan: ChannelId) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.afc().delete_channel(chan.0))?;
-    Ok(())
-}
-
-/// Poll for new Aranya Fast Channels (AFC) data.
-///
-/// If the operation times out, this will return an `::ARANYA_ERROR_TIMEOUT`.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param timeout how long to wait before timing out the poll operation [`Duration`].
-///
-/// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub fn afc_poll_data(client: &mut Client, timeout: Duration) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client.rt.block_on(async {
-        let data = tokio::time::timeout(timeout.into(), client.inner.afc().poll_data()).await??;
-        client.inner.afc().handle_data(data).await?;
-        Ok(())
-    })
-}
-
-/// Send Aranya Fast Channels (AFC) data.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param chan the AFC channel's ID [`ChannelId`].
-/// @param data raw bytes of data to send.
-/// @param data_len length of data to send.
-///
-/// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub fn afc_send_data(client: &mut Client, chan: ChannelId, data: &[u8]) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.afc().send_data(chan.0, data))?;
-    Ok(())
-}
-
-/// Aranya Fast Channels (AFC) message info.
-#[repr(C)]
-#[derive(Debug)]
-#[cfg(feature = "afc")]
-pub struct AfcMsgInfo {
-    /// Uniquely (globally) identifies the channel.
-    pub channel: ChannelId,
-    /// The label applied to the channel.
-    pub label: Label,
-    /// Identifies the position of the message in the channel.
-    ///
-    /// This can be used to sort out-of-order messages.
-    pub seq: u64,
-    /// Peer's network socket address.
-    pub addr: SocketAddr,
-}
-
-/// Network socket address.
-#[repr(transparent)]
-#[derive(Copy, Clone, Debug)]
-#[cfg(feature = "afc")]
-pub struct SocketAddr(
-    /// libc Socket address.
-    // TODO: Custom type instead?
-    pub  libc::sockaddr_storage,
-);
-
-#[cfg(feature = "afc")]
-impl From<std::net::SocketAddr> for SocketAddr {
-    fn from(value: std::net::SocketAddr) -> Self {
-        let mut addr_storage =
-        // SAFETY: `sockaddr_storage` is zero initializable
-        unsafe { MaybeUninit::<libc::sockaddr_storage>::zeroed().assume_init() };
-        match value {
-            std::net::SocketAddr::V4(v4) => {
-                // SAFETY: `sockaddr_storage` "contains" `sockaddr_in`.
-                let in4 =
-                    unsafe { &mut *(ptr::from_mut(&mut addr_storage).cast::<libc::sockaddr_in>()) };
-                in4.sin_family = const { libc::AF_INET as _ };
-                in4.sin_port = v4.port().to_be();
-                in4.sin_addr = libc::in_addr {
-                    s_addr: v4.ip().to_bits().to_be(),
-                };
-            }
-            std::net::SocketAddr::V6(v6) => {
-                // SAFETY: `sockaddr_storage` "contains" `sockaddr_in6`.
-                let in6 = unsafe {
-                    &mut *(ptr::from_mut(&mut addr_storage).cast::<libc::sockaddr_in6>())
-                };
-                in6.sin6_family = const { libc::AF_INET6 as _ };
-                in6.sin6_port = v6.port().to_be();
-                in6.sin6_addr = libc::in6_addr {
-                    s6_addr: v6.ip().to_bits().to_be_bytes(),
-                };
-            }
-        }
-        Self(addr_storage)
-    }
-}
-
-/// Receive Aranya Fast Channels (AFC) data.
-///
-/// @param client the Aranya Client.
-/// @param buf buffer to store message into.
-/// @param buf_len length of buffer.
-/// @param info information about the message [`AfcMsgInfo`].
-/// @result A boolean indicating whether any data was available.
-///
-/// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub unsafe fn afc_recv_data(
-    client: &mut Client,
-    buf: Writer<u8>,
-    info: &mut MaybeUninit<AfcMsgInfo>,
-) -> Result<bool, imp::Error> {
-    let client = client.deref_mut();
-
-    if client.msg.is_none() {
-        client.msg = client.inner.afc().try_recv_data();
-    }
-    let Some(msg) = &mut client.msg else {
-        return Ok(false);
-    };
-
-    // SAFETY: The caller must ensure `buf` is valid.
-    unsafe { buf.copy_to(|buf| buf.write_all(&msg.data)) }
-        .map_err(|_| imp::Error::BufferTooSmall)?;
-
-    info.write(AfcMsgInfo {
-        channel: ChannelId(msg.channel),
-        label: msg.label.into(),
-        seq: msg.seq.to_u64(),
-        addr: msg.address.into(),
-    });
-
-    client.msg = None;
-
-    Ok(true)
-}
-
-/// Create a channel label.
+/// Create a label to open channels with.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -1392,33 +758,14 @@ pub fn create_label(
     name: LabelName,
 ) -> Result<LabelId, imp::Error> {
     let client = client.deref_mut();
+
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
+
     let label_id = client
         .rt
         .block_on(client.inner.team(team.into()).create_label(name))?;
     Ok(label_id.into())
-}
-
-/// Delete a channel label.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param label_id the channel label ID [`LabelId`] to delete.
-///
-/// @relates AranyaClient.
-pub fn delete_label(
-    client: &mut Client,
-    team: &TeamId,
-    label_id: &LabelId,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).delete_label(label_id.into()))?;
-    Ok(())
 }
 
 /// Assign a label to a device so that it can be used for a channel.
@@ -1475,116 +822,205 @@ pub fn revoke_label(
     Ok(())
 }
 
-/// Create an AQC channel.
+/// Create a new graph/team with the current device as the owner.
 ///
-/// Creates a bidirectional AQC channel between the current device
-/// and another peer.
+/// @param client the Aranya Client [`Client`].
+/// @param cfg the Team Configuration [`TeamConfig`].
+/// @param __output the team's ID [`TeamId`].
+///
+/// @relates AranyaClient.
+#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
+pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
+    let cfg = aranya_client::TeamConfig::builder().build()?;
+
+    let client = client.deref_mut();
+    let id = client.rt.block_on(client.inner.create_team(cfg))?;
+    Ok(id.into())
+}
+
+/// Add a team to the local device store.
+///
+/// NOTE: this function is unfinished and will panic if called.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param cfg the Team Configuration [`TeamConfig`].
+///
+/// @relates AranyaClient.
+#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
+pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
+    let cfg = aranya_client::TeamConfig::builder().build()?;
+
+    let client = client.deref_mut();
+    client
+        .rt
+        .block_on(client.inner.add_team(team.into(), cfg))?;
+    Ok(())
+}
+
+/// Remove a team from the local device store.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+///
+/// @relates AranyaClient.
+pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client.rt.block_on(client.inner.remove_team(team.into()))?;
+    Ok(())
+}
+
+/// Close the team and stop all operations on the graph.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+///
+/// @relates AranyaClient.
+pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).close_team())?;
+    Ok(())
+}
+
+/// Add a device to the team with the default role.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param peer the peer's network identifier [`NetIdentifier`].
-/// @param label_id the AQC channel label ID [`LabelId`] to create the channel with.
-/// @param __output the AQC channel's ID [`ChannelId`]
+/// @param keybundle serialized keybundle byte buffer `KeyBundle`.
+/// @param keybundle_len is the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.
-pub unsafe fn aqc_create_bidi_channel(
+pub unsafe fn add_device_to_team(
     client: &mut Client,
     team: &TeamId,
-    peer: NetIdentifier,
-    label_id: &LabelId,
-) -> Result<AqcBidiChannelId, imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `peer` is a valid C String.
-    let peer = unsafe { peer.as_underlying() }?;
-    let (chan_id, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
-    Ok(chan_id.into())
-}
-
-/// Delete a bidirectional AQC channel.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param chan the AQC channel ID [`ChannelId`] of the channel to delete.
-///
-/// @relates AranyaClient.
-pub fn aqc_delete_bidi_channel(
-    client: &mut Client,
-    chan: &AqcBidiChannelId,
+    keybundle: &[u8],
 ) -> Result<(), imp::Error> {
+    let keybundle = imp::key_bundle_deserialize(keybundle)?;
+
     let client = client.deref_mut();
     client
         .rt
-        .block_on(client.inner.aqc().delete_bidi_channel(chan.into()))?;
+        .block_on(client.inner.team(team.into()).add_device_to_team(keybundle))?;
     Ok(())
 }
 
-/// Delete a unidirectional AQC channel.
+/// Remove a device from the team.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
-/// @param chan the AQC channel ID [`ChannelId`] of the channel to delete.
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_delete_uni_channel(
+pub fn remove_device_from_team(
     client: &mut Client,
-    chan: &AqcUniChannelId,
+    team: &TeamId,
+    device: &DeviceId,
 ) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .remove_device_from_team(device.into()),
+    )?;
+    Ok(())
+}
+
+/// Add the peer for automatic periodic Aranya state syncing.
+///
+/// If a peer is not reachable on the network, sync errors
+/// will appear in the tracing logs and
+/// Aranya will be unable to sync state with that peer.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param addr the peer's Aranya network address [`Addr`].
+/// @param config configuration values for syncing with a peer.
+///
+/// @relates AranyaClient.
+pub unsafe fn add_sync_peer(
+    client: &mut Client,
+    team: &TeamId,
+    addr: Addr,
+    config: &SyncPeerConfig,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { addr.as_underlying() }?;
+
+    let client = client.deref_mut();
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .add_sync_peer(addr, (**config).into()),
+    )?;
+    Ok(())
+}
+
+/// Remove the peer from automatic Aranya state syncing.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param addr the peer's Aranya network address [`Addr`].
+///
+/// @relates AranyaClient.
+pub unsafe fn remove_sync_peer(
+    client: &mut Client,
+    team: &TeamId,
+    addr: Addr,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { addr.as_underlying() }?;
+
     let client = client.deref_mut();
     client
         .rt
-        .block_on(client.inner.aqc().delete_uni_channel(chan.into()))?;
+        .block_on(client.inner.team(team.into()).remove_sync_peer(addr))?;
     Ok(())
 }
 
-/// Configures how often the peer will be synced with.
+/// Sync with peer immediately.
 ///
-/// By default, the interval is not set. It is an error to call
-/// [`sync_peer_config_builder_build`] before setting the interval with
-/// this function
+/// If a peer is not reachable on the network, sync errors
+/// will appear in the tracing logs and
+/// Aranya will be unable to sync state with that peer.
 ///
-/// @param cfg a pointer to the builder for a sync config
-/// @param interval Set the interval at which syncing occurs
-pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
-    cfg.deref_mut().interval(interval);
-}
-
-/// Updates the config to enable immediate syncing with the peer.
 ///
-/// Overrides [`sync_peer_config_builder_set_sync_later`] if invoked afterward.
+/// This function ignores [`sync_peer_config_builder_set_interval`] and
+/// [`sync_peer_config_builder_set_sync_later`], if set.
 ///
-/// By default, the peer is synced with immediately.
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param addr the peer's Aranya network address [`Addr`].
+/// @param config configuration values for syncing with a peer.
+/// Default values for a sync config will be used if `config` is `NULL`
 ///
-/// @param cfg a pointer to the builder for a sync config
-// TODO: aranya-core#129
-pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
-    cfg.deref_mut().sync_now(true);
-}
-
-/// Updates the config to disable immediate syncing with the peer.
-///
-/// Overrides [`sync_peer_config_builder_set_sync_now`] if invoked afterward.
-///
-/// By default, the peer is synced with immediately.
-/// @param cfg a pointer to the builder for a sync config
-// TODO: aranya-core#129
-pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
-    cfg.deref_mut().sync_now(false);
-}
-
-/// Build a sync config from a sync config builder
-///
-/// @param cfg a pointer to the builder for a sync config
-pub fn sync_peer_config_builder_build(
-    cfg: &SyncPeerConfigBuilder,
-    out: &mut MaybeUninit<SyncPeerConfig>,
+/// @relates AranyaClient.
+pub unsafe fn sync_now(
+    client: &mut Client,
+    team: &TeamId,
+    addr: Addr,
+    config: Option<&SyncPeerConfig>,
 ) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { addr.as_underlying() }?;
+
+    let client = client.deref_mut();
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .sync_now(addr, config.map(|config| (**config).into())),
+    )?;
     Ok(())
 }
+
 /// Query devices on team.
 ///
 /// @param client the Aranya Client [`Client`].
@@ -1603,60 +1039,27 @@ pub fn query_devices_on_team(
     let data = client
         .rt
         .block_on(client.inner.queries(team.into()).devices_on_team())?;
+
     let data = data.__data();
+
     let Some(devices) = devices else {
         *devices_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     };
+
     let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
+
     if *devices_len < data.len() {
         *devices_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
+
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write((*src).into());
     }
+
     *devices_len = data.len();
     Ok(())
-}
-
-/// The size in bytes of an ID converted to a human-readable base58 string.
-pub const ARANYA_ID_STR_LEN: usize = (ARANYA_ID_LEN * 1375) / 1000 + 1;
-
-/// Writes the human-readable encoding of `id` to `str`.
-///
-/// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
-///
-/// @param device ID [`Id`].
-/// @param str ID string [`Id`].
-/// @param str_len returns the length of `str`
-///
-/// @relates AranyaId.
-#[aranya_capi_core::no_ext_error]
-pub fn id_to_str(
-    id: &Id,
-    str: &mut MaybeUninit<c_char>,
-    str_len: &mut usize,
-) -> Result<(), imp::Error> {
-    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
-    aranya_capi_core::write_c_str(str, id.as_ref(), str_len)?;
-    Ok(())
-}
-
-/// Decodes `str` into an [`Id`].
-///
-///
-/// @param str pointer to a null-terminated string.
-///
-/// @relates AranyaId.
-#[aranya_capi_core::no_ext_error]
-pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
-    // SAFETY: Caller must ensure the pointer is a valid C String.
-    let cstr = unsafe { std::ffi::CStr::from_ptr(str) };
-
-    aranya_crypto::Id::decode(cstr.to_bytes())
-        .map_err(|_| InvalidArg::new("str", "unable to decode ID from bytes").into())
-        .map(Into::into)
 }
 
 // TODO: query_device_role
@@ -1684,8 +1087,10 @@ pub unsafe fn query_device_keybundle(
             .queries(team.into())
             .device_keybundle(device.into()),
     )?;
+
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
     unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
+
     Ok(())
 }
 
@@ -1718,24 +1123,30 @@ pub fn query_device_label_assignments(
             .queries(team.into())
             .device_label_assignments(device.into()),
     )?;
+
     let data = data.__data();
+
     let Some(labels) = labels else {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     };
+
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+
     if *labels_len < data.len() {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
+
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write(src.id.into());
     }
+
     *labels_len = data.len();
     Ok(())
 }
 
-/// Query device AFC label assignments.
+/// Query for list of existing labels.
 ///
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
 /// Writes the number of labels that would have been returned to `labels_len`.
@@ -1743,74 +1154,64 @@ pub fn query_device_label_assignments(
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
 ///
 /// Output params:
-/// @param labels returns a list of labels assigned to the device [`Label`].
-/// @param labels_len returns the length of the labels list [`Label`].
+/// @param labels returns a list of labels [`LabelId`].
+/// @param labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub fn query_device_afc_label_assignments(
+pub fn query_labels(
     client: &mut Client,
     team: &TeamId,
-    device: &DeviceId,
-    labels: Option<&mut MaybeUninit<u32>>,
+    labels: Option<&mut MaybeUninit<LabelId>>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let data = client.rt.block_on(
-        client
-            .inner
-            .queries(team.into())
-            .device_afc_label_assignments(device.into()),
-    )?;
+    let data = client
+        .rt
+        .block_on(client.inner.queries(team.into()).labels())?;
+
     let data = data.__data();
+
     let Some(labels) = labels else {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     };
+
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src.id.into());
+    }
+
     if *labels_len < data.len() {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
-    for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.to_u32());
-    }
+
     *labels_len = data.len();
     Ok(())
 }
 
-/// Query device's AFC network identifier.
+/// Query if a label exists.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param network identifier string [`NetIdentifier`].
+/// @param label the label [`LabelId`].
+/// @param __output boolean indicating whether the label exists.
 ///
 /// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub unsafe fn query_afc_net_identifier(
+pub unsafe fn query_label_exists(
     client: &mut Client,
     team: &TeamId,
-    device: &DeviceId,
-    ident: &mut MaybeUninit<c_char>,
-    ident_len: &mut usize,
+    label: &LabelId,
 ) -> Result<bool, imp::Error> {
     let client = client.deref_mut();
-    let Some(net_identifier) = client.rt.block_on(
-        client
-            .inner
-            .queries(team.into())
-            .afc_net_identifier(device.into()),
-    )?
-    else {
-        return Ok(false);
-    };
-    let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
-    aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
-    Ok(true)
+    let exists = client
+        .rt
+        .block_on(client.inner.queries(team.into()).label_exists(label.into()))?;
+    Ok(exists)
 }
 
 /// Query device's AQC network identifier.
@@ -1838,94 +1239,133 @@ pub unsafe fn query_aqc_net_identifier(
     else {
         return Ok(false);
     };
+
     let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
     aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
     Ok(true)
 }
 
-/// Query if a label exists.
+/// Associate a network identifier to a device for use with AQC.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// If the address already exists for this device, it is replaced with the new address. Capable
+/// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
+/// OpenChannel and receiving messages. Can take either DNS name or IPV4.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param label the label [`LabelId`].
-/// @param __output boolean indicating whether the label exists.
+/// @param net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn query_label_exists(
+pub unsafe fn aqc_assign_net_identifier(
     client: &mut Client,
     team: &TeamId,
-    label: &LabelId,
-) -> Result<bool, imp::Error> {
-    let client = client.deref_mut();
-    let exists = client
-        .rt
-        .block_on(client.inner.queries(team.into()).label_exists(label.into()))?;
-    Ok(exists)
-}
-
-/// Query for list of existing labels.
-///
-/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
-/// Writes the number of labels that would have been returned to `labels_len`.
-/// The application can use `labels_len` to allocate a larger buffer.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-///
-/// Output params:
-/// @param labels returns a list of labels [`LabelId`].
-/// @param labels_len returns the length of the labels list [`LabelId`].
-///
-/// @relates AranyaClient.
-pub fn query_labels(
-    client: &mut Client,
-    team: &TeamId,
-    labels: Option<&mut MaybeUninit<LabelId>>,
-    labels_len: &mut usize,
+    device: &DeviceId,
+    net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
+    let net_identifier = unsafe { net_identifier.as_underlying() }?;
+
     let client = client.deref_mut();
-    let data = client
-        .rt
-        .block_on(client.inner.queries(team.into()).labels())?;
-    let data = data.__data();
-    let Some(labels) = labels else {
-        *labels_len = data.len();
-        return Err(imp::Error::BufferTooSmall);
-    };
-    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-    for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.id.into());
-    }
-    if *labels_len < data.len() {
-        *labels_len = data.len();
-        return Err(imp::Error::BufferTooSmall);
-    }
-    *labels_len = data.len();
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .assign_aqc_net_identifier(device.into(), net_identifier),
+    )?;
     Ok(())
 }
 
-/// Query if an AFC label exists.
+/// Disassociate an AQC network identifier from a device.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param label the AFC label [`Label`].
-/// @param __output boolean indicating whether the label exists.
+/// @param net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
-#[cfg(feature = "afc")]
-pub unsafe fn query_afc_label_exists(
+pub unsafe fn aqc_remove_net_identifier(
     client: &mut Client,
     team: &TeamId,
-    label: &Label,
-) -> Result<bool, imp::Error> {
+    device: &DeviceId,
+    net_identifier: NetIdentifier,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
+    let net_identifier = unsafe { net_identifier.as_underlying() }?;
+
     let client = client.deref_mut();
-    let exists = client.rt.block_on(
+    client.rt.block_on(
         client
             .inner
-            .queries(team.into())
-            .afc_label_exists(label.0.into()),
+            .team(team.into())
+            .remove_aqc_net_identifier(device.into(), net_identifier),
     )?;
-    Ok(exists)
+    Ok(())
+}
+
+/// Create a bidirectional AQC channel between the current device and a peer.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param peer the peer's network identifier [`NetIdentifier`].
+/// @param label_id the AQC channel label ID [`LabelId`] to create the channel with.
+/// @param __output the AQC channel's ID [`AqcBidiChannelId`]
+///
+/// @relates AranyaClient.
+pub fn aqc_create_bidi_channel(
+    client: &mut Client,
+    team: &TeamId,
+    peer: NetIdentifier,
+    label_id: &LabelId,
+) -> Result<AqcBidiChannelId, imp::Error> {
+    // SAFETY: Caller must ensure `peer` is a valid C String.
+    let peer = unsafe { peer.as_underlying() }?;
+
+    let client = client.deref_mut();
+    let (chan, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
+        team.into(),
+        peer,
+        label_id.into(),
+    ))?;
+    Ok(AqcBidiChannelId::from(chan.aqc_id()))
+}
+
+/// Delete a bidirectional AQC channel.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param chan the AQC channel ID [`AqcBidiChannelId`] of the channel to delete.
+///
+/// @relates AranyaClient.
+pub fn aqc_delete_bidi_channel(
+    client: &mut Client,
+    chan: &AqcBidiChannelId,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client
+        .rt
+        .block_on(client.inner.aqc().delete_bidi_channel(chan.into()))?;
+    Ok(())
+}
+
+/// Delete a unidirectional AQC channel.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param chan the AQC channel ID [`AqcUniChannelId`] of the channel to delete.
+///
+/// @relates AranyaClient.
+pub fn aqc_delete_uni_channel(
+    client: &mut Client,
+    chan: &AqcUniChannelId,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client
+        .rt
+        .block_on(client.inner.aqc().delete_uni_channel(chan.into()))?;
+    Ok(())
 }
