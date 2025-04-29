@@ -174,8 +174,6 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 
 // Initializes an Aranya `Team`, initializing each client and creating the team.
 AranyaError init_team(Team *t) {
-    AranyaError err;
-
     // initialize team clients.
     for (int i = 0; i < NUM_CLIENTS; i++) {
         printf("initializing client: %s\r\n", client_names[i]);
@@ -436,13 +434,14 @@ AranyaError run(Team *t) {
 
     memberb_aqc_net_identifier_len = BUFFER_LEN;
     EXPECT(aranya_query_aqc_net_identifier(
-               &operator->client, &t->id, &memberb->id,
+               &t->clients.operator.client, &t->id, &t->clients.memberb.id,
                memberb_aqc_net_identifier, &memberb_aqc_net_identifier_len,
-               &aqc_net_identifier_exists) == ARANYA_ERROR_SUCCESS
-               ? ARANYA_ERROR_BUG
-               : ARANYA_ERROR_SUCCESS,
-           "able to query for memberb's AQC `NetIdentifier` despite being "
-           "removed");
+               &aqc_net_identifier_exists),
+           "error querying memberb aqc net identifier");
+    if (aqc_net_identifier_exists) {
+        fprintf(stderr, "did not expect AQC net identifier to be returned\r\n");
+        return ARANYA_ERROR_BUG;
+    }
     printf("%s aqc net identifier: %s \r\n", t->clients_arr[MEMBERB].name,
            memberb_aqc_net_identifier);
     free(memberb_aqc_net_identifier);
@@ -458,8 +457,6 @@ AranyaError run_aqc_example(Team *t) {
 
     printf("running AQC demo\r\n");
 
-    Client *owner = &t->clients.owner;
-    Client *admin = &t->clients.admin;
     Client *operator= & t->clients.operator;
     Client *membera = &t->clients.membera;
     Client *memberb = &t->clients.memberb;

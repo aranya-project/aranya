@@ -199,9 +199,7 @@ pub unsafe fn client_init(
     .as_ref();
 
     let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
-    let inner = rt.block_on(aranya_client::Client::connect(
-        daemon_socket,
-    ))?;
+    let inner = rt.block_on(aranya_client::Client::connect(daemon_socket))?;
 
     Safe::init(client, imp::Client { rt, inner });
     Ok(())
@@ -602,7 +600,7 @@ pub fn aqc_config_build(
 /// @param cfg a pointer to the AQC config builder [`AqcConfigBuilder`]
 /// @param address a string with the address to bind to
 pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *const c_char) {
-    cfg.address(address);
+    cfg.addr(address);
 }
 
 /// Sets the configuration info for Aranya QUIC Channels.
