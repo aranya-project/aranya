@@ -70,6 +70,4 @@ jobs:
 
       - name: Rust Example Application
         run: |
-          cargo build --release
-          ARANYA_EXAMPLE=info ./target/release/aranya-example
-        working-directory: ./examples/rust
+          cargo make run-rust-example

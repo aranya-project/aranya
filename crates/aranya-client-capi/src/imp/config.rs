@@ -246,7 +246,7 @@ impl Typed for TeamConfig {
 }
 
 /// Builder for a [`TeamConfig`]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct TeamConfigBuilder {}
 
 impl Typed for TeamConfigBuilder {
@@ -263,11 +263,5 @@ impl Builder for TeamConfigBuilder {
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
         Safe::init(out, TeamConfig {});
         Ok(())
-    }
-}
-
-impl Default for TeamConfigBuilder {
-    fn default() -> Self {
-        Self {}
     }
 }
