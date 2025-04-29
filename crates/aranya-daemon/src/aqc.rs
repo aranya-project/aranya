@@ -11,7 +11,7 @@ use aranya_runtime::GraphId;
 use bimap::BiBTreeMap;
 use buggy::{bug, BugExt};
 use tokio::sync::Mutex;
-use tracing::instrument;
+use tracing::{debug, instrument};
 
 use crate::{
     keystore::AranyaStore,
@@ -49,6 +49,8 @@ impl<E, KS> Aqc<E, KS> {
     /// `net_id`.
     #[instrument(skip(self))]
     pub(crate) async fn find_device_id(&self, graph: GraphId, net_id: &str) -> Option<DeviceId> {
+        debug!("looking for peer's device ID");
+
         self.peers
             .lock()
             .await
@@ -60,6 +62,8 @@ impl<E, KS> Aqc<E, KS> {
     /// Returns the peer's net ID that corresponds with `id`.
     #[instrument(skip(self))]
     pub(crate) async fn find_net_id(&self, graph: GraphId, id: DeviceId) -> Option<NetIdentifier> {
+        debug!("looking for peer's net ID");
+
         self.peers
             .lock()
             .await
@@ -71,6 +75,8 @@ impl<E, KS> Aqc<E, KS> {
     /// Adds a peer.
     #[instrument(skip(self))]
     pub(crate) async fn add_peer(&self, graph: GraphId, net_id: NetIdentifier, id: DeviceId) {
+        debug!("adding peer");
+
         self.peers
             .lock()
             .await
@@ -82,6 +88,8 @@ impl<E, KS> Aqc<E, KS> {
     /// Removes a peer.
     #[instrument(skip(self))]
     pub(crate) async fn remove_peer(&self, graph: GraphId, id: DeviceId) {
+        debug!("removing peer");
+
         self.peers.lock().await.entry(graph).and_modify(|entry| {
             entry.remove_by_right(&id);
         });

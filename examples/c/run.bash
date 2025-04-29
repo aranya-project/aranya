@@ -68,12 +68,12 @@ for device in "${devices[@]}"; do
     api_pk="${out}/${device}/api_pk"
     rm -I "${api_pk}" || true
 
-    ARANYA_DAEMON=debug \
+    ARANYA_DAEMON=trace \
         "${release}/aranya-daemon" \
         --config "${cfg_path}" \
         --print-api-pk | tee "${api_pk}"
 
-    ARANYA_DAEMON=debug \
+    ARANYA_DAEMON="aranya_daemon::aqc=trace,aranya_daemon::api=debug" \
         "${release}/aranya-daemon" \
         --config "${cfg_path}" &
 done

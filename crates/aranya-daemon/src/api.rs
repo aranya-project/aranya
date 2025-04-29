@@ -186,11 +186,11 @@ impl EffectHandler {
     /// Handles effects resulting from invoking an Aranya action.
     #[instrument(skip_all, fields(%graph, effects = effects.len()))]
     async fn handle_effects(&self, graph: GraphId, effects: &[Effect]) -> Result<()> {
-        debug!("handling effects");
+        trace!("handling effects");
 
         use Effect::*;
         for effect in effects {
-            debug!(?effect, "handling effect");
+            trace!(?effect, "handling effect");
             match effect {
                 TeamCreated(_team_created) => {}
                 TeamTerminated(_team_terminated) => {}
