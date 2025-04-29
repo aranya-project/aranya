@@ -201,8 +201,6 @@ pub unsafe fn client_init(
     let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
     let inner = rt.block_on(aranya_client::Client::connect(
         daemon_socket,
-        // SAFETY: Caller ensures config.aqc().addr is valid
-        unsafe { NetIdentifier(config.aqc().addr).as_underlying()? },
     ))?;
 
     Safe::init(client, imp::Client { rt, inner });
@@ -1328,12 +1326,12 @@ pub fn aqc_create_bidi_channel(
     let peer = unsafe { peer.as_underlying() }?;
 
     let client = client.deref_mut();
-    let (chan, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
+    let (chan_id, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
         peer,
         label_id.into(),
     ))?;
-    Ok(AqcBidiChannelId::from(chan.aqc_id()))
+    Ok(chan_id.into())
 }
 
 /// Delete a bidirectional AQC channel.
