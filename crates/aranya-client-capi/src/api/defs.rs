@@ -938,7 +938,7 @@ pub unsafe fn setup_default_roles(
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param priority is the device's priority [`DevicePrecedence`].
+/// @param precedence is the device's precedence [`DevicePrecedence`].
 /// @param keybundle serialized keybundle byte buffer `KeyBundle`.
 /// @param keybundle_len is the length of the serialized keybundle.
 ///
@@ -981,6 +981,32 @@ pub fn remove_device_from_team(
             .inner
             .team(team.into())
             .remove_device_from_team(device.into()),
+    )?;
+    Ok(())
+}
+
+/// Assign device precedence.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param precedence is the device's precedence [`DevicePrecedence`].
+///
+/// @relates AranyaClient.
+pub fn assign_device_precedence(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    precedence: &DevicePrecedence,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .assign_device_precedence(device.into(), precedence.0),
     )?;
     Ok(())
 }

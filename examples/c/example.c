@@ -315,6 +315,10 @@ AranyaError run(Team *t) {
         aranya_add_device_to_team(&t->clients.owner.client, &t->id, &precedence,
                                   t->clients.admin.pk, t->clients.admin.pk_len);
     EXPECT("error adding admin to team", err);
+    precedence = 8500;
+    err = aranya_assign_device_precedence(&t->clients.owner.client, &t->id,
+                                          &t->clients.admin.id, &precedence);
+    EXPECT("error assigning new device precedence to admin", err);
 
     // add operator to team.
     precedence = 8000;

@@ -272,6 +272,19 @@ impl Team<'_> {
             .map_err(Into::into)
     }
 
+    /// Assign precedence to device.
+    pub async fn assign_device_precedence(
+        &mut self,
+        device: DeviceId,
+        precedence: i64,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .assign_device_precedence(context::current(), self.id, device, precedence)
+            .await?
+            .map_err(Into::into)
+    }
+
     /// Create role.
     pub async fn create_role(&mut self, name: String) -> Result<Role> {
         self.client

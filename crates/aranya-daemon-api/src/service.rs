@@ -270,6 +270,12 @@ pub trait DaemonApi {
     async fn add_device_to_team(team: TeamId, keys: KeyBundle, precedence: i64) -> Result<()>;
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
+    /// Assign precedence to device.
+    async fn assign_device_precedence(
+        team: TeamId,
+        device: DeviceId,
+        precedence: i64,
+    ) -> Result<()>;
 
     /// Create a role on a team.
     async fn create_role(team: TeamId, name: String) -> Result<Role>;

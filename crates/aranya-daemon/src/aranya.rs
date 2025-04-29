@@ -445,6 +445,20 @@ where
         .in_current_span()
     }
 
+    /// Assign precedence value to device on the team.
+    #[instrument(skip_all)]
+    fn assign_device_precedence(
+        &self,
+        device_id: DeviceId,
+        precedence: i64,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.assign_device_precedence(device_id.into(), precedence)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
     /// Creates a new role.
     #[instrument(skip_all)]
     fn create_role(&self, name: String) -> impl Future<Output = Result<Vec<Effect>>> + Send {

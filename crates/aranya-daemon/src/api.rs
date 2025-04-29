@@ -405,6 +405,22 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
+    async fn assign_device_precedence(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device: api::DeviceId,
+        precedence: i64,
+    ) -> api::Result<()> {
+        self.client
+            .actions(&team.into_id().into())
+            .assign_device_precedence(device.into_id().into(), precedence)
+            .await
+            .context("unable to assign device precedence")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
     async fn create_role(
         self,
         _: context::Context,

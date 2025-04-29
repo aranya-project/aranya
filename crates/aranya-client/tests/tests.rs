@@ -211,6 +211,10 @@ impl TeamCtx {
         owner_team
             .add_device_to_team(self.admin.pk.clone(), 9000)
             .await?;
+        // TODO: verify that assigning a lower precedence can result in loss of operation authorization.
+        owner_team
+            .assign_device_precedence(self.admin.id, 8500)
+            .await?;
         let roles = self.roles.clone().unwrap();
         owner_team
             .assign_role(self.admin.id, roles.admin.id)

@@ -186,6 +186,8 @@ async fn main() -> Result<()> {
     // add admin to team.
     info!("adding admin to team");
     owner_team.add_device_to_team(team.admin.pk, 9000).await?;
+    info!("assigning new device precedence to admin");
+    owner_team.assign_device_precedence(team.admin.id, 8500).await?;
     owner_team.assign_role(team.admin.id, admin_role.id).await?;
 
     // wait for syncing.

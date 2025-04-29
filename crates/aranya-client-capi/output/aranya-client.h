@@ -1270,7 +1270,7 @@ AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param priority is the device's priority [`AranyaDevicePrecedence`](@ref AranyaDevicePrecedence).
+ * @param precedence is the device's precedence [`AranyaDevicePrecedence`](@ref AranyaDevicePrecedence).
  * @param keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param keybundle_len is the length of the serialized keybundle.
  *
@@ -1289,7 +1289,7 @@ AranyaError aranya_add_device_to_team(struct AranyaClient *client,
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param priority is the device's priority [`AranyaDevicePrecedence`](@ref AranyaDevicePrecedence).
+ * @param precedence is the device's precedence [`AranyaDevicePrecedence`](@ref AranyaDevicePrecedence).
  * @param keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param keybundle_len is the length of the serialized keybundle.
  *
@@ -1332,6 +1332,41 @@ AranyaError aranya_remove_device_from_team_ext(struct AranyaClient *client,
                                                const struct AranyaTeamId *team,
                                                const struct AranyaDeviceId *device,
                                                struct AranyaExtError *__ext_err);
+
+/**
+ * Assign device precedence.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param precedence is the device's precedence [`AranyaDevicePrecedence`](@ref AranyaDevicePrecedence).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_assign_device_precedence(struct AranyaClient *client,
+                                            const struct AranyaTeamId *team,
+                                            const struct AranyaDeviceId *device,
+                                            const AranyaDevicePrecedence *precedence);
+
+/**
+ * Assign device precedence.
+ *
+ * Permission to perform this operation is checked against the Aranya policy.
+ *
+ * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param precedence is the device's precedence [`AranyaDevicePrecedence`](@ref AranyaDevicePrecedence).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_assign_device_precedence_ext(struct AranyaClient *client,
+                                                const struct AranyaTeamId *team,
+                                                const struct AranyaDeviceId *device,
+                                                const AranyaDevicePrecedence *precedence,
+                                                struct AranyaExtError *__ext_err);
 
 /**
  * Assign a role to a device.

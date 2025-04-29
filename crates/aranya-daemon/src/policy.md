@@ -487,6 +487,7 @@ command CreateTeam {
             // Assign default operations to owner role.
             assign_op_role("AddMember", role.role_id)
             assign_op_role("RemoveMember", role.role_id)
+            assign_op_role("AssignDevicePrecedence", role.role_id)
             assign_op_role("CreateRole", role.role_id)
             assign_op_role("DeleteRole", role.role_id)
             assign_op_role("AssignRole", role.role_id)
