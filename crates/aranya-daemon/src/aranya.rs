@@ -515,7 +515,7 @@ where
         op: Op,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_role_operation(role_id.into(), op)?;
+            actor.assign_role_operation(role_id.into(), op.to_string())?;
             Ok(())
         })
         .in_current_span()
@@ -529,7 +529,7 @@ where
         op: Op,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.revoke_role_operation(role_id.into(), op)?;
+            actor.revoke_role_operation(role_id.into(), op.to_string())?;
             Ok(())
         })
         .in_current_span()

@@ -14,7 +14,7 @@ use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 use anyhow::{Context, Result};
 use aranya_client::{Client, SyncPeerConfig, TeamConfig};
 use aranya_daemon::{config::Config, Daemon};
-use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
+use aranya_daemon_api::{DeviceId, KeyBundle, Op, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use test_log::test;
@@ -192,9 +192,9 @@ impl TeamCtx {
         };
 
         // Create a dummy role and assign a dummy command to it.
-        let dummy_role = owner_team.create_role("dummy".to_string()).await?;
+        let _dummy_role = owner_team.create_role("dummy".to_string()).await?;
         owner_team
-            .assign_role_operation(dummy_role.id, "dummy_cmd".to_string())
+            .assign_role_operation(admin_role.id, Op::DeleteLabel)
             .await?;
 
         self.roles = Some(default_roles);
@@ -291,7 +291,7 @@ impl TeamCtx {
                 for op in ops.iter() {
                     owner
                         .team(team_id)
-                        .revoke_role_operation(role.id, op.clone())
+                        .revoke_role_operation(role.id, *op)
                         .await?;
                 }
             }

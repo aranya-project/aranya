@@ -8,6 +8,7 @@ use std::{
     future::{self, Future},
     net::SocketAddr,
     path::PathBuf,
+    str::FromStr,
     sync::Arc,
 };
 
@@ -501,7 +502,7 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .assign_role_operation(role, op.clone())
+            .assign_role_operation(role, op)
             .await
             .context(format!("unable to assign role operation: {}", op))?;
         Ok(())
@@ -517,7 +518,7 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .revoke_role_operation(role.into_id().into(), op.clone())
+            .revoke_role_operation(role.into_id().into(), op)
             .await
             .context(format!("unable to revoke role operation: {}", op))?;
         Ok(())
@@ -922,7 +923,10 @@ impl DaemonApi for DaemonApiHandler {
         let mut roles: Vec<api::Op> = Vec::new();
         for e in effects {
             if let Effect::QueriedRoleOp(e) = e {
-                roles.push(e.op);
+                roles.push(
+                    api::Op::from_str(e.op.as_str())
+                        .context("unable to convert string to operation")?,
+                );
             }
         }
         Ok(roles)

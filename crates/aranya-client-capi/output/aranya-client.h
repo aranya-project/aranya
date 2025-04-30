@@ -207,6 +207,87 @@ typedef uint32_t AranyaError;
 #endif // __cplusplus
 
 /**
+ * Valid operations that roles can perform.
+ */
+enum AranyaOp
+#ifdef __cplusplus
+  : uint8_t
+#endif // __cplusplus
+ {
+    /**
+     * Add a member device to team.
+     */
+    ARANYA_OP_ADD_MEMBER,
+    /**
+     * Remove a member device from team.
+     */
+    ARANYA_OP_REMOVE_MEMBER,
+    /**
+     * Assign device precedence to a device.
+     */
+    ARANYA_OP_ASSIGN_DEVICE_PRECEDENCE,
+    /**
+     * Create a role on team.
+     */
+    ARANYA_OP_CREATE_ROLE,
+    /**
+     * Delete a role from team.
+     */
+    ARANYA_OP_DELETE_ROLE,
+    /**
+     * Assign a role to a device.
+     */
+    ARANYA_OP_ASSIGN_ROLE,
+    /**
+     * Revoke a role from a device.
+     */
+    ARANYA_OP_REVOKE_ROLE,
+    /**
+     * Assign operation to a role.
+     */
+    ARANYA_OP_ASSIGN_ROLE_OP,
+    /**
+     * Revoke operation from a role.
+     */
+    ARANYA_OP_REVOKE_ROLE_OP,
+    /**
+     * Create a label on team.
+     */
+    ARANYA_OP_CREATE_LABEL,
+    /**
+     * Delete a label from team.
+     */
+    ARANYA_OP_DELETE_LABEL,
+    /**
+     * Assign a label to a device.
+     */
+    ARANYA_OP_ASSIGN_LABEL,
+    /**
+     * Revoke a label from a device.
+     */
+    ARANYA_OP_REVOKE_LABEL,
+    /**
+     * Set an AQC network name.
+     */
+    ARANYA_OP_SET_AQC_NETWORK_NAME,
+    /**
+     * Unset an AQC network name.
+     */
+    ARANYA_OP_UNSET_AQC_NETWORK_NAME,
+    /**
+     * Create an AQC bidi channel.
+     */
+    ARANYA_OP_AQC_CREATE_BIDI_CHANNEL,
+    /**
+     * Create an AQC uni channel.
+     */
+    ARANYA_OP_AQC_CREATE_UNI_CHANNEL,
+};
+#ifndef __cplusplus
+typedef uint8_t AranyaOp;
+#endif // __cplusplus
+
+/**
  * Extended error information.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaExtError {
@@ -372,27 +453,6 @@ typedef struct AranyaRoleId {
 } AranyaRoleId;
 
 /**
- * A role operation name.
- *
- * E.g. "CreateLabel"
- */
-typedef const char *AranyaOpName;
-
-/**
- * A role operation.
- *
- * E.g. "CreateLabel"
- */
-typedef struct ARANYA_ALIGNED(8) AranyaOp {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[32];
-} AranyaOp;
-
-/**
  * A device precedence.
  *
  * Determines whether the author of a graph command has permission
@@ -432,6 +492,18 @@ typedef struct ARANYA_ALIGNED(8) AranyaLabel {
 typedef struct AranyaLabelId {
     struct AranyaId id;
 } AranyaLabelId;
+
+/**
+ * Valid operations that roles can perform.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaOperation {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[24];
+} AranyaOperation;
 
 /**
  * Channel ID for AQC bidi channel.
@@ -1173,7 +1245,7 @@ AranyaError aranya_create_role_ext(struct AranyaClient *client,
 AranyaError aranya_assign_role_operation(struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
                                          const struct AranyaRoleId *role_id,
-                                         AranyaOpName op);
+                                         AranyaOp op);
 
 /**
  * Assign role operation.
@@ -1190,7 +1262,7 @@ AranyaError aranya_assign_role_operation(struct AranyaClient *client,
 AranyaError aranya_assign_role_operation_ext(struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              const struct AranyaRoleId *role_id,
-                                             AranyaOpName op,
+                                             AranyaOp op,
                                              struct AranyaExtError *__ext_err);
 
 /**
@@ -1208,7 +1280,7 @@ AranyaError aranya_assign_role_operation_ext(struct AranyaClient *client,
 AranyaError aranya_revoke_role_operation(struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
                                          const struct AranyaRoleId *role_id,
-                                         const struct AranyaOp *op);
+                                         AranyaOp op);
 
 /**
  * Revoke role operation.
@@ -1225,7 +1297,7 @@ AranyaError aranya_revoke_role_operation(struct AranyaClient *client,
 AranyaError aranya_revoke_role_operation_ext(struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              const struct AranyaRoleId *role_id,
-                                             const struct AranyaOp *op,
+                                             AranyaOp op,
                                              struct AranyaExtError *__ext_err);
 
 /**
@@ -1650,27 +1722,27 @@ AranyaError aranya_label_cleanup_ext(struct AranyaLabel *label,
                                      struct AranyaExtError *__ext_err);
 
 /**
- * Get name of operation.
+ * Get enum value of operation.
  *
- * Returns a C string pointer to the operation's name.
+ * Returns the enum representation of the operation.
  */
-AranyaError aranya_op_get_name(const struct AranyaOp *op,
-                               const char **__output);
+AranyaError aranya_op_get_enum(const struct AranyaOperation *op,
+                               AranyaOp *__output);
 
 /**
- * Cleanup dynamically allocated strings in op.
+ * Writes `Op` to `str`.
+ *
+ * To always succeed, `str` must be large enough to contain the operation string.
  *
  * @param op the operation [`AranyaOp`](@ref AranyaOp).
- */
-AranyaError aranya_op_cleanup(struct AranyaOp *op);
-
-/**
- * Cleanup dynamically allocated strings in op.
+ * @param str Op string [`AranyaId`](@ref AranyaId).
+ * @param str_len returns the length of `str`
  *
- * @param op the operation [`AranyaOp`](@ref AranyaOp).
+ * @relates AranyaId.
  */
-AranyaError aranya_op_cleanup_ext(struct AranyaOp *op,
-                                  struct AranyaExtError *__ext_err);
+AranyaError aranya_op_to_str(const struct AranyaOperation *op,
+                             char *str,
+                             size_t *str_len);
 
 /**
  * Assign a label to a device so that it can be used for a channel.
@@ -2282,7 +2354,7 @@ AranyaError aranya_query_device_roles_ext(struct AranyaClient *client,
 AranyaError aranya_query_role_operations(struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
                                          const struct AranyaRoleId *role,
-                                         struct AranyaOp *ops,
+                                         struct AranyaOperation *ops,
                                          size_t *ops_len);
 
 /**
@@ -2305,7 +2377,7 @@ AranyaError aranya_query_role_operations(struct AranyaClient *client,
 AranyaError aranya_query_role_operations_ext(struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              const struct AranyaRoleId *role,
-                                             struct AranyaOp *ops,
+                                             struct AranyaOperation *ops,
                                              size_t *ops_len,
                                              struct AranyaExtError *__ext_err);
 

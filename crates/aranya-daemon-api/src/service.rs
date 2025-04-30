@@ -1,8 +1,9 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
 use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
-use std::path::PathBuf;
+use std::{path::PathBuf, str::FromStr};
 
+use anyhow::anyhow;
 use aranya_crypto::{
     aqc::{self, BidiAuthorSecretId, UniAuthorSecretId},
     custom_id,
@@ -210,7 +211,61 @@ pub enum ChanOp {
 }
 
 /// Operation that can be assigned to roles.
-pub type Op = String;
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum Op {
+    AddMember,
+    RemoveMember,
+    AssignDevicePrecedence,
+    CreateRole,
+    DeleteRole,
+    AssignRole,
+    RevokeRole,
+    AssignRoleOp,
+    RevokeRoleOp,
+    CreateLabel,
+    DeleteLabel,
+    AssignLabel,
+    RevokeLabel,
+    SetAqcNetworkName,
+    UnsetAqcNetworkName,
+    AqcCreateBidiChannel,
+    AqcCreateUniChannel,
+}
+
+/// Converts [`Operation`] to string.
+impl FromStr for Op {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Operation::AddMember" => Ok(Self::AddMember),
+            "Operation::RemoveMember" => Ok(Self::RemoveMember),
+            "Operation::AssignDevicePrecedence" => Ok(Self::AssignDevicePrecedence),
+            "Operation::CreateRole" => Ok(Self::CreateRole),
+            "Operation::DeleteRole" => Ok(Self::DeleteRole),
+            "Operation::AssignRole" => Ok(Self::AssignRole),
+            "Operation::RevokeRole" => Ok(Self::RevokeRole),
+            "Operation::AssignRoleOp" => Ok(Self::AssignRoleOp),
+            "Operation::RevokeRoleOp" => Ok(Self::RevokeRoleOp),
+            "Operation::CreateLabel" => Ok(Self::CreateLabel),
+            "Operation::DeleteLabel" => Ok(Self::DeleteLabel),
+            "Operation::AssignLabel" => Ok(Self::AssignLabel),
+            "Operation::RevokeLabel" => Ok(Self::RevokeLabel),
+            "Operation::SetAqcNetworkName" => Ok(Self::SetAqcNetworkName),
+            "Operation::UnsetAqcNetworkName" => Ok(Self::UnsetAqcNetworkName),
+            "Operation::AqcCreateBidiChannel" => Ok(Self::AqcCreateBidiChannel),
+            "Operation::AqcCreateUniChannel" => Ok(Self::AqcCreateUniChannel),
+            _ => Err(anyhow!("unknown `Operation`: {s}")),
+        }
+    }
+}
+
+/// Display implementation for [`Operation`]
+impl fmt::Display for Op {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Operation::{:?}", self)
+    }
+}
 
 /// A label.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]

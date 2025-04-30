@@ -357,6 +357,99 @@ impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
     }
 }
 
+/// Valid operations that roles can perform.
+#[aranya_capi_core::opaque(size = 24, align = 8)]
+pub type Operation = Safe<imp::Op>;
+const _: [(); 24] = [(); size_of::<Operation>()];
+
+/// Valid operations that roles can perform.
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+pub enum Op {
+    /// Add a member device to team.
+    AddMember,
+    /// Remove a member device from team.
+    RemoveMember,
+    /// Assign device precedence to a device.
+    AssignDevicePrecedence,
+    /// Create a role on team.
+    CreateRole,
+    /// Delete a role from team.
+    DeleteRole,
+    /// Assign a role to a device.
+    AssignRole,
+    /// Revoke a role from a device.
+    RevokeRole,
+    /// Assign operation to a role.
+    AssignRoleOp,
+    /// Revoke operation from a role.
+    RevokeRoleOp,
+    /// Create a label on team.
+    CreateLabel,
+    /// Delete a label from team.
+    DeleteLabel,
+    /// Assign a label to a device.
+    AssignLabel,
+    /// Revoke a label from a device.
+    RevokeLabel,
+    /// Set an AQC network name.
+    SetAqcNetworkName,
+    /// Unset an AQC network name.
+    UnsetAqcNetworkName,
+    /// Create an AQC bidi channel.
+    AqcCreateBidiChannel,
+    /// Create an AQC uni channel.
+    AqcCreateUniChannel,
+}
+
+impl From<Op> for aranya_daemon_api::Op {
+    fn from(value: Op) -> Self {
+        match value {
+            Op::AddMember => Self::AddMember,
+            Op::RemoveMember => Self::RemoveMember,
+            Op::AssignDevicePrecedence => Self::AssignDevicePrecedence,
+            Op::CreateRole => Self::CreateRole,
+            Op::DeleteRole => Self::DeleteRole,
+            Op::AssignRole => Self::AssignRole,
+            Op::RevokeRole => Self::RevokeRole,
+            Op::AssignRoleOp => Self::AssignRoleOp,
+            Op::RevokeRoleOp => Self::RevokeRoleOp,
+            Op::CreateLabel => Self::CreateLabel,
+            Op::DeleteLabel => Self::DeleteLabel,
+            Op::AssignLabel => Self::AssignLabel,
+            Op::RevokeLabel => Self::RevokeLabel,
+            Op::SetAqcNetworkName => Self::SetAqcNetworkName,
+            Op::UnsetAqcNetworkName => Self::UnsetAqcNetworkName,
+            Op::AqcCreateBidiChannel => Self::AqcCreateBidiChannel,
+            Op::AqcCreateUniChannel => Self::AqcCreateUniChannel,
+        }
+    }
+}
+
+impl From<aranya_daemon_api::Op> for Op {
+    fn from(value: aranya_daemon_api::Op) -> Self {
+        match value {
+            aranya_daemon_api::Op::AddMember => Self::AddMember,
+            aranya_daemon_api::Op::RemoveMember => Self::RemoveMember,
+            aranya_daemon_api::Op::AssignDevicePrecedence => Self::AssignDevicePrecedence,
+            aranya_daemon_api::Op::CreateRole => Self::CreateRole,
+            aranya_daemon_api::Op::DeleteRole => Self::DeleteRole,
+            aranya_daemon_api::Op::AssignRole => Self::AssignRole,
+            aranya_daemon_api::Op::RevokeRole => Self::RevokeRole,
+            aranya_daemon_api::Op::AssignRoleOp => Self::AssignRoleOp,
+            aranya_daemon_api::Op::RevokeRoleOp => Self::RevokeRoleOp,
+            aranya_daemon_api::Op::CreateLabel => Self::CreateLabel,
+            aranya_daemon_api::Op::DeleteLabel => Self::DeleteLabel,
+            aranya_daemon_api::Op::AssignLabel => Self::AssignLabel,
+            aranya_daemon_api::Op::RevokeLabel => Self::RevokeLabel,
+            aranya_daemon_api::Op::SetAqcNetworkName => Self::SetAqcNetworkName,
+            aranya_daemon_api::Op::UnsetAqcNetworkName => Self::UnsetAqcNetworkName,
+            aranya_daemon_api::Op::AqcCreateBidiChannel => Self::AqcCreateBidiChannel,
+            aranya_daemon_api::Op::AqcCreateUniChannel => Self::AqcCreateUniChannel,
+        }
+    }
+}
+
 /// Valid channel operations for a label assignment.
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
@@ -422,28 +515,6 @@ impl NetIdentifier {
 pub struct RoleName(*const c_char);
 
 impl RoleName {
-    unsafe fn as_underlying(self) -> Result<String, imp::Error> {
-        // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
-        Ok(String::from(cstr.to_str()?))
-    }
-}
-
-/// A role operation.
-///
-/// E.g. "CreateLabel"
-#[aranya_capi_core::opaque(size = 32, align = 8)]
-pub type Op = Safe<imp::Op>;
-const _: [(); 32] = [(); size_of::<Op>()];
-
-/// A role operation name.
-///
-/// E.g. "CreateLabel"
-#[repr(transparent)]
-#[derive(Copy, Clone, Debug)]
-pub struct OpName(*const c_char);
-
-impl OpName {
     unsafe fn as_underlying(self) -> Result<String, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
@@ -847,17 +918,15 @@ pub fn assign_role_operation(
     client: &mut Client,
     team: &TeamId,
     role_id: &RoleId,
-    op: OpName,
+    op: Op,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    // SAFETY: Caller must ensure `op` is a valid C String.
-    let op = unsafe { op.as_underlying() }?;
 
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .assign_role_operation(role_id.into(), op),
+            .assign_role_operation(role_id.into(), op.into()),
     )?;
     Ok(())
 }
@@ -876,20 +945,15 @@ pub unsafe fn revoke_role_operation(
     client: &mut Client,
     team: &TeamId,
     role_id: &RoleId,
-    op: &Op,
+    op: Op,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let op = op
-        .name
-        .clone()
-        .into_string()
-        .map_err(imp::Error::IntoString)?;
 
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .revoke_role_operation(role_id.into(), op),
+            .revoke_role_operation(role_id.into(), op.into()),
     )?;
     Ok(())
 }
@@ -1210,22 +1274,33 @@ pub unsafe fn label_cleanup(label: OwnedPtr<Label>) {
     }
 }
 
-/// Get name of operation.
+/// Get enum value of operation.
 ///
-/// Returns a C string pointer to the operation's name.
+/// Returns the enum representation of the operation.
 #[aranya_capi_core::no_ext_error]
-pub fn op_get_name(op: &Op) -> *const c_char {
-    op.name.as_ptr()
+pub fn op_get_enum(op: &Operation) -> Op {
+    op.op
 }
 
-/// Cleanup dynamically allocated strings in op.
+/// Writes `Op` to `str`.
+///
+/// To always succeed, `str` must be large enough to contain the operation string.
 ///
 /// @param op the operation [`Op`].
-pub unsafe fn op_cleanup(op: OwnedPtr<Op>) {
-    // SAFETY: Caller must ensure `op` is a valid object.
-    unsafe {
-        op.drop_in_place();
-    }
+/// @param str Op string [`Id`].
+/// @param str_len returns the length of `str`
+///
+/// @relates AranyaId.
+#[aranya_capi_core::no_ext_error]
+pub fn op_to_str(
+    op: &Operation,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    let op: aranya_daemon_api::Op = op.op.into();
+    aranya_capi_core::write_c_str(str, &op.to_string(), str_len)?;
+    Ok(())
 }
 
 /// Assign a label to a device so that it can be used for a channel.
@@ -1738,7 +1813,7 @@ pub fn query_role_operations(
     client: &mut Client,
     team: &TeamId,
     role: &RoleId,
-    ops: Option<&mut MaybeUninit<Op>>,
+    ops: Option<&mut MaybeUninit<Operation>>,
     ops_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
@@ -1752,7 +1827,7 @@ pub fn query_role_operations(
     };
     let out = aranya_capi_core::try_as_mut_slice!(ops, *ops_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.clone().try_into()?)
+        Safe::init(dst, imp::Op::new((*src).into()))
     }
     if *ops_len < data.len() {
         *ops_len = data.len();
