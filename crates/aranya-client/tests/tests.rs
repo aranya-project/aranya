@@ -378,12 +378,12 @@ impl Drop for DeviceCtx {
     }
 }
 
-/// Tests that device precedence can affect whether a device is authorized to execute certain operations.
+// Tests that if an operation is revoked from a role, the role can no longer execute the operation.
 #[test(tokio::test(flavor = "multi_thread"))]
-async fn test_device_precedence() -> Result<()> {
+async fn test_revoke_operation() -> Result<()> {
     // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
-    let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
+    let mut team = TeamCtx::new("test_revoke_operation", work_dir).await?;
 
     // Create the initial team, and get our TeamId.
     let cfg = TeamConfig::builder().build()?;
@@ -397,7 +397,116 @@ async fn test_device_precedence() -> Result<()> {
 
     // Create all team roles.
     team.create_all_roles(team_id).await?;
-    let _roles = team.roles.clone().unwrap();
+    let roles = team.roles.clone().unwrap();
+
+    // Tell all peers to sync with one another.
+    team.add_all_sync_peers(team_id).await?;
+
+    // Add all devices to team.
+    team.add_all_device_roles(team_id).await?;
+
+    // Grab the shorthand for the teams we need to operate on.
+    let membera_id = team.membera.client.get_device_id().await?;
+
+    let mut owner = team.owner.client.team(team_id);
+    let mut operator = team.operator.client.team(team_id);
+
+    // Verify that operator can execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1010".to_string()))
+        .await
+        .expect("expected aqc net identifier assignment to succeed");
+
+    // Revoke the operation from the operator role.
+    owner
+        .revoke_role_operation(roles.operator.id, Op::SetAqcNetworkName)
+        .await?;
+
+    // Make sure operator sees the configuration change.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Verify that operator cannot execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1020".to_string()))
+        .await
+        .expect_err("expected aqc net identifier assignment to fail");
+
+    Ok(())
+}
+
+// Tests that if a role is revoked from a device, the device can no longer execute an operation.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_revoke_role() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let mut team = TeamCtx::new("test_revoke_role", work_dir).await?;
+
+    // Create the initial team, and get our TeamId.
+    let cfg = TeamConfig::builder().build()?;
+    let team_id = team
+        .owner
+        .client
+        .create_team(cfg)
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
+    let roles = team.roles.clone().unwrap();
+
+    // Tell all peers to sync with one another.
+    team.add_all_sync_peers(team_id).await?;
+
+    // Add all devices to team.
+    team.add_all_device_roles(team_id).await?;
+
+    // Grab the shorthand for the teams we need to operate on.
+    let membera_id = team.membera.client.get_device_id().await?;
+    let operator_id = team.operator.client.get_device_id().await?;
+    let mut owner = team.owner.client.team(team_id);
+    let mut operator = team.operator.client.team(team_id);
+
+    // Verify that operator can execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1010".to_string()))
+        .await
+        .expect("expected aqc net identifier assignment to succeed");
+
+    // Revoke operator role from operator device.
+    owner.revoke_role(operator_id, roles.operator.id).await?;
+
+    // Make sure operator sees the configuration change.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Verify that operator cannot execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1020".to_string()))
+        .await
+        .expect_err("expected aqc net identifier assignment to fail");
+
+    Ok(())
+}
+
+/// Tests that device precedence can affect whether a device is authorized to execute certain operations.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_device_precedence() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let mut team = TeamCtx::new("test_device_precedence", work_dir).await?;
+
+    // Create the initial team, and get our TeamId.
+    let cfg = TeamConfig::builder().build()?;
+    let team_id = team
+        .owner
+        .client
+        .create_team(cfg)
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
 
     // Tell all peers to sync with one another.
     team.add_all_sync_peers(team_id).await?;
