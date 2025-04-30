@@ -233,7 +233,7 @@ pub enum Op {
     AqcCreateUniChannel,
 }
 
-/// Converts [`Operation`] to string.
+/// Converts [`Op`] to string.
 impl FromStr for Op {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -260,7 +260,7 @@ impl FromStr for Op {
     }
 }
 
-/// Display implementation for [`Operation`]
+/// Display implementation for [`Op`]
 impl fmt::Display for Op {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Operation::{:?}", self)
