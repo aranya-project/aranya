@@ -14,7 +14,7 @@ use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 use anyhow::{Context, Result};
 use aranya_client::{Client, SyncPeerConfig, TeamConfig};
 use aranya_daemon::{config::Config, Daemon};
-use aranya_daemon_api::{DeviceId, KeyBundle, Op, Role, TeamId};
+use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Op, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use test_log::test;
@@ -376,6 +376,60 @@ impl Drop for DeviceCtx {
     fn drop(&mut self) {
         self.daemon.abort();
     }
+}
+
+/// Tests that device precedence can affect whether a device is authorized to execute certain operations.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_device_precedence() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
+
+    // Create the initial team, and get our TeamId.
+    let cfg = TeamConfig::builder().build()?;
+    let team_id = team
+        .owner
+        .client
+        .create_team(cfg)
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
+    let _roles = team.roles.clone().unwrap();
+
+    // Tell all peers to sync with one another.
+    team.add_all_sync_peers(team_id).await?;
+
+    // Add all devices to team.
+    team.add_all_device_roles(team_id).await?;
+
+    // Grab the shorthand for the teams we need to operate on.
+    let membera_id = team.membera.client.get_device_id().await?;
+    let operator_id = team.operator.client.get_device_id().await?;
+    let mut owner = team.owner.client.team(team_id);
+    let mut operator = team.operator.client.team(team_id);
+
+    // Verify that operator can execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1010".to_string()))
+        .await
+        .expect("expected aqc net identifier assignment to succeed");
+
+    // Set operator precedence to zero to ensure it cannot execute any operations.
+    owner.assign_device_precedence(operator_id, 0).await?;
+
+    // Make sure operator sees the configuration change.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Verify that operator cannot execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1020".to_string()))
+        .await
+        .expect_err("expected aqc net identifier assignment to fail");
+
+    Ok(())
 }
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
