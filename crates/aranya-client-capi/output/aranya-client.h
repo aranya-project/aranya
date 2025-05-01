@@ -717,8 +717,8 @@ AranyaError aranya_client_config_builder_cleanup_ext(struct AranyaClientConfigBu
  * @param cfg a pointer to the client config builder
  * @param out a pointer to write the client config to
  */
-AranyaError aranya_client_config_builder_build(struct AranyaClientConfigBuilder *cfg,
-                                               struct AranyaClientConfig *out);
+AranyaError aranya_client_config_build(struct AranyaClientConfigBuilder *cfg,
+                                       struct AranyaClientConfig *out);
 
 /**
  * Attempts to construct a [`AranyaClientConfig`](@ref AranyaClientConfig).
@@ -729,9 +729,9 @@ AranyaError aranya_client_config_builder_build(struct AranyaClientConfigBuilder 
  * @param cfg a pointer to the client config builder
  * @param out a pointer to write the client config to
  */
-AranyaError aranya_client_config_builder_build_ext(struct AranyaClientConfigBuilder *cfg,
-                                                   struct AranyaClientConfig *out,
-                                                   struct AranyaExtError *__ext_err);
+AranyaError aranya_client_config_build_ext(struct AranyaClientConfigBuilder *cfg,
+                                           struct AranyaClientConfig *out,
+                                           struct AranyaExtError *__ext_err);
 
 /**
  * Sets Unix Domain Socket path that the daemon is listening on.
@@ -838,8 +838,8 @@ AranyaError aranya_aqc_config_builder_cleanup_ext(struct AranyaAqcConfigBuilder 
  * @param cfg a pointer to the aqc config builder
  * @param out a pointer to write the aqc config to
  */
-AranyaError aranya_aqc_config_builder_build(struct AranyaAqcConfigBuilder *cfg,
-                                            struct AranyaAqcConfig *out);
+AranyaError aranya_aqc_config_build(struct AranyaAqcConfigBuilder *cfg,
+                                    struct AranyaAqcConfig *out);
 
 /**
  * Attempts to construct an [`AranyaAqcConfig`](@ref AranyaAqcConfig).
@@ -850,9 +850,9 @@ AranyaError aranya_aqc_config_builder_build(struct AranyaAqcConfigBuilder *cfg,
  * @param cfg a pointer to the aqc config builder
  * @param out a pointer to write the aqc config to
  */
-AranyaError aranya_aqc_config_builder_build_ext(struct AranyaAqcConfigBuilder *cfg,
-                                                struct AranyaAqcConfig *out,
-                                                struct AranyaExtError *__ext_err);
+AranyaError aranya_aqc_config_build_ext(struct AranyaAqcConfigBuilder *cfg,
+                                        struct AranyaAqcConfig *out,
+                                        struct AranyaExtError *__ext_err);
 
 /**
  * Sets the network address that the AQC server should listen
@@ -943,8 +943,8 @@ AranyaError aranya_team_config_builder_cleanup_ext(struct AranyaTeamConfigBuilde
  * @param cfg a pointer to the team config builder
  * @param out a pointer to write the team config to
  */
-AranyaError aranya_team_config_builder_build(struct AranyaTeamConfigBuilder *cfg,
-                                             struct AranyaTeamConfig *out);
+AranyaError aranya_team_config_build(struct AranyaTeamConfigBuilder *cfg,
+                                     struct AranyaTeamConfig *out);
 
 /**
  * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
@@ -955,9 +955,9 @@ AranyaError aranya_team_config_builder_build(struct AranyaTeamConfigBuilder *cfg
  * @param cfg a pointer to the team config builder
  * @param out a pointer to write the team config to
  */
-AranyaError aranya_team_config_builder_build_ext(struct AranyaTeamConfigBuilder *cfg,
-                                                 struct AranyaTeamConfig *out,
-                                                 struct AranyaExtError *__ext_err);
+AranyaError aranya_team_config_build_ext(struct AranyaTeamConfigBuilder *cfg,
+                                         struct AranyaTeamConfig *out,
+                                         struct AranyaExtError *__ext_err);
 
 /**
  * Initializes `AranyaSyncPeerConfigBuilder`.
@@ -1007,8 +1007,8 @@ AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerCon
  *
  * @param cfg a pointer to the builder for a sync config
  */
-AranyaError aranya_sync_peer_config_builder_build(struct AranyaSyncPeerConfigBuilder *cfg,
-                                                  struct AranyaSyncPeerConfig *out);
+AranyaError aranya_sync_peer_config_build(struct AranyaSyncPeerConfigBuilder *cfg,
+                                          struct AranyaSyncPeerConfig *out);
 
 /**
  * Attempts to build a [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig).
@@ -1018,15 +1018,15 @@ AranyaError aranya_sync_peer_config_builder_build(struct AranyaSyncPeerConfigBui
  *
  * @param cfg a pointer to the builder for a sync config
  */
-AranyaError aranya_sync_peer_config_builder_build_ext(struct AranyaSyncPeerConfigBuilder *cfg,
-                                                      struct AranyaSyncPeerConfig *out,
-                                                      struct AranyaExtError *__ext_err);
+AranyaError aranya_sync_peer_config_build_ext(struct AranyaSyncPeerConfigBuilder *cfg,
+                                              struct AranyaSyncPeerConfig *out,
+                                              struct AranyaExtError *__ext_err);
 
 /**
  * Configures how often the peer will be synced with.
  *
  * By default, the interval is not set. It is an error to call
- * [`aranya_sync_peer_config_builder_build`](@ref aranya_sync_peer_config_builder_build) before setting the interval with
+ * [`aranya_sync_peer_config_build`](@ref aranya_sync_peer_config_build) before setting the interval with
  * this function
  *
  * @param cfg a pointer to the builder for a sync config
@@ -1039,7 +1039,7 @@ AranyaError aranya_sync_peer_config_builder_set_interval(struct AranyaSyncPeerCo
  * Configures how often the peer will be synced with.
  *
  * By default, the interval is not set. It is an error to call
- * [`aranya_sync_peer_config_builder_build`](@ref aranya_sync_peer_config_builder_build) before setting the interval with
+ * [`aranya_sync_peer_config_build`](@ref aranya_sync_peer_config_build) before setting the interval with
  * this function
  *
  * @param cfg a pointer to the builder for a sync config

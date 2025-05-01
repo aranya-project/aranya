@@ -574,7 +574,7 @@ pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
 ///
 /// @param cfg a pointer to the client config builder
 /// @param out a pointer to write the client config to
-pub fn client_config_builder_build(
+pub fn client_config_build(
     cfg: OwnedPtr<ClientConfigBuilder>,
     out: &mut MaybeUninit<ClientConfig>,
 ) -> Result<(), imp::Error> {
@@ -626,7 +626,7 @@ pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
 ///
 /// @param cfg a pointer to the aqc config builder
 /// @param out a pointer to write the aqc config to
-pub fn aqc_config_builder_build(
+pub fn aqc_config_build(
     cfg: OwnedPtr<AqcConfigBuilder>,
     out: &mut MaybeUninit<AqcConfig>,
 ) -> Result<(), imp::Error> {
@@ -666,7 +666,7 @@ pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 ///
 /// @param cfg a pointer to the team config builder
 /// @param out a pointer to write the team config to
-pub fn team_config_builder_build(
+pub fn team_config_build(
     cfg: OwnedPtr<TeamConfigBuilder>,
     out: &mut MaybeUninit<TeamConfig>,
 ) -> Result<(), imp::Error> {
@@ -690,7 +690,7 @@ pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
 /// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the builder for a sync config
-pub fn sync_peer_config_builder_build(
+pub fn sync_peer_config_build(
     cfg: OwnedPtr<SyncPeerConfigBuilder>,
     out: &mut MaybeUninit<SyncPeerConfig>,
 ) -> Result<(), imp::Error> {
@@ -702,7 +702,7 @@ pub fn sync_peer_config_builder_build(
 /// Configures how often the peer will be synced with.
 ///
 /// By default, the interval is not set. It is an error to call
-/// [`sync_peer_config_builder_build`] before setting the interval with
+/// [`sync_peer_config_build`] before setting the interval with
 /// this function
 ///
 /// @param cfg a pointer to the builder for a sync config
