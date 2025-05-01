@@ -1,7 +1,9 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
 use core::{borrow::Borrow, fmt, hash::Hash, net::SocketAddr, ops::Deref, time::Duration};
+use std::str::FromStr;
 
+use anyhow::anyhow;
 use aranya_crypto::{
     custom_id,
     default::{DefaultCipherSuite, DefaultEngine},
@@ -101,21 +103,11 @@ pub struct KeyBundle {
     pub encoding: Vec<u8>,
 }
 
-/// A device's role on the team.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub enum Role {
-    Owner,
-    Admin,
-    Operator,
-    Member,
-}
-
 /// A configuration for creating or adding a team to a daemon.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TeamConfig {
     // TODO(nikki): any fields added to this should be public
 }
-
 /// A device's network identifier.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
 pub struct NetIdentifier(pub String);
@@ -307,11 +299,77 @@ pub enum ChanOp {
     SendRecv,
 }
 
+/// Operation that can be assigned to roles.
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum Op {
+    AddMember,
+    RemoveMember,
+    AssignDevicePrecedence,
+    CreateRole,
+    DeleteRole,
+    AssignRole,
+    RevokeRole,
+    AssignRoleOp,
+    RevokeRoleOp,
+    CreateLabel,
+    DeleteLabel,
+    AssignLabel,
+    RevokeLabel,
+    SetAqcNetworkName,
+    UnsetAqcNetworkName,
+    AqcCreateBidiChannel,
+    AqcCreateUniChannel,
+}
+
+/// Converts [`Op`] to string.
+impl FromStr for Op {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Operation::AddMember" => Ok(Self::AddMember),
+            "Operation::RemoveMember" => Ok(Self::RemoveMember),
+            "Operation::AssignDevicePrecedence" => Ok(Self::AssignDevicePrecedence),
+            "Operation::CreateRole" => Ok(Self::CreateRole),
+            "Operation::DeleteRole" => Ok(Self::DeleteRole),
+            "Operation::AssignRole" => Ok(Self::AssignRole),
+            "Operation::RevokeRole" => Ok(Self::RevokeRole),
+            "Operation::AssignRoleOp" => Ok(Self::AssignRoleOp),
+            "Operation::RevokeRoleOp" => Ok(Self::RevokeRoleOp),
+            "Operation::CreateLabel" => Ok(Self::CreateLabel),
+            "Operation::DeleteLabel" => Ok(Self::DeleteLabel),
+            "Operation::AssignLabel" => Ok(Self::AssignLabel),
+            "Operation::RevokeLabel" => Ok(Self::RevokeLabel),
+            "Operation::SetAqcNetworkName" => Ok(Self::SetAqcNetworkName),
+            "Operation::UnsetAqcNetworkName" => Ok(Self::UnsetAqcNetworkName),
+            "Operation::AqcCreateBidiChannel" => Ok(Self::AqcCreateBidiChannel),
+            "Operation::AqcCreateUniChannel" => Ok(Self::AqcCreateUniChannel),
+            _ => Err(anyhow!("unknown `Operation`: {s}")),
+        }
+    }
+}
+
+/// Display implementation for [`Op`]
+impl fmt::Display for Op {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Operation::{:?}", self)
+    }
+}
+
 /// A label.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Label {
     pub id: LabelId,
     pub name: String,
+    pub author_id: DeviceId,
+}
+
+/// A role.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct Role {
+    pub id: RoleId,
+    pub name: String,
+    pub author_id: DeviceId,
 }
 
 #[tarpc::service]
@@ -348,15 +406,32 @@ pub trait DaemonApi {
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 
-    /// Add device to the team.
-    async fn add_device_to_team(team: TeamId, keys: KeyBundle) -> Result<()>;
+    /// Setup default roles on team.
+    async fn setup_default_roles(team: TeamId) -> Result<Vec<Role>>;
+
+    /// Add device to the team with a key bundle and operation precedence.
+    async fn add_device_to_team(team: TeamId, keys: KeyBundle, precedence: i64) -> Result<()>;
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
+    /// Assign precedence to device.
+    async fn assign_device_precedence(
+        team: TeamId,
+        device: DeviceId,
+        precedence: i64,
+    ) -> Result<()>;
 
+    /// Create a role on a team.
+    async fn create_role(team: TeamId, name: String) -> Result<Role>;
+    /// Delete a role from a team.
+    async fn delete_role(team: TeamId, role: RoleId) -> Result<()>;
+    /// Assign operation to a role.
+    async fn assign_operation_to_role(team: TeamId, role: RoleId, op: Op) -> Result<()>;
+    /// Revoke operation from a role.
+    async fn revoke_role_operation(team: TeamId, role: RoleId, op: Op) -> Result<()>;
     /// Assign a role to a device.
-    async fn assign_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
+    async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
-    async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
+    async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
 
     /// Assign a QUIC channels network identifier to a device.
     async fn assign_aqc_net_identifier(
@@ -406,8 +481,12 @@ pub trait DaemonApi {
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
-    /// Query device role.
-    async fn query_device_role(team: TeamId, device: DeviceId) -> Result<Role>;
+    /// Query roles on team.
+    async fn query_roles_on_team(team: TeamId) -> Result<Vec<Role>>;
+    /// Query device roles.
+    async fn query_device_roles(team: TeamId, device: DeviceId) -> Result<Vec<Role>>;
+    /// Query role operations.
+    async fn query_role_operations(team: TeamId, role: RoleId) -> Result<Vec<Op>>;
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device label assignments.

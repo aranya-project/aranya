@@ -10,8 +10,8 @@ use aranya_daemon_api::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Version, CS,
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Op, Role, RoleId,
+    TeamId, Version, CS,
 };
 use aranya_util::Addr;
 use tarpc::context;
@@ -57,6 +57,38 @@ impl Labels {
 
     #[doc(hidden)]
     pub fn __data(&self) -> &[Label] {
+        self.data.as_slice()
+    }
+}
+
+/// List of roles.
+pub struct Roles {
+    data: Vec<Role>,
+}
+
+impl Roles {
+    pub fn iter(&self) -> impl Iterator<Item = &Role> {
+        self.data.iter()
+    }
+
+    #[doc(hidden)]
+    pub fn __data(&self) -> &[Role] {
+        self.data.as_slice()
+    }
+}
+
+/// List of operations.
+pub struct Ops {
+    data: Vec<Op>,
+}
+
+impl Ops {
+    pub fn iter(&self) -> impl Iterator<Item = &Op> {
+        self.data.iter()
+    }
+
+    #[doc(hidden)]
+    pub fn __data(&self) -> &[Op] {
         self.data.as_slice()
     }
 }
@@ -306,11 +338,24 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Add a device to the team with the default `Member` role.
-    pub async fn add_device_to_team(&mut self, keys: KeyBundle) -> Result<()> {
+    /// Setup default roles on team.
+    pub async fn setup_default_roles(&mut self) -> Result<Roles> {
+        Ok(Roles {
+            data: self
+                .client
+                .daemon
+                .setup_default_roles(context::current(), self.id)
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        })
+    }
+
+    /// Add a device to the team with key bundle and device precedence.
+    pub async fn add_device_to_team(&mut self, keys: KeyBundle, precedence: i64) -> Result<()> {
         self.client
             .daemon
-            .add_device_to_team(context::current(), self.id, keys)
+            .add_device_to_team(context::current(), self.id, keys, precedence)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -326,8 +371,32 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    /// Assign precedence to device.
+    pub async fn assign_device_precedence(
+        &mut self,
+        device: DeviceId,
+        precedence: i64,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .assign_device_precedence(context::current(), self.id, device, precedence)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Create role.
+    pub async fn create_role(&mut self, name: String) -> Result<Role> {
+        self.client
+            .daemon
+            .create_role(context::current(), self.id, name)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Assign a role to a device.
-    pub async fn assign_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    pub async fn assign_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
             .daemon
             .assign_role(context::current(), self.id, device, role)
@@ -336,8 +405,8 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Revoke a role from a device. This sets the device's role back to the default `Member` role.
-    pub async fn revoke_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    /// Revoke a role from a device.
+    pub async fn revoke_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
             .daemon
             .revoke_role(context::current(), self.id, device, role)
@@ -346,6 +415,25 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    /// Assign operation to a role.
+    pub async fn assign_operation_to_role(&mut self, role: RoleId, op: Op) -> Result<()> {
+        self.client
+            .daemon
+            .assign_operation_to_role(context::current(), self.id, role, op)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Revoke operation from a role.
+    pub async fn revoke_role_operation(&mut self, role: RoleId, op: Op) -> Result<()> {
+        self.client
+            .daemon
+            .revoke_role_operation(context::current(), self.id, role, op)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
     /// Associate a network identifier to a device for use with AQC.
     ///
     /// If the address already exists for this device, it is replaced with the new address. Capable
@@ -397,16 +485,6 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Delete a label.
-    pub async fn delete_label(&mut self, label_id: LabelId) -> Result<()> {
-        self.client
-            .daemon
-            .delete_label(context::current(), self.id, label_id)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
     /// Assign a label to a device.
     pub async fn assign_label(
         &mut self,
@@ -451,14 +529,30 @@ impl Queries<'_> {
         Ok(Devices { data })
     }
 
-    /// Returns the role of the current device.
-    pub async fn device_role(&mut self, device: DeviceId) -> Result<Role> {
-        self.client
-            .daemon
-            .query_device_role(context::current(), self.id, device)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
+    /// Returns the list of roles on the current team.
+    pub async fn roles_on_team(&mut self) -> Result<Roles> {
+        Ok(Roles {
+            data: self
+                .client
+                .daemon
+                .query_roles_on_team(context::current(), self.id)
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        })
+    }
+
+    /// Returns a list of roles assigned to the current device.
+    pub async fn device_roles(&mut self, device: DeviceId) -> Result<Roles> {
+        Ok(Roles {
+            data: self
+                .client
+                .daemon
+                .query_device_roles(context::current(), self.id, device)
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        })
     }
 
     /// Returns the keybundle of the current device.
@@ -471,7 +565,7 @@ impl Queries<'_> {
             .map_err(aranya_error)
     }
 
-    /// Returns a list of labels assiged to the current device.
+    /// Returns a list of labels assigned to the current device.
     pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
         let data = self
             .client
@@ -483,6 +577,18 @@ impl Queries<'_> {
         Ok(Labels { data })
     }
 
+    /// Returns a list of operations assigned to a role.
+    pub async fn role_ops(&mut self, role: RoleId) -> Result<Ops> {
+        Ok(Ops {
+            data: self
+                .client
+                .daemon
+                .query_role_operations(context::current(), self.id, role)
+                .await
+                .map_err(IpcError::new)?
+                .map_err(aranya_error)?,
+        })
+    }
     /// Returns the AQC network identifier assigned to the current device.
     pub async fn aqc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
         self.client

@@ -8,13 +8,10 @@
 )]
 
 use anyhow::{Context, Result};
-use aranya_daemon::{
-    aranya::Actions,
-    policy::{Effect, Role},
-};
+use aranya_daemon::{aranya::Actions, policy::Effect};
 use serial_test::serial;
 use test_log::test;
-use test_util::{contains_effect, TestCtx, TestTeam};
+use test_util::{contains_effect, TestCtx, TestDevices};
 
 /// Smoke test for [`TestCtx::new_group`].
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -25,7 +22,7 @@ async fn test_new_group() -> Result<()> {
     Ok(())
 }
 
-/// Tests creating a team.
+/// Tests creating a devices.
 #[test(tokio::test(flavor = "multi_thread"))]
 #[serial]
 async fn test_create_team() -> Result<()> {
@@ -41,55 +38,63 @@ async fn test_create_team() -> Result<()> {
 async fn test_remove_members() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 
-    let clients = ctx.new_team().await?;
-    let team = TestTeam::new(&clients);
+    let team = ctx.new_team().await?;
+    let devices = TestDevices::new(&team.devices);
 
-    let effects = team
-        .operator
-        .actions()
-        .remove_member(team.membera.pk.ident_pk.id()?)
-        .await
-        .context("unable to remove membera")?;
-    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.membera.pk.ident_pk.id().expect("id").into())
-    {
-        panic!("expected MemberRemoved effect: {:?}", effects)
-    }
-    let effects = team
-        .operator
-        .actions()
-        .remove_member(team.memberb.pk.ident_pk.id()?)
-        .await
-        .context("unable to remove memberb")?;
-    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.memberb.pk.ident_pk.id().expect("id").into())
-    {
-        panic!("expected MemberRemoved effect: {:?}", effects)
-    }
-    team.admin.sync(team.operator).await?;
-    team.owner
-        .actions()
-        .revoke_role(team.operator.pk.ident_pk.id()?, Role::Operator)
-        .await?;
-    let effects = team
+    let effects = devices
         .owner
         .actions()
-        .remove_member(team.operator.pk.ident_pk.id()?)
+        .remove_member(devices.membera.pk.ident_pk.id()?)
+        .await
+        .context("unable to remove membera")?;
+    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  devices.membera.pk.ident_pk.id().expect("id").into())
+    {
+        panic!("expected MemberRemoved effect: {:?}", effects)
+    }
+    let effects = devices
+        .owner
+        .actions()
+        .remove_member(devices.memberb.pk.ident_pk.id()?)
+        .await
+        .context("unable to remove memberb")?;
+    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  devices.memberb.pk.ident_pk.id().expect("id").into())
+    {
+        panic!("expected MemberRemoved effect: {:?}", effects)
+    }
+    devices.admin.sync(devices.operator).await?;
+    devices
+        .owner
+        .actions()
+        .revoke_role(
+            devices.operator.pk.ident_pk.id()?,
+            team.roles.operator.role_id.into(),
+        )
+        .await?;
+    let effects = devices
+        .owner
+        .actions()
+        .remove_member(devices.operator.pk.ident_pk.id()?)
         .await
         .context("unable to remove operator")?;
-    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.operator.pk.ident_pk.id().expect("id").into())
+    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  devices.operator.pk.ident_pk.id().expect("id").into())
     {
         panic!("expected OperatorRemoved effect: {:?}", effects)
     }
-    team.owner
-        .actions()
-        .revoke_role(team.admin.pk.ident_pk.id()?, Role::Admin)
-        .await?;
-    let effects = team
+    devices
         .owner
         .actions()
-        .remove_member(team.admin.pk.ident_pk.id()?)
+        .revoke_role(
+            devices.admin.pk.ident_pk.id()?,
+            team.roles.admin.role_id.into(),
+        )
+        .await?;
+    let effects = devices
+        .owner
+        .actions()
+        .remove_member(devices.admin.pk.ident_pk.id()?)
         .await
         .context("unable to remove admin")?;
-    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.admin.pk.ident_pk.id().expect("id").into())
+    if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  devices.admin.pk.ident_pk.id().expect("id").into())
     {
         panic!("expected AdminRemoved effect: {:?}", effects)
     }

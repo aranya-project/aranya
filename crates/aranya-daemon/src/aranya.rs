@@ -27,7 +27,7 @@ use tokio::{
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument};
 
 use crate::{
-    policy::{ActorExt, ChanOp, Effect, KeyBundle, Role},
+    policy::{ActorExt, ChanOp, Effect, KeyBundle},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -415,11 +415,25 @@ where
         .in_current_span()
     }
 
+    /// Sets up default roles on the team.
+    #[instrument(skip_all)]
+    fn setup_default_roles(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.setup_default_roles()?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
     /// Adds a Member instance to the team.
     #[instrument(skip_all)]
-    fn add_member(&self, keys: KeyBundle) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn add_member(
+        &self,
+        keys: KeyBundle,
+        precedence: i64,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.add_member(keys)?;
+            actor.add_member(keys, precedence)?;
             Ok(())
         })
         .in_current_span()
@@ -438,15 +452,49 @@ where
         .in_current_span()
     }
 
+    /// Assign precedence value to device on the team.
+    #[instrument(skip_all)]
+    fn assign_device_precedence(
+        &self,
+        device_id: DeviceId,
+        precedence: i64,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.assign_device_precedence(device_id.into(), precedence)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Creates a new role.
+    #[instrument(skip_all)]
+    fn create_role(&self, name: String) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.create_role(name)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Deletes a role.
+    #[instrument(skip_all)]
+    fn delete_role(&self, role: RoleId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.delete_role(role.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
     /// Assigns role to a team member.
     #[instrument(skip_all)]
     fn assign_role(
         &self,
         device_id: DeviceId,
-        role: Role,
+        role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_role(device_id.into(), role)?;
+            actor.assign_role(device_id.into(), role_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -457,10 +505,38 @@ where
     fn revoke_role(
         &self,
         device_id: DeviceId,
-        role: Role,
+        role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.revoke_role(device_id.into(), role)?;
+            actor.revoke_role(device_id.into(), role_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Assigns a operations to a role.
+    #[instrument(skip_all)]
+    fn assign_operation_to_role(
+        &self,
+        role_id: RoleId,
+        op: Op,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.assign_operation_to_role(role_id.into(), op.to_string())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Revokes operations from a role.
+    #[instrument(skip_all)]
+    fn revoke_role_operation(
+        &self,
+        role_id: RoleId,
+        op: Op,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.revoke_role_operation(role_id.into(), op.to_string())?;
             Ok(())
         })
         .in_current_span()
@@ -654,15 +730,42 @@ where
         .in_current_span()
     }
 
-    /// Query device role off-graph.
+    /// Query roles on team off-graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_device_role_off_graph(
+    fn query_roles_on_team_off_graph(
+        &self,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_roles_on_team",
+            args: Cow::Owned(vec![]),
+        })
+        .in_current_span()
+    }
+
+    /// Query role operations off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_role_ops_off_graph(
+        &self,
+        role_id: RoleId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_role_ops",
+            args: Cow::Owned(vec![Value::from(role_id.into_id())]),
+        })
+        .in_current_span()
+    }
+
+    /// Query device roles off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_device_roles_off_graph(
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_device_role",
+            name: "query_device_roles",
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
         .in_current_span()
