@@ -327,7 +327,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     // `pk_len` is intentionally set to small size to show how to
     // handle reallocations.
     c->pk_len = 1;
-    c->pk     = malloc(c->pk_len);
+    c->pk     = calloc(c->pk_len, 1);
     if (c->pk == NULL) {
         abort();
     }
@@ -510,17 +510,17 @@ AranyaError run(Team *t) {
                                            t->clients.operator.pk_len);
     EXPECT("error adding operator to team", err);
 
+    // Sync now
+    err = aranya_sync_now(&t->clients.admin.client, &t->id, sync_addrs[OWNER],
+                          NULL);
+    EXPECT("error calling `sync_now` to sync with peer", err);
+
     // upgrade role to admin.
     err = aranya_assign_role(&t->clients.owner.client, &t->id,
                              &t->clients.admin.id, &t->roles.admin);
     EXPECT("error assigning admin role", err);
 
     // upgrade role to operator.
-    err = aranya_assign_role(&t->clients.owner.client, &t->id,
-                             &t->clients.operator.id, &t->roles.operator);
-    EXPECT("error assigning operator role", err);
-
-    sleep(1);
     err = aranya_assign_role(&t->clients.owner.client, &t->id,
                              &t->clients.operator.id, &t->roles.operator);
     EXPECT("error assigning operator role", err);
@@ -624,7 +624,7 @@ AranyaError run(Team *t) {
 
     printf("querying roles on team\r\n");
     size_t roles_len  = BUF_LEN;
-    AranyaRole *roles = malloc(roles_len * sizeof(AranyaRole));
+    AranyaRole *roles = calloc(roles_len, sizeof(AranyaRole));
     err = aranya_query_roles_on_team(&t->clients.operator.client, &t->id, roles,
                                      &roles_len);
     EXPECT("error querying roles on team", err);
@@ -663,7 +663,7 @@ AranyaError run(Team *t) {
 
     printf("querying admin role permissions\r\n");
     size_t ops_len = BUF_LEN;
-    AranyaOp *ops  = malloc(ops_len * sizeof(AranyaOp));
+    AranyaOp *ops  = calloc(ops_len, sizeof(AranyaOp));
     err = aranya_query_role_operations(&t->clients.operator.client, &t->id,
                                        &t->roles.admin, ops, &ops_len);
     EXPECT("error querying role ops", err);
@@ -673,7 +673,7 @@ AranyaError run(Team *t) {
     for (size_t i = 0; i < ops_len; i++) {
         AranyaOp op_result = ops[i];
         size_t op_str_len  = 255;
-        char *op_str       = malloc(op_str_len);
+        char *op_str       = calloc(op_str_len, 1);
         err                = aranya_op_to_str(op_result, op_str, &op_str_len);
         EXPECT("unable to get op name", err);
         printf("op: %s at index: %zu/%zu \r\n", op_str, i, ops_len);
@@ -1018,7 +1018,7 @@ AranyaError cleanup_roles(Team *t) {
                                                    &t->id, &role_id, ops[j]);
                 EXPECT("error revoking role op", err);
                 size_t op_str_len = 255;
-                char *op_str      = malloc(op_str_len);
+                char *op_str      = calloc(op_str_len, 1);
                 err = aranya_op_to_str(ops[j], op_str, &op_str_len);
                 EXPECT("error getting op name", err);
                 printf("revoked role op: %s\r\n", op_str);
@@ -1044,7 +1044,7 @@ AranyaError query_devices_on_team(Team *t, AranyaDeviceId **devices,
     AranyaError err;
 
     *devices_len = BUF_LEN;
-    *devices     = malloc(*devices_len * sizeof(AranyaDeviceId));
+    *devices     = calloc(*devices_len, sizeof(AranyaDeviceId));
     err = aranya_query_devices_on_team(&t->clients.operator.client, &t->id,
                                        *devices, devices_len);
     EXPECT("error querying devices on team", err);
@@ -1059,7 +1059,7 @@ AranyaError setup_default_roles(Team *t, AranyaRole **roles,
     AranyaError err;
 
     *roles_len = BUF_LEN;
-    *roles     = malloc(*roles_len * sizeof(AranyaRole));
+    *roles     = calloc(*roles_len, sizeof(AranyaRole));
     err = aranya_setup_default_roles(&t->clients.owner.client, &t->id, *roles,
                                      roles_len);
     EXPECT("error setting up default roles on team", err);
@@ -1074,7 +1074,7 @@ AranyaError query_roles_on_team(Team *t, AranyaRole **roles,
     AranyaError err;
 
     *roles_len = BUF_LEN;
-    *roles     = malloc(*roles_len * sizeof(AranyaRole));
+    *roles     = calloc(*roles_len, sizeof(AranyaRole));
     err        = aranya_query_roles_on_team(&t->clients.operator.client, &t->id,
                                             *roles, roles_len);
     EXPECT("error querying roles on team", err);
@@ -1089,7 +1089,7 @@ AranyaError query_device_roles(Team *t, AranyaDeviceId *device,
     AranyaError err;
 
     *roles_len = BUF_LEN;
-    *roles     = malloc(*roles_len * sizeof(**roles));
+    *roles     = calloc(*roles_len, sizeof(**roles));
     err = aranya_query_device_roles(&t->clients.operator.client, &t->id, device,
                                     *roles, roles_len);
     EXPECT("error querying device roles", err);
@@ -1104,7 +1104,7 @@ AranyaError query_role_operations(Team *t, AranyaRoleId *role, AranyaOp **ops,
     AranyaError err;
 
     *ops_len = BUF_LEN;
-    *ops     = malloc(*ops_len * sizeof(AranyaOp));
+    *ops     = calloc(*ops_len, sizeof(AranyaOp));
     err      = aranya_query_role_operations(&t->clients.operator.client, &t->id,
                                             role, *ops, ops_len);
     EXPECT("error querying role ops", err);
