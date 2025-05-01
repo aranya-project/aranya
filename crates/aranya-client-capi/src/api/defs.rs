@@ -1,8 +1,14 @@
-use core::{ffi::c_char, ops::DerefMut, ptr};
+use core::{
+    ffi::{c_char, CStr},
+    ops::{Deref, DerefMut},
+    ptr,
+};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
+use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
-use tracing::{debug, error};
+use aranya_crypto::hex;
+use tracing::error;
 
 use crate::imp;
 
@@ -25,10 +31,6 @@ pub enum Error {
     #[capi(msg = "timed out")]
     Timeout,
 
-    /// Logging initialization failure.
-    #[capi(msg = "logging initialization failure")]
-    LogInit,
-
     /// Invalid argument.
     #[capi(msg = "invalid argument")]
     InvalidArgument,
@@ -45,25 +47,17 @@ pub enum Error {
     #[capi(msg = "invalid address")]
     InvalidAddr,
 
-    /// Error connecting to daemon.
-    #[capi(msg = "could not connect to daemon")]
-    Connecting,
-
     /// Could not send request to daemon.
     #[capi(msg = "could not send request to daemon")]
-    Rpc,
+    Ipc,
 
-    /// Daemon reported error.
-    #[capi(msg = "daemon reported error")]
-    Daemon,
+    /// An Aranya error.
+    #[capi(msg = "Aranya error")]
+    Aranya,
 
-    /// An error occurred inside the AQC library.
+    /// AQC library error.
     #[capi(msg = "AQC library error")]
     Aqc,
-
-    /// Failed trying to construct a new tokio runtime.
-    #[capi(msg = "tokio runtime error")]
-    Runtime,
 
     /// Unable to create configuration info.
     #[capi(msg = "invalid config")]
@@ -72,34 +66,37 @@ pub enum Error {
     /// Serialization error.
     #[capi(msg = "serialization")]
     Serialization,
+
+    /// Some other error occurred.
+    #[capi(msg = "other")]
+    Other,
 }
 
 impl From<&imp::Error> for Error {
     fn from(err: &imp::Error) -> Self {
-        debug!(?err);
+        error!(?err);
         match err {
             imp::Error::Bug(_) => Self::Bug,
             imp::Error::Timeout(_) => Self::Timeout,
-            imp::Error::LogInit(_) => Self::LogInit,
             imp::Error::InvalidArg(_) => Self::InvalidArgument,
             imp::Error::Utf8(_) => Self::InvalidUtf8,
             imp::Error::Addr(_) => Self::InvalidAddr,
             imp::Error::BufferTooSmall => Self::BufferTooSmall,
             imp::Error::Client(err) => match err {
-                aranya_client::Error::Connecting(_) => Self::Connecting,
-                aranya_client::Error::Rpc(_) => Self::Rpc,
-                aranya_client::Error::Daemon(_) => Self::Daemon,
+                aranya_client::Error::Ipc(_) => Self::Ipc,
+                aranya_client::Error::Aranya(_) => Self::Aranya,
                 aranya_client::Error::Aqc(_) => Self::Aqc,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::Config(_) => Self::Config,
+                aranya_client::Error::Other(_) => Self::Other,
                 _ => {
-                    error!("Forgot to implement an error variant!");
+                    error!("forgot to implement an error variant");
                     Self::Bug
                 }
             },
-            imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
+            imp::Error::Other(_) => Self::Other,
         }
     }
 }
@@ -191,15 +188,20 @@ pub unsafe fn client_init(
     config: &ClientConfig,
 ) -> Result<(), imp::Error> {
     // TODO: Clean this up.
-
     let daemon_socket = OsStr::from_bytes(
         // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.daemon_addr()) }.to_bytes(),
+        unsafe { CStr::from_ptr(config.daemon_addr()) }.to_bytes(),
     )
     .as_ref();
 
-    let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
-    let inner = rt.block_on(aranya_client::Client::connect(daemon_socket))?;
+    let rt = tokio::runtime::Runtime::new().context("unable to construct tokio runtime")?;
+
+    let inner = rt.block_on({
+        aranya_client::Client::builder()
+            .with_daemon_uds_path(daemon_socket)
+            .with_daemon_api_pk(config.daemon_api_pk())
+            .connect()
+    })?;
 
     Safe::init(client, imp::Client { rt, inner });
     Ok(())
@@ -310,6 +312,31 @@ impl From<Role> for aranya_daemon_api::Role {
     }
 }
 
+/// Valid channel operations for a label assignment.
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+pub enum ChanOp {
+    /// The device can only receive data in channels with this
+    /// label.
+    RecvOnly,
+    /// The device can only send data in channels with this
+    /// label.
+    SendOnly,
+    /// The device can send and receive data in channels with this
+    /// label.
+    SendRecv,
+}
+
+impl From<ChanOp> for aranya_daemon_api::ChanOp {
+    fn from(value: ChanOp) -> Self {
+        match value {
+            ChanOp::RecvOnly => Self::RecvOnly,
+            ChanOp::SendOnly => Self::SendOnly,
+            ChanOp::SendRecv => Self::SendRecv,
+        }
+    }
+}
+
 /// Label ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -343,33 +370,8 @@ pub struct LabelName(*const c_char);
 impl LabelName {
     unsafe fn as_underlying(self) -> Result<String, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
+        let cstr = unsafe { CStr::from_ptr(self.0) };
         Ok(String::from(cstr.to_str()?))
-    }
-}
-
-/// Valid channel operations for a label assignment.
-#[repr(u8)]
-#[derive(Copy, Clone, Debug)]
-pub enum ChanOp {
-    /// The device can only receive data in channels with this
-    /// label.
-    RecvOnly,
-    /// The device can only send data in channels with this
-    /// label.
-    SendOnly,
-    /// The device can send and receive data in channels with this
-    /// label.
-    SendRecv,
-}
-
-impl From<ChanOp> for aranya_daemon_api::ChanOp {
-    fn from(value: ChanOp) -> Self {
-        match value {
-            ChanOp::RecvOnly => Self::RecvOnly,
-            ChanOp::SendOnly => Self::SendOnly,
-            ChanOp::SendRecv => Self::SendRecv,
-        }
     }
 }
 
@@ -383,7 +385,7 @@ pub struct Addr(*const c_char);
 impl Addr {
     unsafe fn as_underlying(self) -> Result<aranya_util::Addr, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
+        let cstr = unsafe { CStr::from_ptr(self.0) };
         Ok(cstr.to_str()?.parse()?)
     }
 }
@@ -398,7 +400,7 @@ pub struct NetIdentifier(*const c_char);
 impl NetIdentifier {
     unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { core::ffi::CStr::from_ptr(self.0) };
+        let cstr = unsafe { CStr::from_ptr(self.0) };
         Ok(aranya_daemon_api::NetIdentifier(String::from(
             cstr.to_str()?,
         )))
@@ -455,13 +457,52 @@ impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
 ///
 /// Assumes the `ARANYA_CAPI` environment variable has been set to the desired tracing log level.
 /// E.g. `ARANYA_CAPI=debug`.
+// TODO(eric): don't make users use env vars.
 pub fn init_logging() -> Result<(), imp::Error> {
     use tracing_subscriber::{prelude::*, EnvFilter};
-
     tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::layer())
         .with(EnvFilter::from_env("ARANYA_CAPI"))
-        .try_init()?;
+        .try_init()
+        .context("unable to initialize logging")?;
+    Ok(())
+}
+
+/// Decodes the hexadecimal string `src` into `dst` and returns
+/// the number of bytes written to `dst`.
+///
+/// If `src` is a valid hexadecimal string, the number of bytes
+/// written to `dst` will be exactly half the length of `src`.
+/// Therefore, `dst` must be at least half as long as `src`.
+///
+/// @param dst the output buffer
+/// @param src the input hexadecimal string
+pub fn decode_hex(dst: &mut [u8], src: &[u8]) -> Result<usize, imp::Error> {
+    hex::ct_decode(dst, src).map_err(|err| match err {
+        hex::Error::InvalidLength => imp::Error::BufferTooSmall,
+        hex::Error::InvalidEncoding => {
+            imp::Error::InvalidArg(InvalidArg::new("src", "not a valid hexadecimal string"))
+        }
+        hex::Error::Bug(err) => imp::Error::Bug(err),
+    })
+}
+
+/// Gets the public key bundle for this device.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param keybundle keybundle byte buffer `KeyBundle`.
+/// @param keybundle_len returns the length of the serialized keybundle.
+///
+/// @relates AranyaClient.
+pub unsafe fn get_key_bundle(
+    client: &mut Client,
+    keybundle: *mut MaybeUninit<u8>,
+    keybundle_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let keys = client.rt.block_on(client.inner.get_key_bundle())?;
+    // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
+    unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
 
     Ok(())
 }
@@ -498,32 +539,11 @@ pub fn id_to_str(
 #[aranya_capi_core::no_ext_error]
 pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
     // SAFETY: Caller must ensure the pointer is a valid C String.
-    let cstr = unsafe { std::ffi::CStr::from_ptr(str) };
+    let cstr = unsafe { CStr::from_ptr(str) };
 
     aranya_crypto::Id::decode(cstr.to_bytes())
         .map_err(|_| InvalidArg::new("str", "unable to decode ID from bytes").into())
         .map(Into::into)
-}
-
-/// Gets the public key bundle for this device.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param keybundle keybundle byte buffer `KeyBundle`.
-/// @param keybundle_len returns the length of the serialized keybundle.
-///
-/// @relates AranyaClient.
-pub unsafe fn get_key_bundle(
-    client: &mut Client,
-    keybundle: *mut MaybeUninit<u8>,
-    keybundle_len: &mut usize,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    let keys = client.rt.block_on(client.inner.get_key_bundle())?;
-
-    // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
-    unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
-
-    Ok(())
 }
 
 /// Gets the public device ID.
@@ -547,32 +567,51 @@ pub type ClientConfig = Safe<imp::ClientConfig>;
 #[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
 
-/// Attempts to construct a [`ClientConfig`], returning an `Error::Config`
-/// if there are invalid parameters.
+/// Attempts to construct a [`ClientConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the client config builder
 /// @param out a pointer to write the client config to
-pub fn client_config_build(
-    cfg: &mut ClientConfigBuilder,
+pub fn client_config_builder_build(
+    cfg: OwnedPtr<ClientConfigBuilder>,
     out: &mut MaybeUninit<ClientConfig>,
 ) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
     Ok(())
 }
 
-/// Sets the daemon address that the Client should try to connect to.
+/// Sets Unix Domain Socket path that the daemon is listening on.
 ///
 /// @param cfg a pointer to the client config builder
 /// @param address a string containing the address
-pub fn client_config_builder_set_daemon_addr(
+pub fn client_config_builder_set_daemon_uds_path(
     cfg: &mut ClientConfigBuilder,
     address: *const c_char,
 ) {
     cfg.daemon_addr(address);
 }
 
+/// Sets the daemon's public API key.
+///
+/// `pk` must not be encoded; it must be the raw key bytes.
+///
+/// The daemon's public API key can be retrieved by invoking the
+/// daemon with the `--print-api-pk` flag. The output will be
+/// hexadecimal encoded and must be decoded before being passed
+/// to this function. You can use [`decode_hex`] for this
+/// purpose.
+///
+/// @param cfg a pointer to the client config builder
+/// @param pk the daemon's raw (not encoded) public API key bytes
+pub fn client_config_builder_set_daemon_api_pk(cfg: &mut ClientConfigBuilder, pk: &[u8]) {
+    cfg.daemon_pk(pk);
+}
+
 /// Configuration info for Aranya QUIC Channels.
-#[aranya_capi_core::opaque(size = 24, align = 8)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type AqcConfig = Safe<imp::AqcConfig>;
 
 /// Configuration info builder for Aranya QUIC Channels.
@@ -585,48 +624,54 @@ pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param cfg a pointer to the AQC config builder [`AqcConfigBuilder`]
+/// @param cfg a pointer to the aqc config builder
 /// @param out a pointer to write the aqc config to
-pub fn aqc_config_build(
-    cfg: &mut AqcConfigBuilder,
+pub fn aqc_config_builder_build(
+    cfg: OwnedPtr<AqcConfigBuilder>,
     out: &mut MaybeUninit<AqcConfig>,
 ) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
     Ok(())
 }
 
-/// Sets the address that the AQC server should bind to for listening.
+/// Sets the network address that the AQC server should listen
+/// on.
 ///
-/// @param cfg a pointer to the AQC config builder [`AqcConfigBuilder`]
+/// @param cfg a pointer to the aqc config builder
 /// @param address a string with the address to bind to
 pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *const c_char) {
     cfg.addr(address);
 }
 
-/// Sets the configuration info for Aranya QUIC Channels.
+/// Sets the configuration for Aranya QUIC Channels.
 ///
 /// @param cfg a pointer to the client config builder
 /// @param aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
 pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
-    cfg.aqc(**aqc_config);
+    cfg.aqc(aqc_config.deref().clone());
 }
 
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
+#[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 16, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 
-/// Attempts to construct a [`TeamConfig`], returning an `Error::Config`
-/// if there are invalid parameters.
+/// Attempts to construct a [`TeamConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the team config builder
 /// @param out a pointer to write the team config to
-pub fn team_config_build(
-    cfg: &mut TeamConfigBuilder,
+pub fn team_config_builder_build(
+    cfg: OwnedPtr<TeamConfigBuilder>,
     out: &mut MaybeUninit<TeamConfig>,
 ) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
     Ok(())
 }
 
@@ -639,21 +684,25 @@ pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
 #[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
 
-/// Build a sync config from a sync config builder
+/// Attempts to build a [`SyncPeerConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the builder for a sync config
-pub fn sync_peer_config_build(
-    cfg: &SyncPeerConfigBuilder,
+pub fn sync_peer_config_builder_build(
+    cfg: OwnedPtr<SyncPeerConfigBuilder>,
     out: &mut MaybeUninit<SyncPeerConfig>,
 ) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
     Ok(())
 }
 
 /// Configures how often the peer will be synced with.
 ///
 /// By default, the interval is not set. It is an error to call
-/// [`sync_peer_config_build`] before setting the interval with
+/// [`sync_peer_config_builder_build`] before setting the interval with
 /// this function
 ///
 /// @param cfg a pointer to the builder for a sync config
@@ -739,7 +788,7 @@ pub fn revoke_role(
     Ok(())
 }
 
-/// Create a label to open channels with.
+/// Create a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -754,14 +803,33 @@ pub fn create_label(
     name: LabelName,
 ) -> Result<LabelId, imp::Error> {
     let client = client.deref_mut();
-
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
-
     let label_id = client
         .rt
         .block_on(client.inner.team(team.into()).create_label(name))?;
     Ok(label_id.into())
+}
+
+/// Delete a channel label.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param label_id the channel label ID [`LabelId`] to delete.
+///
+/// @relates AranyaClient.
+pub fn delete_label(
+    client: &mut Client,
+    team: &TeamId,
+    label_id: &LabelId,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).delete_label(label_id.into()))?;
+    Ok(())
 }
 
 /// Assign a label to a device so that it can be used for a channel.
@@ -827,9 +895,8 @@ pub fn revoke_label(
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
-    let cfg = aranya_client::TeamConfig::builder().build()?;
-
     let client = client.deref_mut();
+    let cfg = aranya_client::TeamConfig::builder().build()?;
     let id = client.rt.block_on(client.inner.create_team(cfg))?;
     Ok(id.into())
 }
@@ -845,9 +912,8 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
-    let cfg = aranya_client::TeamConfig::builder().build()?;
-
     let client = client.deref_mut();
+    let cfg = aranya_client::TeamConfig::builder().build()?;
     client
         .rt
         .block_on(client.inner.add_team(team.into(), cfg))?;
@@ -895,9 +961,9 @@ pub unsafe fn add_device_to_team(
     team: &TeamId,
     keybundle: &[u8],
 ) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
-    let client = client.deref_mut();
     client
         .rt
         .block_on(client.inner.team(team.into()).add_device_to_team(keybundle))?;
@@ -946,15 +1012,14 @@ pub unsafe fn add_sync_peer(
     addr: Addr,
     config: &SyncPeerConfig,
 ) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-
-    let client = client.deref_mut();
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .add_sync_peer(addr, (**config).into()),
+            .add_sync_peer(addr, (*config).clone().into()),
     )?;
     Ok(())
 }
@@ -971,10 +1036,9 @@ pub unsafe fn remove_sync_peer(
     team: &TeamId,
     addr: Addr,
 ) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-
-    let client = client.deref_mut();
     client
         .rt
         .block_on(client.inner.team(team.into()).remove_sync_peer(addr))?;
@@ -996,7 +1060,6 @@ pub unsafe fn remove_sync_peer(
 /// @param addr the peer's Aranya network address [`Addr`].
 /// @param config configuration values for syncing with a peer.
 /// Default values for a sync config will be used if `config` is `NULL`
-///
 /// @relates AranyaClient.
 pub unsafe fn sync_now(
     client: &mut Client,
@@ -1004,15 +1067,14 @@ pub unsafe fn sync_now(
     addr: Addr,
     config: Option<&SyncPeerConfig>,
 ) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-
-    let client = client.deref_mut();
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .sync_now(addr, config.map(|config| (**config).into())),
+            .sync_now(addr, config.map(|config| (*config).clone().into())),
     )?;
     Ok(())
 }
@@ -1035,25 +1097,19 @@ pub fn query_devices_on_team(
     let data = client
         .rt
         .block_on(client.inner.queries(team.into()).devices_on_team())?;
-
     let data = data.__data();
-
     let Some(devices) = devices else {
         *devices_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     };
-
     let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
-
     if *devices_len < data.len() {
         *devices_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
-
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write((*src).into());
     }
-
     *devices_len = data.len();
     Ok(())
 }
@@ -1083,10 +1139,8 @@ pub unsafe fn query_device_keybundle(
             .queries(team.into())
             .device_keybundle(device.into()),
     )?;
-
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
     unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
-
     Ok(())
 }
 
@@ -1119,25 +1173,19 @@ pub fn query_device_label_assignments(
             .queries(team.into())
             .device_label_assignments(device.into()),
     )?;
-
     let data = data.__data();
-
     let Some(labels) = labels else {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     };
-
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-
     if *labels_len < data.len() {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
-
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write(src.id.into());
     }
-
     *labels_len = data.len();
     Ok(())
 }
@@ -1166,25 +1214,19 @@ pub fn query_labels(
     let data = client
         .rt
         .block_on(client.inner.queries(team.into()).labels())?;
-
     let data = data.__data();
-
     let Some(labels) = labels else {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     };
-
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write(src.id.into());
     }
-
     if *labels_len < data.len() {
         *labels_len = data.len();
         return Err(imp::Error::BufferTooSmall);
     }
-
     *labels_len = data.len();
     Ok(())
 }
@@ -1235,7 +1277,6 @@ pub unsafe fn query_aqc_net_identifier(
     else {
         return Ok(false);
     };
-
     let ident = aranya_capi_core::try_as_mut_slice!(ident, *ident_len);
     aranya_capi_core::write_c_str(ident, &net_identifier, ident_len)?;
     Ok(true)
@@ -1261,10 +1302,9 @@ pub unsafe fn aqc_assign_net_identifier(
     device: &DeviceId,
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
     // SAFETY: Caller must ensure `net_identifier` is a valid C String.
     let net_identifier = unsafe { net_identifier.as_underlying() }?;
-
-    let client = client.deref_mut();
     client.rt.block_on(
         client
             .inner
@@ -1290,10 +1330,9 @@ pub unsafe fn aqc_remove_net_identifier(
     device: &DeviceId,
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
     // SAFETY: Caller must ensure `net_identifier` is a valid C String.
     let net_identifier = unsafe { net_identifier.as_underlying() }?;
-
-    let client = client.deref_mut();
     client.rt.block_on(
         client
             .inner
@@ -1303,7 +1342,10 @@ pub unsafe fn aqc_remove_net_identifier(
     Ok(())
 }
 
-/// Create a bidirectional AQC channel between the current device and a peer.
+/// Create an AQC channel.
+///
+/// Creates a bidirectional AQC channel between the current device
+/// and another peer.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -1314,17 +1356,16 @@ pub unsafe fn aqc_remove_net_identifier(
 /// @param __output the AQC channel's ID [`AqcBidiChannelId`]
 ///
 /// @relates AranyaClient.
-pub fn aqc_create_bidi_channel(
+pub unsafe fn aqc_create_bidi_channel(
     client: &mut Client,
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
 ) -> Result<AqcBidiChannelId, imp::Error> {
+    let client = client.deref_mut();
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
-
-    let client = client.deref_mut();
-    let (chan_id, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
+    let chan_id = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
         peer,
         label_id.into(),
