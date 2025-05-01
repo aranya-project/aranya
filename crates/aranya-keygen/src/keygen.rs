@@ -1,3 +1,5 @@
+use core::fmt;
+
 use anyhow::{Context, Result};
 use aranya_crypto::{
     CipherSuite, DeviceId, EncryptionKey, EncryptionKeyId, EncryptionPublicKey, Engine,
@@ -39,6 +41,7 @@ use serde::{Deserialize, Serialize};
 /// # }
 /// ```
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct KeyBundle {
     /// Device identifier derived from the identity key.
     ///
@@ -77,7 +80,8 @@ pub struct KeyBundle {
 /// # Type Parameters
 ///
 /// * `CS` - The cipher suite implementation to use for cryptographic operations
-#[derive(Debug)]
+#[derive(Clone)]
+#[non_exhaustive]
 pub struct PublicKeys<CS: CipherSuite> {
     /// Public identity key for device identification.
     pub ident_pk: IdentityVerifyingKey<CS>,
@@ -213,5 +217,15 @@ impl KeyBundle {
                 .context("unable to find `SigningKey`")?
                 .public()?,
         })
+    }
+}
+
+impl<CS: CipherSuite> fmt::Debug for PublicKeys<CS> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PublicKeys")
+            .field("ident_pk", &self.ident_pk)
+            .field("enc_pk", &self.ident_pk)
+            .field("sign_pk", &self.sign_pk)
+            .finish_non_exhaustive()
     }
 }

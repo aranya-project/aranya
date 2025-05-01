@@ -19,13 +19,13 @@ use tracing_subscriber::{prelude::*, EnvFilter};
 fn main() -> Result<()> {
     let flags = Args::parse();
 
-    let cfg = Config::load(&flags.cfg)?;
+    let cfg = Config::load(&flags.config)?;
 
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::fmt::layer()
+                .with_writer(io::stderr)
                 .with_file(false)
-                .with_target(false)
                 .compact()
                 .with_filter(EnvFilter::from_env("ARANYA_DAEMON")),
         )
@@ -40,16 +40,29 @@ fn main() -> Result<()> {
     rt.block_on(async {
         let daemon = Daemon::load(cfg).await.context("unable to load daemon")?;
         info!("loaded Aranya daemon");
+
+        if flags.print_api_pk {
+            let pk = daemon.public_api_key().await?.encode()?;
+            print!("{}", hex::encode(pk));
+            return Ok(());
+        }
+
         daemon.run().await
     })
-    .inspect_err(|err| error!(err = ?err))
+    .inspect_err(|err| error!(?err))
 }
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Configuration file
-    cfg: PathBuf,
+    /// Path to the configuration file.
+    #[arg(long)]
+    config: PathBuf,
+
+    /// Print the public API key in hexadecimal format, then
+    /// exit.
+    #[arg(long)]
+    print_api_pk: bool,
 }
 
 /// A PID file.
