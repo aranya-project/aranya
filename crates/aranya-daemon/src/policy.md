@@ -142,7 +142,7 @@ struct RoleInfo {
 
 ```policy
 // Device on the team.
-fact Device[device_id id]=>{device struct DeviceInfo}
+fact Device[device_id id]=>{precedence int, sign_key_id id, enc_key_id id}
 
 // A device's public IdentityKey
 fact DeviceIdentKey[device_id id]=>{key bytes}
@@ -153,8 +153,8 @@ fact DeviceSignKey[device_id id]=>{key_id id, key bytes}
 // A device's public EncryptionKey.
 fact DeviceEncKey[device_id id]=>{key_id id, key bytes}
 
-// A ID-based role on the team.
-fact Role[role_id id]=>{role struct RoleInfo}
+// An RBAC role on the team.
+fact Role[role_id id]=>{name string, author_id id}
 
 // Records that a role was assigned to a device.
 fact AssignedRole[role_id id, device_id id]=>{}
@@ -266,10 +266,10 @@ A device may be assigned multiple roles.
 
 ```policy
 finish function create_role(role struct RoleInfo) {
-    create Role[role_id: role.role_id]=>{role: role}
+    create Role[role_id: role.role_id]=>{name: role.name, author_id: role.author_id}
 }
 
-finish function delete_role(role struct RoleInfo) {
+finish function delete_role(role struct Role) {
     delete Role[role_id: role.role_id]
 }
 
@@ -298,7 +298,7 @@ function author_dominates_target(author_id id, target_id id) bool {
     // Check if the device has higher precedence than the target device.
     let author_device = unwrap query Device[device_id: author_id]
     let target_device = unwrap query Device[device_id: target_id]
-    if author_device.device.precedence > target_device.device.precedence {
+    if author_device.precedence > target_device.precedence {
         return true
     }
     return false
@@ -509,7 +509,7 @@ command CreateTeam {
 
 // Adds the device to the Team.
 finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, device struct DeviceInfo) {
-    create Device[device_id: key_ids.device_id]=>{device: device}
+    create Device[device_id: key_ids.device_id]=>{precedence: device.precedence, sign_key_id: device.sign_key_id, enc_key_id: device.enc_key_id}
 
     create DeviceIdentKey[device_id: key_ids.device_id]=>{key: key_bundle.ident_key}
     create DeviceSignKey[device_id: key_ids.device_id]=>{
@@ -852,16 +852,9 @@ command AssignDevicePrecedence {
         check device_can_execute_op(author.device_id, "Operation::AssignDevicePrecedence")
         check author_dominates_target(author.device_id, device.device_id)
 
-        let new_device = DeviceInfo {
-            device_id: device.device_id,
-            precedence: this.precedence,
-            sign_key_id: device.device.sign_key_id,
-            enc_key_id: device.device.enc_key_id,
-        }
-
         finish {
-            update Device[device_id: device.device_id]=>{device: device.device} to {
-                device: new_device
+            update Device[device_id: device.device_id]=>{precedence: device.precedence, sign_key_id: device.sign_key_id, enc_key_id: device.enc_key_id} to {
+                precedence: this.precedence, sign_key_id: device.sign_key_id, enc_key_id: device.enc_key_id
             }
 
             // Return information about precedence assigned to device.
@@ -971,9 +964,15 @@ command DeleteRole {
         // Query role.
         let role = check_unwrap query Role[role_id: this.role_id]
 
+        let role_info = RoleInfo {
+            role_id: role.role_id,
+            name: role.name,
+            author_id: role.author_id,
+        }
+
         finish {
             // Cascade deleting the role assignments.
-            delete AssignedRole[role_id: role.role.role_id, device_id: ?]
+            delete AssignedRole[role_id: role.role_id, device_id: ?]
 
             // TODO: revoke command permissions.
             // There isn't currently a way to lookup the fact to delete from the role ID
@@ -983,11 +982,11 @@ command DeleteRole {
             // Cleans up unused data from the factdb.
 
             // Delete role.
-            delete_role(role.role)
+            delete_role(role)
 
             // Return deleted role info.
             emit RoleDeleted {
-                role: role.role,
+                role: role_info,
             }
         }
     }
@@ -1041,8 +1040,8 @@ command AssignRole {
             // Return assigned role info.
             emit RoleAssigned {
                 device_id: device.device_id,
-                role_id: role.role.role_id,
-                name: role.role.name,
+                role_id: role.role_id,
+                name: role.name,
                 author_id: author.device_id,
             }
         }
@@ -1105,13 +1104,13 @@ command RevokeRole {
         let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
-            delete AssignedRole[role_id: role.role.role_id, device_id: target.device_id]
+            delete AssignedRole[role_id: role.role_id, device_id: target.device_id]
 
             // Return revoked role info.
             emit RoleRevoked {
                 device_id: target.device_id,
-                role_id: role.role.role_id,
-                name: role.role.name,
+                role_id: role.role_id,
+                name: role.name,
                 author_id: author.device_id,
             }
         }
@@ -1167,12 +1166,12 @@ command AssignRoleOp {
         let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
-            assign_op_role(this.op, role.role.role_id)
+            assign_op_role(this.op, role.role_id)
     
             // Return deleted role info.
             emit RoleOpAssigned {
-                role_id: role.role.role_id,
-                name: role.role.name,
+                role_id: role.role_id,
+                name: role.name,
                 op: this.op,
                 author_id: author.device_id,
             }
@@ -1231,8 +1230,8 @@ command RevokeRoleOp {
 
             // Return deleted role info.
             emit RoleOpRevoked {
-                role_id: role.role.role_id,
-                name: role.role.name,
+                role_id: role.role_id,
+                name: role.name,
                 op: this.op,
                 author_id: author.device_id,
             }
@@ -1395,7 +1394,7 @@ action create_aqc_bidi_channel(peer_id id, label_id id) {
 
     let ch = aqc::create_bidi_channel(
         parent_cmd_id,
-        author.device.enc_key_id,
+        author.enc_key_id,
         author_id,
         peer_enc_pk,
         peer_id,
@@ -1516,9 +1515,9 @@ command AqcCreateBidiChannel {
                 emit AqcBidiChannelCreated {
                     channel_id: this.channel_id,
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.device.device_id,
-                    author_enc_key_id: author.device.enc_key_id,
-                    peer_id: peer.device.device_id,
+                    author_id: author.device_id,
+                    author_enc_key_id: author.enc_key_id,
+                    peer_id: peer.device_id,
                     peer_enc_pk: peer_enc_pk,
                     label_id: label.label_id,
                     author_secrets_id: this.author_secrets_id,
@@ -1533,10 +1532,10 @@ command AqcCreateBidiChannel {
                 emit AqcBidiChannelReceived {
                     channel_id: this.channel_id,
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.device.device_id,
+                    author_id: author.device_id,
                     author_enc_pk: author_enc_pk,
-                    peer_id: peer.device.device_id,
-                    peer_enc_key_id: peer.device.enc_key_id,
+                    peer_id: peer.device_id,
+                    peer_enc_key_id: peer.enc_key_id,
                     label_id: label.label_id,
                     encap: this.peer_encap,
                     psk_length_in_bytes: this.psk_length_in_bytes,
@@ -1583,7 +1582,7 @@ action create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) {
 
     let ch = aqc::create_uni_channel(
         parent_cmd_id,
-        author.device.enc_key_id,
+        author.enc_key_id,
         peer_enc_pk,
         sender_id,
         receiver_id,
@@ -1726,7 +1725,7 @@ command AqcCreateUniChannel {
                     author_id: author.device_id,
                     sender_id: this.sender_id,
                     receiver_id: this.receiver_id,
-                    author_enc_key_id: author.device.enc_key_id,
+                    author_enc_key_id: author.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
                     label_id: label.label_id,
                     author_secrets_id: this.author_secrets_id,
@@ -1745,7 +1744,7 @@ command AqcCreateUniChannel {
                     sender_id: this.sender_id,
                     receiver_id: this.receiver_id,
                     author_enc_pk: author_enc_pk,
-                    peer_enc_key_id: peer.device.enc_key_id,
+                    peer_enc_key_id: peer.enc_key_id,
                     label_id: label.label_id,
                     encap: this.peer_encap,
                     psk_length_in_bytes: this.psk_length_in_bytes,
@@ -2411,9 +2410,9 @@ Queries a list of roles on the team.
 action query_roles_on_team() {
     map Role[role_id: ?] as f {
         publish QueryRole {
-            role_id: f.role.role_id,
-            role_name: f.role.name,
-            role_author_id: f.role.author_id,
+            role_id: f.role_id,
+            role_name: f.name,
+            role_author_id: f.author_id,
         }
     }
 }
@@ -2508,8 +2507,8 @@ action query_device_roles(device_id id) {
             publish QueryRoleAssignment {
                 device_id: f.device_id,
                 role_id: role.role_id,
-                role_name: role.role.name,
-                role_author_id: role.role.author_id,
+                role_name: role.name,
+                role_author_id: role.author_id,
             }
         }
     }
@@ -2557,9 +2556,9 @@ action query_role_ops(role_id id) {
             let role = check_unwrap query Role[role_id: f.role_id]
             publish QueryRoleOps {
                 role_id: role.role_id,
-                role_name: role.role.name,
+                role_name: role.name,
                 op: f.op,
-                author_id: role.role.author_id,
+                author_id: role.author_id,
             }
         }
     }
