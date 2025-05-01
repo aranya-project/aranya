@@ -25,6 +25,8 @@ aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
+postcard = { workspace = true }
+serde = { workspace = true }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }

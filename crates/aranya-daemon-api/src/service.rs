@@ -74,6 +74,11 @@ custom_id! {
 }
 
 custom_id! {
+    /// Uniquely identifies a role.
+    pub struct RoleId;
+}
+
+custom_id! {
     /// An AQC label ID.
     pub struct LabelId;
 }
@@ -367,7 +372,7 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     // Create a label.
-    async fn create_label(team: TeamId, name: String) -> Result<LabelId>;
+    async fn create_label(team: TeamId, name: String, managing_role_id: RoleId) -> Result<LabelId>;
     // Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     // Assign a label to a device.

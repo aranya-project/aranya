@@ -5,7 +5,7 @@ use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{bail, Context, Result};
 use aranya_aqc_util::LabelId;
-use aranya_crypto::{Csprng, DeviceId, Rng};
+use aranya_crypto::{Csprng, DeviceId, Id, Rng};
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
@@ -467,10 +467,14 @@ where
     }
 
     /// Create a label.
-    #[instrument(skip(self), fields(name = %name))]
-    fn create_label(&self, name: String) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    #[instrument(skip(self))]
+    fn create_label(
+        &self,
+        name: String,
+        managing_role_id: Id,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_label(name)?;
+            actor.create_label(name, managing_role_id)?;
             Ok(())
         })
         .in_current_span()

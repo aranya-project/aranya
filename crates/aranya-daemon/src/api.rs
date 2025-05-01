@@ -206,6 +206,7 @@ impl EffectHandler {
                 LabelDeleted(_) => {}
                 LabelAssigned(_) => {}
                 LabelRevoked(_) => {}
+                LabelUpdated(_) => {}
                 AqcNetworkNameSet(e) => {
                     self.aqc
                         .add_peer(
@@ -633,18 +634,18 @@ impl DaemonApi for Api {
         Err(anyhow!("unable to find AQC effect").into())
     }
 
-    /// Create a label.
     #[instrument(skip(self))]
     async fn create_label(
         self,
         _: context::Context,
         team: api::TeamId,
         label_name: String,
+        managing_role_id: api::RoleId,
     ) -> api::Result<api::LabelId> {
         let effects = self
             .client
             .actions(&team.into_id().into())
-            .create_label(label_name)
+            .create_label(label_name, managing_role_id.into())
             .await
             .context("unable to create AQC label")?;
         if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {

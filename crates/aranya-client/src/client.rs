@@ -4,7 +4,7 @@ use core::net::SocketAddr;
 use std::{io, path::Path};
 
 use anyhow::Context;
-use aranya_crypto::Rng;
+use aranya_crypto::{custom_id, Rng};
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
@@ -38,6 +38,11 @@ impl Devices {
     pub fn __data(&self) -> &[DeviceId] {
         self.data.as_slice()
     }
+}
+
+custom_id! {
+    /// Uniquely identifies a role.
+    pub struct RoleId;
 }
 
 /// List of labels.
@@ -374,10 +379,19 @@ impl Team<'_> {
     }
 
     /// Create a label.
-    pub async fn create_label(&mut self, label_name: String) -> Result<LabelId> {
+    pub async fn create_label(
+        &mut self,
+        label_name: String,
+        managing_role_id: RoleId,
+    ) -> Result<LabelId> {
         self.client
             .daemon
-            .create_label(context::current(), self.id, label_name)
+            .create_label(
+                context::current(),
+                self.id,
+                label_name,
+                managing_role_id.into_id().into(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

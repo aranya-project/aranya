@@ -190,6 +190,8 @@ dependencies = [
  "aranya-util",
  "backon",
  "buggy",
+ "postcard",
+ "serde",
  "serial_test",
  "tarpc",
  "tempfile",
