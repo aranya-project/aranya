@@ -9,6 +9,7 @@
 //!
 //! For more information, refer to: <https://docs.rs/aranya-client>
 
+pub mod crypto;
 mod service;
 
 pub use service::*;
