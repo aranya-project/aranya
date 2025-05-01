@@ -1297,7 +1297,7 @@ pub fn query_labels(
     Ok(())
 }
 
-/// A type containing the response of receiving a channel.
+/// A type containing the AQC channel variant.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 192, align = 8)]
 pub type AqcChannel = Safe<imp::AqcChannelType>;
