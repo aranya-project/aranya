@@ -159,6 +159,11 @@ fact Role[role_id id]=>{name string, author_id id}
 // Records that a device has been assigned a role.
 fact AssignedRole[role_id id, device_id id]=>{}
 
+// Records that a device must possess a certain role in order to
+// perform the operation.
+// TODO: use enum permission key.
+fact OpRequiresRole[op string]=>{role_id id}
+
 // Indicates that the team has been terminated.
 fact TeamEnd[]=>{}
 
@@ -469,7 +474,7 @@ command CreateTeam {
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
-        
+
         let role = RoleInfo {
             role_id: role_id,
             name: "owner",
@@ -594,7 +599,7 @@ command SetupAdminRole {
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
-        
+
         let role = RoleInfo {
             role_id: role_id,
             name: "admin",
@@ -624,7 +629,7 @@ command SetupOperatorRole {
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
-        
+
         let role = RoleInfo {
             role_id: role_id,
             name: "operator",
@@ -658,7 +663,7 @@ command SetupMemberRole {
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
-        
+
         let role = RoleInfo {
             role_id: role_id,
             name: "member",
@@ -1164,7 +1169,7 @@ command AssignRoleOp {
 
         finish {
             assign_op_role(this.op, role.role.role_id)
-    
+
             // Return deleted role info.
             emit RoleOpAssigned {
                 role_id: role.role.role_id,
@@ -1813,9 +1818,6 @@ command CreateLabel {
 
         let role = check_unwrap query Role[role_id: this.managing_role_id]
 
-        // Owners, Admins and Operators can create labels.
-        check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
-
         // Verify that the label does not already exist.
         //
         // This will happen in the `finish` block if we try to
@@ -1856,12 +1858,6 @@ effect LabelCreated {
     // permission to use the label.
     managing_role_id id,
 }
-
-action delete_label(label_id id) {
-    publish DeleteLabel {
-        label_id: label_id,
-    }
-}
 ```
 
 **Invariants**:
@@ -1872,7 +1868,8 @@ action delete_label(label_id id) {
 
 ##### DeleteLabel
 
-Removes a label from the whitelist. This operation will result in the label revocation across all Members that were assigned to it.
+Deletes a label. This operation revokes access from all devices
+who have been granted permission to use it.
 
 ```policy
 action delete_label(label_id id) {
@@ -2072,9 +2069,6 @@ command AssignLabel {
         // Devices are never allowed to assign roles to
         // themselves.
         check target.device_id != author.device_id
-
-        // Only Owners and Operators can assign labels to Members.
-        check is_owner(author.role) || is_operator(author.role)
 
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
