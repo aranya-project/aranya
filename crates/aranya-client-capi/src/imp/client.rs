@@ -8,7 +8,7 @@ pub struct Client {
 }
 
 impl Typed for Client {
-    const TYPE_ID: TypeId = TypeId::new(0xbbafb41c);
+    const TYPE_ID: TypeId = TypeId::new(0xBBAFB41C);
 }
 
 /// Serializes a [`KeyBundle`] into the output buffer.

@@ -182,6 +182,10 @@ enum AranyaError
      */
     ARANYA_ERROR_AQC,
     /**
+     * Tried to do something on a channel that was closed.
+     */
+    ARANYA_ERROR_AQC_CHANNEL_CLOSED,
+    /**
      * Failed trying to construct a new tokio runtime.
      */
     ARANYA_ERROR_RUNTIME,
@@ -388,6 +392,18 @@ typedef struct AranyaLabelId {
 } AranyaLabelId;
 
 /**
+ * Bidirectional AQC Channel Object
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiChannel {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[184];
+} AranyaAqcBidiChannel;
+
+/**
  * Channel ID for AQC bidi channel.
  */
 typedef struct AranyaAqcBidiChannelId {
@@ -395,11 +411,16 @@ typedef struct AranyaAqcBidiChannelId {
 } AranyaAqcBidiChannelId;
 
 /**
- * Channel ID for AQC uni channel.
+ * A type containing the response of receiving a channel.
  */
-typedef struct AranyaAqcUniChannelId {
-    struct AranyaId id;
-} AranyaAqcUniChannelId;
+typedef struct ARANYA_ALIGNED(8) AranyaAqcChannelType {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[192];
+} AranyaAqcChannelType;
 
 /**
  * A type to represent a span of time in nanoseconds.
@@ -1428,10 +1449,26 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
                                     struct AranyaExtError *__ext_err);
 
 /**
- * Create an AQC channel.
+ * Releases any resources associated with `ptr`.
  *
- * Creates a bidirectional AQC channel between the current device
- * and another peer.
+ * `ptr` must either be null or initialized by `::aranya_aqc_bidi_channel_init`.
+ *
+ * @relates AranyaAqcBidiChannel
+ */
+AranyaError aranya_aqc_bidi_channel_cleanup(struct AranyaAqcBidiChannel *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_aqc_bidi_channel_init`.
+ *
+ * @relates AranyaAqcBidiChannel
+ */
+AranyaError aranya_aqc_bidi_channel_cleanup_ext(struct AranyaAqcBidiChannel *ptr,
+                                                struct AranyaExtError *__ext_err);
+
+/**
+ * Create a bidirectional AQC channel between this device and another peer.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -1439,7 +1476,7 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  * @param label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param __output the AQC channel's ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId)
+ * @param channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
  *
  * @relates AranyaClient.
  */
@@ -1447,13 +1484,10 @@ AranyaError aranya_aqc_create_bidi_channel(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
                                            AranyaNetIdentifier peer,
                                            const struct AranyaLabelId *label_id,
-                                           struct AranyaAqcBidiChannelId *__output);
+                                           struct AranyaAqcBidiChannel *channel);
 
 /**
- * Create an AQC channel.
- *
- * Creates a bidirectional AQC channel between the current device
- * and another peer.
+ * Create a bidirectional AQC channel between this device and another peer.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -1461,7 +1495,7 @@ AranyaError aranya_aqc_create_bidi_channel(struct AranyaClient *client,
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param peer the peer's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  * @param label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to create the channel with.
- * @param __output the AQC channel's ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId)
+ * @param channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
  *
  * @relates AranyaClient.
  */
@@ -1469,54 +1503,57 @@ AranyaError aranya_aqc_create_bidi_channel_ext(struct AranyaClient *client,
                                                const struct AranyaTeamId *team,
                                                AranyaNetIdentifier peer,
                                                const struct AranyaLabelId *label_id,
-                                               struct AranyaAqcBidiChannelId *__output,
+                                               struct AranyaAqcBidiChannel *channel,
                                                struct AranyaExtError *__ext_err);
 
 /**
  * Delete a bidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId) of the channel to delete.
+ * @param channel_id the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_delete_bidi_channel(struct AranyaClient *client,
-                                           const struct AranyaAqcBidiChannelId *chan);
+                                           const struct AranyaAqcBidiChannelId *channel);
 
 /**
  * Delete a bidirectional AQC channel.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId) of the channel to delete.
+ * @param channel_id the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
-                                               const struct AranyaAqcBidiChannelId *chan,
+                                               const struct AranyaAqcBidiChannelId *channel,
                                                struct AranyaExtError *__ext_err);
 
 /**
- * Delete a unidirectional AQC channel.
+ * Releases any resources associated with `ptr`.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaAqcUniChannelId`](@ref AranyaAqcUniChannelId) of the channel to delete.
+ * `ptr` must either be null or initialized by `::aranya_aqc_channel_type_init`.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcChannelType
  */
-AranyaError aranya_aqc_delete_uni_channel(struct AranyaClient *client,
-                                          const struct AranyaAqcUniChannelId *chan);
+AranyaError aranya_aqc_channel_type_cleanup(struct AranyaAqcChannelType *ptr);
 
 /**
- * Delete a unidirectional AQC channel.
+ * Releases any resources associated with `ptr`.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaAqcUniChannelId`](@ref AranyaAqcUniChannelId) of the channel to delete.
+ * `ptr` must either be null or initialized by `::aranya_aqc_channel_type_init`.
  *
- * @relates AranyaClient.
+ * @relates AranyaAqcChannelType
  */
-AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaClient *client,
-                                              const struct AranyaAqcUniChannelId *chan,
-                                              struct AranyaExtError *__ext_err);
+AranyaError aranya_aqc_channel_type_cleanup_ext(struct AranyaAqcChannelType *ptr,
+                                                struct AranyaExtError *__ext_err);
+
+AranyaError aranya_aqc_receive_channel(struct AranyaClient *client,
+                                       struct AranyaAqcChannelType *channel);
+
+AranyaError aranya_aqc_receive_channel_ext(struct AranyaClient *client,
+                                           struct AranyaAqcChannelType *channel,
+                                           struct AranyaExtError *__ext_err);
 
 /**
  * Configures how often the peer will be synced with.

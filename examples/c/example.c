@@ -565,10 +565,10 @@ AranyaError run_aqc_example(Team *t) {
 
     // Create channel using Member A's client
     printf("creating AQC channel \r\n");
-    AranyaAqcBidiChannelId chan_id;
+    AranyaAqcBidiChannel channel;
     err = aranya_aqc_create_bidi_channel(&t->clients.membera.client, &t->id,
                                          aqc_addrs[MEMBERB], &label1_id,
-                                         &chan_id);
+                                         &channel);
     EXPECT("error creating aqc bidi channel", err);
 
     // TODO: send AQC data
