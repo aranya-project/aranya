@@ -92,6 +92,8 @@ typedef struct {
 // team.
 typedef struct {
     AranyaTeamId id;
+    uint8_t *init_cmd;
+    size_t init_cmd_len;
     union {
         struct {
             // Team owner.
@@ -113,6 +115,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                         const char *aqc_addr);
 AranyaError init_team(Team *t);
 AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg);
+AranyaError add_team_to_devices(Team* t);
 AranyaError run(Team *t);
 AranyaError run_aqc_example(Team *t);
 AranyaError cleanup_team(Team *t);
@@ -198,8 +201,21 @@ AranyaError init_team(Team *t) {
     // team to operate on.
     AranyaTeamConfigBuilder build;
     AranyaTeamConfig cfg;
-    aranya_team_config_builder_build(&build, &cfg);
-    err = aranya_create_team(&t->clients.owner.client, &cfg, &t->id);
+
+    err = aranya_team_config_builder_init(&build);
+    EXPECT("error initialzing the team config builder", err);
+    err = aranya_team_config_builder_build(&build, &cfg);
+    EXPECT("error building a team config", err);
+
+    t->init_cmd_len = 1;
+    t->init_cmd     = malloc(t->init_cmd_len);
+    
+    err = aranya_create_team(&t->clients.owner.client, &cfg, &t->id, t->init_cmd, &t->init_cmd_len);
+    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        printf("reallocating init command buffer\r\n");
+        t->init_cmd = realloc(t->init_cmd, t->init_cmd_len);
+        err = aranya_create_team(&t->clients.owner.client, &cfg, &t->id, t->init_cmd, &t->init_cmd_len);
+    }
     EXPECT("error creating team", err);
 
     // Test ID serialization and deserialization
@@ -266,6 +282,34 @@ AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg) {
     return ARANYA_ERROR_SUCCESS;
 }
 
+AranyaError add_team_to_devices(Team* t) {
+    AranyaError err;
+
+    AranyaTeamConfigBuilder build;
+    AranyaTeamConfig cfg;
+
+    err = aranya_team_config_builder_init(&build);
+    EXPECT("error initialzing the team config builder", err);
+
+    err = aranya_team_config_builder_init_command(&build, t->init_cmd, t->init_cmd_len);
+    EXPECT("error setting the init command on the team config builder", err);
+
+    err = aranya_team_config_builder_build(&build, &cfg);
+    EXPECT("error building a team config", err);
+
+    // Storage exists due to a prior call to `sync_now`
+    // err = aranya_add_team(&t->clients.admin.client, &t->id, &cfg);
+    // EXPECT("error adding team for admin", err);
+    err = aranya_add_team(&t->clients.operator.client, &t->id, &cfg);
+    EXPECT("error adding team for operator", err);
+    err = aranya_add_team(&t->clients.membera.client, &t->id, &cfg);
+    EXPECT("error adding team for membera", err);
+    err = aranya_add_team(&t->clients.memberb.client, &t->id, &cfg);
+    EXPECT("error adding team for memberb", err);
+
+    return ARANYA_ERROR_SUCCESS;
+}
+
 // Run the example.
 AranyaError run(Team *t) {
     AranyaError err;
@@ -314,6 +358,10 @@ AranyaError run(Team *t) {
     err = aranya_assign_role(&t->clients.admin.client, &t->id,
                              &t->clients.operator.id, ARANYA_ROLE_OPERATOR);
     EXPECT("error assigning operator role", err);
+
+    // Add teams to each device's local store
+    err = add_team_to_devices(t);
+    EXPECT("error adding team to devices", err);
 
     // Initialize the builder
     struct AranyaSyncPeerConfigBuilder builder;

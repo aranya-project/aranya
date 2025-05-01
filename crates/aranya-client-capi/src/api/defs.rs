@@ -576,11 +576,25 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
     Ok(id.into())
 }
 
-#[aranya_capi_core::opaque(size = 24, align = 8)]
+#[aranya_capi_core::opaque(size = 32, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
-#[aranya_capi_core::opaque(size = 16, align = 8)]
+#[aranya_capi_core::opaque(size = 32, align = 8)]
+#[aranya_capi_core::derive(Init, Cleanup)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
+
+/// Attempts to construct a [`TeamConfig`], returning an `Error::Config`
+/// if there are invalid parameters.
+///
+/// @param cfg a pointer to the team config builder
+/// @param out a pointer to write the team config to
+pub fn team_config_builder_init_command(
+    cfg: &mut TeamConfigBuilder,
+    init_command: *const u8,
+    init_command_len: usize,
+) -> Result<(), imp::Error> {
+    cfg.deref_mut().init_command(init_command, init_command_len)
+}
 
 /// Attempts to construct a [`TeamConfig`], returning an `Error::Config`
 /// if there are invalid parameters.
@@ -597,33 +611,53 @@ pub fn team_config_builder_build(
 
 /// Create a new graph/team with the current device as the owner.
 ///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small hold the init command.
+/// Writes the number of bytes that would have been returned to `init_cmd_len`.
+/// The application can use `init_cmd_len` to allocate a larger buffer.
+///
 /// @param client the Aranya Client [`Client`].
 /// @param cfg the Team Configuration [`TeamConfig`].
-/// @param __output the team's ID [`TeamId`].
+/// @param team_id_out the team's ID [`TeamId`].
+/// @param init_cmd_out pointer to bytes representing a serialized init command
+/// @param init_cmd_len returns the length of the serialized init command
 ///
 /// @relates AranyaClient.
-#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
+pub fn create_team(
+    client: &mut Client,
+    cfg: &TeamConfig,
+    team_id_out: &mut MaybeUninit<TeamId>,
+    init_cmd_out: &mut MaybeUninit<u8>,
+    init_cmd_len: &mut usize,
+) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let cfg = aranya_client::TeamConfig::builder().build()?;
-    // TODO(Steve): Use init command
-    let (id, init_command) = client.rt.block_on(client.inner.create_team(cfg))?;
-    Ok(id.into())
+    let cfg = aranya_client::TeamConfig::try_from(&(**cfg))?;
+    let (id, init_cmd) = client.rt.block_on(client.inner.create_team(cfg))?;
+
+    if *init_cmd_len < init_cmd.len() {
+        *init_cmd_len = init_cmd.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+
+    *init_cmd_len = init_cmd.len();
+    let out = aranya_capi_core::try_as_mut_slice!(init_cmd_out, *init_cmd_len);
+    for (src, dst) in init_cmd.into_iter().zip(out) {
+        dst.write(src);
+    }
+
+    team_id_out.write(TeamId::from(id));
+    Ok(())
 }
 
 /// Add a team to the local device store.
-///
-/// NOTE: this function is unfinished and will panic if called.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param cfg the Team Configuration [`TeamConfig`].
 ///
 /// @relates AranyaClient.
-#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let cfg = aranya_client::TeamConfig::builder().build()?;
+    let cfg = aranya_client::TeamConfig::try_from(&(**cfg))?;
     client
         .rt
         .block_on(client.inner.add_team(team.into(), cfg))?;

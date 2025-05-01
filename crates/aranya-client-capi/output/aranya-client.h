@@ -328,7 +328,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[16];
+    uint8_t __for_size_only[32];
 } AranyaTeamConfigBuilder;
 
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
@@ -337,7 +337,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[24];
+    uint8_t __for_size_only[32];
 } AranyaTeamConfig;
 
 /**
@@ -836,6 +836,69 @@ AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
+ * Initializes `AranyaTeamConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaTeamConfigBuilder
+ */
+AranyaError aranya_team_config_builder_init(struct AranyaTeamConfigBuilder *out);
+
+/**
+ * Initializes `AranyaTeamConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaTeamConfigBuilder
+ */
+AranyaError aranya_team_config_builder_init_ext(struct AranyaTeamConfigBuilder *out,
+                                                struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_team_config_builder_init`.
+ *
+ * @relates AranyaTeamConfigBuilder
+ */
+AranyaError aranya_team_config_builder_cleanup(struct AranyaTeamConfigBuilder *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_team_config_builder_init`.
+ *
+ * @relates AranyaTeamConfigBuilder
+ */
+AranyaError aranya_team_config_builder_cleanup_ext(struct AranyaTeamConfigBuilder *ptr,
+                                                   struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`
+ * if there are invalid parameters.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_team_config_builder_init_command(struct AranyaTeamConfigBuilder *cfg,
+                                                    const uint8_t *init_command,
+                                                    size_t init_command_len);
+
+/**
+ * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`
+ * if there are invalid parameters.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_team_config_builder_init_command_ext(struct AranyaTeamConfigBuilder *cfg,
+                                                        const uint8_t *init_command,
+                                                        size_t init_command_len,
+                                                        struct AranyaExtError *__ext_err);
+
+/**
  * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig), returning an `Error::Config`
  * if there are invalid parameters.
  *
@@ -859,34 +922,48 @@ AranyaError aranya_team_config_builder_build_ext(struct AranyaTeamConfigBuilder 
 /**
  * Create a new graph/team with the current device as the owner.
  *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small hold the init command.
+ * Writes the number of bytes that would have been returned to `init_cmd_len`.
+ * The application can use `init_cmd_len` to allocate a larger buffer.
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
- * @param __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param team_id_out the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param init_cmd_out pointer to bytes representing a serialized init command
+ * @param init_cmd_len returns the length of the serialized init command
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team(struct AranyaClient *client,
                                const struct AranyaTeamConfig *cfg,
-                               struct AranyaTeamId *__output);
+                               struct AranyaTeamId *team_id_out,
+                               uint8_t *init_cmd_out,
+                               size_t *init_cmd_len);
 
 /**
  * Create a new graph/team with the current device as the owner.
  *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small hold the init command.
+ * Writes the number of bytes that would have been returned to `init_cmd_len`.
+ * The application can use `init_cmd_len` to allocate a larger buffer.
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
- * @param __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param team_id_out the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param init_cmd_out pointer to bytes representing a serialized init command
+ * @param init_cmd_len returns the length of the serialized init command
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team_ext(struct AranyaClient *client,
                                    const struct AranyaTeamConfig *cfg,
-                                   struct AranyaTeamId *__output,
+                                   struct AranyaTeamId *team_id_out,
+                                   uint8_t *init_cmd_out,
+                                   size_t *init_cmd_len,
                                    struct AranyaExtError *__ext_err);
 
 /**
  * Add a team to the local device store.
- *
- * NOTE: this function is unfinished and will panic if called.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -900,8 +977,6 @@ AranyaError aranya_add_team(struct AranyaClient *client,
 
 /**
  * Add a team to the local device store.
- *
- * NOTE: this function is unfinished and will panic if called.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).

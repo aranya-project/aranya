@@ -210,24 +210,88 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Copy, Clone, Debug)]
 /// Configuration info when creating or adding a team in Aranya
-pub struct TeamConfig {}
+pub struct TeamConfig {
+    init_command: *const u8,
+    init_command_len: usize,
+}
 
 impl Typed for TeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
 }
 
+impl TryFrom<&TeamConfig> for aranya_client::TeamConfig {
+    type Error = super::Error;
+
+    fn try_from(value: &TeamConfig) -> Result<Self, Self::Error> {
+        let mut builder = Self::builder();
+
+        if !value.init_command.is_null() {
+            let bytes = {
+                // This is a workaround because try_as_slice! expects the first arg to be an identifier
+                let init_command = value.init_command;
+                aranya_capi_core::try_as_slice!(init_command, value.init_command_len)
+            };
+            builder = builder.init_command(bytes);
+        }
+
+        Ok(builder.build()?)
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 /// Builder for a [`TeamConfig`]
-pub struct TeamConfigBuilder {}
+pub struct TeamConfigBuilder {
+    init_command: *const u8,
+    init_command_len: usize,
+}
+
+impl Default for TeamConfigBuilder {
+    fn default() -> Self {
+        Self {
+            init_command: std::ptr::null(),
+            init_command_len: 0,
+        }
+    }
+}
 
 impl Typed for TeamConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0x112905E7);
 }
 
 impl TeamConfigBuilder {
+    pub fn init_command(
+        &mut self,
+        init_command: *const u8,
+        init_command_len: usize,
+    ) -> Result<(), super::Error> {
+        if init_command.is_null() {
+            let e = ConfigError::InvalidArg {
+                arg: "init_command",
+                reason: "Tried to set the `init_command` to an invalid address",
+            };
+            return Err(e.into());
+        }
+
+        if init_command_len == 0 {
+            let e = ConfigError::InvalidArg {
+                arg: "init_command",
+                reason: "Tried to set the `init_command_len` to 0",
+            };
+            return Err(e.into());
+        }
+
+        self.init_command = init_command;
+        self.init_command_len = init_command_len;
+
+        Ok(())
+    }
+
     /// Attempts to construct a [`TeamConfig`], returning an
     /// [`Error::Config`](super::error::Error::Config) if invalid.
-    pub fn build(self) -> Result<TeamConfig, super::Error> {
-        Ok(TeamConfig {})
+    pub fn build(&self) -> Result<TeamConfig, super::Error> {
+        Ok(TeamConfig {
+            init_command: self.init_command,
+            init_command_len: self.init_command_len,
+        })
     }
 }
