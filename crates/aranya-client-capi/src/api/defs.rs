@@ -2,6 +2,7 @@ use core::{ffi::c_char, ops::DerefMut, ptr};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
+use aranya_client::aqc_net::{self as aqc};
 use tracing::{debug, error};
 
 use crate::imp;
@@ -1009,141 +1010,6 @@ pub fn revoke_label(
     Ok(())
 }
 
-/// Bidirectional AQC Channel Object
-#[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 184, align = 8)]
-pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
-
-/// Create a bidirectional AQC channel between this device and another peer.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param peer the peer's network identifier [`NetIdentifier`].
-/// @param label_id the AQC channel label ID [`LabelId`] to create the channel with.
-/// @param channel the AQC channel object [`AqcBidiChannel`] that holds channel info.
-///
-/// @relates AranyaClient.
-pub unsafe fn aqc_create_bidi_channel(
-    client: &mut Client,
-    team: &TeamId,
-    peer: NetIdentifier,
-    label_id: &LabelId,
-    channel: &mut MaybeUninit<AqcBidiChannel>,
-) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `peer` is a valid C String.
-    let peer = unsafe { peer.as_underlying() }?;
-
-    let client = client.deref_mut();
-    let (chan, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
-
-    Safe::init(channel, imp::AqcBidiChannel::new(chan));
-
-    Ok(())
-}
-
-/// Delete a bidirectional AQC channel.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param channel_id the AQC Channel [`AqcBidiChannel`] to delete.
-///
-/// @relates AranyaClient.
-pub fn aqc_delete_bidi_channel(
-    client: &mut Client,
-    channel: &AqcBidiChannelId,
-) -> Result<(), imp::Error> {
-    // TODO(nikki): change to AqcBidiChannel
-    let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.aqc().delete_bidi_channel(channel.into()))?;
-    Ok(())
-}
-
-/// A type containing the response of receiving a channel.
-#[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 192, align = 8)]
-pub type AqcChannelType = Safe<imp::AqcChannelType>;
-
-pub fn aqc_receive_channel(
-    client: &mut Client,
-    channel: &mut MaybeUninit<AqcChannelType>,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    let chan = client.rt.block_on(client.inner.aqc().receive_channel());
-
-    match chan {
-        Some(chan) => {
-            Safe::init(channel, imp::AqcChannelType::new(chan));
-            Ok(())
-        }
-        None => Err(imp::Error::AqcChannelClosed),
-    }
-}
-
-/*
-TODO(nikki): AQC uni support
-/// Unidirectional AQC Channel Object
-#[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 184, align = 8)]
-pub type AqcUniChannel = Safe<imp::AqcUniChannel>;
-
-/// Create a unidirectional AQC channel between this device and another peer.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param peer the peer's network identifier [`NetIdentifier`].
-/// @param label_id the AQC channel label ID [`LabelId`] to create the channel with.
-/// @param channel the AQC channel object [`AqcUniChannel`] that holds channel info.
-///
-/// @relates AranyaClient.
-pub unsafe fn aqc_create_uni_channel(
-    client: &mut Client,
-    team: &TeamId,
-    peer: NetIdentifier,
-    label_id: &LabelId,
-    channel: &mut MaybeUninit<AqcUniChannel>,
-) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `peer` is a valid C String.
-    let peer = unsafe { peer.as_underlying() }?;
-
-    let client = client.deref_mut();
-    let (chan, _) = client.rt.block_on(client.inner.aqc().create_uni_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
-
-    Safe::init(channel, imp::AqcUniChannel::new(chan));
-
-    Ok(())
-}
-
-/// Delete a unidirectional AQC channel.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param chan the AQC Channel [`AqcUniChannel`] to delete.
-///
-/// @relates AranyaClient.
-pub fn aqc_delete_uni_channel(
-    client: &mut Client,
-    channel: &AqcUniChannel,
-) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    client
-        .rt
-        .block_on(client.inner.aqc().delete_uni_channel(channel.into()))?;
-    Ok(())
-}
-*/
-
 /// Configures how often the peer will be synced with.
 ///
 /// By default, the interval is not set. It is an error to call
@@ -1430,3 +1296,266 @@ pub fn query_labels(
     *labels_len = data.len();
     Ok(())
 }
+
+/// A type containing the response of receiving a channel.
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 192, align = 8)]
+pub type AqcChannel = Safe<imp::AqcChannelType>;
+
+/// An enum containing all [`AqcChannel`] variants.
+#[repr(u8)]
+#[derive(Copy, Clone, Debug)]
+pub enum AqcChannelType {
+    Sender,
+    Receiver,
+    Bidirectional,
+}
+
+/// Bidirectional AQC Channel Object
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 184, align = 8)]
+pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
+
+/// Sender AQC Channel Object
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 112, align = 8)]
+pub type AqcSenderChannel = Safe<imp::AqcSenderChannel>;
+
+/// Receiver AQC Channel Object
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 88, align = 8)]
+pub type AqcReceiverChannel = Safe<imp::AqcReceiverChannel>;
+
+/// Create a bidirectional AQC channel between this device and another peer.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param peer the peer's network identifier [`NetIdentifier`].
+/// @param label_id the AQC channel label ID [`LabelId`] to create the channel with.
+/// @param channel the AQC channel object [`AqcBidiChannel`] that holds channel info.
+///
+/// @relates AranyaClient.
+pub unsafe fn aqc_create_bidi_channel(
+    client: &mut Client,
+    team: &TeamId,
+    peer: NetIdentifier,
+    label_id: &LabelId,
+    channel: &mut MaybeUninit<AqcBidiChannel>,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `peer` is a valid C String.
+    let peer = unsafe { peer.as_underlying() }?;
+
+    let client = client.deref_mut();
+    let (chan, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
+        team.into(),
+        peer,
+        label_id.into(),
+    ))?;
+
+    Safe::init(channel, imp::AqcBidiChannel::new(chan));
+
+    Ok(())
+}
+
+/// Delete a bidirectional AQC channel.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param channel_id the AQC Channel [`AqcBidiChannel`] to delete.
+///
+/// @relates AranyaClient.
+pub fn aqc_delete_bidi_channel(
+    client: &mut Client,
+    channel: &AqcBidiChannelId,
+) -> Result<(), imp::Error> {
+    // TODO(nikki): change to AqcBidiChannel
+    let client = client.deref_mut();
+    client
+        .rt
+        .block_on(client.inner.aqc().delete_bidi_channel(channel.into()))?;
+    Ok(())
+}
+
+/// Waits until an AQC channel is received from the client.
+///
+/// Returns `ARANYA_ERROR_AQC_CHANNEL_CLOSED` if trying to call this when the
+/// server connection has been closed.
+pub fn aqc_receive_channel(
+    client: &mut Client,
+    channel: &mut MaybeUninit<AqcChannel>,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let chan = client
+        .rt
+        .block_on(client.inner.aqc().receive_channel())
+        .ok_or(imp::Error::AqcChannelClosed)?;
+
+    Safe::init(channel, imp::AqcChannelType::new(chan));
+
+    Ok(())
+}
+
+/// Returns the [`AqcChannelType`] for a given [`AqcChannel`] for matching.
+///
+/// # Example
+/// ```C
+/// AqcChannel channel;
+/// AqcBidiChannel bidi;
+/// AqcSenderChannel sender;
+/// AqcReceiverChannel receiver;
+/// switch (aranya_aqc_get_channel_type(channel)) {
+///     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
+///         return aranya_aqc_get_bidirectional_channel(channel, &bidi);
+///     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
+///         return aranya_aqc_get_sender_channel(channel, &sender);
+///     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
+///         return aranya_aqc_get_receiver_channel(channel, &receiver);
+/// }
+/// ```
+///
+/// @param channel the AQC channel holder [`AqcChannel`] that holds a channel object.
+/// @param __output the corresponding AQC channel type [`AqcChannelType`] to match against.
+pub fn aqc_get_channel_type(channel: &mut AqcChannel) -> AqcChannelType {
+    match channel.inner {
+        aqc::AqcChannelType::Bidirectional { .. } => AqcChannelType::Bidirectional,
+        aqc::AqcChannelType::Sender { .. } => AqcChannelType::Sender,
+        aqc::AqcChannelType::Receiver { .. } => AqcChannelType::Receiver,
+    }
+}
+
+/// Converts the [`AqcChannel`]` into an [`AqcBidiChannel`] for further use.
+///
+/// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
+///
+/// @param channel the AQC channel holder [`AqcChannel`] that holds a channel object.
+/// @param bidi the AQC channel object [`AqcBidiChannel`] that holds channel info.
+pub fn aqc_get_bidirectional_channel(
+    channel: AqcChannel,
+    bidi: &mut MaybeUninit<AqcBidiChannel>,
+) -> Result<(), imp::Error> {
+    match channel.into_inner().inner {
+        aqc::AqcChannelType::Bidirectional { channel } => {
+            Safe::init(bidi, imp::AqcBidiChannel::new(channel));
+        }
+        _ => {
+            let e = InvalidArg::new(
+                "channel",
+                "Tried to call get_bidirectional_channel with a `AqcChannel` that wasn't Bidirectional!",
+            );
+            return Err(e.into());
+        }
+    }
+
+    Ok(())
+}
+
+/// Converts the [`AqcChannel`]` into an [`AqcSenderChannel`] for further use.
+///
+/// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
+///
+/// @param channel the AQC channel holder [`AqcChannel`] that holds a channel object.
+/// @param sender the AQC channel object [`AqcSenderChannel`] that holds channel info.
+pub fn aqc_get_sender_channel(
+    channel: AqcChannel,
+    sender: &mut MaybeUninit<AqcSenderChannel>,
+) -> Result<(), imp::Error> {
+    match channel.into_inner().inner {
+        aqc::AqcChannelType::Sender { sender: send } => {
+            Safe::init(sender, imp::AqcSenderChannel::new(send));
+        }
+        _ => {
+            let e = InvalidArg::new(
+                "channel",
+                "Tried to call get_receiver_channel with a `AqcChannel` that wasn't a receiver!",
+            );
+            return Err(e.into());
+        }
+    }
+
+    Ok(())
+}
+
+/// Converts the [`AqcChannel`]` into an [`AqcReceiverChannel`] for further use.
+///
+/// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
+///
+/// @param channel the AQC channel holder [`AqcChannel`] that holds a channel object.
+/// @param receiver the AQC channel object [`AqcReceiverChannel`] that holds channel info.
+pub fn aqc_get_receiver_channel(
+    channel: AqcChannel,
+    receiver: &mut MaybeUninit<AqcReceiverChannel>,
+) -> Result<(), imp::Error> {
+    match channel.into_inner().inner {
+        aqc::AqcChannelType::Receiver { receiver: recv } => {
+            Safe::init(receiver, imp::AqcReceiverChannel::new(recv));
+        }
+        _ => {
+            let e = InvalidArg::new(
+                "channel",
+                "Tried to call get_receiver_channel with a `AqcChannel` that wasn't a receiver!",
+            );
+            return Err(e.into());
+        }
+    }
+
+    Ok(())
+}
+
+/*
+TODO(nikki): AQC uni support
+/// Unidirectional AQC Channel Object
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 184, align = 8)]
+pub type AqcUniChannel = Safe<imp::AqcUniChannel>;
+
+/// Create a unidirectional AQC channel between this device and another peer.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param peer the peer's network identifier [`NetIdentifier`].
+/// @param label_id the AQC channel label ID [`LabelId`] to create the channel with.
+/// @param channel the AQC channel object [`AqcUniChannel`] that holds channel info.
+///
+/// @relates AranyaClient.
+pub unsafe fn aqc_create_uni_channel(
+    client: &mut Client,
+    team: &TeamId,
+    peer: NetIdentifier,
+    label_id: &LabelId,
+    channel: &mut MaybeUninit<AqcUniChannel>,
+) -> Result<(), imp::Error> {
+    // SAFETY: Caller must ensure `peer` is a valid C String.
+    let peer = unsafe { peer.as_underlying() }?;
+
+    let client = client.deref_mut();
+    let (chan, _) = client.rt.block_on(client.inner.aqc().create_uni_channel(
+        team.into(),
+        peer,
+        label_id.into(),
+    ))?;
+
+    Safe::init(channel, imp::AqcUniChannel::new(chan));
+
+    Ok(())
+}
+
+/// Delete a unidirectional AQC channel.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param chan the AQC Channel [`AqcUniChannel`] to delete.
+///
+/// @relates AranyaClient.
+pub fn aqc_delete_uni_channel(
+    client: &mut Client,
+    channel: &AqcUniChannel,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    client
+        .rt
+        .block_on(client.inner.aqc().delete_uni_channel(channel.into()))?;
+    Ok(())
+}
+*/

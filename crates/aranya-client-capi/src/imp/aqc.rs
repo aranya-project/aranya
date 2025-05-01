@@ -15,6 +15,34 @@ impl AqcBidiChannel {
     }
 }
 
+pub struct AqcSenderChannel {
+    inner: aqc::AqcChannelSender,
+}
+
+impl Typed for AqcSenderChannel {
+    const TYPE_ID: TypeId = TypeId::new(0x302D3843);
+}
+
+impl AqcSenderChannel {
+    pub fn new(channel: aqc::AqcChannelSender) -> Self {
+        Self { inner: channel }
+    }
+}
+
+pub struct AqcReceiverChannel {
+    inner: aqc::AqcChannelReceiver,
+}
+
+impl Typed for AqcReceiverChannel {
+    const TYPE_ID: TypeId = TypeId::new(0x62A97986);
+}
+
+impl AqcReceiverChannel {
+    pub fn new(channel: aqc::AqcChannelReceiver) -> Self {
+        Self { inner: channel }
+    }
+}
+
 /*
 TODO(nikki): implement uni channels
 pub struct AqcUniChannel {
@@ -33,7 +61,7 @@ impl AqcUniChannel {
 */
 
 pub struct AqcChannelType {
-    inner: aqc::AqcChannelType,
+    pub(crate) inner: aqc::AqcChannelType,
 }
 
 impl Typed for AqcChannelType {
