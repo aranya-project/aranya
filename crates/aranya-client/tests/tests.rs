@@ -324,9 +324,6 @@ async fn test_sync_now() -> Result<()> {
     team.memberb.client.add_team(team_id).await?;
     */
 
-    // Tell all peers to sync with one another.
-    team.add_all_sync_peers(team_id).await?;
-
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
 
