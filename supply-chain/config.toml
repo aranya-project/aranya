@@ -374,6 +374,10 @@ criteria = "safe-to-deploy"
 version = "0.9.10"
 criteria = "safe-to-run"
 
+[[exemptions.paste]]
+version = "1.0.15"
+criteria = "safe-to-deploy"
+
 [[exemptions.pest]]
 version = "2.7.15"
 criteria = "safe-to-deploy"

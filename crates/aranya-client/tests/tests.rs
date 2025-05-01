@@ -240,6 +240,7 @@ impl DeviceCtx {
             pid_file: work_dir.join("pid"),
             sync_addr: Addr::new("localhost", 0)?,
             afc: None,
+            aqc: None,
         };
 
         // Load daemon from config.
@@ -258,11 +259,22 @@ impl DeviceCtx {
         // give daemon time to setup UDS API.
         sleep(SLEEP_INTERVAL).await;
 
-        // Initialize the user library.
-        let mut client = (|| Client::connect(&uds_api_path))
+        let pk_path = cfg.daemon_api_pk_path();
+        let pk = (|| Daemon::load_api_pk(&pk_path))
             .retry(ExponentialBuilder::default())
             .await
-            .context("unable to init client")?;
+            .context("unable to find `ApiKeyId`")?;
+
+        // Initialize the user library.
+        let mut client = (|| {
+            Client::builder()
+                .with_daemon_api_pk(&pk)
+                .with_daemon_uds_path(&uds_api_path)
+                .connect()
+        })
+        .retry(ExponentialBuilder::default())
+        .await
+        .context("unable to init client")?;
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");
@@ -312,9 +324,6 @@ async fn test_sync_now() -> Result<()> {
     team.memberb.client.add_team(team_id).await?;
     */
 
-    // Tell all peers to sync with one another.
-    team.add_all_sync_peers(team_id).await?;
-
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
 
@@ -336,7 +345,7 @@ async fn test_sync_now() -> Result<()> {
     // Now, we try to assign a role using the admin, which is expected to fail.
     match admin.assign_role(team.operator.id, Role::Operator).await {
         Ok(_) => bail!("Expected role assignment to fail"),
-        Err(aranya_client::Error::Daemon(_)) => {}
+        Err(aranya_client::Error::Aranya(_)) => {}
         Err(_) => bail!("Unexpected error"),
     }
 
@@ -368,6 +377,7 @@ async fn test_query_functions() -> Result<()> {
     info!(?team_id);
 
     /*
+     * TODO(geoff): implement this
     team.admin.client.add_team(team_id).await?;
     team.operator.client.add_team(team_id).await?;
     team.membera.client.add_team(team_id).await?;
