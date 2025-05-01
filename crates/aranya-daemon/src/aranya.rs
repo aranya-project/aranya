@@ -6,7 +6,7 @@ use std::{borrow::Cow, sync::Arc};
 use anyhow::{bail, Context, Result};
 use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Id, Rng};
-use aranya_daemon_api::NetIdentifier;
+use aranya_daemon_api::{NetIdentifier, Op, RoleId};
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;

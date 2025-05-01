@@ -751,7 +751,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_name: String,
         managing_role_id: api::RoleId,
-    ) -> api::Result<api::LabelId> {
+    ) -> api::Result<api::Label> {
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -759,7 +759,11 @@ impl DaemonApi for Api {
             .await
             .context("unable to create label")?;
         if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
-            Ok(e.label.clone().into())
+            Ok(api::Label {
+                id: e.label_id.into(),
+                name: e.label_name.to_owned(),
+                author_id: e.label_author_id.into(),
+            })
         } else {
             Err(anyhow!("unable to create label").into())
         }
