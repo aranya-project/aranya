@@ -62,9 +62,9 @@ pub enum Error {
     #[capi(msg = "AQC library error")]
     Aqc,
 
-    /// Tried to do something on a channel that was closed.
-    #[capi(msg = "AQC channel closed")]
-    AqcChannelClosed,
+    /// Tried to do something with AQC while the server was closed.
+    #[capi(msg = "AQC server closed")]
+    AqcServerClosed,
 
     /// Failed trying to construct a new tokio runtime.
     #[capi(msg = "tokio runtime error")]
@@ -105,7 +105,7 @@ impl From<&imp::Error> for Error {
             imp::Error::Runtime(_) => Self::Runtime,
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
-            imp::Error::AqcChannelClosed => Self::AqcChannelClosed,
+            imp::Error::AqcServerClosed => Self::AqcServerClosed,
         }
     }
 }
@@ -1379,7 +1379,7 @@ pub fn aqc_delete_bidi_channel(
 
 /// Waits until an AQC channel is received from the client.
 ///
-/// Returns `ARANYA_ERROR_AQC_CHANNEL_CLOSED` if trying to call this when the
+/// Returns `ARANYA_ERROR_AQC_SERVER_CLOSED` if trying to call this when the
 /// server connection has been closed.
 pub fn aqc_receive_channel(
     client: &mut Client,
@@ -1389,7 +1389,7 @@ pub fn aqc_receive_channel(
     let chan = client
         .rt
         .block_on(client.inner.aqc().receive_channel())
-        .ok_or(imp::Error::AqcChannelClosed)?;
+        .ok_or(imp::Error::AqcServerClosed)?;
 
     Safe::init(channel, imp::AqcChannelType::new(chan));
 

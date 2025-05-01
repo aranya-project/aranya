@@ -26,8 +26,8 @@ pub enum Error {
     #[error("buffer too small")]
     BufferTooSmall,
 
-    #[error("AQC channel was closed")]
-    AqcChannelClosed,
+    #[error("AQC server was closed")]
+    AqcServerClosed,
 
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),
