@@ -140,8 +140,8 @@ AranyaError query_devices_on_team(Team *t, AranyaDeviceId **devices,
 AranyaError query_roles_on_team(Team *t, AranyaRole **roles, size_t *roles_len);
 AranyaError query_device_roles(Team *t, AranyaDeviceId *device,
                                AranyaRole **roles, size_t *roles_len);
-AranyaError query_role_operations(Team *t, AranyaRoleId *role,
-                                  AranyaOperation **ops, size_t *ops_len);
+AranyaError query_role_operations(Team *t, AranyaRoleId *role, AranyaOp **ops,
+                                  size_t *ops_len);
 
 // Initialize an Aranya client.
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
@@ -481,8 +481,8 @@ AranyaError run(Team *t) {
     free(device_roles);
 
     printf("querying admin role permissions\r\n");
-    size_t ops_len       = BUF_LEN;
-    AranyaOperation *ops = malloc(ops_len * sizeof(AranyaOperation));
+    size_t ops_len = BUF_LEN;
+    AranyaOp *ops  = malloc(ops_len * sizeof(AranyaOp));
     err = aranya_query_role_operations(&t->clients.operator.client, &t->id,
                                        &t->roles.admin, ops, &ops_len);
     EXPECT("error querying role ops", err);
@@ -490,10 +490,10 @@ AranyaError run(Team *t) {
         return ARANYA_ERROR_BUG;
     }
     for (size_t i = 0; i < ops_len; i++) {
-        AranyaOperation op_result = ops[i];
-        size_t op_str_len         = 255;
-        char *op_str              = malloc(op_str_len);
-        err = aranya_op_to_str(&op_result, op_str, &op_str_len);
+        AranyaOp op_result = ops[i];
+        size_t op_str_len  = 255;
+        char *op_str       = malloc(op_str_len);
+        err                = aranya_op_to_str(op_result, op_str, &op_str_len);
         EXPECT("unable to get op name", err);
         printf("op: %s at index: %zu/%zu \r\n", op_str, i, ops_len);
         free(op_str);
@@ -808,22 +808,19 @@ AranyaError cleanup_roles(Team *t) {
         err = aranya_role_get_name(&roles[i], &role_str);
         printf("revoking ops for role: %s\r\n", role_str);
 
-        size_t ops_len       = 0;
-        AranyaOperation *ops = NULL;
-        err = query_role_operations(t, &role_id, &ops, &ops_len);
+        size_t ops_len = 0;
+        AranyaOp *ops  = NULL;
+        err            = query_role_operations(t, &role_id, &ops, &ops_len);
         printf("ops_len: %zu\r\n", ops_len);
         EXPECT("error querying role permissions", err);
         for (size_t j = 0; j < ops_len; j++) {
             if (memcmp(&owner_role_id, &role_id, sizeof(AranyaRoleId))) {
-                AranyaOp op;
-                err = aranya_op_get_enum(&ops[j], &op);
-                EXPECT("error getting operation enum", err);
                 err = aranya_revoke_role_operation(&t->clients.owner.client,
-                                                   &t->id, &role_id, op);
+                                                   &t->id, &role_id, ops[j]);
                 EXPECT("error revoking role op", err);
                 size_t op_str_len = 255;
                 char *op_str      = malloc(op_str_len);
-                err = aranya_op_to_str(&ops[j], op_str, &op_str_len);
+                err = aranya_op_to_str(ops[j], op_str, &op_str_len);
                 EXPECT("error getting op name", err);
                 printf("revoked role op: %s\r\n", op_str);
                 free(op_str);
@@ -909,12 +906,12 @@ AranyaError query_device_roles(Team *t, AranyaDeviceId *device,
 }
 
 // Query role permissions. Returned `ops` ptr must be freed.
-AranyaError query_role_operations(Team *t, AranyaRoleId *role,
-                                  AranyaOperation **ops, size_t *ops_len) {
+AranyaError query_role_operations(Team *t, AranyaRoleId *role, AranyaOp **ops,
+                                  size_t *ops_len) {
     AranyaError err;
 
     *ops_len = BUF_LEN;
-    *ops     = malloc(*ops_len * sizeof(AranyaOperation));
+    *ops     = malloc(*ops_len * sizeof(AranyaOp));
     err      = aranya_query_role_operations(&t->clients.operator.client, &t->id,
                                             role, *ops, ops_len);
     EXPECT("error querying role ops", err);

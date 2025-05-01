@@ -433,7 +433,7 @@ impl DaemonApi for DaemonApiHandler {
             .actions(&team.into_id().into())
             .create_role(name.clone())
             .await
-            .context(format!("unable to create role on team: {}", name))?;
+            .with_context(|| format!("unable to create role on team: {}", name))?;
         for e in effects {
             if let Effect::RoleCreated(e) = e {
                 return Ok(e.role.into());
@@ -504,7 +504,7 @@ impl DaemonApi for DaemonApiHandler {
             .actions(&team.into_id().into())
             .assign_operation_to_role(role, op)
             .await
-            .context(format!("unable to assign role operation: {}", op))?;
+            .with_context(|| format!("unable to assign role operation: {}", op))?;
         Ok(())
     }
 
@@ -520,7 +520,7 @@ impl DaemonApi for DaemonApiHandler {
             .actions(&team.into_id().into())
             .revoke_role_operation(role.into_id().into(), op)
             .await
-            .context(format!("unable to revoke role operation: {}", op))?;
+            .with_context(|| format!("unable to revoke role operation: {}", op))?;
         Ok(())
     }
     #[instrument(skip(self))]

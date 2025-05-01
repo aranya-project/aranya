@@ -490,18 +490,6 @@ typedef struct AranyaLabelId {
 } AranyaLabelId;
 
 /**
- * Valid operations that roles can perform.
- */
-typedef struct ARANYA_ALIGNED(8) AranyaOperation {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[24];
-} AranyaOperation;
-
-/**
  * Channel ID for AQC bidi channel.
  */
 typedef struct AranyaAqcBidiChannelId {
@@ -1657,14 +1645,14 @@ AranyaError aranya_role_get_name(const struct AranyaRole *role,
                                  const char **__output);
 
 /**
- * Cleanup dynamically allocated strings in role.
+ * Releases any resources used by the [`AranyaRole`](@ref AranyaRole).
  *
  * @param role the role [`AranyaRole`](@ref AranyaRole).
  */
 AranyaError aranya_role_cleanup(struct AranyaRole *role);
 
 /**
- * Cleanup dynamically allocated strings in role.
+ * Releases any resources used by the [`AranyaRole`](@ref AranyaRole).
  *
  * @param role the role [`AranyaRole`](@ref AranyaRole).
  */
@@ -1703,27 +1691,19 @@ AranyaError aranya_label_get_name(const struct AranyaLabel *label,
                                   const char **__output);
 
 /**
- * Cleanup dynamically allocated strings in label.
+ * Releases any resources used by the [`AranyaLabel`](@ref AranyaLabel).
  *
  * @param label the label [`AranyaLabel`](@ref AranyaLabel).
  */
 AranyaError aranya_label_cleanup(struct AranyaLabel *label);
 
 /**
- * Cleanup dynamically allocated strings in label.
+ * Releases any resources used by the [`AranyaLabel`](@ref AranyaLabel).
  *
  * @param label the label [`AranyaLabel`](@ref AranyaLabel).
  */
 AranyaError aranya_label_cleanup_ext(struct AranyaLabel *label,
                                      struct AranyaExtError *__ext_err);
-
-/**
- * Get enum value of operation.
- *
- * Returns the enum representation of the operation.
- */
-AranyaError aranya_op_get_enum(const struct AranyaOperation *op,
-                               AranyaOp *__output);
 
 /**
  * Writes `Op` to `str`.
@@ -1736,7 +1716,7 @@ AranyaError aranya_op_get_enum(const struct AranyaOperation *op,
  *
  * @relates AranyaId.
  */
-AranyaError aranya_op_to_str(const struct AranyaOperation *op,
+AranyaError aranya_op_to_str(AranyaOp op,
                              char *str,
                              size_t *str_len);
 
@@ -2350,7 +2330,7 @@ AranyaError aranya_query_device_roles_ext(struct AranyaClient *client,
 AranyaError aranya_query_role_operations(struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
                                          const struct AranyaRoleId *role,
-                                         struct AranyaOperation *ops,
+                                         AranyaOp *ops,
                                          size_t *ops_len);
 
 /**
@@ -2373,7 +2353,7 @@ AranyaError aranya_query_role_operations(struct AranyaClient *client,
 AranyaError aranya_query_role_operations_ext(struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              const struct AranyaRoleId *role,
-                                             struct AranyaOperation *ops,
+                                             AranyaOp *ops,
                                              size_t *ops_len,
                                              struct AranyaExtError *__ext_err);
 

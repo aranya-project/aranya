@@ -4,6 +4,7 @@ use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use tracing::{debug, error};
 
+use super::AranyaOp;
 use crate::imp;
 
 /// An error code.
@@ -353,13 +354,8 @@ impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
 }
 
 /// Valid operations that roles can perform.
-#[aranya_capi_core::opaque(size = 24, align = 8)]
-pub type Operation = Safe<imp::Op>;
-const _: [(); 24] = [(); size_of::<Operation>()];
-
-/// Valid operations that roles can perform.
 #[repr(u8)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum Op {
     /// Add a member device to team.
     AddMember,
@@ -1230,7 +1226,7 @@ pub fn role_get_name(role: &Role) -> *const c_char {
     role.name.as_ptr()
 }
 
-/// Cleanup dynamically allocated strings in role.
+/// Releases any resources used by the [`Role`].
 ///
 /// @param role the role [`Role`].
 pub unsafe fn role_cleanup(role: OwnedPtr<Role>) {
@@ -1259,7 +1255,7 @@ pub fn label_get_name(label: &Label) -> *const c_char {
     label.name.as_ptr()
 }
 
-/// Cleanup dynamically allocated strings in label.
+/// Releases any resources used by the [`Label`].
 ///
 /// @param label the label [`Label`].
 pub unsafe fn label_cleanup(label: OwnedPtr<Label>) {
@@ -1267,14 +1263,6 @@ pub unsafe fn label_cleanup(label: OwnedPtr<Label>) {
     unsafe {
         label.drop_in_place();
     }
-}
-
-/// Get enum value of operation.
-///
-/// Returns the enum representation of the operation.
-#[aranya_capi_core::no_ext_error]
-pub fn op_get_enum(op: &Operation) -> Op {
-    op.op
 }
 
 /// Writes `Op` to `str`.
@@ -1288,12 +1276,12 @@ pub fn op_get_enum(op: &Operation) -> Op {
 /// @relates AranyaId.
 #[aranya_capi_core::no_ext_error]
 pub fn op_to_str(
-    op: &Operation,
+    op: Op,
     str: &mut MaybeUninit<c_char>,
     str_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
-    let op: aranya_daemon_api::Op = op.op.into();
+    let op: aranya_daemon_api::Op = op.into();
     aranya_capi_core::write_c_str(str, &op.to_string(), str_len)?;
     Ok(())
 }
@@ -1808,7 +1796,7 @@ pub fn query_role_operations(
     client: &mut Client,
     team: &TeamId,
     role: &RoleId,
-    ops: Option<&mut MaybeUninit<Operation>>,
+    ops: Option<&mut MaybeUninit<AranyaOp>>,
     ops_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
@@ -1822,7 +1810,7 @@ pub fn query_role_operations(
     };
     let out = aranya_capi_core::try_as_mut_slice!(ops, *ops_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, imp::Op::new((*src).into()))
+        dst.write((*src).into());
     }
     if *ops_len < data.len() {
         *ops_len = data.len();
