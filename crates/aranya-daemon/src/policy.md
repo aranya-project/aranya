@@ -1138,7 +1138,7 @@ Note: currently each operation is only allowed to be executed by one role.
 
 ```policy
 
-action assign_role_operation(role_id id, op string) {
+action assign_operation_to_role(role_id id, op string) {
     publish AssignRoleOp{
         role_id: role_id,
         op: op,

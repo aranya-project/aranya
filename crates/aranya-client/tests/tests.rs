@@ -194,7 +194,7 @@ impl TeamCtx {
         // Create a dummy role and assign a dummy command to it.
         let _dummy_role = owner_team.create_role("dummy".to_string()).await?;
         owner_team
-            .assign_role_operation(admin_role.id, Op::DeleteLabel)
+            .assign_operation_to_role(admin_role.id, Op::DeleteLabel)
             .await?;
 
         self.roles = Some(default_roles);

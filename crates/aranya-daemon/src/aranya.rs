@@ -509,13 +509,13 @@ where
 
     /// Assigns a operations to a role.
     #[instrument(skip_all)]
-    fn assign_role_operation(
+    fn assign_operation_to_role(
         &self,
         role_id: RoleId,
         op: Op,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_role_operation(role_id.into(), op.to_string())?;
+            actor.assign_operation_to_role(role_id.into(), op.to_string())?;
             Ok(())
         })
         .in_current_span()

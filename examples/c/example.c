@@ -747,8 +747,9 @@ AranyaError init_roles(Team *t) {
     EXPECT("error getting dummy role id", err);
 
     // assign an operation to admin.
-    err = aranya_assign_role_operation(&t->clients.owner.client, &t->id,
-                                       &t->roles.admin, ARANYA_OP_DELETE_LABEL);
+    err = aranya_assign_operation_to_role(&t->clients.owner.client, &t->id,
+                                          &t->roles.admin,
+                                          ARANYA_OP_DELETE_LABEL);
     EXPECT("error assigning delete label op to admin", err);
 
     return err;

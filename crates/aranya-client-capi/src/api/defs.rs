@@ -76,10 +76,6 @@ pub enum Error {
     /// CString allocation error.
     #[capi(msg = "CString")]
     CString,
-
-    /// CString conversion error.
-    #[capi(msg = "IntoString")]
-    IntoString,
 }
 
 impl From<&imp::Error> for Error {
@@ -109,7 +105,6 @@ impl From<&imp::Error> for Error {
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
             imp::Error::CString(_) => Self::CString,
-            imp::Error::IntoString(_) => Self::IntoString,
         }
     }
 }
@@ -904,7 +899,7 @@ pub fn create_role(
     Ok(())
 }
 
-/// Assign role operation.
+/// Assign permission to execute an operation to a role.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
@@ -914,7 +909,7 @@ pub fn create_role(
 /// @param op the operation to assign to the role [`Op`].
 ///
 /// @relates AranyaClient.
-pub fn assign_role_operation(
+pub fn assign_operation_to_role(
     client: &mut Client,
     team: &TeamId,
     role_id: &RoleId,
@@ -926,7 +921,7 @@ pub fn assign_role_operation(
         client
             .inner
             .team(team.into())
-            .assign_role_operation(role_id.into(), op.into()),
+            .assign_operation_to_role(role_id.into(), op.into()),
     )?;
     Ok(())
 }

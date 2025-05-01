@@ -493,7 +493,7 @@ impl DaemonApi for DaemonApiHandler {
     }
 
     #[instrument(skip(self))]
-    async fn assign_role_operation(
+    async fn assign_operation_to_role(
         self,
         _: context::Context,
         team: api::TeamId,
@@ -502,7 +502,7 @@ impl DaemonApi for DaemonApiHandler {
     ) -> api::Result<()> {
         self.client
             .actions(&team.into_id().into())
-            .assign_role_operation(role, op)
+            .assign_operation_to_role(role, op)
             .await
             .context(format!("unable to assign role operation: {}", op))?;
         Ok(())

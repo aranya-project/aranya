@@ -1,5 +1,5 @@
 use core::{ffi::c_char, mem::MaybeUninit};
-use std::ffi::{IntoStringError, NulError};
+use std::ffi::NulError;
 
 use aranya_capi_core::{
     safe::{TypeId, Typed},
@@ -49,10 +49,6 @@ pub enum Error {
     /// CString allocation error.
     #[error("CString allocation: {0}")]
     CString(#[from] NulError),
-
-    /// CString conversion error.
-    #[error("CString conversion: {0}")]
-    IntoString(#[from] IntoStringError),
 }
 
 impl From<WriteCStrError> for Error {

@@ -313,7 +313,7 @@ pub trait ActorExt {
     fn delete_role(&mut self, role_id: Id) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
-    fn assign_role_operation(
+    fn assign_operation_to_role(
         &mut self,
         role_id: Id,
         op: String,

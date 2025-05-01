@@ -313,10 +313,10 @@ impl Team<'_> {
     }
 
     /// Assign operation to a role.
-    pub async fn assign_role_operation(&mut self, role: RoleId, op: Op) -> Result<()> {
+    pub async fn assign_operation_to_role(&mut self, role: RoleId, op: Op) -> Result<()> {
         self.client
             .daemon
-            .assign_role_operation(context::current(), self.id, role, op)
+            .assign_operation_to_role(context::current(), self.id, role, op)
             .await?
             .map_err(Into::into)
     }

@@ -337,7 +337,7 @@ pub trait DaemonApi {
     /// Delete a role from a team.
     async fn delete_role(team: TeamId, role: RoleId) -> Result<()>;
     /// Assign operation to a role.
-    async fn assign_role_operation(team: TeamId, role: RoleId, op: Op) -> Result<()>;
+    async fn assign_operation_to_role(team: TeamId, role: RoleId, op: Op) -> Result<()>;
     /// Revoke operation from a role.
     async fn revoke_role_operation(team: TeamId, role: RoleId, op: Op) -> Result<()>;
     /// Assign a role to a device.

@@ -197,10 +197,6 @@ enum AranyaError
      * CString allocation error.
      */
     ARANYA_ERROR_C_STRING,
-    /**
-     * CString conversion error.
-     */
-    ARANYA_ERROR_INTO_STRING,
 };
 #ifndef __cplusplus
 typedef uint32_t AranyaError;
@@ -1231,7 +1227,7 @@ AranyaError aranya_create_role_ext(struct AranyaClient *client,
                                    struct AranyaExtError *__ext_err);
 
 /**
- * Assign role operation.
+ * Assign permission to execute an operation to a role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -1242,13 +1238,13 @@ AranyaError aranya_create_role_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_role_operation(struct AranyaClient *client,
-                                         const struct AranyaTeamId *team,
-                                         const struct AranyaRoleId *role_id,
-                                         AranyaOp op);
+AranyaError aranya_assign_operation_to_role(struct AranyaClient *client,
+                                            const struct AranyaTeamId *team,
+                                            const struct AranyaRoleId *role_id,
+                                            AranyaOp op);
 
 /**
- * Assign role operation.
+ * Assign permission to execute an operation to a role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
@@ -1259,11 +1255,11 @@ AranyaError aranya_assign_role_operation(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_role_operation_ext(struct AranyaClient *client,
-                                             const struct AranyaTeamId *team,
-                                             const struct AranyaRoleId *role_id,
-                                             AranyaOp op,
-                                             struct AranyaExtError *__ext_err);
+AranyaError aranya_assign_operation_to_role_ext(struct AranyaClient *client,
+                                                const struct AranyaTeamId *team,
+                                                const struct AranyaRoleId *role_id,
+                                                AranyaOp op,
+                                                struct AranyaExtError *__ext_err);
 
 /**
  * Revoke role operation.
