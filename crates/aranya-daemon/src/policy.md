@@ -1787,7 +1787,7 @@ command AssignLabel {
 
         // The author must have permission to assign the label.
         let ctx = check_unwrap query CanAssignLabel[label_id: label.label_id]
-        check has_role(author.device_id, ctx.managing_role_id)
+        let role = check_unwrap query AssignedRole[role_id: ctx.managing_role_id, device_id: author.device_id]
 
         // Verify that the device has not already been granted
         // permission to use the label.
