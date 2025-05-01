@@ -2,6 +2,7 @@ use std::{ffi::CString, mem::MaybeUninit};
 
 use aranya_capi_core::safe::{TypeId, Typed};
 use aranya_daemon_api::RoleId;
+use buggy::BugExt;
 
 /// A role on the team.
 pub struct Role {
@@ -20,7 +21,7 @@ impl TryFrom<aranya_daemon_api::Role> for Role {
     fn try_from(value: aranya_daemon_api::Role) -> Result<Self, Self::Error> {
         Ok(Self {
             id: value.id,
-            name: CString::new(value.name).map_err(crate::imp::Error::CString)?,
+            name: CString::new(value.name).assume("should not have null byte")?,
             _pad: MaybeUninit::uninit(),
         })
     }

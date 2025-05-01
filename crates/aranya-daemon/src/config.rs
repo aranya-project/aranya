@@ -31,6 +31,10 @@ pub struct Config {
     /// AFC configuration.
     #[serde(default)]
     pub afc: Option<AfcConfig>,
+
+    /// AQC configuration.
+    #[serde(default)]
+    pub aqc: Option<AqcConfig>,
 }
 
 impl Config {
@@ -55,9 +59,29 @@ impl Config {
         self.work_dir.join("key_bundle")
     }
 
-    /// Path to `Store`.
+    /// Path to the daemon's public API key.
+    pub fn daemon_api_pk_path(&self) -> PathBuf {
+        self.work_dir.join("daemon_api_pk")
+    }
+
+    /// The directory where keystore files are written.
     pub(crate) fn keystore_path(&self) -> PathBuf {
         self.work_dir.join("keystore")
+    }
+
+    /// The directory where the root keystore exists.
+    ///
+    /// The Aranaya keystore contains Aranya's key material.
+    pub(crate) fn aranya_keystore_path(&self) -> PathBuf {
+        self.keystore_path().join("aranya")
+    }
+
+    /// The directory where the local keystore exists.
+    ///
+    /// The local keystore contains key material for the daemon.
+    /// E.g., its API key.
+    pub(crate) fn local_keystore_path(&self) -> PathBuf {
+        self.keystore_path().join("local")
     }
 
     /// Path to the runtime's storage.
@@ -97,6 +121,11 @@ pub struct AfcConfig {
     pub max_chans: usize,
 }
 
+/// AQC configuration.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AqcConfig {}
+
 #[cfg(test)]
 mod tests {
     use std::net::Ipv4Addr;
@@ -117,6 +146,7 @@ mod tests {
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
             afc: None,
+            aqc: None,
         };
         assert_eq!(got, want);
         Ok(())

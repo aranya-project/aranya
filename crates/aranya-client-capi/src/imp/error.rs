@@ -1,5 +1,4 @@
 use core::{ffi::c_char, mem::MaybeUninit};
-use std::ffi::NulError;
 
 use aranya_capi_core::{
     safe::{TypeId, Typed},
@@ -7,7 +6,6 @@ use aranya_capi_core::{
 };
 use buggy::Bug;
 use tracing::warn;
-use tracing_subscriber::util::TryInitError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -16,9 +14,6 @@ pub enum Error {
 
     #[error(transparent)]
     Timeout(#[from] tokio::time::error::Elapsed),
-
-    #[error("could not initialize logging: {0}")]
-    LogInit(#[from] TryInitError),
 
     /// An invalid argument was provided.
     #[error(transparent)]
@@ -36,19 +31,14 @@ pub enum Error {
     #[error("client error: {0}")]
     Client(#[from] aranya_client::Error),
 
-    /// Failed trying to construct a new tokio runtime.
-    #[error("tokio runtime error: {0}")]
-    Runtime(#[source] std::io::Error),
-
     #[error("config error: {0}")]
     Config(#[from] aranya_client::ConfigError),
 
     #[error("serialization errors: {0}")]
     Serialization(#[from] postcard::Error),
 
-    /// CString allocation error.
-    #[error("CString allocation: {0}")]
-    CString(#[from] NulError),
+    #[error("{0}")]
+    Other(#[from] anyhow::Error),
 }
 
 impl From<WriteCStrError> for Error {

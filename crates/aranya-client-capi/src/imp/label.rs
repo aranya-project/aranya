@@ -2,6 +2,7 @@ use std::{ffi::CString, mem::MaybeUninit};
 
 use aranya_capi_core::safe::{TypeId, Typed};
 use aranya_daemon_api::LabelId;
+use buggy::BugExt;
 
 /// A label that can be assigned to a device.
 pub struct Label {
@@ -20,7 +21,7 @@ impl TryFrom<aranya_daemon_api::Label> for Label {
     fn try_from(value: aranya_daemon_api::Label) -> Result<Self, Self::Error> {
         Ok(Self {
             id: value.id,
-            name: CString::new(value.name).map_err(crate::imp::Error::CString)?,
+            name: CString::new(value.name).assume("should not have null byte")?,
             _pad: MaybeUninit::uninit(),
         })
     }

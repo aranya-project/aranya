@@ -42,7 +42,7 @@ struct SyncPeer {
 }
 
 /// Handles adding and removing sync peers.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SyncPeers {
     /// Send messages to add/remove peers.
     send: mpsc::Sender<Msg>,

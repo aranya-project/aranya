@@ -331,6 +331,7 @@ impl DeviceCtx {
             pid_file: work_dir.join("pid"),
             sync_addr: Addr::new("localhost", 0)?,
             afc: None,
+            aqc: None,
         };
 
         // Load daemon from config.
@@ -349,11 +350,22 @@ impl DeviceCtx {
         // give daemon time to setup UDS API.
         sleep(SLEEP_INTERVAL).await;
 
-        // Initialize the user library.
-        let mut client = (|| Client::connect(&uds_api_path))
+        let pk_path = cfg.daemon_api_pk_path();
+        let pk = (|| Daemon::load_api_pk(&pk_path))
             .retry(ExponentialBuilder::default())
             .await
-            .context("unable to init client")?;
+            .context("unable to find `ApiKeyId`")?;
+
+        // Initialize the user library.
+        let mut client = (|| {
+            Client::builder()
+                .with_daemon_api_pk(&pk)
+                .with_daemon_uds_path(&uds_api_path)
+                .connect()
+        })
+        .retry(ExponentialBuilder::default())
+        .await
+        .context("unable to init client")?;
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");
@@ -404,6 +416,9 @@ async fn test_revoke_operation() -> Result<()> {
 
     // Add all devices to team.
     team.add_all_device_roles(team_id).await?;
+
+    // give daemon time to setup UDS API.
+    sleep(SLEEP_INTERVAL).await;
 
     // Grab the shorthand for the teams we need to operate on.
     let membera_id = team.membera.client.get_device_id().await?;
@@ -461,6 +476,9 @@ async fn test_revoke_role() -> Result<()> {
     // Add all devices to team.
     team.add_all_device_roles(team_id).await?;
 
+    // give daemon time to setup UDS API.
+    sleep(SLEEP_INTERVAL).await;
+
     // Grab the shorthand for the teams we need to operate on.
     let membera_id = team.membera.client.get_device_id().await?;
     let operator_id = team.operator.client.get_device_id().await?;
@@ -513,6 +531,9 @@ async fn test_device_precedence() -> Result<()> {
 
     // Add all devices to team.
     team.add_all_device_roles(team_id).await?;
+
+    // give daemon time to setup UDS API.
+    sleep(SLEEP_INTERVAL).await;
 
     // Grab the shorthand for the teams we need to operate on.
     let membera_id = team.membera.client.get_device_id().await?;
@@ -570,9 +591,6 @@ async fn test_sync_now() -> Result<()> {
     team.create_all_roles(team_id).await?;
     let roles = team.roles.clone().unwrap();
 
-    // Tell all peers to sync with one another.
-    team.add_all_sync_peers(team_id).await?;
-
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
 
@@ -583,19 +601,13 @@ async fn test_sync_now() -> Result<()> {
     info!("adding admin to team");
     owner.add_device_to_team(team.admin.pk.clone(), 100).await?;
 
-    // Add the operator as a new device, but don't give it a role.
-    info!("adding operator to team");
-    owner
-        .add_device_to_team(team.operator.pk.clone(), 100)
-        .await?;
+    // Sync once to initialize the graph.
+    let mut admin = team.admin.client.team(team_id);
+    admin.sync_now(owner_addr.into(), None).await?;
+    sleep(SLEEP_INTERVAL).await;
 
     // Finally, let's give the admin its role, but don't sync with peers.
     owner.assign_role(team.admin.id, roles.admin.id).await?;
-
-    // Now we should be able to successfully assign a role.
-    owner
-        .assign_role(team.operator.id, roles.operator.id)
-        .await?;
 
     // Try to query admin role before syncing
     {
@@ -605,7 +617,7 @@ async fn test_sync_now() -> Result<()> {
     }
 
     // Let's sync immediately, which will propagate the role assignment.
-    let mut admin = team.admin.client.team(team_id);
+    let mut admin: aranya_client::Team<'_> = team.admin.client.team(team_id);
     admin.sync_now(owner_addr.into(), None).await?;
     sleep(SLEEP_INTERVAL).await;
 
@@ -637,6 +649,7 @@ async fn test_query_functions() -> Result<()> {
     info!(?team_id);
 
     /*
+     * TODO(geoff): implement this
     team.admin.client.add_team(team_id).await?;
     team.operator.client.add_team(team_id).await?;
     team.membera.client.add_team(team_id).await?;
@@ -649,6 +662,9 @@ async fn test_query_functions() -> Result<()> {
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
+
+    // give daemon time to setup UDS API.
+    sleep(SLEEP_INTERVAL).await;
 
     // Test all our fact database queries.
     let mut queries = team.membera.client.queries(team_id);

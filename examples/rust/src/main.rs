@@ -1,99 +1,144 @@
-use aranya_daemon_api::ChanOp;
+use std::{
+    env,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
+    path::{Path, PathBuf},
+    time::Duration,
+};
+
 use anyhow::{Context as _, Result};
 use aranya_client::{client::Client, SyncPeerConfig, TeamConfig};
-use aranya_daemon::{
-    config::Config,
-    Daemon,
-};
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier};
-use aranya_util::Addr;
+use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier};
 use backon::{ExponentialBuilder, Retryable};
-use std::{net::Ipv4Addr, net::SocketAddr, path::PathBuf, time::Duration};
-use tempfile::tempdir;
-use tokio::{fs, task, time::sleep};
-use tracing::{info, Metadata};
+use tempfile::TempDir;
+use tokio::{
+    fs,
+    process::{Child, Command},
+    time::sleep,
+};
+use tracing::{debug, info, Metadata};
 use tracing_subscriber::{
     layer::{Context, Filter},
     prelude::*,
     EnvFilter,
 };
 
-struct TeamCtx {
-    owner: UserCtx,
-    admin: UserCtx,
-    operator: UserCtx,
-    membera: UserCtx,
-    memberb: UserCtx,
+#[derive(Clone, Debug)]
+struct DaemonPath(PathBuf);
+
+#[derive(Debug)]
+#[clippy::has_significant_drop]
+struct Daemon {
+    // NB: This has important drop side effects.
+    _proc: Child,
+    _work_dir: PathBuf,
 }
 
-impl TeamCtx {
-    pub async fn new(name: String, work_dir: PathBuf) -> Result<Self> {
-        let owner = UserCtx::new(name.clone(), "owner".into(), work_dir.join("owner")).await?;
-        let admin = UserCtx::new(name.clone(), "admin".into(), work_dir.join("admin")).await?;
-        let operator =
-            UserCtx::new(name.clone(), "operator".into(), work_dir.join("operator")).await?;
-        let membera =
-            UserCtx::new(name.clone(), "membera".into(), work_dir.join("membera")).await?;
-        let memberb =
-            UserCtx::new(name.clone(), "memberb".into(), work_dir.join("memberb")).await?;
+impl Daemon {
+    async fn spawn(path: &DaemonPath, work_dir: &Path, cfg_path: &Path) -> Result<Self> {
+        fs::create_dir_all(&work_dir).await?;
 
-        Ok(Self {
-            owner,
-            admin,
-            operator,
-            membera,
-            memberb,
+        let cfg_path = cfg_path.as_os_str().to_str().context("should be UTF-8")?;
+        let mut cmd = Command::new(&path.0);
+        cmd.kill_on_drop(true)
+            .current_dir(work_dir)
+            .args(["--config", cfg_path]);
+        debug!(?cmd, "spawning daemon");
+        let proc = cmd.spawn().context("unable to spawn daemon")?;
+        Ok(Daemon {
+            _proc: proc,
+            _work_dir: work_dir.into(),
         })
+    }
+
+    async fn get_api_pk(path: &DaemonPath, cfg_path: &Path) -> Result<Vec<u8>> {
+        let cfg_path = cfg_path.as_os_str().to_str().context("should be UTF-8")?;
+        let mut cmd = Command::new(&path.0);
+        cmd.kill_on_drop(true)
+            .args(["--config", cfg_path])
+            .arg("--print-api-pk");
+        debug!(?cmd, "running daemon");
+        let output = cmd.output().await.context("unable to run daemon")?;
+        let pk_hex = String::from_utf8(output.stdout)?;
+        let pk = hex::decode(pk_hex.trim())?;
+        Ok(pk)
     }
 }
 
-struct UserCtx {
+/// An Aranya device.
+struct ClientCtx {
     client: Client,
     pk: KeyBundle,
     id: DeviceId,
+    // NB: These have important drop side effects.
+    _work_dir: TempDir,
+    _daemon: Daemon,
 }
 
-impl UserCtx {
-    pub async fn new(_team_name: String, _name: String, work_dir: PathBuf) -> Result<Self> {
-        fs::create_dir_all(work_dir.clone()).await?;
+impl ClientCtx {
+    pub async fn new(team_name: &str, user_name: &str, daemon_path: &DaemonPath) -> Result<Self> {
+        info!(team_name, user_name, "creating `ClientCtx`");
 
-        // Setup daemon config.
-        let uds_api_path = work_dir.join("uds.sock");
-        let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
-        let cfg = Config {
-            name: "daemon".into(),
-            work_dir: work_dir.clone(),
-            uds_api_path: uds_api_path.clone(),
-            pid_file: work_dir.join("pid"),
-            sync_addr: any,
-            afc: None,
+        let work_dir = TempDir::with_prefix(user_name)?;
+
+        // The path that the daemon will listen on.
+        let uds_api_path = work_dir.path().join("uds.sock");
+
+        let (daemon, pk) = {
+            let work_dir = work_dir.path().join("daemon");
+            fs::create_dir_all(&work_dir).await?;
+
+            let cfg_path = work_dir.join("config.json");
+            let pid_file = work_dir.join("pid");
+
+            let buf = format!(
+                r#"
+{{
+    "name": "daemon",
+    "work_dir": "{}",
+    "uds_api_path": "{}",
+    "pid_file": "{}",
+    "sync_addr": "localhost:0"
+}}"#,
+                work_dir.as_os_str().to_str().context("should be UTF-8")?,
+                uds_api_path
+                    .as_os_str()
+                    .to_str()
+                    .context("should be UTF-8")?,
+                pid_file.as_os_str().to_str().context("should be UTF-8")?,
+            );
+            fs::write(&cfg_path, buf).await?;
+
+            let pk = Daemon::get_api_pk(daemon_path, &cfg_path).await?;
+            let daemon = Daemon::spawn(daemon_path, &work_dir, &cfg_path).await?;
+            (daemon, pk)
         };
-        // Load daemon from config.
-        // TODO: start daemons from binary rather than objects.
-        let daemon = Daemon::load(cfg.clone())
-            .await
-            .context("unable to init daemon")?;
-        // Start daemon.
-        task::spawn(async move {
-            daemon
-                .run()
-                .await
-                .expect("expected no errors running daemon")
-        });
-        // give daemon time to setup UDS API.
+
+        // Give the daemon time to start up.
         sleep(Duration::from_millis(100)).await;
 
-        // Initialize the user library.
-        let mut client = (|| Client::connect(&cfg.uds_api_path))
-            .retry(ExponentialBuilder::default())
+        let mut client = (|| {
+            Client::builder()
+                .with_daemon_api_pk(&pk)
+                .with_daemon_uds_path(&uds_api_path)
+                .connect()
+        })
+        .retry(ExponentialBuilder::default())
+        .await
+        .context("unable to initialize client")?;
+
+        let pk = client
+            .get_key_bundle()
             .await
-            .context("unable to initialize client")?;
+            .context("expected key bundle")?;
+        let id = client.get_device_id().await.context("expected device id")?;
 
-        // Get device id and key bundle.
-        let pk = client.get_key_bundle().await.expect("expected key bundle");
-        let id = client.get_device_id().await.expect("expected device id");
-
-        Ok(Self { client, pk, id })
+        Ok(Self {
+            client,
+            pk,
+            id,
+            _work_dir: work_dir,
+            _daemon: daemon,
+        })
     }
 
     async fn aranya_local_addr(&self) -> Result<SocketAddr> {
@@ -134,44 +179,52 @@ async fn main() -> Result<()> {
 
     info!("starting example Aranya application");
 
+    let daemon_path = {
+        let mut args = env::args();
+        args.next(); // skip executable name
+        let exe = args.next().context("missing `daemon` executable path")?;
+        DaemonPath(PathBuf::from(exe))
+    };
+
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
+    let team_name = "rust_example";
+    let mut owner = ClientCtx::new(&team_name, "owner", &daemon_path).await?;
+    let mut admin = ClientCtx::new(&team_name, "admin", &daemon_path).await?;
+    let mut operator = ClientCtx::new(&team_name, "operator", &daemon_path).await?;
+    let mut membera = ClientCtx::new(&team_name, "member_a", &daemon_path).await?;
+    let mut memberb = ClientCtx::new(&team_name, "member_b", &daemon_path).await?;
 
-    let mut team = TeamCtx::new("rust_example".into(), work_dir).await?;
-
-    // create team.
+    // Create a team.
     info!("creating team");
     let cfg = TeamConfig::builder().build()?;
-    let team_id = team
-        .owner
+    let team_id = owner
         .client
         .create_team(cfg)
         .await
-        .expect("expected to create team");
-    info!(?team_id);
+        .context("expected to create team")?;
+    info!(%team_id);
 
     // get sync addresses.
-    let owner_addr = team.owner.aranya_local_addr().await?;
-    let admin_addr = team.admin.aranya_local_addr().await?;
-    let operator_addr = team.operator.aranya_local_addr().await?;
-    let membera_addr = team.membera.aranya_local_addr().await?;
-    let memberb_addr = team.memberb.aranya_local_addr().await?;
+    let owner_addr = owner.aranya_local_addr().await?;
+    let admin_addr = admin.aranya_local_addr().await?;
+    let operator_addr = operator.aranya_local_addr().await?;
+    let membera_addr = membera.aranya_local_addr().await?;
+    let memberb_addr = memberb.aranya_local_addr().await?;
 
     // get aqc addresses.
     // TODO: use aqc_local_addr()
-    let membera_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
-    let memberb_aqc_addr = SocketAddr::new(std::net::IpAddr::V4(Ipv4Addr::LOCALHOST), 1);
+    let membera_aqc_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
+    let memberb_aqc_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 1);
 
     // setup sync peers.
-    let mut owner_team = team.owner.client.team(team_id);
-    let mut admin_team = team.admin.client.team(team_id);
-    let mut operator_team = team.operator.client.team(team_id);
-    let mut membera_team = team.membera.client.team(team_id);
-    let mut memberb_team = team.memberb.client.team(team_id);
+    let mut owner_team = owner.client.team(team_id);
+    let mut admin_team = admin.client.team(team_id);
+    let mut operator_team = operator.client.team(team_id);
+    let mut membera_team = membera.client.team(team_id);
+    let mut memberb_team = memberb.client.team(team_id);
 
     let roles = owner_team.setup_default_roles().await?;
     assert_eq!(roles.iter().count(), 3);
@@ -185,24 +238,19 @@ async fn main() -> Result<()> {
 
     // add admin to team.
     info!("adding admin to team");
-    owner_team.add_device_to_team(team.admin.pk, 9000).await?;
+    owner_team.add_device_to_team(admin.pk, 9000).await?;
     info!("assigning new device precedence to admin");
-    owner_team.assign_device_precedence(team.admin.id, 8500).await?;
-    owner_team.assign_role(team.admin.id, admin_role.id).await?;
+    owner_team.assign_device_precedence(admin.id, 8500).await?;
+    owner_team.assign_role(admin.id, admin_role.id).await?;
 
-    // wait for syncing.
     sleep(sleep_interval).await;
 
-    // add operator to team.
     info!("adding operator to team");
-    owner_team.add_device_to_team(team.operator.pk, 8000).await?;
+    owner_team.add_device_to_team(operator.pk, 8000).await?;
 
-    // Admin syncs with the Owner peer and retries the role
-    // assignment command
-    admin_team.sync_now(owner_addr.into(), None).await?;
     sleep(sleep_interval).await;
     owner_team
-        .assign_role(team.operator.id, operator_role.id)
+        .assign_role(operator.id, operator_role.id)
         .await?;
 
     info!("adding sync peers");
@@ -267,16 +315,16 @@ async fn main() -> Result<()> {
 
     // add membera to team.
     info!("adding membera to team");
-    owner_team.add_device_to_team(team.membera.pk, 7000).await?;
+    owner_team.add_device_to_team(membera.pk, 7000).await?;
     owner_team
-        .assign_role(team.membera.id, member_role.id)
+        .assign_role(membera.id, member_role.id)
         .await?;
 
     // add memberb to team.
     info!("adding memberb to team");
-    owner_team.add_device_to_team(team.memberb.pk, 7000).await?;
+    owner_team.add_device_to_team(memberb.pk, 7000).await?;
     owner_team
-        .assign_role(team.memberb.id, member_role.id)
+        .assign_role(memberb.id, member_role.id)
         .await?;
 
     // wait for syncing.
@@ -284,17 +332,17 @@ async fn main() -> Result<()> {
 
     info!("assigning aqc net identifiers");
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, NetIdentifier(membera_aqc_addr.to_string()))
+        .assign_aqc_net_identifier(membera.id, NetIdentifier(membera_aqc_addr.to_string()))
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, NetIdentifier(memberb_aqc_addr.to_string()))
+        .assign_aqc_net_identifier(memberb.id, NetIdentifier(memberb_aqc_addr.to_string()))
         .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
 
     // fact database queries
-    let mut queries = team.owner.client.queries(team_id);
+    let mut queries = membera.client.queries(team_id);
     info!("query list of devices on team:");
     let devices = queries.devices_on_team().await?;
     for device in devices.iter() {
@@ -313,14 +361,14 @@ async fn main() -> Result<()> {
             info!("role: {:?}, device: {}", role, device);
         }
     }
-    let keybundle = queries.device_keybundle(team.membera.id).await?;
+    let keybundle = queries.device_keybundle(membera.id).await?;
     info!("membera keybundle: {:?}", keybundle);
-    let queried_membera_net_ident = queries.aqc_net_identifier(team.membera.id).await?;
+    let queried_membera_net_ident = queries.aqc_net_identifier(membera.id).await?;
     info!(
         "membera queried_membera_net_ident: {:?}",
         queried_membera_net_ident
     );
-    let queried_memberb_net_ident = queries.aqc_net_identifier(team.memberb.id).await?;
+    let queried_memberb_net_ident = queries.aqc_net_identifier(memberb.id).await?;
     info!(
         "memberb queried_memberb_net_ident: {:?}",
         queried_memberb_net_ident
@@ -335,11 +383,11 @@ async fn main() -> Result<()> {
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
     operator_team
-        .assign_label(team.membera.id, label3.id, op)
+        .assign_label(membera.id, label3.id, op)
         .await?;
     info!("assigning label to memberb");
     operator_team
-        .assign_label(team.memberb.id, label3.id, op)
+        .assign_label(memberb.id, label3.id, op)
         .await?;
 
     // wait for syncing.
@@ -347,24 +395,18 @@ async fn main() -> Result<()> {
 
     // TODO: send AQC ctrl via network
     info!("creating acq bidi channel");
-    let (_aqc_id1, aqc_bidi_ctrl) = team
-        .membera
+    let _aqc_id1 = membera
         .client
         .aqc()
         .create_bidi_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label3.id)
         .await?;
     info!("receiving acq bidi channel");
-    team.memberb
-        .client
-        .aqc()
-        .receive_aqc_ctrl(team_id, aqc_bidi_ctrl)
-        .await?;
 
     // TODO: send AQC data.
     info!("revoking label from membera");
-    operator_team.revoke_label(team.membera.id, label3.id).await?;
+    operator_team.revoke_label(membera.id, label3.id).await?;
     info!("revoking label from memberb");
-    operator_team.revoke_label(team.memberb.id, label3.id).await?;
+    operator_team.revoke_label(memberb.id, label3.id).await?;
     // TODO: delete label.
 
     info!("completed aqc demo");
