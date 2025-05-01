@@ -142,7 +142,7 @@ struct RoleInfo {
 
 ```policy
 // Device on the team.
-fact Device[device_id id]=>{device struct DeviceInfo}
+fact Device[device_id id]=>{precedence int, sign_key_id id, enc_key_id id}
 
 // A device's public IdentityKey
 fact DeviceIdentKey[device_id id]=>{key bytes}
@@ -153,7 +153,7 @@ fact DeviceSignKey[device_id id]=>{key_id id, key bytes}
 // A device's public EncryptionKey.
 fact DeviceEncKey[device_id id]=>{key_id id, key bytes}
 
-// A role.
+// An RBAC role.
 fact Role[role_id id]=>{name string, author_id id}
 
 // Records that a device has been assigned a role.
@@ -267,10 +267,10 @@ A device may be assigned multiple roles.
 
 ```policy
 finish function create_role(role struct RoleInfo) {
-    create Role[role_id: role.role_id]=>{role: role}
+    create Role[role_id: role.role_id]=>{name: role.name, author_id: role.author_id}
 }
 
-finish function delete_role(role struct RoleInfo) {
+finish function delete_role(role struct Role) {
     delete Role[role_id: role.role_id]
 }
 
@@ -299,7 +299,7 @@ function author_dominates_target(author_id id, target_id id) bool {
     // Check if the device has higher precedence than the target device.
     let author_device = unwrap query Device[device_id: author_id]
     let target_device = unwrap query Device[device_id: target_id]
-    if author_device.device.precedence > target_device.device.precedence {
+    if author_device.precedence > target_device.precedence {
         return true
     }
     return false
@@ -488,15 +488,15 @@ command CreateTeam {
             create_role(role)
 
             // Assign default operations to owner role.
-            assign_op_role("Operation::AddMember", role.role_id)
-            assign_op_role("Operation::RemoveMember", role.role_id)
-            assign_op_role("Operation::AssignDevicePrecedence", role.role_id)
-            assign_op_role("Operation::CreateRole", role.role_id)
-            assign_op_role("Operation::DeleteRole", role.role_id)
-            assign_op_role("Operation::AssignRole", role.role_id)
-            assign_op_role("Operation::RevokeRole", role.role_id)
-            assign_op_role("Operation::AssignRoleOp", role.role_id)
-            assign_op_role("Operation::RevokeRoleOp", role.role_id)
+            assign_op_role("AddMember", role.role_id)
+            assign_op_role("RemoveMember", role.role_id)
+            assign_op_role("AssignDevicePrecedence", role.role_id)
+            assign_op_role("CreateRole", role.role_id)
+            assign_op_role("DeleteRole", role.role_id)
+            assign_op_role("AssignRole", role.role_id)
+            assign_op_role("RevokeRole", role.role_id)
+            assign_op_role("AssignRoleOp", role.role_id)
+            assign_op_role("RevokeRoleOp", role.role_id)
 
             // Assign owner role to device.
             create AssignedRole[role_id: role.role_id, device_id: author_id]=>{}
@@ -510,7 +510,7 @@ command CreateTeam {
 
 // Adds the device to the Team.
 finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, device struct DeviceInfo) {
-    create Device[device_id: key_ids.device_id]=>{device: device}
+    create Device[device_id: key_ids.device_id]=>{precedence: device.precedence, sign_key_id: device.sign_key_id, enc_key_id: device.enc_key_id}
 
     create DeviceIdentKey[device_id: key_ids.device_id]=>{key: key_bundle.ident_key}
     create DeviceSignKey[device_id: key_ids.device_id]=>{
@@ -608,7 +608,7 @@ command SetupAdminRole {
 
         finish {
             create_role(role)
-            assign_op_role("Operation::DeleteLabel", role.role_id)
+            assign_op_role("DeleteLabel", role.role_id)
 
             emit QueriedRole {
                 role: role
@@ -638,11 +638,11 @@ command SetupOperatorRole {
 
         finish {
             create_role(role)
-            assign_op_role("Operation::SetAqcNetworkName", role.role_id)
-            assign_op_role("Operation::UnsetAqcNetworkName", role.role_id)
-            assign_op_role("Operation::CreateLabel", role.role_id)
-            assign_op_role("Operation::AssignLabel", role.role_id)
-            assign_op_role("Operation::RevokeLabel", role.role_id)
+            assign_op_role("SetAqcNetworkName", role.role_id)
+            assign_op_role("UnsetAqcNetworkName", role.role_id)
+            assign_op_role("CreateLabel", role.role_id)
+            assign_op_role("AssignLabel", role.role_id)
+            assign_op_role("RevokeLabel", role.role_id)
 
             emit QueriedRole {
                 role: role
@@ -672,8 +672,8 @@ command SetupMemberRole {
 
         finish {
             create_role(role)
-            assign_op_role("Operation::AqcCreateBidiChannel", role.role_id)
-            assign_op_role("Operation::AqcCreateUniChannel", role.role_id)
+            assign_op_role("AqcCreateBidiChannel", role.role_id)
+            assign_op_role("AqcCreateUniChannel", role.role_id)
 
             emit QueriedRole {
                 role: role
@@ -729,7 +729,7 @@ command AddMember {
         // Derive the key IDs from the provided KeyBundle.
         let device_key_ids = derive_device_key_ids(this.device_keys)
 
-        check device_can_execute_op(author.device_id, "Operation::AddMember")
+        check device_can_execute_op(author.device_id, "AddMember")
 
         // Check that the Member doesn't already exist.
         check find_existing_device(device_key_ids.device_id) is None
@@ -792,7 +792,7 @@ command RemoveMember{
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
 
-        check device_can_execute_op(author.device_id, "Operation::RemoveMember")
+        check device_can_execute_op(author.device_id, "RemoveMember")
         check author_dominates_target(author.device_id, device.device_id)
 
         finish {
@@ -850,19 +850,12 @@ command AssignDevicePrecedence {
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
 
-        check device_can_execute_op(author.device_id, "Operation::AssignDevicePrecedence")
+        check device_can_execute_op(author.device_id, "AssignDevicePrecedence")
         check author_dominates_target(author.device_id, device.device_id)
 
-        let new_device = DeviceInfo {
-            device_id: device.device_id,
-            precedence: this.precedence,
-            sign_key_id: device.device.sign_key_id,
-            enc_key_id: device.device.enc_key_id,
-        }
-
         finish {
-            update Device[device_id: device.device_id]=>{device: device.device} to {
-                device: new_device
+            update Device[device_id: device.device_id]=>{precedence: device.precedence, sign_key_id: device.sign_key_id, enc_key_id: device.enc_key_id} to {
+                precedence: this.precedence, sign_key_id: device.sign_key_id, enc_key_id: device.enc_key_id
             }
 
             // Return information about precedence assigned to device.
@@ -914,7 +907,7 @@ command CreateRole {
 
         let author = get_valid_device(envelope::author_id(envelope))
 
-        check device_can_execute_op(author.device_id, "Operation::CreateRole")
+        check device_can_execute_op(author.device_id, "CreateRole")
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
@@ -967,14 +960,20 @@ command DeleteRole {
 
         let author = get_valid_device(envelope::author_id(envelope))
 
-        check device_can_execute_op(author.device_id, "Operation::DeleteRole")
+        check device_can_execute_op(author.device_id, "DeleteRole")
 
         // Query role.
         let role = check_unwrap query Role[role_id: this.role_id]
 
+        let role_info = RoleInfo {
+            role_id: role.role_id,
+            name: role.name,
+            author_id: role.author_id,
+        }
+
         finish {
             // Cascade deleting the role assignments.
-            delete AssignedRole[role_id: role.role.role_id, device_id: ?]
+            delete AssignedRole[role_id: role.role_id, device_id: ?]
 
             // TODO: revoke command permissions.
             // There isn't currently a way to lookup the fact to delete from the role ID
@@ -984,11 +983,11 @@ command DeleteRole {
             // Cleans up unused data from the factdb.
 
             // Delete role.
-            delete_role(role.role)
+            delete_role(role)
 
             // Return deleted role info.
             emit RoleDeleted {
-                role: role.role,
+                role: role_info,
             }
         }
     }
@@ -1030,7 +1029,7 @@ command AssignRole {
         let author = get_valid_device(envelope::author_id(envelope))
         let device = get_valid_device(this.device_id)
 
-        check device_can_execute_op(author.device_id, "Operation::AssignRole")
+        check device_can_execute_op(author.device_id, "AssignRole")
         check author_dominates_target(author.device_id, device.device_id)
 
         // Query role.
@@ -1042,8 +1041,8 @@ command AssignRole {
             // Return assigned role info.
             emit RoleAssigned {
                 device_id: device.device_id,
-                role_id: role.role.role_id,
-                name: role.role.name,
+                role_id: role.role_id,
+                name: role.name,
                 author_id: author.device_id,
             }
         }
@@ -1099,20 +1098,20 @@ command RevokeRole {
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
-        check device_can_execute_op(author.device_id, "Operation::RevokeRole")
+        check device_can_execute_op(author.device_id, "RevokeRole")
         check author_dominates_target(author.device_id, target.device_id)
 
         // Query role.
         let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
-            delete AssignedRole[role_id: role.role.role_id, device_id: target.device_id]
+            delete AssignedRole[role_id: role.role_id, device_id: target.device_id]
 
             // Return revoked role info.
             emit RoleRevoked {
                 device_id: target.device_id,
-                role_id: role.role.role_id,
-                name: role.role.name,
+                role_id: role.role_id,
+                name: role.name,
                 author_id: author.device_id,
             }
         }
@@ -1162,18 +1161,18 @@ command AssignRoleOp {
 
         let author = get_valid_device(envelope::author_id(envelope))
 
-        check device_can_execute_op(author.device_id, "Operation::AssignRoleOp")
+        check device_can_execute_op(author.device_id, "AssignRoleOp")
 
         // Query role.
         let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
-            assign_op_role(this.op, role.role.role_id)
+            assign_op_role(this.op, role.role_id)
 
             // Return deleted role info.
             emit RoleOpAssigned {
-                role_id: role.role.role_id,
-                name: role.role.name,
+                role_id: role.role_id,
+                name: role.name,
                 op: this.op,
                 author_id: author.device_id,
             }
@@ -1222,7 +1221,7 @@ command RevokeRoleOp {
 
         let author = get_valid_device(envelope::author_id(envelope))
 
-        check device_can_execute_op(author.device_id, "Operation::RevokeRoleOp")
+        check device_can_execute_op(author.device_id, "RevokeRoleOp")
 
         // Query role.
         let role = check_unwrap query Role[role_id: this.role_id]
@@ -1232,8 +1231,8 @@ command RevokeRoleOp {
 
             // Return deleted role info.
             emit RoleOpRevoked {
-                role_id: role.role.role_id,
-                name: role.role.name,
+                role_id: role.role_id,
+                name: role.name,
                 op: this.op,
                 author_id: author.device_id,
             }
@@ -1286,7 +1285,7 @@ command SetAqcNetworkName {
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
-        check device_can_execute_op(author.device_id, "Operation::SetAqcNetworkName")
+        check device_can_execute_op(author.device_id, "SetAqcNetworkName")
         check author_dominates_target(author.device_id, target.device_id)
 
         let net_id_exists = query AqcMemberNetworkId[device_id: target.device_id]
@@ -1352,7 +1351,7 @@ command UnsetAqcNetworkName {
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
-        check device_can_execute_op(author.device_id, "Operation::UnsetAqcNetworkName")
+        check device_can_execute_op(author.device_id, "UnsetAqcNetworkName")
         check author_dominates_target(author.device_id, target.device_id)
 
         check exists AqcMemberNetworkId[device_id: target.device_id]
@@ -1396,7 +1395,7 @@ action create_aqc_bidi_channel(peer_id id, label_id id) {
 
     let ch = aqc::create_bidi_channel(
         parent_cmd_id,
-        author.device.enc_key_id,
+        author.enc_key_id,
         author_id,
         peer_enc_pk,
         peer_id,
@@ -1501,7 +1500,7 @@ command AqcCreateBidiChannel {
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
 
-        check device_can_execute_op(author.device_id, "Operation::AqcCreateBidiChannel")
+        check device_can_execute_op(author.device_id, "AqcCreateBidiChannel")
 
         // Check that both devices have been assigned to the label and have correct send/recv permissions.
         check can_create_aqc_bidi_channel(author.device_id, peer.device_id, label.label_id)
@@ -1517,9 +1516,9 @@ command AqcCreateBidiChannel {
                 emit AqcBidiChannelCreated {
                     channel_id: this.channel_id,
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.device.device_id,
-                    author_enc_key_id: author.device.enc_key_id,
-                    peer_id: peer.device.device_id,
+                    author_id: author.device_id,
+                    author_enc_key_id: author.enc_key_id,
+                    peer_id: peer.device_id,
                     peer_enc_pk: peer_enc_pk,
                     label_id: label.label_id,
                     author_secrets_id: this.author_secrets_id,
@@ -1534,10 +1533,10 @@ command AqcCreateBidiChannel {
                 emit AqcBidiChannelReceived {
                     channel_id: this.channel_id,
                     parent_cmd_id: parent_cmd_id,
-                    author_id: author.device.device_id,
+                    author_id: author.device_id,
                     author_enc_pk: author_enc_pk,
-                    peer_id: peer.device.device_id,
-                    peer_enc_key_id: peer.device.enc_key_id,
+                    peer_id: peer.device_id,
+                    peer_enc_key_id: peer.enc_key_id,
                     label_id: label.label_id,
                     encap: this.peer_encap,
                     psk_length_in_bytes: this.psk_length_in_bytes,
@@ -1584,7 +1583,7 @@ action create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) {
 
     let ch = aqc::create_uni_channel(
         parent_cmd_id,
-        author.device.enc_key_id,
+        author.enc_key_id,
         peer_enc_pk,
         sender_id,
         receiver_id,
@@ -1708,7 +1707,7 @@ command AqcCreateUniChannel {
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
 
-        check device_can_execute_op(author.device_id, "Operation::AqcCreateUniChannel")
+        check device_can_execute_op(author.device_id, "AqcCreateUniChannel")
 
         // Check that both devices have been assigned to the label and have correct send/recv permissions.
         check can_create_aqc_uni_channel(this.sender_id, this.receiver_id, label.label_id)
@@ -1727,7 +1726,7 @@ command AqcCreateUniChannel {
                     author_id: author.device_id,
                     sender_id: this.sender_id,
                     receiver_id: this.receiver_id,
-                    author_enc_key_id: author.device.enc_key_id,
+                    author_enc_key_id: author.enc_key_id,
                     peer_enc_pk: peer_enc_pk,
                     label_id: label.label_id,
                     author_secrets_id: this.author_secrets_id,
@@ -1746,7 +1745,7 @@ command AqcCreateUniChannel {
                     sender_id: this.sender_id,
                     receiver_id: this.receiver_id,
                     author_enc_pk: author_enc_pk,
-                    peer_enc_key_id: peer.device.enc_key_id,
+                    peer_enc_key_id: peer.enc_key_id,
                     label_id: label.label_id,
                     encap: this.peer_encap,
                     psk_length_in_bytes: this.psk_length_in_bytes,
@@ -1892,7 +1891,7 @@ command DeleteLabel {
 
         let author = get_valid_device(envelope::author_id(envelope))
 
-        check device_can_execute_op(author.device_id, "Operation::DeleteLabel")
+        check device_can_execute_op(author.device_id, "DeleteLabel")
         // TODO: check dominance over devices assigned to label?
 
         // Verify that the label exists.
@@ -2156,7 +2155,7 @@ command RevokeLabel {
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
-        check device_can_execute_op(author.device_id, "Operation::RevokeLabel")
+        check device_can_execute_op(author.device_id, "RevokeLabel")
         check author_dominates_target(author.device_id, target.device_id)
 
         let label = check_unwrap query Label[label_id: this.label_id]
@@ -2528,9 +2527,9 @@ Queries a list of roles on the team.
 action query_roles_on_team() {
     map Role[role_id: ?] as f {
         publish QueryRole {
-            role_id: f.role.role_id,
-            role_name: f.role.name,
-            role_author_id: f.role.author_id,
+            role_id: f.role_id,
+            role_name: f.name,
+            role_author_id: f.author_id,
         }
     }
 }
@@ -2625,8 +2624,8 @@ action query_device_roles(device_id id) {
             publish QueryRoleAssignment {
                 device_id: f.device_id,
                 role_id: role.role_id,
-                role_name: role.role.name,
-                role_author_id: role.role.author_id,
+                role_name: role.name,
+                role_author_id: role.author_id,
             }
         }
     }
@@ -2674,9 +2673,9 @@ action query_role_ops(role_id id) {
             let role = check_unwrap query Role[role_id: f.role_id]
             publish QueryRoleOps {
                 role_id: role.role_id,
-                role_name: role.role.name,
+                role_name: role.name,
                 op: f.op,
-                author_id: role.role.author_id,
+                author_id: role.author_id,
             }
         }
     }
