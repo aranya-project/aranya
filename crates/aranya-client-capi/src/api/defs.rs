@@ -3,18 +3,10 @@ use core::{
     ops::{Deref, DerefMut},
     ptr,
 };
-use core::{
-    ffi::{c_char, CStr},
-    ops::{Deref, DerefMut},
-    ptr,
-};
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use anyhow::Context as _;
-use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
-use aranya_crypto::hex;
-use tracing::error;
 use aranya_crypto::hex;
 use tracing::error;
 
@@ -58,11 +50,7 @@ pub enum Error {
     /// Could not send request to daemon.
     #[capi(msg = "could not send request to daemon")]
     Ipc,
-    Ipc,
 
-    /// An Aranya error.
-    #[capi(msg = "Aranya error")]
-    Aranya,
     /// An Aranya error.
     #[capi(msg = "Aranya error")]
     Aranya,
@@ -82,15 +70,10 @@ pub enum Error {
     /// Some other error occurred.
     #[capi(msg = "other")]
     Other,
-
-    /// Some other error occurred.
-    #[capi(msg = "other")]
-    Other,
 }
 
 impl From<&imp::Error> for Error {
     fn from(err: &imp::Error) -> Self {
-        error!(?err);
         error!(?err);
         match err {
             imp::Error::Bug(_) => Self::Bug,
@@ -102,22 +85,17 @@ impl From<&imp::Error> for Error {
             imp::Error::Client(err) => match err {
                 aranya_client::Error::Ipc(_) => Self::Ipc,
                 aranya_client::Error::Aranya(_) => Self::Aranya,
-                aranya_client::Error::Ipc(_) => Self::Ipc,
-                aranya_client::Error::Aranya(_) => Self::Aranya,
                 aranya_client::Error::Aqc(_) => Self::Aqc,
                 aranya_client::Error::Bug(_) => Self::Bug,
                 aranya_client::Error::Config(_) => Self::Config,
                 aranya_client::Error::Other(_) => Self::Other,
-                aranya_client::Error::Other(_) => Self::Other,
                 _ => {
-                    error!("forgot to implement an error variant");
                     error!("forgot to implement an error variant");
                     Self::Bug
                 }
             },
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
-            imp::Error::Other(_) => Self::Other,
             imp::Error::Other(_) => Self::Other,
         }
     }
@@ -227,25 +205,6 @@ pub unsafe fn client_init(
 
     Safe::init(client, imp::Client { rt, inner });
     Ok(())
-}
-
-/// Decodes the hexadecimal string `src` into `dst` and returns
-/// the number of bytes written to `dst`.
-///
-/// If `src` is a valid hexadecimal string, the number of bytes
-/// written to `dst` will be exactly half the length of `src`.
-/// Therefore, `dst` must be at least half as long as `src`.
-///
-/// @param dst the output buffer
-/// @param src the input hexadecimal string
-pub fn decode_hex(dst: &mut [u8], src: &[u8]) -> Result<usize, imp::Error> {
-    hex::ct_decode(dst, src).map_err(|err| match err {
-        hex::Error::InvalidLength => imp::Error::BufferTooSmall,
-        hex::Error::InvalidEncoding => {
-            imp::Error::InvalidArg(InvalidArg::new("src", "not a valid hexadecimal string"))
-        }
-        hex::Error::Bug(err) => imp::Error::Bug(err),
-    })
 }
 
 /// A handle to an Aranya Client.
@@ -427,7 +386,6 @@ impl Addr {
     unsafe fn as_underlying(self) -> Result<aranya_util::Addr, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
-        let cstr = unsafe { CStr::from_ptr(self.0) };
         Ok(cstr.to_str()?.parse()?)
     }
 }
@@ -442,7 +400,6 @@ pub struct NetIdentifier(*const c_char);
 impl NetIdentifier {
     unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { CStr::from_ptr(self.0) };
         let cstr = unsafe { CStr::from_ptr(self.0) };
         Ok(aranya_daemon_api::NetIdentifier(String::from(
             cstr.to_str()?,
@@ -621,8 +578,6 @@ pub fn client_config_builder_build(
     cfg: OwnedPtr<ClientConfigBuilder>,
     out: &mut MaybeUninit<ClientConfig>,
 ) -> Result<(), imp::Error> {
-    // SAFETY: No special considerations.
-    unsafe { cfg.build(out)? }
     // SAFETY: No special considerations.
     unsafe { cfg.build(out)? }
     Ok(())

@@ -165,12 +165,9 @@ enum AranyaError
      * Could not send request to daemon.
      */
     ARANYA_ERROR_IPC,
-    ARANYA_ERROR_IPC,
     /**
      * An Aranya error.
-     * An Aranya error.
      */
-    ARANYA_ERROR_ARANYA,
     ARANYA_ERROR_ARANYA,
     /**
      * AQC library error.
@@ -184,10 +181,6 @@ enum AranyaError
      * Serialization error.
      */
     ARANYA_ERROR_SERIALIZATION,
-    /**
-     * Some other error occurred.
-     */
-    ARANYA_ERROR_OTHER,
     /**
      * Some other error occurred.
      */
