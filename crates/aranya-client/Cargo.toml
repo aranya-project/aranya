@@ -20,14 +20,11 @@ debug = []
 [dependencies]
 aranya-daemon-api = { workspace = true }
 
-aranya-aqc-util = { workspace = true }
 aranya-crypto = { workspace = true }
-aranya-fast-channels = { workspace = true, features = ["std", "posix"] }
 aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
-postcard = { workspace = true }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }

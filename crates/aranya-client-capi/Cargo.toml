@@ -30,6 +30,7 @@ aranya-capi-core = { workspace = true }
 aranya-crypto = { workspace = true }
 buggy = { workspace = true }
 
+anyhow = { workspace = true }
 postcard = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

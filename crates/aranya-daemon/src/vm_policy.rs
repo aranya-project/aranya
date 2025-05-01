@@ -19,7 +19,10 @@ use aranya_runtime::{
 };
 use tracing::instrument;
 
-use crate::policy::{ChanOp, Role};
+use crate::{
+    keystore::AranyaStore,
+    policy::{ChanOp, Role},
+};
 
 /// Policy loaded from policy.md file.
 pub const TEST_POLICY_1: &str = include_str!("./policy.md");
@@ -57,7 +60,12 @@ where
     E: aranya_crypto::Engine,
 {
     /// Creates a `PolicyEngine` from a policy document.
-    pub fn new(policy_doc: &str, eng: E, store: Store, device_id: DeviceId) -> Result<Self> {
+    pub fn new(
+        policy_doc: &str,
+        eng: E,
+        store: AranyaStore<Store>,
+        device_id: DeviceId,
+    ) -> Result<Self> {
         // compile the policy.
         let ast = parse_policy_document(policy_doc).context("unable to parse policy document")?;
         let module = Compiler::new(&ast)
@@ -109,6 +117,16 @@ where
 
     fn get_policy(&self, _id: PolicyId) -> Result<&Self::Policy, EngineError> {
         Ok(&self.policy)
+    }
+}
+
+impl<E, KS> fmt::Debug for PolicyEngine<E, KS>
+where
+    E: fmt::Debug,
+    KS: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PolicyEngine").finish_non_exhaustive()
     }
 }
 
