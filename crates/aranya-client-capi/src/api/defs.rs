@@ -380,6 +380,12 @@ pub enum Op {
     CreateRole,
     /// Delete a role from team.
     DeleteRole,
+    /// Setup admin role.
+    SetupAdminRole,
+    /// Setup operator role.
+    SetupOperatorRole,
+    /// Setup member role.
+    SetupMemberRole,
     /// Assign a role to a device.
     AssignRole,
     /// Revoke a role from a device.
@@ -414,6 +420,9 @@ impl From<Op> for aranya_client::Op {
             Op::AssignDevicePrecedence => Self::AssignDevicePrecedence,
             Op::CreateRole => Self::CreateRole,
             Op::DeleteRole => Self::DeleteRole,
+            Op::SetupAdminRole => Self::SetupAdminRole,
+            Op::SetupOperatorRole => Self::SetupOperatorRole,
+            Op::SetupMemberRole => Self::SetupMemberRole,
             Op::AssignRole => Self::AssignRole,
             Op::RevokeRole => Self::RevokeRole,
             Op::AssignRoleOp => Self::AssignRoleOp,

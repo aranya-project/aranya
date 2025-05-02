@@ -266,11 +266,11 @@ A role may be assigned to multiple devices.
 A device may be assigned multiple roles.
 
 ```policy
-finish function create_role(role struct RoleInfo) {
+finish function create_role_fact(role struct RoleInfo) {
     create Role[role_id: role.role_id]=>{name: role.name, author_id: role.author_id}
 }
 
-finish function delete_role(role struct Role) {
+finish function delete_role_fact(role struct Role) {
     delete Role[role_id: role.role_id]
 }
 
@@ -464,7 +464,7 @@ command CreateTeam {
         // Check that author_id matches the device_id being created
         check author_id == owner_key_ids.device_id
 
-        // TODO: define const high precedence for owner device.
+        // Note: the owner device must have the highest precedence of all devices on the team.
         let device = DeviceInfo {
             device_id: owner_key_ids.device_id,
             precedence: 65000,
@@ -485,7 +485,7 @@ command CreateTeam {
             // Add device to team.
             add_new_device(this.owner_keys, owner_key_ids, device)
             // Create a new owner role.
-            create_role(role)
+            create_role_fact(role)
 
             // Assign default operations to owner role.
             assign_op_role("AddMember", role.role_id)
@@ -555,7 +555,7 @@ command TerminateTeam {
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(envelope::author_id(envelope))
 
-        check device_can_execute_op(author.device_id, "TerminateTeam")
+        check device_can_execute_op(author.device_id, "Operation::TerminateTeam")
 
         finish {
             create TeamEnd[]=>{}
@@ -577,7 +577,7 @@ command TerminateTeam {
 ## SetupDefaultRoles
 
 The `SetupDefaultRoles` command sets up default roles on the team.
-Operation can only be invoked by the device the team owner.
+Operation can only be invoked by the team owner role.
 
 ```policy
 // Setup default roles on a team.
@@ -595,7 +595,9 @@ command SetupAdminRole {
 
     policy {
         // Get author of command
-        let author_id = envelope::author_id(envelope)
+        let author = get_valid_device(envelope::author_id(envelope))
+
+        check device_can_execute_op(author.device_id, "Operation::SetupAdminRole")
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
@@ -603,7 +605,7 @@ command SetupAdminRole {
         let role = RoleInfo {
             role_id: role_id,
             name: "admin",
-            author_id: author_id,
+            author_id: author.device_id,
         }
 
         finish {
@@ -625,7 +627,9 @@ command SetupOperatorRole {
 
     policy {
         // Get author of command
-        let author_id = envelope::author_id(envelope)
+        let author = get_valid_device(envelope::author_id(envelope))
+
+        check device_can_execute_op(author.device_id, "Operation::SetupOperatorRole")
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
@@ -633,7 +637,7 @@ command SetupOperatorRole {
         let role = RoleInfo {
             role_id: role_id,
             name: "operator",
-            author_id: author_id,
+            author_id: author.device_id,
         }
 
         finish {
@@ -659,7 +663,9 @@ command SetupMemberRole {
 
     policy {
         // Get author of command
-        let author_id = envelope::author_id(envelope)
+        let author = get_valid_device(envelope::author_id(envelope))
+
+        check device_can_execute_op(author.device_id, "Operation::SetupMemberRole")
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
@@ -667,7 +673,7 @@ command SetupMemberRole {
         let role = RoleInfo {
             role_id: role_id,
             name: "member",
-            author_id: author_id,
+            author_id: author.device_id,
         }
 
         finish {
@@ -867,7 +873,7 @@ command AssignDevicePrecedence {
     }
 }
 
-// A precedence value to a device on the team.
+// A precedence value assigned to a device on the team.
 effect DevicePrecedenceAssigned {
     // ID of device the role was assigned to.
     device_id id,
@@ -919,7 +925,7 @@ command CreateRole {
         }
 
         finish {
-            create_role(role)
+            create_role_fact(role)
 
             emit RoleCreated {
                 role: role,
@@ -983,7 +989,7 @@ command DeleteRole {
             // Cleans up unused data from the factdb.
 
             // Delete role.
-            delete_role(role)
+            delete_role_fact(role)
 
             // Return deleted role info.
             emit RoleDeleted {
