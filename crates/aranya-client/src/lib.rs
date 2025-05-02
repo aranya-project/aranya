@@ -15,10 +15,14 @@ pub mod aqc;
 pub mod client;
 pub mod config;
 pub mod error;
+mod util;
 
 #[doc(inline)]
 pub use crate::{
-    client::{Client, DeviceId, Label, LabelId, Role, RoleId, Team, TeamId},
+    client::{
+        ChanOp, Client, DeviceId, InvalidNetIdentifier, KeyBundle, Label, LabelId, NetIdentifier,
+        Op, Role, RoleId, Team, TeamId,
+    },
     config::{SyncPeerConfig, SyncPeerConfigBuilder, TeamConfig, TeamConfigBuilder},
     error::{ConfigError, Error, Result},
 };
