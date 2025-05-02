@@ -1401,6 +1401,9 @@ pub fn aqc_delete_bidi_channel(
 ///
 /// Returns `ARANYA_ERROR_AQC_SERVER_CLOSED` if trying to call this when the
 /// server connection has been closed.
+/// 
+/// @param client the Aranya Client [`Client`].
+/// @param channel the AQC channel holder [`AqcChannel`] that holds a channel object.
 pub fn aqc_receive_channel(
     client: &mut Client,
     channel: &mut MaybeUninit<AqcChannel>,
@@ -1525,6 +1528,12 @@ pub fn aqc_get_receiver_channel(
     Ok(())
 }
 
+/// Create a bidirectional stream from an [`AqcBidiChannel`].
+/// 
+/// @param client the Aranya Client [`Client`].
+/// @param channel the AQC channel object [`AqcBidiChannel`] that holds channel info.
+/// @param send_stream the sending side of a stream [`AqcSendStream`].
+/// @param recv_stream the receiving side of a stream [`AqcReceiveStream`].
 pub fn aqc_bidi_create_bidi_stream(
     client: &mut Client,
     channel: &mut AqcBidiChannel,
@@ -1534,8 +1543,7 @@ pub fn aqc_bidi_create_bidi_stream(
     let client = client.deref_mut();
     let (send, recv) = client
         .rt
-        .block_on(channel.inner.create_bidirectional_stream())
-        .map_err(|e| imp::Error::Other(e))?;
+        .block_on(channel.inner.create_bidirectional_stream())?;
 
     Safe::init(send_stream, imp::AqcSendStream::new(send));
     Safe::init(recv_stream, imp::AqcReceiveStream::new(recv));
@@ -1543,6 +1551,11 @@ pub fn aqc_bidi_create_bidi_stream(
     Ok(())
 }
 
+/// Create a unidirectional stream from an [`AqcBidiChannel`].
+/// 
+/// @param client the Aranya Client [`Client`].
+/// @param channel the AQC channel object [`AqcBidiChannel`] that holds channel info.
+/// @param send_stream the sending side of a stream [`AqcSendStream`].
 pub fn aqc_bidi_create_uni_stream(
     client: &mut Client,
     channel: &mut AqcBidiChannel,
@@ -1551,14 +1564,23 @@ pub fn aqc_bidi_create_uni_stream(
     let client = client.deref_mut();
     let send = client
         .rt
-        .block_on(channel.inner.create_unidirectional_stream())
-        .map_err(|e| imp::Error::Other(e))?;
+        .block_on(channel.inner.create_unidirectional_stream())?;
 
     Safe::init(send_stream, imp::AqcSendStream::new(send));
 
     Ok(())
 }
 
+/// Receives the receiving end of a stream and potentially the sending end of
+/// another stream.
+/// 
+/// Note that the send stream will only be initialized if this returns true.
+/// 
+/// @param client the Aranya Client [`Client`].
+/// @param channel the AQC channel object [`AqcBidiChannel`] that holds channel info.
+/// @param send_stream the sending side of a stream [`AqcSendStream`].
+/// @param recv_stream the receiving side of a stream [`AqcReceiveStream`].
+/// @param __output returns whether we received an [`AqcSendStream`] or not.
 pub fn aqc_bidi_receive_stream(
     client: &mut Client,
     channel: &mut AqcBidiChannel,
@@ -1579,6 +1601,47 @@ pub fn aqc_bidi_receive_stream(
         }
         None => Ok(false),
     }
+}
+
+/// Create a unidirectional stream from an [`AqcSenderChannel`].
+/// 
+/// @param client the Aranya Client [`Client`].
+/// @param channel the AQC channel object [`AqcSenderChannel`] that holds channel info.
+/// @param send_stream the sending side of a stream [`AqcSendStream`].
+pub fn aqc_send_create_uni_stream(
+    client: &mut Client,
+    channel: &mut AqcSenderChannel,
+    send_stream: &mut MaybeUninit<AqcSendStream>,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let send = client
+        .rt
+        .block_on(channel.inner.create_unidirectional_stream())?;
+
+    Safe::init(send_stream, imp::AqcSendStream::new(send));
+
+    Ok(())
+}
+
+/// Receives the stream from an [`AqcReceiverChannel`].
+/// 
+/// @param client the Aranya Client [`Client`].
+/// @param channel the AQC channel object [`AqcReceiverChannel`] that holds channel info.
+/// @param recv_stream the receiving side of a stream [`AqcReceiveStream`].
+pub fn aqc_recv_receive_uni_stream(
+    client: &mut Client,
+    channel: &mut AqcReceiverChannel,
+    recv_stream: &mut MaybeUninit<AqcReceiveStream>,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let recv = client
+        .rt
+        .block_on(channel.inner.receive_unidirectional_stream())?
+        .ok_or(imp::Error::AqcConnectionClosed)?;
+
+    Safe::init(recv_stream, imp::AqcReceiveStream::new(recv));
+
+    Ok(())
 }
 
 /*

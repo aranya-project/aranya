@@ -18,7 +18,7 @@ impl AqcBidiChannel {
 }
 
 pub struct AqcSenderChannel {
-    inner: aqc::AqcSenderChannel,
+    pub(crate) inner: aqc::AqcSenderChannel,
 }
 
 impl Typed for AqcSenderChannel {
@@ -32,7 +32,7 @@ impl AqcSenderChannel {
 }
 
 pub struct AqcReceiverChannel {
-    inner: aqc::AqcReceiverChannel,
+    pub(crate) inner: aqc::AqcReceiverChannel,
 }
 
 impl Typed for AqcReceiverChannel {
