@@ -330,26 +330,26 @@ impl FromStr for Op {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "Operation::AddMember" => Ok(Self::AddMember),
-            "Operation::RemoveMember" => Ok(Self::RemoveMember),
-            "Operation::AssignDevicePrecedence" => Ok(Self::AssignDevicePrecedence),
-            "Operation::CreateRole" => Ok(Self::CreateRole),
-            "Operation::DeleteRole" => Ok(Self::DeleteRole),
-            "Operation::SetupAdminRole" => Ok(Self::SetupAdminRole),
-            "Operation::SetupOperatorRole" => Ok(Self::SetupOperatorRole),
-            "Operation::SetupMemberRole" => Ok(Self::SetupMemberRole),
-            "Operation::AssignRole" => Ok(Self::AssignRole),
-            "Operation::RevokeRole" => Ok(Self::RevokeRole),
-            "Operation::AssignRoleOp" => Ok(Self::AssignRoleOp),
-            "Operation::RevokeRoleOp" => Ok(Self::RevokeRoleOp),
-            "Operation::CreateLabel" => Ok(Self::CreateLabel),
-            "Operation::DeleteLabel" => Ok(Self::DeleteLabel),
-            "Operation::AssignLabel" => Ok(Self::AssignLabel),
-            "Operation::RevokeLabel" => Ok(Self::RevokeLabel),
-            "Operation::SetAqcNetworkName" => Ok(Self::SetAqcNetworkName),
-            "Operation::UnsetAqcNetworkName" => Ok(Self::UnsetAqcNetworkName),
-            "Operation::AqcCreateBidiChannel" => Ok(Self::AqcCreateBidiChannel),
-            "Operation::AqcCreateUniChannel" => Ok(Self::AqcCreateUniChannel),
+            "AddMember" => Ok(Self::AddMember),
+            "RemoveMember" => Ok(Self::RemoveMember),
+            "AssignDevicePrecedence" => Ok(Self::AssignDevicePrecedence),
+            "CreateRole" => Ok(Self::CreateRole),
+            "DeleteRole" => Ok(Self::DeleteRole),
+            "SetupAdminRole" => Ok(Self::SetupAdminRole),
+            "SetupOperatorRole" => Ok(Self::SetupOperatorRole),
+            "SetupMemberRole" => Ok(Self::SetupMemberRole),
+            "AssignRole" => Ok(Self::AssignRole),
+            "RevokeRole" => Ok(Self::RevokeRole),
+            "AssignRoleOp" => Ok(Self::AssignRoleOp),
+            "RevokeRoleOp" => Ok(Self::RevokeRoleOp),
+            "CreateLabel" => Ok(Self::CreateLabel),
+            "DeleteLabel" => Ok(Self::DeleteLabel),
+            "AssignLabel" => Ok(Self::AssignLabel),
+            "RevokeLabel" => Ok(Self::RevokeLabel),
+            "SetAqcNetworkName" => Ok(Self::SetAqcNetworkName),
+            "UnsetAqcNetworkName" => Ok(Self::UnsetAqcNetworkName),
+            "AqcCreateBidiChannel" => Ok(Self::AqcCreateBidiChannel),
+            "AqcCreateUniChannel" => Ok(Self::AqcCreateUniChannel),
             _ => Err(anyhow!("unknown `Operation`: {s}")),
         }
     }
@@ -358,7 +358,7 @@ impl FromStr for Op {
 /// Display implementation for [`Op`]
 impl fmt::Display for Op {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Operation::{:?}", self)
+        write!(f, "{:?}", self)
     }
 }
 
