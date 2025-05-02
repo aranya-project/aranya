@@ -1821,8 +1821,6 @@ pub unsafe fn aqc_create_bidi_channel(
     label_id: &LabelId,
 ) -> Result<AqcBidiChannelId, imp::Error> {
     let client = client.deref_mut();
-    // SAFETY: Caller must ensure `peer` is a valid C String.
-    let peer = unsafe { peer.as_underlying() }?;
     let chan_id = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
         peer,
