@@ -1325,9 +1325,7 @@ AranyaError aranya_revoke_role_operation_ext(struct AranyaClient *client,
  * @relates AranyaClient.
  */
 AranyaError aranya_setup_default_roles(struct AranyaClient *client,
-                                       const struct AranyaTeamId *team,
-                                       struct AranyaRole *roles,
-                                       size_t *roles_len);
+                                       const struct AranyaTeamId *team);
 
 /**
  * Setup default roles on team.
@@ -1343,8 +1341,6 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  */
 AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
-                                           struct AranyaRole *roles,
-                                           size_t *roles_len,
                                            struct AranyaExtError *__ext_err);
 
 /**
@@ -1625,6 +1621,9 @@ AranyaError aranya_aqc_remove_net_identifier_ext(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * @param managing_role_id the ID of the role that is required
+ *        in order to grant *other* devices permission to use
+ *        this label.
  * Output params:
  * @param role returns the created label [`AranyaLabel`](@ref AranyaLabel).
  *
@@ -1633,6 +1632,7 @@ AranyaError aranya_aqc_remove_net_identifier_ext(struct AranyaClient *client,
 AranyaError aranya_create_label(struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaLabelName name,
+                                const struct AranyaRoleId *managing_role_id,
                                 struct AranyaLabel *label);
 
 /**
@@ -1643,6 +1643,9 @@ AranyaError aranya_create_label(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * @param managing_role_id the ID of the role that is required
+ *        in order to grant *other* devices permission to use
+ *        this label.
  * Output params:
  * @param role returns the created label [`AranyaLabel`](@ref AranyaLabel).
  *
@@ -1651,6 +1654,7 @@ AranyaError aranya_create_label(struct AranyaClient *client,
 AranyaError aranya_create_label_ext(struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     AranyaLabelName name,
+                                    const struct AranyaRoleId *managing_role_id,
                                     struct AranyaLabel *label,
                                     struct AranyaExtError *__ext_err);
 

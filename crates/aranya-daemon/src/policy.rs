@@ -60,6 +60,7 @@ pub enum Effect {
     AqcUniChannelReceived(AqcUniChannelReceived),
     LabelCreated(LabelCreated),
     LabelDeleted(LabelDeleted),
+    LabelUpdated(LabelUpdated),
     LabelAssigned(LabelAssigned),
     LabelRevoked(LabelRevoked),
     QueryLabelExistsResult(QueryLabelExistsResult),
@@ -210,7 +211,10 @@ pub struct AqcUniChannelReceived {
 /// LabelCreated policy effect.
 #[effect]
 pub struct LabelCreated {
-    pub label: LabelInfo,
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+    pub managing_role_id: Id,
 }
 /// LabelDeleted policy effect.
 #[effect]
@@ -219,6 +223,14 @@ pub struct LabelDeleted {
     pub label_author_id: Id,
     pub label_id: Id,
     pub author_id: Id,
+}
+/// LabelUpdated policy effect.
+#[effect]
+pub struct LabelUpdated {
+    pub label_id: Id,
+    pub label_name: String,
+    pub label_author_id: Id,
+    pub managing_role_id: Id,
 }
 /// LabelAssigned policy effect.
 #[effect]
@@ -340,8 +352,17 @@ pub trait ActorExt {
         receiver_id: Id,
         label_id: Id,
     ) -> Result<(), ClientError>;
-    fn create_label(&mut self, name: String) -> Result<(), ClientError>;
+    fn create_label(
+        &mut self,
+        name: String,
+        managing_role_id: Id,
+    ) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: Id) -> Result<(), ClientError>;
+    fn change_label_managing_role(
+        &mut self,
+        label_id: Id,
+        managing_role_id: Id,
+    ) -> Result<(), ClientError>;
     fn assign_label(
         &mut self,
         device_id: Id,

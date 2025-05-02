@@ -1,9 +1,10 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-use core::{borrow::Borrow, fmt, hash::Hash, net::SocketAddr, ops::Deref, time::Duration};
-use std::str::FromStr;
+use core::{
+    borrow::Borrow, fmt, hash::Hash, net::SocketAddr, ops::Deref, str::FromStr, time::Duration,
+};
 
-use anyhow::anyhow;
+use anyhow::Context as _;
 use aranya_crypto::{
     custom_id,
     default::{DefaultCipherSuite, DefaultEngine},
@@ -76,16 +77,6 @@ custom_id! {
 }
 
 custom_id! {
-    /// A role ID.
-    pub struct RoleId;
-}
-
-custom_id! {
-    /// An AQC label ID.
-    pub struct LabelId;
-}
-
-custom_id! {
     /// An AQC bidi channel ID.
     pub struct AqcBidiChannelId;
 }
@@ -108,6 +99,7 @@ pub struct KeyBundle {
 pub struct TeamConfig {
     // TODO(nikki): any fields added to this should be public
 }
+
 /// A device's network identifier.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
 pub struct NetIdentifier(pub String);
@@ -300,7 +292,6 @@ pub enum ChanOp {
 }
 
 /// Operation that can be assigned to roles.
-
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Op {
     AddMember,
@@ -325,40 +316,74 @@ pub enum Op {
     AqcCreateUniChannel,
 }
 
-/// Converts [`Op`] to string.
+impl Op {
+    /// Converts the op to a string.
+    pub const fn to_str(self) -> &'static str {
+        match self {
+            Self::AddMember => "AddMember",
+            Self::RemoveMember => "RemoveMember",
+            Self::AssignDevicePrecedence => "AssignDevicePrecedence",
+            Self::CreateRole => "CreateRole",
+            Self::DeleteRole => "DeleteRole",
+            Self::AssignRole => "AssignRole",
+            Self::RevokeRole => "RevokeRole",
+            Self::AssignRoleOp => "AssignRoleOp",
+            Self::RevokeRoleOp => "RevokeRoleOp",
+            Self::CreateLabel => "CreateLabel",
+            Self::DeleteLabel => "DeleteLabel",
+            Self::AssignLabel => "AssignLabel",
+            Self::RevokeLabel => "RevokeLabel",
+            Self::SetAqcNetworkName => "SetAqcNetworkName",
+            Self::UnsetAqcNetworkName => "UnsetAqcNetworkName",
+            Self::AqcCreateBidiChannel => "AqcCreateBidiChannel",
+            Self::AqcCreateUniChannel => "AqcCreateUniChannel",
+            Self::SetupAdminRole => "SetupAdminRole",
+            Self::SetupOperatorRole => "SetupOperatorRole",
+            Self::SetupMemberRole => "SetupMemberRole",
+        }
+    }
+
+    /// Converts the string to an op.
+    pub fn try_from_str(s: &str) -> Option<Self> {
+        let op = match s {
+            "AddMember" => Self::AddMember,
+            "RemoveMember" => Self::RemoveMember,
+            "AssignDevicePrecedence" => Self::AssignDevicePrecedence,
+            "CreateRole" => Self::CreateRole,
+            "DeleteRole" => Self::DeleteRole,
+            "AssignRole" => Self::AssignRole,
+            "RevokeRole" => Self::RevokeRole,
+            "AssignRoleOp" => Self::AssignRoleOp,
+            "RevokeRoleOp" => Self::RevokeRoleOp,
+            "CreateLabel" => Self::CreateLabel,
+            "DeleteLabel" => Self::DeleteLabel,
+            "AssignLabel" => Self::AssignLabel,
+            "RevokeLabel" => Self::RevokeLabel,
+            "SetAqcNetworkName" => Self::SetAqcNetworkName,
+            "UnsetAqcNetworkName" => Self::UnsetAqcNetworkName,
+            "AqcCreateBidiChannel" => Self::AqcCreateBidiChannel,
+            "AqcCreateUniChannel" => Self::AqcCreateUniChannel,
+            "SetupAdminRole" => Self::SetupAdminRole,
+            "SetupOperatorRole" => Self::SetupOperatorRole,
+            "SetupMemberRole" => Self::SetupMemberRole,
+            _ => return None,
+        };
+        Some(op)
+    }
+}
+
 impl FromStr for Op {
     type Err = anyhow::Error;
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "AddMember" => Ok(Self::AddMember),
-            "RemoveMember" => Ok(Self::RemoveMember),
-            "AssignDevicePrecedence" => Ok(Self::AssignDevicePrecedence),
-            "CreateRole" => Ok(Self::CreateRole),
-            "DeleteRole" => Ok(Self::DeleteRole),
-            "SetupAdminRole" => Ok(Self::SetupAdminRole),
-            "SetupOperatorRole" => Ok(Self::SetupOperatorRole),
-            "SetupMemberRole" => Ok(Self::SetupMemberRole),
-            "AssignRole" => Ok(Self::AssignRole),
-            "RevokeRole" => Ok(Self::RevokeRole),
-            "AssignRoleOp" => Ok(Self::AssignRoleOp),
-            "RevokeRoleOp" => Ok(Self::RevokeRoleOp),
-            "CreateLabel" => Ok(Self::CreateLabel),
-            "DeleteLabel" => Ok(Self::DeleteLabel),
-            "AssignLabel" => Ok(Self::AssignLabel),
-            "RevokeLabel" => Ok(Self::RevokeLabel),
-            "SetAqcNetworkName" => Ok(Self::SetAqcNetworkName),
-            "UnsetAqcNetworkName" => Ok(Self::UnsetAqcNetworkName),
-            "AqcCreateBidiChannel" => Ok(Self::AqcCreateBidiChannel),
-            "AqcCreateUniChannel" => Ok(Self::AqcCreateUniChannel),
-            _ => Err(anyhow!("unknown `Operation`: {s}")),
-        }
+        Self::try_from_str(s).context("unknown operation")
     }
 }
 
 /// Display implementation for [`Op`]
 impl fmt::Display for Op {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        self.to_str().fmt(f)
     }
 }
 
@@ -370,12 +395,22 @@ pub struct Label {
     pub author_id: DeviceId,
 }
 
+custom_id! {
+    /// An AQC label ID.
+    pub struct LabelId;
+}
+
 /// A role.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Role {
     pub id: RoleId,
     pub name: String,
     pub author_id: DeviceId,
+}
+
+custom_id! {
+    /// Uniquely identifies a role.
+    pub struct RoleId;
 }
 
 #[tarpc::service]
@@ -453,7 +488,7 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     // Create a label.
-    async fn create_label(team: TeamId, name: String) -> Result<Label>;
+    async fn create_label(team: TeamId, name: String, managing_role_id: RoleId) -> Result<Label>;
     // Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     // Assign a label to a device.

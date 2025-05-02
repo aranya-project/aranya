@@ -208,7 +208,6 @@ dependencies = [
  "aranya-capi-core",
  "aranya-client",
  "aranya-crypto",
- "aranya-daemon-api",
  "aranya-util",
  "buggy",
  "postcard",
