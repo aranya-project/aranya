@@ -33,10 +33,7 @@ use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     provider::{
         congestion_controller::Bbr,
-        tls::rustls::{
-            self as rustls_provider,
-            rustls::pki_types::{DnsName, ServerName},
-        },
+        tls::rustls::{self as rustls_provider, rustls::pki_types::ServerName},
     },
     Server,
 };
@@ -46,9 +43,10 @@ use tokio::{
     sync::{mpsc, Mutex as TokioMutex},
 };
 use tracing::{debug, instrument, Instrument as _};
+use webpki_roots::TLS_SERVER_ROOTS;
 
 use crate::{
-    aqc_net::{AqcBidirectionalChannel, AqcChannelType, AqcClient},
+    aqc_net::{AqcBidirectionalChannel, AqcChannelSender, AqcChannelType, AqcClient},
     error::AqcError,
 };
 
@@ -131,11 +129,12 @@ impl AqcChannelsImpl {
             .assume("unable to create psk")?;
         // Create Arc<ClientPresharedKeys> using the new structure
         let client_keys = Arc::new(ClientPresharedKeys::new(psk.clone()));
+
         // Create Client Config (INSECURE: Skips server cert verification)
         let mut client_config = rustls::ClientConfig::builder()
-            .dangerous() // Enable dangerous options
+            .dangerous()
             .with_custom_certificate_verifier(SkipServerVerification::new())
-            .with_no_client_auth(); // Final step builds the config
+            .with_no_client_auth();
         client_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
         client_config.preshared_keys = client_keys.clone(); // Pass the Arc<ClientPresharedKeys>
 
@@ -144,13 +143,10 @@ impl AqcChannelsImpl {
 
         // Create Server Config
         let mut server_config = rustls::ServerConfig::builder()
-            // .with_client_cert_verifier(client_cert_verifier) // TODO: add client cert verifier that always returns None
             .with_no_client_auth()
-            // .with_cert_resolver(cert_resolver) // TODO: add cert resolver that always returns None
             .with_single_cert(certs.clone(), key)
             .map_err(|e| AqcError::TlsConfig(e.to_string()))?;
         server_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
-                                                                // Pass the sender to the PresharedKeySelection implementation
         server_config.preshared_keys = PresharedKeySelection::Enabled(Arc::new(server_keys));
 
         // Wrap for s2n-quic using deprecated `new`
@@ -193,6 +189,7 @@ impl AqcChannelsImpl {
         Ok(self.client.local_addr().await?)
     }
 
+    /// Creates a bidirectional AQC channel with a peer.
     pub async fn create_bidirectional_channel(
         &mut self,
         peer_addr: SocketAddr,
@@ -202,6 +199,20 @@ impl AqcChannelsImpl {
     ) -> Result<AqcBidirectionalChannel, AqcError> {
         self.client
             .create_bidirectional_channel(peer_addr, label_id, id, psk)
+            .await
+            .map_err(AqcError::Other)
+    }
+
+    /// Creates a unidirectional AQC channel with a peer.
+    pub async fn create_unidirectional_channel(
+        &mut self,
+        peer_addr: SocketAddr,
+        label_id: LabelId,
+        id: UniChannelId,
+        psk: PresharedKey,
+    ) -> Result<AqcChannelSender, AqcError> {
+        self.client
+            .create_unidirectional_channel(peer_addr, label_id, id, psk)
             .await
             .map_err(AqcError::Other)
     }
@@ -238,10 +249,6 @@ impl ServerPresharedKeys {
         if self.keys.insert(identity, Arc::new(psk)).is_some() {
             panic!("duplicate identity")
         }
-    }
-
-    fn get_keys(&self) -> HashMap<Vec<u8>, Arc<PresharedKey>> {
-        self.keys.clone()
     }
 }
 
@@ -393,7 +400,7 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> crate::Result<(AqcUniChannelId, AqcCtrl)> {
+    ) -> crate::Result<AqcChannelSender> {
         debug!("creating aqc uni channel");
 
         // TODO: use correct node ID.
@@ -430,14 +437,34 @@ impl<'a> AqcChannels<'a> {
                 .map_err(AqcError::ChannelCreation)?;
             debug!("psk id: {:?}", psk.identity());
 
-            // TODO: send ctrl msg via network.
+            let peer_addr = tokio::net::lookup_host(peer.as_ref())
+                .await
+                .map_err(AqcError::AddrResolution)?
+                .next()
+                .assume("invalid peer address")?;
 
-            // TODO: for testing only. Send ctrl via network instead of returning.
-            return Ok((v.channel_id.into_id().into(), aqc_ctrl));
+            self.client
+                .aqc
+                .client
+                .send_ctrl(peer_addr, aqc_ctrl, team_id)
+                .await
+                .map_err(AqcError::Other)?;
+
+            let channel = self
+                .client
+                .aqc
+                .create_unidirectional_channel(
+                    peer_addr,
+                    label_id,
+                    v.channel_id,
+                    PresharedKey::external(psk.identity().as_bytes(), psk.raw_secret_bytes())
+                        .assume("unable to create psk")?,
+                )
+                .await?;
+            Ok(channel)
+        } else {
+            Err(crate::Error::Aqc(AqcError::ChannelNotFound))
         }
-
-        // TODO: clean up error-handling
-        Err(crate::Error::Aqc(AqcError::ChannelNotFound))
     }
 
     /// Deletes an AQC bidi channel.

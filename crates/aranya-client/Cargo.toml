@@ -38,6 +38,7 @@ tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
 tracing = { workspace = true }
+webpki-roots = { workspace = true}
 
 [dev-dependencies]
 aranya-daemon = { path = "../aranya-daemon" }
