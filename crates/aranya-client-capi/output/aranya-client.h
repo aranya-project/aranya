@@ -219,6 +219,18 @@ enum AranyaOp
      */
     ARANYA_OP_DELETE_ROLE,
     /**
+     * Setup admin role.
+     */
+    ARANYA_OP_SETUP_ADMIN_ROLE,
+    /**
+     * Setup operator role.
+     */
+    ARANYA_OP_SETUP_OPERATOR_ROLE,
+    /**
+     * Setup member role.
+     */
+    ARANYA_OP_SETUP_MEMBER_ROLE,
+    /**
      * Assign a role to a device.
      */
     ARANYA_OP_ASSIGN_ROLE,
