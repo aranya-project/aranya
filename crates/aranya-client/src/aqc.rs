@@ -315,17 +315,14 @@ impl<'a> AqcChannels<'a> {
             .await
             .map_err(AqcError::Other)?;
 
-        // TODO: get PSK from daemon
-        // TODO: get channel_id from daemon
-
         let channel = self
             .client
             .aqc
             .create_bidirectional_channel(
                 peer_addr,
                 label_id,
-                v.channel_id,
-                PresharedKey::external(psk.identity().as_bytes(), psk.raw_secret_bytes())
+                psk.identity.into(),
+                PresharedKey::external(psk.identity.as_bytes(), psk.secret.raw_secret_bytes())
                     .assume("unable to create psk")?,
             )
             .await?;
@@ -371,16 +368,18 @@ impl<'a> AqcChannels<'a> {
             .await
             .map_err(AqcError::Other)?;
 
-        // TODO: get channel_id from daemon.
-        // TODO: get psk from daemon.
+        let secret = match psk.secret {
+            aranya_daemon_api::Directed::Send(s) => s,
+            aranya_daemon_api::Directed::Recv(s) => s,
+        };
         let channel = self
             .client
             .aqc
             .create_unidirectional_channel(
                 peer_addr,
                 label_id,
-                v.channel_id,
-                PresharedKey::external(psk.identity().as_bytes(), psk.raw_secret_bytes())
+                psk.identity.into(),
+                PresharedKey::external(psk.identity.as_bytes(), secret.raw_secret_bytes())
                     .assume("unable to create psk")?,
             )
             .await?;
