@@ -150,33 +150,38 @@ pub async fn run_channels(
                     }
                 };
                 if let Some(ref identity) = identity {
-                    println!("processing connection accepted after seeing PSK identity hint");
                     tracing::debug!(
                         "Processing connection accepted after seeing PSK identity hint: {:02x?}",
                         identity
                     );
                     if identity == PSK_IDENTITY_CTRL {
-                        println!("PSK identity hint received");
                         match conn.accept_receive_stream().await {
                             Ok(Some(mut receive)) => {
-                                println!("received aqc ctrl stream");
-                                if let Ok(Some(ctrl)) = receive.receive().await {
-                                    let ctrl: AqcCtrlMessage = postcard::from_bytes(&ctrl).unwrap();
-                                    if let Err(e) = receive_aqc_ctrl(
-                                        daemon.clone(),
-                                        ctrl.team_id,
-                                        ctrl.ctrl,
-                                        handler.clone(),
-                                        eng.clone(),
-                                        &mut channel_map,
-                                    )
-                                    .await
-                                    {
-                                        error!("Failed to receive AQC ctrl: {}", e);
+                                if let Ok(Some(ctrl_bytes)) = receive.receive().await {
+                                    match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
+                                        Ok(ctrl) => {
+                                            if let Err(e) = receive_aqc_ctrl(
+                                                daemon.clone(),
+                                                ctrl.team_id,
+                                                ctrl.ctrl,
+                                                handler.clone(),
+                                                eng.clone(),
+                                                &mut channel_map,
+                                            )
+                                            .await
+                                            {
+                                                error!("Failed to receive AQC ctrl: {}", e);
+                                            }
+                                        }
+                                        Err(e) => {
+                                            error!("Failed to deserialize AqcCtrlMessage: {}", e);
+                                        }
                                     }
-                                    println!("received aqc ctrl");
+                                } else {
+                                    // Handle the error or None case from receive.receive() if necessary
+                                    // For example, log an error or break the loop
+                                    error!("Failed to receive control message or stream closed");
                                 }
-                                // TODO: else handle receive error?
                             }
                             Ok(None) => {
                                 error!("Receive stream closed unexpectedly");
@@ -188,7 +193,6 @@ pub async fn run_channels(
                             }
                         }
                     } else if let Some(channel_info) = channel_map.get(identity) {
-                        println!("found channel info");
                         tracing::debug!(
                             "Found channel info in map for identity hint {:02x?}: {:?}",
                             identity,
@@ -196,7 +200,6 @@ pub async fn run_channels(
                         );
                         match channel_info {
                             AqcChannel::Bidirectional { id } => {
-                                println!("found bidirectional channel");
                                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                                 // then open an arbitrary number of streams on.
                                 let (channel, bi_sender) = AqcBidirectionalChannel::new(
@@ -243,7 +246,6 @@ pub async fn run_channels(
                             }
                         }
                     } else {
-                        println!("no channel info found");
                         tracing::debug!(
                             "No channel info found in map for identity hint {:02x?}",
                             identity
@@ -290,14 +292,12 @@ async fn handle_bidi_streams(
         match conn.accept().await {
             Ok(Some(stream)) => match stream {
                 PeerStream::Bidirectional(stream) => {
-                    println!("bidirectional stream");
                     let (recv, send) = stream.split();
                     if sender.send((Some(send), recv)).await.is_err() {
                         error!("error sending bi stream");
                     }
                 }
                 PeerStream::Receive(recv) => {
-                    println!("unidirectional stream");
                     if sender.send((None, recv)).await.is_err() {
                         error!("error sending uni stream");
                     }

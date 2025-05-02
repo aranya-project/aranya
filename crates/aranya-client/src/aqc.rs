@@ -25,10 +25,10 @@ use aranya_crypto::{
 };
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
 use aranya_daemon_api::{
-    AqcChannelInfo::*, AqcCtrl, DeviceId, KeyStoreInfo, LabelId, NetIdentifier, TeamId,
+    AqcChannelInfo::*, DeviceId, KeyStoreInfo, LabelId, NetIdentifier, TeamId,
 };
 use aranya_fast_channels::NodeId;
-use buggy::BugExt;
+use buggy::BugExt as _;
 use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     provider::{
@@ -42,8 +42,7 @@ use tokio::{
     fs,
     sync::{mpsc, Mutex as TokioMutex},
 };
-use tracing::{debug, instrument, Instrument as _};
-use webpki_roots::TLS_SERVER_ROOTS;
+use tracing::{debug, error, instrument, Instrument as _};
 
 use crate::{
     aqc_net::{AqcBidirectionalChannel, AqcChannelSender, AqcChannelType, AqcClient},
@@ -246,19 +245,17 @@ impl ServerPresharedKeys {
 
     fn insert(&mut self, psk: PresharedKey) {
         let identity = psk.identity().to_vec();
-        if self.keys.insert(identity, Arc::new(psk)).is_some() {
-            panic!("duplicate identity")
+        if self.keys.insert(identity.clone(), Arc::new(psk)).is_some() {
+            error!("Duplicate PSK identity inserted: {:?}", identity);
         }
     }
 }
 
 impl SelectsPresharedKeys for ServerPresharedKeys {
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
-        println!("load_psk: {:02x?} {:?}", identity, self.keys.get(identity));
         let key = self.keys.get(identity).cloned();
 
         // Use try_send for non-blocking behavior. Ignore error if receiver dropped.
-        println!("sending identity: {:02x?}", identity);
         let _ = self.identity_sender.try_send(identity.to_vec());
 
         key
@@ -284,8 +281,7 @@ impl ClientPresharedKeys {
 }
 
 impl PresharedKeyStore for ClientPresharedKeys {
-    fn psks(&self, server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
-        println!("psk server name: {:02x?}", server_name);
+    fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
         let key_guard = self.key_ref.lock().expect("Client PSK mutex poisoned");
         vec![key_guard.clone()]
     }
