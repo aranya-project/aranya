@@ -493,6 +493,9 @@ command CreateTeam {
             assign_op_role("AssignDevicePrecedence", role.role_id)
             assign_op_role("CreateRole", role.role_id)
             assign_op_role("DeleteRole", role.role_id)
+            assign_op_role("SetupOperatorRole", role.role_id)
+            assign_op_role("SetupAdminRole", role.role_id)
+            assign_op_role("SetupMemberRole", role.role_id)
             assign_op_role("AssignRole", role.role_id)
             assign_op_role("RevokeRole", role.role_id)
             assign_op_role("AssignRoleOp", role.role_id)
@@ -612,7 +615,7 @@ command SetupAdminRole {
             create_role_fact(role)
             assign_op_role("DeleteLabel", role.role_id)
 
-            emit QueriedRole {
+            emit RoleCreated {
                 role: role
             }
         }
@@ -648,7 +651,7 @@ command SetupOperatorRole {
             assign_op_role("AssignLabel", role.role_id)
             assign_op_role("RevokeLabel", role.role_id)
 
-            emit QueriedRole {
+            emit RoleCreated {
                 role: role
             }
         }
@@ -681,7 +684,7 @@ command SetupMemberRole {
             assign_op_role("AqcCreateBidiChannel", role.role_id)
             assign_op_role("AqcCreateUniChannel", role.role_id)
 
-            emit QueriedRole {
+            emit RoleCreated {
                 role: role
             }
         }
@@ -1982,7 +1985,8 @@ command ChangeLabelManagingRole {
     policy {
         let author = get_valid_device(envelope::author_id(envelope))
 
-        // NB: Check roles, other ACLs here.
+        check device_can_execute_op(author.device_id, "ChangeLabelManagingRole")
+
         let label = check_unwrap query Label[label_id: this.label_id]
 
         // Only the author of the label is allowed to change the
@@ -2070,14 +2074,20 @@ command AssignLabel {
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
-        // Devices are never allowed to assign roles to
+        // Devices are never allowed to assign labels to
         // themselves.
+        //
+        // Perform this check before we make more fact database
+        // queries.
         check target.device_id != author.device_id
+
+        check device_can_execute_op(author.device_id, "AssignLabel")
 
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
 
-        // The author must have permission to assign the label.
+        // The author must have been granted permission to manage
+        // this label.
         let ctx = check_unwrap query CanAssignLabel[label_id: label.label_id]
         let role = check_unwrap query AssignedRole[role_id: ctx.managing_role_id, device_id: author.device_id]
 
@@ -2163,7 +2173,13 @@ command RevokeLabel {
         check device_can_execute_op(author.device_id, "RevokeLabel")
         check author_dominates_target(author.device_id, target.device_id)
 
+        // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
+
+        // The author must have been granted permission to manage
+        // this label.
+        let ctx = check_unwrap query CanAssignLabel[label_id: label.label_id]
+        let role = check_unwrap query AssignedRole[role_id: ctx.managing_role_id, device_id: author.device_id]
 
         // Verify that the device has been granted permission to
         // use the label.

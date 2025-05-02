@@ -1325,9 +1325,7 @@ AranyaError aranya_revoke_role_operation_ext(struct AranyaClient *client,
  * @relates AranyaClient.
  */
 AranyaError aranya_setup_default_roles(struct AranyaClient *client,
-                                       const struct AranyaTeamId *team,
-                                       struct AranyaRole *roles,
-                                       size_t *roles_len);
+                                       const struct AranyaTeamId *team);
 
 /**
  * Setup default roles on team.
@@ -1343,8 +1341,6 @@ AranyaError aranya_setup_default_roles(struct AranyaClient *client,
  */
 AranyaError aranya_setup_default_roles_ext(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
-                                           struct AranyaRole *roles,
-                                           size_t *roles_len,
                                            struct AranyaExtError *__ext_err);
 
 /**

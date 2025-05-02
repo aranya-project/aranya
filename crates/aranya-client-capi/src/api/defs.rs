@@ -1,5 +1,6 @@
 use core::{
     ffi::{c_char, CStr},
+    fmt,
     ops::{Deref, DerefMut},
     ptr,
 };
@@ -242,6 +243,12 @@ impl From<aranya_crypto::Id> for Id {
     }
 }
 
+impl fmt::Display for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        aranya_crypto::Id::from(self.bytes).fmt(f)
+    }
+}
+
 /// Team ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -262,6 +269,12 @@ impl From<aranya_client::TeamId> for TeamId {
 impl From<&TeamId> for aranya_client::TeamId {
     fn from(value: &TeamId) -> Self {
         value.id.bytes.into()
+    }
+}
+
+impl fmt::Display for TeamId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
     }
 }
 
@@ -288,6 +301,12 @@ impl From<&DeviceId> for aranya_client::DeviceId {
     }
 }
 
+impl fmt::Display for DeviceId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
+}
+
 /// Role ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -308,6 +327,12 @@ impl From<aranya_client::RoleId> for RoleId {
 impl From<&RoleId> for aranya_client::RoleId {
     fn from(value: &RoleId) -> Self {
         value.id.bytes.into()
+    }
+}
+
+impl fmt::Display for RoleId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
     }
 }
 
@@ -334,6 +359,12 @@ impl From<&LabelId> for aranya_client::LabelId {
     }
 }
 
+impl fmt::Display for LabelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
+}
+
 /// Channel ID for AQC bidi channel.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -357,6 +388,12 @@ impl From<&AqcBidiChannelId> for aranya_client::aqc::BidiChannelId {
     }
 }
 
+impl fmt::Display for AqcBidiChannelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
+}
+
 /// Channel ID for AQC uni channel.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -377,6 +414,12 @@ impl From<aranya_client::aqc::UniChannelId> for AqcUniChannelId {
 impl From<&AqcUniChannelId> for aranya_client::aqc::UniChannelId {
     fn from(value: &AqcUniChannelId) -> Self {
         value.id.bytes.into()
+    }
+}
+
+impl fmt::Display for AqcUniChannelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
     }
 }
 
@@ -964,32 +1007,12 @@ pub unsafe fn revoke_role_operation(
 /// @param team the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn setup_default_roles(
-    client: &mut Client,
-    team: &TeamId,
-    roles: Option<&mut MaybeUninit<Role>>,
-    roles_len: &mut usize,
-) -> Result<(), imp::Error> {
+pub unsafe fn setup_default_roles(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+    std::println!("Team={team:}");
     let client = client.deref_mut();
-
-    let data = client
+    client
         .rt
         .block_on(client.inner.team(team.into()).setup_default_roles())?;
-    let data = data.__into_data();
-    let Some(roles) = roles else {
-        *roles_len = data.len();
-        return Err(imp::Error::BufferTooSmall);
-    };
-    let len = data.len();
-    if *roles_len < len {
-        *roles_len = len;
-        return Err(imp::Error::BufferTooSmall);
-    }
-    let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
-    for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.clone().try_into()?);
-    }
-    *roles_len = len;
     Ok(())
 }
 
@@ -1506,15 +1529,16 @@ pub fn query_devices_on_team(
         .rt
         .block_on(client.inner.queries(team.into()).devices_on_team())?;
     let data = data.__data();
+    let len = data.len();
     let Some(devices) = devices else {
-        *devices_len = data.len();
+        *devices_len = len;
         return Err(imp::Error::BufferTooSmall);
     };
-    let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
-    if *devices_len < data.len() {
-        *devices_len = data.len();
+    if *devices_len < len {
+        *devices_len = len;
         return Err(imp::Error::BufferTooSmall);
     }
+    let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write((*src).into());
     }
@@ -1579,20 +1603,21 @@ pub fn query_device_label_assignments(
             .queries(team.into())
             .device_label_assignments(device.into()),
     )?;
-    let data = data.__data();
+    let data = data.__into_data();
+    let len = data.len();
     let Some(labels) = labels else {
-        *labels_len = data.len();
+        *labels_len = len;
         return Err(imp::Error::BufferTooSmall);
     };
-    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-    if *labels_len < data.len() {
-        *labels_len = data.len();
+    if *labels_len < len {
+        *labels_len = len;
         return Err(imp::Error::BufferTooSmall);
     }
+    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.clone().try_into()?)
+        Safe::init(dst, src.try_into()?)
     }
-    *labels_len = data.len();
+    *labels_len = len;
     Ok(())
 }
 
@@ -1650,20 +1675,21 @@ pub fn query_labels(
     let data = client
         .rt
         .block_on(client.inner.queries(team.into()).labels())?;
-    let data = data.__data();
+    let data = data.__into_data();
+    let len = data.len();
     let Some(labels) = labels else {
-        *labels_len = data.len();
+        *labels_len = len;
         return Err(imp::Error::BufferTooSmall);
     };
-    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-    for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.clone().try_into()?);
-    }
-    if *labels_len < data.len() {
-        *labels_len = data.len();
+    if *labels_len < len {
+        *labels_len = len;
         return Err(imp::Error::BufferTooSmall);
     }
-    *labels_len = data.len();
+    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        Safe::init(dst, src.try_into()?);
+    }
+    *labels_len = len;
     Ok(())
 }
 
@@ -1692,11 +1718,11 @@ pub fn query_roles_on_team(
         .rt
         .block_on(client.inner.queries(team.into()).roles_on_team())?;
     let data = data.__into_data();
+    let len = data.len();
     let Some(roles) = roles else {
-        *roles_len = data.len();
+        *roles_len = len;
         return Err(imp::Error::BufferTooSmall);
     };
-    let len = data.len();
     if *roles_len < len {
         *roles_len = len;
         return Err(imp::Error::BufferTooSmall);
@@ -1739,11 +1765,11 @@ pub fn query_device_roles(
             .device_roles(device.into()),
     )?;
     let data = data.__into_data();
+    let len = data.len();
     let Some(roles) = roles else {
-        *roles_len = data.len();
+        *roles_len = len;
         return Err(imp::Error::BufferTooSmall);
     };
-    let len = data.len();
     if *roles_len < len {
         *roles_len = len;
         return Err(imp::Error::BufferTooSmall);
@@ -1783,11 +1809,11 @@ pub fn query_role_operations(
         .rt
         .block_on(client.inner.queries(team.into()).role_ops(role.into()))?;
     let data = data.__into_data();
+    let len = data.len();
     let Some(ops) = ops else {
-        *ops_len = data.len();
+        *ops_len = len;
         return Err(imp::Error::BufferTooSmall);
     };
-    let len = data.len();
     if *ops_len < len {
         *ops_len = len;
         return Err(imp::Error::BufferTooSmall);

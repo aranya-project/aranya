@@ -86,8 +86,8 @@ impl Labels {
     }
 
     #[doc(hidden)]
-    pub fn __data(&self) -> &[Label] {
-        self.data.as_slice()
+    pub fn __into_data(self) -> Vec<Label> {
+        self.data
     }
 }
 
