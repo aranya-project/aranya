@@ -1421,12 +1421,15 @@ pub unsafe fn add_sync_peer(
     config: &SyncPeerConfig,
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let chan_id = client.rt.block_on(client.inner.aqc().create_bidi_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
-    Ok(chan_id.into())
+    // SAFETY: Caller must ensure `addr` is a valid C String.
+    let addr = unsafe { addr.as_underlying() }?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .add_sync_peer(addr, (*config).clone().into()),
+    )?;
+    Ok(())
 }
 
 /// Remove the peer from automatic Aranya state syncing.
