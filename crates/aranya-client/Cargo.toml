@@ -25,8 +25,6 @@ aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 
 anyhow = { workspace = true }
-postcard = { workspace = true }
-serde = { workspace = true }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
@@ -43,7 +41,3 @@ test-log = { workspace = true }
 [[test]]
 name = "tests"
 path = "tests/tests.rs"
-
-# Used by `custom_id!`.
-[package.metadata.cargo-machete]
-ignored = ["postcard", "serde"]
