@@ -441,24 +441,28 @@ impl From<Op> for aranya_client::Op {
 
 impl From<aranya_client::Op> for Op {
     fn from(value: aranya_client::Op) -> Self {
+        use aranya_client::Op::*;
         match value {
-            aranya_client::Op::AddMember => Self::AddMember,
-            aranya_client::Op::RemoveMember => Self::RemoveMember,
-            aranya_client::Op::AssignDevicePrecedence => Self::AssignDevicePrecedence,
-            aranya_client::Op::CreateRole => Self::CreateRole,
-            aranya_client::Op::DeleteRole => Self::DeleteRole,
-            aranya_client::Op::AssignRole => Self::AssignRole,
-            aranya_client::Op::RevokeRole => Self::RevokeRole,
-            aranya_client::Op::AssignRoleOp => Self::AssignRoleOp,
-            aranya_client::Op::RevokeRoleOp => Self::RevokeRoleOp,
-            aranya_client::Op::CreateLabel => Self::CreateLabel,
-            aranya_client::Op::DeleteLabel => Self::DeleteLabel,
-            aranya_client::Op::AssignLabel => Self::AssignLabel,
-            aranya_client::Op::RevokeLabel => Self::RevokeLabel,
-            aranya_client::Op::SetAqcNetworkName => Self::SetAqcNetworkName,
-            aranya_client::Op::UnsetAqcNetworkName => Self::UnsetAqcNetworkName,
-            aranya_client::Op::AqcCreateBidiChannel => Self::AqcCreateBidiChannel,
-            aranya_client::Op::AqcCreateUniChannel => Self::AqcCreateUniChannel,
+            AddMember => Self::AddMember,
+            RemoveMember => Self::RemoveMember,
+            AssignDevicePrecedence => Self::AssignDevicePrecedence,
+            CreateRole => Self::CreateRole,
+            DeleteRole => Self::DeleteRole,
+            SetupAdminRole => Self::SetupAdminRole,
+            SetupMemberRole => Self::SetupMemberRole,
+            SetupOperatorRole => Self::SetupOperatorRole,
+            AssignRole => Self::AssignRole,
+            RevokeRole => Self::RevokeRole,
+            AssignRoleOp => Self::AssignRoleOp,
+            RevokeRoleOp => Self::RevokeRoleOp,
+            CreateLabel => Self::CreateLabel,
+            DeleteLabel => Self::DeleteLabel,
+            AssignLabel => Self::AssignLabel,
+            RevokeLabel => Self::RevokeLabel,
+            SetAqcNetworkName => Self::SetAqcNetworkName,
+            UnsetAqcNetworkName => Self::UnsetAqcNetworkName,
+            AqcCreateBidiChannel => Self::AqcCreateBidiChannel,
+            AqcCreateUniChannel => Self::AqcCreateUniChannel,
         }
     }
 }

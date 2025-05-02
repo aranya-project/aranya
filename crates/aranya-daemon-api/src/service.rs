@@ -337,6 +337,9 @@ impl Op {
             Self::UnsetAqcNetworkName => "UnsetAqcNetworkName",
             Self::AqcCreateBidiChannel => "AqcCreateBidiChannel",
             Self::AqcCreateUniChannel => "AqcCreateUniChannel",
+            Self::SetupAdminRole => "SetupAdminRole",
+            Self::SetupOperatorRole => "SetupOperatorRole",
+            Self::SetupMemberRole => "SetupMemberRole",
         }
     }
 
@@ -360,6 +363,9 @@ impl Op {
             "UnsetAqcNetworkName" => Self::UnsetAqcNetworkName,
             "AqcCreateBidiChannel" => Self::AqcCreateBidiChannel,
             "AqcCreateUniChannel" => Self::AqcCreateUniChannel,
+            "SetupAdminRole" => Self::SetupAdminRole,
+            "SetupOperatorRole" => Self::SetupOperatorRole,
+            "SetupMemberRole" => Self::SetupMemberRole,
             _ => return None,
         };
         Some(op)
