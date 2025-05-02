@@ -45,7 +45,7 @@ use tokio::{
 use tracing::{debug, error, instrument, Instrument as _};
 
 use crate::{
-    aqc_net::{AqcBidirectionalChannel, AqcChannelSender, AqcChannelType, AqcClient},
+    aqc_net::{AqcBidirectionalChannel, AqcChannelType, AqcClient, AqcSenderChannel},
     error::AqcError,
 };
 
@@ -209,7 +209,7 @@ impl AqcChannelsImpl {
         label_id: LabelId,
         id: UniChannelId,
         psk: PresharedKey,
-    ) -> Result<AqcChannelSender, AqcError> {
+    ) -> Result<AqcSenderChannel, AqcError> {
         self.client
             .create_unidirectional_channel(peer_addr, label_id, id, psk)
             .await
@@ -396,7 +396,7 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> crate::Result<AqcChannelSender> {
+    ) -> crate::Result<AqcSenderChannel> {
         debug!("creating aqc uni channel");
 
         // TODO: use correct node ID.

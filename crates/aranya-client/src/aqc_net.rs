@@ -227,7 +227,7 @@ pub async fn run_channels(
                                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                                 // then open an arbitrary number of streams on.
                                 let (receiver, uni_sender) =
-                                    AqcChannelReceiver::new(LabelId::default(), *id);
+                                    AqcReceiverChannel::new(LabelId::default(), *id);
 
                                 // Notify the AfcClient that we've accepted a new connection, which the user will
                                 // have to call receive_channel() on in order to use.
@@ -320,12 +320,12 @@ pub enum AqcChannelType {
     /// Used to send data to a peer.
     Sender {
         /// The sending end of a unidirectional channel.
-        sender: AqcChannelSender,
+        sender: AqcSenderChannel,
     },
     /// Used to receive data from a peer.
     Receiver {
         /// The receiving end of a unidirectional channel.
-        receiver: AqcChannelReceiver,
+        receiver: AqcReceiverChannel,
     },
     /// Used to send and receive data from a peer.
     Bidirectional {
@@ -337,13 +337,13 @@ pub enum AqcChannelType {
 /// The sending end of a unidirectional channel.
 /// Allows sending data streams over a channel.
 #[derive(Debug)]
-pub struct AqcChannelSender {
+pub struct AqcSenderChannel {
     label_id: LabelId,
     handle: Handle,
     id: UniChannelId,
 }
 
-impl AqcChannelSender {
+impl AqcSenderChannel {
     /// Create a new channel with the given id and conection handle.
     ///
     /// Returns the new channel and the sender used to send new streams to the
@@ -380,7 +380,7 @@ impl AqcChannelSender {
     }
 }
 
-impl Drop for AqcChannelSender {
+impl Drop for AqcSenderChannel {
     fn drop(&mut self) {
         // Attempt to close the channel when the sender is dropped.
         // Log if there's an error, but don't panic as drop should not panic.
@@ -393,13 +393,13 @@ impl Drop for AqcChannelSender {
 /// The receive end of a unidirectional channel.
 /// Allows receiving data streams over a channel.
 #[derive(Debug)]
-pub struct AqcChannelReceiver {
+pub struct AqcReceiverChannel {
     label_id: LabelId,
     uni_receiver: mpsc::Receiver<ReceiveStream>,
     aqc_id: UniChannelId,
 }
 
-impl AqcChannelReceiver {
+impl AqcReceiverChannel {
     /// Create a new channel with the given conection handle.
     ///
     /// Returns the new channel and the sender used to send new streams to the
@@ -622,7 +622,7 @@ impl AqcClient {
         conn.keep_alive(true)?;
         let channel = match channel {
             AqcChannel::Unidirectional { id } => AqcChannelType::Sender {
-                sender: AqcChannelSender::new(label_id, id, conn.handle()),
+                sender: AqcSenderChannel::new(label_id, id, conn.handle()),
             },
             AqcChannel::Bidirectional { id } => {
                 let (channel, sender) = AqcBidirectionalChannel::new(label_id, id, conn.handle());
@@ -640,7 +640,7 @@ impl AqcClient {
         label_id: LabelId,
         id: UniChannelId,
         psk: PresharedKey,
-    ) -> Result<AqcChannelSender> {
+    ) -> Result<AqcSenderChannel> {
         match self
             .create_channel(addr, label_id, AqcChannel::Unidirectional { id }, psk)
             .await?
