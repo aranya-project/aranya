@@ -1,6 +1,6 @@
 [package]
 name = "aranya-daemon-api"
-description = "IPC API between the Aranya client and daemon"
+description = "IPC API between Aranya client and daemon, enabling team operations, secure channel creation, and sync configurations. Handles type conversions between internal and external types"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
