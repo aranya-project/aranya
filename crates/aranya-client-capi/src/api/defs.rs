@@ -1328,12 +1328,12 @@ pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
 
 /// AQC Sender Channel Object
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 112, align = 8)]
+#[aranya_capi_core::opaque(size = 176, align = 8)]
 pub type AqcSenderChannel = Safe<imp::AqcSenderChannel>;
 
 /// AQC Receiver Channel Object
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 88, align = 8)]
+#[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AqcReceiverChannel = Safe<imp::AqcReceiverChannel>;
 
 /// AQC Sender Stream Object
@@ -1368,7 +1368,7 @@ pub unsafe fn aqc_create_bidi_channel(
     let peer = unsafe { peer.as_underlying() }?;
 
     let client = client.deref_mut();
-    let (chan, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
+    let chan = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
         peer,
         label_id.into(),
@@ -1577,7 +1577,7 @@ pub fn aqc_bidi_receive_stream(
             Safe::init(send_stream, imp::AqcSendStream::new(send));
             Ok(true)
         }
-        None => Ok(false)
+        None => Ok(false),
     }
 }
 
