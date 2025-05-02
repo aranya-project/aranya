@@ -29,6 +29,9 @@ pub enum Error {
     #[error("AQC server was closed")]
     AqcServerClosed,
 
+    #[error("AQC connection was closed")]
+    AqcConnectionClosed,
+
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),
 
@@ -47,6 +50,9 @@ pub enum Error {
 
     #[error("serialization errors: {0}")]
     Serialization(#[from] postcard::Error),
+
+    #[error("{0}")]
+    Other(#[from] anyhow::Error),
 }
 
 impl From<WriteCStrError> for Error {

@@ -1,8 +1,10 @@
 use aranya_capi_core::safe::{TypeId, Typed};
 use aranya_client::aqc_net::{self as aqc};
 
+// TODO(nikki): refactor this to add accessors and remove pub(crate) on inners.
+
 pub struct AqcBidiChannel {
-    inner: aqc::AqcBidirectionalChannel,
+    pub(crate) inner: aqc::AqcBidirectionalChannel,
 }
 
 impl Typed for AqcBidiChannel {
@@ -70,6 +72,34 @@ impl Typed for AqcChannelType {
 
 impl AqcChannelType {
     pub fn new(channel: aqc::AqcChannelType) -> Self {
+        Self { inner: channel }
+    }
+}
+
+pub struct AqcSendStream {
+    pub(crate) inner: aqc::AqcSendStream,
+}
+
+impl Typed for AqcSendStream {
+    const TYPE_ID: TypeId = TypeId::new(0x8C03E403);
+}
+
+impl AqcSendStream {
+    pub fn new(channel: aqc::AqcSendStream) -> Self {
+        Self { inner: channel }
+    }
+}
+
+pub struct AqcReceiveStream {
+    pub(crate) inner: aqc::AqcReceiveStream,
+}
+
+impl Typed for AqcReceiveStream {
+    const TYPE_ID: TypeId = TypeId::new(0xB4D31DA6);
+}
+
+impl AqcReceiveStream {
+    pub fn new(channel: aqc::AqcReceiveStream) -> Self {
         Self { inner: channel }
     }
 }

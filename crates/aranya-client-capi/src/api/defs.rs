@@ -66,6 +66,10 @@ pub enum Error {
     #[capi(msg = "AQC server closed")]
     AqcServerClosed,
 
+    /// Tried to do something with an AQC connection when it was closed.
+    #[capi(msg = "AQC connection closed")]
+    AqcConnectionClosed,
+
     /// Failed trying to construct a new tokio runtime.
     #[capi(msg = "tokio runtime error")]
     Runtime,
@@ -77,6 +81,10 @@ pub enum Error {
     /// Serialization error.
     #[capi(msg = "serialization")]
     Serialization,
+
+    /// Some other error occurred.
+    #[capi(msg = "other")]
+    Other,
 }
 
 impl From<&imp::Error> for Error {
@@ -106,6 +114,8 @@ impl From<&imp::Error> for Error {
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
             imp::Error::AqcServerClosed => Self::AqcServerClosed,
+            imp::Error::AqcConnectionClosed => Self::AqcConnectionClosed,
+            imp::Error::Other(_) => Self::Other,
         }
     }
 }
@@ -1311,20 +1321,30 @@ pub enum AqcChannelType {
     Bidirectional,
 }
 
-/// Bidirectional AQC Channel Object
+/// AQC Bidirectional Channel Object
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 184, align = 8)]
 pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
 
-/// Sender AQC Channel Object
+/// AQC Sender Channel Object
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 112, align = 8)]
 pub type AqcSenderChannel = Safe<imp::AqcSenderChannel>;
 
-/// Receiver AQC Channel Object
+/// AQC Receiver Channel Object
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 88, align = 8)]
 pub type AqcReceiverChannel = Safe<imp::AqcReceiverChannel>;
+
+/// AQC Sender Stream Object
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 152, align = 8)]
+pub type AqcSendStream = Safe<imp::AqcSendStream>;
+
+/// AQC Sender Stream Object
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 152, align = 8)]
+pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 
 /// Create a bidirectional AQC channel between this device and another peer.
 ///
@@ -1503,6 +1523,62 @@ pub fn aqc_get_receiver_channel(
     }
 
     Ok(())
+}
+
+pub fn aqc_bidi_create_bidi_stream(
+    client: &mut Client,
+    channel: &mut AqcBidiChannel,
+    send_stream: &mut MaybeUninit<AqcSendStream>,
+    recv_stream: &mut MaybeUninit<AqcReceiveStream>,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let (send, recv) = client
+        .rt
+        .block_on(channel.inner.create_bidirectional_stream())
+        .map_err(|e| imp::Error::Other(e))?;
+
+    Safe::init(send_stream, imp::AqcSendStream::new(send));
+    Safe::init(recv_stream, imp::AqcReceiveStream::new(recv));
+
+    Ok(())
+}
+
+pub fn aqc_bidi_create_uni_stream(
+    client: &mut Client,
+    channel: &mut AqcBidiChannel,
+    send_stream: &mut MaybeUninit<AqcSendStream>,
+) -> Result<(), imp::Error> {
+    let client = client.deref_mut();
+    let send = client
+        .rt
+        .block_on(channel.inner.create_unidirectional_stream())
+        .map_err(|e| imp::Error::Other(e))?;
+
+    Safe::init(send_stream, imp::AqcSendStream::new(send));
+
+    Ok(())
+}
+
+pub fn aqc_bidi_receive_stream(
+    client: &mut Client,
+    channel: &mut AqcBidiChannel,
+    send_stream: &mut MaybeUninit<AqcSendStream>,
+    recv_stream: &mut MaybeUninit<AqcReceiveStream>,
+) -> Result<bool, imp::Error> {
+    let client = client.deref_mut();
+    let (send, recv) = client
+        .rt
+        .block_on(channel.inner.receive_stream())
+        .ok_or(imp::Error::AqcConnectionClosed)?;
+
+    Safe::init(recv_stream, imp::AqcReceiveStream::new(recv));
+    match send {
+        Some(send) => {
+            Safe::init(send_stream, imp::AqcSendStream::new(send));
+            Ok(true)
+        }
+        None => Ok(false)
+    }
 }
 
 /*
