@@ -43,3 +43,7 @@ test-log = { workspace = true }
 [[test]]
 name = "tests"
 path = "tests/tests.rs"
+
+# Used by `custom_id!`.
+[package.metadata.cargo-machete]
+ignored = ["postcard", "serde"]

@@ -90,7 +90,7 @@ impl<'a> AqcChannels<'a> {
             .map_err(aranya_error)?;
         debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
 
-        let chan_id = psk.identity.into();
+        let chan_id = BidiChannelId::from_api(psk.identity.into());
 
         // TODO: send ctrl msg via network.
         let _ = ctrl;
@@ -132,7 +132,7 @@ impl<'a> AqcChannels<'a> {
             .map_err(aranya_error)?;
         debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
 
-        let chan_id = psk.identity.into();
+        let chan_id = UniChannelId::from_api(psk.identity.into());
 
         // TODO: send ctrl msg via network.
         let _ = ctrl;
