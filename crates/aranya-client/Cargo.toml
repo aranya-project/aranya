@@ -27,9 +27,9 @@ aranya-runtime = { workspace = true, features = ["std"] }
 aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
-s2n-quic = { workspace = true }
-rustls-pemfile = { workspace = true }
 rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+s2n-quic = { workspace = true }
 
 anyhow = { workspace = true }
 postcard = { workspace = true }
@@ -38,7 +38,7 @@ tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
 tracing = { workspace = true }
-webpki-roots = { workspace = true}
+webpki-roots = { workspace = true }
 
 [dev-dependencies]
 aranya-daemon = { path = "../aranya-daemon" }
