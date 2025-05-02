@@ -22,10 +22,10 @@ use serde::{Deserialize, Serialize};
 use tracing::error;
 
 /// Crypto Engine type alias for the engine that supports cryptographic operations.
-/// 
+///
 /// This type represents the default crypto engine used for cryptographic operations
 /// throughout the Aranya system.
-/// 
+///
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
 /// Cipher Suite type alias for the cryptographic operations used in the daemon API.
