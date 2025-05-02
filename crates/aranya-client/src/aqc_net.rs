@@ -314,14 +314,6 @@ async fn handle_bidi_streams(
     }
 }
 
-/// Indicates whether the channel is unidirectional or bidirectional
-enum AqcChannelDirection {
-    /// Data can only be sent in one direction.
-    Unidirectional,
-    /// Data can be sent in either direction
-    Bidirectional,
-}
-
 /// Indicates the type of channel
 #[derive(Debug)]
 pub enum AqcChannelType {
@@ -369,6 +361,11 @@ impl AqcChannelSender {
         self.label_id
     }
 
+    /// Get the channel id.
+    pub fn aqc_id(&self) -> UniChannelId {
+        self.id
+    }
+
     /// Creates a new unidirectional stream for the channel.
     pub async fn create_unidirectional_stream(&mut self) -> Result<AqcSendStream> {
         let send = self.handle.open_send_stream().await?;
@@ -380,6 +377,16 @@ impl AqcChannelSender {
         const ERROR_CODE: u32 = 0;
         self.handle.close(ERROR_CODE.into());
         Ok(())
+    }
+}
+
+impl Drop for AqcChannelSender {
+    fn drop(&mut self) {
+        // Attempt to close the channel when the sender is dropped.
+        // Log if there's an error, but don't panic as drop should not panic.
+        if let Err(e) = self.close() {
+            tracing::error!("Failed to close AqcChannelSender handle: {}", e);
+        }
     }
 }
 
@@ -501,6 +508,16 @@ impl AqcBidirectionalChannel {
         const ERROR_CODE: u32 = 0;
         self.handle.close(ERROR_CODE.into());
         Ok(())
+    }
+}
+
+impl Drop for AqcBidirectionalChannel {
+    fn drop(&mut self) {
+        // Attempt to close the channel when the bidirectional channel is dropped.
+        // Log if there's an error, but don't panic as drop should not panic.
+        if let Err(e) = self.close() {
+            tracing::error!("Failed to close AqcBidirectionalChannel handle: {}", e);
+        }
     }
 }
 
