@@ -1710,6 +1710,9 @@ AranyaError aranya_aqc_remove_net_identifier_ext(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * @param managing_role_id the ID of the role that is required
+ *        in order to grant *other* devices permission to use
+ *        this label.
  * Output params:
  * @param role returns the created label [`AranyaLabel`](@ref AranyaLabel).
  *
@@ -1718,6 +1721,7 @@ AranyaError aranya_aqc_remove_net_identifier_ext(struct AranyaClient *client,
 AranyaError aranya_create_label(struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaLabelName name,
+                                const struct AranyaRoleId *managing_role_id,
                                 struct AranyaLabel *label);
 
 /**
@@ -1728,6 +1732,9 @@ AranyaError aranya_create_label(struct AranyaClient *client,
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * @param managing_role_id the ID of the role that is required
+ *        in order to grant *other* devices permission to use
+ *        this label.
  * Output params:
  * @param role returns the created label [`AranyaLabel`](@ref AranyaLabel).
  *
@@ -1736,6 +1743,7 @@ AranyaError aranya_create_label(struct AranyaClient *client,
 AranyaError aranya_create_label_ext(struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     AranyaLabelName name,
+                                    const struct AranyaRoleId *managing_role_id,
                                     struct AranyaLabel *label,
                                     struct AranyaExtError *__ext_err);
 

@@ -555,7 +555,7 @@ command TerminateTeam {
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(envelope::author_id(envelope))
 
-        check device_can_execute_op(author.device_id, "Operation::TerminateTeam")
+        check device_can_execute_op(author.device_id, "TerminateTeam")
 
         finish {
             create TeamEnd[]=>{}
@@ -597,7 +597,7 @@ command SetupAdminRole {
         // Get author of command
         let author = get_valid_device(envelope::author_id(envelope))
 
-        check device_can_execute_op(author.device_id, "Operation::SetupAdminRole")
+        check device_can_execute_op(author.device_id, "SetupAdminRole")
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
@@ -609,7 +609,7 @@ command SetupAdminRole {
         }
 
         finish {
-            create_role(role)
+            create_role_fact(role)
             assign_op_role("DeleteLabel", role.role_id)
 
             emit QueriedRole {
@@ -629,7 +629,7 @@ command SetupOperatorRole {
         // Get author of command
         let author = get_valid_device(envelope::author_id(envelope))
 
-        check device_can_execute_op(author.device_id, "Operation::SetupOperatorRole")
+        check device_can_execute_op(author.device_id, "SetupOperatorRole")
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
@@ -641,7 +641,7 @@ command SetupOperatorRole {
         }
 
         finish {
-            create_role(role)
+            create_role_fact(role)
             assign_op_role("SetAqcNetworkName", role.role_id)
             assign_op_role("UnsetAqcNetworkName", role.role_id)
             assign_op_role("CreateLabel", role.role_id)
@@ -665,7 +665,7 @@ command SetupMemberRole {
         // Get author of command
         let author = get_valid_device(envelope::author_id(envelope))
 
-        check device_can_execute_op(author.device_id, "Operation::SetupMemberRole")
+        check device_can_execute_op(author.device_id, "SetupMemberRole")
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
@@ -677,7 +677,7 @@ command SetupMemberRole {
         }
 
         finish {
-            create_role(role)
+            create_role_fact(role)
             assign_op_role("AqcCreateBidiChannel", role.role_id)
             assign_op_role("AqcCreateUniChannel", role.role_id)
 
