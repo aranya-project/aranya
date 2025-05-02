@@ -1,6 +1,6 @@
 //! Client-daemon connection.
 
-use std::{net::SocketAddr, path::Path};
+use std::{net::SocketAddr, path::Path, sync::Arc};
 
 use aranya_daemon_api::{
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, KeyStoreInfo, Label, LabelId, NetIdentifier,
@@ -12,6 +12,7 @@ use tracing::{debug, info, instrument};
 
 use crate::{
     aqc::{AqcChannels, AqcChannelsImpl},
+    aqc_net::run_channels,
     config::{SyncPeerConfig, TeamConfig},
     error::{Error, Result},
 };
@@ -64,7 +65,7 @@ impl Labels {
 /// [`tarpc`]: https://crates.io/crates/tarpc
 pub struct Client {
     /// RPC connection to the daemon
-    pub(crate) daemon: DaemonApiClient,
+    pub(crate) daemon: Arc<DaemonApiClient>,
     /// Support for AQC
     pub(crate) aqc: AqcChannelsImpl,
 }
@@ -88,16 +89,30 @@ impl Client {
         let transport = tarpc::serde_transport::unix::connect(daemon_socket, Json::default)
             .await
             .map_err(Error::Connecting)?;
-        let daemon = DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn();
+        let daemon =
+            Arc::new(DaemonApiClient::new(tarpc::client::Config::default(), transport).spawn());
         debug!("connected to daemon");
 
         let keystore_info = daemon.get_keystore_info(context::current()).await??;
         debug!(?keystore_info);
         let device_id = daemon.get_device_id(context::current()).await??;
         debug!(?device_id);
-        let aqc = AqcChannelsImpl::new(device_id, keystore_info, aqc_address).await?;
+        let (aqc, server, sender, identity_rx) =
+            AqcChannelsImpl::new(device_id, keystore_info, aqc_address).await?;
+        tokio::spawn(run_channels(
+            server,
+            sender,
+            identity_rx,
+            daemon.clone(),
+            aqc.handler.clone(),
+            aqc.eng.clone(),
+        ));
+        let client = Self {
+            daemon: Arc::clone(&daemon),
+            aqc,
+        };
 
-        Ok(Self { daemon, aqc })
+        Ok(client)
     }
 
     /// Returns the address that the Aranya sync server is bound to.

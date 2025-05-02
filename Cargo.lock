@@ -202,7 +202,10 @@ dependencies = [
  "bytes",
  "postcard",
  "rcgen",
+ "rustls",
+ "rustls-pemfile",
  "s2n-quic",
+ "serde",
  "serial_test",
  "tarpc",
  "tempfile",
@@ -210,6 +213,7 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tracing",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -600,7 +604,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b756939cb2f8dc900aa6dcd505e6e2428e9cae7ff7b028c49e3946efa70878"
 dependencies = [
  "aws-lc-sys",
- "untrusted",
+ "untrusted 0.7.1",
  "zeroize",
 ]
 
@@ -1489,12 +1493,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
-name = "hex"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
 name = "hex-literal"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2287,6 +2285,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ring"
+version = "0.17.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4689e6c2294d81e88dc6261c768b63bc4fcdb852be6d1352498b114f61383b7"
+dependencies = [
+ "cc",
+ "cfg-if",
+ "getrandom 0.2.15",
+ "libc",
+ "untrusted 0.9.0",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2321,10 +2333,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "rustls"
+version = "0.23.26"
+source = "git+https://github.com/elagergren-spideroak/rustls?rev=648a02550dd319360664f9af79862716be2879ff#648a02550dd319360664f9af79862716be2879ff"
+dependencies = [
+ "aws-lc-rs",
+ "log",
+ "once_cell",
+ "rustls-pki-types",
+ "rustls-webpki",
+ "subtle",
+ "zeroize",
+]
+
+[[package]]
+name = "rustls-pemfile"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dce314e5fee3f39953d46bb63bb8a46d40c2f8fb7cc5a3b6cab2bde9721d6e50"
+dependencies = [
+ "rustls-pki-types",
+]
+
+[[package]]
 name = "rustls-pki-types"
 version = "1.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "917ce264624a4b4db1c364dcc35bfca9ded014d0a958cd47ad3e960e988ea51c"
+
+[[package]]
+name = "rustls-webpki"
+version = "0.103.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fef8b8769aaccf73098557a87cd1816b4f9c7c16811c9c77142aa695c16f2c03"
+dependencies = [
+ "aws-lc-rs",
+ "ring",
+ "rustls-pki-types",
+ "untrusted 0.9.0",
+]
 
 [[package]]
 name = "rustversion"
@@ -2340,9 +2387,9 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "s2n-codec"
-version = "0.56.0"
+version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72772d01799dffe5162e9e1d62755dc7063bcb5dcc177856f84506d84434d3c9"
+checksum = "0593e6de81a75c040d58b4243b09685fc48cfcbe8da89a09cc0190e979662852"
 dependencies = [
  "byteorder",
  "bytes",
@@ -2351,9 +2398,9 @@ dependencies = [
 
 [[package]]
 name = "s2n-quic"
-version = "1.56.0"
+version = "1.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae0cb256038b85ae7fe316ae35e83196495f3e384c4e58f81ede83f392772b6b"
+checksum = "bd6ee672a52de5d9e869dd23ca6491eff83da60083c976194997658f139f3f7f"
 dependencies = [
  "bytes",
  "cfg-if",
@@ -2366,7 +2413,7 @@ dependencies = [
  "s2n-quic-core",
  "s2n-quic-crypto",
  "s2n-quic-platform",
- "s2n-quic-tls",
+ "s2n-quic-rustls",
  "s2n-quic-transport",
  "tokio",
  "zerocopy 0.8.24",
@@ -2375,9 +2422,9 @@ dependencies = [
 
 [[package]]
 name = "s2n-quic-core"
-version = "0.56.0"
+version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d185fcbf428c9212c0e1614a21f788a277a73525c6ea3ae69988eebcfff76e26"
+checksum = "bec1511d660ce7b490058f747665e2873d60f3c0490ba357f757561a38e010f6"
 dependencies = [
  "atomic-waker",
  "byteorder",
@@ -2396,9 +2443,9 @@ dependencies = [
 
 [[package]]
 name = "s2n-quic-crypto"
-version = "0.56.0"
+version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd2d7cd977828c447dcbbe972be6b84d17dd8da78780ce823a2d0f2c2cc8b9ca"
+checksum = "276cfbe1597931d1a65903ab808154452d401163567df79bb07d62c7687b562d"
 dependencies = [
  "aws-lc-rs",
  "cfg-if",
@@ -2410,9 +2457,9 @@ dependencies = [
 
 [[package]]
 name = "s2n-quic-platform"
-version = "0.56.0"
+version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98af2cf5ab5aa2dcf0fdd8d6baa9997e6778f90b3e84affa0bcd36b57374eb81"
+checksum = "a07b42a7ae26e3719f7c5343b0c22a5b0b02e667130f492b702f94ec7570032b"
 dependencies = [
  "cfg-if",
  "futures",
@@ -2424,25 +2471,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "s2n-quic-tls"
-version = "0.56.0"
+name = "s2n-quic-rustls"
+version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bac7ef41cb890147380578223d03e14dea3e8540beeda407cf05c43cc97683b"
+checksum = "e785b0dc2fb9cb595d4b1095c77c54217d4a4da62a759b50937a2f97042891bf"
 dependencies = [
  "bytes",
- "errno",
- "libc",
+ "rustls",
+ "rustls-pemfile",
  "s2n-codec",
  "s2n-quic-core",
  "s2n-quic-crypto",
- "s2n-tls",
 ]
 
 [[package]]
 name = "s2n-quic-transport"
-version = "0.56.0"
+version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ae294c553db782926a785ceae61faa03a6db623d5b456a2670993cb9dc06de40"
+checksum = "90ee1953ce856f6bdbc473dbb347777116cde26553cc3f99c22688b3c947a24c"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -2454,30 +2500,6 @@ dependencies = [
  "s2n-quic-core",
  "siphasher",
  "smallvec",
-]
-
-[[package]]
-name = "s2n-tls"
-version = "0.3.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebf1868fc9471aa5461c3b29c5e11011a5d3cbe36ce62d2a12d33d3681859b80"
-dependencies = [
- "errno",
- "hex",
- "libc",
- "pin-project-lite",
- "s2n-tls-sys",
-]
-
-[[package]]
-name = "s2n-tls-sys"
-version = "0.3.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f49b6ace3b4f332bc550f4ddbf1c1cd4250b10be223ec23a29e28db1e51f3fd"
-dependencies = [
- "aws-lc-rs",
- "cc",
- "libc",
 ]
 
 [[package]]
@@ -3182,6 +3204,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
 
 [[package]]
+name = "untrusted"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
+
+[[package]]
 name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3295,6 +3323,15 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "webpki-roots"
+version = "0.26.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37493cadf42a2a939ed404698ded7fb378bf301b5011f973361779a3a74f8c93"
+dependencies = [
+ "rustls-pki-types",
 ]
 
 [[package]]

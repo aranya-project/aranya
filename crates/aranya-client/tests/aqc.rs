@@ -1,179 +1,20 @@
-use std::{net::SocketAddr, ops::DerefMut as _, sync::Arc, time::Duration};
+use std::time::Duration;
 
 mod common;
 use anyhow::Result;
-use aranya_client::{
-    aqc_net::{run_channels, AqcChannelType, AqcClient},
-    SyncPeerConfig, TeamConfig,
-};
+use aranya_client::{aqc_net::AqcChannelType, SyncPeerConfig, TeamConfig};
 use aranya_crypto::csprng::rand;
-use aranya_daemon_api::{ChanOp, LabelId, Role};
-use aranya_runtime::{
-    protocol::{TestActions, TestEngine, TestSink},
-    storage::memory::MemStorageProvider,
-    ClientState,
-};
-use buggy::BugExt as _;
+use aranya_daemon_api::{ChanOp, Role};
+use buggy::BugExt;
 use bytes::Bytes;
 use common::{sleep, TeamCtx};
-use s2n_quic::{provider::congestion_controller::Bbr, Server};
 use tempfile::tempdir;
-use tokio::sync::{mpsc, Mutex as TMutex};
 use tracing::{debug, info};
 
 /// NOTE: this certificate is to be used for demonstration purposes only!
 pub static CERT_PEM: &str = include_str!("../src/cert.pem");
 /// NOTE: this certificate is to be used for demonstration purposes only!
 pub static KEY_PEM: &str = include_str!("../src/key.pem");
-
-#[test_log::test(tokio::test)]
-async fn test_aqc_channels() -> Result<()> {
-    let client1 = make_client();
-    let sink1 = Arc::new(TMutex::new(TestSink::new()));
-    let ck = rcgen::generate_simple_self_signed(vec!["localhost".into()])?;
-    let key = ck.key_pair.serialize_pem();
-    let cert = ck.cert.pem();
-
-    let server1 = get_server(cert.clone(), key.clone())?;
-    let (mut aqc_client1, sender1) = AqcClient::new(&*cert.clone())?;
-
-    let _client2 = make_client();
-
-    let _ = client1.lock().await.new_graph(
-        &0u64.to_be_bytes(),
-        TestActions::Init(0),
-        sink1.lock().await.deref_mut(),
-    )?;
-
-    let _ = spawn_channel_listener(server1, sender1)?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    let server2 = get_server(cert.clone(), key)?;
-    let (mut aqc_client2, sender2) = AqcClient::new(&*cert)?;
-    let addr2 = spawn_channel_listener(server2, sender2)?;
-    let mut channel1 = aqc_client1
-        .create_bidirectional_channel(addr2, LabelId::default())
-        .await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    let mut channel2 = match aqc_client2
-        .receive_channel()
-        .await
-        .assume("channel must exist")?
-    {
-        AqcChannelType::Bidirectional { channel } => channel,
-        _ => {
-            buggy::bug!("Expected a bidirectional channel")
-        }
-    };
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    let mut send1_1 = channel1.create_unidirectional_stream().await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    // Test sending streams
-
-    // Send from 1 to 2 with a unidirectional stream
-    let msg1 = Bytes::from("hello");
-    send1_1.send(&msg1).await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    // Receive a unidirectional stream from peer 1
-    let (maybe_send2_1, mut recv2_1) = channel2
-        .receive_stream()
-        .await
-        .assume("stream not received")?;
-    assert!(maybe_send2_1.is_none(), "Expected unidirectional stream");
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    let mut target = vec![0u8; 1024 * 1024 * 2];
-    let len = recv2_1
-        .receive(target.as_mut_slice())
-        .await?
-        .assume("no data received")?;
-    assert_eq!(&target[..len], b"hello");
-
-    let (mut send1_2, mut recv1_2) = channel1.create_bidirectional_stream().await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    // Send from 1 to 2 with a bidirectional stream
-    let msg2 = Bytes::from("hello2");
-    send1_2.send(&msg2).await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    let (maybe_send2_2, mut recv2_2) = channel2
-        .receive_stream()
-        .await
-        .assume("stream not received")?;
-    let mut send2_2 = maybe_send2_2.expect("Expected bidirectional stream");
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    let mut target = vec![0u8; 1024 * 1024 * 2];
-    let len = recv2_2
-        .receive(target.as_mut_slice())
-        .await?
-        .assume("no data received")?;
-    assert_eq!(&target[..len], b"hello2");
-
-    // Send from 2 to 1 with a bidirectional stream
-    let msg3 = Bytes::from("hello3");
-    send2_2.send(&msg3).await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    let mut target = vec![0u8; 1024 * 1024 * 2];
-    let len = recv1_2
-        .receive(target.as_mut_slice())
-        .await?
-        .assume("no data received")?;
-    assert_eq!(&target[..len], b"hello3");
-
-    // Test sending a large message
-    let big_data = {
-        let mut rng = rand::thread_rng();
-        let mut data = vec![0u8; 1024 * 1024 * 3 / 2];
-        rand::Rng::fill(&mut rng, &mut data[..]);
-        Bytes::from(data)
-    };
-
-    send1_2.send(&big_data).await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    let mut total_len: usize = 0;
-    let mut total_pieces: i32 = 0;
-    // Send stream should return the message in pieces
-    while let Some(len) = recv2_2.receive(&mut target[total_len..]).await? {
-        total_pieces = total_pieces.checked_add(1).expect("Pieces overflow");
-        total_len = total_len.checked_add(len).expect("Length overflow");
-        if total_len >= big_data.len() {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(20)).await;
-    }
-    assert!(total_pieces > 1);
-    assert_eq!(total_len, big_data.len());
-    assert_eq!(&target[..total_len], &big_data[..]);
-
-    Ok(())
-}
-
-fn get_server(cert: String, key: String) -> Result<Server> {
-    let server = Server::builder()
-        .with_tls((&cert[..], &key[..]))?
-        .with_io("127.0.0.1:0")?
-        .with_congestion_controller(Bbr::default())?
-        .start()?;
-    Ok(server)
-}
-
-fn spawn_channel_listener(
-    server: Server,
-    sender: mpsc::Sender<AqcChannelType>,
-) -> Result<SocketAddr> {
-    let server_addr = server.local_addr()?;
-    tokio::spawn(run_channels(server, sender));
-    Ok(server_addr)
-}
-
-fn make_client() -> Arc<TMutex<ClientState<TestEngine, MemStorageProvider>>> {
-    let engine = TestEngine::new();
-    let storage = MemStorageProvider::new();
-
-    Arc::new(TMutex::new(ClientState::new(engine, storage)))
-}
 
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans() -> Result<()> {
@@ -349,18 +190,11 @@ async fn test_aqc_chans() -> Result<()> {
     sleep(sleep_interval).await;
 
     // membera creates aqc bidi channel with memberb
-    let (mut bidi_chan1, aqc_bidi_ctrl) = team
+    let mut bidi_chan1 = team
         .membera
         .client
         .aqc()
         .create_bidi_channel(team_id, team.memberb.aqc_addr.clone(), label1)
-        .await?;
-    // memberb received aqc bidi channel ctrl message
-    // TODO: receiving AQC ctrl messages will happen via the network.
-    team.memberb
-        .client
-        .aqc()
-        .receive_aqc_ctrl(team_id, aqc_bidi_ctrl)
         .await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -460,6 +294,53 @@ async fn test_aqc_chans() -> Result<()> {
 
     bidi_chan1.close()?;
     bidi_chan2.close()?;
+
+    // membera creates aqc uni channel with memberb
+    let mut uni_chan1 = team
+        .membera
+        .client
+        .aqc()
+        .create_uni_channel(team_id, team.memberb.aqc_addr.clone(), label1)
+        .await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let channel_type = team
+        .memberb
+        .client
+        .aqc()
+        .receive_channel()
+        .await
+        .assume("channel must exist")?;
+    let mut uni_chan2 = match channel_type {
+        AqcChannelType::Receiver { receiver } => receiver,
+        _ => {
+            buggy::bug!("Expected a unidirectional channel")
+        }
+    };
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    let mut send1_1 = uni_chan1.create_unidirectional_stream().await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    // Test sending streams
+
+    // Send from 1 to 2 with a unidirectional stream
+    let msg1 = Bytes::from("hello");
+    send1_1.send(&msg1).await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let mut recv2_1 = uni_chan2
+        .receive_unidirectional_stream()
+        .await
+        .assume("stream not received")?
+        .assume("stream not received")?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    let mut target = vec![0u8; 1024 * 1024 * 2];
+    let len = recv2_1
+        .receive(target.as_mut_slice())
+        .await?
+        .assume("no data received")?;
+    assert_eq!(&target[..len], b"hello");
 
     Ok(())
 }
