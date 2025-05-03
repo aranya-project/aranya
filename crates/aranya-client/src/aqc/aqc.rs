@@ -31,7 +31,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, instrument};
 
 use crate::{
-    aqc_net::{AqcBidirectionalChannel, AqcChannelType, AqcClient, AqcSenderChannel},
+    aqc::net::{AqcBidirectionalChannel, AqcChannelType, AqcClient, AqcSenderChannel},
     error::{aranya_error, AqcError, IpcError},
     Client,
 };
