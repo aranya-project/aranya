@@ -24,6 +24,7 @@ use aranya_crypto::{
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
 use aranya_daemon_api::{DeviceId, LabelId, NetIdentifier, TeamId};
 use buggy::BugExt as _;
+use rustls::crypto::CryptoProvider;
 use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     provider::{
@@ -63,6 +64,7 @@ pub enum AqcChannel {
 }
 
 /// Sends and receives AQC messages.
+#[derive(Debug)]
 pub(crate) struct AqcChannelsImpl {
     pub(crate) client: AqcClient,
 }
@@ -71,7 +73,7 @@ impl AqcChannelsImpl {
     /// Creates a new `QuicChannelsImpl` listening for connections on `address`.
     pub(crate) async fn new(
         device_id: DeviceId,
-        aqc_address: NetIdentifier,
+        aqc_addr: &SocketAddr,
     ) -> Result<
         (
             Self,
@@ -131,8 +133,8 @@ impl AqcChannelsImpl {
         // Pass client_keys Arc to AqcClient::new
         let (client, sender) = AqcClient::new(tls_client_provider, client_keys)?;
 
-        let server_addr = aqc_address
-            .0
+        let server_addr = aqc_addr
+            .to_string()
             .parse::<SocketAddr>()
             .map_err(AqcError::AddrParse)?;
         // Use the rustls server provider
@@ -452,7 +454,6 @@ async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> anyhow::Result
 // INSECURE: Allows connecting to any server certificate.
 // Requires the `dangerous_configuration` feature on the `rustls` crate.
 // Use full paths for traits and types
-use s2n_quic::provider::tls::rustls::{self, crypto::CryptoProvider};
 
 #[derive(Debug)]
 struct SkipServerVerification(Arc<CryptoProvider>);

@@ -63,6 +63,8 @@ pub struct ClientBuilder<'a> {
     uds_path: Option<&'a Path>,
     // The daemon's public key.
     pk: Option<&'a [u8]>,
+    // AQC address.
+    aqc_addr: Option<&'a SocketAddr>,
 }
 
 impl ClientBuilder<'_> {
@@ -70,6 +72,7 @@ impl ClientBuilder<'_> {
         Self {
             uds_path: None,
             pk: None,
+            aqc_addr: None,
         }
     }
 
@@ -89,7 +92,14 @@ impl ClientBuilder<'_> {
             ))
             .into());
         };
-        Client::connect(sock, pk).await
+        let Some(aqc_addr) = &self.aqc_addr else {
+            return Err(IpcError::new(InvalidArg::new(
+                "with_daemon_aqc_addr",
+                "must specify the AQC server address",
+            ))
+            .into());
+        };
+        Client::connect(sock, pk, aqc_addr).await
     }
 }
 
@@ -132,7 +142,7 @@ impl Client {
 
     /// Creates a client connection to the daemon.
     #[instrument(skip_all, fields(?path))]
-    async fn connect(path: &Path, pk: &[u8]) -> Result<Self> {
+    async fn connect(path: &Path, pk: &[u8], aqc_addr: &SocketAddr) -> Result<Self> {
         info!("starting Aranya client");
 
         let daemon = {
@@ -173,15 +183,14 @@ impl Client {
 
         let device_id = daemon
             .get_device_id(context::current())
-            .await?
-            .context("unable to get device ID")
-            .map_err(IpcError::new)?;
+            .await
+            .map_err(IpcError::new)?
+            .context("unable to retrieve device id")
+            .map_err(error::other)?;
         debug!(?device_id);
-        // TODO: get aqc_address as param.
-        let (aqc, server, sender, identity_rx) =
-            AqcChannelsImpl::new(device_id, aqc_address).await?;
+        let (aqc, server, sender, identity_rx) = AqcChannelsImpl::new(device_id, aqc_addr).await?;
         let daemon = Arc::new(daemon);
-        tokio::spawn(run_channels(server, sender, identity_rx, daemon));
+        tokio::spawn(run_channels(server, sender, identity_rx, daemon.clone()));
         let client = Self { daemon, aqc };
 
         Ok(client)

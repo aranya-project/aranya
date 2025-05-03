@@ -4,7 +4,7 @@
 
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{AqcCtrl, DaemonApiClient, LabelId, TeamId};
 use aranya_fast_channels::NodeId;
@@ -21,7 +21,10 @@ use tarpc::context;
 use tokio::sync::mpsc;
 use tracing::{debug, error};
 
-use crate::aqc::{AqcChannel, ClientPresharedKeys, PSK_BYTES_CTRL, PSK_IDENTITY_CTRL};
+use crate::{
+    aqc::{AqcChannel, ClientPresharedKeys, PSK_BYTES_CTRL, PSK_IDENTITY_CTRL},
+    error::{self, IpcError},
+};
 
 /// The maximum number of channels that haven't been received.
 const MAXIMUM_UNRECEIVED_CHANNELS: usize = 20;
@@ -43,12 +46,15 @@ async fn receive_aqc_ctrl(
     channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
 ) -> crate::Result<()> {
     // TODO: use correct node ID
-    let node_id: NodeId = 0.into();
+    let _node_id: NodeId = 0.into();
 
     // TODO: return error properly.
     let (_peer, psk) = daemon
         .receive_aqc_ctrl(context::current(), team, ctrl)
-        .await??;
+        .await
+        .map_err(IpcError::new)?
+        .context("unable to retrieve daemon version")
+        .map_err(error::other)?;
 
     channel_map.insert(
         psk.identity().as_bytes().to_vec(),
