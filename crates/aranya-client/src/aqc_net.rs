@@ -48,7 +48,6 @@ async fn receive_aqc_ctrl(
     // TODO: use correct node ID
     let _node_id: NodeId = 0.into();
 
-    // TODO: return error properly.
     let (_peer, psk) = daemon
         .receive_aqc_ctrl(context::current(), team, ctrl)
         .await
@@ -615,7 +614,6 @@ impl AqcClient {
         ctrl: AqcCtrl,
         team_id: TeamId,
     ) -> Result<()> {
-        // TODO: get PSK const from somewhere.
         let psk = PresharedKey::external(PSK_IDENTITY_CTRL, PSK_BYTES_CTRL)
             .assume("unable to create psk")?;
         self.client_keys.set_key(psk);
