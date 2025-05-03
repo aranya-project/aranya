@@ -21,7 +21,7 @@ use tarpc::context;
 use tokio::sync::mpsc;
 use tracing::{debug, error};
 
-use crate::aqc::{AqcChannel, ClientPresharedKeys, PSK_IDENTITY_CTRL};
+use crate::aqc::{AqcChannel, ClientPresharedKeys, PSK_BYTES_CTRL, PSK_IDENTITY_CTRL};
 
 /// The maximum number of channels that haven't been received.
 const MAXIMUM_UNRECEIVED_CHANNELS: usize = 20;
@@ -46,16 +46,15 @@ async fn receive_aqc_ctrl(
     let node_id: NodeId = 0.into();
 
     // TODO: return error properly.
-    let (_peer, aqc_info) = daemon
+    let (_peer, psk) = daemon
         .receive_aqc_ctrl(context::current(), team, ctrl)
         .await??;
 
-    // TODO: get PSK from daemon.
-    // TODO: get channel ID from daemon.
-    // TODO: store uni channel PSK.
     channel_map.insert(
         psk.identity().as_bytes().to_vec(),
-        AqcChannel::Bidirectional { id: channel_id },
+        AqcChannel::Bidirectional {
+            id: psk.identity().into(),
+        },
     );
 
     Ok(())

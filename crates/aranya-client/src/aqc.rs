@@ -17,10 +17,8 @@ use ::rustls::{
 use anyhow::Context;
 use aranya_crypto::{
     aqc::{BidiChannelId, UniChannelId},
-    default::DefaultEngine,
     import::Import,
     keys::SecretKey,
-    keystore::fs_keystore::Store,
     Rng as CryptoRng,
 };
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
@@ -43,12 +41,6 @@ use crate::{
     error::{aranya_error, AqcError, IpcError},
     Client,
 };
-
-// TODO: use same generics as daemon.
-/// CE = Crypto Engine
-pub(crate) type CE = DefaultEngine;
-/// KS = Key Store
-pub(crate) type KS = Store;
 
 /// TODO: remove this.
 /// NOTE: this certificate is to be used for demonstration purposes only!
@@ -302,7 +294,7 @@ impl<'a> AqcChannels<'a> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
 
-        let peer_addr = tokio::net::lookup_host(peer.as_ref())
+        let peer_addr = tokio::net::lookup_host(peer.0)
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
@@ -355,7 +347,7 @@ impl<'a> AqcChannels<'a> {
             .map_err(aranya_error)?;
         debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.as_ref())
+        let peer_addr = tokio::net::lookup_host(peer.0)
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
@@ -389,7 +381,7 @@ impl<'a> AqcChannels<'a> {
     /// Deletes an AQC bidi channel.
     /// It is an error if the channel does not exist
     #[instrument(skip_all, fields(%chan))]
-    pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannelId) -> Result<()> {
+    pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannelId) -> crate::Result<()> {
         let _ctrl = self
             .client
             .daemon
@@ -397,14 +389,14 @@ impl<'a> AqcChannels<'a> {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        // TODO(geoff): implement this
+
         todo!()
     }
 
     /// Deletes an AQC uni channel.
     /// It is an error if the channel does not exist
     #[instrument(skip_all, fields(%chan))]
-    pub async fn delete_uni_channel(&mut self, chan: AqcUniChannelId) -> Result<()> {
+    pub async fn delete_uni_channel(&mut self, chan: AqcUniChannelId) -> crate::Result<()> {
         let _ctrl = self
             .client
             .daemon
@@ -412,7 +404,9 @@ impl<'a> AqcChannels<'a> {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        // TODO(geoff): implement this
+
+        // TODO: delete PSK from rustls keystore.
+
         todo!()
     }
 
