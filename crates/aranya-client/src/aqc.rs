@@ -2,9 +2,7 @@
 
 use std::{
     collections::HashMap,
-    io,
     net::SocketAddr,
-    path::Path,
     sync::{Arc, Mutex},
 };
 
@@ -15,12 +13,7 @@ use ::rustls::{
     ClientConfig, ServerConfig,
 };
 use anyhow::Context;
-use aranya_crypto::{
-    aqc::{BidiChannelId, UniChannelId},
-    import::Import,
-    keys::SecretKey,
-    Rng as CryptoRng,
-};
+use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
 use aranya_daemon_api::{DeviceId, LabelId, NetIdentifier, TeamId};
 use buggy::BugExt as _;
@@ -34,8 +27,8 @@ use s2n_quic::{
     Server,
 };
 use tarpc::context;
-use tokio::{fs, sync::mpsc};
-use tracing::{debug, error, instrument, Instrument as _};
+use tokio::sync::mpsc;
+use tracing::{debug, error, instrument};
 
 use crate::{
     aqc_net::{AqcBidirectionalChannel, AqcChannelType, AqcClient, AqcSenderChannel},
@@ -416,38 +409,6 @@ impl<'a> AqcChannels<'a> {
     pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
         self.client.aqc.receive_channel().await
     }
-}
-
-// TODO: this was borrowed from daemon.rs. Move to util crate for reuse.
-/// Loads a key from a file or generates and writes a new one.
-async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> anyhow::Result<K> {
-    pub async fn load_or_gen_key_inner<K: SecretKey>(path: &Path) -> anyhow::Result<K> {
-        match fs::read(&path).await {
-            Ok(buf) => {
-                tracing::info!("loading key");
-                let key =
-                    Import::import(buf.as_slice()).context("unable to import key from file")?;
-                Ok(key)
-            }
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                tracing::info!("generating key");
-                let key = K::new(&mut CryptoRng);
-                let bytes = key
-                    .try_export_secret()
-                    .context("unable to export new key")?;
-                aranya_util::write_file(&path, bytes.as_bytes())
-                    .await
-                    .context("unable to write key")?;
-                Ok(key)
-            }
-            Err(err) => Err(err).context("unable to read key"),
-        }
-    }
-    let path = path.as_ref();
-    load_or_gen_key_inner(path)
-        .instrument(tracing::info_span!("load_or_gen_key", ?path))
-        .await
-        .with_context(|| format!("load_or_gen_key({path:?})"))
 }
 
 // --- Start SkipServerVerification ---
