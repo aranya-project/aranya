@@ -80,7 +80,7 @@
 /**
  * The size in bytes of an ID
  */
-#define ARANYA_ID_LEN 64
+#define ARANYA_ID_LEN 32
 
 #define ARANYA_DURATION_SECONDS (1000 * ARANYA_DURATION_MILLISECONDS)
 

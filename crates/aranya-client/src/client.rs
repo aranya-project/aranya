@@ -121,7 +121,7 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<(TeamId, Vec<u8>)> {
+    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<(TeamId, Box<[u8]>)> {
         self.daemon
             .create_team(context::current(), cfg.into())
             .await?

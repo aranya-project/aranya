@@ -16,7 +16,7 @@ use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_daemon_api::{self as api, DaemonApi};
 use aranya_fast_channels::NodeId;
 use aranya_keygen::PublicKeys;
-use aranya_runtime::{GraphId, StorageProvider};
+use aranya_runtime::{init::InitCmd, GraphId, StorageProvider};
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::BugExt;
@@ -340,7 +340,7 @@ impl DaemonApi for DaemonApiHandler {
         self,
         _: context::Context,
         cfg: api::TeamConfig,
-    ) -> api::Result<(api::TeamId, Vec<u8>)> {
+    ) -> api::Result<(api::TeamId, InitCmd)> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);

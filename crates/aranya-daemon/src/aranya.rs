@@ -10,8 +10,7 @@ use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
 use aranya_runtime::{
-    vm_action, ClientError, ClientState, Engine, GraphId, PeerCache, Policy, Session, Sink,
-    StorageProvider, SyncRequester, SyncResponder, SyncType, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
+    init::InitCmd, vm_action, ClientError, ClientState, Engine, GraphId, PeerCache, Policy, Session, Sink, StorageProvider, SyncRequester, SyncResponder, SyncType, VmPolicy, MAX_SYNC_MESSAGE_SIZE
 };
 use aranya_util::Addr;
 use buggy::bug;
@@ -145,7 +144,7 @@ where
         &self,
         owner_keys: KeyBundle,
         nonce: Option<&[u8]>,
-    ) -> Result<(GraphId, Vec<u8>, Vec<Effect>)> {
+    ) -> Result<(GraphId, InitCmd, Vec<Effect>)> {
         let mut sink = VecSink::new();
         let (id, init_command) = self
             .aranya

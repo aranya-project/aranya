@@ -181,7 +181,7 @@ pub fn init_logging() -> Result<(), imp::Error> {
 pub type Client = Safe<imp::Client>;
 
 /// The size in bytes of an ID
-pub const ARANYA_ID_LEN: usize = 64;
+pub const ARANYA_ID_LEN: usize = 32;
 
 const _: () = {
     assert!(ARANYA_ID_LEN == size_of::<aranya_crypto::Id>());
@@ -640,7 +640,8 @@ pub fn create_team(
 
     *init_cmd_len = init_cmd.len();
     let out = aranya_capi_core::try_as_mut_slice!(init_cmd_out, *init_cmd_len);
-    for (src, dst) in init_cmd.into_iter().zip(out) {
+    let iter = <Box<[u8]> as IntoIterator>::into_iter(init_cmd);
+    for (src, dst) in iter.zip(out) {
         dst.write(src);
     }
 
