@@ -70,7 +70,7 @@ pub struct ClientBuilder<'a> {
 }
 
 impl ClientBuilder<'_> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             uds_path: None,
             pk: None,
@@ -117,6 +117,12 @@ impl<'a> ClientBuilder<'a> {
     /// Specifies the daemon's public API key.
     pub fn with_daemon_api_pk(mut self, pk: &'a [u8]) -> Self {
         self.pk = Some(pk);
+        self
+    }
+
+    /// Specifies the AQC server address.
+    pub fn with_daemon_aqc_addr(mut self, addr: &'a SocketAddr) -> Self {
+        self.aqc_addr = Some(addr);
         self
     }
 }
