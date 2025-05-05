@@ -1,5 +1,5 @@
 use aranya_capi_core::safe::{TypeId, Typed};
-use aranya_client::aqc_net::{self as aqc};
+use aranya_client::aqc::net::{self as aqc};
 
 // TODO(nikki): refactor this to add accessors and remove pub(crate) on inners.
 

@@ -3,10 +3,11 @@ use core::{
     ops::{Deref, DerefMut},
     ptr,
 };
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
-use std::str::FromStr;
+use std::{ffi::OsStr, os::unix::ffi::OsStrExt, str::FromStr};
+
 use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
+use aranya_client::aqc::net::{self as aqc};
 use aranya_crypto::hex;
 use tracing::error;
 
@@ -208,7 +209,9 @@ pub unsafe fn client_init(
 
     // TODO: configure AQC server address.
     // SAFETY: Caller must ensure pointer is a valid C String.
-    let aqc_str = unsafe { CStr::from_ptr(config.aqc_addr()) }.to_str().context("unable to convert to string")?;
+    let aqc_str = unsafe { CStr::from_ptr(config.aqc_addr()) }
+        .to_str()
+        .context("unable to convert to string")?;
 
     let aqc_addr = aranya_util::Addr::from_str(aqc_str)?;
     let inner = rt.block_on({
@@ -1452,7 +1455,7 @@ pub fn aqc_delete_bidi_channel(
 ///
 /// Returns `ARANYA_ERROR_AQC_SERVER_CLOSED` if trying to call this when the
 /// server connection has been closed.
-/// 
+///
 /// @param client the Aranya Client [`Client`].
 /// @param channel the AQC channel holder [`AqcChannel`] that holds a channel object.
 pub fn aqc_receive_channel(
@@ -1508,10 +1511,11 @@ pub fn aqc_get_channel_type(channel: &mut AqcChannel) -> AqcChannelType {
 /// @param channel the AQC channel holder [`AqcChannel`] that holds a channel object.
 /// @param bidi the AQC channel object [`AqcBidiChannel`] that holds channel info.
 pub fn aqc_get_bidirectional_channel(
-    channel: AqcChannel,
+    channel: OwnedPtr<AqcChannel>,
     bidi: &mut MaybeUninit<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
-    match channel.into_inner().inner {
+    let inner = unsafe { channel.read() }.into_inner().inner;
+    match inner {
         aqc::AqcChannelType::Bidirectional { channel } => {
             Safe::init(bidi, imp::AqcBidiChannel::new(channel));
         }
@@ -1534,10 +1538,11 @@ pub fn aqc_get_bidirectional_channel(
 /// @param channel the AQC channel holder [`AqcChannel`] that holds a channel object.
 /// @param sender the AQC channel object [`AqcSenderChannel`] that holds channel info.
 pub fn aqc_get_sender_channel(
-    channel: AqcChannel,
+    channel: OwnedPtr<AqcChannel>,
     sender: &mut MaybeUninit<AqcSenderChannel>,
 ) -> Result<(), imp::Error> {
-    match channel.into_inner().inner {
+    let inner = unsafe { channel.read() }.into_inner().inner;
+    match inner {
         aqc::AqcChannelType::Sender { sender: send } => {
             Safe::init(sender, imp::AqcSenderChannel::new(send));
         }
@@ -1560,10 +1565,11 @@ pub fn aqc_get_sender_channel(
 /// @param channel the AQC channel holder [`AqcChannel`] that holds a channel object.
 /// @param receiver the AQC channel object [`AqcReceiverChannel`] that holds channel info.
 pub fn aqc_get_receiver_channel(
-    channel: AqcChannel,
+    channel: OwnedPtr<AqcChannel>,
     receiver: &mut MaybeUninit<AqcReceiverChannel>,
 ) -> Result<(), imp::Error> {
-    match channel.into_inner().inner {
+    let inner = unsafe { channel.read() }.into_inner().inner;
+    match inner {
         aqc::AqcChannelType::Receiver { receiver: recv } => {
             Safe::init(receiver, imp::AqcReceiverChannel::new(recv));
         }
@@ -1580,7 +1586,7 @@ pub fn aqc_get_receiver_channel(
 }
 
 /// Create a bidirectional stream from an [`AqcBidiChannel`].
-/// 
+///
 /// @param client the Aranya Client [`Client`].
 /// @param channel the AQC channel object [`AqcBidiChannel`] that holds channel info.
 /// @param send_stream the sending side of a stream [`AqcSendStream`].
@@ -1603,7 +1609,7 @@ pub fn aqc_bidi_create_bidi_stream(
 }
 
 /// Create a unidirectional stream from an [`AqcBidiChannel`].
-/// 
+///
 /// @param client the Aranya Client [`Client`].
 /// @param channel the AQC channel object [`AqcBidiChannel`] that holds channel info.
 /// @param send_stream the sending side of a stream [`AqcSendStream`].
@@ -1624,9 +1630,9 @@ pub fn aqc_bidi_create_uni_stream(
 
 /// Receives the receiving end of a stream and potentially the sending end of
 /// another stream.
-/// 
+///
 /// Note that the send stream will only be initialized if this returns true.
-/// 
+///
 /// @param client the Aranya Client [`Client`].
 /// @param channel the AQC channel object [`AqcBidiChannel`] that holds channel info.
 /// @param send_stream the sending side of a stream [`AqcSendStream`].
@@ -1655,7 +1661,7 @@ pub fn aqc_bidi_receive_stream(
 }
 
 /// Create a unidirectional stream from an [`AqcSenderChannel`].
-/// 
+///
 /// @param client the Aranya Client [`Client`].
 /// @param channel the AQC channel object [`AqcSenderChannel`] that holds channel info.
 /// @param send_stream the sending side of a stream [`AqcSendStream`].
@@ -1675,7 +1681,7 @@ pub fn aqc_send_create_uni_stream(
 }
 
 /// Receives the stream from an [`AqcReceiverChannel`].
-/// 
+///
 /// @param client the Aranya Client [`Client`].
 /// @param channel the AQC channel object [`AqcReceiverChannel`] that holds channel info.
 /// @param recv_stream the receiving side of a stream [`AqcReceiveStream`].

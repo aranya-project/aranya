@@ -2243,7 +2243,7 @@ AranyaError aranya_aqc_get_channel_type_ext(struct AranyaAqcChannel *channel,
  * @param channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel) that holds a channel object.
  * @param bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
  */
-AranyaError aranya_aqc_get_bidirectional_channel(struct AranyaAqcChannel channel,
+AranyaError aranya_aqc_get_bidirectional_channel(struct AranyaAqcChannel *channel,
                                                  struct AranyaAqcBidiChannel *bidi);
 
 /**
@@ -2254,7 +2254,7 @@ AranyaError aranya_aqc_get_bidirectional_channel(struct AranyaAqcChannel channel
  * @param channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel) that holds a channel object.
  * @param bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
  */
-AranyaError aranya_aqc_get_bidirectional_channel_ext(struct AranyaAqcChannel channel,
+AranyaError aranya_aqc_get_bidirectional_channel_ext(struct AranyaAqcChannel *channel,
                                                      struct AranyaAqcBidiChannel *bidi,
                                                      struct AranyaExtError *__ext_err);
 
@@ -2266,7 +2266,7 @@ AranyaError aranya_aqc_get_bidirectional_channel_ext(struct AranyaAqcChannel cha
  * @param channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel) that holds a channel object.
  * @param sender the AQC channel object [`AranyaAqcSenderChannel`](@ref AranyaAqcSenderChannel) that holds channel info.
  */
-AranyaError aranya_aqc_get_sender_channel(struct AranyaAqcChannel channel,
+AranyaError aranya_aqc_get_sender_channel(struct AranyaAqcChannel *channel,
                                           struct AranyaAqcSenderChannel *sender);
 
 /**
@@ -2277,7 +2277,7 @@ AranyaError aranya_aqc_get_sender_channel(struct AranyaAqcChannel channel,
  * @param channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel) that holds a channel object.
  * @param sender the AQC channel object [`AranyaAqcSenderChannel`](@ref AranyaAqcSenderChannel) that holds channel info.
  */
-AranyaError aranya_aqc_get_sender_channel_ext(struct AranyaAqcChannel channel,
+AranyaError aranya_aqc_get_sender_channel_ext(struct AranyaAqcChannel *channel,
                                               struct AranyaAqcSenderChannel *sender,
                                               struct AranyaExtError *__ext_err);
 
@@ -2289,7 +2289,7 @@ AranyaError aranya_aqc_get_sender_channel_ext(struct AranyaAqcChannel channel,
  * @param channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel) that holds a channel object.
  * @param receiver the AQC channel object [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel) that holds channel info.
  */
-AranyaError aranya_aqc_get_receiver_channel(struct AranyaAqcChannel channel,
+AranyaError aranya_aqc_get_receiver_channel(struct AranyaAqcChannel *channel,
                                             struct AranyaAqcReceiverChannel *receiver);
 
 /**
@@ -2300,7 +2300,7 @@ AranyaError aranya_aqc_get_receiver_channel(struct AranyaAqcChannel channel,
  * @param channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel) that holds a channel object.
  * @param receiver the AQC channel object [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel) that holds channel info.
  */
-AranyaError aranya_aqc_get_receiver_channel_ext(struct AranyaAqcChannel channel,
+AranyaError aranya_aqc_get_receiver_channel_ext(struct AranyaAqcChannel *channel,
                                                 struct AranyaAqcReceiverChannel *receiver,
                                                 struct AranyaExtError *__ext_err);
 
