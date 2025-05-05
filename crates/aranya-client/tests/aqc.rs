@@ -221,7 +221,6 @@ async fn test_aqc_chans() -> Result<()> {
     let msg1 = Bytes::from("hello");
     send1_1.send(&msg1).await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
-
     // Receive a unidirectional stream from peer 1
     let (maybe_send2_1, mut recv2_1) = bidi_chan2
         .receive_stream()
@@ -255,7 +254,6 @@ async fn test_aqc_chans() -> Result<()> {
         .await?
         .assume("no data received")?;
     assert_eq!(&target[..len], b"hello2");
-
     // Send from 2 to 1 with a bidirectional stream
     let msg3 = Bytes::from("hello3");
     send2_2.send(&msg3).await?;
@@ -294,7 +292,6 @@ async fn test_aqc_chans() -> Result<()> {
 
     bidi_chan1.close()?;
     bidi_chan2.close()?;
-
     // membera creates aqc uni channel with memberb
     let mut uni_chan1 = team
         .membera
@@ -303,7 +300,6 @@ async fn test_aqc_chans() -> Result<()> {
         .create_uni_channel(team_id, team.memberb.aqc_addr.clone(), label1)
         .await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
-
     let channel_type = team
         .memberb
         .client
@@ -320,7 +316,6 @@ async fn test_aqc_chans() -> Result<()> {
     tokio::time::sleep(Duration::from_millis(100)).await;
     let mut send1_1 = uni_chan1.create_unidirectional_stream().await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
-
     // Test sending streams
 
     // Send from 1 to 2 with a unidirectional stream
@@ -341,6 +336,5 @@ async fn test_aqc_chans() -> Result<()> {
         .await?
         .assume("no data received")?;
     assert_eq!(&target[..len], b"hello");
-
     Ok(())
 }

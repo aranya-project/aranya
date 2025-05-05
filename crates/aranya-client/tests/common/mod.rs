@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::{
     fmt,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     path::PathBuf,
     time::Duration,
 };
@@ -225,7 +225,7 @@ pub struct DeviceCtx {
 
 impl DeviceCtx {
     async fn new(_team_name: &str, _name: &str, work_dir: PathBuf, port: u16) -> Result<Self> {
-        let aqc_addr = Addr::new("localhost", port).expect("unable to init AQC address");
+        let aqc_addr = Addr::new("127.0.0.1", port).expect("unable to init AQC address");
         fs::create_dir_all(work_dir.clone()).await?;
 
         // Setup daemon config.

@@ -6,7 +6,7 @@ use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
-use aranya_daemon_api::{AqcCtrl, DaemonApiClient, LabelId, TeamId};
+use aranya_daemon_api::{AqcCtrl, AqcPsk, DaemonApiClient, LabelId, TeamId};
 use aranya_fast_channels::NodeId;
 use buggy::BugExt;
 use bytes::Bytes;
@@ -52,15 +52,27 @@ async fn receive_aqc_ctrl(
         .receive_aqc_ctrl(context::current(), team, ctrl)
         .await
         .map_err(IpcError::new)?
-        .context("unable to retrieve daemon version")
+        .context("unable to receive aqc ctrl")
         .map_err(error::other)?;
 
-    channel_map.insert(
-        psk.identity().as_bytes().to_vec(),
-        AqcChannel::Bidirectional {
-            id: psk.identity().into(),
-        },
-    );
+    match psk {
+        AqcPsk::Bidi(b) => {
+            channel_map.insert(
+                b.identity.as_bytes().to_vec(),
+                AqcChannel::Bidirectional {
+                    id: b.identity.into(),
+                },
+            );
+        }
+        AqcPsk::Uni(u) => {
+            channel_map.insert(
+                u.identity.as_bytes().to_vec(),
+                AqcChannel::Unidirectional {
+                    id: u.identity.into(),
+                },
+            );
+        }
+    }
 
     Ok(())
 }
