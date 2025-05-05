@@ -214,7 +214,7 @@ pub unsafe fn client_init(
         .context("unable to convert to string")?;
 
     let aqc_addr = aranya_util::Addr::from_str(aqc_str)?;
-    let inner = rt.block_on({
+    let (inner, _aqc_addr) = rt.block_on({
         aranya_client::Client::builder()
             .with_daemon_uds_path(daemon_socket)
             .with_daemon_api_pk(config.daemon_api_pk())

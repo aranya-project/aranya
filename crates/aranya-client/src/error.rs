@@ -3,6 +3,8 @@ use std::io;
 use aranya_daemon_api as api;
 use tarpc::client::RpcError;
 
+use crate::aqc::api::AqcVersion;
+
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 /// Possible errors that could happen in the Aranya client.
@@ -224,14 +226,11 @@ pub enum AqcError {
     Serde(postcard::Error),
 
     /// AQC version mismatch.
-    // TODO: add this error back, not compiling
-    /*
     #[error("AQC version mismatch: got {actual:?}, expected {expected:?}")]
     VersionMismatch {
         expected: AqcVersion,
         actual: AqcVersion,
     },
-    */
 
     /// An internal bug was discovered.
     #[error("internal bug: {0}")]

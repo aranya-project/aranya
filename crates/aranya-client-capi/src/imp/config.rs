@@ -22,10 +22,6 @@ impl ClientConfig {
         self.daemon_addr
     }
 
-    pub(crate) fn aqc(&self) -> &AqcConfig {
-        &self.aqc
-    }
-
     pub(crate) fn daemon_api_pk(&self) -> &[u8] {
         &self.pk
     }

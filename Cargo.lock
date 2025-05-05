@@ -195,7 +195,6 @@ dependencies = [
  "aranya-daemon",
  "aranya-daemon-api",
  "aranya-fast-channels",
- "aranya-runtime",
  "aranya-util",
  "backon",
  "buggy",
@@ -213,7 +212,6 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tracing",
- "webpki-roots",
 ]
 
 [[package]]
@@ -1034,9 +1032,9 @@ dependencies = [
 
 [[package]]
 name = "deranged"
-version = "0.4.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28cfac68e08048ae1883171632c2aef3ebc555621ae56fbccce1cbf22dd7f058"
+checksum = "9c9e6a11ca8224451684bc0d7d5a7adbf8f2fd6887261a1cfc3c0432f9d4068e"
 dependencies = [
  "powerfmt",
 ]
@@ -3374,15 +3372,6 @@ checksum = "5a6580f308b1fad9207618087a65c04e7a10bc77e02c8e84e9b00dd4b12fa0bb"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "webpki-roots"
-version = "0.26.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37493cadf42a2a939ed404698ded7fb378bf301b5011f973361779a3a74f8c93"
-dependencies = [
- "rustls-pki-types",
 ]
 
 [[package]]

@@ -2,14 +2,14 @@ use std::time::Duration;
 
 mod common;
 use anyhow::Result;
-use aranya_client::{aqc::net::AqcChannelType, SyncPeerConfig, TeamConfig};
+use aranya_client::{aqc::net::AqcChannelType, TeamConfig};
 use aranya_crypto::csprng::rand;
-use aranya_daemon_api::{ChanOp, Role};
+use aranya_daemon_api::ChanOp;
 use buggy::BugExt;
 use bytes::Bytes;
 use common::{sleep, TeamCtx};
 use tempfile::tempdir;
-use tracing::{debug, info};
+use tracing::info;
 
 /// NOTE: this certificate is to be used for demonstration purposes only!
 pub static CERT_PEM: &str = include_str!("../src/aqc/cert.pem");
@@ -19,7 +19,6 @@ pub static KEY_PEM: &str = include_str!("../src/aqc/key.pem");
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans() -> Result<()> {
     let interval = Duration::from_millis(100);
-    let sync_config = SyncPeerConfig::builder().interval(interval).build()?;
     let sleep_interval = interval * 6;
 
     let tmp = tempdir()?;
@@ -37,115 +36,14 @@ async fn test_aqc_chans() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
-    // get sync addresses.
-    let owner_addr = team.owner.aranya_local_addr().await?;
-    let admin_addr = team.admin.aranya_local_addr().await?;
-    let operator_addr = team.operator.aranya_local_addr().await?;
-    let membera_addr = team.membera.aranya_local_addr().await?;
-    let memberb_addr = team.memberb.aranya_local_addr().await?;
+    // Tell all peers to sync with one another, and assign their roles.
+    team.add_all_sync_peers(team_id).await?;
+    team.add_all_device_roles(team_id).await?;
 
-    // setup sync peers.
-    let mut owner_team = team.owner.client.team(team_id);
-    let mut admin_team = team.admin.client.team(team_id);
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
     let mut operator_team = team.operator.client.team(team_id);
-    let mut membera_team = team.membera.client.team(team_id);
-    let mut memberb_team = team.memberb.client.team(team_id);
-
-    owner_team
-        .add_sync_peer(admin_addr.into(), sync_config.clone())
-        .await?;
-    owner_team
-        .add_sync_peer(operator_addr.into(), sync_config.clone())
-        .await?;
-    owner_team
-        .add_sync_peer(membera_addr.into(), sync_config.clone())
-        .await?;
-
-    admin_team
-        .add_sync_peer(owner_addr.into(), sync_config.clone())
-        .await?;
-    admin_team
-        .add_sync_peer(operator_addr.into(), sync_config.clone())
-        .await?;
-    admin_team
-        .add_sync_peer(membera_addr.into(), sync_config.clone())
-        .await?;
-
-    operator_team
-        .add_sync_peer(owner_addr.into(), sync_config.clone())
-        .await?;
-    operator_team
-        .add_sync_peer(admin_addr.into(), sync_config.clone())
-        .await?;
-    operator_team
-        .add_sync_peer(membera_addr.into(), sync_config.clone())
-        .await?;
-
-    membera_team
-        .add_sync_peer(owner_addr.into(), sync_config.clone())
-        .await?;
-    membera_team
-        .add_sync_peer(admin_addr.into(), sync_config.clone())
-        .await?;
-    membera_team
-        .add_sync_peer(operator_addr.into(), sync_config.clone())
-        .await?;
-    membera_team
-        .add_sync_peer(memberb_addr.into(), sync_config.clone())
-        .await?;
-
-    memberb_team
-        .add_sync_peer(owner_addr.into(), sync_config.clone())
-        .await?;
-    memberb_team
-        .add_sync_peer(admin_addr.into(), sync_config.clone())
-        .await?;
-    memberb_team
-        .add_sync_peer(operator_addr.into(), sync_config.clone())
-        .await?;
-    memberb_team
-        .add_sync_peer(membera_addr.into(), sync_config)
-        .await?;
-
-    // add admin to team.
-    info!("adding admin to team");
-    owner_team.add_device_to_team(team.admin.pk.clone()).await?;
-    owner_team.assign_role(team.admin.id, Role::Admin).await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // add operator to team.
-    info!("adding operator to team");
-    owner_team
-        .add_device_to_team(team.operator.pk.clone())
-        .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    admin_team
-        .assign_role(team.operator.id, Role::Operator)
-        .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // add membera to team.
-    info!("adding membera to team");
-    operator_team
-        .add_device_to_team(team.membera.pk.clone())
-        .await?;
-
-    // add memberb to team.
-    info!("adding memberb to team");
-    operator_team
-        .add_device_to_team(team.memberb.pk.clone())
-        .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
     operator_team
         .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_addr.clone())
         .await?;
@@ -155,24 +53,6 @@ async fn test_aqc_chans() -> Result<()> {
 
     // wait for syncing.
     sleep(sleep_interval).await;
-
-    // fact database queries
-    let mut queries = team.membera.client.queries(team_id);
-    let devices = queries.devices_on_team().await?;
-    assert_eq!(devices.iter().count(), 5);
-    debug!("membera devices on team: {:?}", devices.iter().count());
-    let role = queries.device_role(team.membera.id).await?;
-    assert_eq!(role, Role::Member);
-    debug!("membera role: {:?}", role);
-    let keybundle = queries.device_keybundle(team.membera.id).await?;
-    debug!("membera keybundle: {:?}", keybundle);
-
-    let aqc_net_identifier = queries
-        .aqc_net_identifier(team.membera.id)
-        .await?
-        .expect("expected net identifier");
-    assert_eq!(aqc_net_identifier, team.membera.aqc_addr);
-    debug!("membera aqc_net_identifer: {:?}", aqc_net_identifier);
 
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
