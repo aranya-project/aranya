@@ -79,7 +79,7 @@ impl ClientBuilder<'_> {
     }
 
     /// Connects to the daemon.
-    pub async fn connect(self) -> Result<Client> {
+    pub async fn connect(self) -> Result<(Client, SocketAddr)> {
         let Some(sock) = self.uds_path else {
             return Err(IpcError::new(InvalidArg::new(
                 "with_daemon_uds_path",
@@ -156,7 +156,7 @@ impl Client {
 
     /// Creates a client connection to the daemon.
     #[instrument(skip_all, fields(?path))]
-    async fn connect(path: &Path, pk: &[u8], aqc_addr: &Addr) -> Result<Self> {
+    async fn connect(path: &Path, pk: &[u8], aqc_addr: &Addr) -> Result<(Self, SocketAddr)> {
         info!("starting Aranya client");
 
         let daemon = {
@@ -211,10 +211,12 @@ impl Client {
             .expect("expected AQC server address");
         let (aqc, server, sender, identity_rx) = AqcChannelsImpl::new(device_id, &aqc_addr).await?;
         let daemon = Arc::new(daemon);
+        let aqc_server_addr = server.local_addr().context("unable to get address AQC server bound to")
+            .map_err(error::other)?;
         tokio::spawn(run_channels(server, sender, identity_rx, daemon.clone()));
         let client = Self { daemon, aqc };
 
-        Ok(client)
+        Ok((client, aqc_server_addr))
     }
 
     /// Returns the address that the Aranya sync server is bound to.

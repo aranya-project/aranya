@@ -213,6 +213,8 @@ dependencies = [
  "aranya-daemon-api",
  "aranya-util",
  "backon",
+ "buggy",
+ "bytes",
  "hex",
  "tempfile",
  "tokio",
