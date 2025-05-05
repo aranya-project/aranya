@@ -354,7 +354,6 @@ impl<'a> AqcChannels<'a> {
             .send_ctrl(peer_addr, aqc_ctrl, team_id)
             .await
             .map_err(AqcError::Other)?;
-
         let secret = match psk.secret {
             aranya_daemon_api::Directed::Send(s) => s,
             aranya_daemon_api::Directed::Recv(s) => s,
