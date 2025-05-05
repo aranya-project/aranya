@@ -105,6 +105,12 @@ impl ClientBuilder<'_> {
     }
 }
 
+impl Default for ClientBuilder<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> ClientBuilder<'a> {
     /// Specifies the UDS socket path the daemon is listening on.
     #[cfg(unix)]
@@ -196,8 +202,13 @@ impl Client {
             .context("unable to retrieve device id")
             .map_err(error::other)?;
         debug!(?device_id);
-        let aqc_addr = aqc_addr.lookup().await.context("unable to resolve AQC server address")
-            .map_err(error::other)?.next().expect("expected AQC server address");
+        let aqc_addr = aqc_addr
+            .lookup()
+            .await
+            .context("unable to resolve AQC server address")
+            .map_err(error::other)?
+            .next()
+            .expect("expected AQC server address");
         let (aqc, server, sender, identity_rx) = AqcChannelsImpl::new(device_id, &aqc_addr).await?;
         let daemon = Arc::new(daemon);
         tokio::spawn(run_channels(server, sender, identity_rx, daemon.clone()));

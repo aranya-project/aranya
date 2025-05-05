@@ -64,6 +64,7 @@ pub(crate) struct AqcChannelsImpl {
 
 impl AqcChannelsImpl {
     /// Creates a new `QuicChannelsImpl` listening for connections on `address`.
+    #[allow(deprecated)]
     pub(crate) async fn new(
         device_id: DeviceId,
         aqc_addr: &SocketAddr,
