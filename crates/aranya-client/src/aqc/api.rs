@@ -36,6 +36,13 @@ use crate::{
     Client,
 };
 
+/// AQC version.
+pub type AqcVersion = u16;
+
+/// Current AQC version.
+// TODO: return `VersionMismatch` error if peer version does not match this version.
+pub const AQC_VERSION: AqcVersion = 1;
+
 /// TODO: remove this.
 /// NOTE: this certificate is to be used for demonstration purposes only!
 pub static CERT_PEM: &str = include_str!("./cert.pem");
@@ -289,6 +296,7 @@ impl<'a> AqcChannels<'a> {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
+        debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
 
         let peer_addr = tokio::net::lookup_host(peer.0)
             .await
@@ -341,7 +349,7 @@ impl<'a> AqcChannels<'a> {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
+        debug!(%label_id, psk_ident = ?psk.identity, "created uni channel");
 
         let peer_addr = tokio::net::lookup_host(peer.0)
             .await

@@ -244,7 +244,7 @@ async fn handle_bidi_streams(
                 PeerStream::Bidirectional(stream) => {
                     let (recv, send) = stream.split();
                     if sender.send((Some(send), recv)).await.is_err() {
-                        error!("error sending bi stream");
+                        error!("error sending bidi stream");
                     }
                 }
                 PeerStream::Receive(recv) => {
