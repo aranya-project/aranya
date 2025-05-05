@@ -15,8 +15,8 @@ current_dir="$(pwd)"
 
 cargo build \
     --release \
-    --manifest-path "examples/rust/Cargo.toml" \
-    --locked
+    --manifest-path "examples/rust/Cargo.toml" #\
+    #--locked
 
 cargo build \
     --release \
