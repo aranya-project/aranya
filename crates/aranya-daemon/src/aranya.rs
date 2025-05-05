@@ -1,6 +1,7 @@
 //! Aranya.
 
-use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
+use core::{fmt, future::Future, marker::PhantomData, net::SocketAddr};
+use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{bail, Context, Result};
 use aranya_aqc_util::LabelId;
@@ -197,6 +198,12 @@ where
         let mut sink = VecSink::new();
         session.receive(&client, &mut sink, command)?;
         Ok(sink.collect()?)
+    }
+}
+
+impl<EN, SP, CE> fmt::Debug for Client<EN, SP, CE> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Client").finish_non_exhaustive()
     }
 }
 
