@@ -4,7 +4,7 @@ use core::{
     ptr,
 };
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
-
+use std::str::FromStr;
 use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use aranya_crypto::hex;
@@ -196,10 +196,16 @@ pub unsafe fn client_init(
 
     let rt = tokio::runtime::Runtime::new().context("unable to construct tokio runtime")?;
 
+    // TODO: configure AQC server address.
+    // SAFETY: Caller must ensure pointer is a valid C String.
+    let aqc_str = unsafe { CStr::from_ptr(config.aqc_addr()) }.to_str().context("unable to convert to string")?;
+
+    let aqc_addr = aranya_util::Addr::from_str(aqc_str)?;
     let inner = rt.block_on({
         aranya_client::Client::builder()
             .with_daemon_uds_path(daemon_socket)
             .with_daemon_api_pk(config.daemon_api_pk())
+            .with_daemon_aqc_addr(&aqc_addr)
             .connect()
     })?;
 
@@ -475,53 +481,6 @@ pub fn init_logging() -> Result<(), imp::Error> {
 /// written to `dst` will be exactly half the length of `src`.
 /// Therefore, `dst` must be at least half as long as `src`.
 ///
-/// @param cfg a pointer to the client config builder
-/// @param out a pointer to write the client config to
-pub fn client_config_builder_build(
-    cfg: &mut ClientConfigBuilder,
-    out: &mut MaybeUninit<ClientConfig>,
-) -> Result<(), imp::Error> {
-    Safe::init(out, cfg.build()?);
-    Ok(())
-}
-
-/// Sets the configuration for Aranya QUIC Channels.
-///
-/// @param cfg a pointer to the client config builder
-/// @param aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
-pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
-    cfg.aqc(**aqc_config);
-}
-
-/// Initializes a new client instance.
-///
-/// @param client the uninitialized Aranya Client [`Client`].
-/// @param config the client's configuration [`ClientConfig`].
-///
-/// @relates AranyaClient.
-pub unsafe fn client_init(
-    client: &mut MaybeUninit<Client>,
-    config: &ClientConfig,
-) -> Result<(), imp::Error> {
-    // TODO: Clean this up.
-    let daemon_socket = OsStr::from_bytes(
-        // SAFETY: Caller must ensure pointer is a valid C String.
-        unsafe { std::ffi::CStr::from_ptr(config.daemon_addr()) }.to_bytes(),
-    )
-    .as_ref();
-
-    let rt = tokio::runtime::Runtime::new().map_err(imp::Error::Runtime)?;
-
-    let inner = rt.block_on(aranya_client::Client::connect(
-        daemon_socket,
-        // SAFETY: Caller ensures config.aqc().addr is valid
-        unsafe { NetIdentifier(config.aqc().addr).as_underlying()? },
-    ))?;
-
-    Safe::init(client, imp::Client { rt, inner });
-    Ok(())
-}
-
 /// @param dst the output buffer
 /// @param src the input hexadecimal string
 pub fn decode_hex(dst: &mut [u8], src: &[u8]) -> Result<usize, imp::Error> {
@@ -1006,30 +965,6 @@ pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> 
 pub unsafe fn add_device_to_team(
     client: &mut Client,
     team: &TeamId,
-    peer: NetIdentifier,
-    label_id: &LabelId,
-) -> Result<AqcBidiChannelId, imp::Error> {
-    let client = client.deref_mut();
-    // SAFETY: Caller must ensure `peer` is a valid C String.
-    let peer = unsafe { peer.as_underlying() }?;
-    let (chan, _) = client.rt.block_on(client.inner.aqc().create_bidi_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
-    let aqc_id = chan.aqc_id();
-    Ok(AqcBidiChannelId::from(aqc_id))
-}
-
-/// Delete a bidirectional AQC channel.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param chan the AQC channel ID [`AqcBidiChannelId`] of the channel to delete.
-///
-/// @relates AranyaClient.
-pub fn aqc_delete_bidi_channel(
-    client: &mut Client,
-    chan: &AqcBidiChannelId,
     keybundle: &[u8],
 ) -> Result<(), imp::Error> {
     let client = client.deref_mut();
@@ -1441,7 +1376,7 @@ pub unsafe fn aqc_create_bidi_channel(
         peer,
         label_id.into(),
     ))?;
-    Ok(chan_id.into())
+    Ok(AqcBidiChannelId{ id: chan_id.aqc_id().into_id().into() })
 }
 
 /// Delete a bidirectional AQC channel.

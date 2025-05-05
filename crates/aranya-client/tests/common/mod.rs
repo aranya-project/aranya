@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use std::{
     fmt,
-    net::{IpAddr, SocketAddr},
+    net::SocketAddr,
     path::PathBuf,
     time::Duration,
 };
@@ -148,7 +148,7 @@ impl TeamCtx {
         let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
         let mut devices = self.devices();
         for i in 0..devices.len() {
-            let (device, peers) = devices[i..].split_first_mut().unwrap();
+            let (device, peers) = devices[i..].split_first_mut().expect("expected device");
             for peer in peers {
                 device
                     .client
@@ -225,7 +225,7 @@ pub struct DeviceCtx {
 
 impl DeviceCtx {
     async fn new(_team_name: &str, _name: &str, work_dir: PathBuf, port: u16) -> Result<Self> {
-        let aqc_addr = SocketAddr::new(IpAddr::from([127, 0, 0, 1]), port);
+        let aqc_addr = Addr::new("localhost", port).expect("unable to init AQC address");
         fs::create_dir_all(work_dir.clone()).await?;
 
         // Setup daemon config.

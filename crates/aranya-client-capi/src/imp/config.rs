@@ -29,6 +29,10 @@ impl ClientConfig {
     pub(crate) fn daemon_api_pk(&self) -> &[u8] {
         &self.pk
     }
+
+    pub(crate) fn aqc_addr(&self) -> *const c_char {
+        self.aqc.addr
+    }
 }
 
 impl Typed for ClientConfig {
@@ -151,27 +155,6 @@ impl Builder for AqcConfigBuilder {
 
 impl Typed for AqcConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0x153AE387);
-}
-
-impl AqcConfigBuilder {
-    /// Set the Address to bind AQC server to
-    pub fn addr(&mut self, addr: *const c_char) {
-        self.addr = addr;
-    }
-
-    /// Attempts to construct an [`AqcConfig`], returning an
-    /// [`Error::Config`](super::error::Error::Config) if invalid.
-    pub fn build(self) -> Result<AqcConfig, super::Error> {
-        if self.addr.is_null() {
-            let e = ConfigError::InvalidArg {
-                arg: "address",
-                reason: "Tried to create an `AqcConfig` without setting a valid address!",
-            };
-            return Err(e.into());
-        }
-
-        Ok(AqcConfig { addr: self.addr })
-    }
 }
 
 impl Default for AqcConfigBuilder {

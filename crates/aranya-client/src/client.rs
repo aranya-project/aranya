@@ -19,7 +19,7 @@ use tracing::{debug, info, instrument};
 
 use crate::{
     aqc::{
-        aqc::{AqcChannels, AqcChannelsImpl},
+        api::{AqcChannels, AqcChannelsImpl},
         net::run_channels,
     },
     config::{SyncPeerConfig, TeamConfig},
@@ -66,7 +66,7 @@ pub struct ClientBuilder<'a> {
     // The daemon's public key.
     pk: Option<&'a [u8]>,
     // AQC address.
-    aqc_addr: Option<&'a SocketAddr>,
+    aqc_addr: Option<&'a Addr>,
 }
 
 impl ClientBuilder<'_> {
@@ -121,7 +121,7 @@ impl<'a> ClientBuilder<'a> {
     }
 
     /// Specifies the AQC server address.
-    pub fn with_daemon_aqc_addr(mut self, addr: &'a SocketAddr) -> Self {
+    pub fn with_daemon_aqc_addr(mut self, addr: &'a Addr) -> Self {
         self.aqc_addr = Some(addr);
         self
     }
@@ -150,7 +150,7 @@ impl Client {
 
     /// Creates a client connection to the daemon.
     #[instrument(skip_all, fields(?path))]
-    async fn connect(path: &Path, pk: &[u8], aqc_addr: &SocketAddr) -> Result<Self> {
+    async fn connect(path: &Path, pk: &[u8], aqc_addr: &Addr) -> Result<Self> {
         info!("starting Aranya client");
 
         let daemon = {
@@ -196,7 +196,9 @@ impl Client {
             .context("unable to retrieve device id")
             .map_err(error::other)?;
         debug!(?device_id);
-        let (aqc, server, sender, identity_rx) = AqcChannelsImpl::new(device_id, aqc_addr).await?;
+        let aqc_addr = aqc_addr.lookup().await.context("unable to resolve AQC server address")
+            .map_err(error::other)?.next().expect("expected AQC server address");
+        let (aqc, server, sender, identity_rx) = AqcChannelsImpl::new(device_id, &aqc_addr).await?;
         let daemon = Arc::new(daemon);
         tokio::spawn(run_channels(server, sender, identity_rx, daemon.clone()));
         let client = Self { daemon, aqc };

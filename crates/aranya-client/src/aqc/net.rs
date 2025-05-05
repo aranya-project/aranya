@@ -22,7 +22,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, error};
 
 use crate::{
-    aqc::aqc::{AqcChannel, ClientPresharedKeys, PSK_BYTES_CTRL, PSK_IDENTITY_CTRL},
+    aqc::api::{AqcChannel, ClientPresharedKeys, PSK_BYTES_CTRL, PSK_IDENTITY_CTRL},
     error::{self, IpcError},
 };
 
