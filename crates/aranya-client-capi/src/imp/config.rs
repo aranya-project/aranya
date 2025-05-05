@@ -297,7 +297,7 @@ impl TeamConfigBuilder {
                 "init_command",
                 "Tried to set the `init_command` to an invalid address",
             ));
-            return Err(e.into());
+            return Err(e);
         }
 
         if init_command_len == 0 {
@@ -305,7 +305,7 @@ impl TeamConfigBuilder {
                 "init_command",
                 "Tried to set the `init_command_len` to 0",
             ));
-            return Err(e.into());
+            return Err(e);
         }
 
         self.init_command = init_command;
