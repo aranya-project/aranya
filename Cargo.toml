@@ -85,7 +85,6 @@ tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 rustls-pemfile = "2.1.2"
 rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "648a02550dd319360664f9af79862716be2879ff" }
-webpki-roots = "0.26"
 
 
 [profile.dev]
