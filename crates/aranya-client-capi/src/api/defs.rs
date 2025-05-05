@@ -665,7 +665,8 @@ pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 /// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the team config builder
-/// @param out a pointer to write the team config to
+/// @param init_command a pointer to the init command data
+/// @param init_command_len the length of the init command
 pub fn team_config_builder_init_command(
     cfg: &mut TeamConfigBuilder,
     init_command: *const u8,
