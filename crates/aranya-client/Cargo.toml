@@ -23,7 +23,6 @@ aranya-daemon-api = { workspace = true }
 aranya-aqc-util = { workspace = true }
 aranya-crypto = { workspace = true }
 aranya-fast-channels = { workspace = true, features = ["std", "posix"] }
-aranya-runtime = { workspace = true, features = ["std"] }
 aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
@@ -38,7 +37,6 @@ tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
 tracing = { workspace = true }
-webpki-roots = { workspace = true }
 
 [dev-dependencies]
 aranya-daemon = { path = "../aranya-daemon" }

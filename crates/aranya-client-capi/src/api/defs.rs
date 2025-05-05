@@ -3,8 +3,8 @@ use core::{
     ops::{Deref, DerefMut},
     ptr,
 };
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
-use std::str::FromStr;
+use std::{ffi::OsStr, os::unix::ffi::OsStrExt, str::FromStr};
+
 use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use aranya_crypto::hex;
@@ -198,7 +198,9 @@ pub unsafe fn client_init(
 
     // TODO: configure AQC server address.
     // SAFETY: Caller must ensure pointer is a valid C String.
-    let aqc_str = unsafe { CStr::from_ptr(config.aqc_addr()) }.to_str().context("unable to convert to string")?;
+    let aqc_str = unsafe { CStr::from_ptr(config.aqc_addr()) }
+        .to_str()
+        .context("unable to convert to string")?;
 
     let aqc_addr = aranya_util::Addr::from_str(aqc_str)?;
     let inner = rt.block_on({
@@ -1376,7 +1378,9 @@ pub unsafe fn aqc_create_bidi_channel(
         peer,
         label_id.into(),
     ))?;
-    Ok(AqcBidiChannelId{ id: chan_id.aqc_id().into_id().into() })
+    Ok(AqcBidiChannelId {
+        id: chan_id.aqc_id().into_id().into(),
+    })
 }
 
 /// Delete a bidirectional AQC channel.
