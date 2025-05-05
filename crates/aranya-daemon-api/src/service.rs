@@ -92,7 +92,7 @@ pub enum Role {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TeamConfig {
     // TODO(nikki): any fields added to this should be public
-    pub init_command: Option<Vec<u8>>,
+    pub init_command: Option<Box<[u8]>>,
 }
 
 /// A device's network identifier.

@@ -83,7 +83,7 @@ impl Default for SyncPeerConfigBuilder {
 /// Configuration info for adding and creating teams.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TeamConfig {
-    init_command: Option<Vec<u8>>,
+    init_command: Option<Box<[u8]>>,
 }
 
 impl TeamConfig {
@@ -111,7 +111,7 @@ impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
 /// Builder for a [`TeamConfig`]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TeamConfigBuilder {
-    init_command: Option<Vec<u8>>,
+    init_command: Option<Box<[u8]>>,
 }
 
 impl TeamConfigBuilder {
@@ -123,7 +123,7 @@ impl TeamConfigBuilder {
     // TODO(Steve): better docs
     /// Set init command.
     pub fn init_command(mut self, bytes: &[u8]) -> Self {
-        self.init_command = Some(bytes.to_vec());
+        self.init_command = Some(Box::from(bytes));
         self
     }
 

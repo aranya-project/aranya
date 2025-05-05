@@ -345,7 +345,7 @@ impl DaemonApi for DaemonApiHandler {
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
         let pk = self.get_pk()?;
-        let (graph_id, init_command, _) = self
+        let (graph_id, init_command) = self
             .client
             .create_team(pk, Some(nonce))
             .await

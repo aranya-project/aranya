@@ -223,7 +223,7 @@ impl TestCtx {
             if id == GraphId::default() {
                 let nonce = &mut [0u8; 16];
                 Rng.fill_bytes(nonce);
-                (client.graph_id, _, _) = client
+                (client.graph_id, _) = client
                     .create_team(DeviceKeyBundle::try_from(&client.pk)?, Some(nonce))
                     .await?;
             }
