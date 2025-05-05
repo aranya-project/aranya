@@ -253,7 +253,7 @@ impl DeviceCtx {
         sleep(SLEEP_INTERVAL).await;
 
         // Initialize the user library.
-        let mut client = (|| {
+        let (mut client, _aqc_addr) = (|| {
             Client::builder()
                 .with_daemon_uds_path(&uds_api_path)
                 .with_daemon_api_pk(&pk_bytes)
