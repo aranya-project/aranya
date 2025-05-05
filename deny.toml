@@ -257,7 +257,7 @@ skip = [
     "hash32@0.2.1",
     "heapless@0.7.17",
     "zerocopy@0.7.35",
-    "zerocopy-derive@0.7.35"
+    "zerocopy-derive@0.7.35",
 ]
 # Similarly to `skip` allows you to skip certain crates during duplicate
 # detection. Unlike skip, it also includes the entire tree of transitive
