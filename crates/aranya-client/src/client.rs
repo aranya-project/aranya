@@ -211,7 +211,9 @@ impl Client {
             .expect("expected AQC server address");
         let (aqc, server, sender, identity_rx) = AqcChannelsImpl::new(device_id, &aqc_addr).await?;
         let daemon = Arc::new(daemon);
-        let aqc_server_addr = server.local_addr().context("unable to get address AQC server bound to")
+        let aqc_server_addr = server
+            .local_addr()
+            .context("unable to get address AQC server bound to")
             .map_err(error::other)?;
         tokio::spawn(run_channels(server, sender, identity_rx, daemon.clone()));
         let client = Self { daemon, aqc };
