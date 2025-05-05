@@ -5,12 +5,8 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use anyhow::{Context, Result};
-use aranya_aqc_util::{BidiChannelReceived, Handler, UniChannelReceived};
-use aranya_crypto::{
-    aqc::{BidiChannelId, BidiPeerEncap, UniChannelId, UniPeerEncap},
-    keystore::fs_keystore::Store,
-};
-use aranya_daemon_api::{AqcChannelInfo, AqcCtrl, DaemonApiClient, LabelId, TeamId, CS};
+use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
+use aranya_daemon_api::{AqcCtrl, DaemonApiClient, LabelId, TeamId};
 use aranya_fast_channels::NodeId;
 use buggy::BugExt;
 use bytes::Bytes;
@@ -22,15 +18,12 @@ use s2n_quic::{
     Client, Connection, Server,
 };
 use tarpc::context;
-use tokio::sync::{
-    mpsc::{self},
-    Mutex,
-};
+use tokio::sync::mpsc;
 use tracing::{debug, error};
 
 use crate::{
-    aqc::{AqcChannel, ClientPresharedKeys, CE, PSK_BYTES_CTRL, PSK_IDENTITY_CTRL},
-    error::AqcError,
+    aqc::api::{AqcChannel, ClientPresharedKeys, PSK_BYTES_CTRL, PSK_IDENTITY_CTRL},
+    error::{self, IpcError},
 };
 
 /// The maximum number of channels that haven't been received.
@@ -50,75 +43,24 @@ async fn receive_aqc_ctrl(
     daemon: Arc<DaemonApiClient>,
     team: TeamId,
     ctrl: AqcCtrl,
-    handler: Arc<Mutex<Handler<Store>>>,
-    eng: CE,
     channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
 ) -> crate::Result<()> {
     // TODO: use correct node ID
-    let node_id: NodeId = 0.into();
+    let _node_id: NodeId = 0.into();
 
-    let (_peer, aqc_info) = daemon
-        .receive_aqc_ctrl(context::current(), team, node_id, ctrl)
-        .await??;
+    let (_peer, psk) = daemon
+        .receive_aqc_ctrl(context::current(), team, ctrl)
+        .await
+        .map_err(IpcError::new)?
+        .context("unable to retrieve daemon version")
+        .map_err(error::other)?;
 
-    match aqc_info {
-        AqcChannelInfo::BidiReceived(v) => {
-            let encap = BidiPeerEncap::<CS>::from_bytes(&v.encap)
-                .context("unable to get encap")
-                .map_err(AqcError::Encap)?;
-            let channel_id: BidiChannelId = encap.id();
-            let effect = BidiChannelReceived {
-                parent_cmd_id: v.parent_cmd_id,
-                author_id: v.author_id.into_id().into(),
-                author_enc_pk: &v.author_enc_pk,
-                peer_id: v.peer_id.into_id().into(),
-                peer_enc_key_id: v.peer_enc_key_id,
-                label_id: v.label_id.into_id().into(),
-                encap: &v.encap,
-                channel_id,
-                psk_length_in_bytes: v.psk_length_in_bytes,
-            };
-            let psk = handler
-                .lock()
-                .await
-                .bidi_channel_received(&mut eng.clone(), &effect)
-                .map_err(AqcError::ChannelCreation)?;
-            debug!("psk id: {:?}", psk.identity());
-            channel_map.insert(
-                psk.identity().as_bytes().to_vec(),
-                AqcChannel::Bidirectional { id: channel_id },
-            );
-        }
-        AqcChannelInfo::UniReceived(v) => {
-            let encap = UniPeerEncap::<CS>::from_bytes(&v.encap)
-                .context("unable to get encap")
-                .map_err(AqcError::Encap)?;
-            let channel_id: UniChannelId = encap.id();
-            let effect = UniChannelReceived {
-                parent_cmd_id: v.parent_cmd_id,
-                author_id: v.author_id.into_id().into(),
-                author_enc_pk: &v.author_enc_pk,
-                send_id: v.send_id.into_id().into(),
-                recv_id: v.recv_id.into_id().into(),
-                peer_enc_key_id: v.peer_enc_key_id,
-                label_id: v.label_id.into_id().into(),
-                encap: &v.encap,
-                channel_id,
-                psk_length_in_bytes: v.psk_length_in_bytes,
-            };
-            let psk = handler
-                .lock()
-                .await
-                .uni_channel_received(&mut eng.clone(), &effect)
-                .map_err(AqcError::ChannelCreation)?;
-            debug!("psk id: {:?}", psk.identity());
-            channel_map.insert(
-                psk.identity().as_bytes().to_vec(),
-                AqcChannel::Unidirectional { id: channel_id },
-            );
-        }
-        _ => {}
-    }
+    channel_map.insert(
+        psk.identity().as_bytes().to_vec(),
+        AqcChannel::Bidirectional {
+            id: psk.identity().into(),
+        },
+    );
 
     Ok(())
 }
@@ -129,8 +71,6 @@ pub async fn run_channels(
     sender: mpsc::Sender<AqcChannelType>,
     mut identity_rx: mpsc::Receiver<Vec<u8>>,
     daemon: Arc<DaemonApiClient>,
-    handler: Arc<Mutex<Handler<Store>>>,
-    eng: CE,
 ) {
     let mut channel_map = HashMap::new();
     loop {
@@ -164,8 +104,6 @@ pub async fn run_channels(
                                                 daemon.clone(),
                                                 ctrl.team_id,
                                                 ctrl.ctrl,
-                                                handler.clone(),
-                                                eng.clone(),
                                                 &mut channel_map,
                                             )
                                             .await

@@ -1,13 +1,13 @@
 #![allow(dead_code)]
 use std::{
     fmt,
-    net::{IpAddr, SocketAddr},
+    net::SocketAddr,
     path::PathBuf,
     time::Duration,
 };
 
 use anyhow::{Context, Result};
-use aranya_client::{Client, SyncPeerConfig};
+use aranya_client::{client::Client, SyncPeerConfig};
 use aranya_daemon::{config::Config, Daemon};
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId};
 use aranya_util::Addr;
@@ -148,7 +148,7 @@ impl TeamCtx {
         let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
         let mut devices = self.devices();
         for i in 0..devices.len() {
-            let (device, peers) = devices[i..].split_first_mut().unwrap();
+            let (device, peers) = devices[i..].split_first_mut().expect("expected device");
             for peer in peers {
                 device
                     .client
@@ -225,8 +225,7 @@ pub struct DeviceCtx {
 
 impl DeviceCtx {
     async fn new(_team_name: &str, _name: &str, work_dir: PathBuf, port: u16) -> Result<Self> {
-        let aqc_addr =
-            NetIdentifier(SocketAddr::new(IpAddr::from([127, 0, 0, 1]), port).to_string());
+        let aqc_addr = Addr::new("localhost", port).expect("unable to init AQC address");
         fs::create_dir_all(work_dir.clone()).await?;
 
         // Setup daemon config.
@@ -238,13 +237,15 @@ impl DeviceCtx {
             pid_file: work_dir.join("pid"),
             sync_addr: Addr::new("localhost", 0)?,
             afc: None,
+            aqc: None,
         };
 
         // Load daemon from config.
         let daemon = Daemon::load(cfg.clone())
             .await
             .context("unable to init daemon")?;
-        // Start daemon.
+        let pk = daemon.public_api_key().await?;
+        let pk_bytes = pk.encode()?;
         let handle = task::spawn(async move {
             daemon
                 .run()
@@ -257,10 +258,16 @@ impl DeviceCtx {
         sleep(SLEEP_INTERVAL).await;
 
         // Initialize the user library.
-        let mut client = (|| Client::connect(&uds_api_path, aqc_addr.clone()))
-            .retry(ExponentialBuilder::default())
-            .await
-            .context("unable to init client")?;
+        let mut client = (|| {
+            Client::builder()
+                .with_daemon_uds_path(&uds_api_path)
+                .with_daemon_api_pk(&pk_bytes)
+                .with_daemon_aqc_addr(&aqc_addr)
+                .connect()
+        })
+        .retry(ExponentialBuilder::default())
+        .await
+        .context("unable to init client")?;
 
         // Get device id and key bundle.
         let pk = client.get_key_bundle().await.expect("expected key bundle");
@@ -271,7 +278,7 @@ impl DeviceCtx {
             pk,
             id,
             daemon: handle,
-            aqc_addr,
+            aqc_addr: NetIdentifier(aqc_addr.to_string()),
             port,
         })
     }

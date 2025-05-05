@@ -2,7 +2,7 @@ use std::time::Duration;
 
 mod common;
 use anyhow::Result;
-use aranya_client::{aqc_net::AqcChannelType, SyncPeerConfig, TeamConfig};
+use aranya_client::{aqc::net::AqcChannelType, SyncPeerConfig, TeamConfig};
 use aranya_crypto::csprng::rand;
 use aranya_daemon_api::{ChanOp, Role};
 use buggy::BugExt;
@@ -12,9 +12,9 @@ use tempfile::tempdir;
 use tracing::{debug, info};
 
 /// NOTE: this certificate is to be used for demonstration purposes only!
-pub static CERT_PEM: &str = include_str!("../src/cert.pem");
+pub static CERT_PEM: &str = include_str!("../src/aqc/cert.pem");
 /// NOTE: this certificate is to be used for demonstration purposes only!
-pub static KEY_PEM: &str = include_str!("../src/key.pem");
+pub static KEY_PEM: &str = include_str!("../src/aqc/key.pem");
 
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans() -> Result<()> {

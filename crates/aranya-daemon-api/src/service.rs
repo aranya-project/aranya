@@ -1,19 +1,22 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-use core::{fmt, hash::Hash, net::SocketAddr, time::Duration};
-use std::path::PathBuf;
+use core::{borrow::Borrow, fmt, hash::Hash, net::SocketAddr, ops::Deref, time::Duration};
 
 use aranya_crypto::{
-    aqc::{self, BidiAuthorSecretId, UniAuthorSecretId},
     custom_id,
-    default::DefaultCipherSuite,
-    EncryptionKeyId, Id,
+    default::{DefaultCipherSuite, DefaultEngine},
+    subtle::{Choice, ConstantTimeEq},
+    zeroize::{Zeroize, ZeroizeOnDrop},
+    Id,
 };
-use aranya_fast_channels::NodeId;
 use aranya_util::Addr;
+use buggy::Bug;
+pub use semver::Version;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
+/// CE = Crypto Engine
+pub type CE = DefaultEngine;
 /// CS = Cipher Suite
 pub type CS = DefaultCipherSuite;
 
@@ -22,8 +25,22 @@ pub type CS = DefaultCipherSuite;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Error(String);
 
+impl From<Bug> for Error {
+    fn from(err: Bug) -> Self {
+        error!(?err);
+        Self(format!("{err:?}"))
+    }
+}
+
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
+        error!(?err);
+        Self(format!("{err:?}"))
+    }
+}
+
+impl From<semver::Error> for Error {
+    fn from(err: semver::Error) -> Self {
         error!(?err);
         Self(format!("{err:?}"))
     }
@@ -98,8 +115,29 @@ pub struct TeamConfig {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
 pub struct NetIdentifier(pub String);
 
-impl AsRef<str> for NetIdentifier {
-    fn as_ref(&self) -> &str {
+impl Borrow<str> for NetIdentifier {
+    #[inline]
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<T> AsRef<T> for NetIdentifier
+where
+    T: ?Sized,
+    <Self as Deref>::Target: AsRef<T>,
+{
+    #[inline]
+    fn as_ref(&self) -> &T {
+        self.deref().as_ref()
+    }
+}
+
+impl Deref for NetIdentifier {
+    type Target = str;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
@@ -110,85 +148,135 @@ impl fmt::Display for NetIdentifier {
     }
 }
 
-// serialized command which must be passed over AQC.
+/// A serialized command for AQC.
 pub type AqcCtrl = Vec<Box<[u8]>>;
 
-/// AQC channel info.
-/// This includes information that can be used to:
-/// - Lookup the AQC PSK secret from the key store.
-/// - Decode the PSK encap to derive the PSK.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub enum AqcChannelInfo {
-    BidiCreated(AqcBidiChannelCreatedInfo),
-    BidiReceived(AqcBidiChannelReceivedInfo),
-    UniCreated(AqcUniChannelCreatedInfo),
-    UniReceived(AqcUniChannelReceivedInfo),
+/// A secret.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Secret(Box<[u8]>);
+
+impl Secret {
+    /// Provides access to the raw secret bytes.
+    #[inline]
+    pub fn raw_secret_bytes(&self) -> &[u8] {
+        &self.0
+    }
 }
 
-/// Bidirectional AQC channel info.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct AqcBidiChannelCreatedInfo {
-    pub parent_cmd_id: Id,
-    pub author_id: DeviceId,
-    pub author_enc_key_id: EncryptionKeyId,
-    pub peer_id: DeviceId,
-    pub peer_enc_pk: Vec<u8>,
-    pub label_id: LabelId,
-    pub channel_id: aqc::BidiChannelId,
-    pub author_secrets_id: BidiAuthorSecretId,
-    pub psk_length_in_bytes: u16,
+impl<T> From<T> for Secret
+where
+    T: Into<Box<[u8]>>,
+{
+    fn from(value: T) -> Self {
+        Self(value.into())
+    }
 }
 
-/// Bidirectional AQC channel info.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct AqcBidiChannelReceivedInfo {
-    pub parent_cmd_id: Id,
-    pub author_id: DeviceId,
-    pub peer_enc_key_id: EncryptionKeyId,
-    pub peer_id: DeviceId,
-    pub author_enc_pk: Vec<u8>,
-    pub label_id: LabelId,
-    pub encap: Vec<u8>,
-    pub psk_length_in_bytes: u16,
+impl ConstantTimeEq for Secret {
+    fn ct_eq(&self, other: &Self) -> Choice {
+        self.0.ct_eq(&other.0)
+    }
 }
 
-/// Unidirectional AQC channel info.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct AqcUniChannelCreatedInfo {
-    pub parent_cmd_id: Id,
-    pub author_id: DeviceId,
-    pub send_id: DeviceId,
-    pub recv_id: DeviceId,
-    pub author_enc_key_id: EncryptionKeyId,
-    pub peer_enc_pk: Vec<u8>,
-    pub label_id: LabelId,
-    pub channel_id: aqc::UniChannelId,
-    pub author_secrets_id: UniAuthorSecretId,
-    pub psk_length_in_bytes: u16,
+impl ZeroizeOnDrop for Secret {}
+impl Drop for Secret {
+    fn drop(&mut self) {
+        self.0.zeroize()
+    }
 }
 
-/// Unidirectional AQC channel info.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct AqcUniChannelReceivedInfo {
-    pub parent_cmd_id: Id,
-    pub author_id: DeviceId,
-    pub send_id: DeviceId,
-    pub recv_id: DeviceId,
-    pub author_enc_pk: Vec<u8>,
-    pub peer_enc_key_id: EncryptionKeyId,
-    pub label_id: LabelId,
-    pub encap: Vec<u8>,
-    pub psk_length_in_bytes: u16,
+/// An AQC PSK.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum AqcPsk {
+    /// Bidirectional.
+    Bidi(AqcBidiPsk),
+    /// Unidirectional.
+    Uni(AqcUniPsk),
 }
 
-/// Information needed to use the key store.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+impl AqcPsk {
+    /// Returns the PSK identity.
+    #[inline]
+    pub fn identity(&self) -> Id {
+        match self {
+            Self::Bidi(psk) => psk.identity,
+            Self::Uni(psk) => psk.identity,
+        }
+    }
 
-pub struct KeyStoreInfo {
-    /// Path of the key store.
-    pub path: PathBuf,
-    /// Path of the wrapped key.
-    pub wrapped_key: PathBuf,
+    /// Returns the PSK secret.
+    #[inline]
+    pub fn secret(&self) -> &[u8] {
+        match self {
+            Self::Bidi(psk) => psk.secret.raw_secret_bytes(),
+            Self::Uni(psk) => match &psk.secret {
+                Directed::Send(secret) | Directed::Recv(secret) => secret.raw_secret_bytes(),
+            },
+        }
+    }
+}
+
+/// An AQC bidirectional channel PSK.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AqcBidiPsk {
+    /// The PSK identity.
+    ///
+    /// This is the same thing as the channel ID.
+    pub identity: Id,
+    /// The PSK's secret.
+    pub secret: Secret,
+}
+
+impl ConstantTimeEq for AqcBidiPsk {
+    fn ct_eq(&self, other: &Self) -> Choice {
+        let id = self.identity.ct_eq(&other.identity);
+        let secret = self.secret.ct_eq(&other.secret);
+        id & secret
+    }
+}
+
+impl ZeroizeOnDrop for AqcBidiPsk {}
+
+/// An AQC unidirectional PSK.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct AqcUniPsk {
+    /// The PSK identity.
+    ///
+    /// This is the same thing as the channel ID.
+    pub identity: Id,
+    /// The PSK's secret.
+    pub secret: Directed<Secret>,
+}
+
+impl ConstantTimeEq for AqcUniPsk {
+    fn ct_eq(&self, other: &Self) -> Choice {
+        let id = self.identity.ct_eq(&other.identity);
+        let secret = self.secret.ct_eq(&other.secret);
+        id & secret
+    }
+}
+
+impl ZeroizeOnDrop for AqcUniPsk {}
+
+/// Either send only or receive only.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum Directed<T> {
+    /// Send only.
+    Send(T),
+    /// Receive only.
+    Recv(T),
+}
+
+impl<T: ConstantTimeEq> ConstantTimeEq for Directed<T> {
+    fn ct_eq(&self, other: &Self) -> Choice {
+        // It's fine that matching discriminants isn't constant
+        // time since the direction isn't secret data.
+        match (self, other) {
+            (Self::Send(lhs), Self::Send(rhs)) => lhs.ct_eq(rhs),
+            (Self::Recv(lhs), Self::Recv(rhs)) => lhs.ct_eq(rhs),
+            _ => Choice::from(0u8),
+        }
+    }
 }
 
 /// Configuration values for syncing with a peer
@@ -223,9 +311,8 @@ pub struct Label {
 
 #[tarpc::service]
 pub trait DaemonApi {
-    /// Gets the key store info.
-    /// The keystore can be used to pass private keys and secrets between the client and daemon.
-    async fn get_keystore_info() -> Result<KeyStoreInfo>;
+    /// Returns the daemon's version.
+    async fn version() -> Result<Version>;
 
     /// Gets local address the Aranya sync server is bound to.
     async fn aranya_local_addr() -> Result<SocketAddr>;
@@ -297,26 +384,20 @@ pub trait DaemonApi {
     async fn create_aqc_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
-        node_id: NodeId,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcChannelInfo)>;
+    ) -> Result<(AqcCtrl, AqcBidiPsk)>;
     /// Create a unidirectional QUIC channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
-        node_id: NodeId,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcChannelInfo)>;
+    ) -> Result<(AqcCtrl, AqcUniPsk)>;
     /// Delete a QUIC bidi channel.
     async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
     /// Delete a QUIC uni channel.
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
     /// Receive AQC ctrl message.
-    async fn receive_aqc_ctrl(
-        team: TeamId,
-        node_id: NodeId,
-        ctrl: AqcCtrl,
-    ) -> Result<(NetIdentifier, AqcChannelInfo)>;
+    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(NetIdentifier, AqcPsk)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;

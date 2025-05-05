@@ -2,9 +2,7 @@
 
 use std::{
     collections::HashMap,
-    io,
     net::SocketAddr,
-    path::Path,
     sync::{Arc, Mutex},
 };
 
@@ -12,23 +10,14 @@ use ::rustls::{
     client::PresharedKeyStore,
     crypto::PresharedKey,
     server::{PresharedKeySelection, SelectsPresharedKeys},
+    ClientConfig, ServerConfig,
 };
 use anyhow::Context;
-use aranya_aqc_util::{BidiChannelCreated, Handler, UniChannelCreated};
-use aranya_crypto::{
-    aqc::{BidiChannelId, UniChannelId},
-    default::DefaultEngine,
-    import::Import,
-    keys::SecretKey,
-    keystore::fs_keystore::Store,
-    Rng as CryptoRng,
-};
+use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
-use aranya_daemon_api::{
-    AqcChannelInfo::*, DeviceId, KeyStoreInfo, LabelId, NetIdentifier, TeamId,
-};
-use aranya_fast_channels::NodeId;
+use aranya_daemon_api::{DeviceId, LabelId, NetIdentifier, TeamId};
 use buggy::BugExt as _;
+use rustls::crypto::CryptoProvider;
 use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     provider::{
@@ -38,22 +27,14 @@ use s2n_quic::{
     Server,
 };
 use tarpc::context;
-use tokio::{
-    fs,
-    sync::{mpsc, Mutex as TokioMutex},
-};
-use tracing::{debug, error, instrument, Instrument as _};
+use tokio::sync::mpsc;
+use tracing::{debug, error, instrument};
 
 use crate::{
-    aqc_net::{AqcBidirectionalChannel, AqcChannelType, AqcClient, AqcSenderChannel},
-    error::AqcError,
+    aqc::net::{AqcBidirectionalChannel, AqcChannelType, AqcClient, AqcSenderChannel},
+    error::{aranya_error, AqcError, IpcError},
+    Client,
 };
-
-// TODO: use same generics as daemon.
-/// CE = Crypto Engine
-pub(crate) type CE = DefaultEngine;
-/// KS = Key Store
-pub(crate) type KS = Store;
 
 /// TODO: remove this.
 /// NOTE: this certificate is to be used for demonstration purposes only!
@@ -76,18 +57,16 @@ pub enum AqcChannel {
 }
 
 /// Sends and receives AQC messages.
+#[derive(Debug)]
 pub(crate) struct AqcChannelsImpl {
     pub(crate) client: AqcClient,
-    pub(crate) handler: Arc<TokioMutex<Handler<Store>>>,
-    pub(crate) eng: CE,
 }
 
 impl AqcChannelsImpl {
     /// Creates a new `QuicChannelsImpl` listening for connections on `address`.
     pub(crate) async fn new(
         device_id: DeviceId,
-        keystore_info: KeyStoreInfo,
-        aqc_address: NetIdentifier,
+        aqc_addr: &SocketAddr,
     ) -> Result<
         (
             Self,
@@ -98,17 +77,6 @@ impl AqcChannelsImpl {
         AqcError,
     > {
         debug!("device ID: {:?}", device_id);
-        debug!("keystore path: {:?}", keystore_info.path);
-        debug!("keystore wrapped key path: {:?}", keystore_info.wrapped_key);
-        let store = KS::open(keystore_info.path).context("unable to open keystore")?;
-        let handler = Handler::new(
-            device_id.into_id().into(),
-            store.try_clone().context("unable to clone keystore")?,
-        );
-        let eng = {
-            let key = load_or_gen_key(keystore_info.wrapped_key).await?;
-            CE::new(&key, CryptoRng)
-        };
 
         // --- Start Rustls Setup ---
         // Load Cert and Key
@@ -130,7 +98,7 @@ impl AqcChannelsImpl {
         let client_keys = Arc::new(ClientPresharedKeys::new(psk.clone()));
 
         // Create Client Config (INSECURE: Skips server cert verification)
-        let mut client_config = rustls::ClientConfig::builder()
+        let mut client_config = ClientConfig::builder()
             .dangerous()
             .with_custom_certificate_verifier(SkipServerVerification::new())
             .with_no_client_auth();
@@ -141,7 +109,7 @@ impl AqcChannelsImpl {
         server_keys.insert(psk);
 
         // Create Server Config
-        let mut server_config = rustls::ServerConfig::builder()
+        let mut server_config = ServerConfig::builder()
             .with_no_client_auth()
             .with_single_cert(certs.clone(), key)
             .map_err(|e| AqcError::TlsConfig(e.to_string()))?;
@@ -149,6 +117,7 @@ impl AqcChannelsImpl {
         server_config.preshared_keys = PresharedKeySelection::Enabled(Arc::new(server_keys));
 
         // Wrap for s2n-quic using deprecated `new`
+        // TODO: these `new()` are deprecated.
         let tls_client_provider = rustls_provider::Client::new(client_config);
         let tls_server_provider = rustls_provider::Server::new(server_config);
         // --- End Rustls Setup ---
@@ -157,8 +126,8 @@ impl AqcChannelsImpl {
         // Pass client_keys Arc to AqcClient::new
         let (client, sender) = AqcClient::new(tls_client_provider, client_keys)?;
 
-        let server_addr = aqc_address
-            .0
+        let server_addr = aqc_addr
+            .to_string()
             .parse::<SocketAddr>()
             .map_err(AqcError::AddrParse)?;
         // Use the rustls server provider
@@ -171,16 +140,7 @@ impl AqcChannelsImpl {
             .map_err(|e| AqcError::CongestionConfig(e.to_string()))?
             .start()
             .map_err(|e| AqcError::ServerStart(e.to_string()))?;
-        Ok((
-            Self {
-                client,
-                handler: Arc::new(TokioMutex::new(handler)),
-                eng,
-            },
-            server,
-            sender,
-            identity_rx,
-        ))
+        Ok((Self { client }, server, sender, identity_rx))
     }
 
     /// Returns the local address that AQC is bound to.
@@ -289,12 +249,13 @@ impl PresharedKeyStore for ClientPresharedKeys {
 
 /// Aranya QUIC Channels client that allows for opening and closing channels and
 /// sending data between peers.
+#[derive(Debug)]
 pub struct AqcChannels<'a> {
-    client: &'a mut crate::Client,
+    client: &'a mut Client,
 }
 
 impl<'a> AqcChannels<'a> {
-    pub(crate) fn new(client: &'a mut crate::Client) -> Self {
+    pub(crate) fn new(client: &'a mut Client) -> Self {
         Self { client }
     }
 
@@ -320,66 +281,39 @@ impl<'a> AqcChannels<'a> {
     ) -> crate::Result<AqcBidirectionalChannel> {
         debug!("creating bidi channel");
 
-        let node_id: NodeId = 0.into();
-        //let node_id = self.client.aqc.get_next_node_id().await?;
-        debug!(%node_id, "selected node ID");
-
-        let (aqc_ctrl, aqc_info) = self
+        let (aqc_ctrl, psk) = self
             .client
             .daemon
-            .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), node_id, label_id)
-            .await??;
-        debug!(%node_id, %label_id, "created bidi channel");
+            .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), label_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
 
-        if let BidiCreated(v) = aqc_info {
-            let effect = BidiChannelCreated {
-                parent_cmd_id: v.parent_cmd_id,
-                author_id: v.author_id.into_id().into(),
-                author_enc_key_id: v.author_enc_key_id,
-                peer_id: v.peer_id.into_id().into(),
-                peer_enc_pk: &v.peer_enc_pk,
-                label_id: v.label_id.into_id().into(),
-                channel_id: v.channel_id,
-                psk_length_in_bytes: v.psk_length_in_bytes,
-                author_secrets_id: v.author_secrets_id,
-            };
-            let psk = self
-                .client
-                .aqc
-                .handler
-                .lock()
-                .await
-                .bidi_channel_created(&mut self.client.aqc.eng.clone(), &effect)
-                .map_err(AqcError::ChannelCreation)?;
-            debug!("psk id: {:?}", psk.identity());
-            let peer_addr = tokio::net::lookup_host(peer.as_ref())
-                .await
-                .map_err(AqcError::AddrResolution)?
-                .next()
-                .assume("invalid peer address")?;
+        let peer_addr = tokio::net::lookup_host(peer.0)
+            .await
+            .map_err(AqcError::AddrResolution)?
+            .next()
+            .assume("invalid peer address")?;
 
-            self.client
-                .aqc
-                .client
-                .send_ctrl(peer_addr, aqc_ctrl, team_id)
-                .await
-                .map_err(AqcError::Other)?;
+        self.client
+            .aqc
+            .client
+            .send_ctrl(peer_addr, aqc_ctrl, team_id)
+            .await
+            .map_err(AqcError::Other)?;
 
-            let channel = self
-                .client
-                .aqc
-                .create_bidirectional_channel(
-                    peer_addr,
-                    label_id,
-                    v.channel_id,
-                    PresharedKey::external(psk.identity().as_bytes(), psk.raw_secret_bytes())
-                        .assume("unable to create psk")?,
-                )
-                .await?;
-            Ok(channel)
-        } else {
-            Err(crate::Error::Aqc(AqcError::ChannelNotFound))
-        }
+        let channel = self
+            .client
+            .aqc
+            .create_bidirectional_channel(
+                peer_addr,
+                label_id,
+                psk.identity.into(),
+                PresharedKey::external(psk.identity.as_bytes(), psk.secret.raw_secret_bytes())
+                    .assume("unable to create psk")?,
+            )
+            .await?;
+        Ok(channel)
     }
 
     /// Creates a unidirectional AQC channel with a peer.
@@ -399,94 +333,76 @@ impl<'a> AqcChannels<'a> {
     ) -> crate::Result<AqcSenderChannel> {
         debug!("creating aqc uni channel");
 
-        // TODO: use correct node ID.
-        let node_id: NodeId = 0.into();
-        debug!(%node_id, "selected node ID");
-
-        let (aqc_ctrl, aqc_info) = self
+        let (aqc_ctrl, psk) = self
             .client
             .daemon
-            .create_aqc_uni_channel(context::current(), team_id, peer.clone(), node_id, label_id)
-            .await??;
-        debug!(%node_id, %label_id, "created aqc uni channel");
+            .create_aqc_uni_channel(context::current(), team_id, peer.clone(), label_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
 
-        if let UniCreated(v) = aqc_info {
-            let effect = UniChannelCreated {
-                parent_cmd_id: v.parent_cmd_id,
-                author_id: v.author_id.into_id().into(),
-                author_enc_key_id: v.author_enc_key_id,
-                send_id: v.send_id.into_id().into(),
-                recv_id: v.recv_id.into_id().into(),
-                peer_enc_pk: &v.peer_enc_pk,
-                label_id: v.label_id.into_id().into(),
-                channel_id: v.channel_id,
-                psk_length_in_bytes: v.psk_length_in_bytes,
-                author_secrets_id: v.author_secrets_id,
-            };
-            let psk = self
-                .client
-                .aqc
-                .handler
-                .lock()
-                .await
-                .uni_channel_created(&mut self.client.aqc.eng.clone(), &effect)
-                .map_err(AqcError::ChannelCreation)?;
-            debug!("psk id: {:?}", psk.identity());
+        let peer_addr = tokio::net::lookup_host(peer.0)
+            .await
+            .map_err(AqcError::AddrResolution)?
+            .next()
+            .assume("invalid peer address")?;
 
-            let peer_addr = tokio::net::lookup_host(peer.as_ref())
-                .await
-                .map_err(AqcError::AddrResolution)?
-                .next()
-                .assume("invalid peer address")?;
+        self.client
+            .aqc
+            .client
+            .send_ctrl(peer_addr, aqc_ctrl, team_id)
+            .await
+            .map_err(AqcError::Other)?;
 
-            self.client
-                .aqc
-                .client
-                .send_ctrl(peer_addr, aqc_ctrl, team_id)
-                .await
-                .map_err(AqcError::Other)?;
-
-            let channel = self
-                .client
-                .aqc
-                .create_unidirectional_channel(
-                    peer_addr,
-                    label_id,
-                    v.channel_id,
-                    PresharedKey::external(psk.identity().as_bytes(), psk.raw_secret_bytes())
-                        .assume("unable to create psk")?,
-                )
-                .await?;
-            Ok(channel)
-        } else {
-            Err(crate::Error::Aqc(AqcError::ChannelNotFound))
-        }
+        let secret = match psk.secret {
+            aranya_daemon_api::Directed::Send(s) => s,
+            aranya_daemon_api::Directed::Recv(s) => s,
+        };
+        let channel = self
+            .client
+            .aqc
+            .create_unidirectional_channel(
+                peer_addr,
+                label_id,
+                psk.identity.into(),
+                PresharedKey::external(psk.identity.as_bytes(), secret.raw_secret_bytes())
+                    .assume("unable to create psk")?,
+            )
+            .await?;
+        Ok(channel)
     }
 
     /// Deletes an AQC bidi channel.
-    // It is an error if the channel does not exist
-    #[instrument(skip_all, fields(chan = %chan))]
+    /// It is an error if the channel does not exist
+    #[instrument(skip_all, fields(%chan))]
     pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannelId) -> crate::Result<()> {
         let _ctrl = self
             .client
             .daemon
             .delete_aqc_bidi_channel(context::current(), chan)
-            .await??;
-        //self.client.aqc.remove_channel(chan).await;
-        Ok(())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+
+        todo!()
     }
 
     /// Deletes an AQC uni channel.
-    // It is an error if the channel does not exist
-    #[instrument(skip_all, fields(chan = %chan))]
+    /// It is an error if the channel does not exist
+    #[instrument(skip_all, fields(%chan))]
     pub async fn delete_uni_channel(&mut self, chan: AqcUniChannelId) -> crate::Result<()> {
         let _ctrl = self
             .client
             .daemon
             .delete_aqc_uni_channel(context::current(), chan)
-            .await??;
-        //self.client.aqc.remove_channel(chan).await;
-        Ok(())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+
+        // TODO: delete PSK from rustls keystore.
+
+        todo!()
     }
 
     /// Waits for a peer to create an AQC channel with this client.
@@ -495,43 +411,10 @@ impl<'a> AqcChannels<'a> {
     }
 }
 
-// TODO: this was borrowed from daemon.rs. Move to util crate for reuse.
-/// Loads a key from a file or generates and writes a new one.
-async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> anyhow::Result<K> {
-    pub async fn load_or_gen_key_inner<K: SecretKey>(path: &Path) -> anyhow::Result<K> {
-        match fs::read(&path).await {
-            Ok(buf) => {
-                tracing::info!("loading key");
-                let key =
-                    Import::import(buf.as_slice()).context("unable to import key from file")?;
-                Ok(key)
-            }
-            Err(err) if err.kind() == io::ErrorKind::NotFound => {
-                tracing::info!("generating key");
-                let key = K::new(&mut CryptoRng);
-                let bytes = key
-                    .try_export_secret()
-                    .context("unable to export new key")?;
-                aranya_util::write_file(&path, bytes.as_bytes())
-                    .await
-                    .context("unable to write key")?;
-                Ok(key)
-            }
-            Err(err) => Err(err).context("unable to read key"),
-        }
-    }
-    let path = path.as_ref();
-    load_or_gen_key_inner(path)
-        .instrument(tracing::info_span!("load_or_gen_key", ?path))
-        .await
-        .with_context(|| format!("load_or_gen_key({path:?})"))
-}
-
 // --- Start SkipServerVerification ---
 // INSECURE: Allows connecting to any server certificate.
 // Requires the `dangerous_configuration` feature on the `rustls` crate.
 // Use full paths for traits and types
-use s2n_quic::provider::tls::rustls::rustls::{self, crypto::CryptoProvider};
 
 #[derive(Debug)]
 struct SkipServerVerification(Arc<CryptoProvider>);
