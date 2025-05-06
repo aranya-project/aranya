@@ -155,7 +155,7 @@ impl Client {
     }
 
     /// Creates a client connection to the daemon.
-    #[instrument(skip_all, fields(?path))]
+    #[instrument(skip_all, fields(?path, ?aqc_addr))]
     async fn connect(path: &Path, pk: &[u8], aqc_addr: &Addr) -> Result<(Self, SocketAddr)> {
         info!("starting Aranya client");
 
