@@ -67,35 +67,50 @@ async fn test_aqc_chans() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team.create_label("label1".to_string()).await?;
+    const NUM_DEVICES: i8 = 3;
+    const LABELS_PER_DEVICE: i8 = 4;
+    const NUM_LABELS: i8 = NUM_DEVICES * LABELS_PER_DEVICE;
+    let mut labels = Vec::new();
+    for i in 0..NUM_LABELS {
+        let label = operator_team
+            .create_label(format!("label{}", i).to_string())
+            .await?;
+        labels.push(label);
+    }
+    // TODO: test with different ops.
     let op = ChanOp::SendRecv;
-    // TODO: test with different labels.
-    operator_team
-        .assign_label(team.membera.id, label1, op)
-        .await?;
-    operator_team
-        .assign_label(team.memberb.id, label1, op)
-        .await?;
-    operator_team
-        .assign_label(team.memberc.id, label1, op)
-        .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    let mut set = JoinSet::new();
     let membera_peers = [team.memberb.aqc_addr.clone(), team.memberc.aqc_addr.clone()];
     let memberb_peers = [team.membera.aqc_addr.clone(), team.memberc.aqc_addr.clone()];
     let memberc_peers = [team.membera.aqc_addr.clone(), team.memberb.aqc_addr.clone()];
+    let peers = [membera_peers, memberb_peers, memberc_peers];
     let mut devices = Vec::new();
     devices.push(team.membera);
     devices.push(team.memberb);
     devices.push(team.memberc);
 
-    let peers = [membera_peers, memberb_peers, memberc_peers];
+    // Assign labels to all devices.
+    // TODO: only assign labels to devices that use them.
+    for device in &devices {
+        for label in &labels {
+            operator_team.assign_label(device.id, *label, op).await?;
+        }
+    }
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // Run AQC channel tests in parallel.
+    let mut set = JoinSet::new();
     for i in 0..devices.len() {
         let mut device = devices.pop().expect("expected a device");
         let peers = peers[i].clone();
+        let mut l = Vec::new();
+        for _i in 0..LABELS_PER_DEVICE {
+            l.push(labels.pop().expect("expected label"));
+        }
         set.spawn(async move {
             let mut bidi_chans = Vec::new();
             let mut uni_chans = Vec::new();
@@ -104,7 +119,7 @@ async fn test_aqc_chans() -> Result<()> {
                 let bidi = device
                     .client
                     .aqc()
-                    .create_bidi_channel(team_id, peer.clone(), label1)
+                    .create_bidi_channel(team_id, peer.clone(), l.pop().expect("expected label"))
                     .await
                     .expect("expected to create bidi chan");
                 bidi_chans.push(bidi);
@@ -113,12 +128,11 @@ async fn test_aqc_chans() -> Result<()> {
                 let uni = device
                     .client
                     .aqc()
-                    .create_uni_channel(team_id, peer, label1)
+                    .create_uni_channel(team_id, peer, l.pop().expect("expected label"))
                     .await
                     .expect("expected to create bidi chan");
                 uni_chans.push(uni);
             }
-
             // Receive any channels that were created.
             tokio::time::sleep(Duration::from_millis(100)).await;
             let mut recv_chans = Vec::new();
@@ -216,6 +230,9 @@ async fn test_aqc_chans() -> Result<()> {
             }
 
             // TODO: verify total messages send/received.
+
+            // TODO: optimize this delay.
+            tokio::time::sleep(Duration::from_millis(1000)).await;
         });
     }
     set.join_all().await;
