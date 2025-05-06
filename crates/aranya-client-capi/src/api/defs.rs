@@ -1428,7 +1428,8 @@ pub unsafe fn aqc_create_bidi_channel(
         label_id.into(),
     ))?;
 
-    Ok(Safe::init(channel, imp::AqcBidiChannel::new(chan)))
+    Safe::init(channel, imp::AqcBidiChannel::new(chan));
+    Ok(())
 }
 
 /// Create a unidirectional AQC channel between this device and a peer.
@@ -1459,7 +1460,8 @@ pub unsafe fn aqc_create_uni_channel(
         label_id.into(),
     ))?;
 
-    Ok(Safe::init(channel, imp::AqcSenderChannel::new(chan)))
+    Safe::init(channel, imp::AqcSenderChannel::new(chan));
+    Ok(())
 }
 
 /* TODO(nikki): these will panic currently, so let's stub them
@@ -1518,7 +1520,8 @@ pub fn aqc_receive_channel(
         .block_on(client.inner.aqc().receive_channel())
         .ok_or(imp::Error::AqcServerClosed)?;
 
-    Ok(Safe::init(channel, imp::AqcChannelType::new(chan)))
+    Safe::init(channel, imp::AqcChannelType::new(chan));
+    Ok(())
 }
 
 /// Returns the [`AqcChannelType`] for a given [`AqcChannel`] to distinguish
@@ -1567,10 +1570,12 @@ pub fn aqc_get_bidirectional_channel(
     channel: OwnedPtr<AqcChannel>,
     bidi: &mut MaybeUninit<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
+    // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
     let inner = unsafe { channel.read().into_inner().inner };
     match inner {
         aqc::AqcChannelType::Bidirectional { channel } => {
-            Ok(Safe::init(bidi, imp::AqcBidiChannel::new(channel)))
+            Safe::init(bidi, imp::AqcBidiChannel::new(channel));
+            Ok(())
         }
         _ => Err(InvalidArg::new(
                 "channel",
@@ -1592,10 +1597,12 @@ pub fn aqc_get_sender_channel(
     channel: OwnedPtr<AqcChannel>,
     sender: &mut MaybeUninit<AqcSenderChannel>,
 ) -> Result<(), imp::Error> {
+    // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
     let inner = unsafe { channel.read().into_inner().inner };
     match inner {
         aqc::AqcChannelType::Sender { sender: send } => {
-            Ok(Safe::init(sender, imp::AqcSenderChannel::new(send)))
+            Safe::init(sender, imp::AqcSenderChannel::new(send));
+            Ok(())
         }
         _ => Err(InvalidArg::new(
             "channel",
@@ -1617,10 +1624,12 @@ pub fn aqc_get_receiver_channel(
     channel: OwnedPtr<AqcChannel>,
     receiver: &mut MaybeUninit<AqcReceiverChannel>,
 ) -> Result<(), imp::Error> {
+    // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
     let inner = unsafe { channel.read().into_inner().inner };
     match inner {
         aqc::AqcChannelType::Receiver { receiver: recv } => {
-            Ok(Safe::init(receiver, imp::AqcReceiverChannel::new(recv)))
+            Safe::init(receiver, imp::AqcReceiverChannel::new(recv));
+            Ok(())
         }
         _ => Err(InvalidArg::new(
             "channel",
@@ -1650,7 +1659,8 @@ pub fn aqc_bidi_create_bidi_stream(
         .block_on(channel.inner.create_bidirectional_stream())?;
 
     Safe::init(send_stream, imp::AqcSendStream::new(send));
-    Ok(Safe::init(recv_stream, imp::AqcReceiveStream::new(recv)))
+    Safe::init(recv_stream, imp::AqcReceiveStream::new(recv));
+    Ok(())
 }
 
 /// Create a unidirectional stream from an [`AqcBidiChannel`].
@@ -1670,7 +1680,8 @@ pub fn aqc_bidi_create_uni_stream(
         .rt
         .block_on(channel.inner.create_unidirectional_stream())?;
 
-    Ok(Safe::init(stream, imp::AqcSendStream::new(send)))
+    Safe::init(stream, imp::AqcSendStream::new(send));
+    Ok(())
 }
 
 /// Obtains the receive (and potentially send) ends of a stream.
@@ -1723,7 +1734,8 @@ pub fn aqc_send_create_uni_stream(
         .rt
         .block_on(channel.inner.create_unidirectional_stream())?;
 
-    Ok(Safe::init(stream, imp::AqcSendStream::new(send)))
+    Safe::init(stream, imp::AqcSendStream::new(send));
+    Ok(())
 }
 
 /// Receives the stream from an [`AqcReceiverChannel`].
@@ -1746,7 +1758,8 @@ pub fn aqc_recv_receive_uni_stream(
         .block_on(channel.inner.receive_unidirectional_stream())?
         .ok_or(imp::Error::AqcStreamClosed)?;
 
-    Ok(Safe::init(stream, imp::AqcReceiveStream::new(recv)))
+    Safe::init(stream, imp::AqcReceiveStream::new(recv));
+    Ok(())
 }
 
 /// Send some data over an Aranya QUIC Channel.
@@ -1781,9 +1794,9 @@ pub fn aqc_receive_data(
     stream: &mut AqcReceiveStream,
     buffer: &mut [u8],
 ) -> Result<usize, imp::Error> {
-    Ok(client
+    client
         .deref_mut()
         .rt
         .block_on(stream.inner.receive(buffer))?
-        .ok_or(imp::Error::AqcStreamClosed)?)
+        .ok_or(imp::Error::AqcStreamClosed)
 }
