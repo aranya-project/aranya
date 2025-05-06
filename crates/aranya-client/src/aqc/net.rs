@@ -2,7 +2,7 @@
 
 //! The AQC network implementation.
 
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, ops::ControlFlow, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
@@ -97,8 +97,7 @@ pub async fn run_channels(
                     Err(mpsc::error::TryRecvError::Disconnected) => {
                         // Sender was dropped, likely AqcChannelsImpl was dropped.
                         error!("PSK Identity channel disconnected.");
-                        // break; // Exit the loop if the sender is gone
-                        None
+                        break; // Exit the loop if the sender is gone
                     }
                 };
                 if let Some(ref identity) = identity {
@@ -107,40 +106,10 @@ pub async fn run_channels(
                         identity
                     );
                     if identity == PSK_IDENTITY_CTRL {
-                        match conn.accept_receive_stream().await {
-                            Ok(Some(mut receive)) => {
-                                if let Ok(Some(ctrl_bytes)) = receive.receive().await {
-                                    match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
-                                        Ok(ctrl) => {
-                                            if let Err(e) = receive_aqc_ctrl(
-                                                daemon.clone(),
-                                                ctrl.team_id,
-                                                ctrl.ctrl,
-                                                &mut channel_map,
-                                            )
-                                            .await
-                                            {
-                                                error!("Failed to receive AQC ctrl: {}", e);
-                                            }
-                                        }
-                                        Err(e) => {
-                                            error!("Failed to deserialize AqcCtrlMessage: {}", e);
-                                        }
-                                    }
-                                } else {
-                                    // Handle the error or None case from receive.receive() if necessary
-                                    // For example, log an error or break the loop
-                                    error!("Failed to receive control message or stream closed");
-                                }
-                            }
-                            Ok(None) => {
-                                error!("Receive stream closed unexpectedly");
-                                continue;
-                            }
-                            Err(e) => {
-                                error!("Failed to accept receive stream: {}", e);
-                                continue;
-                            }
+                        if let ControlFlow::Break(_) =
+                            receive_ctrl_message(&daemon, &mut channel_map, &mut conn).await
+                        {
+                            continue;
                         }
                     } else if let Some(channel_info) = channel_map.get(identity) {
                         tracing::debug!(
@@ -148,52 +117,10 @@ pub async fn run_channels(
                             identity,
                             channel_info
                         );
-                        match channel_info {
-                            AqcChannel::Bidirectional { id } => {
-                                // Once we accept a valid connection, let's turn it into an AQC Channel that we can
-                                // then open an arbitrary number of streams on.
-                                let (channel, bi_sender) = AqcBidirectionalChannel::new(
-                                    LabelId::default(),
-                                    *id,
-                                    conn.handle(),
-                                );
-
-                                // Notify the AfcClient that we've accepted a new connection, which the user will
-                                // have to call receive_channel() on in order to use.
-                                if sender
-                                    .send(AqcChannelType::Bidirectional { channel })
-                                    .await
-                                    .is_err()
-                                {
-                                    error!("Sender closed. Unable to send channel");
-                                    return;
-                                } else {
-                                    // Spawn a new task so that we can receive any future streams that are opened
-                                    // over the connection.
-                                    tokio::spawn(handle_bidi_streams(conn, bi_sender));
-                                }
-                            }
-                            AqcChannel::Unidirectional { id } => {
-                                // Once we accept a valid connection, let's turn it into an AQC Channel that we can
-                                // then open an arbitrary number of streams on.
-                                let (receiver, uni_sender) =
-                                    AqcReceiverChannel::new(LabelId::default(), *id);
-
-                                // Notify the AfcClient that we've accepted a new connection, which the user will
-                                // have to call receive_channel() on in order to use.
-                                if sender
-                                    .send(AqcChannelType::Receiver { receiver })
-                                    .await
-                                    .is_err()
-                                {
-                                    error!("Sender closed. Unable to send channel");
-                                    return;
-                                } else {
-                                    // Spawn a new task so that we can receive any future streams that are opened
-                                    // over the connection.
-                                    tokio::spawn(handle_uni_streams(conn, uni_sender));
-                                }
-                            }
+                        if let ControlFlow::Break(_) =
+                            create_channel_type(&sender, conn, channel_info).await
+                        {
+                            return;
                         }
                     } else {
                         tracing::debug!(
@@ -203,8 +130,7 @@ pub async fn run_channels(
                         continue;
                     }
                 } else {
-                    // Could use .read().await for blocking read if preferred
-                    tracing::warn!("Could not acquire read lock on channel_map immediately.");
+                    tracing::warn!("No identity hint received. Unable to create channel.");
                 }
             }
             None => {
@@ -213,6 +139,95 @@ pub async fn run_channels(
             }
         }
     }
+}
+
+async fn create_channel_type(
+    sender: &mpsc::Sender<AqcChannelType>,
+    conn: Connection,
+    channel_info: &AqcChannel,
+) -> ControlFlow<()> {
+    match channel_info {
+        AqcChannel::Bidirectional { id } => {
+            // Once we accept a valid connection, let's turn it into an AQC Channel that we can
+            // then open an arbitrary number of streams on.
+            let (channel, bi_sender) =
+                AqcBidirectionalChannel::new(LabelId::default(), *id, conn.handle());
+
+            // Notify the AfcClient that we've accepted a new connection, which the user will
+            // have to call receive_channel() on in order to use.
+            if sender
+                .send(AqcChannelType::Bidirectional { channel })
+                .await
+                .is_ok()
+            {
+                // Spawn a new task so that we can receive any future streams that are opened
+                // over the connection.
+                tokio::spawn(handle_bidi_streams(conn, bi_sender));
+            } else {
+                error!("Sender closed. Unable to send channel");
+                return ControlFlow::Break(());
+            }
+        }
+        AqcChannel::Unidirectional { id } => {
+            // Once we accept a valid connection, let's turn it into an AQC Channel that we can
+            // then open an arbitrary number of streams on.
+            let (receiver, uni_sender) = AqcReceiverChannel::new(LabelId::default(), *id);
+
+            // Notify the AfcClient that we've accepted a new connection, which the user will
+            // have to call receive_channel() on in order to use.
+            if sender
+                .send(AqcChannelType::Receiver { receiver })
+                .await
+                .is_ok()
+            {
+                // Spawn a new task so that we can receive any future streams that are opened
+                tokio::spawn(handle_uni_streams(conn, uni_sender));
+            } else {
+                error!("Sender closed. Unable to send channel");
+                return ControlFlow::Break(());
+            }
+        }
+    }
+    ControlFlow::Continue(())
+}
+
+async fn receive_ctrl_message(
+    daemon: &Arc<DaemonApiClient>,
+    channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
+    conn: &mut Connection,
+) -> ControlFlow<()> {
+    match conn.accept_receive_stream().await {
+        Ok(Some(mut receive)) => {
+            if let Ok(Some(ctrl_bytes)) = receive.receive().await {
+                match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
+                    Ok(ctrl) => {
+                        if let Err(e) =
+                            receive_aqc_ctrl(daemon.clone(), ctrl.team_id, ctrl.ctrl, channel_map)
+                                .await
+                        {
+                            error!("Failed to receive AQC ctrl: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to deserialize AqcCtrlMessage: {}", e);
+                    }
+                }
+            } else {
+                // Handle the error or None case from receive.receive() if necessary
+                // For example, log an error or break the loop
+                error!("Failed to receive control message or stream closed");
+            }
+        }
+        Ok(None) => {
+            error!("Receive stream closed unexpectedly");
+            return ControlFlow::Break(());
+        }
+        Err(e) => {
+            error!("Failed to accept receive stream: {}", e);
+            return ControlFlow::Break(());
+        }
+    }
+    ControlFlow::Continue(())
 }
 
 async fn handle_uni_streams(mut conn: Connection, sender: mpsc::Sender<ReceiveStream>) {
