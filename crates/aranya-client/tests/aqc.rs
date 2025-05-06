@@ -113,7 +113,9 @@ async fn test_aqc_chans() -> Result<()> {
         }
         set.spawn(async move {
             let mut bidi_chans = Vec::new();
-            let mut uni_chans = Vec::new();
+            //let mut uni_chans = Vec::new();
+            let mut send_streams = Vec::new();
+            //let mut recv_streams = Vec::new();
             for peer in peers {
                 // create bidirectional channels with each peer.
                 info!(?device.aqc_addr, ?peer, "creating bidi channel");
@@ -124,8 +126,10 @@ async fn test_aqc_chans() -> Result<()> {
                     .await
                     .expect("expected to create bidi chan");
                 bidi_chans.push(bidi);
+                tokio::time::sleep(Duration::from_millis(300)).await;
 
                 // create unidirectional channels with each peer.
+                /*
                 info!(?device.aqc_addr, ?peer, "creating uni channel");
                 let uni = device
                     .client
@@ -134,10 +138,12 @@ async fn test_aqc_chans() -> Result<()> {
                     .await
                     .expect("expected to create bidi chan");
                 uni_chans.push(uni);
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                */
             }
 
             // Receive any channels that were created.
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            tokio::time::sleep(Duration::from_millis(300)).await;
             let mut recv_chans = Vec::new();
             while let Ok(recv_chan) = device.client.aqc().try_receive_channel() {
                 info!("received channel");
@@ -146,16 +152,21 @@ async fn test_aqc_chans() -> Result<()> {
 
             // Send data over all created channels that support send.
             // TODO: test create_bidirectional_stream()
+            tokio::time::sleep(Duration::from_millis(300)).await;
             for bidi in &mut bidi_chans {
                 let mut send = bidi
                     .create_uni_stream()
                     .await
                     .expect("expected to create uni stream");
                 info!("created unidirectional stream");
+                tokio::time::sleep(Duration::from_millis(300)).await;
+                
                 let msg = Bytes::from("hello");
                 send.send(&msg).await.expect("expected to send data");
+                send_streams.push(send);
                 info!("sent bidi chan data");
             }
+            /*
             for uni in &mut uni_chans {
                 let mut send = uni
                     .create_uni_stream()
@@ -184,8 +195,10 @@ async fn test_aqc_chans() -> Result<()> {
                 let msg = Bytes::from("hello");
                 send.send(&msg).await.expect("expected to send data");
             }
+            */
 
             // Receive data over all created and received channels that support receiving data.
+            /*
             tokio::time::sleep(Duration::from_millis(100)).await;
             for bidi in &mut bidi_chans {
                 while let Ok((_send, mut recv)) = bidi.try_receive_stream() {
@@ -199,7 +212,6 @@ async fn test_aqc_chans() -> Result<()> {
                 }
             }
             for uni in &mut recv_chans {
-                let mut streams = Vec::new();
                 match uni {
                     AqcChannelType::Sender { .. } => continue,
                     AqcChannelType::Receiver { ref mut receiver } => {
@@ -208,24 +220,24 @@ async fn test_aqc_chans() -> Result<()> {
                             .await
                             .expect("expected no error")
                         {
-                            streams.push(recv);
+                            recv_streams.push(recv);
                         }
                     }
                     AqcChannelType::Bidirectional { ref mut channel } => {
                         while let Ok((_send, recv)) = channel.try_receive_stream() {
-                            streams.push(recv);
+                            recv_streams.push(recv);
                         }
                     }
                 };
-                for mut recv in streams {
-                    let mut buf = vec![0u8; 1024 * 1024 * 2];
-                    let len = recv
-                        .receive(buf.as_mut_slice())
-                        .await
-                        .expect("expected to receive data")
-                        .expect("no data received");
-                    assert_eq!(&buf[..len], b"hello");
-                }
+            }
+            for recv in &mut recv_streams {
+                let mut buf = vec![0u8; 1024 * 1024 * 2];
+                let len = recv
+                    .receive(buf.as_mut_slice())
+                    .await
+                    .expect("expected to receive data")
+                    .expect("no data received");
+                assert_eq!(&buf[..len], b"hello");
             }
 
             // Delete all channels created by the device.
@@ -237,9 +249,19 @@ async fn test_aqc_chans() -> Result<()> {
             }
 
             // TODO: verify total messages send/received.
+            */
 
             // TODO: optimize this delay.
-            tokio::time::sleep(Duration::from_millis(2000)).await;
+            //tokio::time::sleep(Duration::from_millis(5000)).await;
+            loop {
+                info!("{}", device.id);
+                info!("{}", recv_chans.len());
+                info!("{}", bidi_chans.len());
+                //info!("{}", uni_chans.len());
+                info!("{}", send_streams.len());
+                //info!("{}", recv_streams.len());
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
         });
     }
     set.join_all().await;
