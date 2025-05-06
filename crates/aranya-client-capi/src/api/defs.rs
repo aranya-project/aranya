@@ -64,9 +64,17 @@ pub enum Error {
     #[capi(msg = "AQC server closed")]
     AqcServerClosed,
 
+    /// Unable to create an AQC channel.
+    #[capi(msg = "AQC channel creation error")]
+    AqcChannelCreate,
+
     /// Tried to do something with an AQC stream when it was closed.
     #[capi(msg = "AQC stream closed")]
     AqcStreamClosed,
+
+    /// Unable to create an AQC stream.
+    #[capi(msg = "AQC stream creation error")]
+    AqcStreamCreate,
 
     /// Unable to create configuration info.
     #[capi(msg = "invalid config")]
@@ -106,7 +114,9 @@ impl From<&imp::Error> for Error {
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
             imp::Error::AqcServerClosed => Self::AqcServerClosed,
+            imp::Error::AqcChannelCreate => Self::AqcChannelCreate,
             imp::Error::AqcStreamClosed => Self::AqcStreamClosed,
+            imp::Error::AqcStreamCreate => Self::AqcStreamCreate,
             imp::Error::Other(_) => Self::Other,
         }
     }
@@ -1422,11 +1432,15 @@ pub unsafe fn aqc_create_bidi_channel(
     let peer = unsafe { peer.as_underlying() }?;
 
     let client = client.deref_mut();
-    let chan = client.rt.block_on(client.inner.aqc().create_bidi_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
+    let chan = client
+        .rt
+        .block_on(
+            client
+                .inner
+                .aqc()
+                .create_bidi_channel(team.into(), peer, label_id.into()),
+        )
+        .map_err(|_| imp::Error::AqcChannelCreate)?;
 
     Safe::init(channel, imp::AqcBidiChannel::new(chan));
     Ok(())
@@ -1454,11 +1468,15 @@ pub unsafe fn aqc_create_uni_channel(
     let peer = unsafe { peer.as_underlying() }?;
 
     let client = client.deref_mut();
-    let chan = client.rt.block_on(client.inner.aqc().create_uni_channel(
-        team.into(),
-        peer,
-        label_id.into(),
-    ))?;
+    let chan = client
+        .rt
+        .block_on(
+            client
+                .inner
+                .aqc()
+                .create_uni_channel(team.into(), peer, label_id.into()),
+        )
+        .map_err(|_| imp::Error::AqcChannelCreate)?;
 
     Safe::init(channel, imp::AqcSenderChannel::new(chan));
     Ok(())
@@ -1658,7 +1676,8 @@ pub fn aqc_bidi_create_bidi_stream(
     let (send, recv) = client
         .deref_mut()
         .rt
-        .block_on(channel.inner.create_bidirectional_stream())?;
+        .block_on(channel.inner.create_bidirectional_stream())
+        .map_err(|_| imp::Error::AqcStreamCreate)?;
 
     Safe::init(send_stream, imp::AqcSendStream::new(send));
     Safe::init(recv_stream, imp::AqcReceiveStream::new(recv));
@@ -1680,7 +1699,8 @@ pub fn aqc_bidi_create_uni_stream(
     let send = client
         .deref_mut()
         .rt
-        .block_on(channel.inner.create_unidirectional_stream())?;
+        .block_on(channel.inner.create_unidirectional_stream())
+        .map_err(|_| imp::Error::AqcStreamCreate)?;
 
     Safe::init(stream, imp::AqcSendStream::new(send));
     Ok(())
@@ -1734,7 +1754,8 @@ pub fn aqc_send_create_uni_stream(
     let send = client
         .deref_mut()
         .rt
-        .block_on(channel.inner.create_unidirectional_stream())?;
+        .block_on(channel.inner.create_unidirectional_stream())
+        .map_err(|_| imp::Error::AqcStreamCreate)?;
 
     Safe::init(stream, imp::AqcSendStream::new(send));
     Ok(())

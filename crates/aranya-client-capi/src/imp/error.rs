@@ -25,8 +25,14 @@ pub enum Error {
     #[error("AQC server was closed")]
     AqcServerClosed,
 
+    #[error("AQC channel creation error")]
+    AqcChannelCreate,
+
     #[error("AQC stream was closed")]
     AqcStreamClosed,
+
+    #[error("AQC stream creation error")]
+    AqcStreamCreate,
 
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),

@@ -4,6 +4,7 @@ use aranya_client::aqc::net::{self as aqc};
 // TODO(nikki): decide if we want to refactor this to add accessors and remove
 // pub(crate) on inners? We also expose .inner in `client.rs`.
 
+/// An AQC channel that can both send and receive data.
 pub struct AqcBidiChannel {
     pub(crate) inner: aqc::AqcBidirectionalChannel,
 }
@@ -18,6 +19,7 @@ impl AqcBidiChannel {
     }
 }
 
+/// An AQC channel that can only send data.
 pub struct AqcSenderChannel {
     pub(crate) inner: aqc::AqcSenderChannel,
 }
@@ -32,6 +34,7 @@ impl AqcSenderChannel {
     }
 }
 
+/// An AQC channel that can only receive data.
 pub struct AqcReceiverChannel {
     pub(crate) inner: aqc::AqcReceiverChannel,
 }
@@ -46,6 +49,10 @@ impl AqcReceiverChannel {
     }
 }
 
+/// Container for an AQC Channel variant.
+/// 
+/// This needs to be destructured before it can be used, since C doesn't have
+/// dataful enums.
 pub struct AqcChannelType {
     pub(crate) inner: aqc::AqcChannelType,
 }
@@ -60,6 +67,7 @@ impl AqcChannelType {
     }
 }
 
+/// The sender end of an AQC stream.
 pub struct AqcSendStream {
     pub(crate) inner: aqc::AqcSendStream,
 }
@@ -74,6 +82,7 @@ impl AqcSendStream {
     }
 }
 
+/// The receiver end of an AQC stream.
 pub struct AqcReceiveStream {
     pub(crate) inner: aqc::AqcReceiveStream,
 }
