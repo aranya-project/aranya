@@ -148,7 +148,7 @@ async fn test_aqc_chans() -> Result<()> {
             // TODO: test create_bidirectional_stream()
             for bidi in &mut bidi_chans {
                 let mut send = bidi
-                    .create_unidirectional_stream()
+                    .create_uni_stream()
                     .await
                     .expect("expected to create uni stream");
                 info!("created unidirectional stream");
@@ -158,7 +158,7 @@ async fn test_aqc_chans() -> Result<()> {
             }
             for uni in &mut uni_chans {
                 let mut send = uni
-                    .create_unidirectional_stream()
+                    .create_uni_stream()
                     .await
                     .expect("expected to create uni stream");
                 let msg = Bytes::from("hello");
@@ -172,12 +172,12 @@ async fn test_aqc_chans() -> Result<()> {
             for uni in &mut recv_chans {
                 let mut send = match uni {
                     AqcChannelType::Sender { ref mut sender } => sender
-                        .create_unidirectional_stream()
+                        .create_uni_stream()
                         .await
                         .expect("expected to create uni stream"),
                     AqcChannelType::Receiver { .. } => continue,
                     AqcChannelType::Bidirectional { ref mut channel } => channel
-                        .create_unidirectional_stream()
+                        .create_uni_stream()
                         .await
                         .expect("expected to create uni stream"),
                 };
@@ -204,7 +204,7 @@ async fn test_aqc_chans() -> Result<()> {
                     AqcChannelType::Sender { .. } => continue,
                     AqcChannelType::Receiver { ref mut receiver } => {
                         while let Some(recv) = receiver
-                            .receive_unidirectional_stream()
+                            .receive_uni_stream()
                             .await
                             .expect("expected no error")
                         {

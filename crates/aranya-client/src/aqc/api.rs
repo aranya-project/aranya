@@ -30,6 +30,7 @@ use tarpc::context;
 use tokio::sync::mpsc;
 use tracing::{debug, error, instrument};
 
+use super::net::TryReceiveError;
 use crate::{
     aqc::net::{AqcBidirectionalChannel, AqcChannelType, AqcClient, AqcSenderChannel},
     error::{aranya_error, AqcError, IpcError},
@@ -97,12 +98,8 @@ impl AqcChannelsImpl {
             .map_err(|e| AqcError::TlsConfig(e.to_string()))?
             .ok_or_else(|| AqcError::TlsConfig("No private key found in KEY_PEM".into()))?;
 
-        // Initialize ServerName here
-        // let psk_server_name = ServerName::DnsName(DnsName::try_from_str("localhost").unwrap());
-
         let psk = PresharedKey::external(PSK_IDENTITY_CTRL, PSK_BYTES_CTRL)
             .assume("unable to create psk")?;
-        // Create Arc<ClientPresharedKeys> using the new structure
         let client_keys = Arc::new(ClientPresharedKeys::new(psk.clone()));
 
         // Create Client Config (INSECURE: Skips server cert verification)
@@ -124,8 +121,6 @@ impl AqcChannelsImpl {
         server_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
         server_config.preshared_keys = PresharedKeySelection::Enabled(Arc::new(server_keys));
 
-        // Wrap for s2n-quic using deprecated `new`
-        // TODO: these `new()` are deprecated.
         let tls_client_provider = rustls_provider::Client::new(client_config);
         let tls_server_provider = rustls_provider::Server::new(server_config);
         // --- End Rustls Setup ---
@@ -165,7 +160,7 @@ impl AqcChannelsImpl {
         psk: PresharedKey,
     ) -> Result<AqcBidirectionalChannel, AqcError> {
         self.client
-            .create_bidirectional_channel(peer_addr, label_id, id, psk)
+            .create_bidi_channel(peer_addr, label_id, id, psk)
             .await
             .map_err(AqcError::Other)
     }
@@ -179,7 +174,7 @@ impl AqcChannelsImpl {
         psk: PresharedKey,
     ) -> Result<AqcSenderChannel, AqcError> {
         self.client
-            .create_unidirectional_channel(peer_addr, label_id, id, psk)
+            .create_uni_channel(peer_addr, label_id, id, psk)
             .await
             .map_err(AqcError::Other)
     }
@@ -187,6 +182,11 @@ impl AqcChannelsImpl {
     /// Receives a channel.
     pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
         self.client.receive_channel().await
+    }
+
+    /// Attempts to receive a channel.
+    pub fn try_receive_channel(&mut self) -> Result<AqcChannelType, TryReceiveError> {
+        self.client.try_receive_channel()
     }
 }
 
@@ -413,9 +413,18 @@ impl<'a> AqcChannels<'a> {
         todo!()
     }
 
-    /// Waits for a peer to create an AQC channel with this client.
+    /// Waits for a peer to create an AQC channel with this client. Returns
+    /// None if channels can no longer be received. If this happens, the
+    /// application should be restarted.
     pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
         self.client.aqc.receive_channel().await
+    }
+
+    /// Returns the next available channel. If there is no channel available,
+    /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
+    /// is returned no channels will be available until the application is restarted.
+    pub fn try_receive_channel(&mut self) -> Result<AqcChannelType, TryReceiveError> {
+        self.client.aqc.try_receive_channel()
     }
 }
 
@@ -423,6 +432,9 @@ impl<'a> AqcChannels<'a> {
 // INSECURE: Allows connecting to any server certificate.
 // Requires the `dangerous_configuration` feature on the `rustls` crate.
 // Use full paths for traits and types
+// TODO: remove this once we have a way to exclusively use PSKs.
+// Currently, we use this to allow the server to be set up to use PSKs
+// without having to rely on the server certificate.
 
 #[derive(Debug)]
 struct SkipServerVerification(Arc<CryptoProvider>);
