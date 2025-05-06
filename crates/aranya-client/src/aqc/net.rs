@@ -344,7 +344,7 @@ impl AqcSenderChannel {
     }
 
     /// Creates a new unidirectional stream for the channel.
-    pub async fn create_unidirectional_stream(&mut self) -> Result<AqcSendStream> {
+    pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream> {
         let send = self.handle.open_send_stream().await?;
         Ok(AqcSendStream { send })
     }
@@ -403,12 +403,22 @@ impl AqcReceiverChannel {
         self.aqc_id
     }
 
-    /// Returns a unidirectional stream if one has been received.
-    /// If no stream has been received return None.
-    pub async fn receive_unidirectional_stream(&mut self) -> Result<Option<AqcReceiveStream>> {
+    /// Returns the next unidirectional stream. If the channel is closed, return None.
+    pub async fn receive_uni_stream(&mut self) -> Result<Option<AqcReceiveStream>> {
         match self.uni_receiver.recv().await {
             Some(stream) => Ok(Some(AqcReceiveStream { receive: stream })),
             None => Ok(None),
+        }
+    }
+
+    /// Receive the next available unidirectional stream. If there is no stream available,
+    /// return Empty. If the stream is disconnected, return Disconnected. If disconnected
+    /// is returned no streams will be available until a new channel is created.
+    pub fn try_receive_uni_stream(&mut self) -> Result<AqcReceiveStream, TryReceiveError> {
+        match self.uni_receiver.try_recv() {
+            Ok(stream) => Ok(AqcReceiveStream { receive: stream }),
+            Err(mpsc::error::TryRecvError::Empty) => Err(TryReceiveError::Empty),
+            Err(mpsc::error::TryRecvError::Disconnected) => Err(TryReceiveError::Disconnected),
         }
     }
 }
@@ -466,16 +476,30 @@ impl AqcBidirectionalChannel {
         }
     }
 
+    /// Receive the next available stream. If there is no stream available,
+    /// return Empty. If the channel is closed, return Disconnected. If disconnected
+    /// is returned no streams will be available until a new channel is created.
+    pub fn try_receive_stream(
+        &mut self,
+    ) -> Result<(Option<AqcSendStream>, AqcReceiveStream), TryReceiveError> {
+        match self.receiver.try_recv() {
+            Ok((Some(send), receive)) => {
+                Ok((Some(AqcSendStream { send }), AqcReceiveStream { receive }))
+            }
+            Ok((None, receive)) => Ok((None, AqcReceiveStream { receive })),
+            Err(mpsc::error::TryRecvError::Empty) => Err(TryReceiveError::Empty),
+            Err(mpsc::error::TryRecvError::Disconnected) => Err(TryReceiveError::Disconnected),
+        }
+    }
+
     /// Creates a new unidirectional stream for the channel.
-    pub async fn create_unidirectional_stream(&mut self) -> Result<AqcSendStream> {
+    pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream> {
         let send = self.handle.open_send_stream().await?;
         Ok(AqcSendStream { send })
     }
 
     /// Creates a new bidirectional stream for the channel.
-    pub async fn create_bidirectional_stream(
-        &mut self,
-    ) -> Result<(AqcSendStream, AqcReceiveStream)> {
+    pub async fn create_bidi_stream(&mut self) -> Result<(AqcSendStream, AqcReceiveStream)> {
         let (receive, send) = self.handle.open_bidirectional_stream().await?.split();
         Ok((AqcSendStream { send }, AqcReceiveStream { receive }))
     }
@@ -542,6 +566,15 @@ impl AqcSendStream {
     }
 }
 
+/// An error that occurs when trying to receive a channel or stream.
+#[derive(Debug)]
+pub enum TryReceiveError {
+    /// The channel or stream is empty.
+    Empty,
+    /// The channel or stream is disconnected.
+    Disconnected,
+}
+
 /// An AQC client. Used to create and receive channels.
 #[derive(Debug)]
 pub(crate) struct AqcClient {
@@ -583,6 +616,17 @@ impl AqcClient {
         self.receiver.recv().await
     }
 
+    /// Receive the next available channel. If there is no channel available,
+    /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
+    /// is returned no channels will be available until the application is restarted.
+    pub fn try_receive_channel(&mut self) -> Result<AqcChannelType, TryReceiveError> {
+        match self.receiver.try_recv() {
+            Ok(channel) => Ok(channel),
+            Err(mpsc::error::TryRecvError::Empty) => Err(TryReceiveError::Empty),
+            Err(mpsc::error::TryRecvError::Disconnected) => Err(TryReceiveError::Disconnected),
+        }
+    }
+
     /// Create a new channel to the given address.
     async fn create_channel(
         &mut self,
@@ -611,7 +655,7 @@ impl AqcClient {
     }
 
     /// Creates a new unidirectional channel to the given address.
-    pub async fn create_unidirectional_channel(
+    pub async fn create_uni_channel(
         &mut self,
         addr: SocketAddr,
         label_id: LabelId,
@@ -628,7 +672,7 @@ impl AqcClient {
     }
 
     /// Creates a new bidirectional channel to the given address.
-    pub async fn create_bidirectional_channel(
+    pub async fn create_bidi_channel(
         &mut self,
         addr: SocketAddr,
         label_id: LabelId,

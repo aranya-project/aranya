@@ -30,6 +30,7 @@ use tarpc::context;
 use tokio::sync::mpsc;
 use tracing::{debug, error, instrument};
 
+use super::net::TryReceiveError;
 use crate::{
     aqc::net::{AqcBidirectionalChannel, AqcChannelType, AqcClient, AqcSenderChannel},
     error::{aranya_error, AqcError, IpcError},
@@ -159,7 +160,7 @@ impl AqcChannelsImpl {
         psk: PresharedKey,
     ) -> Result<AqcBidirectionalChannel, AqcError> {
         self.client
-            .create_bidirectional_channel(peer_addr, label_id, id, psk)
+            .create_bidi_channel(peer_addr, label_id, id, psk)
             .await
             .map_err(AqcError::Other)
     }
@@ -173,7 +174,7 @@ impl AqcChannelsImpl {
         psk: PresharedKey,
     ) -> Result<AqcSenderChannel, AqcError> {
         self.client
-            .create_unidirectional_channel(peer_addr, label_id, id, psk)
+            .create_uni_channel(peer_addr, label_id, id, psk)
             .await
             .map_err(AqcError::Other)
     }
@@ -181,6 +182,11 @@ impl AqcChannelsImpl {
     /// Receives a channel.
     pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
         self.client.receive_channel().await
+    }
+
+    /// Attempts to receive a channel.
+    pub fn try_receive_channel(&mut self) -> Result<AqcChannelType, TryReceiveError> {
+        self.client.try_receive_channel()
     }
 }
 
@@ -407,9 +413,18 @@ impl<'a> AqcChannels<'a> {
         todo!()
     }
 
-    /// Waits for a peer to create an AQC channel with this client.
+    /// Waits for a peer to create an AQC channel with this client. Returns
+    /// None if channels can no longer be received. If this happens, the
+    /// application should be restarted.
     pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
         self.client.aqc.receive_channel().await
+    }
+
+    /// Returns the next available channel. If there is no channel available,
+    /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
+    /// is returned no channels will be available until the application is restarted.
+    pub fn try_receive_channel(&mut self) -> Result<AqcChannelType, TryReceiveError> {
+        self.client.aqc.try_receive_channel()
     }
 }
 
