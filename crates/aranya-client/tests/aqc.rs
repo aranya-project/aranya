@@ -139,7 +139,7 @@ async fn test_aqc_chans() -> Result<()> {
             // Receive any channels that were created.
             tokio::time::sleep(Duration::from_millis(100)).await;
             let mut recv_chans = Vec::new();
-            while let Some(recv_chan) = device.client.aqc().receive_channel().await {
+            while let Ok(recv_chan) = device.client.aqc().try_receive_channel() {
                 info!("received channel");
                 recv_chans.push(recv_chan);
             }
@@ -188,7 +188,7 @@ async fn test_aqc_chans() -> Result<()> {
             // Receive data over all created and received channels that support receiving data.
             tokio::time::sleep(Duration::from_millis(100)).await;
             for bidi in &mut bidi_chans {
-                while let Some((_send, mut recv)) = bidi.receive_stream().await {
+                while let Ok((_send, mut recv)) = bidi.try_receive_stream() {
                     let mut buf = vec![0u8; 1024 * 1024 * 2];
                     let len = recv
                         .receive(buf.as_mut_slice())
@@ -212,7 +212,7 @@ async fn test_aqc_chans() -> Result<()> {
                         }
                     }
                     AqcChannelType::Bidirectional { ref mut channel } => {
-                        while let Some((_send, recv)) = channel.receive_stream().await {
+                        while let Ok((_send, recv)) = channel.try_receive_stream() {
                             streams.push(recv);
                         }
                     }
