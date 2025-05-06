@@ -46,23 +46,6 @@ impl AqcReceiverChannel {
     }
 }
 
-/*
-TODO(nikki): implement uni channels
-pub struct AqcUniChannel {
-    inner: aqc::AqcUnidirectionalChannel,
-}
-
-impl Typed for AqcUniChannel {
-    const TYPE_ID: TypeId = TypeId::new(0xD3DE3627);
-}
-
-impl AqcUniChannel {
-    pub fn new(channel: aqc::AqcUnidirectionalChannel) -> Self {
-        Self { inner: channel }
-    }
-}
-*/
-
 pub struct AqcChannelType {
     pub(crate) inner: aqc::AqcChannelType,
 }

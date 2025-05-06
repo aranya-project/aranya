@@ -453,9 +453,9 @@ AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg) {
 AranyaError run(Team *t) {
     AranyaError err;
     AranyaDeviceId *devices = NULL;
-    Client *owner           = &t->clients.owner;
-    Client *admin           = &t->clients.admin;
-    Client *operator= & t->clients.operator;
+    Client *owner = &t->clients.owner;
+    Client *admin = &t->clients.admin;
+    Client *operator = &t->clients.operator;
 
     // initialize logging.
     printf("initializing logging\n");
@@ -656,8 +656,8 @@ exit:
 AranyaError run_aqc_example(Team *t) {
     AranyaError err       = ARANYA_ERROR_OTHER;
     AranyaLabelId *labels = NULL;
-    Client *admin         = &t->clients.admin;
-    Client *operator= & t->clients.operator;
+    Client *admin = &t->clients.admin;
+    Client *operator= &t->clients.operator;
 
     printf("running AQC demo \n");
 
@@ -764,7 +764,7 @@ AranyaError run_aqc_example(Team *t) {
     }
 
     // Create channel using Member A's client
-    printf("creating AQC channel \r\n");
+    printf("creating AQC channel \n");
     AranyaAqcBidiChannel send_channel;
     err = aranya_aqc_create_bidi_channel(&t->clients.membera.client, &t->id,
                                          aqc_addrs[MEMBERB], &label1_id,
