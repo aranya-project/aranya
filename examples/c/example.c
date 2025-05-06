@@ -550,8 +550,8 @@ AranyaError run(Team *t) {
     EXPECT("error assigning operator role", err);
 
     // Add teams to each device's local store
-    // err = add_team_to_devices(t);
-    // EXPECT("error adding team to devices", err);
+    err = add_team_to_devices(t);
+    EXPECT("error adding team to devices", err);
 
     // Initialize the builder
     struct AranyaSyncPeerConfigBuilder builder;

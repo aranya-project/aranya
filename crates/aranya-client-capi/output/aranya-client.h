@@ -941,7 +941,8 @@ AranyaError aranya_team_config_builder_cleanup_ext(struct AranyaTeamConfigBuilde
  * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the team config builder
- * @param out a pointer to write the team config to
+ * @param init_command a pointer to the init command data
+ * @param init_command_len the length of the init command
  */
 AranyaError aranya_team_config_builder_init_command(struct AranyaTeamConfigBuilder *cfg,
                                                     const uint8_t *init_command,
@@ -954,7 +955,8 @@ AranyaError aranya_team_config_builder_init_command(struct AranyaTeamConfigBuild
  * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the team config builder
- * @param out a pointer to write the team config to
+ * @param init_command a pointer to the init command data
+ * @param init_command_len the length of the init command
  */
 AranyaError aranya_team_config_builder_init_command_ext(struct AranyaTeamConfigBuilder *cfg,
                                                         const uint8_t *init_command,
