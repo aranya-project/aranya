@@ -1529,19 +1529,22 @@ pub fn aqc_receive_channel(
 ///
 /// # Example
 /// ```C
-/// AqcChannel channel;
-/// AqcBidiChannel bidi;
-/// AqcSenderChannel sender;
-/// AqcReceiverChannel receiver;
-/// switch (aranya_aqc_get_channel_type(channel)) {
+/// AranyaAqcChannel channel;
+/// AranyaAqcChannelType channel_type;
+/// AranyaAqcBidiChannel bidi;
+/// AranyaAqcSenderChannel sender;
+/// AranyaAqcReceiverChannel receiver;
+/// 
+/// aranya_aqc_get_channel_type(&channel, &channel_type);
+/// switch (channel_type) {
 ///     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
-///         aranya_aqc_get_bidirectional_channel(channel, &bidi);
+///         aranya_aqc_get_bidirectional_channel(&channel, &bidi);
 ///         break;
 ///     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
-///         aranya_aqc_get_sender_channel(channel, &sender);
+///         aranya_aqc_get_sender_channel(&channel, &sender);
 ///         break;
 ///     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
-///         aranya_aqc_get_receiver_channel(channel, &receiver);
+///         aranya_aqc_get_receiver_channel(&channel, &receiver);
 ///         break;
 /// }
 /// ```

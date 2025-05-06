@@ -453,9 +453,9 @@ AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg) {
 AranyaError run(Team *t) {
     AranyaError err;
     AranyaDeviceId *devices = NULL;
-    Client *owner = &t->clients.owner;
-    Client *admin = &t->clients.admin;
-    Client *operator= &t->clients.operator;
+    Client *owner           = &t->clients.owner;
+    Client *admin           = &t->clients.admin;
+    Client *operator= & t->clients.operator;
 
     // initialize logging.
     printf("initializing logging\n");
@@ -468,38 +468,35 @@ AranyaError run(Team *t) {
     EXPECT("unable to initialize team", err);
 
     // add admin to team.
-    err =
-        aranya_add_device_to_team(&owner->client, &t->id,
-                                  admin->pk, admin->pk_len);
+    err = aranya_add_device_to_team(&owner->client, &t->id, admin->pk,
+                                    admin->pk_len);
     EXPECT("error adding admin to team", err);
 
     // add operator to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id,
-                                    operator->pk,
-                                    operator->pk_len);
+    err = aranya_add_device_to_team(&owner->client,
+                                    &t->id, operator->pk, operator->pk_len);
     EXPECT("error adding operator to team", err);
 
     // upgrade role to admin.
-    err = aranya_assign_role(&owner->client, &t->id,
-                             &admin->id, ARANYA_ROLE_ADMIN);
+    err = aranya_assign_role(&owner->client, &t->id, &admin->id,
+                             ARANYA_ROLE_ADMIN);
     EXPECT("error assigning admin role", err);
 
     // upgrade role to operator.
-    err = aranya_assign_role(&admin->client, &t->id,
-                             &operator->id, ARANYA_ROLE_OPERATOR);
+    err = aranya_assign_role(&admin->client, &t->id, &operator->id,
+                             ARANYA_ROLE_OPERATOR);
     if (err == ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "application failed: expected role assignment to fail");
         err = ARANYA_ERROR_OTHER;
         goto exit;
     }
 
-    err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER],
-                          NULL);
+    err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER], NULL);
     EXPECT("error calling `sync_now` to sync with peer", err);
 
     sleep(1);
-    err = aranya_assign_role(&admin->client, &t->id,
-                             &operator->id, ARANYA_ROLE_OPERATOR);
+    err = aranya_assign_role(&admin->client, &t->id, &operator->id,
+                             ARANYA_ROLE_OPERATOR);
     EXPECT("error assigning operator role", err);
 
     // Initialize the builder
@@ -536,28 +533,26 @@ AranyaError run(Team *t) {
     // something like `scp`.
 
     // add membera to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id,
-                                    t->clients.membera.pk,
-                                    t->clients.membera.pk_len);
+    err =
+        aranya_add_device_to_team(&owner->client, &t->id, t->clients.membera.pk,
+                                  t->clients.membera.pk_len);
     EXPECT("error adding membera to team", err);
 
     // add memberb to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id,
-                                    t->clients.memberb.pk,
-                                    t->clients.memberb.pk_len);
+    err =
+        aranya_add_device_to_team(&owner->client, &t->id, t->clients.memberb.pk,
+                                  t->clients.memberb.pk_len);
     EXPECT("error adding memberb to team", err);
 
     sleep(1);
 
     // assign AQC network addresses.
-    err = aranya_aqc_assign_net_identifier(&operator->client, &t->id,
-                                           &t->clients.membera.id,
-                                           aqc_addrs[MEMBERA]);
+    err = aranya_aqc_assign_net_identifier(
+        &operator->client, &t->id, &t->clients.membera.id, aqc_addrs[MEMBERA]);
     EXPECT("error assigning aqc net name to membera", err);
 
-    err = aranya_aqc_assign_net_identifier(&operator->client, &t->id,
-                                           &t->clients.memberb.id,
-                                           aqc_addrs[MEMBERB]);
+    err = aranya_aqc_assign_net_identifier(
+        &operator->client, &t->id, &t->clients.memberb.id, aqc_addrs[MEMBERB]);
     EXPECT("error assigning aqc net name to memberb", err);
 
     sleep(1);
@@ -570,8 +565,8 @@ AranyaError run(Team *t) {
     if (devices == NULL) {
         abort();
     }
-    err = aranya_query_devices_on_team(&operator->client, &t->id,
-                                       devices, &devices_len);
+    err = aranya_query_devices_on_team(&operator->client, &t->id, devices,
+                                       &devices_len);
     EXPECT("error querying devices on team", err);
 
     for (size_t i = 0; i < devices_len; i++) {
@@ -599,8 +594,8 @@ AranyaError run(Team *t) {
     uint8_t memberb_keybundle[256] = {0};
     size_t memberb_keybundle_len   = sizeof(memberb_keybundle);
     err                            = aranya_query_device_keybundle(
-        &operator->client, &t->id, &t->clients.memberb.id,
-        memberb_keybundle, &memberb_keybundle_len);
+        &operator->client, &t->id, &t->clients.memberb.id, memberb_keybundle,
+        &memberb_keybundle_len);
     EXPECT("error querying memberb key bundle", err);
     printf(
         "%s key bundle len: %zu"
@@ -625,9 +620,8 @@ AranyaError run(Team *t) {
            memberb_aqc_net_identifier);
 
     // Remove the net identifier.
-    err = aranya_aqc_remove_net_identifier(&operator->client, &t->id,
-                                           &t->clients.memberb.id,
-                                           aqc_addrs[MEMBERB]);
+    err = aranya_aqc_remove_net_identifier(
+        &operator->client, &t->id, &t->clients.memberb.id, aqc_addrs[MEMBERB]);
     EXPECT("error removing memberb aqc net identifier", err);
     printf("removed aqc net identifier `%s` from `%s`\n",
            memberb_aqc_net_identifier, t->clients_arr[MEMBERB].name);
@@ -646,9 +640,8 @@ AranyaError run(Team *t) {
     }
 
     // Add the net identifier back.
-    err = aranya_aqc_assign_net_identifier(&operator->client, &t->id,
-                                           &t->clients.memberb.id,
-                                           aqc_addrs[MEMBERB]);
+    err = aranya_aqc_assign_net_identifier(
+        &operator->client, &t->id, &t->clients.memberb.id, aqc_addrs[MEMBERB]);
     EXPECT("error assigning aqc net name to memberb", err);
 
     err = run_aqc_example(t);
@@ -663,8 +656,8 @@ exit:
 AranyaError run_aqc_example(Team *t) {
     AranyaError err       = ARANYA_ERROR_OTHER;
     AranyaLabelId *labels = NULL;
-    Client *admin = &t->clients.admin;
-    Client *operator= &t->clients.operator;
+    Client *admin         = &t->clients.admin;
+    Client *operator= & t->clients.operator;
 
     printf("running AQC demo \n");
 
@@ -673,32 +666,32 @@ AranyaError run_aqc_example(Team *t) {
 
     const char *label1_name = "label1";
     AranyaLabelId label1_id;
-    err = aranya_create_label(&operator->client, &t->id, label1_name,
-                              &label1_id);
+    err =
+        aranya_create_label(&operator->client, &t->id, label1_name, &label1_id);
     EXPECT("error creating label1", err);
 
     const char *label2_name = "label2";
     AranyaLabelId label2_id;
-    err = aranya_create_label(&operator->client, &t->id, label2_name,
-                              &label2_id);
+    err =
+        aranya_create_label(&operator->client, &t->id, label2_name, &label2_id);
     EXPECT("error creating label2", err);
 
     printf("assigning label to members\n");
     AranyaChanOp op = ARANYA_CHAN_OP_SEND_RECV;
-    err             = aranya_assign_label(&operator->client, &t->id,
-                                          &t->clients.membera.id, &label1_id, op);
+    err = aranya_assign_label(&operator->client, &t->id, &t->clients.membera.id,
+                              &label1_id, op);
     EXPECT("error assigning label1 to membera", err);
 
-    err = aranya_assign_label(&operator->client, &t->id,
-                              &t->clients.memberb.id, &label1_id, op);
+    err = aranya_assign_label(&operator->client, &t->id, &t->clients.memberb.id,
+                              &label1_id, op);
     EXPECT("error assigning label2 to memberb", err);
 
-    err = aranya_assign_label(&operator->client, &t->id,
-                              &t->clients.membera.id, &label2_id, op);
+    err = aranya_assign_label(&operator->client, &t->id, &t->clients.membera.id,
+                              &label2_id, op);
     EXPECT("error assigning label2 to membera", err);
 
-    err = aranya_assign_label(&operator->client, &t->id,
-                              &t->clients.memberb.id, &label2_id, op);
+    err = aranya_assign_label(&operator->client, &t->id, &t->clients.memberb.id,
+                              &label2_id, op);
     EXPECT("error assigning label2 to memberb", err);
     sleep(1);
 
@@ -724,14 +717,13 @@ AranyaError run_aqc_example(Team *t) {
     if (labels == NULL) {
         abort();
     }
-    err = aranya_query_device_label_assignments(&operator->client,
-                                                &t->id, &t->clients.memberb.id,
-                                                labels, &labels_len);
+    err = aranya_query_device_label_assignments(
+        &operator->client, &t->id, &t->clients.memberb.id, labels, &labels_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error\n");
         labels = realloc(labels, labels_len * sizeof(AranyaLabelId));
-        err = aranya_query_labels(&operator->client, &t->id, labels,
-                                  &labels_len);
+        err =
+            aranya_query_labels(&operator->client, &t->id, labels, &labels_len);
     }
     EXPECT("error querying labels assigned to device", err);
 
@@ -753,13 +745,12 @@ AranyaError run_aqc_example(Team *t) {
     // `labels_len` is intentionally set to 1 when there are 2 labels to test
     // `ARANYA_ERROR_BUFFER_TOO_SMALL` error handling.
     labels_len = 1;
-    err = aranya_query_labels(&operator->client, &t->id, labels,
-                              &labels_len);
+    err = aranya_query_labels(&operator->client, &t->id, labels, &labels_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error\n");
         labels = realloc(labels, labels_len * sizeof(AranyaLabelId));
-        err = aranya_query_labels(&operator->client, &t->id, labels,
-                                  &labels_len);
+        err =
+            aranya_query_labels(&operator->client, &t->id, labels, &labels_len);
     }
     EXPECT("error querying labels on team", err);
 
@@ -774,21 +765,70 @@ AranyaError run_aqc_example(Team *t) {
 
     // Create channel using Member A's client
     printf("creating AQC channel \r\n");
-    AranyaAqcBidiChannel channel;
+    AranyaAqcBidiChannel send_channel;
     err = aranya_aqc_create_bidi_channel(&t->clients.membera.client, &t->id,
                                          aqc_addrs[MEMBERB], &label1_id,
-                                         &channel);
+                                         &send_channel);
     EXPECT("error creating aqc bidi channel", err);
 
-    // TODO: send AQC data
+    // Receive the channel on Member B's side
+    AranyaAqcChannel channel;
+    AranyaAqcChannelType channel_type;
+    AranyaAqcBidiChannel recv_channel;
+
+    err = aranya_aqc_receive_channel(&t->clients.memberb.client, &channel);
+    EXPECT("error receiving aqc bidi channel", err);
+
+    aranya_aqc_get_channel_type(&channel, &channel_type);
+    switch (channel_type) {
+    case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
+        aranya_aqc_get_bidirectional_channel(&channel, &recv_channel);
+        break;
+    case ARANYA_AQC_CHANNEL_TYPE_SENDER:
+    case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
+        fprintf(stderr, "somehow got the wrong AQC channel type");
+        return ARANYA_ERROR_AQC;
+    }
+
+    // Open up a unidirectional stream from Member A to Member B
+    AranyaAqcSendStream send;
+    AranyaAqcSendStream send_invalid;
+    AranyaAqcReceiveStream recv;
+    bool valid_send;
+    err = aranya_aqc_bidi_create_uni_stream(&t->clients.membera.client,
+                                            &send_channel, &send);
+    EXPECT("error creating an aqc uni stream", err);
+
+    err = aranya_aqc_bidi_receive_stream(&t->clients.memberb.client,
+                                         &recv_channel, &send_invalid, &recv,
+                                         &valid_send);
+    EXPECT("error receiving an aqc uni stream", err);
+    // Validate that we never got a send stream since this is a uni stream.
+    if (valid_send == true) {
+        fprintf(stderr, "somehow received an AQC send stream");
+        return ARANYA_ERROR_AQC;
+    }
+
+    const char *string = "hello from aqc!";
+    uint8_t buffer[BUFFER_LEN];
+    size_t received_length;
+    aranya_aqc_send_data(&t->clients.membera.client, &send,
+                         (const uint8_t *)string, strlen(string));
+    aranya_aqc_receive_data(&t->clients.memberb.client, &recv, buffer,
+                            BUFFER_LEN, &received_length);
+    if (strcmp(string, (const char *)buffer)) {
+        fprintf(stderr, "received string doesn't match");
+        return ARANYA_ERROR_AQC;
+    }
+    printf("Received AQC data: \"%s\"\n", buffer);
 
     // Revoke/delete label using the Operator
     printf("revoke/delete label \n");
-    err = aranya_revoke_label(&operator->client, &t->id,
-                              &t->clients.membera.id, &label1_id);
+    err = aranya_revoke_label(&operator->client, &t->id, &t->clients.membera.id,
+                              &label1_id);
     EXPECT("error revoking label from membera", err);
-    err = aranya_revoke_label(&operator->client, &t->id,
-                              &t->clients.memberb.id, &label1_id);
+    err = aranya_revoke_label(&operator->client, &t->id, &t->clients.memberb.id,
+                              &label1_id);
     EXPECT("error revoking label from memberb", err);
     err = aranya_delete_label(&admin->client, &t->id, &label1_id);
     EXPECT("error deleting label", err);
