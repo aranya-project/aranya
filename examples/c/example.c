@@ -15,7 +15,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "aranya-client.h"
+#include "../../crates/aranya-client-capi/output/aranya-client.h"
 
 // Macro for printing AranyaError to stderr and returning the error.
 // Does nothing if error value is ARANYA_SUCCESS.
@@ -765,16 +765,16 @@ AranyaError run_aqc_example(Team *t) {
 
     // Create channel using Member A's client
     printf("creating AQC channel \n");
-    AranyaAqcBidiChannel send_channel;
+    AranyaAqcBidiChannel bidi_send;
     err = aranya_aqc_create_bidi_channel(&t->clients.membera.client, &t->id,
                                          aqc_addrs[MEMBERB], &label1_id,
-                                         &send_channel);
+                                         &bidi_send);
     EXPECT("error creating aqc bidi channel", err);
 
     // Receive the channel on Member B's side
     AranyaAqcChannel channel;
     AranyaAqcChannelType channel_type;
-    AranyaAqcBidiChannel recv_channel;
+    AranyaAqcBidiChannel bidi_recv;
 
     err = aranya_aqc_receive_channel(&t->clients.memberb.client, &channel);
     EXPECT("error receiving aqc bidi channel", err);
@@ -782,7 +782,7 @@ AranyaError run_aqc_example(Team *t) {
     aranya_aqc_get_channel_type(&channel, &channel_type);
     switch (channel_type) {
     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
-        aranya_aqc_get_bidirectional_channel(&channel, &recv_channel);
+        aranya_aqc_get_bidirectional_channel(&channel, &bidi_recv);
         break;
     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
@@ -796,11 +796,14 @@ AranyaError run_aqc_example(Team *t) {
     AranyaAqcReceiveStream recv;
     bool valid_send;
     err = aranya_aqc_bidi_create_uni_stream(&t->clients.membera.client,
-                                            &send_channel, &send);
+                                            &bidi_send, &send);
     EXPECT("error creating an aqc uni stream", err);
 
+    // Wait for the stream to propagate.
+    sleep(1);
+
     err = aranya_aqc_bidi_receive_stream(&t->clients.memberb.client,
-                                         &recv_channel, &send_invalid, &recv,
+                                         &bidi_recv, &send_invalid, &recv,
                                          &valid_send);
     EXPECT("error receiving an aqc uni stream", err);
     // Validate that we never got a send stream since this is a uni stream.
@@ -811,12 +814,14 @@ AranyaError run_aqc_example(Team *t) {
 
     const char *string = "hello from aqc!";
     uint8_t buffer[BUFFER_LEN];
+    memset(buffer, 0, BUFFER_LEN);
     size_t received_length;
     aranya_aqc_send_data(&t->clients.membera.client, &send,
-                         (const uint8_t *)string, strlen(string));
+                         (const uint8_t *)string,
+                         strnlen(string, BUFFER_LEN - 1) + 1);
     aranya_aqc_receive_data(&t->clients.memberb.client, &recv, buffer,
                             BUFFER_LEN, &received_length);
-    if (strcmp(string, (const char *)buffer)) {
+    if (strncmp(string, (const char *)buffer, BUFFER_LEN)) {
         fprintf(stderr, "received string doesn't match");
         return ARANYA_ERROR_AQC;
     }

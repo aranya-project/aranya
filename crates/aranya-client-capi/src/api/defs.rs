@@ -1714,7 +1714,7 @@ pub fn aqc_bidi_create_uni_stream(
 /// @param channel the AQC channel object [`AqcBidiChannel`].
 /// @param send_stream the sending side of a stream [`AqcSendStream`].
 /// @param recv_stream the receiving side of a stream [`AqcReceiveStream`].
-/// @param __output whether or not we received a `send_stream`.
+/// @param send_init whether or not we received a `send_stream`.
 ///
 /// @relates AranyaClient.
 pub fn aqc_bidi_receive_stream(
@@ -1722,7 +1722,8 @@ pub fn aqc_bidi_receive_stream(
     channel: &mut AqcBidiChannel,
     send_stream: &mut MaybeUninit<AqcSendStream>,
     recv_stream: &mut MaybeUninit<AqcReceiveStream>,
-) -> Result<bool, imp::Error> {
+    send_init: &mut MaybeUninit<bool>,
+) -> Result<(), imp::Error> {
     let (send, recv) = client
         .deref_mut()
         .rt
@@ -1733,10 +1734,13 @@ pub fn aqc_bidi_receive_stream(
     match send {
         Some(send) => {
             Safe::init(send_stream, imp::AqcSendStream::new(send));
-            Ok(true)
+            send_init.write(true);
         }
-        None => Ok(false),
+        None => {
+            send_init.write(false);
+        }
     }
+    Ok(())
 }
 
 /// Create a unidirectional stream from an [`AqcSenderChannel`].

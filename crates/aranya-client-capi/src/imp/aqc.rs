@@ -50,7 +50,7 @@ impl AqcReceiverChannel {
 }
 
 /// Container for an AQC Channel variant.
-/// 
+///
 /// This needs to be destructured before it can be used, since C doesn't have
 /// dataful enums.
 pub struct AqcChannelType {
