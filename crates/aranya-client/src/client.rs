@@ -20,7 +20,7 @@ use tracing::{debug, info, instrument};
 use crate::{
     aqc::{
         api::{AqcChannels, AqcChannelsImpl},
-        net::run_channels,
+        net::run_channels_server,
     },
     config::{SyncPeerConfig, TeamConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
@@ -215,7 +215,12 @@ impl Client {
             .local_addr()
             .context("unable to get address AQC server bound to")
             .map_err(error::other)?;
-        tokio::spawn(run_channels(server, sender, identity_rx, daemon.clone()));
+        tokio::spawn(run_channels_server(
+            server,
+            sender,
+            identity_rx,
+            daemon.clone(),
+        ));
         let client = Self { daemon, aqc };
 
         Ok((client, aqc_server_addr))

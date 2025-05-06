@@ -97,12 +97,8 @@ impl AqcChannelsImpl {
             .map_err(|e| AqcError::TlsConfig(e.to_string()))?
             .ok_or_else(|| AqcError::TlsConfig("No private key found in KEY_PEM".into()))?;
 
-        // Initialize ServerName here
-        // let psk_server_name = ServerName::DnsName(DnsName::try_from_str("localhost").unwrap());
-
         let psk = PresharedKey::external(PSK_IDENTITY_CTRL, PSK_BYTES_CTRL)
             .assume("unable to create psk")?;
-        // Create Arc<ClientPresharedKeys> using the new structure
         let client_keys = Arc::new(ClientPresharedKeys::new(psk.clone()));
 
         // Create Client Config (INSECURE: Skips server cert verification)
@@ -124,8 +120,6 @@ impl AqcChannelsImpl {
         server_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
         server_config.preshared_keys = PresharedKeySelection::Enabled(Arc::new(server_keys));
 
-        // Wrap for s2n-quic using deprecated `new`
-        // TODO: these `new()` are deprecated.
         let tls_client_provider = rustls_provider::Client::new(client_config);
         let tls_server_provider = rustls_provider::Server::new(server_config);
         // --- End Rustls Setup ---
@@ -423,6 +417,9 @@ impl<'a> AqcChannels<'a> {
 // INSECURE: Allows connecting to any server certificate.
 // Requires the `dangerous_configuration` feature on the `rustls` crate.
 // Use full paths for traits and types
+// TODO: remove this once we have a way to exclusively use PSKs.
+// Currently, we use this to allow the server to be set up to use PSKs
+// without having to rely on the server certificate.
 
 #[derive(Debug)]
 struct SkipServerVerification(Arc<CryptoProvider>);
