@@ -101,11 +101,21 @@ async fn test_aqc_chans() -> Result<()> {
             let mut uni_chans = Vec::new();
             for peer in peers {
                 // create bidirectional channels with each peer.
-                let bidi = device.client.aqc().create_bidi_channel(team_id, peer.clone(), label1).await.expect("expected to create bidi chan");
+                let bidi = device
+                    .client
+                    .aqc()
+                    .create_bidi_channel(team_id, peer.clone(), label1)
+                    .await
+                    .expect("expected to create bidi chan");
                 bidi_chans.push(bidi);
 
                 // create unidirectional channels with each peer.
-                let uni = device.client.aqc().create_uni_channel(team_id, peer, label1).await.expect("expected to create bidi chan");
+                let uni = device
+                    .client
+                    .aqc()
+                    .create_uni_channel(team_id, peer, label1)
+                    .await
+                    .expect("expected to create bidi chan");
                 uni_chans.push(uni);
             }
 
@@ -119,12 +129,18 @@ async fn test_aqc_chans() -> Result<()> {
             // Send data over all created channels that support send.
             // TODO: test create_bidirectional_stream()
             for bidi in &mut bidi_chans {
-                let mut send = bidi.create_unidirectional_stream().await.expect("expected to create uni stream");
+                let mut send = bidi
+                    .create_unidirectional_stream()
+                    .await
+                    .expect("expected to create uni stream");
                 let msg = Bytes::from("hello");
                 send.send(&msg).await.expect("expected to send data");
             }
             for uni in &mut uni_chans {
-                let mut send = uni.create_unidirectional_stream().await.expect("expected to create uni stream");
+                let mut send = uni
+                    .create_unidirectional_stream()
+                    .await
+                    .expect("expected to create uni stream");
                 let msg = Bytes::from("hello");
                 send.send(&msg).await.expect("expected to send data");
             }
@@ -134,13 +150,15 @@ async fn test_aqc_chans() -> Result<()> {
             // TODO: send different data over each channel.
             for uni in &mut recv_chans {
                 let mut send = match uni {
-                    AqcChannelType::Sender { ref mut sender } => { 
-                        sender.create_unidirectional_stream().await.expect("expected to create uni stream")
-                    },
-                    AqcChannelType::Receiver { .. } => { continue },
-                    AqcChannelType::Bidirectional { ref mut channel } => {
-                        channel.create_unidirectional_stream().await.expect("expected to create uni stream")
-                    },
+                    AqcChannelType::Sender { ref mut sender } => sender
+                        .create_unidirectional_stream()
+                        .await
+                        .expect("expected to create uni stream"),
+                    AqcChannelType::Receiver { .. } => continue,
+                    AqcChannelType::Bidirectional { ref mut channel } => channel
+                        .create_unidirectional_stream()
+                        .await
+                        .expect("expected to create uni stream"),
                 };
                 let msg = Bytes::from("hello");
                 send.send(&msg).await.expect("expected to send data");
@@ -153,7 +171,8 @@ async fn test_aqc_chans() -> Result<()> {
                     let mut buf = vec![0u8; 1024 * 1024 * 2];
                     let len = recv
                         .receive(buf.as_mut_slice())
-                        .await.expect("expected to receive data")
+                        .await
+                        .expect("expected to receive data")
                         .expect("no data received");
                     assert_eq!(&buf[..len], b"hello");
                 }
@@ -161,23 +180,28 @@ async fn test_aqc_chans() -> Result<()> {
             for uni in &mut recv_chans {
                 let mut streams = Vec::new();
                 match uni {
-                    AqcChannelType::Sender { .. } => { continue },
+                    AqcChannelType::Sender { .. } => continue,
                     AqcChannelType::Receiver { ref mut receiver } => {
-                        while let Some(recv) = receiver.receive_unidirectional_stream().await.expect("expected no error") {
+                        while let Some(recv) = receiver
+                            .receive_unidirectional_stream()
+                            .await
+                            .expect("expected no error")
+                        {
                             streams.push(recv);
                         }
-                    },
+                    }
                     AqcChannelType::Bidirectional { ref mut channel } => {
                         while let Some((_send, recv)) = channel.receive_stream().await {
                             streams.push(recv);
                         }
-                    },
+                    }
                 };
                 for mut recv in streams {
                     let mut buf = vec![0u8; 1024 * 1024 * 2];
                     let len = recv
                         .receive(buf.as_mut_slice())
-                        .await.expect("expected to receive data")
+                        .await
+                        .expect("expected to receive data")
                         .expect("no data received");
                     assert_eq!(&buf[..len], b"hello");
                 }
