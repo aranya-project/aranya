@@ -1375,27 +1375,27 @@ pub enum AqcChannelType {
     Bidirectional,
 }
 
-/// AQC Bidirectional Channel Object
+/// An AQC Bidirectional Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 184, align = 8)]
 pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
 
-/// AQC Sender Channel Object
+/// An AQC Sender Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 176, align = 8)]
 pub type AqcSenderChannel = Safe<imp::AqcSenderChannel>;
 
-/// AQC Receiver Channel Object
+/// An AQC Receiver Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AqcReceiverChannel = Safe<imp::AqcReceiverChannel>;
 
-/// AQC Sender Stream Object
+/// An AQC Sender Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AqcSendStream = Safe<imp::AqcSendStream>;
 
-/// AQC Sender Stream Object
+/// An AQC Sender Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
@@ -1469,14 +1469,13 @@ pub unsafe fn aqc_create_uni_channel(
 /// Delete a bidirectional AQC channel.
 ///
 /// @param client the Aranya Client [`Client`].
-/// @param channel_id the AQC Channel [`AqcBidiChannel`] to delete.
+/// @param channel the AQC Channel [`AqcBidiChannel`] to delete.
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_bidi_channel(
     client: &mut Client,
-    channel: &AqcBidiChannelId,
+    channel: &AqcBidiChannel,
 ) -> Result<(), imp::Error> {
-    // TODO(nikki): change to AqcBidiChannel
     let client = client.deref_mut();
     client
         .rt
@@ -1487,7 +1486,7 @@ pub fn aqc_delete_bidi_channel(
 /// Delete a unidirectional AQC channel.
 ///
 /// @param client the Aranya Client [`Client`].
-/// @param chan the AQC Channel [`AqcSenderChannel`] to delete.
+/// @param channel the AQC Channel [`AqcSenderChannel`] to delete.
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_uni_channel(
@@ -1561,7 +1560,7 @@ pub fn aqc_get_channel_type(channel: &mut AqcChannel) -> AqcChannelType {
     }
 }
 
-/// Converts the [`AqcChannel`]` into an [`AqcBidiChannel`] for use sending/receiving data.
+/// Converts the [`AqcChannel`]` into an [`AqcBidiChannel`] for sending/receiving data.
 ///
 /// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
 ///
@@ -1588,7 +1587,7 @@ pub fn aqc_get_bidirectional_channel(
     }
 }
 
-/// Converts the [`AqcChannel`]` into an [`AqcSenderChannel`] for use sending data.
+/// Converts the [`AqcChannel`]` into an [`AqcSenderChannel`] for sending data.
 ///
 /// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
 ///
@@ -1615,7 +1614,7 @@ pub fn aqc_get_sender_channel(
     }
 }
 
-/// Converts the [`AqcChannel`]` into an [`AqcReceiverChannel`] for use receiving data.
+/// Converts the [`AqcChannel`]` into an [`AqcReceiverChannel`] for receiving data.
 ///
 /// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
 ///
@@ -1642,7 +1641,7 @@ pub fn aqc_get_receiver_channel(
     }
 }
 
-/// Create a bidirectional stream from an [`AqcBidiChannel`].
+/// Create a bidirectional stream from a [`AqcBidiChannel`].
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param channel the AQC channel object [`AqcBidiChannel`].
@@ -1765,7 +1764,7 @@ pub fn aqc_recv_receive_uni_stream(
     Ok(())
 }
 
-/// Send some data over an Aranya QUIC Channel.
+/// Send some data over an Aranya QUIC Channel stream.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param stream the sending side of a stream [`AqcSendStream`].
@@ -1781,7 +1780,7 @@ pub fn aqc_send_data(
     Ok(client.deref_mut().rt.block_on(stream.inner.send(data))?)
 }
 
-/// Receive some data from an Aranya QUIC Channel.
+/// Receive some data from an Aranya QUIC Channel stream.
 ///
 /// Returns `ARANYA_ERROR_AQC_STREAM_CLOSED` if the stream was closed.
 ///
