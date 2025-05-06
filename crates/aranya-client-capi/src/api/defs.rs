@@ -1534,7 +1534,7 @@ pub fn aqc_receive_channel(
 /// AranyaAqcBidiChannel bidi;
 /// AranyaAqcSenderChannel sender;
 /// AranyaAqcReceiverChannel receiver;
-/// 
+///
 /// aranya_aqc_get_channel_type(&channel, &channel_type);
 /// switch (channel_type) {
 ///     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
