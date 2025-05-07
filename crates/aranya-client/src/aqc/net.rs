@@ -46,9 +46,6 @@ async fn receive_aqc_ctrl(
     ctrl: AqcCtrl,
     channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
 ) -> crate::Result<()> {
-    // TODO: use correct node ID
-    let _node_id: NodeId = 0.into();
-
     let (_peer, psk) = daemon
         .receive_aqc_ctrl(context::current(), team, ctrl)
         .await
