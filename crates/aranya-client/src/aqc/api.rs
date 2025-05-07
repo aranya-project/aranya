@@ -200,7 +200,7 @@ struct ServerPresharedKeys {
 impl ServerPresharedKeys {
     fn new() -> (Self, mpsc::Receiver<Vec<u8>>) {
         // Create the mpsc channel for PSK identities
-        let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(1); // Buffer size 1 is likely sufficient
+        let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(10);
 
         (
             Self {
@@ -272,7 +272,8 @@ impl<'a> AqcChannels<'a> {
         Self { client }
     }
 
-    /// Returns the address that AQC is bound to.
+    /// Returns the address that AQC is bound to. This address is used to
+    /// make connections to other peers.
     pub async fn local_addr(&self) -> Result<SocketAddr, AqcError> {
         self.client.aqc.local_addr().await
     }
