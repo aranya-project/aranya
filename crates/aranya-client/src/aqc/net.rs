@@ -92,7 +92,6 @@ pub async fn run_channels_server(
         // Accept a new connection
         match server.accept().await {
             Some(mut conn) => {
-                conn_recv += 1;
                 // Receive a PSK identity hint if one is available
                 // TODO: Instead of receiving the PSK identity hint here, we should
                 // pull it directly from the connection. Eric is working on this.
@@ -148,6 +147,7 @@ pub async fn run_channels_server(
                         continue;
                     }
                 } else {
+                    conn_recv += 1;
                     tracing::error!("No identity hint received. Unable to create channel. ctrl_recv: {}, conn_recv: {}", ctrl_recv, conn_recv);
                 }
             }

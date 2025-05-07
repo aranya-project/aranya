@@ -114,6 +114,7 @@ async fn test_aqc_chans() -> Result<()> {
             l.push(labels.pop().expect("expected label"));
         }
         set.spawn(async move {
+            info!(?device.id, ?device.aqc_addr, peer_len=?peers.len());
             let mut bidi_chans = Vec::new();
             //let mut uni_chans = Vec::new();
             for peer in peers {
