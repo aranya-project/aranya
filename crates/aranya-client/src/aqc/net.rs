@@ -598,13 +598,16 @@ impl AqcSendStream {
 }
 
 /// An error that occurs when trying to receive a channel or stream.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum TryReceiveError {
     /// The channel or stream is empty.
+    #[error("channel or stream is empty")]
     Empty,
     /// The channel or stream is disconnected.
+    #[error("channel or stream is disconnected")]
     Disconnected,
     /// The channel or stream is closed.
+    #[error("channel or stream is closed")]
     Closed,
 }
 
