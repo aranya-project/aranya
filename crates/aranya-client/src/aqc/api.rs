@@ -200,7 +200,7 @@ struct ServerPresharedKeys {
 impl ServerPresharedKeys {
     fn new() -> (Self, mpsc::Receiver<Vec<u8>>) {
         // Create the mpsc channel for PSK identities
-        let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(1); // Buffer size 1 is likely sufficient
+        let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(10);
 
         (
             Self {
@@ -229,7 +229,9 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
         let key = self.keys.get(identity).cloned();
 
         // Use try_send for non-blocking behavior. Ignore error if receiver dropped.
-        let _ = self.identity_sender.try_send(identity.to_vec());
+        self.identity_sender
+            .try_send(identity.to_vec())
+            .expect("Failed to send identity");
 
         key
     }
@@ -272,7 +274,8 @@ impl<'a> AqcChannels<'a> {
         Self { client }
     }
 
-    /// Returns the address that AQC is bound to.
+    /// Returns the address that AQC is bound to. This address is used to
+    /// make connections to other peers.
     pub async fn local_addr(&self) -> Result<SocketAddr, AqcError> {
         self.client.aqc.local_addr().await
     }
