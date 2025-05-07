@@ -147,15 +147,15 @@ async fn test_aqc_chans() -> Result<()> {
             let mut recv_chans = Vec::new();
             // TODO: receive specific number of channels when ctrl messages are more reliable.
             //loop {
-                while let Ok(recv_chan) = device.client.aqc().try_receive_channel() {
-                    info!(?device.id, "received channel");
-                    recv_chans.push(recv_chan);
-                };
-                /*
-                if recv_chans.len() >= 2 {
-                    break;
-                }
-                */
+            while let Ok(recv_chan) = device.client.aqc().try_receive_channel() {
+                info!(?device.id, "received channel");
+                recv_chans.push(recv_chan);
+            }
+            /*
+            if recv_chans.len() >= 2 {
+                break;
+            }
+            */
             //}
             // TODO: verify number of channel received.
             //assert_eq!(recv_chans.len(), 2);
@@ -166,22 +166,18 @@ async fn test_aqc_chans() -> Result<()> {
             let mut send_streams = Vec::new();
             for bidi in &mut bidi_chans {
                 info!(?device.id, "creating unidirectional stream");
-                if let Ok(send) = bidi
-                    .create_uni_stream()
-                    .await {
-                        info!(?device.id, "created unidirectional stream");
-                        send_streams.push(send);
-                    }
+                if let Ok(send) = bidi.create_uni_stream().await {
+                    info!(?device.id, "created unidirectional stream");
+                    send_streams.push(send);
+                }
             }
             // TODO: verify number of send streams
             //assert_eq!(send_streams.len(), 2);
-            
+
             for uni in &mut uni_chans {
-                if let Ok(send) = uni
-                    .create_uni_stream()
-                    .await {
-                        send_streams.push(send);
-                    }
+                if let Ok(send) = uni.create_uni_stream().await {
+                    send_streams.push(send);
+                }
             }
             // TODO: verify number of send streams
             //assert_eq!(send_streams.len(), 4);
@@ -201,22 +197,18 @@ async fn test_aqc_chans() -> Result<()> {
             for uni in &mut recv_chans {
                 let mut send = match uni {
                     AqcChannelType::Sender { ref mut sender } => {
-                      let Ok(recv_chan) = sender
-                        .create_uni_stream()
-                        .await else {
+                        let Ok(recv_chan) = sender.create_uni_stream().await else {
                             continue;
                         };
                         recv_chan
-                    },
+                    }
                     AqcChannelType::Receiver { .. } => continue,
-                    AqcChannelType::Bidirectional { ref mut channel } =>  {
-                        let Ok(recv_chan) = channel
-                        .create_uni_stream()
-                        .await else {
+                    AqcChannelType::Bidirectional { ref mut channel } => {
+                        let Ok(recv_chan) = channel.create_uni_stream().await else {
                             continue;
                         };
                         recv_chan
-                    },
+                    }
                 };
                 info!(?device.id, "sending chan data for received channel");
                 let msg = Bytes::from("hello");
@@ -243,9 +235,7 @@ async fn test_aqc_chans() -> Result<()> {
                 match uni {
                     AqcChannelType::Sender { .. } => continue,
                     AqcChannelType::Receiver { ref mut receiver } => {
-                        while let Ok(recv) = receiver
-                            .try_receive_uni_stream()
-                        {
+                        while let Ok(recv) = receiver.try_receive_uni_stream() {
                             recv_streams.push(recv);
                         }
                     }

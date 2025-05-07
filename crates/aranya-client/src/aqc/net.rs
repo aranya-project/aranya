@@ -119,7 +119,10 @@ pub async fn run_channels_server(
                     // AqcChannel.
                     if identity == PSK_IDENTITY_CTRL {
                         ctrl_recv += 1;
-                        info!("received aqc ctrl msg. ctrl_recv: {}, conn_recv: {}", ctrl_recv, conn_recv);
+                        info!(
+                            "received aqc ctrl msg. ctrl_recv: {}, conn_recv: {}",
+                            ctrl_recv, conn_recv
+                        );
                         if let ControlFlow::Break(_) =
                             receive_ctrl_message(&daemon, &mut channel_map, &mut conn).await
                         {
