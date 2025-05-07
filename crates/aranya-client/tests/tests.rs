@@ -140,6 +140,7 @@ impl TeamCtx {
         })
     }
 
+    #[inline]
     fn devices(&mut self) -> [&mut DeviceCtx; 5] {
         [
             &mut self.owner,
@@ -167,6 +168,17 @@ impl TeamCtx {
                     .await?;
             }
         }
+        Ok(())
+    }
+
+    async fn add_team_to_devices(&mut self, team_id: TeamId, init_cmd: &[u8]) -> Result<()> {
+        let [_owner, rest @ ..] = self.devices();
+        let cfg = TeamConfig::builder().init_command(init_cmd).build()?;
+
+        for device in rest {
+            device.client.add_team(team_id, cfg.clone()).await?;
+        }
+
         Ok(())
     }
 
@@ -317,13 +329,7 @@ async fn test_sync_now() -> Result<()> {
     info!(?team_id);
     info!(?init_command);
 
-    // TODO(geoff): implement add_team.
-    /*
-    team.admin.client.add_team(team_id).await?;
-    team.operator.client.add_team(team_id).await?;
-    team.membera.client.add_team(team_id).await?;
-    team.memberb.client.add_team(team_id).await?;
-    */
+    team.add_team_to_devices(team_id, &init_command).await?;
 
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
@@ -378,13 +384,7 @@ async fn test_query_functions() -> Result<()> {
     info!(?team_id);
     info!(?init_command);
 
-    /*
-     * TODO(geoff): implement this
-    team.admin.client.add_team(team_id).await?;
-    team.operator.client.add_team(team_id).await?;
-    team.membera.client.add_team(team_id).await?;
-    team.memberb.client.add_team(team_id).await?;
-    */
+    team.add_team_to_devices(team_id, &init_command).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;

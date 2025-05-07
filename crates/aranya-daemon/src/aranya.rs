@@ -56,6 +56,11 @@ impl<EN, SP, CE> Client<EN, SP, CE> {
             _eng: PhantomData,
         }
     }
+
+    /// Client state reference
+    pub fn state(&mut self) -> &mut Arc<Mutex<ClientState<EN, SP>>> {
+        &mut self.aranya
+    }
 }
 
 impl<EN, SP, CE> Client<EN, SP, CE>
