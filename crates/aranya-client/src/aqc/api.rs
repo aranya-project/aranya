@@ -229,7 +229,9 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
         let key = self.keys.get(identity).cloned();
 
         // Use try_send for non-blocking behavior. Ignore error if receiver dropped.
-        let _ = self.identity_sender.try_send(identity.to_vec());
+        self.identity_sender
+            .try_send(identity.to_vec())
+            .expect("Failed to send identity");
 
         key
     }
