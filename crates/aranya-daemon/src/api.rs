@@ -15,7 +15,7 @@ use aranya_daemon_api::{
     DaemonApi, CE, CS,
 };
 use aranya_keygen::PublicKeys;
-use aranya_runtime::GraphId;
+use aranya_runtime::{init::InitCmd, GraphId};
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::{pin_mut, StreamExt, TryStreamExt};
@@ -36,6 +36,7 @@ use crate::{
     daemon::KS,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::SyncPeers,
+    vm_policy::VecSink,
     Client, EF,
 };
 
@@ -354,7 +355,17 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::TeamConfig,
     ) -> api::Result<()> {
-        todo!()
+        let mut client = self.client.aranya.lock().await;
+        let init_command = cfg
+            .init_command
+            .context("Team config did not have an init command")?;
+
+        let mut sink = VecSink::new();
+        client
+            .add_graph(&init_command, &mut sink)
+            .context("Unable to add team")?;
+
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -367,18 +378,18 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         cfg: api::TeamConfig,
-    ) -> api::Result<api::TeamId> {
+    ) -> api::Result<(api::TeamId, InitCmd)> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
         let pk = self.get_pk()?;
-        let (graph_id, _) = self
+        let (graph_id, init_command) = self
             .client
             .create_team(pk, Some(nonce))
             .await
             .context("unable to create team")?;
-        debug!(?graph_id);
-        Ok(graph_id.into_id().into())
+        debug!(?graph_id, ?init_command);
+        Ok((graph_id.into_id().into(), init_command))
     }
 
     #[instrument(skip(self))]

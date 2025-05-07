@@ -207,28 +207,50 @@ impl TestCtx {
     /// Creates `n` members.
     pub async fn new_group(&mut self, n: usize) -> Result<Vec<TestDevice>> {
         let mut clients = Vec::<TestDevice>::new();
-        for i in 0..n {
+        let mut members = (0..n).into_iter();
+
+        let Some(_) = members.next() else {
+            return Ok(clients);
+        };
+
+        // First member is the team owner
+        let (graph_id, init_cmd) = {
             let name = format!("client_{}", self.id);
             self.id += 1;
 
-            let id = if i == 0 {
-                GraphId::default()
-            } else {
-                clients[0].graph_id
-            };
+            let id = GraphId::default();
             let mut client = self
                 .new_client(&name, id)
                 .await
                 .with_context(|| format!("unable to create client {name}"))?;
-            // Eww, gross.
-            if id == GraphId::default() {
-                let nonce = &mut [0u8; 16];
-                Rng.fill_bytes(nonce);
-                (client.graph_id, _) = client
-                    .create_team(DeviceKeyBundle::try_from(&client.pk)?, Some(nonce))
-                    .await?;
-            }
-            clients.push(client)
+            let nonce = &mut [0u8; 16];
+            Rng.fill_bytes(nonce);
+            let (graph_id, init_cmd) = client
+                .create_team(DeviceKeyBundle::try_from(&client.pk)?, Some(nonce))
+                .await?;
+            client.graph_id = graph_id;
+            clients.push(client);
+
+            (graph_id, init_cmd)
+        };
+
+        for _ in members {
+            let name = format!("client_{}", self.id);
+            self.id += 1;
+
+            let mut client = self
+                .new_client(&name, graph_id)
+                .await
+                .with_context(|| format!("unable to create client {name}"))?;
+
+            let client_state = client.state();
+            client_state
+                .lock()
+                .await
+                .add_graph(&init_cmd, &mut VecSink::new())?;
+
+            client.graph_id = graph_id;
+            clients.push(client);
         }
         Ok(clients)
     }

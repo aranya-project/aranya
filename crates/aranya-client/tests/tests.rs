@@ -12,7 +12,7 @@
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
-use aranya_client::{Client, SyncPeerConfig, TeamConfig};
+use aranya_client::{Client, SyncPeerConfig, TeamConfig, TeamConfigBuilder};
 use aranya_daemon::{config::Config, Daemon};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
@@ -140,6 +140,7 @@ impl TeamCtx {
         })
     }
 
+    #[inline]
     fn devices(&mut self) -> [&mut DeviceCtx; 5] {
         [
             &mut self.owner,
@@ -167,6 +168,17 @@ impl TeamCtx {
                     .await?;
             }
         }
+        Ok(())
+    }
+
+    async fn add_team_to_devices(&mut self, team_id: TeamId, init_cmd: &[u8]) -> Result<()> {
+        let [_owner, rest @ ..] = self.devices();
+        let cfg = TeamConfig::builder().init_command(init_cmd).build()?;
+
+        for device in rest {
+            device.client.add_team(team_id, cfg.clone()).await?;
+        }
+
         Ok(())
     }
 
@@ -306,23 +318,18 @@ async fn test_sync_now() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
 
-    // Create the initial team, and get our TeamId.
+    // Create the initial team, and get our TeamId and init command.
     let cfg = TeamConfig::builder().build()?;
-    let team_id = team
+    let (team_id, init_command) = team
         .owner
         .client
         .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
+    info!(?init_command);
 
-    // TODO(geoff): implement add_team.
-    /*
-    team.admin.client.add_team(team_id).await?;
-    team.operator.client.add_team(team_id).await?;
-    team.membera.client.add_team(team_id).await?;
-    team.memberb.client.add_team(team_id).await?;
-    */
+    team.add_team_to_devices(team_id, &init_command).await?;
 
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
@@ -366,23 +373,18 @@ async fn test_query_functions() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
 
-    // Create the initial team, and get our TeamId.
+    // Create the initial team, and get our TeamId and init command.
     let cfg = TeamConfig::builder().build()?;
-    let team_id = team
+    let (team_id, init_command) = team
         .owner
         .client
         .create_team(cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
+    info!(?init_command);
 
-    /*
-     * TODO(geoff): implement this
-    team.admin.client.add_team(team_id).await?;
-    team.operator.client.add_team(team_id).await?;
-    team.membera.client.add_team(team_id).await?;
-    team.memberb.client.add_team(team_id).await?;
-    */
+    team.add_team_to_devices(team_id, &init_command).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -408,6 +410,46 @@ async fn test_query_functions() -> Result<()> {
     // TODO(nikki): device_label_assignments, label_exists, labels
 
     // TODO(nikki): if cfg!(feature = "aqc") { aqc_net_identifier } and have aqc on by default.
+
+    Ok(())
+}
+
+/// Tests add_team() by showing that the init command of a graph created by an owner can be used
+/// by other peers to create a graph on their device
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_add_team() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
+
+    // Create the initial team, and get our TeamId and init command.
+    let cfg = TeamConfig::builder().build()?;
+    let (team_id, init_command) = team
+        .owner
+        .client
+        .create_team(cfg)
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+    info!(?init_command);
+
+    let team_cfg = TeamConfigBuilder::default()
+        .init_command(&init_command)
+        .build()?;
+
+    team.admin
+        .client
+        .add_team(team_id, team_cfg.clone())
+        .await?;
+    team.operator
+        .client
+        .add_team(team_id, team_cfg.clone())
+        .await?;
+    team.membera
+        .client
+        .add_team(team_id, team_cfg.clone())
+        .await?;
+    team.memberb.client.add_team(team_id, team_cfg).await?;
 
     Ok(())
 }

@@ -106,9 +106,10 @@ pub enum Role {
 }
 
 /// A configuration for creating or adding a team to a daemon.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TeamConfig {
     // TODO(nikki): any fields added to this should be public
+    pub init_command: Option<Box<[u8]>>,
 }
 
 /// A device's network identifier.
@@ -339,7 +340,7 @@ pub trait DaemonApi {
     async fn remove_team(team: TeamId) -> Result<()>;
 
     /// Create a new graph/team with the current device as the owner.
-    async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
+    async fn create_team(cfg: TeamConfig) -> Result<(TeamId, Box<[u8]>)>;
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 

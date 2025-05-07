@@ -238,19 +238,90 @@ impl Default for SyncPeerConfigBuilder {
 }
 
 /// Configuration info when creating or adding a team in Aranya
-#[derive(Clone, Debug)]
-pub struct TeamConfig {}
+pub struct TeamConfig {
+    init_command: *const u8,
+    init_command_len: usize,
+}
 
 impl Typed for TeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
 }
 
+impl TryFrom<&TeamConfig> for aranya_client::TeamConfig {
+    type Error = Error;
+
+    fn try_from(value: &TeamConfig) -> Result<Self, Self::Error> {
+        let mut builder = Self::builder();
+
+        if !value.init_command.is_null() {
+            let bytes = {
+                // This is a workaround because try_as_slice! expects the first arg to be an identifier
+                let init_command = value.init_command;
+                aranya_capi_core::try_as_slice!(init_command, value.init_command_len)
+            };
+            builder = builder.init_command(bytes);
+        }
+
+        Ok(builder.build()?)
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
 /// Builder for a [`TeamConfig`]
-#[derive(Clone, Debug, Default)]
-pub struct TeamConfigBuilder {}
+pub struct TeamConfigBuilder {
+    init_command: *const u8,
+    init_command_len: usize,
+}
+
+impl Default for TeamConfigBuilder {
+    fn default() -> Self {
+        Self {
+            init_command: ptr::null(),
+            init_command_len: 0,
+        }
+    }
+}
 
 impl Typed for TeamConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0x112905E7);
+}
+
+impl TeamConfigBuilder {
+    pub fn init_command(
+        &mut self,
+        init_command: *const u8,
+        init_command_len: usize,
+    ) -> Result<(), Error> {
+        if init_command.is_null() {
+            let e = Error::InvalidArg(InvalidArg::new(
+                "init_command",
+                "Tried to set the `init_command` to an invalid address",
+            ));
+            return Err(e);
+        }
+
+        if init_command_len == 0 {
+            let e = Error::InvalidArg(InvalidArg::new(
+                "init_command",
+                "Tried to set the `init_command_len` to 0",
+            ));
+            return Err(e);
+        }
+
+        self.init_command = init_command;
+        self.init_command_len = init_command_len;
+
+        Ok(())
+    }
+
+    /// Attempts to construct a [`TeamConfig`], returning an
+    /// [`Error::Config`](super::error::Error::Config) if invalid.
+    fn build_cfg(&self) -> Result<TeamConfig, Error> {
+        Ok(TeamConfig {
+            init_command: self.init_command,
+            init_command_len: self.init_command_len,
+        })
+    }
 }
 
 impl Builder for TeamConfigBuilder {
@@ -261,7 +332,7 @@ impl Builder for TeamConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Safe::init(out, TeamConfig {});
+        Safe::init(out, self.build_cfg()?);
         Ok(())
     }
 }

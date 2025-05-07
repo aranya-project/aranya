@@ -11,8 +11,9 @@ use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
 use aranya_runtime::{
-    vm_action, ClientError, ClientState, Engine, GraphId, PeerCache, Policy, Session, Sink,
-    StorageProvider, SyncRequester, SyncResponder, SyncType, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
+    init::InitCmd, vm_action, ClientError, ClientState, Engine, GraphId, PeerCache, Policy,
+    Session, Sink, StorageProvider, SyncRequester, SyncResponder, SyncType, VmPolicy,
+    MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::Addr;
 use buggy::bug;
@@ -54,6 +55,11 @@ impl<EN, SP, CE> Client<EN, SP, CE> {
             aranya,
             _eng: PhantomData,
         }
+    }
+
+    /// Client state reference
+    pub fn state(&mut self) -> &mut Arc<Mutex<ClientState<EN, SP>>> {
+        &mut self.aranya
     }
 }
 
@@ -146,9 +152,9 @@ where
         &self,
         owner_keys: KeyBundle,
         nonce: Option<&[u8]>,
-    ) -> Result<(GraphId, Vec<Effect>)> {
+    ) -> Result<(GraphId, InitCmd)> {
         let mut sink = VecSink::new();
-        let id = self
+        let (id, init_command) = self
             .aranya
             .lock()
             .await
@@ -161,7 +167,9 @@ where
                 &mut sink,
             )
             .context("unable to create new team")?;
-        Ok((id, sink.collect()?))
+
+        let _ = sink.collect::<Effect>()?;
+        Ok((id, init_command))
     }
 
     /// Returns an implementation of [`Actions`] for a particular

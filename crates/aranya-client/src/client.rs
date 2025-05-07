@@ -21,7 +21,7 @@ use tracing::{debug, info, instrument};
 use crate::{
     aqc::{AqcChannels, AqcChannelsImpl},
     config::{SyncPeerConfig, TeamConfig},
-    error::{self, aranya_error, InvalidArg, IpcError, Result},
+    error::{self, aranya_error, ConfigError, InvalidArg, IpcError, Result},
 };
 
 /// List of device IDs.
@@ -204,7 +204,7 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
+    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<(TeamId, Box<[u8]>)> {
         self.daemon
             .create_team(context::current(), cfg.into())
             .await
@@ -214,6 +214,13 @@ impl Client {
 
     /// Add a team to the local device store.
     pub async fn add_team(&mut self, team: TeamId, cfg: TeamConfig) -> Result<()> {
+        if !cfg.has_init_command() {
+            Err(ConfigError::InvalidArg(InvalidArg::new(
+                "cfg",
+                "Init command not set",
+            )))?;
+        }
+
         self.daemon
             .add_team(context::current(), team, cfg.into())
             .await
@@ -413,6 +420,16 @@ impl Team<'_> {
         self.client
             .daemon
             .revoke_label(context::current(), self.id, device, label_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Add a team to a device's local store
+    pub async fn add_team_to_device(&self, cfg: TeamConfig) -> Result<()> {
+        self.client
+            .daemon
+            .add_team(context::current(), self.id, cfg.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
