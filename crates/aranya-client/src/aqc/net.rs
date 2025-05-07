@@ -8,7 +8,6 @@ use std::{collections::HashMap, net::SocketAddr, ops::ControlFlow, sync::Arc};
 use anyhow::{Context, Result};
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{AqcCtrl, AqcPsk, DaemonApiClient, LabelId, TeamId};
-use aranya_fast_channels::NodeId;
 use buggy::BugExt;
 use bytes::Bytes;
 use s2n_quic::{
