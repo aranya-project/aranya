@@ -64,17 +64,9 @@ pub enum Error {
     #[capi(msg = "AQC server closed")]
     AqcServerClosed,
 
-    /// Unable to create an AQC channel.
-    #[capi(msg = "AQC channel creation error")]
-    AqcChannelCreate,
-
     /// Tried to do something with an AQC stream when it was closed.
     #[capi(msg = "AQC stream closed")]
     AqcStreamClosed,
-
-    /// Unable to create an AQC stream.
-    #[capi(msg = "AQC stream creation error")]
-    AqcStreamCreate,
 
     /// Unable to create configuration info.
     #[capi(msg = "invalid config")]
@@ -114,9 +106,7 @@ impl From<&imp::Error> for Error {
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
             imp::Error::AqcServerClosed => Self::AqcServerClosed,
-            imp::Error::AqcChannelCreate => Self::AqcChannelCreate,
             imp::Error::AqcStreamClosed => Self::AqcStreamClosed,
-            imp::Error::AqcStreamCreate => Self::AqcStreamCreate,
             imp::Error::Other(_) => Self::Other,
         }
     }
@@ -1439,8 +1429,7 @@ pub unsafe fn aqc_create_bidi_channel(
                 .inner
                 .aqc()
                 .create_bidi_channel(team.into(), peer, label_id.into()),
-        )
-        .map_err(|_| imp::Error::AqcChannelCreate)?;
+        )?;
 
     Safe::init(channel, imp::AqcBidiChannel::new(chan));
     Ok(())
@@ -1475,8 +1464,7 @@ pub unsafe fn aqc_create_uni_channel(
                 .inner
                 .aqc()
                 .create_uni_channel(team.into(), peer, label_id.into()),
-        )
-        .map_err(|_| imp::Error::AqcChannelCreate)?;
+        )?;
 
     Safe::init(channel, imp::AqcSenderChannel::new(chan));
     Ok(())
@@ -1676,8 +1664,7 @@ pub fn aqc_bidi_create_bidi_stream(
     let (send, recv) = client
         .deref_mut()
         .rt
-        .block_on(channel.inner.create_bidirectional_stream())
-        .map_err(|_| imp::Error::AqcStreamCreate)?;
+        .block_on(channel.inner.create_bidi_stream())?;
 
     Safe::init(send_stream, imp::AqcSendStream::new(send));
     Safe::init(recv_stream, imp::AqcReceiveStream::new(recv));
@@ -1699,8 +1686,7 @@ pub fn aqc_bidi_create_uni_stream(
     let send = client
         .deref_mut()
         .rt
-        .block_on(channel.inner.create_unidirectional_stream())
-        .map_err(|_| imp::Error::AqcStreamCreate)?;
+        .block_on(channel.inner.create_uni_stream())?;
 
     Safe::init(stream, imp::AqcSendStream::new(send));
     Ok(())
@@ -1758,8 +1744,7 @@ pub fn aqc_send_create_uni_stream(
     let send = client
         .deref_mut()
         .rt
-        .block_on(channel.inner.create_unidirectional_stream())
-        .map_err(|_| imp::Error::AqcStreamCreate)?;
+        .block_on(channel.inner.create_uni_stream())?;
 
     Safe::init(stream, imp::AqcSendStream::new(send));
     Ok(())
@@ -1782,7 +1767,7 @@ pub fn aqc_recv_receive_uni_stream(
     let recv = client
         .deref_mut()
         .rt
-        .block_on(channel.inner.receive_unidirectional_stream())?
+        .block_on(channel.inner.receive_uni_stream())?
         .ok_or(imp::Error::AqcStreamClosed)?;
 
     Safe::init(stream, imp::AqcReceiveStream::new(recv));
@@ -1816,7 +1801,7 @@ pub fn aqc_send_data(
 /// @param __output the number of bytes written to the buffer.
 ///
 /// @relates AranyaClient.
-pub fn aqc_receive_data(
+pub fn aqc_try_receive_data(
     client: &mut Client,
     stream: &mut AqcReceiveStream,
     buffer: &mut [u8],
@@ -1824,6 +1809,5 @@ pub fn aqc_receive_data(
     client
         .deref_mut()
         .rt
-        .block_on(stream.inner.receive(buffer))?
-        .ok_or(imp::Error::AqcStreamClosed)
+        .block_on(stream.inner.try_receive(buffer))
 }
