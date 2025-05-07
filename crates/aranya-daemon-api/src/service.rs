@@ -397,7 +397,7 @@ pub trait DaemonApi {
     /// Delete a QUIC uni channel.
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
     /// Receive AQC ctrl message.
-    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(NetIdentifier, AqcPsk)>;
+    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<AqcPsk>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
