@@ -149,7 +149,7 @@ impl<'a> AqcChannels<'a> {
     // In final AQC implementation, it will only be invoked when a ctrl msg is received via the network.
     #[instrument(skip_all, fields(%team))]
     async fn receive_aqc_ctrl(&mut self, team: TeamId, ctrl: AqcCtrl) -> Result<()> {
-        let (_net_id, psk) = self
+        let psk = self
             .client
             .daemon
             .receive_aqc_ctrl(context::current(), team, ctrl)
