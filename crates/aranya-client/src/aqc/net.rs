@@ -19,7 +19,7 @@ use s2n_quic::{
 };
 use tarpc::context;
 use tokio::sync::mpsc;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 use crate::{
     aqc::api::{AqcChannel, ClientPresharedKeys, PSK_BYTES_CTRL, PSK_IDENTITY_CTRL},
@@ -86,13 +86,17 @@ pub async fn run_channels_server(
 ) {
     // Map of PSK identity to channel type
     let mut channel_map = HashMap::new();
+    let mut ctrl_recv = 0;
+    let mut conn_recv = 0;
     loop {
         // Accept a new connection
         match server.accept().await {
             Some(mut conn) => {
+                conn_recv += 1;
                 // Receive a PSK identity hint if one is available
                 // TODO: Instead of receiving the PSK identity hint here, we should
                 // pull it directly from the connection. Eric is working on this.
+
                 let identity = match identity_rx.try_recv() {
                     Ok(identity) => {
                         tracing::debug!("Received new PSK identity hint: {:02x?}", identity);
@@ -115,6 +119,8 @@ pub async fn run_channels_server(
                     // This will update the channel map with the PSK and associate it with an
                     // AqcChannel.
                     if identity == PSK_IDENTITY_CTRL {
+                        ctrl_recv += 1;
+                        info!("received aqc ctrl msg. ctrl_recv: {}, conn_recv: {}", ctrl_recv, conn_recv);
                         if let ControlFlow::Break(_) =
                             receive_ctrl_message(&daemon, &mut channel_map, &mut conn).await
                         {
@@ -142,7 +148,7 @@ pub async fn run_channels_server(
                         continue;
                     }
                 } else {
-                    tracing::warn!("No identity hint received. Unable to create channel.");
+                    tracing::error!("No identity hint received. Unable to create channel. ctrl_recv: {}, conn_recv: {}", ctrl_recv, conn_recv);
                 }
             }
             None => {
@@ -359,6 +365,7 @@ impl AqcSenderChannel {
 
 impl Drop for AqcSenderChannel {
     fn drop(&mut self) {
+        debug!("dropped uni channel");
         // Attempt to close the channel when the sender is dropped.
         // Log if there's an error, but don't panic as drop should not panic.
         if let Err(e) = self.close() {
@@ -514,6 +521,7 @@ impl AqcBidirectionalChannel {
 
 impl Drop for AqcBidirectionalChannel {
     fn drop(&mut self) {
+        debug!("dropped bidi channel");
         // Attempt to close the channel when the bidirectional channel is dropped.
         // Log if there's an error, but don't panic as drop should not panic.
         if let Err(e) = self.close() {
@@ -582,6 +590,7 @@ pub(crate) struct AqcClient {
     /// Holds channels that have created, but not yet been received.
     receiver: mpsc::Receiver<AqcChannelType>,
     client_keys: Arc<ClientPresharedKeys>,
+    ctrl_sent: u16,
 }
 
 impl AqcClient {
@@ -600,6 +609,7 @@ impl AqcClient {
                 quic_client,
                 receiver,
                 client_keys,
+                ctrl_sent: 0,
             },
             sender,
         ))
@@ -710,6 +720,10 @@ impl AqcClient {
         let msg_bytes = postcard::to_stdvec(&msg)?;
         send.send(Bytes::copy_from_slice(msg_bytes.as_slice()))
             .await?;
+
+        self.ctrl_sent += 1;
+        info!("sent aqc ctrl msg: {}", self.ctrl_sent);
+
         Ok(())
     }
 }
