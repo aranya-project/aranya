@@ -199,6 +199,7 @@ dependencies = [
  "backon",
  "buggy",
  "bytes",
+ "futures-util",
  "postcard",
  "rcgen",
  "rustls",

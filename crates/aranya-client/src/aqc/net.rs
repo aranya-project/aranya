@@ -2,12 +2,12 @@
 
 //! The AQC network implementation.
 
+use core::task::{Context as CoreContext, Poll};
 use std::{collections::HashMap, net::SocketAddr, ops::ControlFlow, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{AqcCtrl, AqcPsk, DaemonApiClient, LabelId, TeamId};
-use aranya_fast_channels::NodeId;
 use buggy::BugExt;
 use bytes::Bytes;
 use s2n_quic::{
@@ -45,9 +45,6 @@ async fn receive_aqc_ctrl(
     ctrl: AqcCtrl,
     channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
 ) -> crate::Result<()> {
-    // TODO: use correct node ID
-    let _node_id: NodeId = 0.into();
-
     let (_peer, psk) = daemon
         .receive_aqc_ctrl(context::current(), team, ctrl)
         .await
@@ -539,8 +536,9 @@ pub struct AqcReceiveStream {
 }
 
 impl AqcReceiveStream {
-    /// Receive the next available data from a stream. If the stream has been
-    /// closed, return None.
+    /// Receive the next available data from a stream. Writes the data to the
+    /// target buffer and returns the number of bytes written. If the stream has
+    /// been closed, return None.
     ///
     /// This method will block until data is available to return.
     /// The data is not guaranteed to be complete, and may need to be called
@@ -554,6 +552,28 @@ impl AqcReceiveStream {
             }
             Ok(None) => Ok(None),
             Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Receive the next available data from a stream. Writes the data to the
+    /// target buffer and returns the number of bytes written.
+    ///
+    /// This method will return immediately with an error if there is no data available.
+    /// The errors are:
+    /// - Empty: No data available.
+    /// - Closed: The stream is closed.
+    pub async fn try_receive(&mut self, target: &mut [u8]) -> Result<usize, TryReceiveError> {
+        let waker = futures_util::task::noop_waker();
+        let mut cx = CoreContext::from_waker(&waker);
+        match self.receive.poll_receive(&mut cx) {
+            Poll::Ready(Ok(Some(chunk))) => {
+                let len = chunk.len();
+                target[..len].copy_from_slice(&chunk);
+                Ok(len)
+            }
+            Poll::Ready(Ok(None)) => Err(TryReceiveError::Closed),
+            Poll::Ready(Err(_e)) => Err(TryReceiveError::Empty),
+            Poll::Pending => Err(TryReceiveError::Empty),
         }
     }
 }
@@ -584,6 +604,8 @@ pub enum TryReceiveError {
     Empty,
     /// The channel or stream is disconnected.
     Disconnected,
+    /// The channel or stream is closed.
+    Closed,
 }
 
 /// An AQC client. Used to create and receive channels.
@@ -721,8 +743,7 @@ impl AqcClient {
         let mut send = conn.open_send_stream().await?;
         let msg = AqcCtrlMessage { team_id, ctrl };
         let msg_bytes = postcard::to_stdvec(&msg)?;
-        send.send(Bytes::copy_from_slice(msg_bytes.as_slice()))
-            .await?;
+        send.send(Bytes::from_owner(msg_bytes)).await?;
 
         self.ctrl_sent += 1;
         info!("sent aqc ctrl msg: {}", self.ctrl_sent);

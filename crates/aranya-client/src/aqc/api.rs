@@ -1,7 +1,7 @@
 //! AQC support.
 
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     net::SocketAddr,
     sync::{Arc, Mutex},
 };
@@ -213,8 +213,13 @@ impl ServerPresharedKeys {
 
     fn insert(&mut self, psk: PresharedKey) {
         let identity = psk.identity().to_vec();
-        if self.keys.insert(identity.clone(), Arc::new(psk)).is_some() {
-            error!("Duplicate PSK identity inserted: {:?}", identity);
+        match self.keys.entry(identity.clone()) {
+            Entry::Vacant(v) => {
+                v.insert(Arc::new(psk));
+            }
+            Entry::Occupied(_) => {
+                error!("Duplicate PSK identity inserted: {:?}", identity);
+            }
         }
     }
 }
