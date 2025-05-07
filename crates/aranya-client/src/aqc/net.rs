@@ -2,12 +2,12 @@
 
 //! The AQC network implementation.
 
+use core::task::{Context as CoreContext, Poll};
 use std::{collections::HashMap, net::SocketAddr, ops::ControlFlow, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{AqcCtrl, AqcPsk, DaemonApiClient, LabelId, TeamId};
-use aranya_fast_channels::NodeId;
 use buggy::BugExt;
 use bytes::Bytes;
 use s2n_quic::{
@@ -45,9 +45,6 @@ async fn receive_aqc_ctrl(
     ctrl: AqcCtrl,
     channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
 ) -> crate::Result<()> {
-    // TODO: use correct node ID
-    let _node_id: NodeId = 0.into();
-
     let (_peer, psk) = daemon
         .receive_aqc_ctrl(context::current(), team, ctrl)
         .await
@@ -344,7 +341,7 @@ impl AqcSenderChannel {
     }
 
     /// Creates a new unidirectional stream for the channel.
-    pub async fn create_unidirectional_stream(&mut self) -> Result<AqcSendStream> {
+    pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream> {
         let send = self.handle.open_send_stream().await?;
         Ok(AqcSendStream { send })
     }
@@ -403,12 +400,22 @@ impl AqcReceiverChannel {
         self.aqc_id
     }
 
-    /// Returns a unidirectional stream if one has been received.
-    /// If no stream has been received return None.
-    pub async fn receive_unidirectional_stream(&mut self) -> Result<Option<AqcReceiveStream>> {
+    /// Returns the next unidirectional stream. If the channel is closed, return None.
+    pub async fn receive_uni_stream(&mut self) -> Result<Option<AqcReceiveStream>> {
         match self.uni_receiver.recv().await {
             Some(stream) => Ok(Some(AqcReceiveStream { receive: stream })),
             None => Ok(None),
+        }
+    }
+
+    /// Receive the next available unidirectional stream. If there is no stream available,
+    /// return Empty. If the stream is disconnected, return Disconnected. If disconnected
+    /// is returned no streams will be available until a new channel is created.
+    pub fn try_receive_uni_stream(&mut self) -> Result<AqcReceiveStream, TryReceiveError> {
+        match self.uni_receiver.try_recv() {
+            Ok(stream) => Ok(AqcReceiveStream { receive: stream }),
+            Err(mpsc::error::TryRecvError::Empty) => Err(TryReceiveError::Empty),
+            Err(mpsc::error::TryRecvError::Disconnected) => Err(TryReceiveError::Disconnected),
         }
     }
 }
@@ -466,16 +473,30 @@ impl AqcBidirectionalChannel {
         }
     }
 
+    /// Receive the next available stream. If there is no stream available,
+    /// return Empty. If the channel is closed, return Disconnected. If disconnected
+    /// is returned no streams will be available until a new channel is created.
+    pub fn try_receive_stream(
+        &mut self,
+    ) -> Result<(Option<AqcSendStream>, AqcReceiveStream), TryReceiveError> {
+        match self.receiver.try_recv() {
+            Ok((Some(send), receive)) => {
+                Ok((Some(AqcSendStream { send }), AqcReceiveStream { receive }))
+            }
+            Ok((None, receive)) => Ok((None, AqcReceiveStream { receive })),
+            Err(mpsc::error::TryRecvError::Empty) => Err(TryReceiveError::Empty),
+            Err(mpsc::error::TryRecvError::Disconnected) => Err(TryReceiveError::Disconnected),
+        }
+    }
+
     /// Creates a new unidirectional stream for the channel.
-    pub async fn create_unidirectional_stream(&mut self) -> Result<AqcSendStream> {
+    pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream> {
         let send = self.handle.open_send_stream().await?;
         Ok(AqcSendStream { send })
     }
 
     /// Creates a new bidirectional stream for the channel.
-    pub async fn create_bidirectional_stream(
-        &mut self,
-    ) -> Result<(AqcSendStream, AqcReceiveStream)> {
+    pub async fn create_bidi_stream(&mut self) -> Result<(AqcSendStream, AqcReceiveStream)> {
         let (receive, send) = self.handle.open_bidirectional_stream().await?.split();
         Ok((AqcSendStream { send }, AqcReceiveStream { receive }))
     }
@@ -504,8 +525,9 @@ pub struct AqcReceiveStream {
 }
 
 impl AqcReceiveStream {
-    /// Receive the next available data from a stream. If the stream has been
-    /// closed, return None.
+    /// Receive the next available data from a stream. Writes the data to the
+    /// target buffer and returns the number of bytes written. If the stream has
+    /// been closed, return None.
     ///
     /// This method will block until data is available to return.
     /// The data is not guaranteed to be complete, and may need to be called
@@ -519,6 +541,28 @@ impl AqcReceiveStream {
             }
             Ok(None) => Ok(None),
             Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Receive the next available data from a stream. Writes the data to the
+    /// target buffer and returns the number of bytes written.
+    ///
+    /// This method will return immediately with an error if there is no data available.
+    /// The errors are:
+    /// - Empty: No data available.
+    /// - Closed: The stream is closed.
+    pub async fn try_receive(&mut self, target: &mut [u8]) -> Result<usize, TryReceiveError> {
+        let waker = futures_util::task::noop_waker();
+        let mut cx = CoreContext::from_waker(&waker);
+        match self.receive.poll_receive(&mut cx) {
+            Poll::Ready(Ok(Some(chunk))) => {
+                let len = chunk.len();
+                target[..len].copy_from_slice(&chunk);
+                Ok(len)
+            }
+            Poll::Ready(Ok(None)) => Err(TryReceiveError::Closed),
+            Poll::Ready(Err(_e)) => Err(TryReceiveError::Empty),
+            Poll::Pending => Err(TryReceiveError::Empty),
         }
     }
 }
@@ -540,6 +584,17 @@ impl AqcSendStream {
         self.send.close().await?;
         Ok(())
     }
+}
+
+/// An error that occurs when trying to receive a channel or stream.
+#[derive(Debug)]
+pub enum TryReceiveError {
+    /// The channel or stream is empty.
+    Empty,
+    /// The channel or stream is disconnected.
+    Disconnected,
+    /// The channel or stream is closed.
+    Closed,
 }
 
 /// An AQC client. Used to create and receive channels.
@@ -583,6 +638,17 @@ impl AqcClient {
         self.receiver.recv().await
     }
 
+    /// Receive the next available channel. If there is no channel available,
+    /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
+    /// is returned no channels will be available until the application is restarted.
+    pub fn try_receive_channel(&mut self) -> Result<AqcChannelType, TryReceiveError> {
+        match self.receiver.try_recv() {
+            Ok(channel) => Ok(channel),
+            Err(mpsc::error::TryRecvError::Empty) => Err(TryReceiveError::Empty),
+            Err(mpsc::error::TryRecvError::Disconnected) => Err(TryReceiveError::Disconnected),
+        }
+    }
+
     /// Create a new channel to the given address.
     async fn create_channel(
         &mut self,
@@ -611,7 +677,7 @@ impl AqcClient {
     }
 
     /// Creates a new unidirectional channel to the given address.
-    pub async fn create_unidirectional_channel(
+    pub async fn create_uni_channel(
         &mut self,
         addr: SocketAddr,
         label_id: LabelId,
@@ -628,7 +694,7 @@ impl AqcClient {
     }
 
     /// Creates a new bidirectional channel to the given address.
-    pub async fn create_bidirectional_channel(
+    pub async fn create_bidi_channel(
         &mut self,
         addr: SocketAddr,
         label_id: LabelId,
@@ -664,8 +730,7 @@ impl AqcClient {
         let mut send = conn.open_send_stream().await?;
         let msg = AqcCtrlMessage { team_id, ctrl };
         let msg_bytes = postcard::to_stdvec(&msg)?;
-        send.send(Bytes::copy_from_slice(msg_bytes.as_slice()))
-            .await?;
+        send.send(Bytes::from_owner(msg_bytes)).await?;
         Ok(())
     }
 }

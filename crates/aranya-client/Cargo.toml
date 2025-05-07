@@ -19,6 +19,7 @@ debug = []
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
+futures-util = { workspace = true }
 
 aranya-aqc-util = { workspace = true }
 aranya-crypto = { workspace = true }
