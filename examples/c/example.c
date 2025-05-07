@@ -40,6 +40,23 @@
         }                                                                      \
     } while (0)
 
+// Macro that polls a command until it returns success, otherwise calling
+// EXPECT.
+#define TRY_RECEIVE(C, M)                                                      \
+    while (1) {                                                                \
+        err = (C);                                                             \
+        if (err == ARANYA_ERROR_SUCCESS) {                                     \
+            break;                                                             \
+        }                                                                      \
+        switch (err) {                                                         \
+        case ARANYA_ERROR_EMPTY:                                               \
+            sleep(1);                                                        \
+            continue;                                                          \
+        default:                                                               \
+            EXPECT((M), err);                                                  \
+        }                                                                      \
+    }
+
 // Default size for allocated data buffers.
 #define BUFFER_LEN 256
 
@@ -770,14 +787,19 @@ AranyaError run_aqc_example(Team *t) {
                                          aqc_addrs[MEMBERB], &label1_id,
                                          &bidi_send);
     EXPECT("error creating aqc bidi channel", err);
+    
+    sleep(1);
 
     // Receive the channel on Member B's side
     AranyaAqcChannel channel;
     AranyaAqcChannelType channel_type;
     AranyaAqcBidiChannel bidi_recv;
 
-    err = aranya_aqc_receive_channel(&t->clients.memberb.client, &channel);
-    EXPECT("error receiving aqc bidi channel", err);
+    // Loop until we receive an actual channel
+    printf("Trying to receive the bidi channel\n");
+    TRY_RECEIVE(
+        aranya_aqc_try_receive_channel(&t->clients.memberb.client, &channel),
+        "error receiving aqc bidi channel");
 
     aranya_aqc_get_channel_type(&channel, &channel_type);
     switch (channel_type) {
@@ -792,35 +814,37 @@ AranyaError run_aqc_example(Team *t) {
 
     // Open up a unidirectional stream from Member A to Member B
     AranyaAqcSendStream send;
-    AranyaAqcSendStream send_invalid;
+    AranyaAqcSendStream invalid_send;
     AranyaAqcReceiveStream recv;
-    bool valid_send;
+    bool send_init;
     err = aranya_aqc_bidi_create_uni_stream(&t->clients.membera.client,
                                             &bidi_send, &send);
     EXPECT("error creating an aqc uni stream", err);
 
-    // Wait for the stream to propagate.
+    const char *string = "hello from aqc!";
+    aranya_aqc_send_data(&t->clients.membera.client, &send,
+                         (const uint8_t *)string,
+                         strnlen(string, BUFFER_LEN - 1) + 1);
+
     sleep(1);
 
-    err = aranya_aqc_bidi_receive_stream(&t->clients.memberb.client,
-                                         &bidi_recv, &send_invalid, &recv,
-                                         &valid_send);
-    EXPECT("error receiving an aqc uni stream", err);
+    printf("Trying to receive the uni stream\n");
+    TRY_RECEIVE(aranya_aqc_bidi_try_receive_stream(&bidi_recv, &recv,
+                                                   &invalid_send, &send_init),
+                "error receiving an aqc uni stream");
     // Validate that we never got a send stream since this is a uni stream.
-    if (valid_send == true) {
+    if (send_init == true) {
         fprintf(stderr, "somehow received an AQC send stream");
         return ARANYA_ERROR_AQC;
     }
 
-    const char *string = "hello from aqc!";
     uint8_t buffer[BUFFER_LEN];
-    memset(buffer, 0, BUFFER_LEN);
     size_t received_length;
-    aranya_aqc_send_data(&t->clients.membera.client, &send,
-                         (const uint8_t *)string,
-                         strnlen(string, BUFFER_LEN - 1) + 1);
-    aranya_aqc_receive_data(&t->clients.memberb.client, &recv, buffer,
-                            BUFFER_LEN, &received_length);
+    memset(buffer, 0, BUFFER_LEN);
+    printf("Trying to receive the stream data\n");
+    TRY_RECEIVE(aranya_aqc_try_receive_data(&recv, buffer, BUFFER_LEN,
+                                            &received_length),
+                "error receving aqc stream data");
     if (strncmp(string, (const char *)buffer, BUFFER_LEN)) {
         fprintf(stderr, "received string doesn't match");
         return ARANYA_ERROR_AQC;
@@ -828,7 +852,7 @@ AranyaError run_aqc_example(Team *t) {
     printf("Received AQC data: \"%s\"\n", buffer);
 
     // Revoke/delete label using the Operator
-    printf("revoke/delete label \n");
+    printf("revoke/delete label\n");
     err = aranya_revoke_label(&operator->client, &t->id, &t->clients.membera.id,
                               &label1_id);
     EXPECT("error revoking label from membera", err);

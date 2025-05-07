@@ -60,13 +60,17 @@ pub enum Error {
     #[capi(msg = "AQC library error")]
     Aqc,
 
-    /// Tried to do something with AQC while the server was closed.
-    #[capi(msg = "AQC server closed")]
-    AqcServerClosed,
+    /// Tried to poll an endpoint but nothing received yet.
+    #[capi(msg = "no response ready yet")]
+    Empty,
 
-    /// Tried to do something with an AQC stream when it was closed.
-    #[capi(msg = "AQC stream closed")]
-    AqcStreamClosed,
+    /// A connection got disconnected.
+    #[capi(msg = "connection got disconnected")]
+    Disconnected,
+
+    /// A connection got unexpectedly closed.
+    #[capi(msg = "connection got closed")]
+    Closed,
 
     /// Unable to create configuration info.
     #[capi(msg = "invalid config")]
@@ -91,6 +95,11 @@ impl From<&imp::Error> for Error {
             imp::Error::Utf8(_) => Self::InvalidUtf8,
             imp::Error::Addr(_) => Self::InvalidAddr,
             imp::Error::BufferTooSmall => Self::BufferTooSmall,
+            imp::Error::TryReceive(err) => match err {
+                aqc::TryReceiveError::Empty => Self::Empty,
+                aqc::TryReceiveError::Disconnected => Self::Disconnected,
+                aqc::TryReceiveError::Closed => Self::Closed,
+            },
             imp::Error::Client(err) => match err {
                 aranya_client::Error::Ipc(_) => Self::Ipc,
                 aranya_client::Error::Aranya(_) => Self::Aranya,
@@ -105,8 +114,6 @@ impl From<&imp::Error> for Error {
             },
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
-            imp::Error::AqcServerClosed => Self::AqcServerClosed,
-            imp::Error::AqcStreamClosed => Self::AqcStreamClosed,
             imp::Error::Other(_) => Self::Other,
         }
     }
@@ -1422,14 +1429,11 @@ pub unsafe fn aqc_create_bidi_channel(
     let peer = unsafe { peer.as_underlying() }?;
 
     let client = client.deref_mut();
-    let chan = client
-        .rt
-        .block_on(
-            client
-                .inner
-                .aqc()
-                .create_bidi_channel(team.into(), peer, label_id.into()),
-        )?;
+    let chan = client.rt.block_on(client.inner.aqc().create_bidi_channel(
+        team.into(),
+        peer,
+        label_id.into(),
+    ))?;
 
     Safe::init(channel, imp::AqcBidiChannel::new(chan));
     Ok(())
@@ -1457,14 +1461,11 @@ pub unsafe fn aqc_create_uni_channel(
     let peer = unsafe { peer.as_underlying() }?;
 
     let client = client.deref_mut();
-    let chan = client
-        .rt
-        .block_on(
-            client
-                .inner
-                .aqc()
-                .create_uni_channel(team.into(), peer, label_id.into()),
-        )?;
+    let chan = client.rt.block_on(client.inner.aqc().create_uni_channel(
+        team.into(),
+        peer,
+        label_id.into(),
+    ))?;
 
     Safe::init(channel, imp::AqcSenderChannel::new(chan));
     Ok(())
@@ -1507,23 +1508,20 @@ pub fn aqc_delete_uni_channel(
 }
 */
 
-/// Waits until an AQC channel is received from the client.
+/// Tries to poll AQC to see if any channels have been received.
 ///
-/// Returns `ARANYA_ERROR_AQC_SERVER_CLOSED` if the server connection was closed.
+/// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
+/// channels received yet which is considered a non-fatal error.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param channel the AQC channel holder [`AqcChannel`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_receive_channel(
+pub fn aqc_try_receive_channel(
     client: &mut Client,
     channel: &mut MaybeUninit<AqcChannel>,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
-    let chan = client
-        .rt
-        .block_on(client.inner.aqc().receive_channel())
-        .ok_or(imp::Error::AqcServerClosed)?;
+    let chan = client.deref_mut().inner.aqc().try_receive_channel()?;
 
     Safe::init(channel, imp::AqcChannelType::new(chan));
     Ok(())
@@ -1649,6 +1647,9 @@ pub fn aqc_get_receiver_channel(
 
 /// Create a bidirectional stream from a [`AqcBidiChannel`].
 ///
+/// Note that the recipient will not be able to receive the stream until data is
+/// sent over the stream.
+///
 /// @param client the Aranya Client [`Client`].
 /// @param channel the AQC channel object [`AqcBidiChannel`].
 /// @param send_stream the sending side of a stream [`AqcSendStream`].
@@ -1673,6 +1674,9 @@ pub fn aqc_bidi_create_bidi_stream(
 
 /// Create a unidirectional stream from an [`AqcBidiChannel`].
 ///
+/// Note that the recipient will not be able to receive the stream until data is
+/// sent over the stream.
+///
 /// @param client the Aranya Client [`Client`].
 /// @param channel the AQC channel object [`AqcBidiChannel`].
 /// @param stream the sending side of a stream [`AqcSendStream`].
@@ -1692,29 +1696,29 @@ pub fn aqc_bidi_create_uni_stream(
     Ok(())
 }
 
-/// Obtains the receive (and potentially send) ends of a stream.
+/// Tries to receive the receive (and potentially send) ends of a stream.
 ///
-/// Note that the send stream will only be initialized if this returns true.
+/// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
+/// streams received yet which is considered a non-fatal error.
 ///
-/// @param client the Aranya Client [`Client`].
+/// Note that the recipient will not be able to receive the stream until data is
+/// sent over the stream.
+///
+/// Additionally, the send stream will only be initialized if `send_init` is true.
+///
 /// @param channel the AQC channel object [`AqcBidiChannel`].
-/// @param send_stream the sending side of a stream [`AqcSendStream`].
 /// @param recv_stream the receiving side of a stream [`AqcReceiveStream`].
+/// @param send_stream the sending side of a stream [`AqcSendStream`].
 /// @param send_init whether or not we received a `send_stream`.
 ///
 /// @relates AranyaClient.
-pub fn aqc_bidi_receive_stream(
-    client: &mut Client,
+pub fn aqc_bidi_try_receive_stream(
     channel: &mut AqcBidiChannel,
-    send_stream: &mut MaybeUninit<AqcSendStream>,
     recv_stream: &mut MaybeUninit<AqcReceiveStream>,
+    send_stream: &mut MaybeUninit<AqcSendStream>,
     send_init: &mut MaybeUninit<bool>,
 ) -> Result<(), imp::Error> {
-    let (send, recv) = client
-        .deref_mut()
-        .rt
-        .block_on(channel.inner.receive_stream())
-        .ok_or(imp::Error::AqcStreamClosed)?;
+    let (send, recv) = channel.inner.try_receive_stream()?;
 
     Safe::init(recv_stream, imp::AqcReceiveStream::new(recv));
     match send {
@@ -1730,6 +1734,9 @@ pub fn aqc_bidi_receive_stream(
 }
 
 /// Create a unidirectional stream from an [`AqcSenderChannel`].
+///
+/// Note that the recipient will not be able to receive the stream until data is
+/// sent over the stream.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param channel the AQC channel object [`AqcSenderChannel`].
@@ -1752,23 +1759,21 @@ pub fn aqc_send_create_uni_stream(
 
 /// Receives the stream from an [`AqcReceiverChannel`].
 ///
-/// Returns `ARANYA_ERROR_AQC_STREAM_CLOSED` if the stream was closed.
+/// Note that the recipient will not be able to receive the stream until data is
+/// sent over the stream.
 ///
-/// @param client the Aranya Client [`Client`].
+/// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+/// received yet which is considered a non-fatal error.
+///
 /// @param channel the AQC channel object [`AqcReceiverChannel`].
 /// @param stream the receiving side of a stream [`AqcReceiveStream`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_recv_receive_uni_stream(
-    client: &mut Client,
+pub fn aqc_recv_try_receive_uni_stream(
     channel: &mut AqcReceiverChannel,
     stream: &mut MaybeUninit<AqcReceiveStream>,
 ) -> Result<(), imp::Error> {
-    let recv = client
-        .deref_mut()
-        .rt
-        .block_on(channel.inner.receive_uni_stream())?
-        .ok_or(imp::Error::AqcStreamClosed)?;
+    let recv = channel.inner.try_receive_uni_stream()?;
 
     Safe::init(stream, imp::AqcReceiveStream::new(recv));
     Ok(())
@@ -1792,9 +1797,9 @@ pub fn aqc_send_data(
 
 /// Receive some data from an Aranya QUIC Channel stream.
 ///
-/// Returns `ARANYA_ERROR_AQC_STREAM_CLOSED` if the stream was closed.
+/// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+/// received yet which is considered a non-fatal error.
 ///
-/// @param client the Aranya Client [`Client`].
 /// @param stream the receiving side of a stream [`AqcReceiveStream`].
 /// @param buffer pointer to the target buffer.
 /// @param buffer_len length of the target buffer.
@@ -1802,12 +1807,8 @@ pub fn aqc_send_data(
 ///
 /// @relates AranyaClient.
 pub fn aqc_try_receive_data(
-    client: &mut Client,
     stream: &mut AqcReceiveStream,
     buffer: &mut [u8],
 ) -> Result<usize, imp::Error> {
-    client
-        .deref_mut()
-        .rt
-        .block_on(stream.inner.try_receive(buffer))
+    Ok(stream.inner.try_receive(buffer)?)
 }

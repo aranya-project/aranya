@@ -1,9 +1,6 @@
 use aranya_capi_core::safe::{TypeId, Typed};
 use aranya_client::aqc::net::{self as aqc};
 
-// TODO(nikki): decide if we want to refactor this to add accessors and remove
-// pub(crate) on inners? We also expose .inner in `client.rs`.
-
 /// An AQC channel that can both send and receive data.
 pub struct AqcBidiChannel {
     pub(crate) inner: aqc::AqcBidirectionalChannel,

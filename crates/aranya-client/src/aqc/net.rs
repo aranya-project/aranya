@@ -551,7 +551,7 @@ impl AqcReceiveStream {
     /// The errors are:
     /// - Empty: No data available.
     /// - Closed: The stream is closed.
-    pub async fn try_receive(&mut self, target: &mut [u8]) -> Result<usize, TryReceiveError> {
+    pub fn try_receive(&mut self, target: &mut [u8]) -> Result<usize, TryReceiveError> {
         let waker = futures_util::task::noop_waker();
         let mut cx = CoreContext::from_waker(&waker);
         match self.receive.poll_receive(&mut cx) {
