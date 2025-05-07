@@ -139,26 +139,24 @@ async fn test_aqc_chans() -> Result<()> {
             }
             assert_eq!(bidi_chans.len(), 2);
             info!(?device.id, "created all bidi channels");
-            //assert_eq!(uni_chans.len(), 2);
-            //info!(?device.id, "created all uni channels");
+            assert_eq!(uni_chans.len(), 2);
+            info!(?device.id, "created all uni channels");
 
             // Receive any channels that were created.
             tokio::time::sleep(Duration::from_millis(1000)).await;
             let mut recv_chans = Vec::new();
             // TODO: receive specific number of channels when ctrl messages are more reliable.
-            //loop {
-            while let Ok(recv_chan) = device.client.aqc().try_receive_channel() {
-                info!(?device.id, "received channel");
-                recv_chans.push(recv_chan);
+            loop {
+                if let Ok(recv_chan) = device.client.aqc().try_receive_channel() {
+                    info!(?device.id, "received channel");
+                    recv_chans.push(recv_chan);
+                }
+                if recv_chans.len() >= 4 {
+                    break;
+                }
             }
-            /*
-            if recv_chans.len() >= 2 {
-                break;
-            }
-            */
-            //}
             // TODO: verify number of channel received.
-            //assert_eq!(recv_chans.len(), 2);
+            assert_eq!(recv_chans.len(), 4);
             info!(?device.id, "received all channels");
 
             // Create a unidirectional stream for each channel.
