@@ -424,6 +424,16 @@ impl Team<'_> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
+
+    /// Add a team to a device's local store
+    pub async fn add_team_to_device(&self, cfg: TeamConfig) -> Result<()> {
+        self.client
+            .daemon
+            .add_team(context::current(), self.id, cfg.into())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
 }
 
 pub struct Queries<'a> {

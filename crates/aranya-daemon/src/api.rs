@@ -36,6 +36,7 @@ use crate::{
     daemon::KS,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::SyncPeers,
+    vm_policy::VecSink,
     Client, EF,
 };
 
@@ -359,8 +360,9 @@ impl DaemonApi for Api {
             .init_command
             .context("Team config did not have an init command")?;
 
+        let mut sink = VecSink::new();
         client
-            .add_graph(&init_command)
+            .add_graph(&init_command, &mut sink)
             .context("Unable to add team")?;
 
         Ok(())
@@ -386,8 +388,7 @@ impl DaemonApi for Api {
             .create_team(pk, Some(nonce))
             .await
             .context("unable to create team")?;
-        debug!(?graph_id);
-        debug!(?init_command);
+        debug!(?graph_id, ?init_command);
         Ok((graph_id.into_id().into(), init_command))
     }
 
