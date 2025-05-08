@@ -1,4 +1,4 @@
-//! Aranya graph actions API.
+//! Aranya graph actions/effects API.
 
 use core::{fmt, future::Future, marker::PhantomData};
 use std::{borrow::Cow, sync::Arc};

@@ -1,4 +1,4 @@
-//! Aranya TCP syncer for syncing Aranya graph commands.
+//! Aranya TCP client and server for syncing Aranya graph commands.
 
 use core::{fmt, marker::PhantomData, net::SocketAddr};
 use std::sync::Arc;
