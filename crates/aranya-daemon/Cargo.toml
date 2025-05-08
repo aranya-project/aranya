@@ -45,6 +45,10 @@ deser-hjson = { version = "2" }
 futures-util = { workspace = true }
 hex = { version = "0.4" }
 postcard = { workspace = true }
+rcgen = { workspace = true }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+s2n-quic = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
 tokio = { workspace = true, features = [

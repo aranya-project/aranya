@@ -67,6 +67,9 @@ clap = { version = "4", features = ["derive"] }
 futures-util = { version = "0.3.30" }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
+# TODO: Remove this after PSK integration
+rcgen = { version = "0.13", default-features = false, features = ["pem", "aws_lc_rs"] }
+s2n-quic = { version = "1.51.0", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"] }
 semver = { version = "1", features = ["serde"] }
 serde = "1"
 serial_test = { version = "3" }
@@ -78,7 +81,8 @@ tokio = { version = "1.44" }
 tokio-util = { version = "0.7.12" }
 tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-
+rustls-pemfile = "2.1.2"
+rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "648a02550dd319360664f9af79862716be2879ff" }
 
 [profile.dev]
 opt-level = 1

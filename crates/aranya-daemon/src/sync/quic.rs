@@ -7,27 +7,42 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::{fmt, marker::PhantomData, net::SocketAddr};
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;
 use aranya_policy_ifgen::VmEffect;
 use aranya_runtime::{ClientState, Engine, GraphId, Sink, StorageProvider, VmPolicy};
 use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
-use tracing::instrument;
+use tokio::{sync::Mutex, task::JoinSet};
+use tracing::{debug, error, info, instrument, trace};
+
+use s2n_quic::{
+    client::Connect,
+    connection::Handle,
+    provider::self,
+    stream::{PeerStream, ReceiveStream, SendStream},
+    Client as QuicClient, Connection, Server as QuicServer,
+};
 
 use super::prot::SyncProtocols;
 
 /// QUIC Syncer protocol type.
-pub const QUIC_SYNC_PROT:SyncProtocols = SyncProtocols::QUIC;
+pub const PROT:SyncProtocols = SyncProtocols::QUIC;
 
 /// QUIC Syncer protocol version.
-pub const QUIC_SYNC_VERSION: u16 = 1;
+pub const VERSION: u16 = 1;
 
 // TODO: get this PSK from keystore or config file.
 // PSK is hard-coded to prototype the QUIC syncer until PSK key management is complete.
 const PSK: &[u8] = "test_psk".as_bytes();
+
+/// TODO: remove this.
+/// NOTE: this certificate is to be used for demonstration purposes only!
+pub static CERT_PEM: &str = include_str!("./cert.pem");
+/// TODO: remove this.
+/// NOTE: this certificate is to be used for demonstration purposes only!
+pub static KEY_PEM: &str = include_str!("./key.pem");
 
 /// A response to a sync request.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -83,14 +98,19 @@ impl<EN, SP, CE> fmt::Debug for Client<EN, SP, CE> {
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
-    // TODO: add listener.
+    /// QUIC server.
+    server: QuicServer,
+    /// Stores a QUIC connection for each peer.
+    conns: Arc<Mutex<BTreeMap<SocketAddr, Connection>>>,
+    /// Tracks running tasks.
+    set: JoinSet<()>,
 }
 
 impl<EN, SP> Server<EN, SP> {
     /// Creates a new `Server`.
     #[inline]
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Self {
-        Self { aranya }
+    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>, server: QuicServer) -> Self {
+        Self { aranya, server, conns: Arc::new(Mutex::new(BTreeMap::new())), set: JoinSet::new() }
     }
 
     /// Returns the local address the sync server bound to.
@@ -107,13 +127,44 @@ where
     /// Begins accepting incoming requests.
     #[instrument(skip_all)]
     pub async fn serve(mut self) -> Result<()> {
-        todo!();
+        // Accept incoming QUIC connections
+        while let Some(mut conn) = self.server.accept().await {
+            info!("received incoming QUIC connection");
+            let Ok(peer) = conn.remote_addr() else {
+                error!("unable to get peer address from connection");
+                continue;
+            };
+            let client = Arc::clone(&self.aranya);
+            self.set.spawn(async move {
+                loop {
+                    // Accept incoming streams.
+                    match conn.accept_receive_stream().await {
+                        Ok(Some(stream)) => {
+                            trace!("received incoming QUIC stream");
+                            if let Err(e) = Self::sync(client.clone(), peer, stream).await {
+                                error!(?e, ?peer, "unable to sync with peer");
+                                break;
+                            }
+                        }
+                        Ok(None) => {
+                            debug!("QUIC connection was closed");
+                            return;
+                        }
+                        Err(e) => {
+                            error!("error receiving QUIC stream: {}", e);
+                            return;
+                        }
+                    }
+                }
+            });
+        }
+        error!("server terminated");
+        Ok(())
     }
 
     /// Responds to a sync.
-    // TODO: add QUIC stream param.
     #[instrument(skip_all, fields(addr = %addr))]
-    async fn sync(client: Arc<Mutex<ClientState<EN, SP>>>, addr: SocketAddr) -> Result<()> {
+    async fn sync(client: Arc<Mutex<ClientState<EN, SP>>>, addr: SocketAddr, stream: ReceiveStream) -> Result<()> {
         todo!();
     }
 
