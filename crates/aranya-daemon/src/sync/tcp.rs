@@ -30,7 +30,7 @@ pub enum SyncResponse {
     Err(String),
 }
 
-/// Aranya sync client.
+/// Aranya TCP sync client.
 pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
     pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
@@ -135,7 +135,7 @@ impl<EN, SP, CE> fmt::Debug for Client<EN, SP, CE> {
     }
 }
 
-/// The Aranya sync server.
+/// The Aranya TCP sync server.
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.

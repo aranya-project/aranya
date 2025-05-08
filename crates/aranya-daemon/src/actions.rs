@@ -23,7 +23,7 @@ use crate::{
     vm_policy::{MsgSink, VecSink},
 };
 
-/// Aranya graph client.
+/// Aranya graph actions/effects client.
 pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
     pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
