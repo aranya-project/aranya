@@ -799,12 +799,12 @@ AranyaError run_aqc_example(Team *t) {
 
     sleep(1);
 
-    // Receive the channel on Member B's side
+    // Receive the bidi channel on Member B's side
     AranyaAqcChannel channel;
     AranyaAqcChannelType channel_type;
     AranyaAqcBidiChannel bidi_recv;
 
-    // Loop until we receive an actual channel
+    // Loop until we receive the bidi channel
     printf("Trying to receive the bidi channel\n");
     TRY_RECEIVE(
         aranya_aqc_try_receive_channel(&t->clients.memberb.client, &channel),
@@ -816,8 +816,39 @@ AranyaError run_aqc_example(Team *t) {
         aranya_aqc_get_bidirectional_channel(&channel, &bidi_recv);
         break;
     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
+        fprintf(stderr, "Should never receive a sender channel\n");
+        return ARANYA_ERROR_AQC;
     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
-        fprintf(stderr, "somehow got the wrong AQC channel type\n");
+        fprintf(stderr,
+                "somehow got receiver AQC channel, expected bidirectional "
+                "channel\n");
+        return ARANYA_ERROR_AQC;
+    }
+
+    // Receive the uni channel on Member B's side
+    AranyaAqcChannel uni_channel;
+    AranyaAqcChannelType uni_channel_type;
+    AranyaAqcReceiverChannel uni_recv;
+
+    // Loop until we receive the uni channel
+    printf("Trying to receive the uni channel\n");
+    TRY_RECEIVE(aranya_aqc_try_receive_channel(&t->clients.memberb.client,
+                                               &uni_channel),
+                "error receiving aqc uni channel");
+
+    aranya_aqc_get_channel_type(&uni_channel, &uni_channel_type);
+    switch (uni_channel_type) {
+    case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
+        fprintf(stderr,
+                "somehow got bidi AQC channel, expected receiver "
+                "channel\n");
+        break;
+    case ARANYA_AQC_CHANNEL_TYPE_SENDER:
+        fprintf(stderr, "Should never receive a sender channel\n");
+        return ARANYA_ERROR_AQC;
+    case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
+        aranya_aqc_get_receiver_channel(&uni_channel, &uni_recv);
+        break;
         return ARANYA_ERROR_AQC;
     }
 

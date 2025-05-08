@@ -1543,11 +1543,11 @@ pub fn aqc_try_receive_channel(
 ///     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
 ///         aranya_aqc_get_bidirectional_channel(&channel, &bidi);
 ///         break;
-///     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
-///         aranya_aqc_get_sender_channel(&channel, &sender);
-///         break;
 ///     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
 ///         aranya_aqc_get_receiver_channel(&channel, &receiver);
+///         break;
+///     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
+///         fprintf(stderr, "Should never receive a sender channel\n");
 ///         break;
 /// }
 /// ```
@@ -1586,33 +1586,6 @@ pub fn aqc_get_bidirectional_channel(
         _ => Err(InvalidArg::new(
                 "channel",
                 "Tried to call get_bidirectional_channel with a `AqcChannel` that wasn't Bidirectional!",
-        )
-        .into()),
-    }
-}
-
-/// Converts the [`AqcChannel`]` into an [`AqcSenderChannel`] for sending data.
-///
-/// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
-///
-/// @param channel the AQC channel container [`AqcChannel`].
-/// @param sender the AQC channel object [`AqcSenderChannel`].
-///
-/// @relates AranyaClient.
-pub fn aqc_get_sender_channel(
-    channel: OwnedPtr<AqcChannel>,
-    sender: &mut MaybeUninit<AqcSenderChannel>,
-) -> Result<(), imp::Error> {
-    // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
-    let inner = unsafe { channel.read().into_inner().inner };
-    match inner {
-        aqc::AqcChannelType::Sender { sender: send } => {
-            Safe::init(sender, imp::AqcSenderChannel::new(send));
-            Ok(())
-        }
-        _ => Err(InvalidArg::new(
-            "channel",
-            "Tried to call get_receiver_channel with a `AqcChannel` that wasn't a receiver!",
         )
         .into()),
     }

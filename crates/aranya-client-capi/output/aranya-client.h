@@ -2212,11 +2212,11 @@ AranyaError aranya_aqc_try_receive_channel_ext(struct AranyaClient *client,
  *     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
  *         aranya_aqc_get_bidirectional_channel(&channel, &bidi);
  *         break;
- *     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
- *         aranya_aqc_get_sender_channel(&channel, &sender);
- *         break;
  *     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
  *         aranya_aqc_get_receiver_channel(&channel, &receiver);
+ *         break;
+ *     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
+ *         fprintf(stderr, "Should never receive a sender channel\n");
  *         break;
  * }
  * ```
@@ -2246,11 +2246,11 @@ AranyaError aranya_aqc_get_channel_type(struct AranyaAqcChannel *channel,
  *     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
  *         aranya_aqc_get_bidirectional_channel(&channel, &bidi);
  *         break;
- *     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
- *         aranya_aqc_get_sender_channel(&channel, &sender);
- *         break;
  *     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
  *         aranya_aqc_get_receiver_channel(&channel, &receiver);
+ *         break;
+ *     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
+ *         fprintf(stderr, "Should never receive a sender channel\n");
  *         break;
  * }
  * ```
@@ -2290,33 +2290,6 @@ AranyaError aranya_aqc_get_bidirectional_channel(struct AranyaAqcChannel *channe
 AranyaError aranya_aqc_get_bidirectional_channel_ext(struct AranyaAqcChannel *channel,
                                                      struct AranyaAqcBidiChannel *bidi,
                                                      struct AranyaExtError *__ext_err);
-
-/**
- * Converts the [`AranyaAqcChannel`](@ref AranyaAqcChannel)` into an [`AranyaAqcSenderChannel`](@ref AranyaAqcSenderChannel) for sending data.
- *
- * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
- *
- * @param channel the AQC channel container [`AranyaAqcChannel`](@ref AranyaAqcChannel).
- * @param sender the AQC channel object [`AranyaAqcSenderChannel`](@ref AranyaAqcSenderChannel).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_get_sender_channel(struct AranyaAqcChannel *channel,
-                                          struct AranyaAqcSenderChannel *sender);
-
-/**
- * Converts the [`AranyaAqcChannel`](@ref AranyaAqcChannel)` into an [`AranyaAqcSenderChannel`](@ref AranyaAqcSenderChannel) for sending data.
- *
- * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
- *
- * @param channel the AQC channel container [`AranyaAqcChannel`](@ref AranyaAqcChannel).
- * @param sender the AQC channel object [`AranyaAqcSenderChannel`](@ref AranyaAqcSenderChannel).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_get_sender_channel_ext(struct AranyaAqcChannel *channel,
-                                              struct AranyaAqcSenderChannel *sender,
-                                              struct AranyaExtError *__ext_err);
 
 /**
  * Converts the [`AranyaAqcChannel`](@ref AranyaAqcChannel)` into an [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel) for receiving data.
