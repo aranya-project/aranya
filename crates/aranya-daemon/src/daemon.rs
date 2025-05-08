@@ -46,6 +46,7 @@ pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = crate::sync::tcp::Client<EN, SP, CE>;
 type Server = crate::sync::tcp::Server<EN, SP>;
+pub(crate) type ActionsClient = crate::sync::actions::Client<EN, SP, CE>;
 
 /// The daemon itself.
 pub struct Daemon {
@@ -85,7 +86,7 @@ impl Daemon {
         let mut local_store = self.load_local_keystore().await?;
         let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
 
-        // Initialize Aranya client.
+        // Initialize Aranya syncer client.
         let (client, local_addr) = {
             let (client, server) = self
                 .setup_aranya(
@@ -103,6 +104,9 @@ impl Daemon {
 
             (client, local_addr)
         };
+
+        // Initialize Aranya actions client.
+        let actions_client = ActionsClient::new(Arc::clone(&client.aranya));
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
@@ -129,7 +133,7 @@ impl Daemon {
                 let mut peers = BTreeMap::new();
                 for graph_id in &graph_ids {
                     let graph_peers = BiBTreeMap::from_iter(
-                        client
+                        actions_client
                             .actions(graph_id)
                             .query_aqc_network_names_off_graph()
                             .await?,
@@ -142,7 +146,7 @@ impl Daemon {
         };
 
         let api = DaemonApiServer::new(
-            client,
+            actions_client.into(),
             local_addr,
             self.cfg.uds_api_path.clone(),
             api_sk,

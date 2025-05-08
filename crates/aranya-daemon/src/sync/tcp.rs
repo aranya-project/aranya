@@ -30,7 +30,7 @@ pub enum SyncResponse {
     Err(String),
 }
 
-/// Aranya client.
+/// Aranya sync client.
 pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
     pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,

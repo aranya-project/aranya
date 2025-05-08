@@ -35,7 +35,7 @@ use crate::{
     daemon::KS,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::{actions::Actions, task::SyncPeers},
-    Client, EF,
+    ActionsClient, EF,
 };
 
 /// returns first effect matching a particular type.
@@ -56,8 +56,8 @@ pub(crate) struct DaemonApiServer {
     sk: ApiKey<CS>,
     /// The UDS path we serve the API on.
     uds_path: PathBuf,
-
-    client: Arc<Client>,
+    /// The Aranya actions client.
+    client: Arc<ActionsClient>,
     /// The local network address for the `Client`'s sync server.
     local_addr: SocketAddr,
     /// Public keys of current device.
@@ -75,7 +75,7 @@ impl DaemonApiServer {
     #[instrument(skip_all)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        client: Arc<Client>,
+        client: Arc<ActionsClient>,
         local_addr: SocketAddr,
         uds_path: PathBuf,
         sk: ApiKey<CS>,
@@ -239,7 +239,7 @@ impl EffectHandler {
 /// (inside [`Api`]).
 #[derive(Debug)]
 struct ApiInner {
-    client: Arc<Client>,
+    client: Arc<ActionsClient>,
     /// Local socket address of the API.
     local_addr: SocketAddr,
     /// Public keys of current device.
