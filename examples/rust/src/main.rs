@@ -397,7 +397,7 @@ async fn main() -> Result<()> {
 
     // membera creates a new stream on the channel.
     info!("membera creating aqc bidi stream");
-    let (mut send1, _recv1) = created_aqc_chan.create_bidirectional_stream().await?;
+    let (mut send1, _recv1) = created_aqc_chan.create_bidi_stream().await?;
 
     // membera sends data via the aqc stream.
     info!("membera sending aqc data");
