@@ -9,7 +9,7 @@
 
 use anyhow::{Context, Result};
 use aranya_daemon::{
-    aranya::Actions,
+    actions::Actions,
     policy::{Effect, Role},
 };
 use serial_test::serial;

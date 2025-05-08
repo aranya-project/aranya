@@ -13,8 +13,9 @@ use aranya_crypto::{
     Csprng, Rng,
 };
 use aranya_daemon::{
-    aranya::{self, Actions},
+    actions::{self, Actions},
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
+    sync,
     vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
     AranyaStore,
 };
@@ -31,13 +32,23 @@ use tokio::{
     task::{self, AbortHandle},
 };
 
-pub type TestClient = aranya::Client<
+// Aranya sync client for testing.
+pub type TestClient = sync::tcp::Client<
     PolicyEngine<DefaultEngine, Store>,
     LinearStorageProvider<FileManager>,
     DefaultEngine,
 >;
+
+// Aranya sync server for testing.
 pub type TestServer =
-    aranya::Server<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
+    sync::tcp::Server<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
+
+// Aranya actions client for testing.
+pub type TestActionsClient = actions::Client<
+    PolicyEngine<DefaultEngine, Store>,
+    LinearStorageProvider<FileManager>,
+    DefaultEngine,
+>;
 
 // checks if effects vector contains a particular type of effect.
 #[macro_export]
@@ -48,7 +59,10 @@ macro_rules! contains_effect {
 }
 
 pub struct TestDevice {
+    /// Aranya sync client.
     aranya: TestClient,
+    /// Aranya actions client.
+    actions: TestActionsClient,
     /// The Aranya graph ID.
     pub graph_id: GraphId,
     /// The address that the server is listening on.
@@ -63,6 +77,7 @@ impl TestDevice {
     pub fn new(
         client: TestClient,
         server: TestServer,
+        actions: TestActionsClient,
         local_addr: Addr,
         pk: PublicKeys<DefaultCipherSuite>,
         graph_id: GraphId,
@@ -70,6 +85,7 @@ impl TestDevice {
         let handle = task::spawn(async { server.serve().await }).abort_handle();
         Ok(Self {
             aranya: client,
+            actions,
             graph_id,
             local_addr,
             handle,
@@ -94,7 +110,7 @@ impl TestDevice {
         LinearStorageProvider<FileManager>,
         DefaultEngine<Rng>,
     > {
-        self.aranya.actions(&self.graph_id)
+        self.actions.actions(&self.graph_id)
     }
 }
 
@@ -163,7 +179,7 @@ impl TestCtx {
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
 
-        let (client, server, local_addr, pk) = {
+        let (client, server, actions, local_addr, pk) = {
             let mut store = {
                 let path = root.join("keystore");
                 fs::create_dir_all(&path)?;
@@ -198,10 +214,11 @@ impl TestCtx {
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
             let server = TestServer::new(Arc::clone(&aranya), listener);
-            (client, server, local_addr, pk)
+            let actions = TestActionsClient::new(Arc::clone(&aranya));
+            (client, server, actions, local_addr, pk)
         };
 
-        TestDevice::new(client, server, local_addr.into(), pk, id)
+        TestDevice::new(client, server, actions, local_addr.into(), pk, id)
     }
 
     /// Creates `n` members.
@@ -225,6 +242,7 @@ impl TestCtx {
                 let nonce = &mut [0u8; 16];
                 Rng.fill_bytes(nonce);
                 (client.graph_id, _) = client
+                    .actions
                     .create_team(DeviceKeyBundle::try_from(&client.pk)?, Some(nonce))
                     .await?;
             }
