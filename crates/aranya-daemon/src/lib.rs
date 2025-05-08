@@ -29,17 +29,16 @@
     unused_qualifications
 )]
 
-pub mod aranya;
 pub mod config;
 #[rustfmt::skip]
 pub mod policy;
+pub mod sync;
 pub mod vm_policy;
 
 mod api;
 mod aqc;
 mod daemon;
 mod keystore;
-mod sync;
 
 pub use daemon::*;
 pub use keystore::AranyaStore;

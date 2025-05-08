@@ -25,11 +25,10 @@ use tracing::{error, info, info_span, Instrument as _};
 use crate::{
     api::{ApiKey, DaemonApiServer, PublicApiKey},
     aqc::Aqc,
-    aranya::{self, Actions},
     config::Config,
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::Syncer,
+    sync::{actions::Actions, task::Syncer},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
@@ -45,8 +44,8 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 /// EF = Policy Effect
 pub(crate) type EF = policy::Effect;
 
-pub(crate) type Client = aranya::Client<EN, SP, CE>;
-type Server = aranya::Server<EN, SP>;
+pub(crate) type Client = crate::sync::tcp::Client<EN, SP, CE>;
+type Server = crate::sync::tcp::Server<EN, SP>;
 
 /// The daemon itself.
 pub struct Daemon {

@@ -13,8 +13,9 @@ use aranya_crypto::{
     Csprng, Rng,
 };
 use aranya_daemon::{
-    aranya::{self, Actions},
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
+    sync,
+    sync::actions::Actions,
     vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
     AranyaStore,
 };
@@ -31,13 +32,13 @@ use tokio::{
     task::{self, AbortHandle},
 };
 
-pub type TestClient = aranya::Client<
+pub type TestClient = sync::tcp::Client<
     PolicyEngine<DefaultEngine, Store>,
     LinearStorageProvider<FileManager>,
     DefaultEngine,
 >;
 pub type TestServer =
-    aranya::Server<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
+    sync::tcp::Server<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
 // checks if effects vector contains a particular type of effect.
 #[macro_export]

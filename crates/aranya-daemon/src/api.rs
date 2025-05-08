@@ -32,10 +32,9 @@ use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
     aqc::Aqc,
-    aranya::Actions,
     daemon::KS,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::SyncPeers,
+    sync::{actions::Actions, task::SyncPeers},
     Client, EF,
 };
 
