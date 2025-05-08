@@ -19,7 +19,7 @@ use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument};
 
 use crate::{
-    daemon::{TcpSyncClient, EF},
+    daemon::{QuicSyncClient, EF},
     vm_policy::VecSink,
 };
 
@@ -132,7 +132,7 @@ type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
 pub struct Syncer {
     /// Aranya client to allow syncing the Aranya graph with another peer.
-    client: Arc<TcpSyncClient>,
+    client: Arc<QuicSyncClient>,
     /// Keeps track of peer info.
     peers: HashMap<SyncPeer, PeerInfo>,
     /// Receives added/removed peers.
@@ -152,7 +152,7 @@ struct PeerInfo {
 
 impl Syncer {
     /// Creates a new `Syncer`.
-    pub fn new(client: Arc<TcpSyncClient>, send_effects: EffectSender) -> (Self, SyncPeers) {
+    pub fn new(client: Arc<QuicSyncClient>, send_effects: EffectSender) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (

@@ -45,8 +45,8 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 /// EF = Policy Effect
 pub(crate) type EF = policy::Effect;
 
-pub(crate) type TcpSyncClient = crate::sync::tcp::Client<EN, SP, CE>;
-type TcpSyncServer = crate::sync::tcp::Server<EN, SP>;
+pub(crate) type QuicSyncClient = crate::sync::quic::Client<EN, SP, CE>;
+type QuicSyncServer = crate::sync::quic::Server<EN, SP>;
 pub(crate) type ActionsClient = crate::actions::Client<EN, SP, CE>;
 
 /// The daemon itself.
@@ -185,7 +185,7 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-    ) -> Result<(TcpSyncClient, TcpSyncServer)> {
+    ) -> Result<(QuicSyncClient, QuicSyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -196,14 +196,12 @@ impl Daemon {
             ),
         )));
 
-        let client = TcpSyncClient::new(Arc::clone(&aranya));
+        let client = QuicSyncClient::new(Arc::clone(&aranya));
 
         let server = {
             info!(addr = %external_sync_addr, "starting TCP server");
-            let listener = TcpListener::bind(external_sync_addr.to_socket_addrs())
-                .await
-                .context("unable to bind TCP listener")?;
-            TcpSyncServer::new(Arc::clone(&aranya), listener)
+            // TODO: QUIC listener.
+            QuicSyncServer::new(Arc::clone(&aranya))
         };
 
         info!(device_id = %device_id, "set up Aranya");

@@ -33,7 +33,7 @@ use tokio::{
 };
 
 // Aranya sync client for testing.
-pub type TestClient = sync::tcp::Client<
+pub type TestClient = sync::quic::Client<
     PolicyEngine<DefaultEngine, Store>,
     LinearStorageProvider<FileManager>,
     DefaultEngine,
@@ -41,7 +41,7 @@ pub type TestClient = sync::tcp::Client<
 
 // Aranya sync server for testing.
 pub type TestServer =
-    sync::tcp::Server<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
+    sync::quic::Server<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
 // Aranya actions client for testing.
 pub type TestActionsClient = actions::Client<
@@ -189,7 +189,8 @@ impl TestCtx {
             let bundle = KeyBundle::generate(&mut eng, &mut store)
                 .context("unable to generate `KeyBundle`")?;
 
-            let (listener, local_addr) = {
+            // TODO: QUIC listener instead of TCP listener.
+            let (_listener, local_addr) = {
                 let listener = TcpListener::bind(addr.to_socket_addrs())
                     .await
                     .context("unable to bind `TcpListener`")?;
@@ -213,7 +214,8 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let server = TestServer::new(Arc::clone(&aranya), listener);
+            // TODO: QUIC listener.
+            let server = TestServer::new(Arc::clone(&aranya));
             let actions = TestActionsClient::new(Arc::clone(&aranya));
             (client, server, actions, local_addr, pk)
         };
