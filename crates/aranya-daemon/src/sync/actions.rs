@@ -3,15 +3,16 @@
 use core::{future::Future, marker::PhantomData};
 use std::{borrow::Cow, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use aranya_aqc_util::LabelId;
-use aranya_crypto::DeviceId;
+use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
 use aranya_runtime::{
-    ClientError, ClientState, Engine, GraphId, Policy, Sink, StorageProvider, VmPolicy,
+    vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
+    VmPolicy,
 };
 use futures_util::TryFutureExt as _;
 use tokio::sync::Mutex;
@@ -19,8 +20,76 @@ use tracing::{debug, info, instrument, warn, Instrument};
 
 use crate::{
     policy::{ActorExt, ChanOp, Effect, KeyBundle, Role},
+    sync::tcp::Client,
     vm_policy::{MsgSink, VecSink},
 };
+
+// TODO: use a different type for actions and network client.
+impl<EN, SP, CE> Client<EN, SP, CE>
+where
+    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
+    SP: StorageProvider + Send + 'static,
+    CE: aranya_crypto::Engine + Send + Sync + 'static,
+{
+    /// Creates the team.
+    /// Creates a new graph, adds the `CreateTeam` command to the root of the graph.
+    /// Returns the [`GraphId`] of the newly created graph.
+    #[instrument(skip_all)]
+    pub async fn create_team(
+        &self,
+        owner_keys: KeyBundle,
+        nonce: Option<&[u8]>,
+    ) -> Result<(GraphId, Vec<Effect>)> {
+        let mut sink = VecSink::new();
+        let id = self
+            .aranya
+            .lock()
+            .await
+            .new_graph(
+                &[0u8],
+                vm_action!(create_team(
+                    owner_keys,
+                    nonce.unwrap_or(&Rng.bytes::<[u8; 16]>()),
+                )),
+                &mut sink,
+            )
+            .context("unable to create new team")?;
+        Ok((id, sink.collect()?))
+    }
+
+    /// Returns an implementation of [`Actions`] for a particular
+    /// storage.
+    #[instrument(skip_all, fields(id = %id))]
+    pub fn actions(&self, id: &GraphId) -> impl Actions<EN, SP, CE> {
+        ActionsImpl {
+            aranya: Arc::clone(&self.aranya),
+            graph_id: *id,
+            _eng: PhantomData,
+        }
+    }
+
+    /// Create new ephemeral Session.
+    /// Once the Session has been created, call `session_receive` to add an ephemeral command to the Session.
+    #[instrument(skip_all, fields(id = %id))]
+    pub async fn session_new(&self, id: &GraphId) -> Result<Session<SP, EN>> {
+        let session = self.aranya.lock().await.session(*id)?;
+        Ok(session)
+    }
+
+    /// Receives an ephemeral command from another ephemeral Session.
+    /// Assumes an ephemeral Session has already been created before adding an ephemeral command to the Session.
+    #[instrument(skip_all)]
+    pub async fn session_receive(
+        &self,
+        session: &mut Session<SP, EN>,
+        command: &[u8],
+    ) -> Result<Vec<Effect>> {
+        let client = self.aranya.lock().await;
+        let mut sink = VecSink::new();
+        session.receive(&client, &mut sink, command)?;
+        Ok(sink.collect()?)
+    }
+}
 
 /// Implements [`Actions`] for a particular storage.
 pub struct ActionsImpl<EN, SP, CE> {

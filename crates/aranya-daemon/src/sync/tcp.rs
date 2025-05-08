@@ -4,11 +4,11 @@ use core::{fmt, marker::PhantomData, net::SocketAddr};
 use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
-use aranya_crypto::{Csprng, Rng};
+use aranya_crypto::Rng;
 use aranya_policy_ifgen::VmEffect;
 use aranya_runtime::{
-    vm_action, ClientState, Engine, GraphId, PeerCache, Session, Sink, StorageProvider,
-    SyncRequester, SyncResponder, SyncType, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
+    ClientState, Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder,
+    SyncType, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::Addr;
 use buggy::bug;
@@ -19,14 +19,7 @@ use tokio::{
     sync::Mutex,
     task::JoinSet,
 };
-use tracing::{debug, error, info_span, instrument, warn, Instrument};
-
-use super::actions::ActionsImpl;
-use crate::{
-    policy::{Effect, KeyBundle},
-    sync::actions::Actions,
-    vm_policy::VecSink,
-};
+use tracing::{debug, error, info_span, instrument, Instrument};
 
 /// A response to a sync request.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -133,65 +126,6 @@ where
         }
 
         Ok(())
-    }
-
-    /// Creates the team.
-    /// Creates a new graph, adds the `CreateTeam` command to the root of the graph.
-    /// Returns the [`GraphId`] of the newly created graph.
-    #[instrument(skip_all)]
-    pub async fn create_team(
-        &self,
-        owner_keys: KeyBundle,
-        nonce: Option<&[u8]>,
-    ) -> Result<(GraphId, Vec<Effect>)> {
-        let mut sink = VecSink::new();
-        let id = self
-            .aranya
-            .lock()
-            .await
-            .new_graph(
-                &[0u8],
-                vm_action!(create_team(
-                    owner_keys,
-                    nonce.unwrap_or(&Rng.bytes::<[u8; 16]>()),
-                )),
-                &mut sink,
-            )
-            .context("unable to create new team")?;
-        Ok((id, sink.collect()?))
-    }
-
-    /// Returns an implementation of [`Actions`] for a particular
-    /// storage.
-    #[instrument(skip_all, fields(id = %id))]
-    pub fn actions(&self, id: &GraphId) -> impl Actions<EN, SP, CE> {
-        ActionsImpl {
-            aranya: Arc::clone(&self.aranya),
-            graph_id: *id,
-            _eng: PhantomData,
-        }
-    }
-
-    /// Create new ephemeral Session.
-    /// Once the Session has been created, call `session_receive` to add an ephemeral command to the Session.
-    #[instrument(skip_all, fields(id = %id))]
-    pub async fn session_new(&self, id: &GraphId) -> Result<Session<SP, EN>> {
-        let session = self.aranya.lock().await.session(*id)?;
-        Ok(session)
-    }
-
-    /// Receives an ephemeral command from another ephemeral Session.
-    /// Assumes an ephemeral Session has already been created before adding an ephemeral command to the Session.
-    #[instrument(skip_all)]
-    pub async fn session_receive(
-        &self,
-        session: &mut Session<SP, EN>,
-        command: &[u8],
-    ) -> Result<Vec<Effect>> {
-        let client = self.aranya.lock().await;
-        let mut sink = VecSink::new();
-        session.receive(&client, &mut sink, command)?;
-        Ok(sink.collect()?)
     }
 }
 
