@@ -23,12 +23,13 @@ use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
+    actions::Actions,
     api::{ApiKey, DaemonApiServer, PublicApiKey},
     aqc::Aqc,
     config::Config,
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::{actions::Actions, task::Syncer},
+    sync::task::Syncer,
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
@@ -46,7 +47,7 @@ pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = crate::sync::tcp::Client<EN, SP, CE>;
 type Server = crate::sync::tcp::Server<EN, SP>;
-pub(crate) type ActionsClient = crate::sync::actions::Client<EN, SP, CE>;
+pub(crate) type ActionsClient = crate::actions::Client<EN, SP, CE>;
 
 /// The daemon itself.
 pub struct Daemon {

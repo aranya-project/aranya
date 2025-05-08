@@ -29,6 +29,7 @@
     unused_qualifications
 )]
 
+pub mod actions;
 pub mod config;
 #[rustfmt::skip]
 pub mod policy;

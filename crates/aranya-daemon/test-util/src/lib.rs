@@ -13,9 +13,9 @@ use aranya_crypto::{
     Csprng, Rng,
 };
 use aranya_daemon::{
+    actions::{self, Actions},
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync,
-    sync::actions::Actions,
     vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
     AranyaStore,
 };
@@ -44,7 +44,7 @@ pub type TestServer =
     sync::tcp::Server<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
 // Aranya actions client for testing.
-pub type TestActionsClient = sync::actions::Client<
+pub type TestActionsClient = actions::Client<
     PolicyEngine<DefaultEngine, Store>,
     LinearStorageProvider<FileManager>,
     DefaultEngine,

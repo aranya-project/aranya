@@ -31,10 +31,11 @@ use tokio::{
 use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
+    actions::Actions,
     aqc::Aqc,
     daemon::KS,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::{actions::Actions, task::SyncPeers},
+    sync::task::SyncPeers,
     ActionsClient, EF,
 };
 
