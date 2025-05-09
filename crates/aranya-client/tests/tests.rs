@@ -238,7 +238,7 @@ impl DeviceCtx {
             work_dir: work_dir.clone(),
             uds_api_path: uds_api_path.clone(),
             pid_file: work_dir.join("pid"),
-            sync_addr: Addr::new("localhost", 0)?,
+            sync_addr: Addr::new("127.0.0.1", 0)?,
             afc: None,
             aqc: None,
         };

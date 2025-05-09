@@ -173,7 +173,7 @@ impl TestCtx {
 
     /// Creates a single client.
     pub async fn new_client(&mut self, name: &str, id: GraphId) -> Result<TestDevice> {
-        let addr = Addr::new("localhost", 0)?; // random port
+        let addr = Addr::new("127.0.0.1", 0)?; // random port
 
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");

@@ -45,7 +45,7 @@ use tokio::{
     sync::{mpsc, Mutex},
     task::JoinSet,
 };
-use tracing::{debug, error, info, instrument, trace};
+use tracing::{debug, error, info, instrument};
 
 use super::prot::SyncProtocols;
 
@@ -159,23 +159,40 @@ where
     }
 
     async fn connect(&self, peer: &Addr) -> Result<BidirectionalStream> {
+        info!(?peer, "client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
         let mut conns = self.conns.lock().await;
         let client = self.client.lock().await;
         if !conns.contains_key(peer) {
-            let Some(addr) = peer.lookup().await?.next() else {
-                bail!("unable to lookup peer address");
-            };
-            let mut conn = client.connect(Connect::new(addr)).await?;
+            debug!(?peer, "existing quic connection not found");
+            
+            let addr = tokio::net::lookup_host(peer.to_socket_addrs())
+                .await?
+                .next()
+                .assume("invalid peer address")?;
+            // Note: cert is not used but server name must be set to connect.
+            debug!(?peer, "attempting to create new quic connection");
+            let mut conn = client.connect(Connect::new(addr).with_server_name("127.0.0.1")).await?;
             conn.keep_alive(true)?;
+            debug!(?peer, "created new quic connection");
             conns.insert(*peer, conn);
         }
 
         let Some(conn) = conns.get(peer) else {
+            error!(?peer, "unable to lookup quic connection");
             bail!("unable to get connection");
         };
-        let stream = conn.handle().open_bidirectional_stream().await?;
+        info!("client connected to QUIC sync server");
+        let stream = match conn.handle().open_bidirectional_stream().await {
+            Ok(stream) => { stream }
+            Err(e) => { 
+                error!(?peer, "unable to open bidi stream: {}", e);
+                bail!("unable to open bidi stream: {}", e); 
+            }
+        };
+
+        info!(?peer, "client opened bidi stream with QUIC sync server");
         Ok(stream)
     }
 
@@ -188,6 +205,7 @@ where
     where
         A: Serialize + DeserializeOwned + Clone,
     {
+        info!("client sending sync request to QUIC sync server");
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let (len, _) = {
@@ -220,6 +238,8 @@ where
         S: Sink<<EN as Engine>::Effect>,
         A: Serialize + DeserializeOwned + Clone,
     {
+        info!("client receiving sync response from QUIC sync server");
+
         let mut recv_buf = Vec::new();
         recv.read_to_end(&mut recv_buf)
             .await
@@ -301,9 +321,10 @@ impl<EN, SP> Server<EN, SP> {
 
         let tls_server_provider = rustls_provider::Server::new(server_config);
 
-        let Some(addr) = addr.lookup().await?.next() else {
-            bail!("unable to lookup server address");
-        };
+        let addr = tokio::net::lookup_host(addr.to_socket_addrs())
+            .await?
+            .next()
+            .assume("invalid server address")?;
         // Use the rustls server provider
         let server = QuicServer::builder()
             .with_tls(tls_server_provider)? // Use the wrapped server config
@@ -332,9 +353,11 @@ where
     /// Begins accepting incoming requests.
     #[instrument(skip_all)]
     pub async fn serve(mut self) -> Result<()> {
+        info!("QUIC sync server listening for incoming connections: {}", self.local_addr()?);
+
         // Accept incoming QUIC connections
         while let Some(mut conn) = self.server.accept().await {
-            info!("received incoming QUIC connection");
+            debug!("received incoming QUIC connection");
             let Ok(peer) = conn.remote_addr() else {
                 error!("unable to get peer address from connection");
                 continue;
@@ -345,25 +368,25 @@ where
                     // Accept incoming streams.
                     match conn.accept_bidirectional_stream().await {
                         Ok(Some(mut stream)) => {
-                            trace!("received incoming QUIC stream");
+                            debug!(?peer, "received incoming QUIC stream");
                             if let Err(e) = Self::sync(client.clone(), peer, &mut stream).await {
-                                error!(?e, ?peer, "unable to sync with peer");
+                                error!(?e, ?peer, "server unable to sync with peer");
                                 break;
                             }
                         }
                         Ok(None) => {
-                            debug!("QUIC connection was closed");
+                            debug!(?peer, "QUIC connection was closed");
                             return;
                         }
                         Err(e) => {
-                            error!("error receiving QUIC stream: {}", e);
+                            error!(?peer, "error receiving QUIC stream: {}", e);
                             return;
                         }
                     }
                 }
             });
         }
-        error!("server terminated");
+        error!("server terminated: {}", self.local_addr()?);
         Ok(())
     }
 
@@ -374,6 +397,8 @@ where
         peer: SocketAddr,
         stream: &mut BidirectionalStream,
     ) -> Result<()> {
+        info!("server received a sync request");
+
         let mut recv = Vec::new();
         stream
             .read_to_end(&mut recv)
@@ -407,6 +432,8 @@ where
         client: Arc<Mutex<ClientState<EN, SP>>>,
         request: &[u8],
     ) -> Result<Box<[u8]>> {
+        info!("server responding to sync request");
+
         // TODO: Use real server address
         let server_address = ();
         let mut resp = SyncResponder::new(server_address);

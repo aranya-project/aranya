@@ -115,7 +115,7 @@ impl Daemon {
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
-                    error!(err = ?err, "unable to sync with peer");
+                    error!(err = ?err, "client unable to sync with peer");
                 }
             }
         });
