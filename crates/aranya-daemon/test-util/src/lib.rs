@@ -27,13 +27,12 @@ use aranya_runtime::{
 use aranya_util::Addr;
 use tempfile::{tempdir, TempDir};
 use tokio::{
-    net::TcpListener,
     sync::Mutex,
     task::{self, AbortHandle},
 };
 
 // Aranya sync client for testing.
-pub type TestClient = sync::tcp::Client<
+pub type TestClient = sync::quic::Client<
     PolicyEngine<DefaultEngine, Store>,
     LinearStorageProvider<FileManager>,
     DefaultEngine,
@@ -41,7 +40,7 @@ pub type TestClient = sync::tcp::Client<
 
 // Aranya sync server for testing.
 pub type TestServer =
-    sync::tcp::Server<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
+    sync::quic::Server<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
 // Aranya actions client for testing.
 pub type TestActionsClient = actions::Client<
@@ -174,7 +173,7 @@ impl TestCtx {
 
     /// Creates a single client.
     pub async fn new_client(&mut self, name: &str, id: GraphId) -> Result<TestDevice> {
-        let addr = Addr::new("localhost", 0)?; // random port
+        let addr = Addr::new("127.0.0.1", 0)?; // random port
 
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
@@ -189,13 +188,6 @@ impl TestCtx {
             let bundle = KeyBundle::generate(&mut eng, &mut store)
                 .context("unable to generate `KeyBundle`")?;
 
-            let (listener, local_addr) = {
-                let listener = TcpListener::bind(addr.to_socket_addrs())
-                    .await
-                    .context("unable to bind `TcpListener`")?;
-                let local_addr = listener.local_addr()?;
-                (listener, local_addr)
-            };
             let storage_dir = root.join("storage");
             fs::create_dir_all(&storage_dir)?;
 
@@ -212,8 +204,9 @@ impl TestCtx {
             );
 
             let aranya = Arc::new(Mutex::new(graph));
-            let client = TestClient::new(Arc::clone(&aranya));
-            let server = TestServer::new(Arc::clone(&aranya), listener);
+            let client = TestClient::new(Arc::clone(&aranya))?;
+            let server = TestServer::new(Arc::clone(&aranya), &addr).await?;
+            let local_addr = server.local_addr()?;
             let actions = TestActionsClient::new(Arc::clone(&aranya));
             (client, server, actions, local_addr, pk)
         };

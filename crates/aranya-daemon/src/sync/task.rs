@@ -19,7 +19,7 @@ use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument};
 
 use crate::{
-    daemon::{TcpSyncClient, EF},
+    daemon::{QuicSyncClient, EF},
     vm_policy::VecSink,
 };
 
@@ -132,7 +132,7 @@ type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
 pub struct Syncer {
     /// Aranya client to allow syncing the Aranya graph with another peer.
-    client: Arc<TcpSyncClient>,
+    client: Arc<QuicSyncClient>,
     /// Keeps track of peer info.
     peers: HashMap<SyncPeer, PeerInfo>,
     /// Receives added/removed peers.
@@ -152,7 +152,7 @@ struct PeerInfo {
 
 impl Syncer {
     /// Creates a new `Syncer`.
-    pub fn new(client: Arc<TcpSyncClient>, send_effects: EffectSender) -> (Self, SyncPeers) {
+    pub fn new(client: Arc<QuicSyncClient>, send_effects: EffectSender) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -222,7 +222,7 @@ impl Syncer {
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
     async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
-        info!("syncing with peer");
+        info!(?peer, "syncing with peer");
 
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
@@ -238,7 +238,7 @@ impl Syncer {
             .send((*id, effects))
             .await
             .context("unable to send effects")?;
-        info!(?n, "completed sync");
+        info!(?peer, ?n, "completed sync");
         Ok(())
     }
 }

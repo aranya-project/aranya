@@ -19,7 +19,7 @@ use bimap::BiBTreeMap;
 use buggy::BugExt;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
+use tokio::{fs, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
@@ -45,8 +45,8 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 /// EF = Policy Effect
 pub(crate) type EF = policy::Effect;
 
-pub(crate) type TcpSyncClient = crate::sync::tcp::Client<EN, SP, CE>;
-type TcpSyncServer = crate::sync::tcp::Server<EN, SP>;
+pub(crate) type QuicSyncClient = crate::sync::quic::Client<EN, SP, CE>;
+type QuicSyncServer = crate::sync::quic::Server<EN, SP>;
 pub(crate) type ActionsClient = crate::actions::Client<EN, SP, CE>;
 
 /// The daemon itself.
@@ -115,7 +115,7 @@ impl Daemon {
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
-                    error!(err = ?err, "unable to sync with peer");
+                    error!(err = ?err, "client unable to sync with peer");
                 }
             }
         });
@@ -185,7 +185,7 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-    ) -> Result<(TcpSyncClient, TcpSyncServer)> {
+    ) -> Result<(QuicSyncClient, QuicSyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -196,14 +196,14 @@ impl Daemon {
             ),
         )));
 
-        let client = TcpSyncClient::new(Arc::clone(&aranya));
+        let client = QuicSyncClient::new(Arc::clone(&aranya))
+            .context("unable to initialize QUIC sync client")?;
 
         let server = {
-            info!(addr = %external_sync_addr, "starting TCP server");
-            let listener = TcpListener::bind(external_sync_addr.to_socket_addrs())
+            info!(addr = %external_sync_addr, "starting QUIC sync server");
+            QuicSyncServer::new(Arc::clone(&aranya), &external_sync_addr)
                 .await
-                .context("unable to bind TCP listener")?;
-            TcpSyncServer::new(Arc::clone(&aranya), listener)
+                .context("unable to initialize QUIC sync server")?
         };
 
         info!(device_id = %device_id, "set up Aranya");
