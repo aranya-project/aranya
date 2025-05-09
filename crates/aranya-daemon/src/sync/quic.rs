@@ -187,7 +187,7 @@ impl<EN, SP> Server<EN, SP> {
 
         let tls_server_provider = rustls_provider::Server::new(server_config);
 
-        let Some(addr) = addr.lookup().await?.into_iter().next() else {
+        let Some(addr) = addr.lookup().await?.next() else {
             bail!("unable to lookup server address");
         };
         // Use the rustls server provider
