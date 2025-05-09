@@ -22,11 +22,11 @@ use anyhow::{bail, Context, Result};
 use aranya_crypto::Rng;
 use aranya_policy_ifgen::VmEffect;
 use aranya_runtime::{
-    ClientState, Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, VmPolicy,
-    MAX_SYNC_MESSAGE_SIZE,
+    ClientState, Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder,
+    SyncType, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::Addr;
-use buggy::BugExt as _;
+use buggy::{bug, BugExt as _};
 use bytes::Bytes;
 use rustls::crypto::CryptoProvider;
 use rustls_pemfile::{certs, private_key};
@@ -343,10 +343,10 @@ where
             self.set.spawn(async move {
                 loop {
                     // Accept incoming streams.
-                    match conn.accept_receive_stream().await {
-                        Ok(Some(stream)) => {
+                    match conn.accept_bidirectional_stream().await {
+                        Ok(Some(mut stream)) => {
                             trace!("received incoming QUIC stream");
-                            if let Err(e) = Self::sync(client.clone(), peer, stream).await {
+                            if let Err(e) = Self::sync(client.clone(), peer, &mut stream).await {
                                 error!(?e, ?peer, "unable to sync with peer");
                                 break;
                             }
@@ -368,22 +368,71 @@ where
     }
 
     /// Responds to a sync.
-    #[instrument(skip_all, fields(peer = %_peer))]
+    #[instrument(skip_all, fields(peer = %peer))]
     async fn sync(
-        _client: Arc<Mutex<ClientState<EN, SP>>>,
-        _peer: SocketAddr,
-        _stream: ReceiveStream,
+        client: Arc<Mutex<ClientState<EN, SP>>>,
+        peer: SocketAddr,
+        stream: &mut BidirectionalStream,
     ) -> Result<()> {
-        todo!();
+        let mut recv = Vec::new();
+        stream
+            .read_to_end(&mut recv)
+            .await
+            .context("failed to read sync request")?;
+        debug!(n = recv.len(), "received sync request");
+
+        // Generate a sync response for a sync request.
+        let resp = match Self::sync_respond(client, &recv).await {
+            Ok(data) => SyncResponse::Ok(data),
+            Err(err) => {
+                error!(?err, "error responding to sync request");
+                SyncResponse::Err(format!("{err:?}"))
+            }
+        };
+        // Serialize the sync response.
+        let data =
+            &postcard::to_allocvec(&resp).context("postcard unable to serialize sync response")?;
+
+        // TODO: `send_all`?
+        stream.send(Bytes::copy_from_slice(data)).await?;
+        stream.close().await?;
+        debug!(n = data.len(), "sent sync response");
+
+        Ok(())
     }
 
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
-        _client: Arc<Mutex<ClientState<EN, SP>>>,
-        _request: &[u8],
+        client: Arc<Mutex<ClientState<EN, SP>>>,
+        request: &[u8],
     ) -> Result<Box<[u8]>> {
-        todo!();
+        // TODO: Use real server address
+        let server_address = ();
+        let mut resp = SyncResponder::new(server_address);
+
+        let SyncType::Poll {
+            request,
+            address: (),
+        } = postcard::from_bytes(request)?
+        else {
+            bug!("Other sync types are not implemented");
+        };
+
+        resp.receive(request).context("sync recv failed")?;
+
+        let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+        // TODO: save PeerCache somewhere.
+        let len = resp
+            .poll(
+                &mut buf,
+                client.lock().await.provider(),
+                &mut PeerCache::new(),
+            )
+            .context("sync resp poll failed")?;
+        debug!(len = len, "sync poll finished");
+        buf.truncate(len);
+        Ok(buf.into())
     }
 }
 
