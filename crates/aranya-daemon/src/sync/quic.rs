@@ -36,10 +36,10 @@ use s2n_quic::{
         congestion_controller::Bbr,
         tls::rustls::{self as rustls_provider, rustls::pki_types::ServerName},
     },
-    stream::ReceiveStream,
+    stream::{BidirectionalStream, ReceiveStream, SendStream},
     Client as QuicClient, Connection, Server as QuicServer,
 };
-use serde::{Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use tokio::{
     io::AsyncReadExt,
     sync::{mpsc, Mutex},
@@ -137,6 +137,28 @@ where
     where
         S: Sink<<EN as Engine>::Effect>,
     {
+        let stream = self.connect(peer).await?;
+        // TODO: spawn a task for send/recv?
+        let (mut recv, mut send) = stream.split();
+
+        // TODO: Real server address.
+        let server_addr = ();
+        let mut syncer = SyncRequester::new(id, &mut Rng, server_addr);
+
+        // send sync request.
+        self.send_sync_request(&mut send, &mut syncer, peer).await?;
+
+        // receive sync response.
+        self.receive_sync_response(&mut recv, &mut syncer, &id, sink, peer)
+            .await?;
+
+        // close the stream.
+        send.close().await?;
+
+        Ok(())
+    }
+
+    async fn connect(&self, peer: &Addr) -> Result<BidirectionalStream> {
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
         let mut conns = self.conns.lock().await;
@@ -154,13 +176,18 @@ where
             bail!("unable to get connection");
         };
         let stream = conn.handle().open_bidirectional_stream().await?;
-        // TODO: spawn a task for send/recv?
-        let (mut recv, mut send) = stream.split();
+        Ok(stream)
+    }
 
-        // send sync request.
-        // TODO: Real server address.
-        let server_addr = ();
-        let mut syncer = SyncRequester::new(id, &mut Rng, server_addr);
+    async fn send_sync_request<'a, A>(
+        &self,
+        send: &mut SendStream,
+        syncer: &mut SyncRequester<'a, A>,
+        peer: &Addr,
+    ) -> Result<()>
+    where
+        A: Serialize + DeserializeOwned + Clone,
+    {
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let (len, _) = {
@@ -178,7 +205,21 @@ where
         send.flush().await?;
         debug!(?peer, "sent sync request");
 
-        // get sync response.
+        Ok(())
+    }
+
+    async fn receive_sync_response<'a, S, A>(
+        &self,
+        recv: &mut ReceiveStream,
+        syncer: &mut SyncRequester<'a, A>,
+        id: &GraphId,
+        sink: &mut S,
+        peer: &Addr,
+    ) -> Result<()>
+    where
+        S: Sink<<EN as Engine>::Effect>,
+        A: Serialize + DeserializeOwned + Clone,
+    {
         let mut recv_buf = Vec::new();
         recv.read_to_end(&mut recv_buf)
             .await
@@ -200,7 +241,7 @@ where
             debug!(num = cmds.len(), "received commands");
             if !cmds.is_empty() {
                 let mut client = self.aranya.lock().await;
-                let mut trx = client.transaction(id);
+                let mut trx = client.transaction(*id);
                 // TODO: save PeerCache somewhere.
                 client
                     .add_commands(&mut trx, sink, &cmds)
@@ -215,8 +256,6 @@ where
                 debug!("committed");
             }
         }
-
-        send.close().await?;
 
         Ok(())
     }
