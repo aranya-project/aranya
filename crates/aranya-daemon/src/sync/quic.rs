@@ -62,8 +62,8 @@ pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
     pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
     /// QUIC client to make sync requests and handle sync responses.
-    client: QuicClient,
-    conns: BTreeMap<Addr, Connection>,
+    client: Arc<Mutex<QuicClient>>,
+    conns: Arc<Mutex<BTreeMap<Addr, Connection>>>,
     _eng: PhantomData<CE>,
 }
 
@@ -94,8 +94,8 @@ impl<EN, SP, CE> Client<EN, SP, CE> {
 
         Ok(Client {
             aranya,
-            client,
-            conns: BTreeMap::new(),
+            client: Arc::new(Mutex::new(client)),
+            conns: Arc::new(Mutex::new(BTreeMap::new())),
             _eng: PhantomData,
         })
     }
@@ -110,21 +110,23 @@ where
     /// Syncs with the peer.
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
-    pub async fn sync_peer<S>(&mut self, id: GraphId, sink: &mut S, peer: &Addr) -> Result<()>
+    pub async fn sync_peer<S>(&self, id: GraphId, sink: &mut S, peer: &Addr) -> Result<()>
     where
         S: Sink<<EN as Engine>::Effect>,
     {
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
-        if !self.conns.contains_key(peer) {
-            let Some(addr) = peer.lookup().await?.into_iter().next() else {
+        let mut conns = self.conns.lock().await;
+        let client = self.client.lock().await;
+        if !conns.contains_key(peer) {
+            let Some(addr) = peer.lookup().await?.next() else {
                 bail!("unable to lookup peer address");
             };
-            let conn = self.client.connect(Connect::new(addr)).await?;
-            self.conns.insert(*peer, conn);
+            let conn = client.connect(Connect::new(addr)).await?;
+            conns.insert(*peer, conn);
         }
 
-        let Some(_conn) = self.conns.get(peer) else {
+        let Some(_conn) = conns.get(peer) else {
             bail!("unable to get connection");
         };
 
