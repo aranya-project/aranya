@@ -9,26 +9,27 @@
 use core::{fmt, marker::PhantomData, net::SocketAddr};
 use std::{collections::BTreeMap, sync::Arc};
 
-use anyhow::Result;
+use ::rustls::ClientConfig;
+use anyhow::{bail, Result};
 use aranya_policy_ifgen::VmEffect;
 use aranya_runtime::{ClientState, Engine, GraphId, Sink, StorageProvider, VmPolicy};
 use aranya_util::Addr;
+use rustls::{crypto::CryptoProvider, pki_types::ServerName};
+use rustls_pemfile::{certs, private_key};
+use s2n_quic::{
+    client::Connect,
+    provider::tls::rustls::{self as rustls_provider},
+    stream::ReceiveStream,
+    Client as QuicClient, Connection, Server as QuicServer,
+};
 use serde::{Deserialize, Serialize};
 use tokio::{sync::Mutex, task::JoinSet};
 use tracing::{debug, error, info, instrument, trace};
 
-use s2n_quic::{
-    client::Connect,
-    connection::Handle,
-    provider::self,
-    stream::{PeerStream, ReceiveStream, SendStream},
-    Client as QuicClient, Connection, Server as QuicServer,
-};
-
 use super::prot::SyncProtocols;
 
 /// QUIC Syncer protocol type.
-pub const PROT:SyncProtocols = SyncProtocols::QUIC;
+pub const PROT: SyncProtocols = SyncProtocols::QUIC;
 
 /// QUIC Syncer protocol version.
 pub const VERSION: u16 = 1;
@@ -57,16 +58,44 @@ pub enum SyncResponse {
 pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
     pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    /// QUIC client to make sync requests and handle sync responses.
+    client: QuicClient,
+    conns: BTreeMap<Addr, Connection>,
     _eng: PhantomData<CE>,
 }
 
 impl<EN, SP, CE> Client<EN, SP, CE> {
     /// Creates a new [`Client`].
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Self {
-        Client {
+    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Result<Self> {
+        // Load Cert and Key
+        let certs = certs(&mut CERT_PEM.as_bytes()).collect::<Result<Vec<_>, _>>()?;
+        let key = private_key(&mut KEY_PEM.as_bytes())?;
+
+        // Create Client Config (INSECURE: Skips server cert verification)
+        let mut client_config = ClientConfig::builder()
+            .dangerous()
+            .with_custom_certificate_verifier(SkipServerVerification::new())
+            .with_no_client_auth();
+        //client_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
+        //client_config.preshared_keys = client_keys.clone(); // Pass the Arc<ClientPresharedKeys>
+
+        // TODO: configure PSKs
+        //let (mut server_keys, identity_rx) = ServerPresharedKeys::new();
+        //server_keys.insert(psk);
+
+        let provider = rustls_provider::Client::new(client_config);
+
+        let client = QuicClient::builder()
+            .with_tls(provider)?
+            .with_io("0.0.0.0:0")?
+            .start()?;
+
+        Ok(Client {
             aranya,
+            client,
+            conns: BTreeMap::new(),
             _eng: PhantomData,
-        }
+        })
     }
 }
 
@@ -79,11 +108,25 @@ where
     /// Syncs with the peer.
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
-    pub async fn sync_peer<S>(&self, id: GraphId, sink: &mut S, addr: &Addr) -> Result<()>
+    pub async fn sync_peer<S>(&mut self, id: GraphId, sink: &mut S, peer: &Addr) -> Result<()>
     where
         S: Sink<<EN as Engine>::Effect>,
     {
-        todo!();
+        // Check if there is an existing connection with the peer.
+        // If not, create a new connection.
+        let _conn = match self.conns.get(peer) {
+            Some(conn) => conn,
+            None => {
+                let Some(addr) = peer.lookup().await?.into_iter().next() else {
+                    bail!("unable to lookup peer address");
+                };
+                let conn = self.client.connect(Connect::new(addr)).await?;
+                self.conns.insert(*peer, conn);
+                &conn
+            }
+        };
+
+        Ok(())
     }
 }
 
@@ -98,10 +141,8 @@ impl<EN, SP, CE> fmt::Debug for Client<EN, SP, CE> {
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
     aranya: Arc<Mutex<ClientState<EN, SP>>>,
-    /// QUIC server.
+    /// QUIC server to handle sync requests and send sync responses.
     server: QuicServer,
-    /// Stores a QUIC connection for each peer.
-    conns: Arc<Mutex<BTreeMap<SocketAddr, Connection>>>,
     /// Tracks running tasks.
     set: JoinSet<()>,
 }
@@ -110,12 +151,16 @@ impl<EN, SP> Server<EN, SP> {
     /// Creates a new `Server`.
     #[inline]
     pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>, server: QuicServer) -> Self {
-        Self { aranya, server, conns: Arc::new(Mutex::new(BTreeMap::new())), set: JoinSet::new() }
+        Self {
+            aranya,
+            server,
+            set: JoinSet::new(),
+        }
     }
 
     /// Returns the local address the sync server bound to.
     pub fn local_addr(&self) -> Result<SocketAddr> {
-        todo!();
+        Ok(self.server.local_addr()?)
     }
 }
 
@@ -163,8 +208,12 @@ where
     }
 
     /// Responds to a sync.
-    #[instrument(skip_all, fields(addr = %addr))]
-    async fn sync(client: Arc<Mutex<ClientState<EN, SP>>>, addr: SocketAddr, stream: ReceiveStream) -> Result<()> {
+    #[instrument(skip_all, fields(peer = %peer))]
+    async fn sync(
+        client: Arc<Mutex<ClientState<EN, SP>>>,
+        peer: SocketAddr,
+        stream: ReceiveStream,
+    ) -> Result<()> {
         todo!();
     }
 
@@ -177,3 +226,70 @@ where
         todo!();
     }
 }
+
+// --- Start SkipServerVerification ---
+// INSECURE: Allows connecting to any server certificate.
+// Requires the `dangerous_configuration` feature on the `rustls` crate.
+// Use full paths for traits and types
+// TODO: remove this once we have a way to exclusively use PSKs.
+// Currently, we use this to allow the server to be set up to use PSKs
+// without having to rely on the server certificate.
+
+#[derive(Debug)]
+struct SkipServerVerification(Arc<CryptoProvider>);
+
+impl SkipServerVerification {
+    fn new() -> Arc<Self> {
+        let provider = CryptoProvider::get_default().expect("Default crypto provider not found");
+        Arc::new(Self(provider.clone()))
+    }
+}
+
+// Use full trait path
+impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
+    fn verify_server_cert(
+        &self,
+        _end_entity: &rustls::pki_types::CertificateDer<'_>,
+        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        _now: rustls::pki_types::UnixTime,
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+        Ok(rustls::client::danger::ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &rustls::pki_types::CertificateDer<'_>,
+        dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        // Use the selected provider's verification algorithms
+        rustls::crypto::verify_tls12_signature(
+            message,
+            cert,
+            dss,
+            &self.0.signature_verification_algorithms,
+        )
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &rustls::pki_types::CertificateDer<'_>,
+        dss: &rustls::DigitallySignedStruct,
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+        // Use the selected provider's verification algorithms
+        rustls::crypto::verify_tls13_signature(
+            message,
+            cert,
+            dss,
+            &self.0.signature_verification_algorithms,
+        )
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
+        self.0.signature_verification_algorithms.supported_schemes()
+    }
+}
+// --- End SkipServerVerification ---
