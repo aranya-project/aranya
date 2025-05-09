@@ -76,7 +76,7 @@ impl<EN, SP, CE> Client<EN, SP, CE> {
         let key = private_key(&mut KEY_PEM.as_bytes())?;
 
         // Create Client Config (INSECURE: Skips server cert verification)
-        let mut client_config = ClientConfig::builder()
+        let client_config = ClientConfig::builder()
             .dangerous()
             .with_custom_certificate_verifier(SkipServerVerification::new())
             .with_no_client_auth();
