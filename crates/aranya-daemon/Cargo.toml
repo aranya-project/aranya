@@ -39,6 +39,7 @@ buggy = { workspace = true }
 
 anyhow = { workspace = true }
 bimap = "0.6"
+bytes = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }
 deser-hjson = { version = "2" }

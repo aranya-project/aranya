@@ -7,19 +7,27 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::{fmt, marker::PhantomData, net::SocketAddr};
-use std::{collections::{hash_map::Entry, BTreeMap, HashMap}, sync::{Arc, Mutex as SyncMutex}};
+use std::{
+    collections::{hash_map::Entry, BTreeMap, HashMap},
+    sync::{Arc, Mutex as SyncMutex},
+};
 
-use buggy::BugExt as _;
 use ::rustls::{
     client::PresharedKeyStore,
     crypto::PresharedKey,
     server::{PresharedKeySelection, SelectsPresharedKeys},
     ClientConfig, ServerConfig,
 };
-use anyhow::{bail, Result};
+use anyhow::{bail, Context, Result};
+use aranya_crypto::Rng;
 use aranya_policy_ifgen::VmEffect;
-use aranya_runtime::{ClientState, Engine, GraphId, Sink, StorageProvider, VmPolicy};
+use aranya_runtime::{
+    ClientState, Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, VmPolicy,
+    MAX_SYNC_MESSAGE_SIZE,
+};
 use aranya_util::Addr;
+use buggy::BugExt as _;
+use bytes::Bytes;
 use rustls::crypto::CryptoProvider;
 use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
@@ -32,7 +40,10 @@ use s2n_quic::{
     Client as QuicClient, Connection, Server as QuicServer,
 };
 use serde::{Deserialize, Serialize};
-use tokio::{sync::{mpsc, Mutex}, task::JoinSet};
+use tokio::{
+    sync::{mpsc, Mutex},
+    task::JoinSet,
+};
 use tracing::{debug, error, info, instrument, trace};
 
 use super::prot::SyncProtocols;
@@ -85,8 +96,7 @@ impl<EN, SP, CE> Client<EN, SP, CE> {
     #[allow(deprecated)]
     pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Result<Self> {
         // TODO: don't hard-code PSK.
-        let psk = PresharedKey::external(PSK_IDENTITY, PSK_BYTES)
-            .assume("unable to create psk")?;
+        let psk = PresharedKey::external(PSK_IDENTITY, PSK_BYTES).assume("unable to create psk")?;
         let client_keys = Arc::new(ClientPresharedKeys::new(psk.clone()));
 
         // Create Client Config (INSECURE: Skips server cert verification)
@@ -122,7 +132,7 @@ where
     /// Syncs with the peer.
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
-    pub async fn sync_peer<S>(&self, _id: GraphId, _sink: &mut S, peer: &Addr) -> Result<()>
+    pub async fn sync_peer<S>(&self, id: GraphId, _sink: &mut S, peer: &Addr) -> Result<()>
     where
         S: Sink<<EN as Engine>::Effect>,
     {
@@ -134,13 +144,40 @@ where
             let Some(addr) = peer.lookup().await?.next() else {
                 bail!("unable to lookup peer address");
             };
-            let conn = client.connect(Connect::new(addr)).await?;
+            let mut conn = client.connect(Connect::new(addr)).await?;
+            conn.keep_alive(true)?;
             conns.insert(*peer, conn);
         }
 
-        let Some(_conn) = conns.get(peer) else {
+        let Some(conn) = conns.get(peer) else {
             bail!("unable to get connection");
         };
+        let mut stream = conn.handle().open_bidirectional_stream().await?;
+
+        // send sync request.
+        // TODO: Real server address.
+        let server_addr = ();
+        let mut syncer = SyncRequester::new(id, &mut Rng, server_addr);
+        let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+
+        let (len, _) = {
+            let mut client = self.aranya.lock().await;
+            // TODO: save PeerCache somewhere.
+            syncer
+                .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
+                .context("sync poll failed")?
+        };
+        debug!(?len, "sync poll finished");
+        send_buf.truncate(len);
+
+        // TODO: `send_all`?
+        stream.send(Bytes::copy_from_slice(&send_buf)).await?;
+        stream.flush().await?;
+        debug!(?peer, "sent sync request");
+
+        // get sync response.
+
+        stream.close().await?;
 
         Ok(())
     }
@@ -173,8 +210,7 @@ impl<EN, SP> Server<EN, SP> {
         let key = private_key(&mut KEY_PEM.as_bytes())?.assume("expected private key")?;
 
         // TODO: don't hard-code PSK.
-        let psk = PresharedKey::external(PSK_IDENTITY, PSK_BYTES)
-            .assume("unable to create psk")?;
+        let psk = PresharedKey::external(PSK_IDENTITY, PSK_BYTES).assume("unable to create psk")?;
         let (mut server_keys, _identity_rx) = ServerPresharedKeys::new();
         server_keys.insert(psk);
 

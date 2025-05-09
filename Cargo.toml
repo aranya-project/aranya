@@ -62,6 +62,7 @@ aranya-util = { version = "0.5.1", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
 backon = { version = "1.2.0" }
+bytes = { version = "1.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 futures-util = { version = "0.3.30" }

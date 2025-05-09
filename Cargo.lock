@@ -283,6 +283,7 @@ dependencies = [
  "aranya-util",
  "bimap",
  "buggy",
+ "bytes",
  "ciborium",
  "clap",
  "deser-hjson",
