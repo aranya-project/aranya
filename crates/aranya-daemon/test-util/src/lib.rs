@@ -27,7 +27,6 @@ use aranya_runtime::{
 use aranya_util::Addr;
 use tempfile::{tempdir, TempDir};
 use tokio::{
-    net::TcpListener,
     sync::Mutex,
     task::{self, AbortHandle},
 };
@@ -189,14 +188,6 @@ impl TestCtx {
             let bundle = KeyBundle::generate(&mut eng, &mut store)
                 .context("unable to generate `KeyBundle`")?;
 
-            // TODO: QUIC listener instead of TCP listener.
-            let (_listener, local_addr) = {
-                let listener = TcpListener::bind(addr.to_socket_addrs())
-                    .await
-                    .context("unable to bind `TcpListener`")?;
-                let local_addr = listener.local_addr()?;
-                (listener, local_addr)
-            };
             let storage_dir = root.join("storage");
             fs::create_dir_all(&storage_dir)?;
 
@@ -213,9 +204,9 @@ impl TestCtx {
             );
 
             let aranya = Arc::new(Mutex::new(graph));
-            let client = TestClient::new(Arc::clone(&aranya));
-            // TODO: QUIC listener.
-            let server = TestServer::new(Arc::clone(&aranya));
+            let client = TestClient::new(Arc::clone(&aranya))?;
+            let server = TestServer::new(Arc::clone(&aranya), &addr).await?;
+            let local_addr = server.local_addr()?;
             let actions = TestActionsClient::new(Arc::clone(&aranya));
             (client, server, actions, local_addr, pk)
         };

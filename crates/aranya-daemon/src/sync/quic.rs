@@ -34,6 +34,9 @@ use super::prot::SyncProtocols;
 /// QUIC Syncer protocol type.
 pub const PROT: SyncProtocols = SyncProtocols::QUIC;
 
+/// ALPN protocol identifier for Aranya QUIC sync.
+const ALPN_QUIC_SYNC: &[u8] = b"quic_sync";
+
 /// QUIC Syncer protocol version.
 pub const VERSION: u16 = 1;
 
@@ -76,11 +79,11 @@ impl<EN, SP, CE> Client<EN, SP, CE> {
         let key = private_key(&mut KEY_PEM.as_bytes())?;
 
         // Create Client Config (INSECURE: Skips server cert verification)
-        let client_config = ClientConfig::builder()
+        let mut client_config = ClientConfig::builder()
             .dangerous()
             .with_custom_certificate_verifier(SkipServerVerification::new())
             .with_no_client_auth();
-        //client_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
+        client_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
         //client_config.preshared_keys = client_keys.clone(); // Pass the Arc<ClientPresharedKeys>
 
         // TODO: configure PSKs
@@ -161,10 +164,10 @@ impl<EN, SP> Server<EN, SP> {
         let key = private_key(&mut KEY_PEM.as_bytes())?.unwrap();
 
         // Create Server Config
-        let server_config = ServerConfig::builder()
+        let mut server_config = ServerConfig::builder()
             .with_no_client_auth()
             .with_single_cert(certs.clone(), key)?;
-        //server_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
+        server_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
         //server_config.preshared_keys = PresharedKeySelection::Enabled(Arc::new(server_keys));
 
         // TODO: configure PSKs
