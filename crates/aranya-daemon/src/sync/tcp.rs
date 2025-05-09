@@ -1,6 +1,6 @@
 //! Aranya TCP client and server for syncing Aranya graph commands.
 
-use core::{fmt, marker::PhantomData, net::SocketAddr};
+use core::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
@@ -21,6 +21,8 @@ use tokio::{
 };
 use tracing::{debug, error, info_span, instrument, Instrument};
 
+use crate::aranya::Client;
+
 /// A response to a sync request.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SyncResponse {
@@ -30,33 +32,18 @@ pub enum SyncResponse {
     Err(String),
 }
 
-/// Aranya TCP sync client.
-pub struct Client<EN, SP, CE> {
-    /// Thread-safe Aranya client reference.
-    pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
-    _eng: PhantomData<CE>,
-}
-
-impl<EN, SP, CE> Client<EN, SP, CE> {
-    /// Creates a new [`Client`].
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Self {
-        Client {
-            aranya,
-            _eng: PhantomData,
-        }
-    }
-}
-
+/// TCP Syncing related functions
 impl<EN, SP, CE> Client<EN, SP, CE>
 where
     EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
     SP: StorageProvider + Send + 'static,
     CE: aranya_crypto::Engine + Send + Sync + 'static,
 {
+    // TODO(Steve): Make this more generic and not specific to TCP.
     /// Syncs with the peer.
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
-    pub async fn sync_peer<S>(&self, id: GraphId, sink: &mut S, addr: &Addr) -> Result<()>
+    pub async fn sync_peer_tcp<S>(&self, id: GraphId, sink: &mut S, addr: &Addr) -> Result<()>
     where
         S: Sink<<EN as Engine>::Effect>,
     {
@@ -126,12 +113,6 @@ where
         }
 
         Ok(())
-    }
-}
-
-impl<EN, SP, CE> fmt::Debug for Client<EN, SP, CE> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Client").finish_non_exhaustive()
     }
 }
 

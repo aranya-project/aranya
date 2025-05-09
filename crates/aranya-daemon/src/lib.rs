@@ -30,6 +30,7 @@
 )]
 
 pub mod actions;
+pub mod aranya;
 pub mod config;
 #[rustfmt::skip]
 pub mod policy;
