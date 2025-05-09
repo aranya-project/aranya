@@ -41,6 +41,7 @@ use s2n_quic::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::{
+    io::AsyncReadExt,
     sync::{mpsc, Mutex},
     task::JoinSet,
 };
@@ -132,7 +133,7 @@ where
     /// Syncs with the peer.
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     #[instrument(skip_all)]
-    pub async fn sync_peer<S>(&self, id: GraphId, _sink: &mut S, peer: &Addr) -> Result<()>
+    pub async fn sync_peer<S>(&self, id: GraphId, sink: &mut S, peer: &Addr) -> Result<()>
     where
         S: Sink<<EN as Engine>::Effect>,
     {
@@ -152,7 +153,9 @@ where
         let Some(conn) = conns.get(peer) else {
             bail!("unable to get connection");
         };
-        let mut stream = conn.handle().open_bidirectional_stream().await?;
+        let stream = conn.handle().open_bidirectional_stream().await?;
+        // TODO: spawn a task for send/recv?
+        let (mut recv, mut send) = stream.split();
 
         // send sync request.
         // TODO: Real server address.
@@ -171,13 +174,49 @@ where
         send_buf.truncate(len);
 
         // TODO: `send_all`?
-        stream.send(Bytes::copy_from_slice(&send_buf)).await?;
-        stream.flush().await?;
+        send.send(Bytes::copy_from_slice(&send_buf)).await?;
+        send.flush().await?;
         debug!(?peer, "sent sync request");
 
         // get sync response.
+        let mut recv_buf = Vec::new();
+        recv.read_to_end(&mut recv_buf)
+            .await
+            .context("failed to read sync response")?;
+        debug!(?peer, n = recv_buf.len(), "received sync response");
 
-        stream.close().await?;
+        // process the sync response.
+        let resp = postcard::from_bytes(&recv_buf)
+            .context("postcard unable to deserialize sync response")?;
+        let data = match resp {
+            SyncResponse::Ok(data) => data,
+            SyncResponse::Err(msg) => bail!("sync error: {msg}"),
+        };
+        if data.is_empty() {
+            debug!("nothing to sync");
+            return Ok(());
+        }
+        if let Some(cmds) = syncer.receive(&data)? {
+            debug!(num = cmds.len(), "received commands");
+            if !cmds.is_empty() {
+                let mut client = self.aranya.lock().await;
+                let mut trx = client.transaction(id);
+                // TODO: save PeerCache somewhere.
+                client
+                    .add_commands(&mut trx, sink, &cmds)
+                    .context("unable to add received commands")?;
+                client.commit(&mut trx, sink).context("commit failed")?;
+                // TODO: Update heads
+                // client.update_heads(
+                //     id,
+                //     cmds.iter().filter_map(|cmd| cmd.address().ok()),
+                //     heads,
+                // )?;
+                debug!("committed");
+            }
+        }
+
+        send.close().await?;
 
         Ok(())
     }
