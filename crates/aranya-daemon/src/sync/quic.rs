@@ -163,14 +163,16 @@ where
         let client = self.client.lock().await;
         if !conns.contains_key(peer) {
             debug!(?peer, "existing quic connection not found");
-            
+
             let addr = tokio::net::lookup_host(peer.to_socket_addrs())
                 .await?
                 .next()
                 .assume("invalid peer address")?;
             // Note: cert is not used but server name must be set to connect.
             debug!(?peer, "attempting to create new quic connection");
-            let mut conn = client.connect(Connect::new(addr).with_server_name("127.0.0.1")).await?;
+            let mut conn = client
+                .connect(Connect::new(addr).with_server_name("127.0.0.1"))
+                .await?;
             conn.keep_alive(true)?;
             debug!(?peer, "created new quic connection");
             conns.insert(*peer, conn);
@@ -184,10 +186,10 @@ where
         };
         info!("client connected to QUIC sync server");
         let stream = match conn.handle().open_bidirectional_stream().await {
-            Ok(stream) => { stream }
-            Err(e) => { 
+            Ok(stream) => stream,
+            Err(e) => {
                 error!(?peer, "unable to open bidi stream: {}", e);
-                bail!("unable to open bidi stream: {}", e); 
+                bail!("unable to open bidi stream: {}", e);
             }
         };
 
@@ -355,7 +357,10 @@ where
     /// Begins accepting incoming requests.
     #[instrument(skip_all)]
     pub async fn serve(mut self) -> Result<()> {
-        info!("QUIC sync server listening for incoming connections: {}", self.local_addr()?);
+        info!(
+            "QUIC sync server listening for incoming connections: {}",
+            self.local_addr()?
+        );
 
         // Accept incoming QUIC connections
         while let Some(mut conn) = self.server.accept().await {
@@ -403,8 +408,7 @@ where
 
         let mut recv_buf = Vec::new();
         let (mut recv, mut send) = stream.split();
-        recv
-            .read_to_end(&mut recv_buf)
+        recv.read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync request")?;
         debug!(?peer, n = recv_buf.len(), "received sync request");
