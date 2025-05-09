@@ -184,8 +184,9 @@ async fn test_aqc_chans() -> Result<()> {
         .memberb
         .client
         .aqc()
-        .try_receive_channel()
-        .expect("channel must exist");
+        .receive_channel()
+        .await
+        .assume("channel must exist")?;
     let mut uni_chan2 = match channel_type {
         AqcChannelType::Receiver { receiver } => receiver,
         _ => {
@@ -202,11 +203,7 @@ async fn test_aqc_chans() -> Result<()> {
     send1_1.send(&msg1).await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let mut recv2_1 = uni_chan2
-        .receive_uni_stream()
-        .await
-        .assume("stream not received")?
-        .assume("stream not received")?;
+    let mut recv2_1 = uni_chan2.receive_uni_stream().await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let mut target = vec![0u8; 1024 * 1024 * 2];

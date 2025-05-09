@@ -18,10 +18,7 @@ use tokio::net::UnixStream;
 use tracing::{debug, info, instrument};
 
 use crate::{
-    aqc::{
-        api::{AqcChannels, AqcChannelsImpl},
-        net::run_channels_server,
-    },
+    aqc::api::{AqcChannels, AqcChannelsImpl},
     config::{SyncPeerConfig, TeamConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
 };
@@ -209,18 +206,9 @@ impl Client {
             .map_err(error::other)?
             .next()
             .expect("expected AQC server address");
-        let (aqc, server, sender, identity_rx) = AqcChannelsImpl::new(device_id, &aqc_addr).await?;
         let daemon = Arc::new(daemon);
-        let aqc_server_addr = server
-            .local_addr()
-            .context("unable to get address AQC server bound to")
-            .map_err(error::other)?;
-        tokio::spawn(run_channels_server(
-            server,
-            sender,
-            identity_rx,
-            daemon.clone(),
-        ));
+        let (aqc, aqc_server_addr) =
+            AqcChannelsImpl::new(device_id, &aqc_addr, daemon.clone()).await?;
         let client = Self { daemon, aqc };
 
         Ok((client, aqc_server_addr))
