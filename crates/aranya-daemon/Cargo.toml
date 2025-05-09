@@ -46,7 +46,6 @@ deser-hjson = { version = "2" }
 futures-util = { workspace = true }
 hex = { version = "0.4" }
 postcard = { workspace = true }
-rcgen = { workspace = true }
 rustls = { workspace = true }
 rustls-pemfile = { workspace = true }
 s2n-quic = { workspace = true }
@@ -87,7 +86,3 @@ test = false
 [[test]]
 name = "tests"
 path = "tests/tests.rs"
-
-# TODO: remove this patch before merging PR
-[patch.crates-io]
-rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "648a02550dd319360664f9af79862716be2879ff" }

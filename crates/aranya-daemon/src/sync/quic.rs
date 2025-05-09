@@ -298,7 +298,7 @@ pub struct Server<EN, SP> {
     /// Tracks running tasks.
     set: JoinSet<()>,
     /// Identity Receiver.
-    identity_rx: mpsc::Receiver<Vec<u8>>,
+    _identity_rx: mpsc::Receiver<Vec<u8>>,
 }
 
 impl<EN, SP> Server<EN, SP> {
@@ -312,7 +312,7 @@ impl<EN, SP> Server<EN, SP> {
 
         // TODO: don't hard-code PSK.
         let psk = PresharedKey::external(PSK_IDENTITY, PSK_BYTES).assume("unable to create psk")?;
-        let (mut server_keys, identity_rx) = ServerPresharedKeys::new();
+        let (mut server_keys, _identity_rx) = ServerPresharedKeys::new();
         server_keys.insert(psk);
 
         // Create Server Config
@@ -339,7 +339,7 @@ impl<EN, SP> Server<EN, SP> {
             aranya,
             server,
             set: JoinSet::new(),
-            identity_rx,
+            _identity_rx,
         })
     }
 
@@ -509,9 +509,10 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
         let key = self.keys.get(identity).cloned();
 
         // Use try_send for non-blocking behavior. Ignore error if receiver dropped.
-        self.identity_sender
+        let _ = self
+            .identity_sender
             .try_send(identity.to_vec())
-            .expect("Failed to send identity");
+            .assume("Failed to send identity");
 
         key
     }
@@ -529,14 +530,19 @@ impl ClientPresharedKeys {
         }
     }
 
+    // TODO: if we need to set PSK to something else
+    /*
     pub(crate) fn set_key(&self, key: PresharedKey) {
         let mut key_guard = self.key_ref.lock().expect("Client PSK mutex poisoned");
         *key_guard = Arc::new(key);
     }
+    */
 }
 
 impl PresharedKeyStore for ClientPresharedKeys {
+    #![allow(clippy::expect_used)]
     fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
+        // TODO: don't panic here
         let key_guard = self.key_ref.lock().expect("Client PSK mutex poisoned");
         vec![key_guard.clone()]
     }
@@ -554,7 +560,9 @@ impl PresharedKeyStore for ClientPresharedKeys {
 struct SkipServerVerification(Arc<CryptoProvider>);
 
 impl SkipServerVerification {
+    #![allow(clippy::expect_used)]
     fn new() -> Arc<Self> {
+        // TODO: don't panic here
         let provider = CryptoProvider::get_default().expect("Default crypto provider not found");
         Arc::new(Self(provider.clone()))
     }
