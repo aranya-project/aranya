@@ -9,16 +9,19 @@
 use core::{fmt, marker::PhantomData, net::SocketAddr};
 use std::{collections::BTreeMap, sync::Arc};
 
-use ::rustls::ClientConfig;
+use ::rustls::{ClientConfig, ServerConfig};
 use anyhow::{bail, Result};
 use aranya_policy_ifgen::VmEffect;
 use aranya_runtime::{ClientState, Engine, GraphId, Sink, StorageProvider, VmPolicy};
 use aranya_util::Addr;
-use rustls::{crypto::CryptoProvider, pki_types::ServerName};
+use rustls::crypto::CryptoProvider;
 use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     client::Connect,
-    provider::tls::rustls::{self as rustls_provider},
+    provider::{
+        congestion_controller::Bbr,
+        tls::rustls::{self as rustls_provider, rustls::pki_types::ServerName},
+    },
     stream::ReceiveStream,
     Client as QuicClient, Connection, Server as QuicServer,
 };
@@ -66,6 +69,7 @@ pub struct Client<EN, SP, CE> {
 
 impl<EN, SP, CE> Client<EN, SP, CE> {
     /// Creates a new [`Client`].
+    #[allow(deprecated)]
     pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Result<Self> {
         // Load Cert and Key
         let certs = certs(&mut CERT_PEM.as_bytes()).collect::<Result<Vec<_>, _>>()?;
@@ -80,8 +84,6 @@ impl<EN, SP, CE> Client<EN, SP, CE> {
         //client_config.preshared_keys = client_keys.clone(); // Pass the Arc<ClientPresharedKeys>
 
         // TODO: configure PSKs
-        //let (mut server_keys, identity_rx) = ServerPresharedKeys::new();
-        //server_keys.insert(psk);
 
         let provider = rustls_provider::Client::new(client_config);
 
@@ -114,16 +116,16 @@ where
     {
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
-        let _conn = match self.conns.get(peer) {
-            Some(conn) => conn,
-            None => {
-                let Some(addr) = peer.lookup().await?.into_iter().next() else {
-                    bail!("unable to lookup peer address");
-                };
-                let conn = self.client.connect(Connect::new(addr)).await?;
-                self.conns.insert(*peer, conn);
-                &conn
-            }
+        if !self.conns.contains_key(peer) {
+            let Some(addr) = peer.lookup().await?.into_iter().next() else {
+                bail!("unable to lookup peer address");
+            };
+            let conn = self.client.connect(Connect::new(addr)).await?;
+            self.conns.insert(*peer, conn);
+        }
+
+        let Some(_conn) = self.conns.get(peer) else {
+            bail!("unable to get connection");
         };
 
         Ok(())
@@ -150,12 +152,38 @@ pub struct Server<EN, SP> {
 impl<EN, SP> Server<EN, SP> {
     /// Creates a new `Server`.
     #[inline]
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>, server: QuicServer) -> Self {
-        Self {
+    #[allow(deprecated)]
+    pub async fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>, addr: &Addr) -> Result<Self> {
+        // Load Cert and Key
+        let certs = certs(&mut CERT_PEM.as_bytes()).collect::<Result<Vec<_>, _>>()?;
+        let key = private_key(&mut KEY_PEM.as_bytes())?.unwrap();
+
+        // Create Server Config
+        let server_config = ServerConfig::builder()
+            .with_no_client_auth()
+            .with_single_cert(certs.clone(), key)?;
+        //server_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
+        //server_config.preshared_keys = PresharedKeySelection::Enabled(Arc::new(server_keys));
+
+        // TODO: configure PSKs
+
+        let tls_server_provider = rustls_provider::Server::new(server_config);
+
+        let Some(addr) = addr.lookup().await?.into_iter().next() else {
+            bail!("unable to lookup server address");
+        };
+        // Use the rustls server provider
+        let server = QuicServer::builder()
+            .with_tls(tls_server_provider)? // Use the wrapped server config
+            .with_io(addr)?
+            .with_congestion_controller(Bbr::default())?
+            .start()?;
+
+        Ok(Self {
             aranya,
             server,
             set: JoinSet::new(),
-        }
+        })
     }
 
     /// Returns the local address the sync server bound to.

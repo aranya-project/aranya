@@ -98,3 +98,6 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
+
+[patch.crates-io]
+rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "648a02550dd319360664f9af79862716be2879ff" }

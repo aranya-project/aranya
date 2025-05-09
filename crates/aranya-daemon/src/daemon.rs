@@ -19,7 +19,7 @@ use bimap::BiBTreeMap;
 use buggy::BugExt;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
+use tokio::{fs, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
@@ -196,12 +196,14 @@ impl Daemon {
             ),
         )));
 
-        let client = QuicSyncClient::new(Arc::clone(&aranya));
+        let client = QuicSyncClient::new(Arc::clone(&aranya))
+            .context("unable to initialize QUIC sync client")?;
 
         let server = {
-            info!(addr = %external_sync_addr, "starting TCP server");
-            // TODO: QUIC listener.
-            QuicSyncServer::new(Arc::clone(&aranya))
+            info!(addr = %external_sync_addr, "starting QUIC sync server");
+            QuicSyncServer::new(Arc::clone(&aranya), &external_sync_addr)
+                .await
+                .context("unable to initialize QUIC sync server")?
         };
 
         info!(device_id = %device_id, "set up Aranya");
