@@ -152,9 +152,6 @@ where
         self.receive_sync_response(&mut recv, &mut syncer, &id, sink, peer)
             .await?;
 
-        // close the stream.
-        send.close().await?;
-
         Ok(())
     }
 
@@ -177,6 +174,8 @@ where
             conn.keep_alive(true)?;
             debug!(?peer, "created new quic connection");
             conns.insert(*peer, conn);
+        } else {
+            debug!("client is able to reuse existing quic connection");
         }
 
         let Some(conn) = conns.get(peer) else {
@@ -220,7 +219,7 @@ where
 
         // TODO: `send_all`?
         send.send(Bytes::copy_from_slice(&send_buf)).await?;
-        send.flush().await?;
+        send.close().await?;
         debug!(?peer, "sent sync request");
 
         Ok(())
@@ -296,6 +295,8 @@ pub struct Server<EN, SP> {
     server: QuicServer,
     /// Tracks running tasks.
     set: JoinSet<()>,
+    /// Identity Receiver.
+    identity_rx: mpsc::Receiver<Vec<u8>>,
 }
 
 impl<EN, SP> Server<EN, SP> {
@@ -309,7 +310,7 @@ impl<EN, SP> Server<EN, SP> {
 
         // TODO: don't hard-code PSK.
         let psk = PresharedKey::external(PSK_IDENTITY, PSK_BYTES).assume("unable to create psk")?;
-        let (mut server_keys, _identity_rx) = ServerPresharedKeys::new();
+        let (mut server_keys, identity_rx) = ServerPresharedKeys::new();
         server_keys.insert(psk);
 
         // Create Server Config
@@ -336,6 +337,7 @@ impl<EN, SP> Server<EN, SP> {
             aranya,
             server,
             set: JoinSet::new(),
+            identity_rx,
         })
     }
 
@@ -367,9 +369,9 @@ where
                 loop {
                     // Accept incoming streams.
                     match conn.accept_bidirectional_stream().await {
-                        Ok(Some(mut stream)) => {
+                        Ok(Some(stream)) => {
                             debug!(?peer, "received incoming QUIC stream");
-                            if let Err(e) = Self::sync(client.clone(), peer, &mut stream).await {
+                            if let Err(e) = Self::sync(client.clone(), peer, stream).await {
                                 error!(?e, ?peer, "server unable to sync with peer");
                                 break;
                             }
@@ -395,19 +397,20 @@ where
     async fn sync(
         client: Arc<Mutex<ClientState<EN, SP>>>,
         peer: SocketAddr,
-        stream: &mut BidirectionalStream,
+        stream: BidirectionalStream,
     ) -> Result<()> {
-        info!("server received a sync request");
+        info!(?peer, "server received a sync request");
 
-        let mut recv = Vec::new();
-        stream
-            .read_to_end(&mut recv)
+        let mut recv_buf = Vec::new();
+        let (mut recv, mut send) = stream.split();
+        recv
+            .read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync request")?;
-        debug!(n = recv.len(), "received sync request");
+        debug!(?peer, n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let resp = match Self::sync_respond(client, &recv).await {
+        let resp = match Self::sync_respond(client, &recv_buf).await {
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
                 error!(?err, "error responding to sync request");
@@ -419,9 +422,9 @@ where
             &postcard::to_allocvec(&resp).context("postcard unable to serialize sync response")?;
 
         // TODO: `send_all`?
-        stream.send(Bytes::copy_from_slice(data)).await?;
-        stream.close().await?;
-        debug!(n = data.len(), "sent sync response");
+        send.send(Bytes::copy_from_slice(data)).await?;
+        send.close().await?;
+        debug!(?peer, n = data.len(), "server sent sync response");
 
         Ok(())
     }
