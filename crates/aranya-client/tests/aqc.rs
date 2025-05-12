@@ -69,29 +69,34 @@ async fn test_aqc_chans() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // membera creates aqc bidi channel with memberb
-    let mut bidi_chan1 = team
-        .membera
-        .client
-        .aqc()
-        .create_bidi_channel(team_id, team.memberb.aqc_addr.clone(), label1)
-        .await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    let mut membera = team.membera;
+    let memberb_aqc_addr = team.memberb.aqc_addr.clone();
 
-    let channel_type = team
-        .memberb
-        .client
-        .aqc()
-        .receive_channel()
+    let create_handle = tokio::spawn(async move {
+        let channel_result = membera
+            .client
+            .aqc()
+            .create_bidi_channel(team_id, memberb_aqc_addr, label1)
+            .await;
+        (channel_result, membera)
+    });
+
+    let channel_type_result = team.memberb.client.aqc().receive_channel().await;
+
+    let (bidi_chan1_result, membera) = create_handle
         .await
-        .assume("channel must exist")?;
+        .expect("Task panicked (channel creation)");
+
+    team.membera = membera;
+    let mut bidi_chan1 = bidi_chan1_result?;
+
+    let channel_type = channel_type_result.assume("channel must exist on memberb")?;
     let mut bidi_chan2 = match channel_type {
         AqcChannelType::Bidirectional { channel } => channel,
-        _ => {
-            buggy::bug!("Expected a bidirectional channel")
-        }
+        _ => buggy::bug!("Expected a bidirectional channel on memberb"),
     };
     tokio::time::sleep(Duration::from_millis(100)).await;
+
     let mut send1_1 = bidi_chan1.create_uni_stream().await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -108,7 +113,6 @@ async fn test_aqc_chans() -> Result<()> {
         .assume("stream not received")?;
     assert!(maybe_send2_1.is_none(), "Expected unidirectional stream");
     tokio::time::sleep(Duration::from_millis(100)).await;
-
     let mut target = vec![0u8; 1024 * 1024 * 2];
     let len = recv2_1
         .receive(target.as_mut_slice())
@@ -152,7 +156,6 @@ async fn test_aqc_chans() -> Result<()> {
         rand::Rng::fill(&mut rng, &mut data[..]);
         Bytes::from(data)
     };
-
     send1_2.send(&big_data).await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
     let mut total_len: usize = 0;
@@ -172,20 +175,30 @@ async fn test_aqc_chans() -> Result<()> {
 
     bidi_chan1.close()?;
     bidi_chan2.close()?;
-    // membera creates aqc uni channel with memberb
-    let mut uni_chan1 = team
-        .membera
-        .client
-        .aqc()
-        .create_uni_channel(team_id, team.memberb.aqc_addr.clone(), label1)
-        .await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    let channel_type = team
-        .memberb
-        .client
-        .aqc()
-        .try_receive_channel()
-        .expect("channel must exist");
+
+    // membera creates aqc uni channel with memberb concurrently
+    let mut membera = team.membera;
+    let memberb_aqc_addr = team.memberb.aqc_addr.clone();
+
+    let create_uni_handle = tokio::spawn(async move {
+        let channel_result = membera
+            .client
+            .aqc()
+            .create_uni_channel(team_id, memberb_aqc_addr, label1)
+            .await;
+        (channel_result, membera)
+    });
+
+    let channel_type_result = team.memberb.client.aqc().receive_channel().await;
+
+    let (uni_chan1_result, membera) = create_uni_handle // Get back owned membera
+        .await
+        .expect("Task panicked (uni channel creation)");
+
+    team.membera = membera;
+    let mut uni_chan1 = uni_chan1_result?;
+
+    let channel_type = channel_type_result.assume("uni channel must exist on memberb")?;
     let mut uni_chan2 = match channel_type {
         AqcChannelType::Receiver { receiver } => receiver,
         _ => {
@@ -193,8 +206,9 @@ async fn test_aqc_chans() -> Result<()> {
         }
     };
     tokio::time::sleep(Duration::from_millis(100)).await;
+
     let mut send1_1 = uni_chan1.create_uni_stream().await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
+
     // Test sending streams
 
     // Send from 1 to 2 with a unidirectional stream
@@ -202,11 +216,7 @@ async fn test_aqc_chans() -> Result<()> {
     send1_1.send(&msg1).await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
-    let mut recv2_1 = uni_chan2
-        .receive_uni_stream()
-        .await
-        .assume("stream not received")?
-        .assume("stream not received")?;
+    let mut recv2_1 = uni_chan2.receive_uni_stream().await?;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let mut target = vec![0u8; 1024 * 1024 * 2];

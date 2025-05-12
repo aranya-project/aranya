@@ -15,7 +15,7 @@ use ::rustls::{
 use anyhow::Context;
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
-use aranya_daemon_api::{DeviceId, LabelId, NetIdentifier, TeamId};
+use aranya_daemon_api::{DaemonApiClient, DeviceId, LabelId, NetIdentifier, TeamId};
 use buggy::BugExt as _;
 use rustls::crypto::CryptoProvider;
 use rustls_pemfile::{certs, private_key};
@@ -76,15 +76,8 @@ impl AqcChannelsImpl {
     pub(crate) async fn new(
         device_id: DeviceId,
         aqc_addr: &SocketAddr,
-    ) -> Result<
-        (
-            Self,
-            Server,
-            mpsc::Sender<AqcChannelType>,
-            mpsc::Receiver<Vec<u8>>,
-        ),
-        AqcError,
-    > {
+        daemon: Arc<DaemonApiClient>,
+    ) -> Result<(Self, SocketAddr), AqcError> {
         debug!("device ID: {:?}", device_id);
 
         // --- Start Rustls Setup ---
@@ -127,7 +120,6 @@ impl AqcChannelsImpl {
 
         // Use the rustls client provider
         // Pass client_keys Arc to AqcClient::new
-        let (client, sender) = AqcClient::new(tls_client_provider, client_keys)?;
 
         let server_addr = aqc_addr
             .to_string()
@@ -143,7 +135,14 @@ impl AqcChannelsImpl {
             .map_err(|e| AqcError::CongestionConfig(e.to_string()))?
             .start()
             .map_err(|e| AqcError::ServerStart(e.to_string()))?;
-        Ok((Self { client }, server, sender, identity_rx))
+        let client = AqcClient::new(
+            tls_client_provider,
+            client_keys,
+            identity_rx,
+            server,
+            daemon,
+        )?;
+        Ok((Self { client }, server_addr))
     }
 
     /// Returns the local address that AQC is bound to.
@@ -180,7 +179,7 @@ impl AqcChannelsImpl {
     }
 
     /// Receives a channel.
-    pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
+    pub async fn receive_channel(&mut self) -> Result<AqcChannelType, AqcError> {
         self.client.receive_channel().await
     }
 
@@ -424,7 +423,7 @@ impl<'a> AqcChannels<'a> {
     /// Waits for a peer to create an AQC channel with this client. Returns
     /// None if channels can no longer be received. If this happens, the
     /// application should be restarted.
-    pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
+    pub async fn receive_channel(&mut self) -> Result<AqcChannelType, AqcError> {
         self.client.aqc.receive_channel().await
     }
 
