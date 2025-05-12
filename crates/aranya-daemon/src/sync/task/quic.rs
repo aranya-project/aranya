@@ -87,10 +87,10 @@ pub enum SyncResponse {
 /// Data used for sending sync requests and processing sync responses
 pub struct State {
     /// QUIC client to make sync requests and handle sync responses.
-    client: Arc<Mutex<QuicClient>>,
+    client: QuicClient,
     /// Address -> Connection map used for re-using connections
     /// when making outgoing sync requests
-    conns: Arc<Mutex<BTreeMap<Addr, Connection>>>,
+    conns: BTreeMap<Addr, Connection>,
 }
 
 impl SyncState for State {
@@ -150,19 +150,19 @@ impl State {
             .start()?;
 
         Ok(Self {
-            client: Arc::new(Mutex::new(client)),
-            conns: Arc::new(Mutex::new(BTreeMap::new())),
+            client,
+            conns: BTreeMap::new(),
         })
     }
 }
 
 impl Syncer<State> {
-    async fn connect(&self, peer: &Addr) -> Result<BidirectionalStream> {
+    async fn connect(&mut self, peer: &Addr) -> Result<BidirectionalStream> {
         info!(?peer, "client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
-        let mut conns = self.state.conns.lock().await;
-        let client = self.state.client.lock().await;
+        let conns = &mut self.state.conns;
+        let client = &self.state.client;
         if !conns.contains_key(peer) {
             debug!(?peer, "existing quic connection not found");
 
