@@ -134,6 +134,7 @@ impl State {
         client_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
         client_config.preshared_keys = client_keys.clone(); // Pass the Arc<ClientPresharedKeys>
 
+        #[allow(deprecated)] //FIXME(Steve) - temporary for CI build
         let provider = rustls_provider::Client::new(client_config);
 
         let client = QuicClient::builder()
