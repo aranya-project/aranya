@@ -213,7 +213,7 @@ pub unsafe fn client_init(
 pub type Client = Safe<imp::Client>;
 
 /// The size in bytes of an ID
-pub const ARANYA_ID_LEN: usize = 64;
+pub const ARANYA_ID_LEN: usize = 32;
 
 const _: () = {
     assert!(ARANYA_ID_LEN == size_of::<aranya_crypto::Id>());

@@ -5,8 +5,8 @@ use anyhow::Result;
 use aranya_aqc_util::{
     BidiChannelCreated, BidiChannelReceived, Handler, UniChannelCreated, UniChannelReceived,
 };
-use aranya_crypto::{DeviceId, Engine, KeyStore};
-use aranya_daemon_api::{AqcBidiPsk, AqcUniPsk, Directed, NetIdentifier, Secret};
+use aranya_crypto::{aqc::CipherSuiteId, DeviceId, Engine, KeyStore};
+use aranya_daemon_api::{AqcBidiPsk, AqcPsk, AqcUniPsk, Directed, NetIdentifier, Secret};
 use aranya_runtime::GraphId;
 use bimap::BiBTreeMap;
 use buggy::{bug, BugExt};
@@ -116,7 +116,7 @@ where
     pub(crate) async fn bidi_channel_created(
         &self,
         e: &AqcBidiChannelCreated,
-    ) -> Result<AqcBidiPsk> {
+    ) -> Result<Box<[AqcBidiPsk]>> {
         if e.author_id != self.device_id.into() {
             bug!("not the author of the bidi channel");
         }
@@ -133,15 +133,21 @@ where
             psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
                 .assume("`psk_length_in_bytes` is out of range")?,
         };
-        let psk = self
+        let secret = self
             .while_locked(|handler, eng| handler.bidi_channel_created(eng, &info))
             .await?;
-        debug_assert_eq!(e.channel_id, psk.identity().into());
+        debug_assert_eq!(e.channel_id, (*secret.id()).into());
 
-        Ok(AqcBidiPsk {
-            identity: psk.identity().into(),
-            secret: Secret::from(psk.raw_secret_bytes()),
-        })
+        CipherSuiteId::all()
+            .iter()
+            .map(|&suite| {
+                let psk = secret.generate_psk(suite)?;
+                Ok(AqcBidiPsk {
+                    identity: *psk.identity(),
+                    secret: Secret::from(psk.raw_secret_bytes()),
+                })
+            })
+            .collect()
     }
 
     /// Handles the [`AqcBidiChannelReceived`] effect, returning
@@ -150,7 +156,7 @@ where
     pub(crate) async fn bidi_channel_received(
         &self,
         e: &AqcBidiChannelReceived,
-    ) -> Result<AqcBidiPsk> {
+    ) -> Result<Box<[AqcPsk]>> {
         if e.peer_id != self.device_id.into() {
             bug!("not the peer of the bidi channel");
         }
@@ -167,21 +173,30 @@ where
             psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
                 .assume("`psk_length_in_bytes` is out of range")?,
         };
-        let psk = self
+        let secret = self
             .while_locked(|handler, eng| handler.bidi_channel_received(eng, &info))
             .await?;
-        debug_assert_eq!(e.channel_id, psk.identity().into());
+        debug_assert_eq!(e.channel_id, (*secret.id()).into());
 
-        Ok(AqcBidiPsk {
-            identity: psk.identity().into(),
-            secret: Secret::from(psk.raw_secret_bytes()),
-        })
+        CipherSuiteId::all()
+            .iter()
+            .map(|&suite| {
+                let psk = secret.generate_psk(suite)?;
+                Ok(AqcPsk::Bidi(AqcBidiPsk {
+                    identity: *psk.identity(),
+                    secret: Secret::from(psk.raw_secret_bytes()),
+                }))
+            })
+            .collect()
     }
 
     /// Handles the [`AqcUniChannelCreated`] effect, returning
     /// the channel's PSK.
     #[instrument(skip_all, fields(id = %e.channel_id))]
-    pub(crate) async fn uni_channel_created(&self, e: &AqcUniChannelCreated) -> Result<AqcUniPsk> {
+    pub(crate) async fn uni_channel_created(
+        &self,
+        e: &AqcUniChannelCreated,
+    ) -> Result<Box<[AqcUniPsk]>> {
         if e.author_id != self.device_id.into() {
             bug!("not the author of the uni channel");
         }
@@ -202,20 +217,28 @@ where
             psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
                 .assume("`psk_length_in_bytes` is out of range")?,
         };
-        let psk = self
+        let secret = self
             .while_locked(|handler, eng| handler.uni_channel_created(eng, &info))
             .await?;
-        debug_assert_eq!(e.channel_id, psk.identity().into());
+        debug_assert_eq!(e.channel_id, (*secret.id()).into());
 
-        let secret = Secret::from(psk.raw_secret_bytes());
-        Ok(AqcUniPsk {
-            identity: psk.identity().into(),
-            secret: if self.device_id == info.send_id {
-                Directed::Send(secret)
-            } else {
-                Directed::Recv(secret)
-            },
-        })
+        CipherSuiteId::all()
+            .iter()
+            .map(|&suite| {
+                let (identity, secret) = if self.device_id == info.send_id {
+                    let psk = secret.generate_send_only_psk(suite)?;
+                    let identity = *psk.identity();
+                    let secret = Directed::Send(Secret::from(psk.raw_secret_bytes()));
+                    (identity, secret)
+                } else {
+                    let psk = secret.generate_recv_only_psk(suite)?;
+                    let identity = *psk.identity();
+                    let secret = Directed::Recv(Secret::from(psk.raw_secret_bytes()));
+                    (identity, secret)
+                };
+                Ok(AqcUniPsk { identity, secret })
+            })
+            .collect()
     }
 
     /// Handles the [`AqcUniChannelReceived`] effect, returning
@@ -224,7 +247,7 @@ where
     pub(crate) async fn uni_channel_received(
         &self,
         e: &AqcUniChannelReceived,
-    ) -> Result<AqcUniPsk> {
+    ) -> Result<Box<[AqcPsk]>> {
         if e.author_id == self.device_id.into() {
             bug!("not the peer of the uni channel");
         }
@@ -245,20 +268,28 @@ where
             psk_length_in_bytes: u16::try_from(e.psk_length_in_bytes)
                 .assume("`psk_length_in_bytes` is out of range")?,
         };
-        let psk = self
+        let secret = self
             .while_locked(|handler, eng| handler.uni_channel_received(eng, &info))
             .await?;
-        debug_assert_eq!(e.channel_id, psk.identity().into());
+        debug_assert_eq!(e.channel_id, (*secret.id()).into());
 
-        let secret = Secret::from(psk.raw_secret_bytes());
-        Ok(AqcUniPsk {
-            identity: psk.identity().into(),
-            secret: if self.device_id == info.send_id {
-                Directed::Send(secret)
-            } else {
-                Directed::Recv(secret)
-            },
-        })
+        CipherSuiteId::all()
+            .iter()
+            .map(|&suite| {
+                let (identity, secret) = if self.device_id == info.send_id {
+                    let psk = secret.generate_send_only_psk(suite)?;
+                    let identity = *psk.identity();
+                    let secret = Directed::Send(Secret::from(psk.raw_secret_bytes()));
+                    (identity, secret)
+                } else {
+                    let psk = secret.generate_recv_only_psk(suite)?;
+                    let identity = *psk.identity();
+                    let secret = Directed::Recv(Secret::from(psk.raw_secret_bytes()));
+                    (identity, secret)
+                };
+                Ok(AqcPsk::Uni(AqcUniPsk { identity, secret }))
+            })
+            .collect()
     }
 }
 
