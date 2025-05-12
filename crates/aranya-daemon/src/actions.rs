@@ -25,7 +25,7 @@ use crate::{
 };
 
 /// Functions related to Aranya actions
-impl<EN, SP, CE> Client<EN, SP, CE>
+impl<EN, SP, CE> Client<EN, SP>
 where
     EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
     SP: StorageProvider + Send + 'static,

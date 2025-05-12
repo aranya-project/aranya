@@ -39,11 +39,8 @@ pub type TestState = sync::task::quic::State;
 // Aranya sync client for testing.
 pub type TestSyncer = sync::task::Syncer<TestState>;
 
-pub type TestClient = aranya::Client<
-    PolicyEngine<DefaultEngine, Store>,
-    LinearStorageProvider<FileManager>,
-    DefaultEngine,
->;
+pub type TestClient =
+    aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
 // Aranya sync server for testing.
 pub type TestServer = sync::task::quic::Server<
