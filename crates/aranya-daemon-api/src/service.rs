@@ -3,6 +3,7 @@
 use core::{borrow::Borrow, fmt, hash::Hash, net::SocketAddr, ops::Deref, time::Duration};
 
 use aranya_crypto::{
+    aqc::{BidiPskId, CipherSuiteId, UniPskId},
     custom_id,
     default::{DefaultCipherSuite, DefaultEngine},
     subtle::{Choice, ConstantTimeEq},
@@ -197,10 +198,10 @@ pub enum AqcPsk {
 impl AqcPsk {
     /// Returns the PSK identity.
     #[inline]
-    pub fn identity(&self) -> Id {
+    pub fn identity(&self) -> AqcPskId {
         match self {
-            Self::Bidi(psk) => psk.identity,
-            Self::Uni(psk) => psk.identity,
+            Self::Bidi(psk) => AqcPskId::Bidi(psk.identity),
+            Self::Uni(psk) => AqcPskId::Uni(psk.identity),
         }
     }
 
@@ -220,9 +221,7 @@ impl AqcPsk {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AqcBidiPsk {
     /// The PSK identity.
-    ///
-    /// This is the same thing as the channel ID.
-    pub identity: Id,
+    pub identity: BidiPskId,
     /// The PSK's secret.
     pub secret: Secret,
 }
@@ -241,9 +240,7 @@ impl ZeroizeOnDrop for AqcBidiPsk {}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AqcUniPsk {
     /// The PSK identity.
-    ///
-    /// This is the same thing as the channel ID.
-    pub identity: Id,
+    pub identity: UniPskId,
     /// The PSK's secret.
     pub secret: Directed<Secret>,
 }
@@ -275,6 +272,33 @@ impl<T: ConstantTimeEq> ConstantTimeEq for Directed<T> {
             (Self::Send(lhs), Self::Send(rhs)) => lhs.ct_eq(rhs),
             (Self::Recv(lhs), Self::Recv(rhs)) => lhs.ct_eq(rhs),
             _ => Choice::from(0u8),
+        }
+    }
+}
+
+/// An AQC PSK identity.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum AqcPskId {
+    /// A bidirectional PSK.
+    Bidi(BidiPskId),
+    /// A unidirectional PSK.
+    Uni(UniPskId),
+}
+
+impl AqcPskId {
+    /// Returns the unique channel ID.
+    pub fn channel_id(&self) -> Id {
+        match self {
+            Self::Bidi(v) => (*v.channel_id()).into(),
+            Self::Uni(v) => (*v.channel_id()).into(),
+        }
+    }
+
+    /// Returns the cipher suite.
+    pub fn cipher_suite(&self) -> CipherSuiteId {
+        match self {
+            Self::Bidi(v) => v.cipher_suite(),
+            Self::Uni(v) => v.cipher_suite(),
         }
     }
 }
@@ -385,19 +409,22 @@ pub trait DaemonApi {
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcBidiPsk)>;
+    ) -> Result<(AqcCtrl, Box<[AqcBidiPsk]>)>;
     /// Create a unidirectional QUIC channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcUniPsk)>;
+    ) -> Result<(AqcCtrl, Box<[AqcUniPsk]>)>;
     /// Delete a QUIC bidi channel.
     async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
     /// Delete a QUIC uni channel.
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
     /// Receive AQC ctrl message.
-    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(NetIdentifier, AqcPsk)>;
+    async fn receive_aqc_ctrl(
+        team: TeamId,
+        ctrl: AqcCtrl,
+    ) -> Result<(NetIdentifier, Box<[AqcPsk]>)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;

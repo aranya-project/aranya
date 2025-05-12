@@ -63,21 +63,21 @@ impl<'a> AqcChannels<'a> {
     ) -> Result<AqcBidiChannelId> {
         debug!("creating bidi channel");
 
-        let (ctrl, psk) = self
+        let (ctrl, psks) = self
             .client
             .daemon
             .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), label_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
+        debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
-        let chan_id = psk.identity.into();
+        let chan_id = *psks[0].identity.channel_id();
 
         // TODO: send ctrl msg via network.
         let _ = ctrl;
 
-        Ok(chan_id)
+        Ok(chan_id.into_id().into())
     }
 
     /// Creates a unidirectional AQC channel with a peer.
@@ -97,21 +97,21 @@ impl<'a> AqcChannels<'a> {
     ) -> Result<AqcUniChannelId> {
         debug!("creating aqc uni channel");
 
-        let (ctrl, psk) = self
+        let (ctrl, psks) = self
             .client
             .daemon
             .create_aqc_uni_channel(context::current(), team_id, peer.clone(), label_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
+        debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
-        let chan_id = psk.identity.into();
+        let chan_id = *psks[0].identity.channel_id();
 
         // TODO: send ctrl msg via network.
         let _ = ctrl;
 
-        Ok(chan_id)
+        Ok(chan_id.into_id().into())
     }
 
     /// Deletes an AQC bidi channel.
@@ -149,7 +149,7 @@ impl<'a> AqcChannels<'a> {
     // In final AQC implementation, it will only be invoked when a ctrl msg is received via the network.
     #[instrument(skip_all, fields(%team))]
     async fn receive_aqc_ctrl(&mut self, team: TeamId, ctrl: AqcCtrl) -> Result<()> {
-        let (_net_id, psk) = self
+        let (_net_id, psks) = self
             .client
             .daemon
             .receive_aqc_ctrl(context::current(), team, ctrl)
@@ -157,12 +157,14 @@ impl<'a> AqcChannels<'a> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
 
-        match psk {
-            AqcPsk::Bidi(psk) => {
-                debug!(identity = ?psk.identity, "bidi psk identity");
-            }
-            AqcPsk::Uni(psk) => {
-                debug!(identity = ?psk.identity, "uni psk identity");
+        for psk in psks {
+            match psk {
+                AqcPsk::Bidi(psk) => {
+                    debug!(identity = ?psk.identity, "bidi psk identity");
+                }
+                AqcPsk::Uni(psk) => {
+                    debug!(identity = ?psk.identity, "uni psk identity");
+                }
             }
         }
 
