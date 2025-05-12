@@ -38,7 +38,7 @@ use s2n_quic::{
     stream::{BidirectionalStream, ReceiveStream, SendStream},
     Client as QuicClient, Connection, Server as QuicServer,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use tokio::{
     io::AsyncReadExt,
     sync::{mpsc, Mutex},
@@ -46,6 +46,7 @@ use tokio::{
 };
 use tracing::{debug, error, info, instrument};
 
+use super::SyncResponse;
 use crate::sync::{
     prot::SyncProtocols,
     task::{SyncState, Syncer},
@@ -74,15 +75,6 @@ pub static CERT_PEM: &str = include_str!("./cert.pem");
 /// TODO: remove this.
 /// NOTE: this certificate is to be used for demonstration purposes only!
 pub static KEY_PEM: &str = include_str!("./key.pem");
-
-/// A response to a sync request.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum SyncResponse {
-    /// Success.
-    Ok(Box<[u8]>),
-    /// Failure.
-    Err(String),
-}
 
 /// Data used for sending sync requests and processing sync responses
 pub struct State {

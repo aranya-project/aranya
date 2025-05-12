@@ -14,6 +14,7 @@ use aranya_runtime::{storage::GraphId, Engine, Sink};
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::StreamExt;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument};
@@ -50,6 +51,15 @@ pub struct SyncPeers {
     send: mpsc::Sender<Msg>,
     /// Configuration values for syncing
     cfgs: HashMap<(Addr, GraphId), SyncPeerConfig>,
+}
+
+/// A response to a sync request.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum SyncResponse {
+    /// Success.
+    Ok(Box<[u8]>),
+    /// Failure.
+    Err(String),
 }
 
 impl SyncPeers {
