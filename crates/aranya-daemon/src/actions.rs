@@ -1,6 +1,6 @@
 //! Aranya graph actions/effects API.
 
-use core::{fmt, future::Future, marker::PhantomData};
+use core::{future::Future, marker::PhantomData};
 use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -19,27 +19,12 @@ use tokio::sync::Mutex;
 use tracing::{debug, info, instrument, warn, Instrument};
 
 use crate::{
+    aranya::Client,
     policy::{ActorExt, ChanOp, Effect, KeyBundle, Role},
     vm_policy::{MsgSink, VecSink},
 };
 
-/// Aranya graph actions/effects client.
-pub struct Client<EN, SP, CE> {
-    /// Thread-safe Aranya client reference.
-    pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
-    _eng: PhantomData<CE>,
-}
-
-impl<EN, SP, CE> Client<EN, SP, CE> {
-    /// Creates a new [`Client`].
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Self {
-        Client {
-            aranya,
-            _eng: PhantomData,
-        }
-    }
-}
-
+/// Functions related to Aranya actions
 impl<EN, SP, CE> Client<EN, SP, CE>
 where
     EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
@@ -103,12 +88,6 @@ where
         let mut sink = VecSink::new();
         session.receive(&client, &mut sink, command)?;
         Ok(sink.collect()?)
-    }
-}
-
-impl<EN, SP, CE> fmt::Debug for Client<EN, SP, CE> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Client").finish_non_exhaustive()
     }
 }
 

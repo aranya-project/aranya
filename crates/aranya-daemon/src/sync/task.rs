@@ -6,11 +6,11 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::storage::GraphId;
+use aranya_runtime::{storage::GraphId, Engine, Sink};
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::StreamExt;
@@ -19,9 +19,11 @@ use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, info, instrument};
 
 use crate::{
-    daemon::{QuicSyncClient, EF},
+    daemon::{Client, EF},
     vm_policy::VecSink,
 };
+
+pub mod quic;
 
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
@@ -130,9 +132,9 @@ type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
-pub struct Syncer {
+pub struct Syncer<ST> {
     /// Aranya client to allow syncing the Aranya graph with another peer.
-    client: Arc<QuicSyncClient>,
+    pub client: Client,
     /// Keeps track of peer info.
     peers: HashMap<SyncPeer, PeerInfo>,
     /// Receives added/removed peers.
@@ -141,6 +143,8 @@ pub struct Syncer {
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
+    /// Additional state used by the syncer
+    state: ST,
 }
 
 struct PeerInfo {
@@ -150,9 +154,24 @@ struct PeerInfo {
     key: Key,
 }
 
-impl Syncer {
+/// Types that contain additional data that are part of a [`Syncer`]
+/// object.
+pub trait SyncState: Sized {
+    #[allow(async_fn_in_trait)] // SyncState should be  a sealed trait?
+    /// Syncs with the peer.
+    async fn sync_impl<S>(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        sink: &mut S,
+        peer: &Addr,
+    ) -> Result<()>
+    where
+        S: Sink<<crate::EN as Engine>::Effect>;
+}
+
+impl<ST> Syncer<ST> {
     /// Creates a new `Syncer`.
-    pub fn new(client: Arc<QuicSyncClient>, send_effects: EffectSender) -> (Self, SyncPeers) {
+    pub fn new(client: Client, send_effects: EffectSender, state: ST) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -162,11 +181,14 @@ impl Syncer {
                 recv,
                 queue: DelayQueue::new(),
                 send_effects,
+                state,
             },
             peers,
         )
     }
+}
 
+impl<ST: SyncState> Syncer<ST> {
     /// Syncs with the next peer in the list.
     #[instrument(skip_all)]
     pub async fn next(&mut self) -> Result<()> {
@@ -221,13 +243,12 @@ impl Syncer {
 
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
-    async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
+    pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
         info!(?peer, "syncing with peer");
 
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
-            self.client
-                .sync_peer(*id, &mut sink, peer)
+            <ST as SyncState>::sync_impl(self, *id, &mut sink, peer)
                 .await
                 .context("sync_peer error")
                 .inspect_err(|err| error!("{err:?}"))?;

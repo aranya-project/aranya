@@ -26,10 +26,11 @@ use crate::{
     actions::Actions,
     api::{ApiKey, DaemonApiServer, PublicApiKey},
     aqc::Aqc,
+    aranya,
     config::Config,
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::task::Syncer,
+    sync::task::{quic::State as QuicSyncState, Syncer},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
@@ -45,9 +46,8 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 /// EF = Policy Effect
 pub(crate) type EF = policy::Effect;
 
-pub(crate) type QuicSyncClient = crate::sync::quic::Client<EN, SP, CE>;
-type QuicSyncServer = crate::sync::quic::Server<EN, SP>;
-pub(crate) type ActionsClient = crate::actions::Client<EN, SP, CE>;
+pub(crate) type Client = aranya::Client<EN, SP, CE>;
+pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
 
 /// The daemon itself.
 pub struct Daemon {
@@ -100,18 +100,14 @@ impl Daemon {
                 )
                 .await?;
             let local_addr = server.local_addr()?;
-            let client = Arc::new(client);
             set.spawn(async move { server.serve().await });
 
             (client, local_addr)
         };
 
-        // Initialize Aranya actions client.
-        let actions_client = ActionsClient::new(Arc::clone(&client.aranya));
-
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-        let (mut syncer, peers) = Syncer::new(Arc::clone(&client), send_effects);
+        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects, QuicSyncState::new()?);
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
@@ -134,7 +130,7 @@ impl Daemon {
                 let mut peers = BTreeMap::new();
                 for graph_id in &graph_ids {
                     let graph_peers = BiBTreeMap::from_iter(
-                        actions_client
+                        client
                             .actions(graph_id)
                             .query_aqc_network_names_off_graph()
                             .await?,
@@ -147,7 +143,7 @@ impl Daemon {
         };
 
         let api = DaemonApiServer::new(
-            actions_client.into(),
+            client,
             local_addr,
             self.cfg.uds_api_path.clone(),
             api_sk,
@@ -185,7 +181,7 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-    ) -> Result<(QuicSyncClient, QuicSyncServer)> {
+    ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -196,12 +192,11 @@ impl Daemon {
             ),
         )));
 
-        let client = QuicSyncClient::new(Arc::clone(&aranya))
-            .context("unable to initialize QUIC sync client")?;
+        let client = Client::new(Arc::clone(&aranya));
 
         let server = {
             info!(addr = %external_sync_addr, "starting QUIC sync server");
-            QuicSyncServer::new(Arc::clone(&aranya), &external_sync_addr)
+            SyncServer::new(Arc::clone(&aranya), &external_sync_addr)
                 .await
                 .context("unable to initialize QUIC sync server")?
         };

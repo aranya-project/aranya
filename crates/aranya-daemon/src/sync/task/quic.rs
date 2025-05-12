@@ -6,7 +6,7 @@
 //! If a QUIC connection does not exist with a certain peer, a new QUIC connection will be created.
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
-use core::{fmt, marker::PhantomData, net::SocketAddr};
+use core::net::SocketAddr;
 use std::{
     collections::{hash_map::Entry, BTreeMap, HashMap},
     sync::{Arc, Mutex as SyncMutex},
@@ -20,10 +20,9 @@ use ::rustls::{
 };
 use anyhow::{bail, Context, Result};
 use aranya_crypto::Rng;
-use aranya_policy_ifgen::VmEffect;
 use aranya_runtime::{
     ClientState, Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder,
-    SyncType, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
+    SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::Addr;
 use buggy::{bug, BugExt as _};
@@ -47,7 +46,10 @@ use tokio::{
 };
 use tracing::{debug, error, info, instrument};
 
-use super::prot::SyncProtocols;
+use crate::sync::{
+    prot::SyncProtocols,
+    task::{SyncState, Syncer},
+};
 
 /// QUIC Syncer protocol type.
 pub const PROT: SyncProtocols = SyncProtocols::QUIC;
@@ -82,20 +84,52 @@ pub enum SyncResponse {
     Err(String),
 }
 
-/// Aranya QUIC sync client.
-pub struct Client<EN, SP, CE> {
-    /// Thread-safe Aranya client reference.
-    pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
+/// Data used for sending sync requests and processing sync responses
+pub struct State {
     /// QUIC client to make sync requests and handle sync responses.
     client: Arc<Mutex<QuicClient>>,
+    /// Address -> Connection map used for re-using connections
+    /// when making outgoing sync requests
     conns: Arc<Mutex<BTreeMap<Addr, Connection>>>,
-    _eng: PhantomData<CE>,
 }
 
-impl<EN, SP, CE> Client<EN, SP, CE> {
-    /// Creates a new [`Client`].
-    #[allow(deprecated)]
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>) -> Result<Self> {
+impl SyncState for State {
+    /// Syncs with the peer.
+    /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
+    async fn sync_impl<S>(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        sink: &mut S,
+        peer: &Addr,
+    ) -> Result<()>
+    where
+        S: Sink<<crate::EN as Engine>::Effect>,
+    {
+        let stream = syncer.connect(peer).await?;
+        // TODO: spawn a task for send/recv?
+        let (mut recv, mut send) = stream.split();
+
+        // TODO: Real server address.
+        let server_addr = ();
+        let mut sync_requester = SyncRequester::new(id, &mut Rng, server_addr);
+
+        // send sync request.
+        syncer
+            .send_sync_request(&mut send, &mut sync_requester, peer)
+            .await?;
+
+        // receive sync response.
+        syncer
+            .receive_sync_response(&mut recv, &mut sync_requester, &id, sink, peer)
+            .await?;
+
+        Ok(())
+    }
+}
+
+impl State {
+    /// Creates a new instance
+    pub fn new() -> Result<Self> {
         // TODO: don't hard-code PSK.
         let psk = PresharedKey::external(PSK_IDENTITY, PSK_BYTES).assume("unable to create psk")?;
         let client_keys = Arc::new(ClientPresharedKeys::new(psk.clone()));
@@ -115,52 +149,20 @@ impl<EN, SP, CE> Client<EN, SP, CE> {
             .with_io("0.0.0.0:0")?
             .start()?;
 
-        Ok(Client {
-            aranya,
+        Ok(Self {
             client: Arc::new(Mutex::new(client)),
             conns: Arc::new(Mutex::new(BTreeMap::new())),
-            _eng: PhantomData,
         })
     }
 }
 
-impl<EN, SP, CE> Client<EN, SP, CE>
-where
-    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
-    SP: StorageProvider + Send + 'static,
-    CE: aranya_crypto::Engine + Send + Sync + 'static,
-{
-    /// Syncs with the peer.
-    /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
-    #[instrument(skip_all)]
-    pub async fn sync_peer<S>(&self, id: GraphId, sink: &mut S, peer: &Addr) -> Result<()>
-    where
-        S: Sink<<EN as Engine>::Effect>,
-    {
-        let stream = self.connect(peer).await?;
-        // TODO: spawn a task for send/recv?
-        let (mut recv, mut send) = stream.split();
-
-        // TODO: Real server address.
-        let server_addr = ();
-        let mut syncer = SyncRequester::new(id, &mut Rng, server_addr);
-
-        // send sync request.
-        self.send_sync_request(&mut send, &mut syncer, peer).await?;
-
-        // receive sync response.
-        self.receive_sync_response(&mut recv, &mut syncer, &id, sink, peer)
-            .await?;
-
-        Ok(())
-    }
-
+impl Syncer<State> {
     async fn connect(&self, peer: &Addr) -> Result<BidirectionalStream> {
         info!(?peer, "client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
-        let mut conns = self.conns.lock().await;
-        let client = self.client.lock().await;
+        let mut conns = self.state.conns.lock().await;
+        let client = self.state.client.lock().await;
         if !conns.contains_key(peer) {
             debug!(?peer, "existing quic connection not found");
 
@@ -210,7 +212,7 @@ where
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let (len, _) = {
-            let mut client = self.aranya.lock().await;
+            let mut client = self.client.aranya.lock().await;
             // TODO: save PeerCache somewhere.
             syncer
                 .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
@@ -236,7 +238,7 @@ where
         peer: &Addr,
     ) -> Result<()>
     where
-        S: Sink<<EN as Engine>::Effect>,
+        S: Sink<<crate::EN as Engine>::Effect>,
         A: Serialize + DeserializeOwned + Clone,
     {
         info!("client receiving sync response from QUIC sync server");
@@ -261,7 +263,7 @@ where
         if let Some(cmds) = syncer.receive(&data)? {
             debug!(num = cmds.len(), "received commands");
             if !cmds.is_empty() {
-                let mut client = self.aranya.lock().await;
+                let mut client = self.client.aranya.lock().await;
                 let mut trx = client.transaction(*id);
                 // TODO: save PeerCache somewhere.
                 client
@@ -279,12 +281,6 @@ where
         }
 
         Ok(())
-    }
-}
-
-impl<EN, SP, CE> fmt::Debug for Client<EN, SP, CE> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Client").finish_non_exhaustive()
     }
 }
 
@@ -399,7 +395,7 @@ where
 
     /// Responds to a sync.
     #[instrument(skip_all, fields(peer = %peer))]
-    async fn sync(
+    pub async fn sync(
         client: Arc<Mutex<ClientState<EN, SP>>>,
         peer: SocketAddr,
         stream: BidirectionalStream,
