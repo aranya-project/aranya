@@ -3,7 +3,7 @@
 //! The AQC network implementation.
 
 use core::task::{Context as CoreContext, Poll};
-use std::{collections::HashMap, net::SocketAddr, ops::ControlFlow, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
@@ -34,6 +34,15 @@ pub struct AqcCtrlMessage {
     pub team_id: TeamId,
     /// The control message.
     pub ctrl: AqcCtrl,
+}
+
+/// An AQC control message.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub enum AqcAckMessage {
+    /// The success message.
+    Success,
+    /// The failure message.
+    Failure(String),
 }
 
 /// Receives an AQC ctrl message.
@@ -169,39 +178,57 @@ async fn receive_ctrl_message(
     daemon: &Arc<DaemonApiClient>,
     channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
     conn: &mut Connection,
-) -> ControlFlow<()> {
-    match conn.accept_receive_stream().await {
-        Ok(Some(mut receive)) => {
-            if let Ok(Some(ctrl_bytes)) = receive.receive().await {
+) -> Result<(), AqcError> {
+    match conn.accept_bidirectional_stream().await {
+        Ok(Some(stream)) => {
+            let (mut recv, mut send) = stream.split();
+            if let Ok(Some(ctrl_bytes)) = recv.receive().await {
                 match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
                     Ok(ctrl) => {
-                        if let Err(e) =
-                            receive_aqc_ctrl(daemon.clone(), ctrl.team_id, ctrl.ctrl, channel_map)
-                                .await
-                        {
-                            error!("Failed to receive AQC ctrl: {}", e);
-                        }
+                        receive_aqc_ctrl(daemon.clone(), ctrl.team_id, ctrl.ctrl, channel_map)
+                            .await
+                            .map_err(anyhow::Error::new)?;
+                        // Send an ACK back
+                        let ack_msg = AqcAckMessage::Success;
+                        let ack_bytes = postcard::to_stdvec(&ack_msg)
+                            .map_err(|e| AqcError::Other(anyhow::Error::new(e)))?;
+                        send.send(Bytes::from(ack_bytes))
+                            .await
+                            .map_err(|e| AqcError::ConnectionError(e.to_string()))?;
+                        send.close()
+                            .await
+                            .map_err(|e| AqcError::ConnectionError(e.to_string()))?;
                     }
                     Err(e) => {
                         error!("Failed to deserialize AqcCtrlMessage: {}", e);
+                        let ack_msg = AqcAckMessage::Failure(format!(
+                            "Failed to deserialize AqcCtrlMessage: {}",
+                            e
+                        ));
+                        let ack_bytes = postcard::to_stdvec(&ack_msg).map_err(|e_postcard| {
+                            AqcError::Other(anyhow::Error::new(e_postcard))
+                        })?;
+                        let _ = send.send(Bytes::from(ack_bytes)).await;
+                        let _ = send.close().await;
+                        return Err(AqcError::Other(anyhow::anyhow!(
+                            "Failed to deserialize AqcCtrlMessage: {}",
+                            e
+                        )));
                     }
                 }
             } else {
-                // Handle the error or None case from receive.receive() if necessary
-                // For example, log an error or break the loop
                 error!("Failed to receive control message or stream closed");
+                return Err(AqcError::ConnectionClosed); // Or a more specific error
             }
         }
         Ok(None) => {
-            error!("Receive stream closed unexpectedly");
-            return ControlFlow::Break(());
+            return Err(AqcError::ConnectionClosed);
         }
         Err(e) => {
-            error!("Failed to accept receive stream: {}", e);
-            return ControlFlow::Break(());
+            return Err(AqcError::ConnectionError(e.to_string()));
         }
     }
-    ControlFlow::Continue(())
+    Ok(())
 }
 
 /// Indicates the type of channel
@@ -590,19 +617,15 @@ impl AqcClient {
                     // pull it directly from the connection.
                     if let Some(identity) = self.identity_rx.recv().await {
                         tracing::debug!(
-                        "Processing connection accepted after seeing PSK identity hint: {:02x?}",
-                        identity
-                    );
+                            "Processing connection accepted after seeing PSK identity hint: {:02x?}",
+                            identity
+                        );
                         // If the PSK identity hint is the control PSK, receive a control message.
                         // This will update the channel map with the PSK and associate it with an
                         // AqcChannel.
                         if identity == PSK_IDENTITY_CTRL {
-                            if let ControlFlow::Break(_) =
-                                receive_ctrl_message(&self.daemon, &mut self.channels, &mut conn)
-                                    .await
-                            {
-                                continue;
-                            }
+                            receive_ctrl_message(&self.daemon, &mut self.channels, &mut conn)
+                                .await?;
                         // If the PSK identity hint is not the control PSK, check if it's in the channel map.
                         // If it is, create a channel of the appropriate type. We should have already received
                         // the control message for this PSK, if we don't we can't create a channel.
@@ -660,21 +683,23 @@ impl AqcClient {
                                         anyhow::anyhow!("Failed to get Tokio runtime: {}", e),
                                     ))
                                 })?
-                                .block_on(receive_ctrl_message(
-                                    &self.daemon,
-                                    &mut self.channels,
-                                    &mut conn,
-                                ));
+                                .block_on(async {
+                                    receive_ctrl_message(
+                                        &self.daemon,
+                                        &mut self.channels,
+                                        &mut conn,
+                                    ).await
+                                });
 
-                            if let ControlFlow::Break(_) = result {
+                            if let Err(e) = result {
                                 // The original function logged an error and returned ControlFlow::Break
                                 // which implies the loop should terminate or an error state.
                                 // For try_receive_channel, this might mean the connection is unusable for ctrl messages.
-                                tracing::warn!("Receiving control message indicated a break, potential issue with connection.");
+                                tracing::warn!("Receiving control message failed: {}, potential issue with connection.", e);
                                 // Depending on desired behavior, you might return an error or continue.
                                 // For now, let's assume it's an error if control message processing fails critically.
                                 return Err(TryReceiveError::AqcError(AqcError::Other(
-                                    anyhow::anyhow!("Control message processing failed"),
+                                    anyhow::anyhow!("Control message processing failed: {}", e),
                                 )));
                             }
                         // If the PSK identity hint is not the control PSK, check if it's in the channel map.
@@ -783,10 +808,17 @@ impl AqcClient {
             .connect(Connect::new(addr).with_server_name("localhost"))
             .await?;
         conn.keep_alive(true)?;
-        let mut send = conn.open_send_stream().await?;
+        let (mut recv, mut send) = conn.open_bidirectional_stream().await?.split();
         let msg = AqcCtrlMessage { team_id, ctrl };
         let msg_bytes = postcard::to_stdvec(&msg)?;
         send.send(Bytes::from_owner(msg_bytes)).await?;
+        if let Some(msg_bytes) = recv.receive().await? {
+            let msg = postcard::from_bytes::<AqcAckMessage>(&msg_bytes)?;
+            match msg {
+                AqcAckMessage::Success => (),
+                AqcAckMessage::Failure(e) => return Err(anyhow::anyhow!(e)),
+            }
+        }
         Ok(())
     }
 }
