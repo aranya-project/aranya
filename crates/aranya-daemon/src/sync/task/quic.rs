@@ -31,6 +31,7 @@ use rustls::crypto::CryptoProvider;
 use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     client::Connect,
+    connection::Error as ConnErr,
     provider::{
         congestion_controller::Bbr,
         tls::rustls::{self as rustls_provider, rustls::pki_types::ServerName},
@@ -180,11 +181,24 @@ impl Syncer<State> {
             bail!("unable to get connection");
         };
         info!("client connected to QUIC sync server");
-        let stream = match conn.handle().open_bidirectional_stream().await {
+
+        let open_stream_res = conn
+            .handle()
+            .open_bidirectional_stream()
+            .await
+            .inspect_err(|e| error!(?peer, "unable to open bidi stream: {}", e));
+        let stream = match open_stream_res {
             Ok(stream) => stream,
+            // Retry for these errors?
+            Err(ConnErr::StatelessReset { .. })
+            | Err(ConnErr::StreamIdExhausted { .. })
+            | Err(ConnErr::MaxHandshakeDurationExceeded { .. }) => {
+                bail!("unable to open bidi stream");
+            }
+            // Other errors means the stream has closed
             Err(e) => {
-                error!(?peer, "unable to open bidi stream: {}", e);
-                bail!("unable to open bidi stream: {}", e);
+                conns.remove(peer);
+                bail!("connection closed: {e}");
             }
         };
 
