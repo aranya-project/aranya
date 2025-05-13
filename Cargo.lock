@@ -300,6 +300,7 @@ dependencies = [
  "tempfile",
  "test-log",
  "test-util",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-util",
  "tracing",

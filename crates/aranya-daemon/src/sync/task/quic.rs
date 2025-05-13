@@ -49,8 +49,9 @@ use tracing::{debug, error, info, instrument};
 
 use super::SyncResponse;
 use crate::sync::{
-    prot::SyncProtocol,
+    prot::{SyncProtocol, PROTOCOL_ERR},
     task::{SyncState, Syncer},
+    SyncError,
 };
 
 /// Protocol Version.
@@ -254,8 +255,23 @@ impl Syncer<State> {
             .context("failed to read sync response")?;
         debug!(?peer, n = recv_buf.len(), "received sync response");
 
+        // check protocol version
+        let Some((version_byte, sync_response)) = recv_buf.split_first() else {
+            error!("Empty sync response");
+            bail!("Empty sync response");
+        };
+
+        let version = match version_byte {
+            &PROTOCOL_ERR => bail!("Recieved protocol error byte"),
+            v => SyncProtocol::try_from(*v)?,
+        };
+
+        if version != self.protocol {
+            bail!(SyncError::Protocol)
+        }
+
         // process the sync response.
-        let resp = postcard::from_bytes(&recv_buf)
+        let resp = postcard::from_bytes(&sync_response)
             .context("postcard unable to deserialize sync response")?;
         let data = match resp {
             SyncResponse::Ok(data) => data,
@@ -429,17 +445,26 @@ where
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
                 error!(?err, "error responding to sync request");
-                SyncResponse::Err(format!("{err:?}"))
+                match err.downcast_ref::<SyncError>() {
+                    Some(SyncError::Protocol) => {
+                        send.send(Bytes::from_owner([PROTOCOL_ERR])).await?;
+                        send.close().await?;
+                        return Ok(());
+                    }
+                    _ => SyncResponse::Err(format!("{err:?}")),
+                }
             }
         };
         // Serialize the sync response.
         let data =
-            &postcard::to_allocvec(&resp).context("postcard unable to serialize sync response")?;
+            postcard::to_allocvec(&resp).context("postcard unable to serialize sync response")?;
 
         // TODO: `send_all`?
-        send.send(Bytes::copy_from_slice(data)).await?;
+        let data_len = data.len();
+        send.send(Bytes::from_owner([protocol as u8])).await?;
+        send.send(Bytes::from_owner(data)).await?;
         send.close().await?;
-        debug!(?peer, n = data.len(), "server sent sync response");
+        debug!(?peer, n = data_len, "server sent sync response");
 
         Ok(())
     }
@@ -453,12 +478,20 @@ where
     ) -> Result<Box<[u8]>> {
         info!("server responding to sync request");
 
-        let Some((version, sync_request)) = request_data.split_first() else {
+        let Some((version_byte, sync_request)) = request_data.split_first() else {
             error!("Empty sync request");
             bail!("Empty sync request");
         };
 
-        debug_assert_eq!(*version, protocol as u8);
+        let version = match version_byte {
+            &PROTOCOL_ERR => bail!("Recieved protocol error byte"),
+            v => SyncProtocol::try_from(*v)?,
+        };
+
+        debug_assert!(version == protocol);
+        if version != protocol {
+            bail!(SyncError::Protocol);
+        }
 
         // TODO: Use real server address
         let server_address = ();
