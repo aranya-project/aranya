@@ -629,14 +629,19 @@ impl AqcClient {
                         // If the PSK identity hint is not the control PSK, check if it's in the channel map.
                         // If it is, create a channel of the appropriate type. We should have already received
                         // the control message for this PSK, if we don't we can't create a channel.
-                        } else if let Some(channel_info) = self.channels.get(&identity) {
-                            return Ok(create_channel_type(conn, channel_info));
                         } else {
-                            tracing::debug!(
-                                "No channel info found in map for identity hint {:02x?}",
-                                identity
-                            );
-                            return Err(AqcError::NoChannelInfoFound);
+                            match self.channels.get(&identity) {
+                                Some(channel_info) => {
+                                    return Ok(create_channel_type(conn, channel_info))
+                                }
+                                None => {
+                                    tracing::debug!(
+                                        "No channel info found in map for identity hint {:02x?}",
+                                        identity
+                                    );
+                                    return Err(AqcError::NoChannelInfoFound);
+                                }
+                            }
                         }
                     } else {
                         tracing::error!("Identity hint channel closed. Unable to create channel.");
