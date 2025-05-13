@@ -18,7 +18,7 @@ use ::rustls::{
     server::{PresharedKeySelection, SelectsPresharedKeys},
     ClientConfig, ServerConfig,
 };
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Context, Result as AnyResult};
 use aranya_crypto::Rng;
 use aranya_runtime::{
     ClientState, Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder,
@@ -92,7 +92,7 @@ impl SyncState for State {
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> Result<()>
+    ) -> AnyResult<()>
     where
         S: Sink<<crate::EN as Engine>::Effect>,
     {
@@ -120,7 +120,7 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub fn new() -> Result<Self> {
+    pub fn new() -> AnyResult<Self> {
         // TODO: don't hard-code PSK.
         let psk = PresharedKey::external(PSK_IDENTITY, PSK_BYTES).assume("unable to create psk")?;
         let client_keys = Arc::new(ClientPresharedKeys::new(psk.clone()));
@@ -149,7 +149,7 @@ impl State {
 }
 
 impl Syncer<State> {
-    async fn connect(&mut self, peer: &Addr) -> Result<BidirectionalStream> {
+    async fn connect(&mut self, peer: &Addr) -> AnyResult<BidirectionalStream> {
         info!(?peer, "client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
@@ -209,7 +209,7 @@ impl Syncer<State> {
         send: &mut SendStream,
         syncer: &mut SyncRequester<'a, A>,
         peer: &Addr,
-    ) -> Result<()>
+    ) -> AnyResult<()>
     where
         A: Serialize + DeserializeOwned + Clone,
     {
@@ -242,7 +242,7 @@ impl Syncer<State> {
         id: &GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> Result<()>
+    ) -> AnyResult<()>
     where
         S: Sink<<crate::EN as Engine>::Effect>,
         A: Serialize + DeserializeOwned + Clone,
@@ -328,9 +328,9 @@ impl<EN, SP> Server<EN, SP> {
         aranya: Arc<Mutex<ClientState<EN, SP>>>,
         addr: &Addr,
         protocol: SyncProtocol,
-    ) -> Result<Self> {
+    ) -> AnyResult<Self> {
         // Load Cert and Key
-        let certs = certs(&mut CERT_PEM.as_bytes()).collect::<Result<Vec<_>, _>>()?;
+        let certs = certs(&mut CERT_PEM.as_bytes()).collect::<AnyResult<Vec<_>, _>>()?;
         let key = private_key(&mut KEY_PEM.as_bytes())?.assume("expected private key")?;
 
         // TODO: don't hard-code PSK.
@@ -368,7 +368,7 @@ impl<EN, SP> Server<EN, SP> {
     }
 
     /// Returns the local address the sync server bound to.
-    pub fn local_addr(&self) -> Result<SocketAddr> {
+    pub fn local_addr(&self) -> AnyResult<SocketAddr> {
         Ok(self.server.local_addr()?)
     }
 }
@@ -380,7 +380,7 @@ where
 {
     /// Begins accepting incoming requests.
     #[instrument(skip_all)]
-    pub async fn serve(mut self) -> Result<()> {
+    pub async fn serve(mut self) -> AnyResult<()> {
         info!(
             "QUIC sync server listening for incoming connections: {}",
             self.local_addr()?
@@ -430,7 +430,7 @@ where
         peer: SocketAddr,
         stream: BidirectionalStream,
         protocol: SyncProtocol,
-    ) -> Result<()> {
+    ) -> AnyResult<()> {
         info!(?peer, "server received a sync request");
 
         let mut recv_buf = Vec::new();
@@ -441,19 +441,18 @@ where
         debug!(?peer, n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let resp = match Self::sync_respond(client, &recv_buf, protocol).await {
+        let sync_response_res = Self::sync_respond(client, &recv_buf, protocol)
+            .await
+            .inspect_err(|e| error!(?e, "error responding to sync request"));
+        
+        let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
-            Err(err) => {
-                error!(?err, "error responding to sync request");
-                match err.downcast_ref::<SyncError>() {
-                    Some(SyncError::Protocol) => {
-                        send.send(Bytes::from_owner([PROTOCOL_ERR])).await?;
-                        send.close().await?;
-                        return Ok(());
-                    }
-                    _ => SyncResponse::Err(format!("{err:?}")),
-                }
+            Err(SyncError::Protocol) => {
+                send.send(Bytes::from_owner([PROTOCOL_ERR])).await?;
+                send.close().await?;
+                return Ok(());
             }
+            Err(err) => SyncResponse::Err(format!("{err:?}")),
         };
         // Serialize the sync response.
         let data =
@@ -475,22 +474,22 @@ where
         client: Arc<Mutex<ClientState<EN, SP>>>,
         request_data: &[u8],
         protocol: SyncProtocol,
-    ) -> Result<Box<[u8]>> {
+    ) -> Result<Box<[u8]>, SyncError> {
         info!("server responding to sync request");
 
         let Some((version_byte, sync_request)) = request_data.split_first() else {
             error!("Empty sync request");
-            bail!("Empty sync request");
+            return Err(anyhow::anyhow!("Empty sync request").into());
         };
 
         let version = match version_byte {
-            &PROTOCOL_ERR => bail!("Recieved protocol error byte"),
+            &PROTOCOL_ERR => return Err(anyhow::anyhow!("Recieved protocol error byte").into()),
             v => SyncProtocol::try_from(*v)?,
         };
 
         debug_assert!(version == protocol);
         if version != protocol {
-            bail!(SyncError::Protocol);
+            return Err(SyncError::Protocol);
         }
 
         // TODO: Use real server address
@@ -500,7 +499,7 @@ where
         let SyncType::Poll {
             request: request_msg,
             address: (),
-        } = postcard::from_bytes(sync_request)?
+        } = postcard::from_bytes(sync_request).map_err(|e| anyhow::anyhow!(e))?
         else {
             bug!("Other sync types are not implemented");
         };
@@ -629,7 +628,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
         _server_name: &ServerName<'_>,
         _ocsp_response: &[u8],
         _now: rustls::pki_types::UnixTime,
-    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
+    ) -> AnyResult<rustls::client::danger::ServerCertVerified, rustls::Error> {
         Ok(rustls::client::danger::ServerCertVerified::assertion())
     }
 
@@ -638,7 +637,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
         message: &[u8],
         cert: &rustls::pki_types::CertificateDer<'_>,
         dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+    ) -> AnyResult<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
         // Use the selected provider's verification algorithms
         rustls::crypto::verify_tls12_signature(
             message,
@@ -653,7 +652,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
         message: &[u8],
         cert: &rustls::pki_types::CertificateDer<'_>,
         dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+    ) -> AnyResult<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
         // Use the selected provider's verification algorithms
         rustls::crypto::verify_tls13_signature(
             message,
