@@ -49,18 +49,15 @@ use tracing::{debug, error, info, instrument};
 
 use super::SyncResponse;
 use crate::sync::{
-    prot::SyncProtocols,
+    prot::SyncProtocol,
     task::{SyncState, Syncer},
 };
 
-/// QUIC Syncer protocol type.
-pub const PROT: SyncProtocols = SyncProtocols::QUIC;
+/// Protocol Version.
+pub const PROT: SyncProtocol = SyncProtocol::V1;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic_sync";
-
-/// QUIC Syncer protocol version.
-pub const VERSION: u16 = 1;
 
 // TODO: get this PSK from keystore or config file.
 // PSK is hard-coded to prototype the QUIC syncer until PSK key management is complete.
@@ -229,7 +226,8 @@ impl Syncer<State> {
         send_buf.truncate(len);
 
         // TODO: `send_all`?
-        send.send(Bytes::copy_from_slice(&send_buf)).await?;
+        send.send(Bytes::from_owner([self.protocol as u8])).await?;
+        send.send(Bytes::from_owner(send_buf)).await?;
         send.close().await?;
         debug!(?peer, "sent sync request");
 
@@ -302,13 +300,19 @@ pub struct Server<EN, SP> {
     set: JoinSet<()>,
     /// Identity Receiver.
     _identity_rx: mpsc::Receiver<Vec<u8>>,
+    /// Sync Protocol version.
+    protocol: SyncProtocol,
 }
 
 impl<EN, SP> Server<EN, SP> {
     /// Creates a new `Server`.
     #[inline]
     #[allow(deprecated)]
-    pub async fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>, addr: &Addr) -> Result<Self> {
+    pub async fn new(
+        aranya: Arc<Mutex<ClientState<EN, SP>>>,
+        addr: &Addr,
+        protocol: SyncProtocol,
+    ) -> Result<Self> {
         // Load Cert and Key
         let certs = certs(&mut CERT_PEM.as_bytes()).collect::<Result<Vec<_>, _>>()?;
         let key = private_key(&mut KEY_PEM.as_bytes())?.assume("expected private key")?;
@@ -343,6 +347,7 @@ impl<EN, SP> Server<EN, SP> {
             server,
             set: JoinSet::new(),
             _identity_rx,
+            protocol,
         })
     }
 
@@ -379,7 +384,9 @@ where
                     match conn.accept_bidirectional_stream().await {
                         Ok(Some(stream)) => {
                             debug!(?peer, "received incoming QUIC stream");
-                            if let Err(e) = Self::sync(client.clone(), peer, stream).await {
+                            if let Err(e) =
+                                Self::sync(client.clone(), peer, stream, self.protocol).await
+                            {
                                 error!(?e, ?peer, "server unable to sync with peer");
                                 break;
                             }
@@ -406,6 +413,7 @@ where
         client: Arc<Mutex<ClientState<EN, SP>>>,
         peer: SocketAddr,
         stream: BidirectionalStream,
+        protocol: SyncProtocol,
     ) -> Result<()> {
         info!(?peer, "server received a sync request");
 
@@ -417,7 +425,7 @@ where
         debug!(?peer, n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let resp = match Self::sync_respond(client, &recv_buf).await {
+        let resp = match Self::sync_respond(client, &recv_buf, protocol).await {
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
                 error!(?err, "error responding to sync request");
@@ -440,23 +448,31 @@ where
     #[instrument(skip_all)]
     async fn sync_respond(
         client: Arc<Mutex<ClientState<EN, SP>>>,
-        request: &[u8],
+        request_data: &[u8],
+        protocol: SyncProtocol,
     ) -> Result<Box<[u8]>> {
         info!("server responding to sync request");
+
+        let Some((version, sync_request)) = request_data.split_first() else {
+            error!("Empty sync request");
+            bail!("Empty sync request");
+        };
+
+        debug_assert_eq!(*version, protocol as u8);
 
         // TODO: Use real server address
         let server_address = ();
         let mut resp = SyncResponder::new(server_address);
 
         let SyncType::Poll {
-            request,
+            request: request_msg,
             address: (),
-        } = postcard::from_bytes(request)?
+        } = postcard::from_bytes(sync_request)?
         else {
             bug!("Other sync types are not implemented");
         };
 
-        resp.receive(request).context("sync recv failed")?;
+        resp.receive(request_msg).context("sync recv failed")?;
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
         // TODO: save PeerCache somewhere.

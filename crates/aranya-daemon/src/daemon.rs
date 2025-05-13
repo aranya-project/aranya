@@ -30,7 +30,10 @@ use crate::{
     config::Config,
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::task::{quic::State as QuicSyncState, Syncer},
+    sync::{
+        prot::SyncProtocol,
+        task::{quic::State as QuicSyncState, Syncer},
+    },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
@@ -48,6 +51,8 @@ pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
+// TODO(Steve): Load from daemon config
+pub(crate) const SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
 
 /// The daemon itself.
 pub struct Daemon {
@@ -107,7 +112,12 @@ impl Daemon {
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects, QuicSyncState::new()?);
+        let (mut syncer, peers) = Syncer::new(
+            client.clone(),
+            send_effects,
+            SYNC_PROTOCOL,
+            QuicSyncState::new()?,
+        );
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
@@ -196,7 +206,7 @@ impl Daemon {
 
         let server = {
             info!(addr = %external_sync_addr, "starting QUIC sync server");
-            SyncServer::new(Arc::clone(&aranya), &external_sync_addr)
+            SyncServer::new(Arc::clone(&aranya), &external_sync_addr, SYNC_PROTOCOL)
                 .await
                 .context("unable to initialize QUIC sync server")?
         };
