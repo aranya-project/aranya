@@ -1,12 +1,12 @@
 use core::{ffi::c_char, mem::MaybeUninit, ptr};
 
 use aranya_capi_core::{
-    safe::{Safe, TypeId, Typed},
+    safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
 
 use super::Error;
-use crate::api::defs::Duration;
+use crate::api::defs::{self, Duration};
 
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
@@ -61,7 +61,7 @@ impl Typed for ClientConfigBuilder {
 }
 
 impl Builder for ClientConfigBuilder {
-    type Output = Safe<ClientConfig>;
+    type Output = defs::ClientConfig;
     type Error = Error;
 
     /// # Safety
@@ -85,7 +85,7 @@ impl Builder for ClientConfigBuilder {
             pk: pk.clone(),
             _aqc: aqc,
         };
-        Safe::init(out, cfg);
+        Self::Output::init(out, cfg);
         Ok(())
     }
 }
@@ -127,7 +127,7 @@ impl AqcConfigBuilder {
 }
 
 impl Builder for AqcConfigBuilder {
-    type Output = Safe<AqcConfig>;
+    type Output = defs::AqcConfig;
     type Error = Error;
 
     /// # Safety
@@ -140,7 +140,7 @@ impl Builder for AqcConfigBuilder {
 
         let cfg = AqcConfig { _addr: self.addr };
 
-        Safe::init(out, cfg);
+        Self::Output::init(out, cfg);
         Ok(())
     }
 }
@@ -204,7 +204,7 @@ impl SyncPeerConfigBuilder {
 }
 
 impl Builder for SyncPeerConfigBuilder {
-    type Output = Safe<SyncPeerConfig>;
+    type Output = defs::SyncPeerConfig;
     type Error = Error;
 
     /// # Safety
@@ -219,7 +219,7 @@ impl Builder for SyncPeerConfigBuilder {
             interval,
             sync_now: self.sync_now,
         };
-        Safe::init(out, cfg);
+        Self::Output::init(out, cfg);
         Ok(())
     }
 }
@@ -254,14 +254,14 @@ impl Typed for TeamConfigBuilder {
 }
 
 impl Builder for TeamConfigBuilder {
-    type Output = Safe<TeamConfig>;
+    type Output = defs::TeamConfig;
     type Error = Error;
 
     /// # Safety
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Safe::init(out, TeamConfig {});
+        Self::Output::init(out, TeamConfig {});
         Ok(())
     }
 }

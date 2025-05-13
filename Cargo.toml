@@ -94,3 +94,9 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
+
+
+[patch.crates-io]
+aranya-capi-core = { git = "https://github.com/aranya-project/aranya-core", branch = "opaque-exact-size" }
+aranya-capi-codegen = { git = "https://github.com/aranya-project/aranya-core", branch = "opaque-exact-size" }
+aranya-capi-macro = { git = "https://github.com/aranya-project/aranya-core", branch = "opaque-exact-size" }
