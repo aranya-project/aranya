@@ -136,8 +136,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-codegen"
 version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7482a25508d9c6315a97acd08f62528552deb011835311e53651e525ae967cb7"
+source = "git+https://github.com/aranya-project/aranya-core?branch=opaque-exact-size#0d5feecf397bef4d49a82832303d3df41d869f43"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -154,14 +153,14 @@ dependencies = [
 [[package]]
 name = "aranya-capi-core"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8f57f8686eff6ff7d3052167b71a0316f6b1a86d8a1f5bb61065160648fc0ce"
+source = "git+https://github.com/aranya-project/aranya-core?branch=opaque-exact-size#0d5feecf397bef4d49a82832303d3df41d869f43"
 dependencies = [
  "aranya-capi-macro",
- "aranya-libc",
+ "aranya-libc 0.2.0 (git+https://github.com/aranya-project/aranya-core?branch=opaque-exact-size)",
  "buggy",
  "cfg-if",
  "const_format",
+ "elain",
  "thiserror 2.0.12",
  "tracing",
 ]
@@ -169,8 +168,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-macro"
 version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c97a7ee1b24b93873230d68acaa4410574a53b009f93bb1776b3d62c73d960f"
+source = "git+https://github.com/aranya-project/aranya-core?branch=opaque-exact-size#0d5feecf397bef4d49a82832303d3df41d869f43"
 dependencies = [
  "aranya-capi-codegen",
  "proc-macro2",
@@ -395,6 +393,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "aranya-libc"
+version = "0.2.0"
+source = "git+https://github.com/aranya-project/aranya-core?branch=opaque-exact-size#0d5feecf397bef4d49a82832303d3df41d869f43"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "memchr",
+ "thiserror 2.0.12",
+ "tracing",
+]
+
+[[package]]
 name = "aranya-perspective-ffi"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -533,7 +543,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ccc634876c5310e7b57c4d1c47052e0546574db958abbf2ea92e037891344876"
 dependencies = [
  "aranya-crypto",
- "aranya-libc",
+ "aranya-libc 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "aranya-policy-vm",
  "buggy",
  "heapless 0.8.0",
@@ -975,6 +985,12 @@ dependencies = [
  "quote",
  "syn 2.0.99",
 ]
+
+[[package]]
+name = "elain"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ba39bdf557eef05f2c1c2e986cbab6b85329b922e7606e5b63ee4c5037ba77a"
 
 [[package]]
 name = "elliptic-curve"
