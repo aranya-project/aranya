@@ -79,8 +79,9 @@ struct ClientCtx {
 }
 
 impl ClientCtx {
-    pub async fn new(team_name: &str, user_name: &str, daemon_path: &DaemonPath) -> Result<Self> {
+    pub async fn new(team_name: &str, user_name: &str, daemon_path: &DaemonPath, port: u16) -> Result<Self> {
         info!(team_name, user_name, "creating `ClientCtx`");
+        let aqc_addr = Addr::new("127.0.0.1", port).expect("unable to init AQC address");
 
         let work_dir = TempDir::with_prefix(user_name)?;
 
@@ -120,7 +121,6 @@ impl ClientCtx {
         // Give the daemon time to start up.
         sleep(Duration::from_millis(100)).await;
 
-        let aqc_addr = Addr::new("127.0.0.1", 0).context("expected to parse AQC addr")?;
         let (mut client, aqc_server_addr) = (|| {
             Client::builder()
                 .with_daemon_api_pk(&pk)
@@ -198,11 +198,11 @@ async fn main() -> Result<()> {
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
     let team_name = "rust_example";
-    let mut owner = ClientCtx::new(&team_name, "owner", &daemon_path).await?;
-    let mut admin = ClientCtx::new(&team_name, "admin", &daemon_path).await?;
-    let mut operator = ClientCtx::new(&team_name, "operator", &daemon_path).await?;
-    let mut membera = ClientCtx::new(&team_name, "member_a", &daemon_path).await?;
-    let mut memberb = ClientCtx::new(&team_name, "member_b", &daemon_path).await?;
+    let mut owner = ClientCtx::new(&team_name, "owner", &daemon_path, 9001).await?;
+    let mut admin = ClientCtx::new(&team_name, "admin", &daemon_path, 9002).await?;
+    let mut operator = ClientCtx::new(&team_name, "operator", &daemon_path, 9003).await?;
+    let mut membera = ClientCtx::new(&team_name, "member_a", &daemon_path, 9004).await?;
+    let mut memberb = ClientCtx::new(&team_name, "member_b", &daemon_path, 9005).await?;
 
     // Create a team.
     info!("creating team");
@@ -320,7 +320,7 @@ async fn main() -> Result<()> {
 
     // add membera to team.
     info!("adding membera to team");
-    operator_team.add_device_to_team(membera.pk).await?;
+    operator_team.add_device_to_team(membera.pk.clone()).await?;
 
     // add memberb to team.
     info!("adding memberb to team");
@@ -376,11 +376,17 @@ async fn main() -> Result<()> {
 
     // membera creates a bidirectional channel.
     info!("membera creating acq bidi channel");
-    let mut created_aqc_chan = membera
-        .client
-        .aqc()
-        .create_bidi_channel(team_id, NetIdentifier(memberb.aqc_addr.to_string()), label3)
-        .await?;
+    // Prepare arguments that need to be captured by the async move block
+    let memberb_net_identifier = NetIdentifier(memberb.aqc_addr.to_string());
+
+    let create_handle = tokio::spawn(async move {
+        let channel_result = membera
+            .client
+            .aqc()
+            .create_bidi_channel(team_id, memberb_net_identifier, label3)
+            .await;
+        (channel_result, membera) // Return membera along with the result
+    });
 
     // memberb receives a bidirectional channel.
     info!("memberb receiving acq bidi channel");
@@ -391,6 +397,14 @@ async fn main() -> Result<()> {
             _ => bail!("expected a bidirectional channel"),
         }
     };
+
+    // Now await the completion of membera's channel creation
+    let (created_aqc_chan_result, membera_returned) = create_handle
+        .await
+        .context("Task for membera creating bidi channel panicked")?;
+    membera = membera_returned; // Assign the moved membera back
+    let mut created_aqc_chan = created_aqc_chan_result
+        .context("Membera failed to create bidi channel")?;
 
     // membera creates a new stream on the channel.
     info!("membera creating aqc bidi stream");
