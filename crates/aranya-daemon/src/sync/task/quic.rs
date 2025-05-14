@@ -271,7 +271,7 @@ impl Syncer<State> {
         }
 
         // process the sync response.
-        let resp = postcard::from_bytes(&sync_response)
+        let resp = postcard::from_bytes(sync_response)
             .context("postcard unable to deserialize sync response")?;
         let data = match resp {
             SyncResponse::Ok(data) => data,
@@ -444,7 +444,7 @@ where
         let sync_response_res = Self::sync_respond(client, &recv_buf, protocol)
             .await
             .inspect_err(|e| error!(?e, "error responding to sync request"));
-        
+
         let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
             Err(SyncError::Protocol) => {
