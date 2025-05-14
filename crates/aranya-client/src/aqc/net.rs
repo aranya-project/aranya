@@ -556,7 +556,7 @@ impl AqcClient {
                     } else {
                         match self.channels.get(&identity) {
                             Some(channel_info) => {
-                                return Ok(create_channel_type(conn, channel_info))
+                                return Ok(create_channel_type(conn, channel_info));
                             }
                             None => {
                                 tracing::debug!(
