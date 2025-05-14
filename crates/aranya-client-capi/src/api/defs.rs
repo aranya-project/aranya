@@ -97,7 +97,7 @@ impl From<&imp::Error> for Error {
             imp::Error::BufferTooSmall => Self::BufferTooSmall,
             imp::Error::TryReceive(err) => match err {
                 aqc::TryReceiveError::Empty => Self::Empty,
-                aqc::TryReceiveError::Disconnected => Self::Disconnected,
+                aqc::TryReceiveError::AqcError(_) => Self::Aqc,
                 aqc::TryReceiveError::Closed => Self::Closed,
             },
             imp::Error::Client(err) => match err {
@@ -1394,7 +1394,7 @@ pub type AqcSenderChannel = Safe<imp::AqcSenderChannel>;
 
 /// An AQC Receiver Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 152, align = 8)]
+#[aranya_capi_core::opaque(size = 176, align = 8)]
 pub type AqcReceiverChannel = Safe<imp::AqcReceiverChannel>;
 
 /// An AQC Sender Stream Object.
