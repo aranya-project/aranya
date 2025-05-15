@@ -601,23 +601,9 @@ impl AqcClient {
                     // AqcChannel.
                     if identity == PSK_IDENTITY_CTRL {
                         // Block on the async function
-                        let result = tokio::runtime::Handle::try_current()
-                            .map_err(|e| {
-                                error!(
-                                    "try_receive_channel: Failed to get current Tokio runtime handle: {}",
-                                    e
-                                );
-                                TryReceiveError::AqcError(AqcError::Other(
-                                    anyhow::anyhow!("Failed to get Tokio runtime: {}", e),
-                                ))
-                            })?
-                            .block_on(async {
-                                receive_ctrl_message(
-                                    &self.daemon,
-                                    &mut self.channels,
-                                    &mut conn,
-                                ).await
-                            });
+                        let result = futures_lite::future::block_on(async {
+                            receive_ctrl_message(&self.daemon, &mut self.channels, &mut conn).await
+                        });
 
                         if let Err(e) = result {
                             // The original function logged an error and returned ControlFlow::Break
