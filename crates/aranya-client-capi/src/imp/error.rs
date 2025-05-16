@@ -4,6 +4,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     write_c_str, ExtendedError, InvalidArg, WriteCStrError,
 };
+use aranya_client::aqc::net::TryReceiveError;
 use buggy::Bug;
 use tracing::warn;
 
@@ -21,6 +22,9 @@ pub enum Error {
 
     #[error("buffer too small")]
     BufferTooSmall,
+
+    #[error(transparent)]
+    TryReceive(#[from] TryReceiveError),
 
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),

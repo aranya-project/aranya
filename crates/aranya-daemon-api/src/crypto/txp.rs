@@ -38,7 +38,7 @@ fn other<E>(err: E) -> io::Error
 where
     E: Into<Box<dyn error::Error + Send + Sync>>,
 {
-    io::Error::new(io::ErrorKind::Other, err)
+    io::Error::other(err)
 }
 
 type Encap<CS> = <<CS as CipherSuite>::Kem as Kem>::Encap;
@@ -118,7 +118,7 @@ impl<CS: CipherSuite> Ctx<CS> {
     where
         SinkItem: Serialize,
     {
-        let mut codec = MessagePack::<Item, SinkItem>::default();
+        let codec = MessagePack::<Item, SinkItem>::default();
         let mut plaintext = BytesMut::from(pin!(codec).serialize(&item)?);
         let mut tag = BytesMut::from(&*Tag::<CS::Aead>::default());
         let ad = auth_data(self.seal.seq(), side);
@@ -150,7 +150,7 @@ impl<CS: CipherSuite> Ctx<CS> {
         self.open
             .open_in_place_at(&mut ciphertext, &tag, &ad, Seq::new(seq))
             .map_err(other)?;
-        let mut codec = MessagePack::<Item, SinkItem>::default();
+        let codec = MessagePack::<Item, SinkItem>::default();
         let item = pin!(codec).deserialize(&ciphertext)?;
         Ok(item)
     }
