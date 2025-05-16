@@ -45,6 +45,7 @@ clap = { workspace = true }
 deser-hjson = { version = "2" }
 futures-util = { workspace = true }
 hex = { version = "0.4" }
+keyring = { workspace = true }
 postcard = { workspace = true }
 rustls = { workspace = true }
 rustls-pemfile = { workspace = true }

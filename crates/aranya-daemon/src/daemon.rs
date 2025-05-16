@@ -8,7 +8,7 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore, KeyStoreExt},
     Engine, Rng,
 };
-use aranya_daemon_api::CS;
+use aranya_daemon_api::{TeamId, CS};
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -32,7 +32,10 @@ use crate::{
     policy,
     sync::{
         prot::SyncProtocol,
-        task::{quic::State as QuicSyncState, Syncer},
+        task::{
+            quic::{set_sync_psk, State as QuicSyncState},
+            Syncer,
+        },
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
@@ -53,6 +56,10 @@ pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
 // TODO(Steve): Load from daemon config
 pub(crate) const SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
+
+// TODO(Steve): Remove later
+pub(crate) const TEAM_ID: TeamId = TeamId::default();
+pub(crate) const SERVICE_NAME: &str = "Aranya-QUIC-Sync";
 
 /// The daemon itself.
 pub struct Daemon {
@@ -92,7 +99,10 @@ impl Daemon {
         let mut local_store = self.load_local_keystore().await?;
         let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
 
-        // Initialize Aranya syncer client.
+        // TODO(Steve): Temporarily set the PSK secret in the OS's keystore
+        set_sync_psk()?;
+
+        // Initialize the Aranya client and sync server.
         let (client, local_addr) = {
             let (client, server) = self
                 .setup_aranya(
@@ -184,7 +194,7 @@ impl Daemon {
         Ok(())
     }
 
-    /// Creates the Aranya client and server.
+    /// Creates the Aranya client and sync server.
     async fn setup_aranya(
         &self,
         eng: CE,
@@ -206,7 +216,7 @@ impl Daemon {
 
         let server = {
             info!(addr = %external_sync_addr, "starting QUIC sync server");
-            SyncServer::new(Arc::clone(&aranya), &external_sync_addr, SYNC_PROTOCOL)
+            SyncServer::new(client.clone(), &external_sync_addr, SYNC_PROTOCOL)
                 .await
                 .context("unable to initialize QUIC sync server")?
         };

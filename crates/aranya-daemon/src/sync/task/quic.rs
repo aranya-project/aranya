@@ -7,22 +7,14 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::net::SocketAddr;
-use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap},
-    sync::{Arc, Mutex as SyncMutex},
-};
+use std::{collections::BTreeMap, sync::Arc};
 
-use ::rustls::{
-    client::PresharedKeyStore,
-    crypto::PresharedKey,
-    server::{PresharedKeySelection, SelectsPresharedKeys},
-    ClientConfig, ServerConfig,
-};
+use ::rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig};
 use anyhow::{bail, Context, Result as AnyResult};
 use aranya_crypto::Rng;
 use aranya_runtime::{
-    ClientState, Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder,
-    SyncType, MAX_SYNC_MESSAGE_SIZE,
+    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder, SyncType,
+    MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::Addr;
 use buggy::{bug, BugExt as _};
@@ -40,18 +32,17 @@ use s2n_quic::{
     Client as QuicClient, Connection, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{
-    io::AsyncReadExt,
-    sync::{mpsc, Mutex},
-    task::JoinSet,
-};
+use tokio::{io::AsyncReadExt, sync::mpsc, task::JoinSet};
 use tracing::{debug, error, info, instrument};
 
 use super::SyncResponse;
-use crate::sync::{
-    prot::{SyncProtocol, PROTOCOL_ERR},
-    task::{SyncState, Syncer},
-    SyncError,
+use crate::{
+    aranya::Client as AranyaClient,
+    sync::{
+        prot::{SyncProtocol, PROTOCOL_ERR},
+        task::{SyncState, Syncer},
+        SyncError,
+    },
 };
 
 /// Protocol Version.
@@ -60,20 +51,16 @@ pub const PROT: SyncProtocol = SyncProtocol::V1;
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic_sync";
 
-// TODO: get this PSK from keystore or config file.
-// PSK is hard-coded to prototype the QUIC syncer until PSK key management is complete.
-// Define constant PSK identity and bytes
-/// PSK identity.
-pub const PSK_IDENTITY: &[u8; 16] = b"aranya-ctrl-psk!"; // 16 bytes
-/// PSK secret bytes.
-pub const PSK_BYTES: &[u8; 32] = b"this-is-a-32-byte-secret-psk!!!!"; // 32 bytes
-
 /// TODO: remove this.
 /// NOTE: this certificate is to be used for demonstration purposes only!
 pub static CERT_PEM: &str = include_str!("./cert.pem");
 /// TODO: remove this.
 /// NOTE: this certificate is to be used for demonstration purposes only!
 pub static KEY_PEM: &str = include_str!("./key.pem");
+
+mod psk;
+pub(crate) use psk::set_sync_psk;
+use psk::{get_existing_psks, load_sync_psk, ClientPresharedKeys, ServerPresharedKeys};
 
 /// Data used for sending sync requests and processing sync responses
 pub struct State {
@@ -122,7 +109,8 @@ impl State {
     /// Creates a new instance
     pub fn new() -> AnyResult<Self> {
         // TODO: don't hard-code PSK.
-        let psk = PresharedKey::external(PSK_IDENTITY, PSK_BYTES).assume("unable to create psk")?;
+        let psk = load_sync_psk()?;
+
         let client_keys = Arc::new(ClientPresharedKeys::new(psk.clone()));
 
         // Create Client Config (INSECURE: Skips server cert verification)
@@ -217,7 +205,7 @@ impl Syncer<State> {
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let (len, _) = {
-            let mut client = self.client.aranya.lock().await;
+            let mut client = self.client.lock().await;
             // TODO: save PeerCache somewhere.
             syncer
                 .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
@@ -284,7 +272,7 @@ impl Syncer<State> {
         if let Some(cmds) = syncer.receive(&data)? {
             debug!(num = cmds.len(), "received commands");
             if !cmds.is_empty() {
-                let mut client = self.client.aranya.lock().await;
+                let mut client = self.client.lock().await;
                 let mut trx = client.transaction(*id);
                 // TODO: save PeerCache somewhere.
                 client
@@ -309,7 +297,7 @@ impl Syncer<State> {
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
-    aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    aranya: AranyaClient<EN, SP>,
     /// QUIC server to handle sync requests and send sync responses.
     server: QuicServer,
     /// Tracks running tasks.
@@ -321,11 +309,22 @@ pub struct Server<EN, SP> {
 }
 
 impl<EN, SP> Server<EN, SP> {
+    /// Returns the local address the sync server bound to.
+    pub fn local_addr(&self) -> AnyResult<SocketAddr> {
+        Ok(self.server.local_addr()?)
+    }
+}
+
+impl<EN, SP> Server<EN, SP>
+where
+    EN: Engine + Send + 'static,
+    SP: StorageProvider + Send + Sync + 'static,
+{
     /// Creates a new `Server`.
     #[inline]
     #[allow(deprecated)]
     pub async fn new(
-        aranya: Arc<Mutex<ClientState<EN, SP>>>,
+        aranya: AranyaClient<EN, SP>,
         addr: &Addr,
         protocol: SyncProtocol,
     ) -> AnyResult<Self> {
@@ -334,9 +333,15 @@ impl<EN, SP> Server<EN, SP> {
         let key = private_key(&mut KEY_PEM.as_bytes())?.assume("expected private key")?;
 
         // TODO: don't hard-code PSK.
-        let psk = PresharedKey::external(PSK_IDENTITY, PSK_BYTES).assume("unable to create psk")?;
+        let default_psk = load_sync_psk()?;
+
         let (mut server_keys, _identity_rx) = ServerPresharedKeys::new();
-        server_keys.insert(psk);
+        server_keys.insert(default_psk);
+
+        // Load existing PSKs from secure storage
+        for psk in get_existing_psks(aranya.clone()).await? {
+            server_keys.insert(psk);
+        }
 
         // Create Server Config
         let mut server_config = ServerConfig::builder()
@@ -367,17 +372,6 @@ impl<EN, SP> Server<EN, SP> {
         })
     }
 
-    /// Returns the local address the sync server bound to.
-    pub fn local_addr(&self) -> AnyResult<SocketAddr> {
-        Ok(self.server.local_addr()?)
-    }
-}
-
-impl<EN, SP> Server<EN, SP>
-where
-    EN: Engine + Send + 'static,
-    SP: StorageProvider + Send + Sync + 'static,
-{
     /// Begins accepting incoming requests.
     #[instrument(skip_all)]
     pub async fn serve(mut self) -> AnyResult<()> {
@@ -393,7 +387,7 @@ where
                 error!("unable to get peer address from connection");
                 continue;
             };
-            let client = Arc::clone(&self.aranya);
+            let client = self.aranya.clone();
             self.set.spawn(async move {
                 loop {
                     // Accept incoming streams.
@@ -426,7 +420,7 @@ where
     /// Responds to a sync.
     #[instrument(skip_all, fields(peer = %peer))]
     pub async fn sync(
-        client: Arc<Mutex<ClientState<EN, SP>>>,
+        client: AranyaClient<EN, SP>,
         peer: SocketAddr,
         stream: BidirectionalStream,
         protocol: SyncProtocol,
@@ -471,7 +465,7 @@ where
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
     async fn sync_respond(
-        client: Arc<Mutex<ClientState<EN, SP>>>,
+        client: AranyaClient<EN, SP>,
         request_data: &[u8],
         protocol: SyncProtocol,
     ) -> Result<Box<[u8]>, SyncError> {
@@ -518,84 +512,6 @@ where
         debug!(len = len, "sync poll finished");
         buf.truncate(len);
         Ok(buf.into())
-    }
-}
-
-#[derive(Debug)]
-struct ServerPresharedKeys {
-    keys: HashMap<Vec<u8>, Arc<PresharedKey>>,
-    // Optional sender to report the selected identity
-    identity_sender: mpsc::Sender<Vec<u8>>,
-}
-
-impl ServerPresharedKeys {
-    fn new() -> (Self, mpsc::Receiver<Vec<u8>>) {
-        // Create the mpsc channel for PSK identities
-        let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(10);
-
-        (
-            Self {
-                keys: HashMap::new(),
-                identity_sender: identity_tx,
-            },
-            identity_rx,
-        )
-    }
-
-    fn insert(&mut self, psk: PresharedKey) {
-        let identity = psk.identity().to_vec();
-        match self.keys.entry(identity.clone()) {
-            Entry::Vacant(v) => {
-                v.insert(Arc::new(psk));
-            }
-            Entry::Occupied(_) => {
-                error!("Duplicate PSK identity inserted: {:?}", identity);
-            }
-        }
-    }
-}
-
-impl SelectsPresharedKeys for ServerPresharedKeys {
-    fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
-        let key = self.keys.get(identity).cloned();
-
-        // Use try_send for non-blocking behavior. Ignore error if receiver dropped.
-        let _ = self
-            .identity_sender
-            .try_send(identity.to_vec())
-            .assume("Failed to send identity");
-
-        key
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct ClientPresharedKeys {
-    key_ref: Arc<SyncMutex<Arc<PresharedKey>>>,
-}
-
-impl ClientPresharedKeys {
-    fn new(key: PresharedKey) -> Self {
-        Self {
-            key_ref: Arc::new(SyncMutex::new(Arc::new(key))),
-        }
-    }
-
-    // TODO: if we need to set PSK to something else
-    /*
-    pub(crate) fn set_key(&self, key: PresharedKey) {
-        let mut key_guard = self.key_ref.lock().expect("Client PSK mutex poisoned");
-        *key_guard = Arc::new(key);
-    }
-    */
-}
-
-impl PresharedKeyStore for ClientPresharedKeys {
-    #![allow(clippy::expect_used)]
-    fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
-        // TODO: don't panic here
-        let key_guard = self.key_ref.lock().expect("Client PSK mutex poisoned");
-        vec![key_guard.clone()]
     }
 }
 

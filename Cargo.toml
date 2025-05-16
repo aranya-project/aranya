@@ -66,6 +66,7 @@ bytes = { version = "1.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 futures-util = { version = "0.3.30" }
+keyring = { version = "3.6", features = ["apple-native"] }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
 # TODO: Remove this after PSK integration

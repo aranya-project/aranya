@@ -233,7 +233,7 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let server = TestServer::new(Arc::clone(&aranya), &addr, TEST_SYNC_PROTOCOL).await?;
+            let server = TestServer::new(client.clone(), &addr, TEST_SYNC_PROTOCOL).await?;
             let local_addr = server.local_addr()?;
             (client, server, local_addr, pk)
         };
