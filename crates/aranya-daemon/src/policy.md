@@ -2205,7 +2205,7 @@ action query_label_assignments(device_id id) {
         if f.device_id == device_id {
             let opt_label = query Label[label_id: f.label_id]
             if opt_label is Some {
-                let label = unwrap label
+                let label = unwrap opt_label
                 publish QueryLabelAssignment {
                     device_id: f.device_id,
                     label_id: f.label_id,
