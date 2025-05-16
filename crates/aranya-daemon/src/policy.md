@@ -288,6 +288,9 @@ function device_can_execute_op(device_id id, op string) bool {
         return false
     }
     let role_id = (unwrap role_op_opt).role_id
+    if !exists Role[role_id: role_id] {
+        return false
+    }
 
     return exists AssignedRole[role_id: role_id, device_id: device_id]
 }
@@ -473,7 +476,7 @@ command CreateTeam {
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
-        
+
         let role = RoleInfo {
             role_id: role_id,
             name: "owner",
@@ -635,7 +638,7 @@ command SetupOperatorRole {
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
-        
+
         let role = RoleInfo {
             role_id: role_id,
             name: "operator",
@@ -671,7 +674,7 @@ command SetupMemberRole {
 
         // A role's ID is the ID of the command that created it.
         let role_id = envelope::command_id(envelope)
-        
+
         let role = RoleInfo {
             role_id: role_id,
             name: "member",
@@ -980,9 +983,6 @@ command DeleteRole {
         }
 
         finish {
-            // Cascade deleting the role assignments.
-            delete AssignedRole[role_id: role.role_id, device_id: ?]
-
             // TODO: revoke command permissions.
             // There isn't currently a way to lookup the fact to delete from the role ID
             // because the role ID is not part of the key:
@@ -1176,7 +1176,7 @@ command AssignRoleOp {
 
         finish {
             assign_op_role(this.op, role.role_id)
-    
+
             // Return deleted role info.
             emit RoleOpAssigned {
                 role_id: role.role_id,
@@ -1886,9 +1886,6 @@ command DeleteLabel {
         let label = check_unwrap query Label[label_id: this.label_id]
 
         finish {
-            // Cascade deleting the label assignments.
-            delete AssignedLabel[label_id: label.label_id, device_id: ?]
-
             delete Label[label_id: label.label_id]
 
             emit LabelDeleted {
@@ -2206,12 +2203,15 @@ action query_label_assignments(device_id id) {
     // The key order is optimized for `delete AssignedLabel`.
     map AssignedLabel[label_id: ?, device_id: ?] as f {
         if f.device_id == device_id {
-            let label = check_unwrap query Label[label_id: f.label_id]
-            publish QueryLabelAssignment {
-                device_id: f.device_id,
-                label_id: f.label_id,
-                label_name: label.name,
-                label_author_id: label.author_id,
+            let opt_label = query Label[label_id: f.label_id]
+            if opt_label is Some {
+                let label = unwrap opt_label
+                publish QueryLabelAssignment {
+                    device_id: f.device_id,
+                    label_id: f.label_id,
+                    label_name: label.name,
+                    label_author_id: label.author_id,
+                }
             }
         }
     }
@@ -2512,12 +2512,15 @@ action query_device_roles(device_id id) {
     // The key order is optimized for `delete AssignedRole`.
     map AssignedRole[role_id: ?, device_id: ?] as f {
         if f.device_id == device_id {
-            let role = check_unwrap query Role[role_id: f.role_id]
-            publish QueryRoleAssignment {
-                device_id: f.device_id,
-                role_id: role.role_id,
-                role_name: role.name,
-                role_author_id: role.author_id,
+            let opt_role = query Role[role_id: f.role_id]
+            if opt_role is Some {
+                let role = unwrap opt_role
+                publish QueryRoleAssignment {
+                    device_id: f.device_id,
+                    role_id: role.role_id,
+                    role_name: role.name,
+                    role_author_id: role.author_id,
+                }
             }
         }
     }
