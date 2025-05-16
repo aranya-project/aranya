@@ -19,7 +19,7 @@ aranya-util = { workspace = true }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }
-bytes = { version = "1", features = ["serde"] }
+bytes = { workspace = true, features = ["serde"] }
 ciborium = { workspace = true }
 futures-util = { workspace = true }
 pin-project = { version = "1.1" }

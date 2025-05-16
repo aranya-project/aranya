@@ -31,11 +31,18 @@ wildcard_imports = "warn"
 [dependencies]
 aranya-client = { path = "../../crates/aranya-client" }
 aranya-daemon-api = { path = "../../crates/aranya-daemon-api" }
+aranya-util = { path = "../../crates/aranya-util" }
 
 anyhow = { version = "1.0.94" }
 backon = { version = "1.3.0" }
+buggy = { version = "0.1.0" }
+bytes = { version = "1.0" }
 hex = { version = "0.4" }
 tempfile = { version = "3.14.0" }
 tokio = { version = "1.44.2", features = ["io-util", "macros", "net", "process", "sync"] }
 tracing = { version = "0.1.41" }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+
+# TODO: remove this patch before merging PR
+[patch.crates-io]
+rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "648a02550dd319360664f9af79862716be2879ff" }
