@@ -14,7 +14,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, error};
 
 use super::AranyaClient;
-use crate::daemon::{SERVICE_NAME, TEAM_ID};
+use crate::{config::NonEmptyString, daemon::TEAM_ID};
 
 // FIXME
 // PSK is hard-coded to prototype the QUIC syncer until PSK key management is complete.
@@ -99,17 +99,18 @@ impl PresharedKeyStore for ClientPresharedKeys {
     }
 }
 
-pub(crate) fn set_sync_psk() -> anyhow::Result<()> {
+pub(crate) fn set_sync_psk(service_name: &NonEmptyString) -> anyhow::Result<()> {
     let id_string = TEAM_ID.to_string();
-    let entry = keyring::Entry::new(SERVICE_NAME, &id_string)?;
-    entry.set_secret(PSK_BYTES)?;
+    let entry = keyring::Entry::new(service_name, &id_string)?;
+
+    let _ = entry.set_secret(PSK_BYTES).inspect_err(|e| error!(%e));
 
     Ok(())
 }
 
-pub(super) fn load_sync_psk() -> anyhow::Result<PresharedKey> {
+pub(crate) fn load_sync_psk(service_name: &NonEmptyString) -> anyhow::Result<PresharedKey> {
     let id_string = TEAM_ID.to_string();
-    let entry = keyring::Entry::new(SERVICE_NAME, &id_string)?;
+    let entry = keyring::Entry::new(service_name, &id_string)?;
     let secret = entry
         .get_secret()
         .context("Couldn't retreive secret for PSK")?;
@@ -119,6 +120,7 @@ pub(super) fn load_sync_psk() -> anyhow::Result<PresharedKey> {
 
 pub(super) async fn get_existing_psks<EN, SP: StorageProvider>(
     client: AranyaClient<EN, SP>,
+    service_name: &NonEmptyString,
 ) -> anyhow::Result<Vec<PresharedKey>> {
     let mut aranya_client = client.lock().await;
     let graph_id_iter = aranya_client.provider().list_graph_ids()?.flatten();
@@ -126,7 +128,7 @@ pub(super) async fn get_existing_psks<EN, SP: StorageProvider>(
     let mut keys = Vec::new();
     for id in graph_id_iter {
         let id_string = id.to_string();
-        let Ok(entry) = keyring::Entry::new(SERVICE_NAME, &id_string) else {
+        let Ok(entry) = keyring::Entry::new(service_name, &id_string) else {
             continue;
         };
         let Ok(secret) = entry.get_secret() else {

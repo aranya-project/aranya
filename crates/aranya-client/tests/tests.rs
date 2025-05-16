@@ -13,7 +13,11 @@ use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{Client, SyncPeerConfig, TeamConfig};
-use aranya_daemon::{config::Config, Daemon};
+use aranya_daemon::{
+    config::{Config, NonEmptyString},
+    sync::prot::SyncProtocol,
+    Daemon,
+};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
@@ -228,17 +232,29 @@ struct DeviceCtx {
 }
 
 impl DeviceCtx {
-    async fn new(_team_name: &str, _name: &str, work_dir: PathBuf) -> Result<Self> {
+    async fn new(_team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(work_dir.clone()).await?;
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
+
+        // Reduce chance of having a collision in the storage
+        let exe_name = std::env::current_exe()
+            .ok()
+            .map(PathBuf::into_os_string)
+            .and_then(|s| s.into_string().ok())
+            .unwrap_or_else(|| String::from("test-device"));
+        let pid = std::process::id();
+        let serice_name = format!("{exe_name}-{name}-daemon-{pid}");
+
         let cfg = Config {
-            name: "daemon".into(),
+            name: name.into(),
             work_dir: work_dir.clone(),
             uds_api_path: uds_api_path.clone(),
             pid_file: work_dir.join("pid"),
             sync_addr: Addr::new("127.0.0.1", 0)?,
+            sync_version: Some(SyncProtocol::V1),
+            service_name: NonEmptyString::try_from(serice_name)?, // TODO(Steve): Clean up storage entries
             afc: None,
             aqc: None,
         };

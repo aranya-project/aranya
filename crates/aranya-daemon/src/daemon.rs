@@ -33,7 +33,7 @@ use crate::{
     sync::{
         prot::SyncProtocol,
         task::{
-            quic::{set_sync_psk, State as QuicSyncState},
+            quic::{load_sync_psk, set_sync_psk, State as QuicSyncState},
             Syncer,
         },
     },
@@ -59,7 +59,7 @@ pub(crate) const SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
 
 // TODO(Steve): Remove later
 pub(crate) const TEAM_ID: TeamId = TeamId::default();
-pub(crate) const SERVICE_NAME: &str = "Aranya-QUIC-Sync";
+// pub(crate) const SERVICE_NAME: &str = "Aranya-QUIC-Sync";
 
 /// The daemon itself.
 pub struct Daemon {
@@ -100,7 +100,7 @@ impl Daemon {
         let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
 
         // TODO(Steve): Temporarily set the PSK secret in the OS's keystore
-        set_sync_psk()?;
+        set_sync_psk(&self.cfg.service_name).context("Could not set PSK")?;
 
         // Initialize the Aranya client and sync server.
         let (client, local_addr) = {
@@ -122,11 +122,13 @@ impl Daemon {
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
+        // TODO: don't hard-code PSK.
+        let psk = load_sync_psk(&self.cfg.service_name)?;
         let (mut syncer, peers) = Syncer::new(
             client.clone(),
             send_effects,
             SYNC_PROTOCOL,
-            QuicSyncState::new()?,
+            QuicSyncState::new(psk)?,
         );
         set.spawn(async move {
             loop {
@@ -213,12 +215,19 @@ impl Daemon {
         )));
 
         let client = Client::new(Arc::clone(&aranya));
+        // TODO: don't hard-code PSK.
+        let psk = load_sync_psk(&self.cfg.service_name)?;
 
         let server = {
             info!(addr = %external_sync_addr, "starting QUIC sync server");
-            SyncServer::new(client.clone(), &external_sync_addr, SYNC_PROTOCOL)
-                .await
-                .context("unable to initialize QUIC sync server")?
+            SyncServer::new(
+                client.clone(),
+                &external_sync_addr,
+                SYNC_PROTOCOL,
+                vec![psk],
+            )
+            .await
+            .context("unable to initialize QUIC sync server")?
         };
 
         info!(device_id = %device_id, "set up Aranya");
@@ -383,20 +392,29 @@ async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
 mod tests {
     #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-    use std::time::Duration;
+    use std::{path::PathBuf, time::Duration};
 
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;
 
     use super::*;
-    use crate::config::AfcConfig;
+    use crate::config::{AfcConfig, NonEmptyString};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
     async fn test_daemon_run() {
         let dir = tempdir().expect("should be able to create temp dir");
         let work_dir = dir.path().join("work");
+
+        // Reduce chance of having a collision in the storage
+        let exe_name = std::env::current_exe()
+            .ok()
+            .map(PathBuf::into_os_string)
+            .and_then(|s| s.into_string().ok())
+            .unwrap_or_else(|| String::from("test-device"));
+        let pid = std::process::id();
+        let serice_name = format!("{exe_name}-daemon-{pid}");
 
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
@@ -405,6 +423,9 @@ mod tests {
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
+            sync_version: None,
+            service_name: NonEmptyString::try_from(serice_name)
+                .expect("this is a non-empty string"),
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,

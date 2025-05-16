@@ -19,7 +19,7 @@ use aranya_runtime::{
 use aranya_util::Addr;
 use buggy::{bug, BugExt as _};
 use bytes::Bytes;
-use rustls::crypto::CryptoProvider;
+use rustls::crypto::{CryptoProvider, PresharedKey};
 use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     client::Connect,
@@ -59,8 +59,8 @@ pub static CERT_PEM: &str = include_str!("./cert.pem");
 pub static KEY_PEM: &str = include_str!("./key.pem");
 
 mod psk;
-pub(crate) use psk::set_sync_psk;
-use psk::{get_existing_psks, load_sync_psk, ClientPresharedKeys, ServerPresharedKeys};
+pub(crate) use psk::{load_sync_psk, set_sync_psk};
+use psk::{ClientPresharedKeys, ServerPresharedKeys};
 
 /// Data used for sending sync requests and processing sync responses
 pub struct State {
@@ -107,11 +107,8 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub fn new() -> AnyResult<Self> {
-        // TODO: don't hard-code PSK.
-        let psk = load_sync_psk()?;
-
-        let client_keys = Arc::new(ClientPresharedKeys::new(psk.clone()));
+    pub fn new(initial_psk: PresharedKey) -> AnyResult<Self> {
+        let client_keys = Arc::new(ClientPresharedKeys::new(initial_psk));
 
         // Create Client Config (INSECURE: Skips server cert verification)
         let mut client_config = ClientConfig::builder()
@@ -327,21 +324,21 @@ where
         aranya: AranyaClient<EN, SP>,
         addr: &Addr,
         protocol: SyncProtocol,
+        initial_psks: Vec<PresharedKey>,
     ) -> AnyResult<Self> {
         // Load Cert and Key
         let certs = certs(&mut CERT_PEM.as_bytes()).collect::<AnyResult<Vec<_>, _>>()?;
         let key = private_key(&mut KEY_PEM.as_bytes())?.assume("expected private key")?;
 
-        // TODO: don't hard-code PSK.
-        let default_psk = load_sync_psk()?;
-
         let (mut server_keys, _identity_rx) = ServerPresharedKeys::new();
-        server_keys.insert(default_psk);
-
-        // Load existing PSKs from secure storage
-        for psk in get_existing_psks(aranya.clone()).await? {
+        for psk in initial_psks {
             server_keys.insert(psk);
         }
+
+        // Load existing PSKs from secure storage
+        // for psk in get_existing_psks(aranya.clone()).await? {
+        //     server_keys.insert(psk);
+        // }
 
         // Create Server Config
         let mut server_config = ServerConfig::builder()

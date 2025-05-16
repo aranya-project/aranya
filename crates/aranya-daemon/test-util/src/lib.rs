@@ -3,7 +3,7 @@
 use std::{
     fs,
     ops::{Deref, DerefMut},
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 use anyhow::{bail, Context, Result};
@@ -26,6 +26,7 @@ use aranya_runtime::{
     ClientState, GraphId,
 };
 use aranya_util::Addr;
+use rustls::crypto::PresharedKey;
 use tempfile::{tempdir, TempDir};
 use tokio::{
     sync::{
@@ -48,6 +49,9 @@ pub type TestServer = sync::task::quic::Server<
     PolicyEngine<DefaultEngine, Store>,
     LinearStorageProvider<FileManager>,
 >;
+
+const TEST_PSK: LazyLock<PresharedKey> =
+    LazyLock::new(|| PresharedKey::external(b"identity", b"secret").expect("should not fail"));
 
 // checks if effects vector contains a particular type of effect.
 #[macro_export]
@@ -80,7 +84,7 @@ impl TestDevice {
         graph_id: GraphId,
     ) -> Result<Self> {
         let handle = task::spawn(async { server.serve().await }).abort_handle();
-        let state = TestState::new()?;
+        let state = TestState::new(TEST_PSK.clone())?;
         let (send, effect_recv) = mpsc::channel(1);
         let (syncer, _sync_peers) = TestSyncer::new(client, send, TEST_SYNC_PROTOCOL, state);
         Ok(Self {
@@ -233,7 +237,13 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let server = TestServer::new(client.clone(), &addr, TEST_SYNC_PROTOCOL).await?;
+            let server = TestServer::new(
+                client.clone(),
+                &addr,
+                TEST_SYNC_PROTOCOL,
+                vec![TEST_PSK.clone()],
+            )
+            .await?;
             let local_addr = server.local_addr()?;
             (client, server, local_addr, pk)
         };
