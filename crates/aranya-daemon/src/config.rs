@@ -2,12 +2,45 @@
 
 use std::{
     fs,
+    ops::Deref,
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
 use aranya_util::Addr;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+
+use crate::sync::prot::SyncProtocol;
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(try_from = "String")]
+pub struct NonEmptyString(String);
+
+impl Deref for NonEmptyString {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl TryFrom<String> for NonEmptyString {
+    type Error = anyhow::Error;
+    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
+        if value.is_empty() {
+            anyhow::bail!("Invalid String. NonEmptyString can't be blank")
+        } else {
+            Ok(Self(value))
+        }
+    }
+}
+
+impl TryFrom<&str> for NonEmptyString {
+    type Error = anyhow::Error;
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        Self::try_from(value.to_owned())
+    }
+}
 
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -27,6 +60,11 @@ pub struct Config {
 
     /// Network address of Aranya sync server.
     pub sync_addr: Addr,
+    pub service_name: NonEmptyString,
+
+    /// Sync Protocol Version
+    #[serde(default)]
+    pub sync_version: Option<SyncProtocol>,
 
     /// AFC configuration.
     #[serde(default)]
@@ -131,8 +169,19 @@ mod tests {
     use std::net::Ipv4Addr;
 
     use pretty_assertions::assert_eq;
+    use tracing::warn;
 
     use super::*;
+
+    pub fn delete_sync_psk(service_name: &NonEmptyString) -> Result<()> {
+        let id_string = crate::daemon::TEAM_ID.to_string();
+        let entry = keyring::Entry::new(service_name, &id_string)?;
+        let _ = entry
+            .delete_credential()
+            .inspect_err(|e| warn!("Couldn't delete secret for PSK: {}", e));
+
+        Ok(())
+    }
 
     #[test]
     fn test_config() -> Result<()> {
@@ -145,10 +194,14 @@ mod tests {
             uds_api_path: "/var/run/uds.sock".parse()?,
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
+            sync_version: Some(SyncProtocol::V1),
+            service_name: NonEmptyString::try_from("Aranya-QUIC-sync")?,
             afc: None,
             aqc: None,
         };
         assert_eq!(got, want);
+
+        delete_sync_psk(&want.service_name)?;
         Ok(())
     }
 }

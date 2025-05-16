@@ -9,7 +9,7 @@
 
 use anyhow::{Context, Result};
 use aranya_daemon::{
-    aranya::Actions,
+    actions::Actions,
     policy::{Effect, Role},
 };
 use serial_test::serial;
@@ -42,7 +42,7 @@ async fn test_remove_members() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 
     let clients = ctx.new_team().await?;
-    let team = TestTeam::new(&clients);
+    let mut team = TestTeam::new(clients);
 
     let effects = team
         .operator
@@ -64,7 +64,7 @@ async fn test_remove_members() -> Result<()> {
     {
         panic!("expected MemberRemoved effect: {:?}", effects)
     }
-    team.admin.sync(team.operator).await?;
+    team.admin.sync(&team.operator).await?;
     team.owner
         .actions()
         .revoke_role(team.operator.pk.ident_pk.id()?, Role::Operator)
