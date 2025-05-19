@@ -1369,6 +1369,10 @@ pub unsafe fn aqc_remove_net_identifier(
 }
 
 /// A type containing the AQC channel variant.
+/// 
+/// Note that this data is only valid after a successful call to
+/// `try_receive_channel`, and is invalidated after calling
+/// `get_bidirectional_channel`/`get_receiver_channel`.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 192, align = 8)]
 pub type AqcChannel = Safe<imp::AqcChannelType>;
@@ -1557,6 +1561,8 @@ pub fn aqc_try_receive_channel(
 /// Converts the [`AqcChannel`]` into an [`AqcBidiChannel`] for sending/receiving data.
 ///
 /// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
+/// 
+/// Note that this function takes ownership of the [`AqcChannel`] and invalidates any further use.
 ///
 /// @param channel the AQC channel holder [`AqcChannel`] that holds a channel object.
 /// @param bidi the AQC channel object [`AqcBidiChannel`] that holds channel info.
@@ -1584,6 +1590,8 @@ pub fn aqc_get_bidirectional_channel(
 /// Converts the [`AqcChannel`]` into an [`AqcReceiverChannel`] for receiving data.
 ///
 /// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
+/// 
+/// Note that this function takes ownership of the [`AqcChannel`] and invalidates any further use.
 ///
 /// @param channel the AQC channel container [`AqcChannel`].
 /// @param receiver the AQC channel object [`AqcReceiverChannel`].
