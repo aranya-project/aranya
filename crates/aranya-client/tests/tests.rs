@@ -13,6 +13,7 @@ use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{Client, SyncPeerConfig, TeamConfig};
+use aranya_crypto::{csprng::rand::RngCore, Rng};
 use aranya_daemon::{
     config::{Config, NonEmptyString},
     sync::prot::SyncProtocol,
@@ -27,7 +28,7 @@ use tokio::{
     task::{self, AbortHandle},
     time::{self, Sleep},
 };
-use tracing::{debug, info, instrument};
+use tracing::{debug, error, info, instrument};
 
 const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
@@ -229,6 +230,7 @@ struct DeviceCtx {
     pk: KeyBundle,
     id: DeviceId,
     daemon: AbortHandle,
+    cleanup: Option<Box<dyn FnOnce() -> Result<()>>>,
 }
 
 impl DeviceCtx {
@@ -239,13 +241,7 @@ impl DeviceCtx {
         let uds_api_path = work_dir.join("uds.sock");
 
         // Reduce chance of having a collision in the storage
-        let exe_name = std::env::current_exe()
-            .ok()
-            .map(PathBuf::into_os_string)
-            .and_then(|s| s.into_string().ok())
-            .unwrap_or_else(|| String::from("test-device"));
-        let pid = std::process::id();
-        let serice_name = format!("{exe_name}-{name}-daemon-{pid}");
+        let serice_name = Self::gen_service_name(name, &mut Rng);
 
         let cfg = Config {
             name: name.into(),
@@ -254,7 +250,7 @@ impl DeviceCtx {
             pid_file: work_dir.join("pid"),
             sync_addr: Addr::new("127.0.0.1", 0)?,
             sync_version: Some(SyncProtocol::V1),
-            service_name: NonEmptyString::try_from(serice_name)?, // TODO(Steve): Clean up storage entries
+            service_name: NonEmptyString::try_from(serice_name)?,
             afc: None,
             aqc: None,
         };
@@ -263,6 +259,10 @@ impl DeviceCtx {
         let daemon = Daemon::load(cfg.clone())
             .await
             .context("unable to init daemon")?;
+
+        // Generate the cleanup routine for this daemon.
+        let cleanup = daemon.cleanup();
+
         // Start daemon.
         let handle = task::spawn(async move {
             daemon
@@ -301,16 +301,31 @@ impl DeviceCtx {
             pk,
             id,
             daemon: handle,
+            cleanup: Some(Box::new(cleanup)),
         })
     }
 
     async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.local_addr().await?)
     }
+
+    fn gen_service_name(name: &str, rng: &mut Rng) -> String {
+        let exe_name = std::env::current_exe()
+            .ok()
+            .map(PathBuf::into_os_string)
+            .and_then(|s| s.into_string().ok())
+            .unwrap_or_else(|| String::from("test-device"));
+        let pid = std::process::id();
+        let rand_int = rng.next_u32();
+        format!("{exe_name}-{name}-daemon-{pid}-{rand_int}")
+    }
 }
 
 impl Drop for DeviceCtx {
     fn drop(&mut self) {
+        if let Some(cleanup_fn) = self.cleanup.take() {
+            let _ = cleanup_fn().inspect_err(|e| error!(%e));
+        }
         self.daemon.abort();
     }
 }

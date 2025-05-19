@@ -1,6 +1,7 @@
 //! Daemon configuration.
 
 use std::{
+    fmt::Display,
     fs,
     ops::Deref,
     path::{Path, PathBuf},
@@ -12,6 +13,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::sync::prot::SyncProtocol;
 
+/// An immutable [`String`] that can't be blank.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "String")]
 pub struct NonEmptyString(String);
@@ -42,6 +44,12 @@ impl TryFrom<&str> for NonEmptyString {
     }
 }
 
+impl Display for NonEmptyString {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -60,6 +68,10 @@ pub struct Config {
 
     /// Network address of Aranya sync server.
     pub sync_addr: Addr,
+
+    /// The service name used by Keyring's [`keyring::Entry`] API
+    /// See the documentation for each Platform's credential store
+    /// to see what the service name maps to.
     pub service_name: NonEmptyString,
 
     /// Sync Protocol Version

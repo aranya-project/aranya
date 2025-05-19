@@ -7,13 +7,11 @@ use std::{
 
 use ::rustls::{client::PresharedKeyStore, crypto::PresharedKey, server::SelectsPresharedKeys};
 use anyhow::Context;
-use aranya_runtime::StorageProvider;
 use buggy::BugExt as _;
 use s2n_quic::provider::tls::rustls::rustls::pki_types::ServerName;
 use tokio::sync::mpsc;
-use tracing::{debug, error};
+use tracing::error;
 
-use super::AranyaClient;
 use crate::{config::NonEmptyString, daemon::TEAM_ID};
 
 // FIXME
@@ -103,7 +101,9 @@ pub(crate) fn set_sync_psk(service_name: &NonEmptyString) -> anyhow::Result<()> 
     let id_string = TEAM_ID.to_string();
     let entry = keyring::Entry::new(service_name, &id_string)?;
 
-    let _ = entry.set_secret(PSK_BYTES).inspect_err(|e| error!(%e));
+    entry
+        .set_secret(PSK_BYTES)
+        .inspect_err(|e| error!(%e, %service_name))?;
 
     Ok(())
 }
@@ -118,29 +118,39 @@ pub(crate) fn load_sync_psk(service_name: &NonEmptyString) -> anyhow::Result<Pre
     Ok(PresharedKey::external(id_string.as_bytes(), &secret).assume("unable to create PSK")?)
 }
 
-pub(super) async fn get_existing_psks<EN, SP: StorageProvider>(
-    client: AranyaClient<EN, SP>,
-    service_name: &NonEmptyString,
-) -> anyhow::Result<Vec<PresharedKey>> {
-    let mut aranya_client = client.lock().await;
-    let graph_id_iter = aranya_client.provider().list_graph_ids()?.flatten();
+pub(crate) fn delete_sync_psk(service_name: &NonEmptyString) -> anyhow::Result<()> {
+    let id_string = TEAM_ID.to_string();
+    let entry = keyring::Entry::new(service_name, &id_string)?;
 
-    let mut keys = Vec::new();
-    for id in graph_id_iter {
-        let id_string = id.to_string();
-        let Ok(entry) = keyring::Entry::new(service_name, &id_string) else {
-            continue;
-        };
-        let Ok(secret) = entry.get_secret() else {
-            debug!("Unable to get PSK secret for graph_id {id_string}");
-            continue;
-        };
+    entry.delete_credential().inspect_err(|e| error!(%e))?;
 
-        let Some(psk) = PresharedKey::external(id_string.as_bytes(), &secret) else {
-            continue;
-        };
-        keys.push(psk);
-    }
-
-    Ok(keys)
+    Ok(())
 }
+
+// pub(super) async fn get_existing_psks<EN, SP: StorageProvider>(
+//     client: AranyaClient<EN, SP>,
+//     service_name: &NonEmptyString,
+// ) -> anyhow::Result<Vec<PresharedKey>> {
+//     let mut aranya_client = client.lock().await;
+//     let graph_id_iter = aranya_client.provider().list_graph_ids()?.flatten();
+
+//     let mut keys = Vec::new();
+//     for id in graph_id_iter {
+//         let id_string = id.to_string();
+//         let Ok(entry) = keyring::Entry::new(service_name, &id_string) else {
+//             continue;
+//         };
+//         let Ok(secret) = entry.get_secret() else {
+//             debug!("Unable to get PSK secret for graph_id {id_string}");
+//             continue;
+//         };
+
+//         let Some(psk) = PresharedKey::external(id_string.as_bytes(), &secret) else {
+//             debug!("Unable to create external PSK for graph_id {id_string}");
+//             continue;
+//         };
+//         keys.push(psk);
+//     }
+
+//     Ok(keys)
+// }

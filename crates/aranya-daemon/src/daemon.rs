@@ -33,7 +33,7 @@ use crate::{
     sync::{
         prot::SyncProtocol,
         task::{
-            quic::{load_sync_psk, set_sync_psk, State as QuicSyncState},
+            quic::{delete_sync_psk, load_sync_psk, set_sync_psk, State as QuicSyncState},
             Syncer,
         },
     },
@@ -54,8 +54,7 @@ pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
-// TODO(Steve): Load from daemon config
-pub(crate) const SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
+pub(crate) const DEFAULT_SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
 
 // TODO(Steve): Remove later
 pub(crate) const TEAM_ID: TeamId = TeamId::default();
@@ -127,7 +126,7 @@ impl Daemon {
         let (mut syncer, peers) = Syncer::new(
             client.clone(),
             send_effects,
-            SYNC_PROTOCOL,
+            self.cfg.sync_version.unwrap_or(DEFAULT_SYNC_PROTOCOL),
             QuicSyncState::new(psk)?,
         );
         set.spawn(async move {
@@ -223,7 +222,7 @@ impl Daemon {
             SyncServer::new(
                 client.clone(),
                 &external_sync_addr,
-                SYNC_PROTOCOL,
+                self.cfg.sync_version.unwrap_or(DEFAULT_SYNC_PROTOCOL),
                 vec![psk],
             )
             .await
@@ -333,6 +332,14 @@ impl Daemon {
             }
         }
     }
+
+    /// Clean up routine.
+    ///
+    /// For testing purposes only.
+    pub fn cleanup(&self) -> impl FnOnce() -> Result<()> {
+        let service_name = self.cfg.service_name.clone();
+        move || delete_sync_psk(&service_name)
+    }
 }
 
 impl Drop for Daemon {
@@ -440,8 +447,10 @@ mod tests {
             .await
             .expect("should be able to load `Daemon`");
 
-        time::timeout(Duration::from_secs(1), daemon.run())
-            .await
-            .expect_err("`Timeout` should return Elapsed");
+        let cleanup = Box::new(daemon.cleanup());
+        let run_result = time::timeout(Duration::from_secs(1), daemon.run()).await;
+
+        let _ = cleanup();
+        run_result.expect_err("`Timeout` should return Elapsed");
     }
 }

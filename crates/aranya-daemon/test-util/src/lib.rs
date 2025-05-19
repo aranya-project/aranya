@@ -1,4 +1,10 @@
-#![allow(clippy::expect_used, clippy::indexing_slicing, rust_2018_idioms)]
+#![allow(
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::borrow_interior_mutable_const,
+    clippy::declare_interior_mutable_const,
+    rust_2018_idioms
+)]
 
 use std::{
     fs,
