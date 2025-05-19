@@ -20,7 +20,7 @@ use s2n_quic::{
 };
 use tarpc::context;
 use tokio::sync::mpsc;
-use tracing::error;
+use tracing::{debug, error, warn};
 
 use crate::{
     aqc::api::{AqcChannel, ClientPresharedKeys, PSK_BYTES_CTRL, PSK_IDENTITY_CTRL},
@@ -224,7 +224,7 @@ impl Drop for AqcSenderChannel {
         // Attempt to close the channel when the sender is dropped.
         // Log if there's an error, but don't panic as drop should not panic.
         if let Err(e) = self.close() {
-            tracing::error!("Failed to close AqcChannelSender handle: {}", e);
+            error!("Failed to close AqcChannelSender handle: {}", e);
         }
     }
 }
@@ -401,7 +401,7 @@ impl Drop for AqcBidirectionalChannel {
         // Attempt to close the channel when the bidirectional channel is dropped.
         // Log if there's an error, but don't panic as drop should not panic.
         if let Err(e) = self.close() {
-            tracing::error!("Failed to close AqcBidirectionalChannel handle: {}", e);
+            error!("Failed to close AqcBidirectionalChannel handle: {}", e);
         }
     }
 }
@@ -538,10 +538,10 @@ impl AqcClient {
                     // TODO: Instead of receiving the PSK identity hint here, we should
                     // pull it directly from the connection.
                     let Some(identity) = self.identity_rx.recv().await else {
-                        tracing::error!("Identity hint channel closed. Unable to create channel.");
+                        error!("Identity hint channel closed. Unable to create channel.");
                         return Err(AqcError::NoIdentityHint);
                     };
-                    tracing::debug!(
+                    debug!(
                         "Processing connection accepted after seeing PSK identity hint: {:02x?}",
                         identity
                     );
@@ -559,7 +559,7 @@ impl AqcClient {
                                 return Ok(create_channel_type(conn, channel_info));
                             }
                             None => {
-                                tracing::debug!(
+                                debug!(
                                     "No channel info found in map for identity hint {:02x?}",
                                     identity
                                 );
@@ -589,10 +589,10 @@ impl AqcClient {
                     // TODO: Instead of receiving the PSK identity hint here, we should
                     // pull it directly from the connection.
                     let Ok(identity) = self.identity_rx.try_recv() else {
-                        tracing::error!("Identity hint channel closed. Unable to create channel.");
+                        error!("Identity hint channel closed. Unable to create channel.");
                         return Err(TryReceiveError::AqcError(AqcError::NoIdentityHint));
                     };
-                    tracing::debug!(
+                    debug!(
                         "Processing connection accepted after seeing PSK identity hint: {:02x?}",
                         identity
                     );
@@ -609,7 +609,7 @@ impl AqcClient {
                             // The original function logged an error and returned ControlFlow::Break
                             // which implies the loop should terminate or an error state.
                             // For try_receive_channel, this might mean the connection is unusable for ctrl messages.
-                            tracing::warn!("Receiving control message failed: {}, potential issue with connection.", e);
+                            warn!("Receiving control message failed: {}, potential issue with connection.", e);
                             // Depending on desired behavior, you might return an error or continue.
                             // For now, let's assume it's an error if control message processing fails critically.
                             return Err(TryReceiveError::AqcError(AqcError::Other(
@@ -622,7 +622,7 @@ impl AqcClient {
                     } else if let Some(channel_info) = self.channels.get(&identity) {
                         return Ok(create_channel_type(conn, channel_info));
                     } else {
-                        tracing::debug!(
+                        debug!(
                             "No channel info found in map for identity hint {:02x?}",
                             identity
                         );
