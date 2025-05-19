@@ -14,13 +14,9 @@ use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 use anyhow::{bail, Context, Result};
 use aranya_client::{Client, SyncPeerConfig, TeamConfig};
 use aranya_crypto::{csprng::rand::RngCore, Rng};
-use aranya_daemon::{
-    config::{Config, NonEmptyString},
-    sync::prot::SyncProtocol,
-    Daemon,
-};
+use aranya_daemon::{config::Config, sync::prot::SyncProtocol, Daemon};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
-use aranya_util::Addr;
+use aranya_util::{Addr, NonEmptyString};
 use backon::{ExponentialBuilder, Retryable as _};
 use test_log::test;
 use tokio::{

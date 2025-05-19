@@ -7,12 +7,13 @@ use std::{
 
 use ::rustls::{client::PresharedKeyStore, crypto::PresharedKey, server::SelectsPresharedKeys};
 use anyhow::Context;
+use aranya_util::NonEmptyString;
 use buggy::BugExt as _;
 use s2n_quic::provider::tls::rustls::rustls::pki_types::ServerName;
 use tokio::sync::mpsc;
 use tracing::error;
 
-use crate::{config::NonEmptyString, daemon::TEAM_ID};
+use crate::daemon::TEAM_ID;
 
 // FIXME
 // PSK is hard-coded to prototype the QUIC syncer until PSK key management is complete.

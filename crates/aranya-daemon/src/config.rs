@@ -1,54 +1,15 @@
 //! Daemon configuration.
 
 use std::{
-    fmt::Display,
     fs,
-    ops::Deref,
     path::{Path, PathBuf},
 };
 
 use anyhow::{Context, Result};
-use aranya_util::Addr;
+use aranya_util::{Addr, NonEmptyString};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::sync::prot::SyncProtocol;
-
-/// An immutable [`String`] that can't be blank.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(try_from = "String")]
-pub struct NonEmptyString(String);
-
-impl Deref for NonEmptyString {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl TryFrom<String> for NonEmptyString {
-    type Error = anyhow::Error;
-    fn try_from(value: String) -> std::result::Result<Self, Self::Error> {
-        if value.is_empty() {
-            anyhow::bail!("Invalid String. NonEmptyString can't be blank")
-        } else {
-            Ok(Self(value))
-        }
-    }
-}
-
-impl TryFrom<&str> for NonEmptyString {
-    type Error = anyhow::Error;
-    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
-        Self::try_from(value.to_owned())
-    }
-}
-
-impl Display for NonEmptyString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
-    }
-}
 
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -72,6 +33,8 @@ pub struct Config {
     /// The service name used by Keyring's [`keyring::Entry`] API
     /// See the documentation for each Platform's credential store
     /// to see what the service name maps to.
+    ///
+    /// This value cannot be blank.
     pub service_name: NonEmptyString,
 
     /// Sync Protocol Version
@@ -181,19 +144,8 @@ mod tests {
     use std::net::Ipv4Addr;
 
     use pretty_assertions::assert_eq;
-    use tracing::warn;
 
     use super::*;
-
-    pub fn delete_sync_psk(service_name: &NonEmptyString) -> Result<()> {
-        let id_string = crate::daemon::TEAM_ID.to_string();
-        let entry = keyring::Entry::new(service_name, &id_string)?;
-        let _ = entry
-            .delete_credential()
-            .inspect_err(|e| warn!("Couldn't delete secret for PSK: {}", e));
-
-        Ok(())
-    }
 
     #[test]
     fn test_config() -> Result<()> {
@@ -213,7 +165,6 @@ mod tests {
         };
         assert_eq!(got, want);
 
-        delete_sync_psk(&want.service_name)?;
         Ok(())
     }
 }

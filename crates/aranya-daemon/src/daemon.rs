@@ -401,12 +401,13 @@ mod tests {
 
     use std::{path::PathBuf, time::Duration};
 
+    use aranya_util::NonEmptyString;
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;
 
     use super::*;
-    use crate::config::{AfcConfig, NonEmptyString};
+    use crate::config::AfcConfig;
 
     /// Tests running the daemon.
     #[test(tokio::test)]

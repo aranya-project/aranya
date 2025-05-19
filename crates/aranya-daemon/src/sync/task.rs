@@ -205,6 +205,29 @@ impl<ST> Syncer<ST> {
             peers,
         )
     }
+
+    /// Add a peer to the delay queue, overwriting an existing one.
+    fn add_peer(&mut self, peer: SyncPeer, cfg: &SyncPeerConfig) {
+        let key = self.queue.insert(peer.clone(), cfg.interval);
+        self.peers
+            .entry(peer)
+            .and_modify(|info| {
+                self.queue.remove(&info.key);
+                info.interval = cfg.interval;
+                info.key = key;
+            })
+            .or_insert(PeerInfo {
+                interval: cfg.interval,
+                key,
+            });
+    }
+
+    /// Remove a peer from the delay queue.
+    fn remove_peer(&mut self, peer: SyncPeer) {
+        if let Some(info) = self.peers.remove(&peer) {
+            self.queue.remove(&info.key);
+        }
+    }
 }
 
 impl<ST: SyncState> Syncer<ST> {
@@ -235,29 +258,6 @@ impl<ST: SyncState> Syncer<ST> {
             }
         }
         Ok(())
-    }
-
-    /// Add a peer to the delay queue, overwriting an existing one.
-    fn add_peer(&mut self, peer: SyncPeer, cfg: &SyncPeerConfig) {
-        let key = self.queue.insert(peer.clone(), cfg.interval);
-        self.peers
-            .entry(peer)
-            .and_modify(|info| {
-                self.queue.remove(&info.key);
-                info.interval = cfg.interval;
-                info.key = key;
-            })
-            .or_insert(PeerInfo {
-                interval: cfg.interval,
-                key,
-            });
-    }
-
-    /// Remove a peer from the delay queue.
-    fn remove_peer(&mut self, peer: SyncPeer) {
-        if let Some(info) = self.peers.remove(&peer) {
-            self.queue.remove(&info.key);
-        }
     }
 
     /// Sync with a peer.
