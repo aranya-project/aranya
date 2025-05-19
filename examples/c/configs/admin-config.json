@@ -15,4 +15,9 @@
 
 	// Aranya sync server address.
 	"sync_addr": "127.0.0.1:10002",
+
+	// Aranya sync protocol version.
+    "sync_version": "V1",
+
+    "service_name": "Aranya-QUIC-sync-c-example",
 }

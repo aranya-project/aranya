@@ -97,7 +97,9 @@ impl ClientCtx {
     "work_dir": "{}",
     "uds_api_path": "{}",
     "pid_file": "{}",
-    "sync_addr": "127.0.0.1:0"
+    "sync_addr": "127.0.0.1:0",
+    "sync_version": "V1",
+    "service_name": "Aranya-QUIC-sync-rust-example",
 }}"#,
                 work_dir.as_os_str().to_str().context("should be UTF-8")?,
                 uds_api_path
