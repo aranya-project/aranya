@@ -103,9 +103,8 @@ enum AranyaAqcChannelType
   : uint8_t
 #endif // __cplusplus
  {
-    ARANYA_AQC_CHANNEL_TYPE_SENDER,
-    ARANYA_AQC_CHANNEL_TYPE_RECEIVER,
     ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL,
+    ARANYA_AQC_CHANNEL_TYPE_RECEIVER,
 };
 #ifndef __cplusplus
 typedef uint8_t AranyaAqcChannelType;
@@ -2172,13 +2171,33 @@ AranyaError aranya_aqc_create_uni_channel_ext(struct AranyaClient *client,
  * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
  * channels received yet which is considered a non-fatal error.
  *
+ * Note that the [`AranyaAqcChannel`](@ref AranyaAqcChannel) must be converted before it can be used:
+ * ```C
+ * AranyaAqcChannel channel;
+ * AranyaAqcChannelType channel_type;
+ * AranyaAqcBidiChannel bidi;
+ * AranyaAqcReceiverChannel receiver;
+ *
+ * aranya_aqc_try_receive_channel(&client, &channel, &channel_type);
+ * switch (channel_type) {
+ *     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
+ *         aranya_aqc_get_bidirectional_channel(&channel, &bidi);
+ *         break;
+ *     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
+ *         aranya_aqc_get_receiver_channel(&channel, &receiver);
+ *         break;
+ * }
+ * ```
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel).
+ * @param __output the corresponding AQC channel type [`AranyaAqcChannelType`](@ref AranyaAqcChannelType).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_try_receive_channel(struct AranyaClient *client,
-                                           struct AranyaAqcChannel *channel);
+                                           struct AranyaAqcChannel *channel,
+                                           AranyaAqcChannelType *__output);
 
 /**
  * Tries to poll AQC to see if any channels have been received.
@@ -2186,83 +2205,34 @@ AranyaError aranya_aqc_try_receive_channel(struct AranyaClient *client,
  * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
  * channels received yet which is considered a non-fatal error.
  *
+ * Note that the [`AranyaAqcChannel`](@ref AranyaAqcChannel) must be converted before it can be used:
+ * ```C
+ * AranyaAqcChannel channel;
+ * AranyaAqcChannelType channel_type;
+ * AranyaAqcBidiChannel bidi;
+ * AranyaAqcReceiverChannel receiver;
+ *
+ * aranya_aqc_try_receive_channel(&client, &channel, &channel_type);
+ * switch (channel_type) {
+ *     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
+ *         aranya_aqc_get_bidirectional_channel(&channel, &bidi);
+ *         break;
+ *     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
+ *         aranya_aqc_get_receiver_channel(&channel, &receiver);
+ *         break;
+ * }
+ * ```
+ *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel).
+ * @param __output the corresponding AQC channel type [`AranyaAqcChannelType`](@ref AranyaAqcChannelType).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_try_receive_channel_ext(struct AranyaClient *client,
                                                struct AranyaAqcChannel *channel,
+                                               AranyaAqcChannelType *__output,
                                                struct AranyaExtError *__ext_err);
-
-/**
- * Returns the [`AranyaAqcChannelType`](@ref AranyaAqcChannelType) for a given [`AranyaAqcChannel`](@ref AranyaAqcChannel) to distinguish
- * between channel types.
- *
- * # Example
- * ```C
- * AranyaAqcChannel channel;
- * AranyaAqcChannelType channel_type;
- * AranyaAqcBidiChannel bidi;
- * AranyaAqcSenderChannel sender;
- * AranyaAqcReceiverChannel receiver;
- *
- * aranya_aqc_get_channel_type(&channel, &channel_type);
- * switch (channel_type) {
- *     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
- *         aranya_aqc_get_bidirectional_channel(&channel, &bidi);
- *         break;
- *     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
- *         aranya_aqc_get_receiver_channel(&channel, &receiver);
- *         break;
- *     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
- *         fprintf(stderr, "Should never receive a sender channel\n");
- *         break;
- * }
- * ```
- *
- * @param channel the AQC channel container [`AranyaAqcChannel`](@ref AranyaAqcChannel).
- * @param __output the corresponding AQC channel type [`AranyaAqcChannelType`](@ref AranyaAqcChannelType).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_get_channel_type(struct AranyaAqcChannel *channel,
-                                        AranyaAqcChannelType *__output);
-
-/**
- * Returns the [`AranyaAqcChannelType`](@ref AranyaAqcChannelType) for a given [`AranyaAqcChannel`](@ref AranyaAqcChannel) to distinguish
- * between channel types.
- *
- * # Example
- * ```C
- * AranyaAqcChannel channel;
- * AranyaAqcChannelType channel_type;
- * AranyaAqcBidiChannel bidi;
- * AranyaAqcSenderChannel sender;
- * AranyaAqcReceiverChannel receiver;
- *
- * aranya_aqc_get_channel_type(&channel, &channel_type);
- * switch (channel_type) {
- *     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
- *         aranya_aqc_get_bidirectional_channel(&channel, &bidi);
- *         break;
- *     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
- *         aranya_aqc_get_receiver_channel(&channel, &receiver);
- *         break;
- *     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
- *         fprintf(stderr, "Should never receive a sender channel\n");
- *         break;
- * }
- * ```
- *
- * @param channel the AQC channel container [`AranyaAqcChannel`](@ref AranyaAqcChannel).
- * @param __output the corresponding AQC channel type [`AranyaAqcChannelType`](@ref AranyaAqcChannelType).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_get_channel_type_ext(struct AranyaAqcChannel *channel,
-                                            AranyaAqcChannelType *__output,
-                                            struct AranyaExtError *__ext_err);
 
 /**
  * Converts the [`AranyaAqcChannel`](@ref AranyaAqcChannel)` into an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) for sending/receiving data.

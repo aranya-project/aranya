@@ -43,7 +43,7 @@
 
 // Macro that polls a command until it returns success, otherwise calling
 // EXPECT.
-#define TRY_RECEIVE(C, M)                                                      \
+#define POLL(C, M)                                                             \
     while (1) {                                                                \
         err = (C);                                                             \
         if (err == ARANYA_ERROR_SUCCESS) {                                     \
@@ -705,19 +705,13 @@ static void *membera_aqc_thread(void *arg) {
 
     // Then, let's receive the uni channel from Member B.
     printf("Trying to receive the uni channel\n");
-    TRY_RECEIVE(aranya_aqc_try_receive_channel(ctx->client, &uni_channel),
-                "error receiving aqc uni channel");
-
-    // Convert it to the proper channel type
-    aranya_aqc_get_channel_type(&uni_channel, &uni_channel_type);
+    POLL(aranya_aqc_try_receive_channel(ctx->client, &uni_channel,
+                                        &uni_channel_type),
+         "error receiving aqc uni channel");
     switch (uni_channel_type) {
     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
         fprintf(stderr,
-                "got bidirectional AQC channel, expected receiver channel!\n");
-        err = ARANYA_ERROR_AQC;
-        goto exit;
-    case ARANYA_AQC_CHANNEL_TYPE_SENDER:
-        fprintf(stderr, "should never receive a sender channel!\n");
+                "expected receiver AQC channel, got bidirectional channel!\n");
         err = ARANYA_ERROR_AQC;
         goto exit;
     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
@@ -738,14 +732,15 @@ static void *membera_aqc_thread(void *arg) {
                          (const uint8_t *)bidi_string,
                          strnlen(bidi_string, BUFFER_LEN - 1) + 1);
 
+    sleep(1);
+
     char bidi_buffer[BUFFER_LEN];
     size_t bidi_recv_length;
     memset(bidi_buffer, 0, BUFFER_LEN);
     printf("Trying to receive the stream data\n");
-    TRY_RECEIVE(
-        aranya_aqc_try_receive_data(&bidi_recv_stream, (uint8_t *)bidi_buffer,
-                                    BUFFER_LEN, &bidi_recv_length),
-        "error receving aqc stream data");
+    POLL(aranya_aqc_try_receive_data(&bidi_recv_stream, (uint8_t *)bidi_buffer,
+                                     BUFFER_LEN, &bidi_recv_length),
+         "error receving aqc stream data");
 
     if (strncmp("hello from aqc memberb!", bidi_buffer, BUFFER_LEN)) {
         fprintf(stderr, "received string doesn't match\n");
@@ -772,22 +767,16 @@ static void *memberb_aqc_thread(void *arg) {
 
     // First, let's receive the bidi channel from Member A.
     printf("Trying to receive the bidi channel\n");
-    TRY_RECEIVE(aranya_aqc_try_receive_channel(ctx->client, &bidi_channel),
-                "error receiving aqc bidi channel");
-
-    // Convert it to the proper channel type
-    aranya_aqc_get_channel_type(&bidi_channel, &bidi_channel_type);
+    POLL(aranya_aqc_try_receive_channel(ctx->client, &bidi_channel,
+                                        &bidi_channel_type),
+         "error receiving aqc bidi channel");
     switch (bidi_channel_type) {
     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
         aranya_aqc_get_bidirectional_channel(&bidi_channel, &bidi_recv);
         break;
-    case ARANYA_AQC_CHANNEL_TYPE_SENDER:
-        fprintf(stderr, "should never receive a sender channel!\n");
-        err = ARANYA_ERROR_AQC;
-        goto exit;
     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
         fprintf(stderr,
-                "got receiver AQC channel, expected bidirectional channel!\n");
+                "expected bidirectional AQC channel, got receiver channel!\n");
         err = ARANYA_ERROR_AQC;
         goto exit;
     }
@@ -803,10 +792,9 @@ static void *memberb_aqc_thread(void *arg) {
     // Now we need to receive the streams opened on those channels.
     printf("Trying to receive the bidi stream\n");
     bool bidi_send_init;
-    TRY_RECEIVE(
-        aranya_aqc_bidi_try_receive_stream(&bidi_recv, &bidi_recv_stream,
-                                           &bidi_send_stream, &bidi_send_init),
-        "error receiving an aqc uni stream");
+    POLL(aranya_aqc_bidi_try_receive_stream(&bidi_recv, &bidi_recv_stream,
+                                            &bidi_send_stream, &bidi_send_init),
+         "error receiving an aqc uni stream");
     // Validate that we got a send stream since this is a bidi stream.
     if (!bidi_send_init) {
         fprintf(stderr,
@@ -815,14 +803,15 @@ static void *memberb_aqc_thread(void *arg) {
         goto exit;
     }
 
+    sleep(1);
+
     char bidi_buffer[BUFFER_LEN];
     size_t bidi_recv_length;
     memset(bidi_buffer, 0, BUFFER_LEN);
     printf("Trying to receive the stream data\n");
-    TRY_RECEIVE(
-        aranya_aqc_try_receive_data(&bidi_recv_stream, (uint8_t *)bidi_buffer,
-                                    BUFFER_LEN, &bidi_recv_length),
-        "error receving aqc stream data");
+    POLL(aranya_aqc_try_receive_data(&bidi_recv_stream, (uint8_t *)bidi_buffer,
+                                     BUFFER_LEN, &bidi_recv_length),
+         "error receving aqc stream data");
 
     if (strncmp("hello from aqc membera!", bidi_buffer, BUFFER_LEN)) {
         fprintf(stderr, "received string doesn't match\n");

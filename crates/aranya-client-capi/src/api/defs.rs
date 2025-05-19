@@ -1377,9 +1377,8 @@ pub type AqcChannel = Safe<imp::AqcChannelType>;
 #[repr(u8)]
 #[derive(Copy, Clone, Debug)]
 pub enum AqcChannelType {
-    Sender,
-    Receiver,
     Bidirectional,
+    Receiver,
 }
 
 /// An AQC Bidirectional Channel Object.
@@ -1513,32 +1512,14 @@ pub fn aqc_delete_uni_channel(
 /// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
 /// channels received yet which is considered a non-fatal error.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param channel the AQC channel holder [`AqcChannel`].
-///
-/// @relates AranyaClient.
-pub fn aqc_try_receive_channel(
-    client: &mut Client,
-    channel: &mut MaybeUninit<AqcChannel>,
-) -> Result<(), imp::Error> {
-    let chan = client.deref_mut().inner.aqc().try_receive_channel()?;
-
-    Safe::init(channel, imp::AqcChannelType::new(chan));
-    Ok(())
-}
-
-/// Returns the [`AqcChannelType`] for a given [`AqcChannel`] to distinguish
-/// between channel types.
-///
-/// # Example
+/// Note that the [`AqcChannel`] must be converted before it can be used:
 /// ```C
 /// AranyaAqcChannel channel;
 /// AranyaAqcChannelType channel_type;
 /// AranyaAqcBidiChannel bidi;
-/// AranyaAqcSenderChannel sender;
 /// AranyaAqcReceiverChannel receiver;
 ///
-/// aranya_aqc_get_channel_type(&channel, &channel_type);
+/// aranya_aqc_try_receive_channel(&client, &channel, &channel_type);
 /// switch (channel_type) {
 ///     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
 ///         aranya_aqc_get_bidirectional_channel(&channel, &bidi);
@@ -1546,22 +1527,31 @@ pub fn aqc_try_receive_channel(
 ///     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
 ///         aranya_aqc_get_receiver_channel(&channel, &receiver);
 ///         break;
-///     case ARANYA_AQC_CHANNEL_TYPE_SENDER:
-///         fprintf(stderr, "Should never receive a sender channel\n");
-///         break;
 /// }
 /// ```
 ///
-/// @param channel the AQC channel container [`AqcChannel`].
+/// @param client the Aranya Client [`Client`].
+/// @param channel the AQC channel holder [`AqcChannel`].
 /// @param __output the corresponding AQC channel type [`AqcChannelType`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_get_channel_type(channel: &mut AqcChannel) -> AqcChannelType {
-    match channel.inner {
-        aqc::AqcChannelType::Bidirectional { .. } => AqcChannelType::Bidirectional,
-        aqc::AqcChannelType::Sender { .. } => AqcChannelType::Sender,
-        aqc::AqcChannelType::Receiver { .. } => AqcChannelType::Receiver,
-    }
+pub fn aqc_try_receive_channel(
+    client: &mut Client,
+    channel: &mut MaybeUninit<AqcChannel>,
+) -> Result<AqcChannelType, imp::Error> {
+    let chan = client.deref_mut().inner.aqc().try_receive_channel()?;
+
+    let chan_type = match chan {
+        aqc::AqcChannelType::Bidirectional { .. } => AqcChannelType::Bidirectional.into(),
+        aqc::AqcChannelType::Receiver { .. } => AqcChannelType::Receiver.into(),
+        aqc::AqcChannelType::Sender { .. } => {
+            unreachable!()
+        }
+    };
+
+    Safe::init(channel, imp::AqcChannelType::new(chan));
+
+    Ok(chan_type)
 }
 
 /// Converts the [`AqcChannel`]` into an [`AqcBidiChannel`] for sending/receiving data.
