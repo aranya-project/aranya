@@ -1415,11 +1415,11 @@ pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param peer the peer's network identifier [`NetIdentifier`].
-/// @param label_id the AQC channel label ID [`LabelId`] to create the channel with.
-/// @param channel the AQC channel object [`AqcBidiChannel`].
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  team the team's ID [`TeamId`].
+/// @param[in]  peer the peer's network identifier [`NetIdentifier`].
+/// @param[in]  label_id the AQC channel label ID [`LabelId`] to create the channel with.
+/// @param[out] channel the AQC channel object [`AqcBidiChannel`].
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_bidi_channel(
@@ -1447,11 +1447,11 @@ pub unsafe fn aqc_create_bidi_channel(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param peer the peer's network identifier [`NetIdentifier`].
-/// @param label_id the AQC channel label ID [`LabelId`] to create the channel with.
-/// @param channel the AQC channel object [`AqcSenderChannel`].
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  team the team's ID [`TeamId`].
+/// @param[in]  peer the peer's network identifier [`NetIdentifier`].
+/// @param[in]  label_id the AQC channel label ID [`LabelId`] to create the channel with.
+/// @param[out] channel the AQC channel object [`AqcSenderChannel`].
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_uni_channel(
@@ -1479,8 +1479,8 @@ pub unsafe fn aqc_create_uni_channel(
 
 /// Delete a bidirectional AQC channel.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param channel the AQC Channel [`AqcBidiChannel`] to delete.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] channel the AQC Channel [`AqcBidiChannel`] to delete.
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_bidi_channel(
@@ -1496,8 +1496,8 @@ pub fn aqc_delete_bidi_channel(
 
 /// Delete a unidirectional AQC channel.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param channel the AQC Channel [`AqcSenderChannel`] to delete.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] channel the AQC Channel [`AqcSenderChannel`] to delete.
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_uni_channel(
@@ -1535,9 +1535,9 @@ pub fn aqc_delete_uni_channel(
 /// }
 /// ```
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param channel the AQC channel holder [`AqcChannel`].
-/// @param __output the corresponding AQC channel type [`AqcChannelType`].
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[out] channel the AQC channel holder [`AqcChannel`].
+/// @param[out] __output the corresponding AQC channel type [`AqcChannelType`].
 ///
 /// @relates AranyaClient.
 pub fn aqc_try_receive_channel(
@@ -1565,8 +1565,8 @@ pub fn aqc_try_receive_channel(
 ///
 /// Note that this function takes ownership of the [`AqcChannel`] and invalidates any further use.
 ///
-/// @param channel the AQC channel holder [`AqcChannel`] that holds a channel object.
-/// @param bidi the AQC channel object [`AqcBidiChannel`] that holds channel info.
+/// @param[in]  channel the AQC channel holder [`AqcChannel`] that holds a channel object.
+/// @param[out] bidi the AQC channel object [`AqcBidiChannel`] that holds channel info.
 ///
 /// @relates AranyaClient.
 pub fn aqc_get_bidirectional_channel(
@@ -1594,8 +1594,8 @@ pub fn aqc_get_bidirectional_channel(
 ///
 /// Note that this function takes ownership of the [`AqcChannel`] and invalidates any further use.
 ///
-/// @param channel the AQC channel container [`AqcChannel`].
-/// @param receiver the AQC channel object [`AqcReceiverChannel`].
+/// @param[in]  channel the AQC channel container [`AqcChannel`].
+/// @param[out] receiver the AQC channel object [`AqcReceiverChannel`].
 ///
 /// @relates AranyaClient.
 pub fn aqc_get_receiver_channel(
@@ -1622,10 +1622,10 @@ pub fn aqc_get_receiver_channel(
 /// Note that the recipient will not be able to receive the stream until data is
 /// sent over the stream.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param channel the AQC channel object [`AqcBidiChannel`].
-/// @param send_stream the sending side of a stream [`AqcSendStream`].
-/// @param recv_stream the receiving side of a stream [`AqcReceiveStream`].
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  channel the AQC channel object [`AqcBidiChannel`].
+/// @param[out] send_stream the sending side of a stream [`AqcSendStream`].
+/// @param[out] recv_stream the receiving side of a stream [`AqcReceiveStream`].
 ///
 /// @relates AranyaClient.
 pub fn aqc_bidi_create_bidi_stream(
@@ -1649,9 +1649,9 @@ pub fn aqc_bidi_create_bidi_stream(
 /// Note that the recipient will not be able to receive the stream until data is
 /// sent over the stream.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param channel the AQC channel object [`AqcBidiChannel`].
-/// @param stream the sending side of a stream [`AqcSendStream`].
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  channel the AQC channel object [`AqcBidiChannel`].
+/// @param[out] stream the sending side of a stream [`AqcSendStream`].
 ///
 /// @relates AranyaClient.
 pub fn aqc_bidi_create_uni_stream(
@@ -1678,10 +1678,10 @@ pub fn aqc_bidi_create_uni_stream(
 ///
 /// Additionally, the send stream will only be initialized if `send_init` is true.
 ///
-/// @param channel the AQC channel object [`AqcBidiChannel`].
-/// @param recv_stream the receiving side of a stream [`AqcReceiveStream`].
-/// @param send_stream the sending side of a stream [`AqcSendStream`].
-/// @param send_init whether or not we received a `send_stream`.
+/// @param[in]  channel the AQC channel object [`AqcBidiChannel`].
+/// @param[out] recv_stream the receiving side of a stream [`AqcReceiveStream`].
+/// @param[out] send_stream the sending side of a stream [`AqcSendStream`].
+/// @param[out] send_init whether or not we received a `send_stream`.
 ///
 /// @relates AranyaClient.
 pub fn aqc_bidi_try_receive_stream(
@@ -1710,9 +1710,9 @@ pub fn aqc_bidi_try_receive_stream(
 /// Note that the recipient will not be able to receive the stream until data is
 /// sent over the stream.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param channel the AQC channel object [`AqcSenderChannel`].
-/// @param stream the sending side of a stream [`AqcSendStream`].
+/// @param[in]  client the Aranya Client [`Client`].
+/// @param[in]  channel the AQC channel object [`AqcSenderChannel`].
+/// @param[out] stream the sending side of a stream [`AqcSendStream`].
 ///
 /// @relates AranyaClient.
 pub fn aqc_send_create_uni_stream(
@@ -1737,8 +1737,8 @@ pub fn aqc_send_create_uni_stream(
 /// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
 /// received yet which is considered a non-fatal error.
 ///
-/// @param channel the AQC channel object [`AqcReceiverChannel`].
-/// @param stream the receiving side of a stream [`AqcReceiveStream`].
+/// @param[in]  channel the AQC channel object [`AqcReceiverChannel`].
+/// @param[out] stream the receiving side of a stream [`AqcReceiveStream`].
 ///
 /// @relates AranyaClient.
 pub fn aqc_recv_try_receive_uni_stream(
@@ -1753,10 +1753,10 @@ pub fn aqc_recv_try_receive_uni_stream(
 
 /// Send some data over an Aranya QUIC Channel stream.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param stream the sending side of a stream [`AqcSendStream`].
-/// @param data pointer to the data to send.
-/// @param data_len length of the data to send.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] stream the sending side of a stream [`AqcSendStream`].
+/// @param[in] data pointer to the data to send.
+/// @param[in] data_len length of the data to send.
 ///
 /// @relates AranyaClient.
 pub fn aqc_send_data(
@@ -1772,10 +1772,10 @@ pub fn aqc_send_data(
 /// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
 /// received yet which is considered a non-fatal error.
 ///
-/// @param stream the receiving side of a stream [`AqcReceiveStream`].
-/// @param buffer pointer to the target buffer.
-/// @param buffer_len length of the target buffer.
-/// @param __output the number of bytes written to the buffer.
+/// @param[in]  stream the receiving side of a stream [`AqcReceiveStream`].
+/// @param[in]  buffer pointer to the target buffer.
+/// @param[in]  buffer_len length of the target buffer.
+/// @param[out] __output the number of bytes written to the buffer.
 ///
 /// @relates AranyaClient.
 pub fn aqc_try_receive_data(
