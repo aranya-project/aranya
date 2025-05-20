@@ -59,8 +59,9 @@ pub static CERT_PEM: &str = include_str!("./cert.pem");
 pub static KEY_PEM: &str = include_str!("./key.pem");
 
 mod psk;
-pub(crate) use psk::{delete_sync_psk, load_sync_psk, set_sync_psk};
-use psk::{ClientPresharedKeys, ServerPresharedKeys};
+pub(crate) use psk::{
+    delete_sync_psk, load_sync_psk, set_sync_psk, ClientPresharedKeys, ServerPresharedKeys,
+};
 
 /// Data used for sending sync requests and processing sync responses
 pub struct State {
@@ -107,7 +108,7 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub fn new<I>(initial_keys: I) -> AnyResult<Self>
+    pub fn new<I>(initial_keys: I) -> AnyResult<(Self, Arc<ClientPresharedKeys>)>
     where
         I: IntoIterator<Item = Arc<PresharedKey>>,
     {
@@ -129,10 +130,13 @@ impl State {
             .with_io("0.0.0.0:0")?
             .start()?;
 
-        Ok(Self {
-            client,
-            conns: BTreeMap::new(),
-        })
+        Ok((
+            Self {
+                client,
+                conns: BTreeMap::new(),
+            },
+            client_keys,
+        ))
     }
 }
 
@@ -328,12 +332,13 @@ where
         addr: &Addr,
         protocol: SyncProtocol,
         initial_psks: impl IntoIterator<Item = Arc<PresharedKey>>,
-    ) -> AnyResult<Self> {
+    ) -> AnyResult<(Self, Arc<ServerPresharedKeys>)> {
         // Load Cert and Key
         let certs = certs(&mut CERT_PEM.as_bytes()).collect::<AnyResult<Vec<_>, _>>()?;
         let key = private_key(&mut KEY_PEM.as_bytes())?.assume("expected private key")?;
 
         let (server_keys, _identity_rx) = ServerPresharedKeys::new();
+        let server_keys = Arc::new(server_keys);
         server_keys.extend(initial_psks)?;
 
         // Load existing PSKs from secure storage
@@ -346,7 +351,7 @@ where
             .with_no_client_auth()
             .with_single_cert(certs.clone(), key)?;
         server_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
-        server_config.preshared_keys = PresharedKeySelection::Enabled(Arc::new(server_keys));
+        server_config.preshared_keys = PresharedKeySelection::Enabled(server_keys.clone());
 
         let tls_server_provider = rustls_provider::Server::new(server_config);
 
@@ -361,13 +366,16 @@ where
             .with_congestion_controller(Bbr::default())?
             .start()?;
 
-        Ok(Self {
-            aranya,
-            server,
-            set: JoinSet::new(),
-            _identity_rx,
-            protocol,
-        })
+        Ok((
+            Self {
+                aranya,
+                server,
+                set: JoinSet::new(),
+                _identity_rx,
+                protocol,
+            },
+            server_keys,
+        ))
     }
 
     /// Begins accepting incoming requests.

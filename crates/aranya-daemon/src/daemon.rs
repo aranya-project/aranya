@@ -34,7 +34,10 @@ use crate::{
     sync::{
         prot::SyncProtocol,
         task::{
-            quic::{delete_sync_psk, load_sync_psk, set_sync_psk, State as QuicSyncState},
+            quic::{
+                delete_sync_psk, load_sync_psk, set_sync_psk, ServerPresharedKeys,
+                State as QuicSyncState,
+            },
             Syncer,
         },
     },
@@ -105,9 +108,11 @@ impl Daemon {
         // TODO: don't hard-code. Load graph IDs from storage
         let initial_keys = [Arc::new(load_sync_psk(&self.cfg.service_name)?)];
 
+        let (psk_send, mut psk_recv) = tokio::sync::broadcast::channel(16);
+
         // Initialize the Aranya client and sync server.
         let (client, local_addr) = {
-            let (client, server) = self
+            let (client, server, server_keys) = self
                 .setup_aranya(
                     eng.clone(),
                     aranya_store
@@ -121,21 +126,56 @@ impl Daemon {
             let local_addr = server.local_addr()?;
             set.spawn(async move { server.serve().await });
 
+            // New PSK received from add_team or create_team
+            set.spawn(async move {
+                loop {
+                    match psk_recv.recv().await {
+                        Ok(psk) => {
+                            let _ = server_keys
+                                .insert(psk)
+                                .inspect_err(|err| error!(err = ?err, "unable to insert PSK"));
+                        }
+                        Err(err) => {
+                            error!(err = ?err, "unable to receive psk on broadcast channel")
+                        }
+                    }
+                }
+            });
+
             (client, local_addr)
         };
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
+
+        let (state, client_keys) = QuicSyncState::new(initial_keys)?;
         let (mut syncer, peers) = Syncer::new(
             client.clone(),
             send_effects,
             self.cfg.sync_version.unwrap_or(DEFAULT_SYNC_PROTOCOL),
-            QuicSyncState::new(initial_keys)?,
+            state,
         );
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
                     error!(err = ?err, "client unable to sync with peer");
+                }
+            }
+        });
+
+        let mut psk_recv2 = psk_send.subscribe();
+        // New PSK received from add_team or create_team
+        set.spawn(async move {
+            loop {
+                match psk_recv2.recv().await {
+                    Ok(psk) => {
+                        let _ = client_keys
+                            .insert(psk)
+                            .inspect_err(|err| error!(err = ?err, "unable to insert PSK"));
+                    }
+                    Err(err) => {
+                        error!(err = ?err, "unable to receive psk on broadcast channel")
+                    }
                 }
             }
         });
@@ -166,6 +206,7 @@ impl Daemon {
             Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
         };
 
+        // TODO: Use `psk_send` in create_team and add_team API calls
         let api = DaemonApiServer::new(
             client,
             local_addr,
@@ -206,7 +247,7 @@ impl Daemon {
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
         initial_keys: impl IntoIterator<Item = Arc<PresharedKey>>,
-    ) -> Result<(Client, SyncServer)> {
+    ) -> Result<(Client, SyncServer, Arc<ServerPresharedKeys>)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -219,7 +260,7 @@ impl Daemon {
 
         let client = Client::new(Arc::clone(&aranya));
 
-        let server = {
+        let (server, server_keys) = {
             info!(addr = %external_sync_addr, "starting QUIC sync server");
             SyncServer::new(
                 client.clone(),
@@ -233,7 +274,7 @@ impl Daemon {
 
         info!(device_id = %device_id, "set up Aranya");
 
-        Ok((client, server))
+        Ok((client, server, server_keys))
     }
 
     /// Loads the crypto engine.

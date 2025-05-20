@@ -90,7 +90,7 @@ impl TestDevice {
         graph_id: GraphId,
     ) -> Result<Self> {
         let handle = task::spawn(async { server.serve().await }).abort_handle();
-        let state = TestState::new([Arc::new(TEST_PSK.clone())])?;
+        let (state, _client_keys) = TestState::new([Arc::new(TEST_PSK.clone())])?;
         let (send, effect_recv) = mpsc::channel(1);
         let (syncer, _sync_peers) = TestSyncer::new(client, send, TEST_SYNC_PROTOCOL, state);
         Ok(Self {
@@ -243,7 +243,7 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let server = TestServer::new(
+            let (server, _) = TestServer::new(
                 client.clone(),
                 &addr,
                 TEST_SYNC_PROTOCOL,

@@ -22,7 +22,9 @@ use crate::daemon::TEAM_ID;
 const PSK_BYTES: &[u8; 32] = b"this-is-a-32-byte-secret-psk!!!!"; // 32 bytes
 
 #[derive(Debug)]
-pub(super) struct ServerPresharedKeys {
+/// Contains thread-safe references to [PresharedKey]s.
+/// Used by [`super::Server`]
+pub struct ServerPresharedKeys {
     keys: SyncMutex<HashMap<Vec<u8>, Arc<PresharedKey>>>,
     // Optional sender to report the selected identity
     identity_sender: mpsc::Sender<Vec<u8>>,
@@ -42,18 +44,16 @@ impl ServerPresharedKeys {
         )
     }
 
-    // TODO: use in create_team and add_team?
-    // pub(super) fn insert(&mut self, psk: Arc<PresharedKey>) {
-    //     let identity = psk.identity().to_vec();
-    //     match self.keys.entry(identity.clone()) {
-    //         Entry::Vacant(v) => {
-    //             v.insert(psk);
-    //         }
-    //         Entry::Occupied(_) => {
-    //             error!("Duplicate PSK identity inserted: {:?}", identity);
-    //         }
-    //     }
-    // }
+    pub(crate) fn insert(&self, key: Arc<PresharedKey>) -> Result<()> {
+        match self.keys.lock() {
+            Ok(ref mut map) => {
+                map.insert(key.identity().to_vec(), key);
+            }
+            Err(e) => bail!(e.to_string()),
+        }
+
+        Ok(())
+    }
 
     pub(super) fn extend(&self, psks: impl IntoIterator<Item = Arc<PresharedKey>>) -> Result<()> {
         match self.keys.lock() {
@@ -90,7 +90,9 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
 }
 
 #[derive(Debug)]
-pub(crate) struct ClientPresharedKeys {
+/// Contains thread-safe references to [PresharedKey]s.
+/// Used by [`super::Syncer`]
+pub struct ClientPresharedKeys {
     key_refs: SyncMutex<HashMap<Vec<u8>, Arc<PresharedKey>>>,
 }
 
@@ -108,17 +110,16 @@ impl ClientPresharedKeys {
         }
     }
 
-    // TODO: use in create_team and add_team?
-    // pub(super) fn insert(&self, key: Arc<PresharedKey>) -> Result<()> {
-    //     match self.key_refs.lock() {
-    //         Ok(ref mut map) => {
-    //             map.insert(key.identity().to_vec(), key);
-    //         }
-    //         Err(e) => bail!(e.to_string()),
-    //     }
+    pub(crate) fn insert(&self, key: Arc<PresharedKey>) -> Result<()> {
+        match self.key_refs.lock() {
+            Ok(ref mut map) => {
+                map.insert(key.identity().to_vec(), key);
+            }
+            Err(e) => bail!(e.to_string()),
+        }
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }
 
 impl PresharedKeyStore for ClientPresharedKeys {
