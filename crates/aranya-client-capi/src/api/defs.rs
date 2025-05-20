@@ -9,6 +9,7 @@ use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::net::{self as aqc};
 use aranya_crypto::hex;
+use buggy::bug;
 use tracing::error;
 
 use crate::imp;
@@ -1546,10 +1547,10 @@ pub fn aqc_try_receive_channel(
     let chan = client.deref_mut().inner.aqc().try_receive_channel()?;
 
     let chan_type = match chan {
-        aqc::AqcChannelType::Bidirectional { .. } => AqcChannelType::Bidirectional.into(),
-        aqc::AqcChannelType::Receiver { .. } => AqcChannelType::Receiver.into(),
+        aqc::AqcChannelType::Bidirectional { .. } => AqcChannelType::Bidirectional,
+        aqc::AqcChannelType::Receiver { .. } => AqcChannelType::Receiver,
         aqc::AqcChannelType::Sender { .. } => {
-            unreachable!()
+            bug!("We should never be able to receive a Sender channel!");
         }
     };
 
