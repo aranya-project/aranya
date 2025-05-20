@@ -66,6 +66,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "4.5.18 -> 4.5.28"
 
+[[audits.cmake]]
+who = "Declan Johnson <djohnson@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.1.49 -> 0.1.54"
+
 [[audits.cpufeatures]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -75,6 +80,11 @@ delta = "0.2.16 -> 0.2.17"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.2.2 -> 0.2.3"
+
+[[audits.dunce]]
+who = "Declan Johnson <djohnson@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "1.0.5"
 
 [[audits.getrandom]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -90,6 +100,11 @@ delta = "0.2.1 -> 0.3.1"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.7.17 -> 0.8.0"
+
+[[audits.hex-literal]]
+who = "Declan Johnson <djohnson@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.1"
 
 [[audits.inout]]
 who = "gknopf <gknopf@spideroak.com>"
