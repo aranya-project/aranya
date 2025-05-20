@@ -107,8 +107,11 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub fn new(initial_psk: PresharedKey) -> AnyResult<Self> {
-        let client_keys = Arc::new(ClientPresharedKeys::new(initial_psk));
+    pub fn new<I>(initial_keys: I) -> AnyResult<Self>
+    where
+        I: IntoIterator<Item = Arc<PresharedKey>>,
+    {
+        let client_keys = Arc::new(ClientPresharedKeys::new(initial_keys));
 
         // Create Client Config (INSECURE: Skips server cert verification)
         let mut client_config = ClientConfig::builder()
@@ -324,16 +327,14 @@ where
         aranya: AranyaClient<EN, SP>,
         addr: &Addr,
         protocol: SyncProtocol,
-        initial_psks: Vec<PresharedKey>,
+        initial_psks: impl IntoIterator<Item = Arc<PresharedKey>>,
     ) -> AnyResult<Self> {
         // Load Cert and Key
         let certs = certs(&mut CERT_PEM.as_bytes()).collect::<AnyResult<Vec<_>, _>>()?;
         let key = private_key(&mut KEY_PEM.as_bytes())?.assume("expected private key")?;
 
-        let (mut server_keys, _identity_rx) = ServerPresharedKeys::new();
-        for psk in initial_psks {
-            server_keys.insert(psk);
-        }
+        let (server_keys, _identity_rx) = ServerPresharedKeys::new();
+        server_keys.extend(initial_psks)?;
 
         // Load existing PSKs from secure storage
         // for psk in get_existing_psks(aranya.clone()).await? {

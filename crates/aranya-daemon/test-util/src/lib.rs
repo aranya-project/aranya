@@ -90,7 +90,7 @@ impl TestDevice {
         graph_id: GraphId,
     ) -> Result<Self> {
         let handle = task::spawn(async { server.serve().await }).abort_handle();
-        let state = TestState::new(TEST_PSK.clone())?;
+        let state = TestState::new([Arc::new(TEST_PSK.clone())])?;
         let (send, effect_recv) = mpsc::channel(1);
         let (syncer, _sync_peers) = TestSyncer::new(client, send, TEST_SYNC_PROTOCOL, state);
         Ok(Self {
@@ -247,7 +247,7 @@ impl TestCtx {
                 client.clone(),
                 &addr,
                 TEST_SYNC_PROTOCOL,
-                vec![TEST_PSK.clone()],
+                [Arc::new(TEST_PSK.clone())],
             )
             .await?;
             let local_addr = server.local_addr()?;

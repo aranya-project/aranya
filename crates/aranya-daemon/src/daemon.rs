@@ -18,6 +18,7 @@ use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::BugExt;
 use ciborium as cbor;
+use rustls::crypto::PresharedKey;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
@@ -56,7 +57,7 @@ pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
 pub(crate) const DEFAULT_SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
 
-// TODO(Steve): Remove later
+// TODO(Steve): Remove once "add_team" is implemented
 pub(crate) const TEAM_ID: TeamId = TeamId::default();
 // pub(crate) const SERVICE_NAME: &str = "Aranya-QUIC-Sync";
 
@@ -101,6 +102,9 @@ impl Daemon {
         // TODO(Steve): Temporarily set the PSK secret in the OS's keystore
         set_sync_psk(&self.cfg.service_name).context("Could not set PSK")?;
 
+        // TODO: don't hard-code. Load graph IDs from storage
+        let initial_keys = [Arc::new(load_sync_psk(&self.cfg.service_name)?)];
+
         // Initialize the Aranya client and sync server.
         let (client, local_addr) = {
             let (client, server) = self
@@ -111,6 +115,7 @@ impl Daemon {
                         .context("unable to clone keystore")?,
                     &pk,
                     self.cfg.sync_addr,
+                    initial_keys.clone(),
                 )
                 .await?;
             let local_addr = server.local_addr()?;
@@ -121,13 +126,11 @@ impl Daemon {
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-        // TODO: don't hard-code PSK.
-        let psk = load_sync_psk(&self.cfg.service_name)?;
         let (mut syncer, peers) = Syncer::new(
             client.clone(),
             send_effects,
             self.cfg.sync_version.unwrap_or(DEFAULT_SYNC_PROTOCOL),
-            QuicSyncState::new(psk)?,
+            QuicSyncState::new(initial_keys)?,
         );
         set.spawn(async move {
             loop {
@@ -202,6 +205,7 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
+        initial_keys: impl IntoIterator<Item = Arc<PresharedKey>>,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
@@ -214,8 +218,6 @@ impl Daemon {
         )));
 
         let client = Client::new(Arc::clone(&aranya));
-        // TODO: don't hard-code PSK.
-        let psk = load_sync_psk(&self.cfg.service_name)?;
 
         let server = {
             info!(addr = %external_sync_addr, "starting QUIC sync server");
@@ -223,7 +225,7 @@ impl Daemon {
                 client.clone(),
                 &external_sync_addr,
                 self.cfg.sync_version.unwrap_or(DEFAULT_SYNC_PROTOCOL),
-                vec![psk],
+                initial_keys,
             )
             .await
             .context("unable to initialize QUIC sync server")?

@@ -1,18 +1,19 @@
 //! PSK setup for rustls for use with QUIC connections
 
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::HashMap,
     sync::{Arc, Mutex as SyncMutex},
 };
 
 use ::rustls::{client::PresharedKeyStore, crypto::PresharedKey, server::SelectsPresharedKeys};
-use anyhow::Context;
+use anyhow::{bail, Context, Result};
 use aranya_util::NonEmptyString;
 use buggy::BugExt as _;
 use s2n_quic::provider::tls::rustls::rustls::pki_types::ServerName;
 use tokio::sync::mpsc;
 use tracing::error;
 
+// TODO(Steve): Remove once "add_team" is implemented
 use crate::daemon::TEAM_ID;
 
 // FIXME
@@ -22,7 +23,7 @@ const PSK_BYTES: &[u8; 32] = b"this-is-a-32-byte-secret-psk!!!!"; // 32 bytes
 
 #[derive(Debug)]
 pub(super) struct ServerPresharedKeys {
-    keys: HashMap<Vec<u8>, Arc<PresharedKey>>,
+    keys: SyncMutex<HashMap<Vec<u8>, Arc<PresharedKey>>>,
     // Optional sender to report the selected identity
     identity_sender: mpsc::Sender<Vec<u8>>,
 }
@@ -34,29 +35,49 @@ impl ServerPresharedKeys {
 
         (
             Self {
-                keys: HashMap::new(),
+                keys: SyncMutex::new(HashMap::new()),
                 identity_sender: identity_tx,
             },
             identity_rx,
         )
     }
 
-    pub(super) fn insert(&mut self, psk: PresharedKey) {
-        let identity = psk.identity().to_vec();
-        match self.keys.entry(identity.clone()) {
-            Entry::Vacant(v) => {
-                v.insert(Arc::new(psk));
+    // TODO: use in create_team and add_team?
+    // pub(super) fn insert(&mut self, psk: Arc<PresharedKey>) {
+    //     let identity = psk.identity().to_vec();
+    //     match self.keys.entry(identity.clone()) {
+    //         Entry::Vacant(v) => {
+    //             v.insert(psk);
+    //         }
+    //         Entry::Occupied(_) => {
+    //             error!("Duplicate PSK identity inserted: {:?}", identity);
+    //         }
+    //     }
+    // }
+
+    pub(super) fn extend(&self, psks: impl IntoIterator<Item = Arc<PresharedKey>>) -> Result<()> {
+        match self.keys.lock() {
+            Ok(ref mut keys) => {
+                keys.extend(psks.into_iter().map(|psk| (psk.identity().to_vec(), psk)));
             }
-            Entry::Occupied(_) => {
-                error!("Duplicate PSK identity inserted: {:?}", identity);
-            }
+            Err(e) => bail!(e.to_string()),
         }
+
+        Ok(())
     }
 }
 
 impl SelectsPresharedKeys for ServerPresharedKeys {
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
-        let key = self.keys.get(identity).cloned();
+        let key = self
+            .keys
+            .lock()
+            .inspect_err(|e| {
+                error!("Server mutex poisoned: {e}");
+            })
+            .ok()?
+            .get(identity)
+            .cloned();
 
         // Use try_send for non-blocking behavior. Ignore error if receiver dropped.
         let _ = self
@@ -70,35 +91,46 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
 
 #[derive(Debug)]
 pub(crate) struct ClientPresharedKeys {
-    key_ref: Arc<SyncMutex<Arc<PresharedKey>>>,
+    key_refs: SyncMutex<HashMap<Vec<u8>, Arc<PresharedKey>>>,
 }
 
 impl ClientPresharedKeys {
-    pub(super) fn new(key: PresharedKey) -> Self {
+    pub(super) fn new<I>(initial_keys: I) -> Self
+    where
+        I: IntoIterator<Item = Arc<PresharedKey>>,
+    {
+        let key_refs = initial_keys
+            .into_iter()
+            .map(|key| (key.identity().to_vec(), key))
+            .collect();
         Self {
-            key_ref: Arc::new(SyncMutex::new(Arc::new(key))),
+            key_refs: SyncMutex::new(key_refs),
         }
     }
 
-    // TODO: if we need to set PSK to something else
-    /*
-    pub(crate) fn set_key(&self, key: PresharedKey) {
-        let mut key_guard = self.key_ref.lock().expect("Client PSK mutex poisoned");
-        *key_guard = Arc::new(key);
-    }
-    */
+    // TODO: use in create_team and add_team?
+    // pub(super) fn insert(&self, key: Arc<PresharedKey>) -> Result<()> {
+    //     match self.key_refs.lock() {
+    //         Ok(ref mut map) => {
+    //             map.insert(key.identity().to_vec(), key);
+    //         }
+    //         Err(e) => bail!(e.to_string()),
+    //     }
+
+    //     Ok(())
+    // }
 }
 
 impl PresharedKeyStore for ClientPresharedKeys {
     #![allow(clippy::expect_used)]
     fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
         // TODO: don't panic here
-        let key_guard = self.key_ref.lock().expect("Client PSK mutex poisoned");
-        vec![key_guard.clone()]
+        let key_map = self.key_refs.lock().expect("Client PSK mutex poisoned");
+        key_map.values().map(Arc::clone).collect()
     }
 }
 
-pub(crate) fn set_sync_psk(service_name: &NonEmptyString) -> anyhow::Result<()> {
+pub(crate) fn set_sync_psk(service_name: &NonEmptyString) -> Result<()> {
     let id_string = TEAM_ID.to_string();
     let entry = keyring::Entry::new(service_name, &id_string)?;
 
@@ -109,7 +141,7 @@ pub(crate) fn set_sync_psk(service_name: &NonEmptyString) -> anyhow::Result<()> 
     Ok(())
 }
 
-pub(crate) fn load_sync_psk(service_name: &NonEmptyString) -> anyhow::Result<PresharedKey> {
+pub(crate) fn load_sync_psk(service_name: &NonEmptyString) -> Result<PresharedKey> {
     let id_string = TEAM_ID.to_string();
     let entry = keyring::Entry::new(service_name, &id_string)?;
     let secret = entry
@@ -119,7 +151,7 @@ pub(crate) fn load_sync_psk(service_name: &NonEmptyString) -> anyhow::Result<Pre
     Ok(PresharedKey::external(id_string.as_bytes(), &secret).assume("unable to create PSK")?)
 }
 
-pub(crate) fn delete_sync_psk(service_name: &NonEmptyString) -> anyhow::Result<()> {
+pub(crate) fn delete_sync_psk(service_name: &NonEmptyString) -> Result<()> {
     let id_string = TEAM_ID.to_string();
     let entry = keyring::Entry::new(service_name, &id_string)?;
 
@@ -131,7 +163,7 @@ pub(crate) fn delete_sync_psk(service_name: &NonEmptyString) -> anyhow::Result<(
 // pub(super) async fn get_existing_psks<EN, SP: StorageProvider>(
 //     client: AranyaClient<EN, SP>,
 //     service_name: &NonEmptyString,
-// ) -> anyhow::Result<Vec<PresharedKey>> {
+// ) -> Result<Vec<PresharedKey>> {
 //     let mut aranya_client = client.lock().await;
 //     let graph_id_iter = aranya_client.provider().list_graph_ids()?.flatten();
 
