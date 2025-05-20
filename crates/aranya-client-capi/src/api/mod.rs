@@ -9,6 +9,7 @@ pub mod defs;
 #[allow(clippy::undocumented_unsafe_blocks)]
 #[rustfmt::skip]
 mod generated {
+    #![allow(rustdoc::broken_intra_doc_links)]
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 }
 pub use generated::*;

@@ -1,3 +1,4 @@
+#![allow(rustdoc::broken_intra_doc_links)]
 use core::{
     ffi::{c_char, CStr},
     ops::{Deref, DerefMut},
