@@ -212,20 +212,25 @@ impl AqcSenderChannel {
     }
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
-    pub fn close(&mut self) -> Result<()> {
+    pub fn close(&mut self) {
         const ERROR_CODE: u32 = 0;
         self.handle.close(ERROR_CODE.into());
-        Ok(())
     }
 }
 
 impl Drop for AqcSenderChannel {
     fn drop(&mut self) {
-        // Attempt to close the channel when the sender is dropped.
-        // Log if there's an error, but don't panic as drop should not panic.
-        if let Err(e) = self.close() {
-            error!("Failed to close AqcChannelSender handle: {}", e);
-        }
+        self.close();
+    }
+}
+
+impl std::fmt::Display for AqcSenderChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "AqcSenderChannel(label_id: {}, id: {})",
+            self.label_id, self.id
+        )
     }
 }
 
@@ -389,20 +394,25 @@ impl AqcBidirectionalChannel {
     }
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
-    pub fn close(&mut self) -> Result<()> {
+    pub fn close(&mut self) {
         const ERROR_CODE: u32 = 0;
         self.conn.close(ERROR_CODE.into());
-        Ok(())
     }
 }
 
 impl Drop for AqcBidirectionalChannel {
     fn drop(&mut self) {
-        // Attempt to close the channel when the bidirectional channel is dropped.
-        // Log if there's an error, but don't panic as drop should not panic.
-        if let Err(e) = self.close() {
-            error!("Failed to close AqcBidirectionalChannel handle: {}", e);
-        }
+        self.close();
+    }
+}
+
+impl std::fmt::Display for AqcBidirectionalChannel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "AqcBidirectionalChannel(label_id: {}, aqc_id: {})",
+            self.label_id, self.aqc_id
+        )
     }
 }
 

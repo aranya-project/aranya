@@ -104,24 +104,20 @@ async fn test_aqc_chans() -> Result<()> {
         AqcChannelType::Bidirectional { channel } => channel,
         _ => buggy::bug!("Expected a bidirectional channel on memberb"),
     };
-    tokio::time::sleep(Duration::from_millis(100)).await;
 
     let mut send1_1 = bidi_chan1.create_uni_stream().await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Test sending streams
 
     // Send from 1 to 2 with a unidirectional stream
     let msg1 = Bytes::from("hello");
     send1_1.send(&msg1).await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
     // Receive a unidirectional stream from peer 1
     let (maybe_send2_1, mut recv2_1) = bidi_chan2
         .receive_stream()
         .await
         .assume("stream not received")?;
     assert!(maybe_send2_1.is_none(), "Expected unidirectional stream");
-    tokio::time::sleep(Duration::from_millis(100)).await;
     let mut target = vec![0u8; 1024 * 1024 * 2];
     let len = recv2_1
         .receive(target.as_mut_slice())
@@ -130,17 +126,14 @@ async fn test_aqc_chans() -> Result<()> {
     assert_eq!(&target[..len], b"hello");
 
     let (mut send1_2, mut recv1_2) = bidi_chan1.create_bidi_stream().await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
     // Send from 1 to 2 with a bidirectional stream
     let msg2 = Bytes::from("hello2");
     send1_2.send(&msg2).await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
     let (maybe_send2_2, mut recv2_2) = bidi_chan2
         .receive_stream()
         .await
         .assume("stream not received")?;
     let mut send2_2 = maybe_send2_2.expect("Expected bidirectional stream");
-    tokio::time::sleep(Duration::from_millis(100)).await;
     let mut target = vec![0u8; 1024 * 1024 * 2];
     let len = recv2_2
         .receive(target.as_mut_slice())
@@ -150,7 +143,6 @@ async fn test_aqc_chans() -> Result<()> {
     // Send from 2 to 1 with a bidirectional stream
     let msg3 = Bytes::from("hello3");
     send2_2.send(&msg3).await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
     let mut target = vec![0u8; 1024 * 1024 * 2];
     let len = recv1_2
         .receive(target.as_mut_slice())
@@ -166,7 +158,6 @@ async fn test_aqc_chans() -> Result<()> {
         Bytes::from(data)
     };
     send1_2.send(&big_data).await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
     let mut total_len: usize = 0;
     let mut total_pieces: i32 = 0;
     // Send stream should return the message in pieces
@@ -182,8 +173,16 @@ async fn test_aqc_chans() -> Result<()> {
     assert_eq!(total_len, big_data.len());
     assert_eq!(&target[..total_len], &big_data[..]);
 
-    bidi_chan1.close()?;
-    bidi_chan2.close()?;
+    team.membera
+        .client
+        .aqc()
+        .delete_bidi_channel(bidi_chan1)
+        .await?;
+    team.memberb
+        .client
+        .aqc()
+        .delete_bidi_channel(bidi_chan2)
+        .await?;
 
     // membera creates aqc uni channel with memberb concurrently
     let mut membera = team.membera;
@@ -214,7 +213,6 @@ async fn test_aqc_chans() -> Result<()> {
             buggy::bug!("Expected a unidirectional channel")
         }
     };
-    tokio::time::sleep(Duration::from_millis(100)).await;
 
     let mut send1_1 = uni_chan1.create_uni_stream().await?;
 
@@ -223,10 +221,8 @@ async fn test_aqc_chans() -> Result<()> {
     // Send from 1 to 2 with a unidirectional stream
     let msg1 = Bytes::from("hello");
     send1_1.send(&msg1).await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
 
     let mut recv2_1 = uni_chan2.receive_uni_stream().await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
 
     let mut target = vec![0u8; 1024 * 1024 * 2];
     let len = recv2_1
@@ -265,10 +261,8 @@ async fn test_aqc_chans() -> Result<()> {
         AqcChannelType::Bidirectional { channel } => channel,
         _ => buggy::bug!("Expected a bidirectional channel on memberb"),
     };
-    tokio::time::sleep(Duration::from_millis(100)).await;
 
     let mut send1_1 = bidi_chan1.create_uni_stream().await?;
-    tokio::time::sleep(Duration::from_millis(100)).await;
 
     // Test sending streams
 
@@ -281,7 +275,6 @@ async fn test_aqc_chans() -> Result<()> {
         .try_receive_stream()
         .assume("stream not received")?;
     assert!(maybe_send2_1.is_none(), "Expected unidirectional stream");
-    tokio::time::sleep(Duration::from_millis(100)).await;
     let mut target = vec![0u8; 1024 * 1024 * 2];
     let len = recv2_1
         .receive(target.as_mut_slice())
