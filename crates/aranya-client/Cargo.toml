@@ -27,6 +27,7 @@ aranya-fast-channels = { workspace = true, features = ["std", "posix"] }
 aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
+futures-lite = { workspace = true }
 rustls = { workspace = true }
 rustls-pemfile = { workspace = true }
 s2n-quic = { workspace = true }

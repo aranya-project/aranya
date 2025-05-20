@@ -119,9 +119,33 @@ pub enum AqcError {
     #[error("unable to parse encap")]
     Encap(anyhow::Error),
 
+    /// No control message was found.
+    #[error("no control message found")]
+    NoCtrlMessage,
+
     /// The channel was not found.
     #[error("channel not found")]
     ChannelNotFound,
+
+    /// The server connection was terminated.
+    #[error("server connection terminated")]
+    ServerConnectionTerminated,
+
+    /// No identity hint was found.
+    #[error("no identity hint found")]
+    NoIdentityHint,
+
+    /// No channel info found.
+    #[error("no channel info found")]
+    NoChannelInfoFound,
+
+    /// The connection was closed.
+    #[error("connection closed")]
+    ConnectionClosed,
+
+    /// The connection error.
+    #[error("connection error: {0}")]
+    ConnectionError(String),
 
     /// Received an unexpected channel type.
     #[error("received unexpected channel type: {0}")]

@@ -15,7 +15,7 @@ use ::rustls::{
 use anyhow::Context;
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
-use aranya_daemon_api::{DeviceId, LabelId, NetIdentifier, TeamId};
+use aranya_daemon_api::{DaemonApiClient, DeviceId, LabelId, NetIdentifier, TeamId};
 use buggy::BugExt as _;
 use rustls::crypto::CryptoProvider;
 use rustls_pemfile::{certs, private_key};
@@ -76,15 +76,8 @@ impl AqcChannelsImpl {
     pub(crate) async fn new(
         device_id: DeviceId,
         aqc_addr: &SocketAddr,
-    ) -> Result<
-        (
-            Self,
-            Server,
-            mpsc::Sender<AqcChannelType>,
-            mpsc::Receiver<Vec<u8>>,
-        ),
-        AqcError,
-    > {
+        daemon: Arc<DaemonApiClient>,
+    ) -> Result<(Self, SocketAddr), AqcError> {
         debug!("device ID: {:?}", device_id);
 
         // --- Start Rustls Setup ---
@@ -127,23 +120,25 @@ impl AqcChannelsImpl {
 
         // Use the rustls client provider
         // Pass client_keys Arc to AqcClient::new
-        let (client, sender) = AqcClient::new(tls_client_provider, client_keys)?;
 
-        let server_addr = aqc_addr
-            .to_string()
-            .parse::<SocketAddr>()
-            .map_err(AqcError::AddrParse)?;
         // Use the rustls server provider
         let server = Server::builder()
             .with_tls(tls_server_provider) // Use the wrapped server config
             .map_err(|e| AqcError::TlsConfig(e.to_string()))?
-            .with_io(server_addr)
+            .with_io(*aqc_addr)
             .map_err(|e| AqcError::IoConfig(e.to_string()))?
             .with_congestion_controller(Bbr::default())
             .map_err(|e| AqcError::CongestionConfig(e.to_string()))?
             .start()
             .map_err(|e| AqcError::ServerStart(e.to_string()))?;
-        Ok((Self { client }, server, sender, identity_rx))
+        let client = AqcClient::new(
+            tls_client_provider,
+            client_keys,
+            identity_rx,
+            server,
+            daemon,
+        )?;
+        Ok((Self { client }, *aqc_addr))
     }
 
     /// Returns the local address that AQC is bound to.
@@ -180,7 +175,7 @@ impl AqcChannelsImpl {
     }
 
     /// Receives a channel.
-    pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
+    pub async fn receive_channel(&mut self) -> Result<AqcChannelType, AqcError> {
         self.client.receive_channel().await
     }
 
@@ -318,7 +313,6 @@ impl<'a> AqcChannels<'a> {
             .send_ctrl(peer_addr, aqc_ctrl, team_id)
             .await
             .map_err(AqcError::Other)?;
-
         let channel = self
             .client
             .aqc
@@ -391,40 +385,41 @@ impl<'a> AqcChannels<'a> {
 
     /// Deletes an AQC bidi channel.
     /// It is an error if the channel does not exist
-    #[instrument(skip_all, fields(%chan))]
-    pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannelId) -> crate::Result<()> {
-        let _ctrl = self
-            .client
-            .daemon
-            .delete_aqc_bidi_channel(context::current(), chan)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-
-        todo!()
+    #[instrument(skip_all, fields(?chan))]
+    pub async fn delete_bidi_channel(
+        &mut self,
+        mut chan: AqcBidirectionalChannel,
+    ) -> crate::Result<()> {
+        // let _ctrl = self
+        //     .client
+        //     .daemon
+        //     .delete_aqc_bidi_channel(context::current(), chan.aqc_id().into_id().into())
+        //     .await
+        //     .map_err(IpcError::new)?
+        //     .map_err(aranya_error)?;
+        chan.close();
+        Ok(())
     }
 
     /// Deletes an AQC uni channel.
     /// It is an error if the channel does not exist
-    #[instrument(skip_all, fields(%chan))]
-    pub async fn delete_uni_channel(&mut self, chan: AqcUniChannelId) -> crate::Result<()> {
-        let _ctrl = self
-            .client
-            .daemon
-            .delete_aqc_uni_channel(context::current(), chan)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
-
-        // TODO: delete PSK from rustls keystore.
-
-        todo!()
+    #[instrument(skip_all, fields(?chan))]
+    pub async fn delete_uni_channel(&mut self, mut chan: AqcSenderChannel) -> crate::Result<()> {
+        // let _ctrl = self
+        //     .client
+        //     .daemon
+        //     .delete_aqc_uni_channel(context::current(), chan.aqc_id().into_id().into())
+        //     .await
+        //     .map_err(IpcError::new)?
+        //     .map_err(aranya_error)?;
+        chan.close();
+        Ok(())
     }
 
     /// Waits for a peer to create an AQC channel with this client. Returns
     /// None if channels can no longer be received. If this happens, the
     /// application should be restarted.
-    pub async fn receive_channel(&mut self) -> Option<AqcChannelType> {
+    pub async fn receive_channel(&mut self) -> Result<AqcChannelType, AqcError> {
         self.client.aqc.receive_channel().await
     }
 
