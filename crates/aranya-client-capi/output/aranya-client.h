@@ -413,6 +413,10 @@ typedef const char *AranyaNetIdentifier;
 
 /**
  * A type containing the AQC channel variant.
+ *
+ * Note that this data is only valid after a successful call to
+ * `try_receive_channel`, and is invalidated after calling
+ * `get_bidirectional_channel`/`get_receiver_channel`.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAqcChannel {
     /**
@@ -2239,6 +2243,8 @@ AranyaError aranya_aqc_try_receive_channel_ext(struct AranyaClient *client,
  *
  * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
  *
+ * Note that this function takes ownership of the [`AranyaAqcChannel`](@ref AranyaAqcChannel) and invalidates any further use.
+ *
  * @param channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel) that holds a channel object.
  * @param bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
  *
@@ -2251,6 +2257,8 @@ AranyaError aranya_aqc_get_bidirectional_channel(struct AranyaAqcChannel *channe
  * Converts the [`AranyaAqcChannel`](@ref AranyaAqcChannel)` into an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) for sending/receiving data.
  *
  * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
+ *
+ * Note that this function takes ownership of the [`AranyaAqcChannel`](@ref AranyaAqcChannel) and invalidates any further use.
  *
  * @param channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel) that holds a channel object.
  * @param bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
@@ -2266,6 +2274,8 @@ AranyaError aranya_aqc_get_bidirectional_channel_ext(struct AranyaAqcChannel *ch
  *
  * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
  *
+ * Note that this function takes ownership of the [`AranyaAqcChannel`](@ref AranyaAqcChannel) and invalidates any further use.
+ *
  * @param channel the AQC channel container [`AranyaAqcChannel`](@ref AranyaAqcChannel).
  * @param receiver the AQC channel object [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel).
  *
@@ -2278,6 +2288,8 @@ AranyaError aranya_aqc_get_receiver_channel(struct AranyaAqcChannel *channel,
  * Converts the [`AranyaAqcChannel`](@ref AranyaAqcChannel)` into an [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel) for receiving data.
  *
  * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
+ *
+ * Note that this function takes ownership of the [`AranyaAqcChannel`](@ref AranyaAqcChannel) and invalidates any further use.
  *
  * @param channel the AQC channel container [`AranyaAqcChannel`](@ref AranyaAqcChannel).
  * @param receiver the AQC channel object [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel).
