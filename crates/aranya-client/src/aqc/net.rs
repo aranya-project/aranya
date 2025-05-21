@@ -155,7 +155,7 @@ async fn receive_ctrl_message(
 
 /// Indicates the type of channel. This will be a channel that can be used to send data to a peer.
 #[derive(Debug)]
-pub enum AqcSendChannelType {
+enum AqcSendChannelType {
     /// Used to send data to a peer.
     Sender {
         /// The sending end of a unidirectional channel.
