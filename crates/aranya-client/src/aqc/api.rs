@@ -3,7 +3,7 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
     net::SocketAddr,
-    sync::{Arc, Mutex},
+    sync::{Arc, LazyLock, Mutex},
 };
 
 use ::rustls::{
@@ -15,9 +15,12 @@ use ::rustls::{
 use anyhow::Context;
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
-use aranya_daemon_api::{DaemonApiClient, DeviceId, LabelId, NetIdentifier, TeamId};
+use aranya_daemon_api::{
+    AqcBidiPsks, AqcPsks, AqcUniPsks, CipherSuiteId, DaemonApiClient, DeviceId, Directed, LabelId,
+    NetIdentifier, TeamId,
+};
 use buggy::BugExt as _;
-use rustls::crypto::CryptoProvider;
+use rustls::crypto::{hash::HashAlgorithm, CryptoProvider};
 use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     provider::{
@@ -55,8 +58,14 @@ pub static KEY_PEM: &str = include_str!("./key.pem");
 const ALPN_AQC: &[u8] = b"aqc";
 
 // Define constant PSK identity and bytes
-pub const PSK_IDENTITY_CTRL: &[u8; 16] = b"aranya-ctrl-psk!"; // 16 bytes
-pub const PSK_BYTES_CTRL: &[u8; 32] = b"this-is-a-32-byte-secret-psk!!!!"; // 32 bytes
+pub(super) const PSK_IDENTITY_CTRL: &[u8; 16] = b"aranya-ctrl-psk!"; // 16 bytes
+const PSK_BYTES_CTRL: &[u8; 32] = b"this-is-a-32-byte-secret-psk!!!!"; // 32 bytes
+
+pub(super) static CTRL_KEY: LazyLock<Arc<PresharedKey>> = LazyLock::new(|| {
+    let psk = PresharedKey::external(PSK_IDENTITY_CTRL, PSK_BYTES_CTRL)
+        .expect("identity and bytes are small and nonzero");
+    Arc::new(psk)
+});
 
 #[derive(Debug)]
 pub enum AqcChannel {
@@ -91,9 +100,7 @@ impl AqcChannelsImpl {
             .map_err(|e| AqcError::TlsConfig(e.to_string()))?
             .ok_or_else(|| AqcError::TlsConfig("No private key found in KEY_PEM".into()))?;
 
-        let psk = PresharedKey::external(PSK_IDENTITY_CTRL, PSK_BYTES_CTRL)
-            .assume("unable to create psk")?;
-        let client_keys = Arc::new(ClientPresharedKeys::new(psk.clone()));
+        let client_keys = Arc::new(ClientPresharedKeys::new(CTRL_KEY.clone()));
 
         // Create Client Config (INSECURE: Skips server cert verification)
         let mut client_config = ClientConfig::builder()
@@ -104,7 +111,7 @@ impl AqcChannelsImpl {
         client_config.preshared_keys = client_keys.clone(); // Pass the Arc<ClientPresharedKeys>
 
         let (mut server_keys, identity_rx) = ServerPresharedKeys::new();
-        server_keys.insert(psk);
+        server_keys.insert(CTRL_KEY.clone());
 
         // Create Server Config
         let mut server_config = ServerConfig::builder()
@@ -151,11 +158,10 @@ impl AqcChannelsImpl {
         &mut self,
         peer_addr: SocketAddr,
         label_id: LabelId,
-        id: BidiChannelId,
-        psk: PresharedKey,
+        psks: AqcBidiPsks,
     ) -> Result<AqcBidirectionalChannel, AqcError> {
         self.client
-            .create_bidi_channel(peer_addr, label_id, id, psk)
+            .create_bidi_channel(peer_addr, label_id, psks)
             .await
             .map_err(AqcError::Other)
     }
@@ -165,11 +171,10 @@ impl AqcChannelsImpl {
         &mut self,
         peer_addr: SocketAddr,
         label_id: LabelId,
-        id: UniChannelId,
-        psk: PresharedKey,
+        psks: AqcUniPsks,
     ) -> Result<AqcSenderChannel, AqcError> {
         self.client
-            .create_uni_channel(peer_addr, label_id, id, psk)
+            .create_uni_channel(peer_addr, label_id, psks)
             .await
             .map_err(AqcError::Other)
     }
@@ -206,11 +211,11 @@ impl ServerPresharedKeys {
         )
     }
 
-    fn insert(&mut self, psk: PresharedKey) {
+    fn insert(&mut self, psk: Arc<PresharedKey>) {
         let identity = psk.identity().to_vec();
         match self.keys.entry(identity.clone()) {
             Entry::Vacant(v) => {
-                v.insert(Arc::new(psk));
+                v.insert(psk);
             }
             Entry::Occupied(_) => {
                 error!("Duplicate PSK identity inserted: {:?}", identity);
@@ -234,26 +239,67 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
 
 #[derive(Debug)]
 pub(crate) struct ClientPresharedKeys {
-    key_ref: Arc<Mutex<Arc<PresharedKey>>>,
+    keys: Arc<Mutex<Vec<Arc<PresharedKey>>>>,
+}
+
+fn suite_hash(suite: CipherSuiteId) -> HashAlgorithm {
+    match suite {
+        CipherSuiteId::TlsAes128GcmSha256 => HashAlgorithm::SHA256,
+        CipherSuiteId::TlsAes256GcmSha384 => HashAlgorithm::SHA384,
+        CipherSuiteId::TlsChaCha20Poly1305Sha256 => HashAlgorithm::SHA256,
+        CipherSuiteId::TlsAes128CcmSha256 => HashAlgorithm::SHA256,
+        CipherSuiteId::TlsAes128Ccm8Sha256 => HashAlgorithm::SHA256,
+        _ => HashAlgorithm::SHA256,
+    }
 }
 
 impl ClientPresharedKeys {
-    fn new(key: PresharedKey) -> Self {
+    fn new(key: Arc<PresharedKey>) -> Self {
         Self {
-            key_ref: Arc::new(Mutex::new(Arc::new(key))),
+            keys: Arc::new(Mutex::new(vec![key])),
         }
     }
 
-    pub(crate) fn set_key(&self, key: PresharedKey) {
-        let mut key_guard = self.key_ref.lock().expect("Client PSK mutex poisoned");
-        *key_guard = Arc::new(key);
+    pub(crate) fn set_key(&self, key: Arc<PresharedKey>) {
+        let mut keys_guard = self.keys.lock().expect("Client PSK mutex poisoned");
+        keys_guard.clear();
+        keys_guard.push(key);
+    }
+
+    pub(crate) fn load_psks(&self, psks: AqcPsks) {
+        let keys = match psks {
+            AqcPsks::Bidi(psks) => psks
+                .into_iter()
+                .map(|(suite, psk)| {
+                    PresharedKey::external(psk.identity.as_bytes(), psk.secret.raw_secret_bytes())
+                        .unwrap()
+                        .with_hash_alg(suite_hash(suite))
+                        .unwrap()
+                })
+                .map(Arc::new)
+                .collect(),
+            AqcPsks::Uni(psks) => psks
+                .into_iter()
+                .map(|(suite, psk)| {
+                    let secret = match &psk.secret {
+                        Directed::Send(s) => s.raw_secret_bytes(),
+                        Directed::Recv(s) => s.raw_secret_bytes(),
+                    };
+                    PresharedKey::external(psk.identity.as_bytes(), secret)
+                        .unwrap()
+                        .with_hash_alg(suite_hash(suite))
+                        .unwrap()
+                })
+                .map(Arc::new)
+                .collect(),
+        };
+        *self.keys.lock().expect("poisoned") = keys;
     }
 }
 
 impl PresharedKeyStore for ClientPresharedKeys {
     fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
-        let key_guard = self.key_ref.lock().expect("Client PSK mutex poisoned");
-        vec![key_guard.clone()]
+        self.keys.lock().expect("Client PSK mutex poisoned").clone()
     }
 }
 
@@ -292,14 +338,14 @@ impl<'a> AqcChannels<'a> {
     ) -> crate::Result<AqcBidirectionalChannel> {
         debug!("creating bidi channel");
 
-        let (aqc_ctrl, psk) = self
+        let (aqc_ctrl, psks) = self
             .client
             .daemon
             .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), label_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
+        debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
         let peer_addr = tokio::net::lookup_host(peer.0)
             .await
@@ -316,13 +362,7 @@ impl<'a> AqcChannels<'a> {
         let channel = self
             .client
             .aqc
-            .create_bidirectional_channel(
-                peer_addr,
-                label_id,
-                psk.identity.into(),
-                PresharedKey::external(psk.identity.as_bytes(), psk.secret.raw_secret_bytes())
-                    .assume("unable to create psk")?,
-            )
+            .create_bidirectional_channel(peer_addr, label_id, psks)
             .await?;
         Ok(channel)
     }
@@ -344,14 +384,14 @@ impl<'a> AqcChannels<'a> {
     ) -> crate::Result<AqcSenderChannel> {
         debug!("creating aqc uni channel");
 
-        let (aqc_ctrl, psk) = self
+        let (aqc_ctrl, psks) = self
             .client
             .daemon
             .create_aqc_uni_channel(context::current(), team_id, peer.clone(), label_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        debug!(%label_id, psk_ident = ?psk.identity, "created uni channel");
+        debug!(%label_id, num_psks = psks.len(), "created uni channel");
 
         let peer_addr = tokio::net::lookup_host(peer.0)
             .await
@@ -365,20 +405,11 @@ impl<'a> AqcChannels<'a> {
             .send_ctrl(peer_addr, aqc_ctrl, team_id)
             .await
             .map_err(AqcError::Other)?;
-        let secret = match psk.secret {
-            aranya_daemon_api::Directed::Send(s) => s,
-            aranya_daemon_api::Directed::Recv(s) => s,
-        };
+
         let channel = self
             .client
             .aqc
-            .create_unidirectional_channel(
-                peer_addr,
-                label_id,
-                psk.identity.into(),
-                PresharedKey::external(psk.identity.as_bytes(), secret.raw_secret_bytes())
-                    .assume("unable to create psk")?,
-            )
+            .create_unidirectional_channel(peer_addr, label_id, psks)
             .await?;
         Ok(channel)
     }
