@@ -149,12 +149,8 @@ impl Daemon {
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
         let (state, client_keys) = QuicSyncState::new(initial_keys)?;
-        let (mut syncer, peers) = Syncer::new(
-            client.clone(),
-            send_effects,
-            self.cfg.sync_version.unwrap_or(DEFAULT_SYNC_PROTOCOL),
-            state,
-        );
+        let (mut syncer, peers) =
+            Syncer::new(client.clone(), send_effects, DEFAULT_SYNC_PROTOCOL, state);
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
@@ -265,7 +261,7 @@ impl Daemon {
             SyncServer::new(
                 client.clone(),
                 &external_sync_addr,
-                self.cfg.sync_version.unwrap_or(DEFAULT_SYNC_PROTOCOL),
+                DEFAULT_SYNC_PROTOCOL,
                 initial_keys,
             )
             .await
@@ -474,7 +470,6 @@ mod tests {
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
-            sync_version: None,
             service_name: NonEmptyString::try_from(serice_name)
                 .expect("this is a non-empty string"),
             afc: Some(AfcConfig {

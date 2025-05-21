@@ -9,8 +9,6 @@ use anyhow::{Context, Result};
 use aranya_util::{Addr, NonEmptyString};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
-use crate::sync::prot::SyncProtocol;
-
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -36,10 +34,6 @@ pub struct Config {
     ///
     /// This value cannot be blank.
     pub service_name: NonEmptyString,
-
-    /// Sync Protocol Version
-    #[serde(default)]
-    pub sync_version: Option<SyncProtocol>,
 
     /// AFC configuration.
     #[serde(default)]
@@ -158,7 +152,6 @@ mod tests {
             uds_api_path: "/var/run/uds.sock".parse()?,
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
-            sync_version: Some(SyncProtocol::V1),
             service_name: NonEmptyString::try_from("Aranya-QUIC-sync")?,
             afc: None,
             aqc: None,

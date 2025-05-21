@@ -19,7 +19,7 @@ use std::{
 use anyhow::{bail, Context, Result};
 use aranya_client::{Client, SyncPeerConfig, TeamConfig};
 use aranya_crypto::{csprng::rand::RngCore, Rng};
-use aranya_daemon::{config::Config, sync::prot::SyncProtocol, Daemon};
+use aranya_daemon::{config::Config, Daemon};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::{Addr, NonEmptyString};
 use backon::{ExponentialBuilder, Retryable as _};
@@ -250,7 +250,6 @@ impl DeviceCtx {
             uds_api_path: uds_api_path.clone(),
             pid_file: work_dir.join("pid"),
             sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
-            sync_version: Some(SyncProtocol::V1),
             service_name: NonEmptyString::try_from(serice_name)?,
             afc: None,
             aqc: None,

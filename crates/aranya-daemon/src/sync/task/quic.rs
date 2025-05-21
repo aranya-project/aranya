@@ -45,9 +45,6 @@ use crate::{
     },
 };
 
-/// Protocol Version.
-pub const PROT: SyncProtocol = SyncProtocol::V1;
-
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = b"quic_sync";
 
