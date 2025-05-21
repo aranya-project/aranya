@@ -19,10 +19,7 @@ use aranya_runtime::{
 };
 use tracing::instrument;
 
-use crate::{
-    keystore::AranyaStore,
-    policy::{ChanOp, Role},
-};
+use crate::{keystore::AranyaStore, policy::ChanOp};
 
 /// Policy loaded from policy.md file.
 pub const TEST_POLICY_1: &str = include_str!("./policy.md");
@@ -127,18 +124,6 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PolicyEngine").finish_non_exhaustive()
-    }
-}
-
-/// Converts policy [`Role`] to string.
-impl fmt::Display for Role {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Owner => f.write_str("Owner"),
-            Self::Admin => f.write_str("Admin"),
-            Self::Operator => f.write_str("Operator"),
-            Self::Member => f.write_str("Member"),
-        }
     }
 }
 

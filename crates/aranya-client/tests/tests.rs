@@ -11,10 +11,10 @@
 
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use aranya_client::{Client, SyncPeerConfig, TeamConfig};
 use aranya_daemon::{config::Config, Daemon};
-use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
+use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Op, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use test_log::test;
@@ -121,6 +121,7 @@ struct TeamCtx {
     operator: DeviceCtx,
     membera: DeviceCtx,
     memberb: DeviceCtx,
+    roles: Option<RoleCtx>,
 }
 
 impl TeamCtx {
@@ -137,6 +138,7 @@ impl TeamCtx {
             operator,
             membera,
             memberb,
+            roles: None,
         })
     }
 
@@ -170,16 +172,53 @@ impl TeamCtx {
         Ok(())
     }
 
+    async fn create_all_roles(&mut self, team_id: TeamId) -> Result<()> {
+        let mut owner_team = self.owner.client.team(team_id);
+
+        // Assign commands to roles.
+        let roles = owner_team.setup_default_roles().await?;
+        assert_eq!(roles.iter().count(), 3);
+        let mut roles_iter = roles.iter();
+        let admin_role = roles_iter.next().expect("expected admin role");
+        assert_eq!(admin_role.name, "admin");
+        let operator_role = roles_iter.next().expect("expected operator role");
+        assert_eq!(operator_role.name, "operator");
+        let member_role = roles_iter.next().expect("expected member role");
+        assert_eq!(member_role.name, "member");
+        let default_roles = RoleCtx {
+            admin: admin_role.clone(),
+            operator: operator_role.clone(),
+            member: member_role.clone(),
+        };
+
+        // Create a dummy role and assign a dummy command to it.
+        let _dummy_role = owner_team.create_role("dummy".to_string()).await?;
+        owner_team
+            .assign_operation_to_role(admin_role.id, Op::DeleteLabel)
+            .await?;
+
+        self.roles = Some(default_roles);
+
+        Ok(())
+    }
+
     async fn add_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
         // Shorthand for the teams we need to operate on.
         let mut owner_team = self.owner.client.team(team_id);
-        let mut admin_team = self.admin.client.team(team_id);
-        let mut operator_team = self.operator.client.team(team_id);
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
-        owner_team.add_device_to_team(self.admin.pk.clone()).await?;
-        owner_team.assign_role(self.admin.id, Role::Admin).await?;
+        owner_team
+            .add_device_to_team(self.admin.pk.clone(), 9000)
+            .await?;
+        // TODO: verify that assigning a lower precedence can result in loss of operation authorization.
+        owner_team
+            .assign_device_precedence(self.admin.id, 8500)
+            .await?;
+        let roles = self.roles.clone().unwrap();
+        owner_team
+            .assign_role(self.admin.id, roles.admin.id)
+            .await?;
 
         // Make sure it sees the configuration change.
         sleep(SLEEP_INTERVAL).await;
@@ -187,15 +226,15 @@ impl TeamCtx {
         // Add the operator as a new device.
         info!("adding operator to team");
         owner_team
-            .add_device_to_team(self.operator.pk.clone())
+            .add_device_to_team(self.operator.pk.clone(), 8000)
             .await?;
 
         // Make sure it sees the configuration change.
         sleep(SLEEP_INTERVAL).await;
 
         // Assign the operator its role.
-        admin_team
-            .assign_role(self.operator.id, Role::Operator)
+        owner_team
+            .assign_role(self.operator.id, roles.operator.id)
             .await?;
 
         // Make sure it sees the configuration change.
@@ -203,14 +242,22 @@ impl TeamCtx {
 
         // Add member A as a new device.
         info!("adding membera to team");
-        operator_team
-            .add_device_to_team(self.membera.pk.clone())
+        owner_team
+            .add_device_to_team(self.membera.pk.clone(), 7000)
+            .await?;
+        // Assign the membera its role.
+        owner_team
+            .assign_role(self.membera.id, roles.member.id)
             .await?;
 
         // Add member A as a new device.
         info!("adding memberb to team");
-        operator_team
-            .add_device_to_team(self.memberb.pk.clone())
+        owner_team
+            .add_device_to_team(self.memberb.pk.clone(), 6000)
+            .await?;
+        // Assign the memberb its role.
+        owner_team
+            .assign_role(self.memberb.id, roles.member.id)
             .await?;
 
         // Make sure they see the configuration change.
@@ -218,6 +265,50 @@ impl TeamCtx {
 
         Ok(())
     }
+
+    async fn delete_all_roles(&mut self, team_id: TeamId) -> Result<()> {
+        let owner = &mut self.owner.client;
+        let owner_id = owner.get_device_id().await?;
+        let owner_roles = owner.queries(team_id).device_roles(owner_id).await?;
+        let owner_role = owner_roles.iter().next().unwrap();
+
+        // Revoke roles from devices.
+        let devices = owner.queries(team_id).devices_on_team().await?;
+        for device in devices.iter() {
+            if *device != owner_id {
+                let roles = owner.queries(team_id).device_roles(*device).await?;
+                for role in roles.iter() {
+                    owner.team(team_id).revoke_role(*device, role.id).await?;
+                }
+            }
+        }
+
+        // Revoke commands from roles.
+        let roles = &mut owner.queries(team_id).roles_on_team().await?;
+        for role in roles.iter() {
+            if role.id != owner_role.id {
+                let ops = owner.queries(team_id).role_ops(role.id).await?;
+                for op in ops.iter() {
+                    owner
+                        .team(team_id)
+                        .revoke_role_operation(role.id, *op)
+                        .await?;
+                }
+            }
+        }
+
+        // TODO: delete all roles.
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RoleCtx {
+    // Note: owner role is created by policy by default.
+    admin: Role,
+    operator: Role,
+    member: Role,
 }
 
 struct DeviceCtx {
@@ -299,6 +390,178 @@ impl Drop for DeviceCtx {
     }
 }
 
+// Tests that if an operation is revoked from a role, the role can no longer execute the operation.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_revoke_operation() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let mut team = TeamCtx::new("test_revoke_operation", work_dir).await?;
+
+    // Create the initial team, and get our TeamId.
+    let cfg = TeamConfig::builder().build()?;
+    let team_id = team
+        .owner
+        .client
+        .create_team(cfg)
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
+    let roles = team.roles.clone().unwrap();
+
+    // Tell all peers to sync with one another.
+    team.add_all_sync_peers(team_id).await?;
+
+    // Add all devices to team.
+    team.add_all_device_roles(team_id).await?;
+
+    // give daemon time to setup UDS API.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Grab the shorthand for the teams we need to operate on.
+    let membera_id = team.membera.client.get_device_id().await?;
+
+    let mut owner = team.owner.client.team(team_id);
+    let mut operator = team.operator.client.team(team_id);
+
+    // Verify that operator can execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1010".to_string()))
+        .await
+        .expect("expected aqc net identifier assignment to succeed");
+
+    // Revoke the operation from the operator role.
+    owner
+        .revoke_role_operation(roles.operator.id, Op::SetAqcNetworkName)
+        .await?;
+
+    // Make sure operator sees the configuration change.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Verify that operator cannot execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1020".to_string()))
+        .await
+        .expect_err("expected aqc net identifier assignment to fail");
+
+    Ok(())
+}
+
+// Tests that if a role is revoked from a device, the device can no longer execute an operation.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_revoke_role() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let mut team = TeamCtx::new("test_revoke_role", work_dir).await?;
+
+    // Create the initial team, and get our TeamId.
+    let cfg = TeamConfig::builder().build()?;
+    let team_id = team
+        .owner
+        .client
+        .create_team(cfg)
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
+    let roles = team.roles.clone().unwrap();
+
+    // Tell all peers to sync with one another.
+    team.add_all_sync_peers(team_id).await?;
+
+    // Add all devices to team.
+    team.add_all_device_roles(team_id).await?;
+
+    // give daemon time to setup UDS API.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Grab the shorthand for the teams we need to operate on.
+    let membera_id = team.membera.client.get_device_id().await?;
+    let operator_id = team.operator.client.get_device_id().await?;
+    let mut owner = team.owner.client.team(team_id);
+    let mut operator = team.operator.client.team(team_id);
+
+    // Verify that operator can execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1010".to_string()))
+        .await
+        .expect("expected aqc net identifier assignment to succeed");
+
+    // Revoke operator role from operator device.
+    owner.revoke_role(operator_id, roles.operator.id).await?;
+
+    // Make sure operator sees the configuration change.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Verify that operator cannot execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1020".to_string()))
+        .await
+        .expect_err("expected aqc net identifier assignment to fail");
+
+    Ok(())
+}
+
+/// Tests that device precedence can affect whether a device is authorized to execute certain operations.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_device_precedence() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let mut team = TeamCtx::new("test_device_precedence", work_dir).await?;
+
+    // Create the initial team, and get our TeamId.
+    let cfg = TeamConfig::builder().build()?;
+    let team_id = team
+        .owner
+        .client
+        .create_team(cfg)
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
+
+    // Tell all peers to sync with one another.
+    team.add_all_sync_peers(team_id).await?;
+
+    // Add all devices to team.
+    team.add_all_device_roles(team_id).await?;
+
+    // give daemon time to setup UDS API.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Grab the shorthand for the teams we need to operate on.
+    let membera_id = team.membera.client.get_device_id().await?;
+    let operator_id = team.operator.client.get_device_id().await?;
+    let mut owner = team.owner.client.team(team_id);
+    let mut operator = team.operator.client.team(team_id);
+
+    // Verify that operator can execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1010".to_string()))
+        .await
+        .expect("expected aqc net identifier assignment to succeed");
+
+    // Set operator precedence to zero to ensure it cannot execute any operations.
+    owner.assign_device_precedence(operator_id, 0).await?;
+
+    // Make sure operator sees the configuration change.
+    sleep(SLEEP_INTERVAL).await;
+
+    // Verify that operator cannot execute operation.
+    operator
+        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1020".to_string()))
+        .await
+        .expect_err("expected aqc net identifier assignment to fail");
+
+    Ok(())
+}
+
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_sync_now() -> Result<()> {
@@ -324,37 +587,46 @@ async fn test_sync_now() -> Result<()> {
     team.memberb.client.add_team(team_id).await?;
     */
 
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
+    let roles = team.roles.clone().unwrap();
+
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
 
     // Grab the shorthand for the teams we need to operate on.
     let mut owner = team.owner.client.team(team_id);
-    let mut admin = team.admin.client.team(team_id);
 
     // Add the admin as a new device, but don't give it a role.
     info!("adding admin to team");
-    owner.add_device_to_team(team.admin.pk.clone()).await?;
+    owner.add_device_to_team(team.admin.pk.clone(), 100).await?;
 
-    // Add the operator as a new device, but don't give it a role.
-    info!("adding operator to team");
-    owner.add_device_to_team(team.operator.pk.clone()).await?;
-
-    // Finally, let's give the admin its role, but don't sync with peers.
-    owner.assign_role(team.admin.id, Role::Admin).await?;
-
-    // Now, we try to assign a role using the admin, which is expected to fail.
-    match admin.assign_role(team.operator.id, Role::Operator).await {
-        Ok(_) => bail!("Expected role assignment to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(_) => bail!("Unexpected error"),
-    }
-
-    // Let's sync immediately, which will propagate the role change.
+    // Sync once to initialize the graph.
+    let mut admin = team.admin.client.team(team_id);
     admin.sync_now(owner_addr.into(), None).await?;
     sleep(SLEEP_INTERVAL).await;
 
-    // Now we should be able to successfully assign a role.
-    admin.assign_role(team.operator.id, Role::Operator).await?;
+    // Finally, let's give the admin its role, but don't sync with peers.
+    owner.assign_role(team.admin.id, roles.admin.id).await?;
+
+    // Try to query admin role before syncing
+    {
+        let mut queries = team.admin.client.queries(team_id);
+        let admin_roles = queries.device_roles(team.admin.id).await?;
+        assert_eq!(admin_roles.iter().count(), 0);
+    }
+
+    // Let's sync immediately, which will propagate the role assignment.
+    let mut admin: aranya_client::Team<'_> = team.admin.client.team(team_id);
+    admin.sync_now(owner_addr.into(), None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    // Try to query operator role after syncing
+    {
+        let mut queries = team.admin.client.queries(team_id);
+        let admin_roles = queries.device_roles(team.admin.id).await?;
+        assert_eq!(admin_roles.iter().count(), 1);
+    }
 
     Ok(())
 }
@@ -384,9 +656,15 @@ async fn test_query_functions() -> Result<()> {
     team.memberb.client.add_team(team_id).await?;
     */
 
+    // Create all team roles.
+    team.create_all_roles(team_id).await?;
+
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
+
+    // give daemon time to setup UDS API.
+    sleep(SLEEP_INTERVAL).await;
 
     // Test all our fact database queries.
     let mut queries = team.membera.client.queries(team_id);
@@ -397,9 +675,10 @@ async fn test_query_functions() -> Result<()> {
     debug!("membera devices on team: {:?}", devices.iter().count());
 
     // Check the specific role(s) a device has.
-    let role = queries.device_role(team.membera.id).await?;
-    assert_eq!(role, Role::Member);
-    debug!("membera role: {:?}", role);
+    let roles = queries.device_roles(team.membera.id).await?;
+    let role = roles.iter().next().unwrap();
+    assert_eq!(role.name, "member");
+    debug!("membera role: {:?}", role.name);
 
     // Make sure that we have the correct keybundle.
     let keybundle = queries.device_keybundle(team.membera.id).await?;
@@ -408,6 +687,8 @@ async fn test_query_functions() -> Result<()> {
     // TODO(nikki): device_label_assignments, label_exists, labels
 
     // TODO(nikki): if cfg!(feature = "aqc") { aqc_net_identifier } and have aqc on by default.
+
+    team.delete_all_roles(team_id).await?;
 
     Ok(())
 }
