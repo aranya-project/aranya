@@ -491,7 +491,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer: api::NetIdentifier,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, Box<[api::AqcBidiPsk]>)> {
+    ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsks)> {
         info!("creating bidi channel");
 
         let graph = GraphId::from(team.into_id());
@@ -530,7 +530,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer: api::NetIdentifier,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, Box<[api::AqcUniPsk]>)> {
+    ) -> api::Result<(api::AqcCtrl, api::AqcUniPsks)> {
         info!("creating uni channel");
 
         let graph = GraphId::from(team.into_id());
@@ -588,7 +588,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AqcCtrl,
-    ) -> api::Result<(api::NetIdentifier, Box<[api::AqcPsk]>)> {
+    ) -> api::Result<(api::NetIdentifier, api::AqcPsks)> {
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {

@@ -1,9 +1,19 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-use core::{borrow::Borrow, fmt, hash::Hash, net::SocketAddr, ops::Deref, time::Duration};
+use core::{
+    borrow::Borrow,
+    error, fmt,
+    hash::{Hash, Hasher},
+    net::SocketAddr,
+    ops::Deref,
+    time::Duration,
+};
+use std::collections::hash_map::{self, HashMap};
 
+use anyhow::bail;
+pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
-    aqc::{BidiPskId, CipherSuiteId, UniPskId},
+    aqc::{BidiPskId, UniPskId},
     custom_id,
     default::{DefaultCipherSuite, DefaultEngine},
     subtle::{Choice, ConstantTimeEq},
@@ -13,7 +23,7 @@ use aranya_crypto::{
 use aranya_util::Addr;
 use buggy::Bug;
 pub use semver::Version;
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Serialize};
 use tracing::error;
 
 /// CE = Crypto Engine
@@ -60,7 +70,7 @@ impl fmt::Display for Error {
     }
 }
 
-impl core::error::Error for Error {}
+impl error::Error for Error {}
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
@@ -186,6 +196,180 @@ impl Drop for Secret {
     }
 }
 
+macro_rules! psk_map {
+    (
+        $(#[$meta:meta])*
+        $vis:vis struct $name:ident(PskMap<$psk:ty>);
+    ) => {
+        $(#[$meta])*
+        #[derive(Clone, Debug, Serialize, Deserialize)]
+        #[cfg_attr(test, derive(PartialEq))]
+        $vis struct $name {
+            id: Id,
+            psks: HashMap<CsId, $psk>
+        }
+
+        impl $name {
+            /// Returns the number of PSKs.
+            pub fn len(&self) -> usize {
+                self.psks.len()
+            }
+
+            /// Reports whether `self` is empty.
+            pub fn is_empty(&self) -> bool {
+                self.psks.is_empty()
+            }
+
+            /// Returns the channel ID.
+            pub fn channel_id(&self) -> &Id {
+                &self.id
+            }
+
+            /// Returns the PSK for the cipher suite.
+            pub fn get(&self, suite: CipherSuiteId) -> Option<&$psk> {
+                self.psks.get(&CsId(suite))
+            }
+
+            /// Creates a PSK map from a function that generates
+            /// a PSK for a cipher suite.
+            pub fn try_from_fn<I, E, F>(id: I, mut f: F) -> anyhow::Result<Self>
+            where
+                I: Into<Id>,
+                E: error::Error + fmt::Display + fmt::Debug + Send + Sync + 'static,
+                F: FnMut(CipherSuiteId) -> Result<$psk, E>,
+            {
+                let id = id.into();
+                let mut psks = HashMap::new();
+                for &suite in CipherSuiteId::all() {
+                    let psk = f(suite)?;
+                    if !bool::from(psk.identity().channel_id().into_id().ct_eq(&id)) {
+                        bail!("PSK identity does not match channel ID");
+                    }
+                    psks.insert(CsId(suite), psk);
+                }
+                Ok(Self { id, psks })
+            }
+        }
+
+        impl FromIterator<$psk> for $name {
+            fn from_iter<I>(iter: I) -> Self
+            where
+                I: IntoIterator<Item = $psk>,
+            {
+                let psks = HashMap::from_iter(iter.into_iter().map(|psk| {
+                    let suite = psk.cipher_suite();
+                    (CsId(suite), psk)
+                }));
+                Self {
+                    // TODO
+                    id: Id::default(),
+                    psks,
+                }
+            }
+        }
+
+        impl IntoIterator for $name {
+            type Item = (CipherSuiteId, $psk);
+            type IntoIter = IntoPsks<$psk>;
+
+            fn into_iter(self) -> Self::IntoIter {
+                IntoPsks {
+                    iter: self.psks.into_iter(),
+                }
+            }
+        }
+
+        #[cfg(test)]
+        impl tests::PskMap for $name {
+            type Psk = $psk;
+
+            fn new() -> Self {
+                Self {
+                    // TODO
+                    id: Id::default(),
+                    psks: HashMap::new(),
+                }
+            }
+
+            fn len(&self) -> usize {
+                self.psks.len()
+            }
+
+            fn insert(&mut self, psk: Self::Psk) {
+                let suite = psk.cipher_suite();
+                let opt = self.psks.insert(CsId(suite), psk);
+                assert!(opt.is_none());
+            }
+        }
+    };
+}
+psk_map! {
+    /// An injective mapping of PSKs to cipher suites for
+    /// a single bidirectional channel.
+    pub struct AqcBidiPsks(PskMap<AqcBidiPsk>);
+}
+
+psk_map! {
+    /// An injective mapping of PSKs to cipher suites for
+    /// a single unidirectional channel.
+    pub struct AqcUniPsks(PskMap<AqcUniPsk>);
+}
+
+/// An injective mapping of PSKs to cipher suites for a single
+/// bidirectional or unidirectional channel.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum AqcPsks {
+    Bidi(AqcBidiPsks),
+    Uni(AqcUniPsks),
+}
+
+/// An iterator over an AQC channel's PSKs.
+#[derive(Debug)]
+pub struct IntoPsks<V> {
+    iter: hash_map::IntoIter<CsId, V>,
+}
+
+impl<V> Iterator for IntoPsks<V> {
+    type Item = (CipherSuiteId, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(k, v)| (k.0, v))
+    }
+}
+
+// TODO(eric): Get rid of this once `CipherSuiteId` implements
+// `Hash`, `Serialize`, and `Deserialize`.
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+struct CsId(CipherSuiteId);
+
+impl Hash for CsId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_bytes().hash(state);
+    }
+}
+
+impl Serialize for CsId {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let id = u16::from_be_bytes(self.0.to_bytes());
+        serializer.serialize_u16(id)
+    }
+}
+
+impl<'de> Deserialize<'de> for CsId {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let id = <u16>::deserialize(deserializer)?;
+        CipherSuiteId::try_from_bytes(id.to_be_bytes())
+            .ok_or_else(|| de::Error::custom("invalid cipher suite id"))
+            .map(CsId)
+    }
+}
+
 /// An AQC PSK.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AqcPsk {
@@ -205,6 +389,12 @@ impl AqcPsk {
         }
     }
 
+    /// Returns the PSK cipher suite.
+    #[inline]
+    pub fn cipher_suite(&self) -> CipherSuiteId {
+        self.identity().cipher_suite()
+    }
+
     /// Returns the PSK secret.
     #[inline]
     pub fn secret(&self) -> &[u8] {
@@ -217,6 +407,30 @@ impl AqcPsk {
     }
 }
 
+impl From<AqcBidiPsk> for AqcPsk {
+    fn from(psk: AqcBidiPsk) -> Self {
+        Self::Bidi(psk)
+    }
+}
+
+impl From<AqcUniPsk> for AqcPsk {
+    fn from(psk: AqcUniPsk) -> Self {
+        Self::Uni(psk)
+    }
+}
+
+impl ConstantTimeEq for AqcPsk {
+    fn ct_eq(&self, other: &Self) -> Choice {
+        // It's fine that matching discriminants isn't constant
+        // time since it isn't secret data.
+        match (self, other) {
+            (Self::Bidi(lhs), Self::Bidi(rhs)) => lhs.ct_eq(rhs),
+            (Self::Uni(lhs), Self::Uni(rhs)) => lhs.ct_eq(rhs),
+            _ => Choice::from(0u8),
+        }
+    }
+}
+
 /// An AQC bidirectional channel PSK.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AqcBidiPsk {
@@ -224,6 +438,15 @@ pub struct AqcBidiPsk {
     pub identity: BidiPskId,
     /// The PSK's secret.
     pub secret: Secret,
+}
+
+impl AqcBidiPsk {
+    fn identity(&self) -> &BidiPskId {
+        &self.identity
+    }
+    fn cipher_suite(&self) -> CipherSuiteId {
+        self.identity.cipher_suite()
+    }
 }
 
 impl ConstantTimeEq for AqcBidiPsk {
@@ -243,6 +466,15 @@ pub struct AqcUniPsk {
     pub identity: UniPskId,
     /// The PSK's secret.
     pub secret: Directed<Secret>,
+}
+
+impl AqcUniPsk {
+    fn identity(&self) -> &UniPskId {
+        &self.identity
+    }
+    fn cipher_suite(&self) -> CipherSuiteId {
+        self.identity.cipher_suite()
+    }
 }
 
 impl ConstantTimeEq for AqcUniPsk {
@@ -277,7 +509,7 @@ impl<T: ConstantTimeEq> ConstantTimeEq for Directed<T> {
 }
 
 /// An AQC PSK identity.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum AqcPskId {
     /// A bidirectional PSK.
     Bidi(BidiPskId),
@@ -409,22 +641,19 @@ pub trait DaemonApi {
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, Box<[AqcBidiPsk]>)>;
+    ) -> Result<(AqcCtrl, AqcBidiPsks)>;
     /// Create a unidirectional QUIC channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, Box<[AqcUniPsk]>)>;
+    ) -> Result<(AqcCtrl, AqcUniPsks)>;
     /// Delete a QUIC bidi channel.
     async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
     /// Delete a QUIC uni channel.
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
     /// Receive AQC ctrl message.
-    async fn receive_aqc_ctrl(
-        team: TeamId,
-        ctrl: AqcCtrl,
-    ) -> Result<(NetIdentifier, Box<[AqcPsk]>)>;
+    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(NetIdentifier, AqcPsks)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
@@ -443,4 +672,90 @@ pub trait DaemonApi {
     async fn query_labels(team: TeamId) -> Result<Vec<Label>>;
     /// Query whether a label exists.
     async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
+}
+
+#[cfg(test)]
+mod tests {
+    use aranya_crypto::Rng;
+    use serde::de::DeserializeOwned;
+
+    use super::*;
+
+    fn secret(secret: &[u8]) -> Secret {
+        Secret(Box::from(secret))
+    }
+
+    pub(super) trait PskMap:
+        fmt::Debug + PartialEq + Serialize + DeserializeOwned + Sized
+    {
+        type Psk;
+        fn new() -> Self;
+        /// Returns the number of PSKs in the map.
+        fn len(&self) -> usize;
+        /// Adds `psk` to the map.
+        ///
+        /// # Panics
+        ///
+        /// Panics if `psk` already exists.
+        fn insert(&mut self, psk: Self::Psk);
+    }
+
+    impl PartialEq for AqcBidiPsk {
+        fn eq(&self, other: &Self) -> bool {
+            bool::from(self.ct_eq(other))
+        }
+    }
+    impl PartialEq for AqcUniPsk {
+        fn eq(&self, other: &Self) -> bool {
+            bool::from(self.ct_eq(other))
+        }
+    }
+    impl PartialEq for AqcPsk {
+        fn eq(&self, other: &Self) -> bool {
+            bool::from(self.ct_eq(other))
+        }
+    }
+
+    #[track_caller]
+    fn psk_map_test<M, F>(name: &'static str, mut f: F)
+    where
+        M: PskMap,
+        F: FnMut(Secret, Id, CipherSuiteId) -> M::Psk,
+    {
+        let mut psks = M::new();
+        for (i, &suite) in CipherSuiteId::all().iter().enumerate() {
+            let id = Id::random(&mut Rng);
+            let secret = secret(&i.to_le_bytes());
+            psks.insert(f(secret, id, suite));
+        }
+        assert_eq!(psks.len(), CipherSuiteId::all().len(), "{name}");
+
+        let bytes = postcard::to_allocvec(&psks).unwrap();
+        let got = postcard::from_bytes::<M>(&bytes).unwrap();
+        assert_eq!(got, psks, "{name}")
+    }
+
+    /// Test that we can correctly serialize and deserialize
+    /// [`AqcBidiPsk`].
+    #[test]
+    fn test_aqc_bidi_psks_serde() {
+        psk_map_test::<AqcBidiPsks, _>("AqcBidiPsk", |secret, id, suite| AqcBidiPsk {
+            identity: BidiPskId::from((id.into(), suite)),
+            secret,
+        });
+    }
+
+    /// Test that we can correctly serialize and deserialize
+    /// [`AqcUniPsk`].
+    #[test]
+    fn test_aqc_uni_psks_serde() {
+        psk_map_test::<AqcUniPsks, _>("AqcUniPsk (send)", |secret, id, suite| AqcUniPsk {
+            identity: UniPskId::from((id.into(), suite)),
+            secret: Directed::Send(secret),
+        });
+        psk_map_test::<AqcUniPsks, _>("AqcUniPsk (recv)", |secret, id, suite| AqcUniPsk {
+            identity: UniPskId::from((id.into(), suite)),
+            secret: Directed::Recv(secret),
+        });
+    }
 }

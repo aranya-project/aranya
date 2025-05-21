@@ -3,7 +3,7 @@
 use core::{fmt, net::SocketAddr};
 
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
-use aranya_daemon_api::{AqcCtrl, AqcPsk, LabelId, NetIdentifier, TeamId};
+use aranya_daemon_api::{AqcCtrl, AqcPsks, LabelId, NetIdentifier, TeamId};
 use tarpc::context;
 use tracing::{debug, instrument};
 
@@ -72,12 +72,12 @@ impl<'a> AqcChannels<'a> {
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
-        let chan_id = *psks[0].identity.channel_id();
+        let chan_id = *psks.channel_id();
 
         // TODO: send ctrl msg via network.
         let _ = ctrl;
 
-        Ok(chan_id.into_id().into())
+        Ok(chan_id.into())
     }
 
     /// Creates a unidirectional AQC channel with a peer.
@@ -106,12 +106,12 @@ impl<'a> AqcChannels<'a> {
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
-        let chan_id = *psks[0].identity.channel_id();
+        let chan_id = *psks.channel_id();
 
         // TODO: send ctrl msg via network.
         let _ = ctrl;
 
-        Ok(chan_id.into_id().into())
+        Ok(chan_id.into())
     }
 
     /// Deletes an AQC bidi channel.
@@ -157,13 +157,15 @@ impl<'a> AqcChannels<'a> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
 
-        for psk in psks {
-            match psk {
-                AqcPsk::Bidi(psk) => {
-                    debug!(identity = ?psk.identity, "bidi psk identity");
+        match psks {
+            AqcPsks::Bidi(psks) => {
+                for (suite, psk) in psks {
+                    debug!(identity = ?psk.identity, %suite, "bidi psk");
                 }
-                AqcPsk::Uni(psk) => {
-                    debug!(identity = ?psk.identity, "uni psk identity");
+            }
+            AqcPsks::Uni(psks) => {
+                for (suite, psk) in psks {
+                    debug!(identity = ?psk.identity, %suite, "uni psk");
                 }
             }
         }
