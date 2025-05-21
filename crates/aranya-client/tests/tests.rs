@@ -9,7 +9,12 @@
     rust_2018_idioms
 )]
 
-use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    fmt,
+    net::{Ipv4Addr, SocketAddr},
+    path::PathBuf,
+    time::Duration,
+};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{Client, SyncPeerConfig, TeamConfig};
@@ -244,7 +249,7 @@ impl DeviceCtx {
             work_dir: work_dir.clone(),
             uds_api_path: uds_api_path.clone(),
             pid_file: work_dir.join("pid"),
-            sync_addr: Addr::new("127.0.0.1", 0)?,
+            sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
             sync_version: Some(SyncProtocol::V1),
             service_name: NonEmptyString::try_from(serice_name)?,
             afc: None,
