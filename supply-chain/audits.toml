@@ -166,6 +166,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.2.15 -> 0.2.16"
 
+[[audits.ppv-lite86]]
+who = "Eric Lagergren <elagergren@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.20 -> 0.2.21"
+
 [[audits.prettyplease]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
