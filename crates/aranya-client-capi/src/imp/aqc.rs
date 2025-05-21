@@ -51,7 +51,7 @@ impl AqcReceiverChannel {
 /// This needs to be destructured before it can be used, since C doesn't have
 /// dataful enums.
 pub struct AqcChannelType {
-    pub(crate) inner: aqc::AqcChannelType,
+    pub(crate) inner: aqc::AqcReceiveChannelType,
 }
 
 impl Typed for AqcChannelType {
@@ -59,7 +59,7 @@ impl Typed for AqcChannelType {
 }
 
 impl AqcChannelType {
-    pub fn new(channel: aqc::AqcChannelType) -> Self {
+    pub fn new(channel: aqc::AqcReceiveChannelType) -> Self {
         Self { inner: channel }
     }
 }
@@ -82,6 +82,7 @@ impl AqcSendStream {
 /// The receiver end of an AQC stream.
 pub struct AqcReceiveStream {
     pub(crate) inner: aqc::AqcReceiveStream,
+    pub(crate) data: Option<bytes::Bytes>,
 }
 
 impl Typed for AqcReceiveStream {
@@ -90,6 +91,6 @@ impl Typed for AqcReceiveStream {
 
 impl AqcReceiveStream {
     pub fn new(channel: aqc::AqcReceiveStream) -> Self {
-        Self { inner: channel }
+        Self { inner: channel, data: None }
     }
 }

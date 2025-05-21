@@ -31,6 +31,7 @@ aranya-crypto = { workspace = true }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }
+bytes = { workspace = true }
 postcard = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }

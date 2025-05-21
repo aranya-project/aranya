@@ -436,7 +436,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[184];
+    uint8_t __for_size_only[176];
 } AranyaAqcBidiChannel;
 
 /**
@@ -484,7 +484,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveStream {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[152];
+    uint8_t __for_size_only[184];
 } AranyaAqcReceiveStream;
 
 #ifdef __cplusplus
@@ -2523,8 +2523,8 @@ AranyaError aranya_aqc_send_data_ext(struct AranyaClient *client,
  * received yet which is considered a non-fatal error.
  *
  * @param[in]  stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- * @param[in]  buffer pointer to the target buffer.
- * @param[in]  buffer_len length of the target buffer.
+ * @param[out] buffer pointer to the target buffer.
+ * @param[out] buffer_len length of the target buffer.
  * @param[out] __output the number of bytes written to the buffer.
  *
  * @relates AranyaClient.
@@ -2541,8 +2541,8 @@ AranyaError aranya_aqc_try_receive_data(struct AranyaAqcReceiveStream *stream,
  * received yet which is considered a non-fatal error.
  *
  * @param[in]  stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- * @param[in]  buffer pointer to the target buffer.
- * @param[in]  buffer_len length of the target buffer.
+ * @param[out] buffer pointer to the target buffer.
+ * @param[out] buffer_len length of the target buffer.
  * @param[out] __output the number of bytes written to the buffer.
  *
  * @relates AranyaClient.

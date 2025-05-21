@@ -228,6 +228,7 @@ dependencies = [
  "aranya-daemon-api",
  "aranya-util",
  "buggy",
+ "bytes",
  "postcard",
  "quote",
  "syn 2.0.99",

@@ -10,7 +10,6 @@ use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::net::{self as aqc};
 use aranya_crypto::hex;
-use buggy::bug;
 use tracing::error;
 
 use crate::imp;
@@ -1389,7 +1388,7 @@ pub enum AqcChannelType {
 
 /// An AQC Bidirectional Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 184, align = 8)]
+#[aranya_capi_core::opaque(size = 176, align = 8)]
 pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
 
 /// An AQC Sender Channel Object.
@@ -1409,7 +1408,7 @@ pub type AqcSendStream = Safe<imp::AqcSendStream>;
 
 /// An AQC Sender Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 152, align = 8)]
+#[aranya_capi_core::opaque(size = 184, align = 8)]
 pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 
 /// Create a bidirectional AQC channel between this device and a peer.
@@ -1548,11 +1547,8 @@ pub fn aqc_try_receive_channel(
     let chan = client.deref_mut().inner.aqc().try_receive_channel()?;
 
     let chan_type = match chan {
-        aqc::AqcChannelType::Bidirectional { .. } => AqcChannelType::Bidirectional,
-        aqc::AqcChannelType::Receiver { .. } => AqcChannelType::Receiver,
-        aqc::AqcChannelType::Sender { .. } => {
-            bug!("We should never be able to receive a Sender channel!");
-        }
+        aqc::AqcReceiveChannelType::Bidirectional { .. } => AqcChannelType::Bidirectional,
+        aqc::AqcReceiveChannelType::Receiver { .. } => AqcChannelType::Receiver,
     };
 
     Safe::init(channel, imp::AqcChannelType::new(chan));
@@ -1575,17 +1571,17 @@ pub fn aqc_get_bidirectional_channel(
     bidi: &mut MaybeUninit<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
-    let inner = unsafe { channel.read().into_inner().inner };
-    match inner {
-        aqc::AqcChannelType::Bidirectional { channel } => {
-            Safe::init(bidi, imp::AqcBidiChannel::new(channel));
-            Ok(())
-        }
-        _ => Err(InvalidArg::new(
+    if let aqc::AqcReceiveChannelType::Bidirectional { channel } =
+        unsafe { channel.read().into_inner().inner }
+    {
+        Safe::init(bidi, imp::AqcBidiChannel::new(channel));
+        Ok(())
+    } else {
+        Err(InvalidArg::new(
                 "channel",
                 "Tried to call get_bidirectional_channel with a `AqcChannel` that wasn't Bidirectional!",
         )
-        .into()),
+        .into())
     }
 }
 
@@ -1604,17 +1600,17 @@ pub fn aqc_get_receiver_channel(
     receiver: &mut MaybeUninit<AqcReceiverChannel>,
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
-    let inner = unsafe { channel.read().into_inner().inner };
-    match inner {
-        aqc::AqcChannelType::Receiver { receiver: recv } => {
-            Safe::init(receiver, imp::AqcReceiverChannel::new(recv));
-            Ok(())
-        }
-        _ => Err(InvalidArg::new(
+    if let aqc::AqcReceiveChannelType::Receiver { receiver: recv } =
+        unsafe { channel.read().into_inner().inner }
+    {
+        Safe::init(receiver, imp::AqcReceiverChannel::new(recv));
+        Ok(())
+    } else {
+        Err(InvalidArg::new(
             "channel",
             "Tried to call get_receiver_channel with a `AqcChannel` that wasn't a receiver!",
         )
-        .into()),
+        .into())
     }
 }
 
@@ -1774,14 +1770,64 @@ pub fn aqc_send_data(
 /// received yet which is considered a non-fatal error.
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcReceiveStream`].
-/// @param[in]  buffer pointer to the target buffer.
-/// @param[in]  buffer_len length of the target buffer.
+/// @param[out] buffer pointer to the target buffer.
+/// @param[out] buffer_len length of the target buffer.
 /// @param[out] __output the number of bytes written to the buffer.
 ///
 /// @relates AranyaClient.
 pub fn aqc_try_receive_data(
     stream: &mut AqcReceiveStream,
-    buffer: &mut [u8],
+    buffer: &mut [MaybeUninit<u8>],
 ) -> Result<usize, imp::Error> {
-    Ok(stream.inner.try_receive(buffer)?)
+    // First, let's check to see if we have any leftover data from last call.
+    let requested = buffer.len();
+    let mut written = 0;
+
+    // If we do, grab it and set data to None
+    if let Some(mut data) = stream.data.take() {
+        // Check to see if we still have leftover data
+        let length = core::cmp::min(data.len(), requested);
+        let left = data.split_off(length);
+        if left.len() > 0 {
+            stream.data = Some(left);
+        }
+
+        // Copy as many bytes as we can to the buffer, either filling it up or depleting data.
+        for (dst, src) in core::iter::zip(&mut buffer[..length], data) {
+            dst.write(src);
+        }
+
+        written += length;
+    }
+
+    // If we still have space left in the buffer, let's try to receive more data.
+    while written < requested {
+        match stream.inner.try_receive() {
+            Ok(mut data) => {
+                // Check to see if we still have leftover data
+                let length = core::cmp::min(data.len(), requested - written);
+                let left = data.split_off(length);
+                if left.len() > 0 {
+                    stream.data = Some(left);
+                }
+
+                // Copy as many bytes as we can to the buffer, hopefully filling the buffer.
+                for (dst, src) in core::iter::zip(&mut buffer[written..written + length], data) {
+                    dst.write(src);
+                }
+
+                written += length;
+            }
+            Err(e) => {
+                // If we get an error, let's check to see if we've written any
+                // amount of data, and if so let's just return.
+                if written != 0 {
+                    break;
+                }
+                return Err(e.into());
+            }
+        }
+    }
+
+    Ok(written)
 }
