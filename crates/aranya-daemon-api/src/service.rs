@@ -23,7 +23,7 @@ use aranya_crypto::{
 use aranya_util::Addr;
 use buggy::Bug;
 pub use semver::Version;
-use serde::{de, Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use tracing::error;
 
 /// CE = Crypto Engine
@@ -235,7 +235,7 @@ macro_rules! psk_map {
             pub fn try_from_fn<I, E, F>(id: I, mut f: F) -> anyhow::Result<Self>
             where
                 I: Into<Id>,
-                E: error::Error + fmt::Display + fmt::Debug + Send + Sync + 'static,
+                anyhow::Error: From<E>,
                 F: FnMut(CipherSuiteId) -> Result<$psk, E>,
             {
                 let id = id.into();
@@ -248,23 +248,6 @@ macro_rules! psk_map {
                     psks.insert(CsId(suite), psk);
                 }
                 Ok(Self { id, psks })
-            }
-        }
-
-        impl FromIterator<$psk> for $name {
-            fn from_iter<I>(iter: I) -> Self
-            where
-                I: IntoIterator<Item = $psk>,
-            {
-                let psks = HashMap::from_iter(iter.into_iter().map(|psk| {
-                    let suite = psk.cipher_suite();
-                    (CsId(suite), psk)
-                }));
-                Self {
-                    // TODO
-                    id: Id::default(),
-                    psks,
-                }
             }
         }
 
@@ -338,35 +321,14 @@ impl<V> Iterator for IntoPsks<V> {
 }
 
 // TODO(eric): Get rid of this once `CipherSuiteId` implements
-// `Hash`, `Serialize`, and `Deserialize`.
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+// `Hash`.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
 struct CsId(CipherSuiteId);
 
 impl Hash for CsId {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.to_bytes().hash(state);
-    }
-}
-
-impl Serialize for CsId {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        let id = u16::from_be_bytes(self.0.to_bytes());
-        serializer.serialize_u16(id)
-    }
-}
-
-impl<'de> Deserialize<'de> for CsId {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        let id = <u16>::deserialize(deserializer)?;
-        CipherSuiteId::try_from_bytes(id.to_be_bytes())
-            .ok_or_else(|| de::Error::custom("invalid cipher suite id"))
-            .map(CsId)
     }
 }
 
@@ -444,6 +406,8 @@ impl AqcBidiPsk {
     fn identity(&self) -> &BidiPskId {
         &self.identity
     }
+
+    #[cfg(test)]
     fn cipher_suite(&self) -> CipherSuiteId {
         self.identity.cipher_suite()
     }
@@ -472,6 +436,8 @@ impl AqcUniPsk {
     fn identity(&self) -> &UniPskId {
         &self.identity
     }
+
+    #[cfg(test)]
     fn cipher_suite(&self) -> CipherSuiteId {
         self.identity.cipher_suite()
     }
