@@ -91,6 +91,9 @@ impl Typed for AqcReceiveStream {
 
 impl AqcReceiveStream {
     pub fn new(channel: aqc::AqcReceiveStream) -> Self {
-        Self { inner: channel, data: None }
+        Self {
+            inner: channel,
+            data: None,
+        }
     }
 }

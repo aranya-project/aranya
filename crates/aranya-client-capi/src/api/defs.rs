@@ -1570,8 +1570,8 @@ pub fn aqc_get_bidirectional_channel(
     channel: OwnedPtr<AqcChannel>,
     bidi: &mut MaybeUninit<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
-    // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
     if let aqc::AqcReceiveChannelType::Bidirectional { channel } =
+        // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
         unsafe { channel.read().into_inner().inner }
     {
         Safe::init(bidi, imp::AqcBidiChannel::new(channel));
@@ -1599,8 +1599,8 @@ pub fn aqc_get_receiver_channel(
     channel: OwnedPtr<AqcChannel>,
     receiver: &mut MaybeUninit<AqcReceiverChannel>,
 ) -> Result<(), imp::Error> {
-    // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
     if let aqc::AqcReceiveChannelType::Receiver { receiver: recv } =
+        // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
         unsafe { channel.read().into_inner().inner }
     {
         Safe::init(receiver, imp::AqcReceiverChannel::new(recv));
@@ -1788,7 +1788,7 @@ pub fn aqc_try_receive_data(
         // Check to see if we still have leftover data
         let length = core::cmp::min(data.len(), requested);
         let left = data.split_off(length);
-        if left.len() > 0 {
+        if !left.is_empty() {
             stream.data = Some(left);
         }
 
@@ -1807,7 +1807,7 @@ pub fn aqc_try_receive_data(
                 // Check to see if we still have leftover data
                 let length = core::cmp::min(data.len(), requested - written);
                 let left = data.split_off(length);
-                if left.len() > 0 {
+                if !left.is_empty() {
                     stream.data = Some(left);
                 }
 
