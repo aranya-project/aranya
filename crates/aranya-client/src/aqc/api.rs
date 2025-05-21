@@ -30,9 +30,9 @@ use tarpc::context;
 use tokio::sync::mpsc;
 use tracing::{debug, error, instrument};
 
-use super::net::TryReceiveError;
+use super::net::{AqcSenderChannel, TryReceiveError};
 use crate::{
-    aqc::net::{AqcBidirectionalChannel, AqcChannelType, AqcClient, AqcSenderChannel},
+    aqc::net::{AqcBidirectionalChannel, AqcClient, AqcReceiveChannelType},
     error::{aranya_error, AqcError, IpcError},
     Client,
 };
@@ -175,12 +175,12 @@ impl AqcChannelsImpl {
     }
 
     /// Receives a channel.
-    pub async fn receive_channel(&mut self) -> Result<AqcChannelType, AqcError> {
+    pub async fn receive_channel(&mut self) -> Result<AqcReceiveChannelType, AqcError> {
         self.client.receive_channel().await
     }
 
     /// Attempts to receive a channel.
-    pub fn try_receive_channel(&mut self) -> Result<AqcChannelType, TryReceiveError> {
+    pub fn try_receive_channel(&mut self) -> Result<AqcReceiveChannelType, TryReceiveError> {
         self.client.try_receive_channel()
     }
 }
@@ -419,14 +419,14 @@ impl<'a> AqcChannels<'a> {
     /// Waits for a peer to create an AQC channel with this client. Returns
     /// None if channels can no longer be received. If this happens, the
     /// application should be restarted.
-    pub async fn receive_channel(&mut self) -> Result<AqcChannelType, AqcError> {
+    pub async fn receive_channel(&mut self) -> Result<AqcReceiveChannelType, AqcError> {
         self.client.aqc.receive_channel().await
     }
 
     /// Returns the next available channel. If there is no channel available,
     /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
     /// is returned no channels will be available until the application is restarted.
-    pub fn try_receive_channel(&mut self) -> Result<AqcChannelType, TryReceiveError> {
+    pub fn try_receive_channel(&mut self) -> Result<AqcReceiveChannelType, TryReceiveError> {
         self.client.aqc.try_receive_channel()
     }
 }

@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{aqc::net::AqcChannelType, client::Client, Error, SyncPeerConfig, TeamConfig};
+use aranya_client::{aqc::net::AqcReceiveChannelType, client::Client, Error, SyncPeerConfig, TeamConfig};
 use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -393,7 +393,7 @@ async fn main() -> Result<()> {
     let mut received_aqc_chan = loop {
         let chan = memberb.client.aqc().receive_channel().await?;
         match chan {
-            AqcChannelType::Bidirectional { channel } => break channel,
+            AqcReceiveChannelType::Bidirectional { channel } => break channel,
             _ => bail!("expected a bidirectional channel"),
         }
     };
@@ -424,12 +424,11 @@ async fn main() -> Result<()> {
 
     // memberb receives data from stream.
     info!("memberb receiving acq data");
-    let mut buf = vec![0u8; 1024 * 1024 * 2];
-    let len = recv2
-        .receive(buf.as_mut_slice())
+    let bytes = recv2
+        .receive()
         .await?
         .assume("no data received")?;
-    assert_eq!(&buf[..len], b"hello");
+    assert_eq!(bytes, msg);
 
     info!("revoking label from membera");
     operator_team.revoke_label(membera.id, label3).await?;
