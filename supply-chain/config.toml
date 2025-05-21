@@ -7,6 +7,9 @@ version = "0.10"
 [imports.actix]
 url = "https://raw.githubusercontent.com/actix/supply-chain/main/audits.toml"
 
+[imports.aranya-core]
+url = "https://raw.githubusercontent.com/aranya-project/aranya-core/refs/heads/main/supply-chain/audits.toml"
+
 [imports.bytecode-alliance]
 url = "https://raw.githubusercontent.com/bytecodealliance/wasmtime/main/supply-chain/audits.toml"
 
