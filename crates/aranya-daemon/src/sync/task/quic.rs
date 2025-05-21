@@ -57,7 +57,7 @@ pub static KEY_PEM: &str = include_str!("./key.pem");
 
 mod psk;
 pub(crate) use psk::{
-    delete_sync_psk, load_sync_psk, set_sync_psk, ClientPresharedKeys, ServerPresharedKeys,
+    delete_sync_psk, load_sync_psk, set_sync_psk, ClientPresharedKeys, Msg, ServerPresharedKeys,
     TeamIdPSKPair,
 };
 

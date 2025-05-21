@@ -4,6 +4,7 @@ use aranya_capi_core::{
     safe::{Safe, TypeId, Typed},
     Builder, InvalidArg,
 };
+use aranya_daemon_api::Secret;
 
 use super::Error;
 use crate::api::defs::Duration;
@@ -239,7 +240,27 @@ impl Default for SyncPeerConfigBuilder {
 
 /// Configuration info when creating or adding a team in Aranya
 #[derive(Clone, Debug)]
-pub struct TeamConfig {}
+pub struct TeamConfig {
+    psk_idenitity: Option<Box<[u8]>>,
+    psk_secret: Option<Secret>,
+}
+
+impl From<TeamConfig> for aranya_client::TeamConfig {
+    fn from(value: TeamConfig) -> Self {
+        let mut builder = Self::builder();
+        if let (Some(idenitity), Some(secret)) = (value.psk_idenitity, value.psk_secret) {
+            builder = builder.psk(idenitity, secret);
+        }
+
+        builder.build().expect("All fields set")
+    }
+}
+
+impl From<&TeamConfig> for aranya_client::TeamConfig {
+    fn from(value: &TeamConfig) -> Self {
+        Self::from(value.to_owned())
+    }
+}
 
 impl Typed for TeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
@@ -247,7 +268,10 @@ impl Typed for TeamConfig {
 
 /// Builder for a [`TeamConfig`]
 #[derive(Clone, Debug, Default)]
-pub struct TeamConfigBuilder {}
+pub struct TeamConfigBuilder {
+    psk_idenitity: Option<Box<[u8]>>,
+    psk_secret: Option<Secret>,
+}
 
 impl Typed for TeamConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0x112905E7);
@@ -261,7 +285,13 @@ impl Builder for TeamConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Safe::init(out, TeamConfig {});
+        Safe::init(
+            out,
+            TeamConfig {
+                psk_idenitity: self.psk_idenitity,
+                psk_secret: self.psk_secret,
+            },
+        );
         Ok(())
     }
 }

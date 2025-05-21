@@ -213,6 +213,7 @@ impl Daemon {
             peers,
             recv_effects,
             aqc,
+            psk_send,
         )?;
         api.serve().await?;
 

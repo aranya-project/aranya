@@ -652,11 +652,11 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
     cfg.aqc(aqc_config.deref().clone());
 }
 
-#[aranya_capi_core::opaque(size = 24, align = 8)]
+#[aranya_capi_core::opaque(size = 48, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 16, align = 8)]
+#[aranya_capi_core::opaque(size = 48, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 
 /// Attempts to construct a [`TeamConfig`].
@@ -896,8 +896,9 @@ pub fn revoke_label(
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.deref_mut();
-    let cfg = aranya_client::TeamConfig::builder().build()?;
-    let id = client.rt.block_on(client.inner.create_team(cfg))?;
+    let id = client
+        .rt
+        .block_on(client.inner.create_team(cfg.deref().into()))?;
     Ok(id.into())
 }
 
@@ -913,10 +914,9 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.deref_mut();
-    let cfg = aranya_client::TeamConfig::builder().build()?;
     client
         .rt
-        .block_on(client.inner.add_team(team.into(), cfg))?;
+        .block_on(client.inner.add_team(team.into(), cfg.deref().into()))?;
     Ok(())
 }
 

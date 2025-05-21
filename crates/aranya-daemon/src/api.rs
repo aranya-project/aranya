@@ -19,13 +19,14 @@ use aranya_runtime::GraphId;
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::{pin_mut, StreamExt, TryStreamExt};
+use rustls::crypto::PresharedKey;
 use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
 };
 use tokio::{
     net::UnixListener,
-    sync::{mpsc, Mutex},
+    sync::{broadcast, mpsc, Mutex},
     task::JoinSet,
 };
 use tracing::{debug, error, info, instrument, trace, warn};
@@ -35,7 +36,7 @@ use crate::{
     aqc::Aqc,
     daemon::KS,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::task::SyncPeers,
+    sync::task::{quic::Msg, SyncPeers},
     Client, EF,
 };
 
@@ -49,6 +50,7 @@ macro_rules! find_effect {
 }
 
 type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
+type PSKSender = broadcast::Sender<Msg>;
 
 /// Daemon API Server.
 #[derive(Debug)]
@@ -69,6 +71,10 @@ pub(crate) struct DaemonApiServer {
 
     /// Channel for receiving effects from the syncer.
     recv_effects: EffectReceiver,
+
+    /// Channel for sending PSK updates
+    // Should this be optional since there will be other syncer types in the future?
+    psk_send: broadcast::Sender<Msg>,
 }
 
 impl DaemonApiServer {
@@ -84,6 +90,7 @@ impl DaemonApiServer {
         peers: SyncPeers,
         recv_effects: EffectReceiver,
         aqc: Aqc<CE, KS>,
+        psk_send: PSKSender,
     ) -> Result<Self> {
         Ok(Self {
             uds_path,
@@ -94,6 +101,7 @@ impl DaemonApiServer {
             pk,
             peers,
             aqc,
+            psk_send,
         })
     }
 
@@ -126,6 +134,7 @@ impl DaemonApiServer {
             handler: EffectHandler {
                 aqc: Arc::clone(&aqc),
             },
+            psk_send: self.psk_send,
         }));
 
         let server = {
@@ -249,6 +258,7 @@ struct ApiInner {
     peers: Mutex<SyncPeers>,
     handler: EffectHandler,
     aqc: Arc<Aqc<CE, KS>>,
+    psk_send: broadcast::Sender<Msg>,
 }
 
 impl ApiInner {
@@ -354,12 +364,19 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::TeamConfig,
     ) -> api::Result<()> {
-        todo!()
+        let (Some(identity), Some(secret)) = (cfg.psk_idenitity, cfg.psk_secret) else {
+            return Err(anyhow::anyhow!("Invalid Team Config for `add_team`. Expected `psk_idenitity` and `psk_secret` fields to be set").into());
+        };
+        let psk = PresharedKey::external(&identity, secret.raw_secret_bytes())
+            .context("unable to create PSK")?;
+        self.psk_send.send(Msg::Insert((team, Arc::new(psk))))?;
+        todo!("Store PSK in credential store. What else is left?")
     }
 
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        todo!();
+        self.psk_send.send(Msg::Remove(team))?;
+        todo!("Remove PSK from crendential store? Should remove graph data from storage provider");
     }
 
     #[instrument(skip(self))]

@@ -53,6 +53,13 @@ impl From<aranya_crypto::id::IdError> for Error {
     }
 }
 
+impl<T> From<tokio::sync::broadcast::error::SendError<T>> for Error {
+    fn from(err: tokio::sync::broadcast::error::SendError<T>) -> Self {
+        error!(%err);
+        Self(err.to_string())
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
@@ -106,9 +113,11 @@ pub enum Role {
 }
 
 /// A configuration for creating or adding a team to a daemon.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TeamConfig {
     // TODO(nikki): any fields added to this should be public
+    pub psk_idenitity: Option<Box<[u8]>>,
+    pub psk_secret: Option<Secret>,
 }
 
 /// A device's network identifier.
