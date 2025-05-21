@@ -422,41 +422,31 @@ pub struct AqcReceiveStream {
 }
 
 impl AqcReceiveStream {
-    /// Receive the next available data from a stream. Writes the data to the
-    /// target buffer and returns the number of bytes written. If the stream has
+    /// Receive the next available data from a stream. If the stream has
     /// been closed, return None.
     ///
     /// This method will block until data is available to return.
     /// The data is not guaranteed to be complete, and may need to be called
     /// multiple times to receive all data from a message.
-    pub async fn receive(&mut self, target: &mut [u8]) -> Result<Option<usize>> {
+    pub async fn receive(&mut self) -> Result<Option<Bytes>> {
         match self.receive.receive().await {
-            Ok(Some(chunk)) => {
-                let len = chunk.len();
-                target[..len].copy_from_slice(&chunk);
-                Ok(Some(len))
-            }
+            Ok(Some(chunk)) => Ok(Some(chunk)),
             Ok(None) => Ok(None),
             Err(e) => Err(e.into()),
         }
     }
 
-    /// Receive the next available data from a stream. Writes the data to the
-    /// target buffer and returns the number of bytes written.
+    /// Receive the next available data from a stream.
     ///
     /// This method will return immediately with an error if there is no data available.
     /// The errors are:
     /// - Empty: No data available.
     /// - Closed: The stream is closed.
-    pub fn try_receive(&mut self, target: &mut [u8]) -> Result<usize, TryReceiveError> {
+    pub fn try_receive(&mut self) -> Result<Bytes, TryReceiveError> {
         let waker = noop_waker();
         let mut cx = CoreContext::from_waker(&waker);
         match self.receive.poll_receive(&mut cx) {
-            Poll::Ready(Ok(Some(chunk))) => {
-                let len = chunk.len();
-                target[..len].copy_from_slice(&chunk);
-                Ok(len)
-            }
+            Poll::Ready(Ok(Some(chunk))) => Ok(chunk),
             Poll::Ready(Ok(None)) => Err(TryReceiveError::Closed),
             Poll::Ready(Err(_e)) => Err(TryReceiveError::Empty),
             Poll::Pending => Err(TryReceiveError::Empty),

@@ -6,7 +6,7 @@ use aranya_client::{aqc::net::AqcChannelType, TeamConfig};
 use aranya_crypto::csprng::rand;
 use aranya_daemon_api::ChanOp;
 use buggy::BugExt;
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use common::{sleep, TeamCtx};
 use tempfile::tempdir;
 use tracing::info;
@@ -118,12 +118,8 @@ async fn test_aqc_chans() -> Result<()> {
         .await
         .assume("stream not received")?;
     assert!(maybe_send2_1.is_none(), "Expected unidirectional stream");
-    let mut target = vec![0u8; 1024 * 1024 * 2];
-    let len = recv2_1
-        .receive(target.as_mut_slice())
-        .await?
-        .assume("no data received")?;
-    assert_eq!(&target[..len], b"hello");
+    let bytes = recv2_1.receive().await?.assume("no data received")?;
+    assert_eq!(bytes, msg1);
 
     let (mut send1_2, mut recv1_2) = bidi_chan1.create_bidi_stream().await?;
     // Send from 1 to 2 with a bidirectional stream
@@ -134,21 +130,13 @@ async fn test_aqc_chans() -> Result<()> {
         .await
         .assume("stream not received")?;
     let mut send2_2 = maybe_send2_2.expect("Expected bidirectional stream");
-    let mut target = vec![0u8; 1024 * 1024 * 2];
-    let len = recv2_2
-        .receive(target.as_mut_slice())
-        .await?
-        .assume("no data received")?;
-    assert_eq!(&target[..len], b"hello2");
+    let bytes = recv2_2.receive().await?.assume("no data received")?;
+    assert_eq!(bytes, msg2);
     // Send from 2 to 1 with a bidirectional stream
     let msg3 = Bytes::from("hello3");
     send2_2.send(&msg3).await?;
-    let mut target = vec![0u8; 1024 * 1024 * 2];
-    let len = recv1_2
-        .receive(target.as_mut_slice())
-        .await?
-        .assume("no data received")?;
-    assert_eq!(&target[..len], b"hello3");
+    let bytes = recv1_2.receive().await?.assume("no data received")?;
+    assert_eq!(bytes, msg3);
 
     // Test sending a large message
     let big_data = {
@@ -158,20 +146,16 @@ async fn test_aqc_chans() -> Result<()> {
         Bytes::from(data)
     };
     send1_2.send(&big_data).await?;
-    let mut total_len: usize = 0;
-    let mut total_pieces: i32 = 0;
+    let mut dest_bytes = BytesMut::new();
     // Send stream should return the message in pieces
-    while let Some(len) = recv2_2.receive(&mut target[total_len..]).await? {
-        total_pieces = total_pieces.checked_add(1).expect("Pieces overflow");
-        total_len = total_len.checked_add(len).expect("Length overflow");
-        if total_len >= big_data.len() {
+    while let Some(bytes) = recv2_2.receive().await? {
+        dest_bytes.extend_from_slice(&bytes);
+        if dest_bytes.len() >= big_data.len() {
             break;
         }
         tokio::time::sleep(Duration::from_millis(20)).await;
     }
-    assert!(total_pieces > 1);
-    assert_eq!(total_len, big_data.len());
-    assert_eq!(&target[..total_len], &big_data[..]);
+    assert_eq!(dest_bytes.freeze(), big_data);
 
     team.membera
         .client
@@ -224,12 +208,8 @@ async fn test_aqc_chans() -> Result<()> {
 
     let mut recv2_1 = uni_chan2.receive_uni_stream().await?;
 
-    let mut target = vec![0u8; 1024 * 1024 * 2];
-    let len = recv2_1
-        .receive(target.as_mut_slice())
-        .await?
-        .assume("no data received")?;
-    assert_eq!(&target[..len], b"hello");
+    let bytes = recv2_1.receive().await?.assume("no data received")?;
+    assert_eq!(bytes, msg1);
 
     let mut membera = team.membera;
     let memberb_aqc_addr = team.memberb.aqc_addr.clone();
@@ -275,11 +255,7 @@ async fn test_aqc_chans() -> Result<()> {
         .try_receive_stream()
         .assume("stream not received")?;
     assert!(maybe_send2_1.is_none(), "Expected unidirectional stream");
-    let mut target = vec![0u8; 1024 * 1024 * 2];
-    let len = recv2_1
-        .receive(target.as_mut_slice())
-        .await?
-        .assume("no data received")?;
-    assert_eq!(&target[..len], b"hello");
+    let bytes = recv2_1.receive().await?.assume("no data received")?;
+    assert_eq!(bytes, msg1);
     Ok(())
 }
