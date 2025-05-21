@@ -24,6 +24,12 @@ const PSK_BYTES: &[u8; 32] = b"this-is-a-32-byte-secret-psk!!!!"; // 32 bytes
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
+#[derive(Clone)]
+pub(crate) enum Msg {
+    Insert(TeamIdPSKPair),
+    Remove(TeamId),
+}
+
 #[derive(Debug)]
 /// Contains thread-safe references to [PresharedKey]s.
 /// Used by [`super::Server`]
@@ -47,7 +53,7 @@ impl ServerPresharedKeys {
         )
     }
 
-    pub(crate) fn insert(&self, id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
+    fn insert(&self, id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
         match self.keys.lock() {
             Ok(ref mut map) => {
                 map.insert(psk.identity().to_vec(), (id, psk));
@@ -70,6 +76,19 @@ impl ServerPresharedKeys {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn handle_msg(&self, msg: Msg) {
+        match msg {
+            Msg::Insert((team_id, psk)) => {
+                let _ = self
+                    .insert(team_id, psk)
+                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"));
+            }
+            Msg::Remove(_team_id) => {
+                todo!("Add remove method to `ServerPreSharedKeys`")
+            }
+        }
     }
 }
 
@@ -113,7 +132,7 @@ impl ClientPresharedKeys {
         }
     }
 
-    pub(crate) fn insert(&self, id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
+    fn insert(&self, id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
         match self.key_refs.lock() {
             Ok(ref mut map) => {
                 map.insert(id, psk);
@@ -122,6 +141,19 @@ impl ClientPresharedKeys {
         }
 
         Ok(())
+    }
+
+    pub(crate) fn handle_msg(&self, msg: Msg) {
+        match msg {
+            Msg::Insert((team_id, psk)) => {
+                let _ = self
+                    .insert(team_id, psk)
+                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"));
+            }
+            Msg::Remove(_team_id) => {
+                todo!("Add remove method to `ClientPresharedKeys`")
+            }
+        }
     }
 }
 

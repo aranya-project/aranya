@@ -111,9 +111,8 @@ impl Daemon {
         // TODO: don't hard-code. Load graph IDs from storage
         let initial_keys = [(TEAM_ID, Arc::new(load_sync_psk(&self.cfg.service_name)?))];
 
-        let (psk_send, mut psk_recv) = tokio::sync::broadcast::channel(16);
         // Initialize the Aranya client and sync server.
-        let (client, local_addr) = {
+        let (client, local_addr, server_keys) = {
             let (client, server, server_keys) = self
                 .setup_aranya(
                     eng.clone(),
@@ -128,27 +127,7 @@ impl Daemon {
             let local_addr = server.local_addr()?;
             set.spawn(async move { server.serve().await });
 
-            // New PSK received from add_team or create_team
-            set.spawn(async move {
-                loop {
-                    match psk_recv.recv().await {
-                        Ok((team_id, psk)) => {
-                            let _ = server_keys
-                                .insert(team_id, psk)
-                                .inspect_err(|err| error!(err = ?err, "unable to insert PSK"));
-                        }
-                        Err(RecvError::Closed) => break,
-                        Err(err) => {
-                            error!(err = ?err, "unable to receive psk on broadcast channel")
-                        }
-                    }
-                }
-
-                info!("PSK broadcast channel closed");
-                Ok(())
-            });
-
-            (client, local_addr)
+            (client, local_addr, server_keys)
         };
 
         // Sync in the background at some specified interval.
@@ -165,16 +144,28 @@ impl Daemon {
             }
         });
 
-        // New PSK received from add_team or create_team
+        // New PSK received from add_team/create_team or a PSK should be removed due to remove_team
+        let (psk_send, mut psk_recv) = tokio::sync::broadcast::channel(16);
+        set.spawn(async move {
+            loop {
+                match psk_recv.recv().await {
+                    Ok(msg) => server_keys.handle_msg(msg),
+                    Err(RecvError::Closed) => break,
+                    Err(err) => {
+                        error!(err = ?err, "unable to receive psk on broadcast channel")
+                    }
+                }
+            }
+
+            info!("PSK broadcast channel closed");
+            Ok(())
+        });
+
         let mut psk_recv2 = psk_send.subscribe();
         set.spawn(async move {
             loop {
                 match psk_recv2.recv().await {
-                    Ok((team_id, psk)) => {
-                        let _ = client_keys
-                            .insert(team_id, psk)
-                            .inspect_err(|err| error!(err = ?err, "unable to insert PSK"));
-                    }
+                    Ok(msg) => client_keys.handle_msg(msg),
                     Err(RecvError::Closed) => break,
                     Err(err) => {
                         error!(err = ?err, "unable to receive psk on broadcast channel")
