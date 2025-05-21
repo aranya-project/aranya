@@ -19,7 +19,7 @@ use aranya_runtime::{
 use aranya_util::Addr;
 use buggy::{bug, BugExt as _};
 use bytes::Bytes;
-use rustls::crypto::{CryptoProvider, PresharedKey};
+use rustls::crypto::CryptoProvider;
 use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     client::Connect,
@@ -58,6 +58,7 @@ pub static KEY_PEM: &str = include_str!("./key.pem");
 mod psk;
 pub(crate) use psk::{
     delete_sync_psk, load_sync_psk, set_sync_psk, ClientPresharedKeys, ServerPresharedKeys,
+    TeamIdPSKPair,
 };
 
 /// Data used for sending sync requests and processing sync responses
@@ -107,7 +108,7 @@ impl State {
     /// Creates a new instance
     pub fn new<I>(initial_keys: I) -> AnyResult<(Self, Arc<ClientPresharedKeys>)>
     where
-        I: IntoIterator<Item = Arc<PresharedKey>>,
+        I: IntoIterator<Item = TeamIdPSKPair>,
     {
         let client_keys = Arc::new(ClientPresharedKeys::new(initial_keys));
 
@@ -324,12 +325,15 @@ where
     /// Creates a new `Server`.
     #[inline]
     #[allow(deprecated)]
-    pub async fn new(
+    pub async fn new<I>(
         aranya: AranyaClient<EN, SP>,
         addr: &Addr,
         protocol: SyncProtocol,
-        initial_psks: impl IntoIterator<Item = Arc<PresharedKey>>,
-    ) -> AnyResult<(Self, Arc<ServerPresharedKeys>)> {
+        initial_psks: I,
+    ) -> AnyResult<(Self, Arc<ServerPresharedKeys>)>
+    where
+        I: IntoIterator<Item = TeamIdPSKPair>,
+    {
         // Load Cert and Key
         let certs = certs(&mut CERT_PEM.as_bytes()).collect::<AnyResult<Vec<_>, _>>()?;
         let key = private_key(&mut KEY_PEM.as_bytes())?.assume("expected private key")?;

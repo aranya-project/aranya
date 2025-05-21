@@ -7,6 +7,7 @@ use std::{
 
 use ::rustls::{client::PresharedKeyStore, crypto::PresharedKey, server::SelectsPresharedKeys};
 use anyhow::{bail, Context, Result};
+use aranya_daemon_api::TeamId;
 use aranya_util::NonEmptyString;
 use buggy::BugExt as _;
 use s2n_quic::provider::tls::rustls::rustls::pki_types::ServerName;
@@ -21,11 +22,13 @@ use crate::daemon::TEAM_ID;
 /// PSK secret bytes.
 const PSK_BYTES: &[u8; 32] = b"this-is-a-32-byte-secret-psk!!!!"; // 32 bytes
 
+pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
+
 #[derive(Debug)]
 /// Contains thread-safe references to [PresharedKey]s.
 /// Used by [`super::Server`]
 pub struct ServerPresharedKeys {
-    keys: SyncMutex<HashMap<Vec<u8>, Arc<PresharedKey>>>,
+    keys: SyncMutex<HashMap<Vec<u8>, TeamIdPSKPair>>,
     // Optional sender to report the selected identity
     identity_sender: mpsc::Sender<Vec<u8>>,
 }
@@ -44,10 +47,10 @@ impl ServerPresharedKeys {
         )
     }
 
-    pub(crate) fn insert(&self, key: Arc<PresharedKey>) -> Result<()> {
+    pub(crate) fn insert(&self, id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
         match self.keys.lock() {
             Ok(ref mut map) => {
-                map.insert(key.identity().to_vec(), key);
+                map.insert(psk.identity().to_vec(), (id, psk));
             }
             Err(e) => bail!(e.to_string()),
         }
@@ -55,10 +58,13 @@ impl ServerPresharedKeys {
         Ok(())
     }
 
-    pub(super) fn extend(&self, psks: impl IntoIterator<Item = Arc<PresharedKey>>) -> Result<()> {
+    pub(super) fn extend(&self, psks: impl IntoIterator<Item = TeamIdPSKPair>) -> Result<()> {
         match self.keys.lock() {
             Ok(ref mut keys) => {
-                keys.extend(psks.into_iter().map(|psk| (psk.identity().to_vec(), psk)));
+                keys.extend(
+                    psks.into_iter()
+                        .map(|(id, psk)| (psk.identity().to_vec(), (id, psk))),
+                );
             }
             Err(e) => bail!(e.to_string()),
         }
@@ -69,7 +75,7 @@ impl ServerPresharedKeys {
 
 impl SelectsPresharedKeys for ServerPresharedKeys {
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
-        let key = self
+        let id_key = self
             .keys
             .lock()
             .inspect_err(|e| {
@@ -85,7 +91,7 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
             .try_send(identity.to_vec())
             .assume("Failed to send identity");
 
-        key
+        id_key.map(|(_, key)| key)
     }
 }
 
@@ -93,27 +99,24 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
 /// Contains thread-safe references to [PresharedKey]s.
 /// Used by [`super::Syncer`]
 pub struct ClientPresharedKeys {
-    key_refs: SyncMutex<HashMap<Vec<u8>, Arc<PresharedKey>>>,
+    key_refs: SyncMutex<HashMap<TeamId, Arc<PresharedKey>>>,
 }
 
 impl ClientPresharedKeys {
     pub(super) fn new<I>(initial_keys: I) -> Self
     where
-        I: IntoIterator<Item = Arc<PresharedKey>>,
+        I: IntoIterator<Item = TeamIdPSKPair>,
     {
-        let key_refs = initial_keys
-            .into_iter()
-            .map(|key| (key.identity().to_vec(), key))
-            .collect();
+        let key_refs = initial_keys.into_iter().collect();
         Self {
             key_refs: SyncMutex::new(key_refs),
         }
     }
 
-    pub(crate) fn insert(&self, key: Arc<PresharedKey>) -> Result<()> {
+    pub(crate) fn insert(&self, id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
         match self.key_refs.lock() {
             Ok(ref mut map) => {
-                map.insert(key.identity().to_vec(), key);
+                map.insert(id, psk);
             }
             Err(e) => bail!(e.to_string()),
         }

@@ -27,6 +27,7 @@ use aranya_daemon::{
     vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore,
 };
+use aranya_daemon_api::TeamId;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -56,6 +57,8 @@ pub type TestServer = sync::task::quic::Server<
     PolicyEngine<DefaultEngine, Store>,
     LinearStorageProvider<FileManager>,
 >;
+
+const TEST_TEAM_ID: TeamId = TeamId::default();
 
 const TEST_PSK: LazyLock<PresharedKey> =
     LazyLock::new(|| PresharedKey::external(b"identity", b"secret").expect("should not fail"));
@@ -91,7 +94,8 @@ impl TestDevice {
         graph_id: GraphId,
     ) -> Result<Self> {
         let handle = task::spawn(async { server.serve().await }).abort_handle();
-        let (state, _client_keys) = TestState::new([Arc::new(TEST_PSK.clone())])?;
+        let initial_keys = [(TEST_TEAM_ID, Arc::new(TEST_PSK.clone()))];
+        let (state, _client_keys) = TestState::new(initial_keys)?;
         let (send, effect_recv) = mpsc::channel(1);
         let (syncer, _sync_peers) = TestSyncer::new(client, send, TEST_SYNC_PROTOCOL, state);
         Ok(Self {
@@ -248,7 +252,7 @@ impl TestCtx {
                 client.clone(),
                 &addr,
                 TEST_SYNC_PROTOCOL,
-                [Arc::new(TEST_PSK.clone())],
+                [(TEST_TEAM_ID, Arc::new(TEST_PSK.clone()))],
             )
             .await?;
             let local_addr = server.local_addr()?;

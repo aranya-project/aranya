@@ -18,9 +18,12 @@ use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::BugExt;
 use ciborium as cbor;
-use rustls::crypto::PresharedKey;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{fs, sync::Mutex, task::JoinSet};
+use tokio::{
+    fs,
+    sync::{broadcast::error::RecvError, Mutex},
+    task::JoinSet,
+};
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
@@ -36,7 +39,7 @@ use crate::{
         task::{
             quic::{
                 delete_sync_psk, load_sync_psk, set_sync_psk, ServerPresharedKeys,
-                State as QuicSyncState,
+                State as QuicSyncState, TeamIdPSKPair,
             },
             Syncer,
         },
@@ -106,10 +109,9 @@ impl Daemon {
         set_sync_psk(&self.cfg.service_name).context("Could not set PSK")?;
 
         // TODO: don't hard-code. Load graph IDs from storage
-        let initial_keys = [Arc::new(load_sync_psk(&self.cfg.service_name)?)];
+        let initial_keys = [(TEAM_ID, Arc::new(load_sync_psk(&self.cfg.service_name)?))];
 
         let (psk_send, mut psk_recv) = tokio::sync::broadcast::channel(16);
-
         // Initialize the Aranya client and sync server.
         let (client, local_addr) = {
             let (client, server, server_keys) = self
@@ -130,16 +132,20 @@ impl Daemon {
             set.spawn(async move {
                 loop {
                     match psk_recv.recv().await {
-                        Ok(psk) => {
+                        Ok((team_id, psk)) => {
                             let _ = server_keys
-                                .insert(psk)
+                                .insert(team_id, psk)
                                 .inspect_err(|err| error!(err = ?err, "unable to insert PSK"));
                         }
+                        Err(RecvError::Closed) => break,
                         Err(err) => {
                             error!(err = ?err, "unable to receive psk on broadcast channel")
                         }
                     }
                 }
+
+                info!("PSK broadcast channel closed");
+                Ok(())
             });
 
             (client, local_addr)
@@ -159,21 +165,25 @@ impl Daemon {
             }
         });
 
-        let mut psk_recv2 = psk_send.subscribe();
         // New PSK received from add_team or create_team
+        let mut psk_recv2 = psk_send.subscribe();
         set.spawn(async move {
             loop {
                 match psk_recv2.recv().await {
-                    Ok(psk) => {
+                    Ok((team_id, psk)) => {
                         let _ = client_keys
-                            .insert(psk)
+                            .insert(team_id, psk)
                             .inspect_err(|err| error!(err = ?err, "unable to insert PSK"));
                     }
+                    Err(RecvError::Closed) => break,
                     Err(err) => {
                         error!(err = ?err, "unable to receive psk on broadcast channel")
                     }
                 }
             }
+
+            info!("PSK broadcast channel closed");
+            Ok(())
         });
 
         let graph_ids = client
@@ -242,7 +252,7 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-        initial_keys: impl IntoIterator<Item = Arc<PresharedKey>>,
+        initial_keys: impl IntoIterator<Item = TeamIdPSKPair>,
     ) -> Result<(Client, SyncServer, Arc<ServerPresharedKeys>)> {
         let device_id = pk.ident_pk.id()?;
 

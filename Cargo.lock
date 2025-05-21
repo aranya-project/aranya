@@ -3011,6 +3011,7 @@ dependencies = [
  "anyhow",
  "aranya-crypto",
  "aranya-daemon",
+ "aranya-daemon-api",
  "aranya-keygen",
  "aranya-runtime",
  "aranya-util",
