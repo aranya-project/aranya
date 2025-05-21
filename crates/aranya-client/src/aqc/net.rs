@@ -230,7 +230,10 @@ impl AqcSenderChannel {
 
 impl Drop for AqcSenderChannel {
     fn drop(&mut self) {
-        self.close();
+        debug!("dropped uni channel");
+        // Attempt to close the channel when the sender is dropped.
+        // Log if there's an error, but don't panic as drop should not panic.
+        self.close()
     }
 }
 
@@ -412,7 +415,10 @@ impl AqcBidirectionalChannel {
 
 impl Drop for AqcBidirectionalChannel {
     fn drop(&mut self) {
-        self.close();
+        debug!("dropped bidi channel");
+        // Attempt to close the channel when the bidirectional channel is dropped.
+        // Log if there's an error, but don't panic as drop should not panic.
+        self.close()
     }
 }
 

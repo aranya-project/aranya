@@ -110,6 +110,7 @@ pub struct TeamCtx {
     pub operator: DeviceCtx,
     pub membera: DeviceCtx,
     pub memberb: DeviceCtx,
+    pub memberc: DeviceCtx,
 }
 
 impl TeamCtx {
@@ -117,8 +118,10 @@ impl TeamCtx {
         let owner = DeviceCtx::new(name, "owner", work_dir.join("owner"), 9001).await?;
         let admin = DeviceCtx::new(name, "admin", work_dir.join("admin"), 9002).await?;
         let operator = DeviceCtx::new(name, "operator", work_dir.join("operator"), 9003).await?;
+        // TODO: support setting up tests with a variable number of devices with the member role.
         let membera = DeviceCtx::new(name, "membera", work_dir.join("membera"), 9004).await?;
         let memberb = DeviceCtx::new(name, "memberb", work_dir.join("memberb"), 9005).await?;
+        let memberc = DeviceCtx::new(name, "memberc", work_dir.join("memberc"), 9006).await?;
 
         Ok(Self {
             owner,
@@ -126,16 +129,18 @@ impl TeamCtx {
             operator,
             membera,
             memberb,
+            memberc,
         })
     }
 
-    fn devices(&mut self) -> [&mut DeviceCtx; 5] {
+    fn devices(&mut self) -> [&mut DeviceCtx; 6] {
         [
             &mut self.owner,
             &mut self.admin,
             &mut self.operator,
             &mut self.membera,
             &mut self.memberb,
+            &mut self.memberc,
         ]
     }
 
@@ -196,10 +201,16 @@ impl TeamCtx {
             .add_device_to_team(self.membera.pk.clone())
             .await?;
 
-        // Add member A as a new device.
+        // Add member B as a new device.
         info!("adding memberb to team");
         operator_team
             .add_device_to_team(self.memberb.pk.clone())
+            .await?;
+
+        // Add member C as a new device.
+        info!("adding memberc to team");
+        operator_team
+            .add_device_to_team(self.memberc.pk.clone())
             .await?;
 
         // Make sure they see the configuration change.
