@@ -12,7 +12,6 @@ use ::rustls::{
     server::{PresharedKeySelection, SelectsPresharedKeys},
     ClientConfig, ServerConfig,
 };
-use anyhow::Context;
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
 use aranya_daemon_api::{
@@ -21,7 +20,6 @@ use aranya_daemon_api::{
 };
 use buggy::BugExt as _;
 use rustls::crypto::{hash::HashAlgorithm, CryptoProvider};
-use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     provider::{
         congestion_controller::Bbr,
@@ -46,13 +44,6 @@ pub type AqcVersion = u16;
 /// Current AQC version.
 // TODO: return `VersionMismatch` error if peer version does not match this version.
 pub const AQC_VERSION: AqcVersion = 1;
-
-/// TODO: remove this.
-/// NOTE: this certificate is to be used for demonstration purposes only!
-pub static CERT_PEM: &str = include_str!("./cert.pem");
-/// TODO: remove this.
-/// NOTE: this certificate is to be used for demonstration purposes only!
-pub static KEY_PEM: &str = include_str!("./key.pem");
 
 /// ALPN protocol identifier for Aranya QUIC Channels
 const ALPN_AQC: &[u8] = b"aqc";
@@ -93,16 +84,6 @@ impl AqcChannelsImpl {
         debug!("device ID: {:?}", device_id);
 
         // --- Start Rustls Setup ---
-        // Load Cert and Key
-        let certs = certs(&mut CERT_PEM.as_bytes())
-            .collect::<Result<Vec<_>, _>>()
-            .context("Failed to load CERT_PEM")
-            .map_err(|e| AqcError::TlsConfig(e.to_string()))?;
-        let key = private_key(&mut KEY_PEM.as_bytes())
-            .context("Failed to load KEY_PEM")
-            .map_err(|e| AqcError::TlsConfig(e.to_string()))?
-            .ok_or_else(|| AqcError::TlsConfig("No private key found in KEY_PEM".into()))?;
-
         let client_keys = Arc::new(ClientPresharedKeys::new(CTRL_KEY.clone()));
 
         // Create Client Config (INSECURE: Skips server cert verification)
@@ -123,8 +104,7 @@ impl AqcChannelsImpl {
         // Create Server Config
         let mut server_config = ServerConfig::builder()
             .with_no_client_auth()
-            .with_single_cert(certs.clone(), key)
-            .map_err(|e| AqcError::TlsConfig(e.to_string()))?;
+            .with_cert_resolver(Arc::new(NoCertResolver::default()));
         server_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
         server_config.preshared_keys =
             PresharedKeySelection::Required(Arc::clone(&server_keys) as _);
@@ -570,3 +550,32 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
     }
 }
 // --- End SkipServerVerification ---
+
+#[derive(Debug, Default)]
+struct NoCertResolver(Arc<NoSigningKey>);
+impl rustls::server::ResolvesServerCert for NoCertResolver {
+    fn resolve(
+        &self,
+        _client_hello: rustls::server::ClientHello<'_>,
+    ) -> Option<Arc<rustls::sign::CertifiedKey>> {
+        Some(Arc::new(rustls::sign::CertifiedKey::new(
+            vec![],
+            Arc::clone(&self.0) as _,
+        )))
+    }
+}
+
+#[derive(Debug, Default)]
+struct NoSigningKey;
+impl rustls::sign::SigningKey for NoSigningKey {
+    fn choose_scheme(
+        &self,
+        _offered: &[rustls::SignatureScheme],
+    ) -> Option<Box<dyn rustls::sign::Signer>> {
+        None
+    }
+
+    fn algorithm(&self) -> rustls::SignatureAlgorithm {
+        rustls::SignatureAlgorithm::ECDSA
+    }
+}

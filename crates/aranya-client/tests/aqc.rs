@@ -11,11 +11,6 @@ use common::{sleep, TeamCtx};
 use tempfile::tempdir;
 use tracing::info;
 
-/// NOTE: this certificate is to be used for demonstration purposes only!
-pub static CERT_PEM: &str = include_str!("../src/aqc/cert.pem");
-/// NOTE: this certificate is to be used for demonstration purposes only!
-pub static KEY_PEM: &str = include_str!("../src/aqc/key.pem");
-
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans() -> Result<()> {
     let interval = Duration::from_millis(100);
