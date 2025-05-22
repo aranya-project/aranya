@@ -20,7 +20,7 @@ use aranya_daemon_api::{
     NetIdentifier, TeamId,
 };
 use buggy::BugExt as _;
-use rustls::crypto::{hash::HashAlgorithm, CryptoProvider};
+use rustls::crypto::CryptoProvider;
 use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     provider::{
