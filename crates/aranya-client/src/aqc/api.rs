@@ -242,17 +242,6 @@ pub(crate) struct ClientPresharedKeys {
     keys: Arc<Mutex<Vec<Arc<PresharedKey>>>>,
 }
 
-fn suite_hash(suite: CipherSuiteId) -> HashAlgorithm {
-    match suite {
-        CipherSuiteId::TlsAes128GcmSha256 => HashAlgorithm::SHA256,
-        CipherSuiteId::TlsAes256GcmSha384 => HashAlgorithm::SHA384,
-        CipherSuiteId::TlsChaCha20Poly1305Sha256 => HashAlgorithm::SHA256,
-        CipherSuiteId::TlsAes128CcmSha256 => HashAlgorithm::SHA256,
-        CipherSuiteId::TlsAes128Ccm8Sha256 => HashAlgorithm::SHA256,
-        _ => HashAlgorithm::SHA256,
-    }
-}
-
 impl ClientPresharedKeys {
     fn new(key: Arc<PresharedKey>) -> Self {
         Self {
@@ -267,33 +256,23 @@ impl ClientPresharedKeys {
     }
 
     pub(crate) fn load_psks(&self, psks: AqcPsks) {
-        let keys = match psks {
-            AqcPsks::Bidi(psks) => psks
-                .into_iter()
-                .map(|(suite, psk)| {
-                    PresharedKey::external(psk.identity.as_bytes(), psk.secret.raw_secret_bytes())
-                        .unwrap()
-                        .with_hash_alg(suite_hash(suite))
-                        .unwrap()
-                })
-                .map(Arc::new)
-                .collect(),
-            AqcPsks::Uni(psks) => psks
-                .into_iter()
-                .map(|(suite, psk)| {
-                    let secret = match &psk.secret {
-                        Directed::Send(s) => s.raw_secret_bytes(),
-                        Directed::Recv(s) => s.raw_secret_bytes(),
-                    };
-                    PresharedKey::external(psk.identity.as_bytes(), secret)
-                        .unwrap()
-                        .with_hash_alg(suite_hash(suite))
-                        .unwrap()
-                })
-                .map(Arc::new)
-                .collect(),
+        let suite = CipherSuiteId::TlsAes128CcmSha256;
+        let psk = match psks {
+            AqcPsks::Bidi(psks) => {
+                let psk = psks.get(suite).expect("has psk");
+                PresharedKey::external(psk.identity.as_bytes(), psk.secret.raw_secret_bytes())
+                    .expect("valid psk")
+            }
+            AqcPsks::Uni(psks) => {
+                let psk = psks.get(suite).expect("has psk");
+                let secret = match &psk.secret {
+                    Directed::Send(s) => s.raw_secret_bytes(),
+                    Directed::Recv(s) => s.raw_secret_bytes(),
+                };
+                PresharedKey::external(psk.identity.as_bytes(), secret).expect("valid psk")
+            }
         };
-        *self.keys.lock().expect("poisoned") = keys;
+        *self.keys.lock().expect("poisoned") = vec![Arc::new(psk)];
     }
 }
 

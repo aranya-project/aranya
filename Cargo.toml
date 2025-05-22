@@ -85,7 +85,7 @@ tokio-util = { version = "0.7.12" }
 tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 rustls-pemfile = "2.1.2"
-rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "648a02550dd319360664f9af79862716be2879ff" }
+rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "fc478a5e9d8e2ab08b7d2d3b62f57b422033a18c" }
 
 [profile.dev]
 opt-level = 1
@@ -103,4 +103,4 @@ tag-message = ""
 tag-prefix = ""
 
 [patch.crates-io]
-rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "648a02550dd319360664f9af79862716be2879ff" }
+rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "fc478a5e9d8e2ab08b7d2d3b62f57b422033a18c" }

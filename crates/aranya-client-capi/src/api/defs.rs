@@ -1383,6 +1383,7 @@ pub unsafe fn aqc_create_bidi_channel(
     })
 }
 
+/*
 /// Delete a bidirectional AQC channel.
 ///
 /// @param client the Aranya Client [`Client`].
@@ -1416,3 +1417,4 @@ pub fn aqc_delete_uni_channel(
         .block_on(client.inner.aqc().delete_uni_channel(chan.into()))?;
     Ok(())
 }
+*/
