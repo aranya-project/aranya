@@ -12,7 +12,7 @@ pub(crate) use aranya_daemon_api::crypto::{ApiKey, PublicApiKey};
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, CE, CS,
+    DaemonApi, CE, CS, PSK,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -384,7 +384,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         cfg: api::TeamConfig,
-    ) -> api::Result<api::TeamId> {
+    ) -> api::Result<(api::TeamId, PSK)> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
@@ -395,7 +395,9 @@ impl DaemonApi for Api {
             .await
             .context("unable to create team")?;
         debug!(?graph_id);
-        Ok(graph_id.into_id().into())
+
+        let psk = PSK::new(&mut Rng);
+        Ok((graph_id.into_id().into(), psk))
     }
 
     #[instrument(skip(self))]

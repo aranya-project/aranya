@@ -11,7 +11,7 @@ use aranya_daemon_api::{
         PublicApiKey,
     },
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Version, CS,
+    Version, CS, PSK,
 };
 use aranya_util::Addr;
 use tarpc::context;
@@ -204,7 +204,7 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
+    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<(TeamId, PSK)> {
         self.daemon
             .create_team(context::current(), cfg.into())
             .await

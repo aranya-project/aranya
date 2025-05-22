@@ -896,7 +896,8 @@ pub fn revoke_label(
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.deref_mut();
-    let id = client
+    // FIXME(Steve): Return id and psk with out params
+    let (id, _psk) = client
         .rt
         .block_on(client.inner.create_team(cfg.deref().into()))?;
     Ok(id.into())
