@@ -406,7 +406,7 @@ impl DaemonApi for Api {
                 PresharedKey::external(psk.idenitity(), psk.raw_secret_bytes())
                     .context("unable to create PSK")?,
             );
-            let team_id = api::TeamId::from(graph_id.as_array().clone());
+            let team_id = api::TeamId::from(*graph_id.as_array());
             self.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
         }
 

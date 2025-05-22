@@ -221,13 +221,13 @@ impl PSK {
     /// Return the id bytes.
     #[inline]
     pub fn idenitity(&self) -> &[u8] {
-        &self.id.as_bytes()
+        self.id.as_bytes()
     }
 
     /// Return the secret bytes.
     #[inline]
     pub fn raw_secret_bytes(&self) -> &[u8] {
-        &self.secret.raw_secret_bytes()
+        self.secret.raw_secret_bytes()
     }
 }
 
