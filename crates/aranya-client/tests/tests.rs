@@ -338,22 +338,26 @@ async fn test_sync_now() -> Result<()> {
     let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
 
     // Create the initial team, and get our TeamId.
-    let cfg = TeamConfig::builder().build()?;
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
+    let (team_id, psk) = {
+        let cfg = TeamConfig::builder().build()?;
+        team.owner
+            .client
+            .create_team(cfg)
+            .await
+            .expect("expected to create team")
+    };
     info!(?team_id);
 
-    // TODO(geoff): implement add_team.
-    /*
-    team.admin.client.add_team(team_id).await?;
-    team.operator.client.add_team(team_id).await?;
-    team.membera.client.add_team(team_id).await?;
-    team.memberb.client.add_team(team_id).await?;
-    */
+    let cfg = {
+        let idenitity = psk.idenitity().to_vec().into_boxed_slice();
+        let secret = psk.raw_secret_bytes().to_vec().into_boxed_slice();
+        TeamConfig::builder().psk(idenitity, secret).build()?
+    };
+
+    team.admin.client.add_team(team_id, cfg.clone()).await?;
+    team.operator.client.add_team(team_id, cfg.clone()).await?;
+    team.membera.client.add_team(team_id, cfg.clone()).await?;
+    team.memberb.client.add_team(team_id, cfg).await?;
 
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
@@ -398,22 +402,26 @@ async fn test_query_functions() -> Result<()> {
     let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
 
     // Create the initial team, and get our TeamId.
-    let cfg = TeamConfig::builder().build()?;
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
+    let (team_id, psk) = {
+        let cfg = TeamConfig::builder().build()?;
+        team.owner
+            .client
+            .create_team(cfg)
+            .await
+            .expect("expected to create team")
+    };
     info!(?team_id);
 
-    /*
-     * TODO(geoff): implement this
-    team.admin.client.add_team(team_id).await?;
-    team.operator.client.add_team(team_id).await?;
-    team.membera.client.add_team(team_id).await?;
-    team.memberb.client.add_team(team_id).await?;
-    */
+    let cfg = {
+        let idenitity = psk.idenitity().to_vec().into_boxed_slice();
+        let secret = psk.raw_secret_bytes().to_vec().into_boxed_slice();
+        TeamConfig::builder().psk(idenitity, secret).build()?
+    };
+
+    team.admin.client.add_team(team_id, cfg.clone()).await?;
+    team.operator.client.add_team(team_id, cfg.clone()).await?;
+    team.membera.client.add_team(team_id, cfg.clone()).await?;
+    team.memberb.client.add_team(team_id, cfg).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;

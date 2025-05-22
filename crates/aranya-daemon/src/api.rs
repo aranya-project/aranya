@@ -370,7 +370,9 @@ impl DaemonApi for Api {
         let psk = PresharedKey::external(&identity, secret.raw_secret_bytes())
             .context("unable to create PSK")?;
         self.psk_send.send(Msg::Insert((team, Arc::new(psk))))?;
-        todo!("Store PSK in credential store. What else is left?")
+        // TODO(Steve): Store PSK in credential store. What else is left?
+
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -397,6 +399,17 @@ impl DaemonApi for Api {
         debug!(?graph_id);
 
         let psk = PSK::new(&mut Rng);
+
+        // Send PSK update to the key stores
+        {
+            let psk_ref = Arc::new(
+                PresharedKey::external(psk.idenitity(), psk.raw_secret_bytes())
+                    .context("unable to create PSK")?,
+            );
+            let team_id = api::TeamId::from(graph_id.as_array().clone());
+            self.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
+        }
+
         Ok((graph_id.into_id().into(), psk))
     }
 

@@ -6,21 +6,12 @@ use std::{
 };
 
 use ::rustls::{client::PresharedKeyStore, crypto::PresharedKey, server::SelectsPresharedKeys};
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, Result};
 use aranya_daemon_api::TeamId;
-use aranya_util::NonEmptyString;
 use buggy::BugExt as _;
 use s2n_quic::provider::tls::rustls::rustls::pki_types::ServerName;
 use tokio::sync::mpsc;
 use tracing::error;
-
-// TODO(Steve): Remove once "add_team" is implemented
-use crate::daemon::TEAM_ID;
-
-// FIXME
-// PSK is hard-coded to prototype the QUIC syncer until PSK key management is complete.
-/// PSK secret bytes.
-const PSK_BYTES: &[u8; 32] = b"this-is-a-32-byte-secret-psk!!!!"; // 32 bytes
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
@@ -164,36 +155,6 @@ impl PresharedKeyStore for ClientPresharedKeys {
         let key_map = self.key_refs.lock().expect("Client PSK mutex poisoned");
         key_map.values().map(Arc::clone).collect()
     }
-}
-
-pub(crate) fn set_sync_psk(service_name: &NonEmptyString) -> Result<()> {
-    let id_string = TEAM_ID.to_string();
-    let entry = keyring::Entry::new(service_name, &id_string)?;
-
-    entry
-        .set_secret(PSK_BYTES)
-        .inspect_err(|e| error!(%e, %service_name))?;
-
-    Ok(())
-}
-
-pub(crate) fn load_sync_psk(service_name: &NonEmptyString) -> Result<PresharedKey> {
-    let id_string = TEAM_ID.to_string();
-    let entry = keyring::Entry::new(service_name, &id_string)?;
-    let secret = entry
-        .get_secret()
-        .context("Couldn't retreive secret for PSK")?;
-
-    Ok(PresharedKey::external(id_string.as_bytes(), &secret).assume("unable to create PSK")?)
-}
-
-pub(crate) fn delete_sync_psk(service_name: &NonEmptyString) -> Result<()> {
-    let id_string = TEAM_ID.to_string();
-    let entry = keyring::Entry::new(service_name, &id_string)?;
-
-    entry.delete_credential().inspect_err(|e| error!(%e))?;
-
-    Ok(())
 }
 
 // pub(super) async fn get_existing_psks<EN, SP: StorageProvider>(

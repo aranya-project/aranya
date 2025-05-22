@@ -8,7 +8,7 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore, KeyStoreExt},
     Engine, Rng,
 };
-use aranya_daemon_api::{TeamId, CS};
+use aranya_daemon_api::CS;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -37,10 +37,7 @@ use crate::{
     sync::{
         prot::SyncProtocol,
         task::{
-            quic::{
-                delete_sync_psk, load_sync_psk, set_sync_psk, ServerPresharedKeys,
-                State as QuicSyncState, TeamIdPSKPair,
-            },
+            quic::{ServerPresharedKeys, State as QuicSyncState, TeamIdPSKPair},
             Syncer,
         },
     },
@@ -63,8 +60,6 @@ pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
 pub(crate) const DEFAULT_SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
 
-// TODO(Steve): Remove once "add_team" is implemented
-pub(crate) const TEAM_ID: TeamId = TeamId::default();
 // pub(crate) const SERVICE_NAME: &str = "Aranya-QUIC-Sync";
 
 /// The daemon itself.
@@ -105,11 +100,8 @@ impl Daemon {
         let mut local_store = self.load_local_keystore().await?;
         let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
 
-        // TODO(Steve): Temporarily set the PSK secret in the OS's keystore
-        set_sync_psk(&self.cfg.service_name).context("Could not set PSK")?;
-
-        // TODO: don't hard-code. Load graph IDs from storage
-        let initial_keys = [(TEAM_ID, Arc::new(load_sync_psk(&self.cfg.service_name)?))];
+        // TODO: Load graph IDs from storage
+        let initial_keys = [];
 
         // Initialize the Aranya client and sync server.
         let (client, local_addr, server_keys) = {
@@ -378,8 +370,8 @@ impl Daemon {
     ///
     /// For testing purposes only.
     pub fn cleanup(&self) -> impl FnOnce() -> Result<()> {
-        let service_name = self.cfg.service_name.clone();
-        move || delete_sync_psk(&service_name)
+        // FIXME: Replace this to clean up the entries in the credential store
+        move || Ok(())
     }
 }
 

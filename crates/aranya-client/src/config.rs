@@ -82,6 +82,7 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
+#[derive(Clone)]
 /// Configuration info for adding and creating teams.
 pub struct TeamConfig {
     psk_idenitity: Option<Box<[u8]>>,
