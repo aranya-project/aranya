@@ -160,7 +160,7 @@ dependencies = [
 [[package]]
 name = "aranya-capi-codegen"
 version = "0.3.0"
-source = "git+https://github.com/aranya-project/aranya-core?branch=opaque-pub-branch#dc7291b9e47d376ebd71f29b13f366b26c1c1135"
+source = "git+https://github.com/aranya-project/aranya-core?rev=d0d5c84cc82138709678f0c7be8895141d741d83#d0d5c84cc82138709678f0c7be8895141d741d83"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -177,10 +177,10 @@ dependencies = [
 [[package]]
 name = "aranya-capi-core"
 version = "0.4.0"
-source = "git+https://github.com/aranya-project/aranya-core?branch=opaque-pub-branch#dc7291b9e47d376ebd71f29b13f366b26c1c1135"
+source = "git+https://github.com/aranya-project/aranya-core?rev=d0d5c84cc82138709678f0c7be8895141d741d83#d0d5c84cc82138709678f0c7be8895141d741d83"
 dependencies = [
  "aranya-capi-macro",
- "aranya-libc 0.2.0 (git+https://github.com/aranya-project/aranya-core?branch=opaque-pub-branch)",
+ "aranya-libc 0.2.0 (git+https://github.com/aranya-project/aranya-core?rev=d0d5c84cc82138709678f0c7be8895141d741d83)",
  "buggy",
  "cfg-if",
  "const_format",
@@ -192,9 +192,9 @@ dependencies = [
 [[package]]
 name = "aranya-capi-macro"
 version = "0.3.0"
-source = "git+https://github.com/aranya-project/aranya-core?branch=opaque-pub-branch#dc7291b9e47d376ebd71f29b13f366b26c1c1135"
+source = "git+https://github.com/aranya-project/aranya-core?rev=d0d5c84cc82138709678f0c7be8895141d741d83#d0d5c84cc82138709678f0c7be8895141d741d83"
 dependencies = [
- "aranya-capi-codegen 0.3.0 (git+https://github.com/aranya-project/aranya-core?branch=opaque-pub-branch)",
+ "aranya-capi-codegen 0.3.0 (git+https://github.com/aranya-project/aranya-core?rev=d0d5c84cc82138709678f0c7be8895141d741d83)",
  "proc-macro2",
  "quote",
  "syn 2.0.99",
@@ -432,7 +432,7 @@ dependencies = [
 [[package]]
 name = "aranya-libc"
 version = "0.2.0"
-source = "git+https://github.com/aranya-project/aranya-core?branch=opaque-pub-branch#dc7291b9e47d376ebd71f29b13f366b26c1c1135"
+source = "git+https://github.com/aranya-project/aranya-core?rev=d0d5c84cc82138709678f0c7be8895141d741d83#d0d5c84cc82138709678f0c7be8895141d741d83"
 dependencies = [
  "cfg-if",
  "libc",

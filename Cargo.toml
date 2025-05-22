@@ -104,4 +104,4 @@ tag-prefix = ""
 
 [patch.crates-io]
 rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "fc478a5e9d8e2ab08b7d2d3b62f57b422033a18c" }
-aranya-capi-core = { git = "https://github.com/aranya-project/aranya-core", branch = "opaque-pub-branch"}
+aranya-capi-core = { git = "https://github.com/aranya-project/aranya-core", rev = "d0d5c84cc82138709678f0c7be8895141d741d83" }
