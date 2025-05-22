@@ -25,7 +25,7 @@ use tracing::{debug, error, warn};
 
 use super::api::CTRL_KEY;
 use crate::{
-    aqc::api::{AqcChannel, ClientPresharedKeys, PSK_IDENTITY_CTRL},
+    aqc::api::{AqcChannel, ClientPresharedKeys, ServerPresharedKeys, PSK_IDENTITY_CTRL},
     error::{self, AqcError, IpcError},
 };
 
@@ -52,6 +52,7 @@ async fn receive_aqc_ctrl(
     daemon: Arc<DaemonApiClient>,
     team: TeamId,
     ctrl: AqcCtrl,
+    server_keys: &ServerPresharedKeys,
     channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
 ) -> crate::Result<()> {
     let (_peer, psks) = daemon
@@ -60,6 +61,8 @@ async fn receive_aqc_ctrl(
         .map_err(IpcError::new)?
         .context("unable to receive aqc ctrl")
         .map_err(error::other)?;
+
+    server_keys.load_psks(psks.clone());
 
     match psks {
         AqcPsks::Bidi(psks) => {
@@ -106,6 +109,7 @@ fn create_channel_type(conn: Connection, channel_info: &AqcChannel) -> AqcReceiv
 
 async fn receive_ctrl_message(
     daemon: &Arc<DaemonApiClient>,
+    server_keys: &ServerPresharedKeys,
     channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
     conn: &mut Connection,
 ) -> Result<(), AqcError> {
@@ -118,9 +122,15 @@ async fn receive_ctrl_message(
             };
             match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
                 Ok(ctrl) => {
-                    receive_aqc_ctrl(daemon.clone(), ctrl.team_id, ctrl.ctrl, channel_map)
-                        .await
-                        .map_err(anyhow::Error::new)?;
+                    receive_aqc_ctrl(
+                        daemon.clone(),
+                        ctrl.team_id,
+                        ctrl.ctrl,
+                        server_keys,
+                        channel_map,
+                    )
+                    .await
+                    .map_err(anyhow::Error::new)?;
                     // Send an ACK back
                     let ack_msg = AqcAckMessage::Success;
                     let ack_bytes = postcard::to_stdvec(&ack_msg)
@@ -493,6 +503,7 @@ pub enum TryReceiveError {
 pub(crate) struct AqcClient {
     quic_client: Client,
     client_keys: Arc<ClientPresharedKeys>,
+    server_keys: Arc<ServerPresharedKeys>,
     /// Map of PSK identity to channel type
     channels: HashMap<Vec<u8>, AqcChannel>,
     server: Server,
@@ -505,6 +516,7 @@ impl AqcClient {
     pub fn new<T: provider::tls::Provider>(
         provider: T,
         client_keys: Arc<ClientPresharedKeys>,
+        server_keys: Arc<ServerPresharedKeys>,
         identity_rx: mpsc::Receiver<Vec<u8>>,
         server: Server,
         daemon: Arc<DaemonApiClient>,
@@ -516,6 +528,7 @@ impl AqcClient {
         Ok(AqcClient {
             quic_client,
             client_keys,
+            server_keys,
             channels: HashMap::new(),
             server,
             daemon,
@@ -550,7 +563,13 @@ impl AqcClient {
                     // This will update the channel map with the PSK and associate it with an
                     // AqcChannel.
                     if identity == PSK_IDENTITY_CTRL {
-                        receive_ctrl_message(&self.daemon, &mut self.channels, &mut conn).await?;
+                        receive_ctrl_message(
+                            &self.daemon,
+                            &self.server_keys,
+                            &mut self.channels,
+                            &mut conn,
+                        )
+                        .await?;
                     // If the PSK identity hint is not the control PSK, check if it's in the channel map.
                     // If it is, create a channel of the appropriate type. We should have already received
                     // the control message for this PSK, if we don't we can't create a channel.
@@ -603,7 +622,13 @@ impl AqcClient {
                     if identity == PSK_IDENTITY_CTRL {
                         // Block on the async function
                         let result = futures_lite::future::block_on(async {
-                            receive_ctrl_message(&self.daemon, &mut self.channels, &mut conn).await
+                            receive_ctrl_message(
+                                &self.daemon,
+                                &self.server_keys,
+                                &mut self.channels,
+                                &mut conn,
+                            )
+                            .await
                         });
 
                         if let Err(e) = result {
