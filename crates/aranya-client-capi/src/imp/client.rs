@@ -8,6 +8,13 @@ pub struct Client {
     pub(crate) rt: tokio::runtime::Runtime,
 }
 
+impl Client {
+    /// Useful for deref coercion.
+    pub(crate) fn imp(&mut self) -> &mut Self {
+        self
+    }
+}
+
 impl Typed for Client {
     const TYPE_ID: TypeId = TypeId::new(0xBBAFB41C);
 }
