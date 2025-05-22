@@ -424,7 +424,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[192];
+    uint8_t __for_size_only[120];
 } AranyaAqcChannel;
 
 /**

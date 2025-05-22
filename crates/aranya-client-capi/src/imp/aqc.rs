@@ -50,15 +50,15 @@ impl AqcReceiverChannel {
 ///
 /// This needs to be destructured before it can be used, since C doesn't have
 /// dataful enums.
-pub struct AqcChannelType {
+pub struct AqcChannel {
     pub(crate) inner: aqc::AqcReceiveChannelType,
 }
 
-impl Typed for AqcChannelType {
+impl Typed for AqcChannel {
     const TYPE_ID: TypeId = TypeId::new(0x7A1D7BE9);
 }
 
-impl AqcChannelType {
+impl AqcChannel {
     pub fn new(channel: aqc::AqcReceiveChannelType) -> Self {
         Self { inner: channel }
     }

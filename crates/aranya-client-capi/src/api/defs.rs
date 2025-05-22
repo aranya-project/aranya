@@ -7,7 +7,7 @@ use core::{
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt, str::FromStr};
 
 use anyhow::Context as _;
-use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
+use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::net::{self as aqc};
 use aranya_crypto::hex;
 use tracing::error;
@@ -1375,8 +1375,8 @@ pub unsafe fn aqc_remove_net_identifier(
 /// `try_receive_channel`, and is invalidated after calling
 /// `get_bidirectional_channel`/`get_receiver_channel`.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 192, align = 8)]
-pub type AqcChannel = Safe<imp::AqcChannelType>;
+#[aranya_capi_core::opaque(size = 120, align = 8)]
+pub type AqcChannel = Safe<imp::AqcChannel>;
 
 /// An enum containing all [`AqcChannel`] variants.
 #[repr(u8)]
@@ -1432,14 +1432,14 @@ pub unsafe fn aqc_create_bidi_channel(
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
 
-    let client = client.deref_mut();
+    let client = client.imp();
     let chan = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
         peer,
         label_id.into(),
     ))?;
 
-    Safe::init(channel, imp::AqcBidiChannel::new(chan));
+    AqcBidiChannel::init(channel, imp::AqcBidiChannel::new(chan));
     Ok(())
 }
 
@@ -1464,14 +1464,14 @@ pub unsafe fn aqc_create_uni_channel(
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
 
-    let client = client.deref_mut();
+    let client = client.imp();
     let chan = client.rt.block_on(client.inner.aqc().create_uni_channel(
         team.into(),
         peer,
         label_id.into(),
     ))?;
 
-    Safe::init(channel, imp::AqcSenderChannel::new(chan));
+    AqcSenderChannel::init(channel, imp::AqcSenderChannel::new(chan));
     Ok(())
 }
 
@@ -1551,7 +1551,7 @@ pub fn aqc_try_receive_channel(
         aqc::AqcReceiveChannelType::Receiver { .. } => AqcChannelType::Receiver,
     };
 
-    Safe::init(channel, imp::AqcChannelType::new(chan));
+    AqcChannel::init(channel, imp::AqcChannel::new(chan));
 
     Ok(chan_type)
 }
@@ -1572,9 +1572,9 @@ pub fn aqc_get_bidirectional_channel(
 ) -> Result<(), imp::Error> {
     if let aqc::AqcReceiveChannelType::Bidirectional { channel } =
         // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
-        unsafe { channel.read().into_inner().inner }
+        unsafe { Opaque::into_inner(channel.read()).into_inner().inner }
     {
-        Safe::init(bidi, imp::AqcBidiChannel::new(channel));
+        AqcBidiChannel::init(bidi, imp::AqcBidiChannel::new(channel));
         Ok(())
     } else {
         Err(InvalidArg::new(
@@ -1601,9 +1601,9 @@ pub fn aqc_get_receiver_channel(
 ) -> Result<(), imp::Error> {
     if let aqc::AqcReceiveChannelType::Receiver { receiver: recv } =
         // SAFETY: the user is responsible for passing in a valid AqcChannel pointer.
-        unsafe { channel.read().into_inner().inner }
+        unsafe { Opaque::into_inner(channel.read()).into_inner().inner }
     {
-        Safe::init(receiver, imp::AqcReceiverChannel::new(recv));
+        AqcReceiverChannel::init(receiver, imp::AqcReceiverChannel::new(recv));
         Ok(())
     } else {
         Err(InvalidArg::new(
@@ -1636,8 +1636,8 @@ pub fn aqc_bidi_create_bidi_stream(
         .rt
         .block_on(channel.inner.create_bidi_stream())?;
 
-    Safe::init(send_stream, imp::AqcSendStream::new(send));
-    Safe::init(recv_stream, imp::AqcReceiveStream::new(recv));
+    AqcSendStream::init(send_stream, imp::AqcSendStream::new(send));
+    AqcReceiveStream::init(recv_stream, imp::AqcReceiveStream::new(recv));
     Ok(())
 }
 
@@ -1661,7 +1661,7 @@ pub fn aqc_bidi_create_uni_stream(
         .rt
         .block_on(channel.inner.create_uni_stream())?;
 
-    Safe::init(stream, imp::AqcSendStream::new(send));
+    AqcSendStream::init(stream, imp::AqcSendStream::new(send));
     Ok(())
 }
 
@@ -1689,10 +1689,10 @@ pub fn aqc_bidi_try_receive_stream(
 ) -> Result<(), imp::Error> {
     let (send, recv) = channel.inner.try_receive_stream()?;
 
-    Safe::init(recv_stream, imp::AqcReceiveStream::new(recv));
+    AqcReceiveStream::init(recv_stream, imp::AqcReceiveStream::new(recv));
     match send {
         Some(send) => {
-            Safe::init(send_stream, imp::AqcSendStream::new(send));
+            AqcSendStream::init(send_stream, imp::AqcSendStream::new(send));
             send_init.write(true);
         }
         None => {
@@ -1722,7 +1722,7 @@ pub fn aqc_send_create_uni_stream(
         .rt
         .block_on(channel.inner.create_uni_stream())?;
 
-    Safe::init(stream, imp::AqcSendStream::new(send));
+    AqcSendStream::init(stream, imp::AqcSendStream::new(send));
     Ok(())
 }
 
@@ -1744,7 +1744,7 @@ pub fn aqc_recv_try_receive_uni_stream(
 ) -> Result<(), imp::Error> {
     let recv = channel.inner.try_receive_uni_stream()?;
 
-    Safe::init(stream, imp::AqcReceiveStream::new(recv));
+    AqcReceiveStream::init(stream, imp::AqcReceiveStream::new(recv));
     Ok(())
 }
 
