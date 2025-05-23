@@ -223,9 +223,9 @@ impl Client {
             .map_err(aranya_error)
     }
 
-    /// Returns the address that the AQC server is bound to.
-    pub async fn aqc_local_addr(&self) -> Result<SocketAddr> {
-        Ok(self.aqc.local_addr()?)
+    /// Returns the address that the AQC client is bound to.
+    pub async fn aqc_client_addr(&self) -> Result<SocketAddr> {
+        Ok(self.aqc.client_addr()?)
     }
 
     /// Gets the public key bundle for this device.

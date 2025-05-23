@@ -523,9 +523,14 @@ impl AqcClient {
         })
     }
 
-    /// Get the local address of the client.
-    pub fn local_addr(&self) -> Result<SocketAddr, Bug> {
+    /// Get the client address.
+    pub fn client_addr(&self) -> Result<SocketAddr, Bug> {
         self.quic_client.local_addr().assume("can get local addr")
+    }
+
+    /// Get the server address.
+    pub fn server_addr(&self) -> Result<SocketAddr, Bug> {
+        self.server.local_addr().assume("can get local addr")
     }
 
     /// Receive the next available channel. If the channel is closed, return None.
@@ -661,7 +666,7 @@ impl AqcClient {
         self.client_keys.load_psks(AqcPsks::Uni(psks));
         let mut conn = self
             .quic_client
-            .connect(Connect::new(addr).with_server_name("localhost"))
+            .connect(Connect::new(addr).with_server_name(addr.to_string()))
             .await?;
         conn.keep_alive(true)?;
         Ok(AqcSenderChannel::new(label_id, channel_id, conn.handle()))
@@ -678,7 +683,7 @@ impl AqcClient {
         self.client_keys.load_psks(AqcPsks::Bidi(psks));
         let mut conn = self
             .quic_client
-            .connect(Connect::new(addr).with_server_name("localhost"))
+            .connect(Connect::new(addr).with_server_name(addr.to_string()))
             .await?;
         conn.keep_alive(true)?;
         Ok(AqcBidirectionalChannel::new(label_id, channel_id, conn))
@@ -694,7 +699,7 @@ impl AqcClient {
         self.client_keys.set_key(CTRL_KEY.clone());
         let mut conn = self
             .quic_client
-            .connect(Connect::new(addr).with_server_name("localhost"))
+            .connect(Connect::new(addr).with_server_name(addr.to_string()))
             .await?;
         conn.keep_alive(true)?;
         let (mut recv, mut send) = conn.open_bidirectional_stream().await?.split();

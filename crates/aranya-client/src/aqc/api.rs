@@ -135,9 +135,14 @@ impl AqcChannelsImpl {
         Ok((Self { client }, aqc_addr))
     }
 
-    /// Returns the local address that AQC is bound to.
-    pub fn local_addr(&self) -> Result<SocketAddr, Bug> {
-        self.client.local_addr()
+    /// Returns the local address that the AQC client is bound to.
+    pub fn client_addr(&self) -> Result<SocketAddr, Bug> {
+        self.client.client_addr()
+    }
+
+    /// Returns the local address that the AQC server is bound to.
+    pub fn server_addr(&self) -> Result<SocketAddr, Bug> {
+        self.client.server_addr()
     }
 
     /// Creates a bidirectional AQC channel with a peer.
@@ -296,10 +301,16 @@ impl<'a> AqcChannels<'a> {
         Self { client }
     }
 
-    /// Returns the address that AQC is bound to. This address is used to
+    /// Returns the address that the AQC client is bound to. This address is used to
     /// make connections to other peers.
-    pub async fn local_addr(&self) -> Result<SocketAddr, AqcError> {
-        Ok(self.client.aqc.local_addr()?)
+    pub fn client_addr(&self) -> Result<SocketAddr, AqcError> {
+        Ok(self.client.aqc.client_addr()?)
+    }
+
+    /// Returns the address that the AQC server is bound to. This address is used by
+    /// peers to connect to this instance.
+    pub fn server_addr(&self) -> Result<SocketAddr, AqcError> {
+        Ok(self.client.aqc.server_addr()?)
     }
 
     /// Creates a bidirectional AQC channel with a peer.
