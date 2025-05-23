@@ -33,7 +33,7 @@ use tracing::{debug, error, instrument};
 
 use super::net::{AqcSenderChannel, TryReceiveError};
 use crate::{
-    aqc::net::{AqcBidirectionalChannel, AqcClient, AqcReceiveChannelType},
+    aqc::net::{AqcBidirectionalChannel, AqcClient, AqcPeerChannel},
     error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
 };
@@ -62,9 +62,9 @@ pub(super) static CTRL_KEY: LazyLock<Arc<PresharedKey>> = LazyLock::new(|| {
 });
 
 #[derive(Debug)]
-pub enum AqcChannel {
-    Bidirectional { id: BidiChannelId },
-    Unidirectional { id: UniChannelId },
+pub enum AqcChannelId {
+    Bidirectional(BidiChannelId),
+    Unidirectional(UniChannelId),
 }
 
 /// Sends and receives AQC messages.
@@ -170,14 +170,12 @@ impl AqcChannelsImpl {
     }
 
     /// Receives a channel.
-    pub async fn receive_channel(&mut self) -> crate::Result<AqcReceiveChannelType> {
+    pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
         self.client.receive_channel().await
     }
 
     /// Attempts to receive a channel.
-    pub fn try_receive_channel(
-        &mut self,
-    ) -> Result<AqcReceiveChannelType, TryReceiveError<crate::Error>> {
+    pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         self.client.try_receive_channel()
     }
 }
@@ -440,16 +438,14 @@ impl<'a> AqcChannels<'a> {
     /// Waits for a peer to create an AQC channel with this client. Returns
     /// None if channels can no longer be received. If this happens, the
     /// application should be restarted.
-    pub async fn receive_channel(&mut self) -> crate::Result<AqcReceiveChannelType> {
+    pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
         self.client.aqc.receive_channel().await
     }
 
     /// Returns the next available channel. If there is no channel available,
     /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
     /// is returned no channels will be available until the application is restarted.
-    pub fn try_receive_channel(
-        &mut self,
-    ) -> Result<AqcReceiveChannelType, TryReceiveError<crate::Error>> {
+    pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         self.client.aqc.try_receive_channel()
     }
 }

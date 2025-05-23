@@ -29,7 +29,7 @@ use tracing::{debug, error, warn};
 
 use super::api::CTRL_KEY;
 use crate::{
-    aqc::api::{AqcChannel, ClientPresharedKeys, ServerPresharedKeys, PSK_IDENTITY_CTRL},
+    aqc::api::{AqcChannelId, ClientPresharedKeys, ServerPresharedKeys, PSK_IDENTITY_CTRL},
     error::{aranya_error, AqcError, IpcError},
 };
 
@@ -57,7 +57,7 @@ async fn receive_aqc_ctrl(
     team: TeamId,
     ctrl: AqcCtrl,
     server_keys: &ServerPresharedKeys,
-    channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
+    channel_map: &mut HashMap<Vec<u8>, AqcChannelId>,
 ) -> crate::Result<()> {
     let (_peer, psks) = daemon
         .receive_aqc_ctrl(context::current(), team, ctrl)
@@ -72,9 +72,7 @@ async fn receive_aqc_ctrl(
             for (_suite, psk) in psks {
                 channel_map.insert(
                     psk.identity.as_bytes().to_vec(),
-                    AqcChannel::Bidirectional {
-                        id: *psk.identity.channel_id(),
-                    },
+                    AqcChannelId::Bidirectional(*psk.identity.channel_id()),
                 );
             }
         }
@@ -82,9 +80,7 @@ async fn receive_aqc_ctrl(
             for (_suite, psk) in psks {
                 channel_map.insert(
                     psk.identity.as_bytes().to_vec(),
-                    AqcChannel::Unidirectional {
-                        id: *psk.identity.channel_id(),
-                    },
+                    AqcChannelId::Unidirectional(*psk.identity.channel_id()),
                 );
             }
         }
@@ -93,19 +89,19 @@ async fn receive_aqc_ctrl(
     Ok(())
 }
 
-fn create_channel_type(conn: Connection, channel_info: &AqcChannel) -> AqcReceiveChannelType {
-    match channel_info {
-        AqcChannel::Bidirectional { id } => {
+fn create_peer_channel(conn: Connection, channel_id: &AqcChannelId) -> AqcPeerChannel {
+    match channel_id {
+        AqcChannelId::Bidirectional(id) => {
             // Once we accept a valid connection, let's turn it into an AQC Channel that we can
             // then open an arbitrary number of streams on.
             let channel = AqcBidirectionalChannel::new(LabelId::default(), *id, conn);
-            AqcReceiveChannelType::Bidirectional { channel }
+            AqcPeerChannel::Bidirectional(channel)
         }
-        AqcChannel::Unidirectional { id } => {
+        AqcChannelId::Unidirectional(id) => {
             // Once we accept a valid connection, let's turn it into an AQC Channel that we can
             // then open an arbitrary number of streams on.
             let receiver = AqcReceiverChannel::new(LabelId::default(), *id, conn);
-            AqcReceiveChannelType::Receiver { receiver }
+            AqcPeerChannel::Receiver(receiver)
         }
     }
 }
@@ -113,7 +109,7 @@ fn create_channel_type(conn: Connection, channel_info: &AqcChannel) -> AqcReceiv
 async fn receive_ctrl_message(
     daemon: &Arc<DaemonApiClient>,
     server_keys: &ServerPresharedKeys,
-    channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
+    channel_map: &mut HashMap<Vec<u8>, AqcChannelId>,
     conn: &mut Connection,
 ) -> crate::Result<()> {
     let stream = conn
@@ -157,19 +153,13 @@ async fn receive_ctrl_message(
     Ok(())
 }
 
-/// Indicates the type of channel. This will be a channel that can be used to receive data from a peer.
+/// A channel opened by a peer.
 #[derive(Debug)]
-pub enum AqcReceiveChannelType {
+pub enum AqcPeerChannel {
     /// Used to receive data from a peer.
-    Receiver {
-        /// The receiving end of a unidirectional channel.
-        receiver: AqcReceiverChannel,
-    },
-    /// Used to send and receive data from a peer.
-    Bidirectional {
-        /// The sending and receiving end of a bidirectional channel.
-        channel: AqcBidirectionalChannel,
-    },
+    Receiver(AqcReceiverChannel),
+    /// Used to send and receive data with a peer.
+    Bidirectional(AqcBidirectionalChannel),
 }
 
 /// The sending end of a unidirectional channel.
@@ -491,7 +481,7 @@ pub(crate) struct AqcClient {
     client_keys: Arc<ClientPresharedKeys>,
     server_keys: Arc<ServerPresharedKeys>,
     /// Map of PSK identity to channel type
-    channels: HashMap<Vec<u8>, AqcChannel>,
+    channels: HashMap<Vec<u8>, AqcChannelId>,
     server: Server,
     daemon: Arc<DaemonApiClient>,
     identity_rx: mpsc::Receiver<Vec<u8>>,
@@ -535,7 +525,7 @@ impl AqcClient {
 
     /// Receive the next available channel. If the channel is closed, return None.
     /// This method will return a channel created by a peer that hasn't been received yet.
-    pub async fn receive_channel(&mut self) -> crate::Result<AqcReceiveChannelType> {
+    pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
         loop {
             // Accept a new connection
             let mut conn = self
@@ -577,16 +567,14 @@ impl AqcClient {
                 );
                 AqcError::NoChannelInfoFound
             })?;
-            return Ok(create_channel_type(conn, channel_info));
+            return Ok(create_peer_channel(conn, channel_info));
         }
     }
 
     /// Receive the next available channel. If there is no channel available,
     /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
     /// is returned no channels will be available until the application is restarted.
-    pub fn try_receive_channel(
-        &mut self,
-    ) -> Result<AqcReceiveChannelType, TryReceiveError<crate::Error>> {
+    pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         let waker = noop_waker();
         let mut cx = CoreContext::from_waker(&waker);
         loop {
@@ -651,7 +639,7 @@ impl AqcClient {
                 );
                 TryReceiveError::Error(AqcError::NoChannelInfoFound.into())
             })?;
-            return Ok(create_channel_type(conn, channel_info));
+            return Ok(create_peer_channel(conn, channel_info));
         }
     }
 

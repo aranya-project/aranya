@@ -2,7 +2,7 @@ use std::time::Duration;
 
 mod common;
 use anyhow::Result;
-use aranya_client::{aqc::net::AqcReceiveChannelType, TeamConfig};
+use aranya_client::{aqc::net::AqcPeerChannel, TeamConfig};
 use aranya_crypto::csprng::rand;
 use aranya_daemon_api::ChanOp;
 use buggy::BugExt;
@@ -96,7 +96,7 @@ async fn test_aqc_chans() -> Result<()> {
 
     let channel_type = channel_type_result.assume("channel must exist on memberb")?;
     let mut bidi_chan2 = match channel_type {
-        AqcReceiveChannelType::Bidirectional { channel } => channel,
+        AqcPeerChannel::Bidirectional(channel) => channel,
         _ => buggy::bug!("Expected a bidirectional channel on memberb"),
     };
 
@@ -187,7 +187,7 @@ async fn test_aqc_chans() -> Result<()> {
 
     let channel_type = channel_type_result.assume("uni channel must exist on memberb")?;
     let mut uni_chan2 = match channel_type {
-        AqcReceiveChannelType::Receiver { receiver } => receiver,
+        AqcPeerChannel::Receiver(receiver) => receiver,
         _ => {
             buggy::bug!("Expected a unidirectional channel")
         }
@@ -233,7 +233,7 @@ async fn test_aqc_chans() -> Result<()> {
     let mut bidi_chan1 = bidi_chan1_result?;
 
     let mut bidi_chan2 = match channel_type {
-        AqcReceiveChannelType::Bidirectional { channel } => channel,
+        AqcPeerChannel::Bidirectional(channel) => channel,
         _ => buggy::bug!("Expected a bidirectional channel on memberb"),
     };
 
