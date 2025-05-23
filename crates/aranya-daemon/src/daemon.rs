@@ -14,22 +14,33 @@ use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, StorageProvider,
 };
-use aranya_util::Addr;
+use aranya_util::{Addr, NonEmptyString};
 use bimap::BiBTreeMap;
 use buggy::BugExt;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
+use tokio::{
+    fs,
+    sync::{broadcast::error::RecvError, Mutex},
+    task::JoinSet,
+};
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
+    actions::Actions,
     api::{ApiKey, DaemonApiServer, PublicApiKey},
     aqc::Aqc,
-    aranya::{self, Actions},
+    aranya,
     config::Config,
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::Syncer,
+    sync::{
+        prot::SyncProtocol,
+        task::{
+            quic::{Msg, ServerPresharedKeys, State as QuicSyncState, TeamIdPSKPair},
+            Syncer,
+        },
+    },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
@@ -45,8 +56,11 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 /// EF = Policy Effect
 pub(crate) type EF = policy::Effect;
 
-pub(crate) type Client = aranya::Client<EN, SP, CE>;
-type Server = aranya::Server<EN, SP>;
+pub(crate) type Client = aranya::Client<EN, SP>;
+pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
+pub(crate) const DEFAULT_SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
+
+// pub(crate) const SERVICE_NAME: &str = "Aranya-QUIC-Sync";
 
 /// The daemon itself.
 pub struct Daemon {
@@ -86,9 +100,12 @@ impl Daemon {
         let mut local_store = self.load_local_keystore().await?;
         let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
 
-        // Initialize Aranya client.
-        let (client, local_addr) = {
-            let (client, server) = self
+        // TODO: Load graph IDs from storage
+        let initial_keys = [];
+
+        // Initialize the Aranya client and sync server.
+        let (client, local_addr, server_keys) = {
+            let (client, server, server_keys) = self
                 .setup_aranya(
                     eng.clone(),
                     aranya_store
@@ -96,24 +113,81 @@ impl Daemon {
                         .context("unable to clone keystore")?,
                     &pk,
                     self.cfg.sync_addr,
+                    initial_keys.clone(),
                 )
                 .await?;
             let local_addr = server.local_addr()?;
-            let client = Arc::new(client);
             set.spawn(async move { server.serve().await });
 
-            (client, local_addr)
+            (client, local_addr, server_keys)
         };
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-        let (mut syncer, peers) = Syncer::new(Arc::clone(&client), send_effects);
+
+        let (state, client_keys) = QuicSyncState::new(initial_keys)?;
+        let (mut syncer, peers) =
+            Syncer::new(client.clone(), send_effects, DEFAULT_SYNC_PROTOCOL, state);
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
-                    error!(err = ?err, "unable to sync with peer");
+                    error!(err = ?err, "client unable to sync with peer");
                 }
             }
+        });
+
+        // New PSK received from add_team/create_team or a PSK should be removed due to remove_team
+        let (psk_send, mut psk_recv) = tokio::sync::broadcast::channel(16);
+        set.spawn(async move {
+            loop {
+                match psk_recv.recv().await {
+                    Ok(msg) => server_keys.handle_msg(msg),
+                    Err(RecvError::Closed) => break,
+                    Err(err) => {
+                        error!(err = ?err, "unable to receive psk on broadcast channel")
+                    }
+                }
+            }
+
+            info!("PSK broadcast channel closed");
+            Ok(())
+        });
+
+        let mut psk_recv2 = psk_send.subscribe();
+        set.spawn(async move {
+            loop {
+                match psk_recv2.recv().await {
+                    Ok(msg) => client_keys.handle_msg(msg),
+                    Err(RecvError::Closed) => break,
+                    Err(err) => {
+                        error!(err = ?err, "unable to receive psk on broadcast channel")
+                    }
+                }
+            }
+
+            info!("PSK broadcast channel closed");
+            Ok(())
+        });
+
+        // Async task for inserting and removing PSK idenitities and secrets
+        // in the platform's credential store.
+        let mut psk_recv3 = psk_send.subscribe();
+        let service_name = self.cfg.service_name.clone();
+        set.spawn(async move {
+            loop {
+                match psk_recv3.recv().await {
+                    Ok(msg) => {
+                        let _ = Self::handle_psk_message(&service_name, msg);
+                    }
+                    Err(RecvError::Closed) => break,
+                    Err(err) => {
+                        error!(err = ?err, "unable to receive psk on broadcast channel")
+                    }
+                }
+            }
+
+            info!("PSK broadcast channel closed");
+            Ok(())
         });
 
         let graph_ids = client
@@ -142,6 +216,7 @@ impl Daemon {
             Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
         };
 
+        // TODO: Use `psk_send` in create_team and add_team API calls
         let api = DaemonApiServer::new(
             client,
             local_addr,
@@ -151,6 +226,7 @@ impl Daemon {
             peers,
             recv_effects,
             aqc,
+            psk_send,
         )?;
         api.serve().await?;
 
@@ -174,14 +250,15 @@ impl Daemon {
         Ok(())
     }
 
-    /// Creates the Aranya client and server.
+    /// Creates the Aranya client and sync server.
     async fn setup_aranya(
         &self,
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-    ) -> Result<(Client, Server)> {
+        initial_keys: impl IntoIterator<Item = TeamIdPSKPair>,
+    ) -> Result<(Client, SyncServer, Arc<ServerPresharedKeys>)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -194,17 +271,21 @@ impl Daemon {
 
         let client = Client::new(Arc::clone(&aranya));
 
-        let server = {
-            info!(addr = %external_sync_addr, "starting TCP server");
-            let listener = TcpListener::bind(external_sync_addr.to_socket_addrs())
-                .await
-                .context("unable to bind TCP listener")?;
-            Server::new(Arc::clone(&aranya), listener)
+        let (server, server_keys) = {
+            info!(addr = %external_sync_addr, "starting QUIC sync server");
+            SyncServer::new(
+                client.clone(),
+                &external_sync_addr,
+                DEFAULT_SYNC_PROTOCOL,
+                initial_keys,
+            )
+            .await
+            .context("unable to initialize QUIC sync server")?
         };
 
         info!(device_id = %device_id, "set up Aranya");
 
-        Ok((client, server))
+        Ok((client, server, server_keys))
     }
 
     /// Loads the crypto engine.
@@ -305,6 +386,43 @@ impl Daemon {
             }
         }
     }
+
+    /// Clean up routine.
+    ///
+    /// For testing purposes only.
+    pub fn cleanup(&self) -> impl FnOnce() -> Result<()> {
+        // FIXME: Replace this to clean up the entries in the credential store
+        move || Ok(())
+    }
+
+    #[inline]
+    fn handle_psk_message(service_name: &NonEmptyString, msg: Msg) -> Result<()> {
+        match msg {
+            Msg::Insert((id, psk)) => {
+                {
+                    let user_string = format!("{id}-idenitity");
+                    let entry = keyring::Entry::new(service_name, &user_string)?;
+                    // Entry may already exist
+                    let _ = entry.set_secret(psk.identity()).inspect_err(|e| error!(%e));
+                }
+
+                {
+                    let user_string = format!("{id}-secret");
+                    let _entry = keyring::Entry::new(service_name, &user_string)?;
+                    // entry.set_secret(psk.secret()).inspect_err(|e| error!(%e))} Can't do this because secret() is not public
+                }
+            }
+            Msg::Remove(id) => {
+                for user_string in [format!("{id}-idenitity"), format!("{id}-secret")] {
+                    let entry = keyring::Entry::new(service_name, &user_string)?;
+                    let _ = entry.delete_credential().inspect_err(|e| error!(%e));
+                    // Entry may not exist
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Drop for Daemon {
@@ -364,8 +482,9 @@ async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
 mod tests {
     #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-    use std::time::Duration;
+    use std::{path::PathBuf, time::Duration};
 
+    use aranya_util::NonEmptyString;
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;
@@ -379,6 +498,15 @@ mod tests {
         let dir = tempdir().expect("should be able to create temp dir");
         let work_dir = dir.path().join("work");
 
+        // Reduce chance of having a collision in the storage
+        let exe_name = std::env::current_exe()
+            .ok()
+            .map(PathBuf::into_os_string)
+            .and_then(|s| s.into_string().ok())
+            .unwrap_or_else(|| String::from("test-device"));
+        let pid = std::process::id();
+        let serice_name = format!("{exe_name}-daemon-{pid}");
+
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
             name: "name".to_string(),
@@ -386,6 +514,8 @@ mod tests {
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
+            service_name: NonEmptyString::try_from(serice_name)
+                .expect("this is a non-empty string"),
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,
@@ -400,8 +530,10 @@ mod tests {
             .await
             .expect("should be able to load `Daemon`");
 
-        time::timeout(Duration::from_secs(1), daemon.run())
-            .await
-            .expect_err("`Timeout` should return Elapsed");
+        let cleanup = Box::new(daemon.cleanup());
+        let run_result = time::timeout(Duration::from_secs(1), daemon.run()).await;
+
+        let _ = cleanup();
+        run_result.expect_err("`Timeout` should return Elapsed");
     }
 }

@@ -1,5 +1,7 @@
 use core::time::Duration;
 
+use aranya_daemon_api::Secret;
+
 use crate::{error::InvalidArg, ConfigError, Result};
 
 /// Configuration info for syncing with a peer.
@@ -80,9 +82,11 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
+#[derive(Clone)]
 /// Configuration info for adding and creating teams.
 pub struct TeamConfig {
-    _priv: (),
+    psk_idenitity: Option<Box<[u8]>>,
+    psk_secret: Option<Secret>,
 }
 
 impl TeamConfig {
@@ -93,15 +97,19 @@ impl TeamConfig {
 }
 
 impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
-    fn from(_value: TeamConfig) -> Self {
-        Self {}
+    fn from(value: TeamConfig) -> Self {
+        Self {
+            psk_idenitity: value.psk_idenitity,
+            psk_secret: value.psk_secret,
+        }
     }
 }
 
 /// Builder for a [`TeamConfig`]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default)]
 pub struct TeamConfigBuilder {
-    _priv: (),
+    psk_idenitity: Option<Box<[u8]>>,
+    psk_secret: Option<Secret>,
 }
 
 impl TeamConfigBuilder {
@@ -110,8 +118,19 @@ impl TeamConfigBuilder {
         Self::default()
     }
 
+    /// Configures the psk fields.
+    pub fn psk<I: Into<Box<[u8]>>, S: Into<Secret>>(mut self, idenitity: I, secret: S) -> Self {
+        self.psk_idenitity = Some(idenitity.into());
+        self.psk_secret = Some(secret.into());
+
+        self
+    }
+
     /// Attempts to build a [`TeamConfig`] using the provided parameters.
     pub fn build(self) -> Result<TeamConfig> {
-        Ok(TeamConfig { _priv: () })
+        Ok(TeamConfig {
+            psk_idenitity: self.psk_idenitity,
+            psk_secret: self.psk_secret,
+        })
     }
 }

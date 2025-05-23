@@ -12,30 +12,31 @@ pub(crate) use aranya_daemon_api::crypto::{ApiKey, PublicApiKey};
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, CE, CS,
+    DaemonApi, QuicSyncPSK, CE, CS,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::{pin_mut, StreamExt, TryStreamExt};
+use rustls::crypto::{hash::HashAlgorithm, PresharedKey};
 use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
 };
 use tokio::{
     net::UnixListener,
-    sync::{mpsc, Mutex},
+    sync::{broadcast, mpsc, Mutex},
     task::JoinSet,
 };
 use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
+    actions::Actions,
     aqc::Aqc,
-    aranya::Actions,
     daemon::KS,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::SyncPeers,
+    sync::task::{quic::Msg, SyncPeers},
     Client, EF,
 };
 
@@ -49,6 +50,7 @@ macro_rules! find_effect {
 }
 
 type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
+type PSKSender = broadcast::Sender<Msg>;
 
 /// Daemon API Server.
 #[derive(Debug)]
@@ -57,8 +59,8 @@ pub(crate) struct DaemonApiServer {
     sk: ApiKey<CS>,
     /// The UDS path we serve the API on.
     uds_path: PathBuf,
-
-    client: Arc<Client>,
+    /// The Aranya actions client.
+    client: Client,
     /// The local network address for the `Client`'s sync server.
     local_addr: SocketAddr,
     /// Public keys of current device.
@@ -69,6 +71,10 @@ pub(crate) struct DaemonApiServer {
 
     /// Channel for receiving effects from the syncer.
     recv_effects: EffectReceiver,
+
+    /// Channel for sending PSK updates
+    // Should this be optional since there will be other syncer types in the future?
+    psk_send: broadcast::Sender<Msg>,
 }
 
 impl DaemonApiServer {
@@ -76,7 +82,7 @@ impl DaemonApiServer {
     #[instrument(skip_all)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        client: Arc<Client>,
+        client: Client,
         local_addr: SocketAddr,
         uds_path: PathBuf,
         sk: ApiKey<CS>,
@@ -84,6 +90,7 @@ impl DaemonApiServer {
         peers: SyncPeers,
         recv_effects: EffectReceiver,
         aqc: Aqc<CE, KS>,
+        psk_send: PSKSender,
     ) -> Result<Self> {
         Ok(Self {
             uds_path,
@@ -94,6 +101,7 @@ impl DaemonApiServer {
             pk,
             peers,
             aqc,
+            psk_send,
         })
     }
 
@@ -126,6 +134,7 @@ impl DaemonApiServer {
             handler: EffectHandler {
                 aqc: Arc::clone(&aqc),
             },
+            psk_send: self.psk_send,
         }));
 
         let server = {
@@ -240,7 +249,7 @@ impl EffectHandler {
 /// (inside [`Api`]).
 #[derive(Debug)]
 struct ApiInner {
-    client: Arc<Client>,
+    client: Client,
     /// Local socket address of the API.
     local_addr: SocketAddr,
     /// Public keys of current device.
@@ -249,6 +258,7 @@ struct ApiInner {
     peers: Mutex<SyncPeers>,
     handler: EffectHandler,
     aqc: Arc<Aqc<CE, KS>>,
+    psk_send: broadcast::Sender<Msg>,
 }
 
 impl ApiInner {
@@ -354,12 +364,23 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::TeamConfig,
     ) -> api::Result<()> {
-        todo!()
+        let (Some(identity), Some(secret)) = (cfg.psk_idenitity, cfg.psk_secret) else {
+            return Err(anyhow::anyhow!("Invalid Team Config for `add_team`. Expected `psk_idenitity` and `psk_secret` fields to be set").into());
+        };
+        let psk = PresharedKey::external(&identity, secret.raw_secret_bytes())
+            .context("unable to create PSK")?
+            .with_hash_alg(HashAlgorithm::SHA384)
+            .expect("Valid hash algorithm");
+        self.psk_send.send(Msg::Insert((team, Arc::new(psk))))?;
+        // TODO(Steve): Store PSK in credential store. What else is left?
+
+        Ok(())
     }
 
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        todo!();
+        self.psk_send.send(Msg::Remove(team))?;
+        todo!("Remove PSK from crendential store? Should remove graph data from storage provider");
     }
 
     #[instrument(skip(self))]
@@ -367,7 +388,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         cfg: api::TeamConfig,
-    ) -> api::Result<api::TeamId> {
+    ) -> api::Result<(api::TeamId, QuicSyncPSK)> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
@@ -378,7 +399,22 @@ impl DaemonApi for Api {
             .await
             .context("unable to create team")?;
         debug!(?graph_id);
-        Ok(graph_id.into_id().into())
+
+        let psk = QuicSyncPSK::new(&mut Rng);
+
+        // Send PSK update to the key stores
+        {
+            let psk_ref = Arc::new(
+                PresharedKey::external(psk.idenitity(), psk.raw_secret_bytes())
+                    .context("unable to create PSK")?
+                    .with_hash_alg(HashAlgorithm::SHA384)
+                    .expect("Valid hash algorithm"),
+            );
+            let team_id = api::TeamId::from(*graph_id.as_array());
+            self.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
+        }
+
+        Ok((graph_id.into_id().into(), psk))
     }
 
     #[instrument(skip(self))]

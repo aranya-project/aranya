@@ -9,13 +9,19 @@
     rust_2018_idioms
 )]
 
-use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    fmt,
+    net::{Ipv4Addr, SocketAddr},
+    path::PathBuf,
+    time::Duration,
+};
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{Client, SyncPeerConfig, TeamConfig};
+use aranya_crypto::{csprng::rand::RngCore, Rng};
 use aranya_daemon::{config::Config, Daemon};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
-use aranya_util::Addr;
+use aranya_util::{Addr, NonEmptyString};
 use backon::{ExponentialBuilder, Retryable as _};
 use test_log::test;
 use tokio::{
@@ -23,7 +29,7 @@ use tokio::{
     task::{self, AbortHandle},
     time::{self, Sleep},
 };
-use tracing::{debug, info, instrument};
+use tracing::{debug, error, info, instrument};
 
 const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
@@ -225,20 +231,26 @@ struct DeviceCtx {
     pk: KeyBundle,
     id: DeviceId,
     daemon: AbortHandle,
+    cleanup: Option<Box<dyn FnOnce() -> Result<()>>>,
 }
 
 impl DeviceCtx {
-    async fn new(_team_name: &str, _name: &str, work_dir: PathBuf) -> Result<Self> {
+    async fn new(_team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         fs::create_dir_all(work_dir.clone()).await?;
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
+
+        // Reduce chance of having a collision in the storage
+        let serice_name = Self::gen_service_name(name, &mut Rng);
+
         let cfg = Config {
-            name: "daemon".into(),
+            name: name.into(),
             work_dir: work_dir.clone(),
             uds_api_path: uds_api_path.clone(),
             pid_file: work_dir.join("pid"),
-            sync_addr: Addr::new("localhost", 0)?,
+            sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
+            service_name: NonEmptyString::try_from(serice_name)?,
             afc: None,
             aqc: None,
         };
@@ -247,6 +259,10 @@ impl DeviceCtx {
         let daemon = Daemon::load(cfg.clone())
             .await
             .context("unable to init daemon")?;
+
+        // Generate the cleanup routine for this daemon.
+        let cleanup = daemon.cleanup();
+
         // Start daemon.
         let handle = task::spawn(async move {
             daemon
@@ -285,16 +301,31 @@ impl DeviceCtx {
             pk,
             id,
             daemon: handle,
+            cleanup: Some(Box::new(cleanup)),
         })
     }
 
     async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.local_addr().await?)
     }
+
+    fn gen_service_name(name: &str, rng: &mut Rng) -> String {
+        let exe_name = std::env::current_exe()
+            .ok()
+            .map(PathBuf::into_os_string)
+            .and_then(|s| s.into_string().ok())
+            .unwrap_or_else(|| String::from("test-device"));
+        let pid = std::process::id();
+        let rand_int = rng.next_u32();
+        format!("{exe_name}-{name}-daemon-{pid}-{rand_int}")
+    }
 }
 
 impl Drop for DeviceCtx {
     fn drop(&mut self) {
+        if let Some(cleanup_fn) = self.cleanup.take() {
+            let _ = cleanup_fn().inspect_err(|e| error!(%e));
+        }
         self.daemon.abort();
     }
 }
@@ -306,23 +337,27 @@ async fn test_sync_now() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
 
-    // Create the initial team, and get our TeamId.
-    let cfg = TeamConfig::builder().build()?;
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
+    // Create the initial team, and get our TeamId and PSK.
+    let (team_id, psk) = {
+        let cfg = TeamConfig::builder().build()?;
+        team.owner
+            .client
+            .create_team(cfg)
+            .await
+            .expect("expected to create team")
+    };
     info!(?team_id);
 
-    // TODO(geoff): implement add_team.
-    /*
-    team.admin.client.add_team(team_id).await?;
-    team.operator.client.add_team(team_id).await?;
-    team.membera.client.add_team(team_id).await?;
-    team.memberb.client.add_team(team_id).await?;
-    */
+    let cfg = {
+        let idenitity = psk.idenitity();
+        let secret = psk.raw_secret_bytes();
+        TeamConfig::builder().psk(idenitity, secret).build()?
+    };
+
+    team.admin.client.add_team(team_id, cfg.clone()).await?;
+    team.operator.client.add_team(team_id, cfg.clone()).await?;
+    team.membera.client.add_team(team_id, cfg.clone()).await?;
+    team.memberb.client.add_team(team_id, cfg).await?;
 
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
@@ -366,23 +401,27 @@ async fn test_query_functions() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
 
-    // Create the initial team, and get our TeamId.
-    let cfg = TeamConfig::builder().build()?;
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
+    // Create the initial team, and get our TeamId and PSK.
+    let (team_id, psk) = {
+        let cfg = TeamConfig::builder().build()?;
+        team.owner
+            .client
+            .create_team(cfg)
+            .await
+            .expect("expected to create team")
+    };
     info!(?team_id);
 
-    /*
-     * TODO(geoff): implement this
-    team.admin.client.add_team(team_id).await?;
-    team.operator.client.add_team(team_id).await?;
-    team.membera.client.add_team(team_id).await?;
-    team.memberb.client.add_team(team_id).await?;
-    */
+    let cfg = {
+        let idenitity = psk.idenitity();
+        let secret = psk.raw_secret_bytes();
+        TeamConfig::builder().psk(idenitity, secret).build()?
+    };
+
+    team.admin.client.add_team(team_id, cfg.clone()).await?;
+    team.operator.client.add_team(team_id, cfg.clone()).await?;
+    team.membera.client.add_team(team_id, cfg.clone()).await?;
+    team.memberb.client.add_team(team_id, cfg).await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -408,6 +447,74 @@ async fn test_query_functions() -> Result<()> {
     // TODO(nikki): device_label_assignments, label_exists, labels
 
     // TODO(nikki): if cfg!(feature = "aqc") { aqc_net_identifier } and have aqc on by default.
+
+    Ok(())
+}
+
+/// Tests add_team() by demonstrating that syncing can only occur after
+/// a peer calls the add_team() API
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_add_team() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
+
+    // Create the initial team, and get our TeamId and PSK.
+    let (team_id, psk) = {
+        let cfg = TeamConfig::builder().build()?;
+        team.owner
+            .client
+            .create_team(cfg)
+            .await
+            .expect("expected to create team")
+    };
+    info!(?team_id);
+
+    let cfg = {
+        let idenitity = psk.idenitity();
+        let secret = psk.raw_secret_bytes();
+        TeamConfig::builder().psk(idenitity, secret).build()?
+    };
+
+    // Grab the shorthand for our address.
+    let owner_addr = team.owner.aranya_local_addr().await?;
+
+    // Grab the shorthand for the teams we need to operate on.
+    let mut owner = team.owner.client.team(team_id);
+    let mut admin = team.admin.client.team(team_id);
+
+    // Add the admin as a new device.
+    info!("adding admin to team");
+    owner.add_device_to_team(team.admin.pk.clone()).await?;
+
+    // Add the operator as a new device.
+    info!("adding operator to team");
+    owner.add_device_to_team(team.operator.pk.clone()).await?;
+
+    // Give the admin its role.
+    owner.assign_role(team.admin.id, Role::Admin).await?;
+
+    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+    admin.sync_now(owner_addr.into(), None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    // Now, we try to assign a role using the admin, which is expected to fail.
+    match admin.assign_role(team.operator.id, Role::Operator).await {
+        Ok(_) => bail!("Expected role assignment to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(_) => bail!("Unexpected error"),
+    }
+
+    admin.add_team(cfg.clone()).await?;
+    sleep(SLEEP_INTERVAL).await;
+    admin.sync_now(owner_addr.into(), None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    // Now we should be able to successfully assign a role.
+    admin
+        .assign_role(team.operator.id, Role::Operator)
+        .await
+        .context("Assigning a role should not fail here!")?;
 
     Ok(())
 }

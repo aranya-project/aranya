@@ -18,7 +18,7 @@ use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    Id,
+    Csprng, Id, Random,
 };
 use aranya_util::Addr;
 use buggy::Bug;
@@ -64,6 +64,13 @@ impl From<aranya_crypto::id::IdError> for Error {
     }
 }
 
+impl<T> From<tokio::sync::broadcast::error::SendError<T>> for Error {
+    fn from(err: tokio::sync::broadcast::error::SendError<T>) -> Self {
+        error!(%err);
+        Self(err.to_string())
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
@@ -99,6 +106,11 @@ custom_id! {
     pub struct AqcUniChannelId;
 }
 
+custom_id! {
+    /// A PSK ID.
+    pub struct PskId;
+}
+
 /// A device's public key bundle.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KeyBundle {
@@ -117,9 +129,11 @@ pub enum Role {
 }
 
 /// A configuration for creating or adding a team to a daemon.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TeamConfig {
     // TODO(nikki): any fields added to this should be public
+    pub psk_idenitity: Option<Box<[u8]>>,
+    pub psk_secret: Option<Secret>,
 }
 
 /// A device's network identifier.
@@ -193,6 +207,38 @@ impl ZeroizeOnDrop for Secret {}
 impl Drop for Secret {
     fn drop(&mut self) {
         self.0.zeroize()
+    }
+}
+
+/// A secret key.
+// TODO(Steve): Replace?
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuicSyncPSK {
+    id: PskId,
+    secret: Secret,
+}
+
+impl QuicSyncPSK {
+    /// Creates a new instance.
+    pub fn new<R: Csprng>(rng: &mut R) -> Self {
+        let random_bytes = <[u8; 32] as Random>::random(rng);
+
+        Self {
+            id: PskId::random(rng),
+            secret: Secret::from(random_bytes),
+        }
+    }
+
+    /// Return the id bytes.
+    #[inline]
+    pub fn idenitity(&self) -> &[u8] {
+        self.id.as_bytes()
+    }
+
+    /// Return the secret bytes.
+    #[inline]
+    pub fn raw_secret_bytes(&self) -> &[u8] {
+        self.secret.raw_secret_bytes()
     }
 }
 
@@ -561,7 +607,7 @@ pub trait DaemonApi {
     async fn remove_team(team: TeamId) -> Result<()>;
 
     /// Create a new graph/team with the current device as the owner.
-    async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
+    async fn create_team(cfg: TeamConfig) -> Result<(TeamId, QuicSyncPSK)>;
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 

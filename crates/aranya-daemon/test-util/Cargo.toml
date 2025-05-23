@@ -15,8 +15,10 @@ aranya-runtime = { workspace = true }
 aranya-util = { workspace = true }
 
 aranya-daemon = { workspace = true }
+aranya-daemon-api = { workspace = true }
 aranya-keygen = { workspace = true }
 
 anyhow = { workspace = true }
+rustls = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
