@@ -53,7 +53,7 @@ pub enum AqcAckMessage {
 
 /// Receives an AQC ctrl message.
 async fn receive_aqc_ctrl(
-    daemon: Arc<DaemonApiClient>,
+    daemon: &DaemonApiClient,
     team: TeamId,
     ctrl: AqcCtrl,
     server_keys: &ServerPresharedKeys,
@@ -107,7 +107,7 @@ fn create_peer_channel(conn: Connection, channel_id: &AqcChannelId) -> AqcPeerCh
 }
 
 async fn receive_ctrl_message(
-    daemon: &Arc<DaemonApiClient>,
+    daemon: &DaemonApiClient,
     server_keys: &ServerPresharedKeys,
     channel_map: &mut HashMap<Vec<u8>, AqcChannelId>,
     conn: &mut Connection,
@@ -124,14 +124,7 @@ async fn receive_ctrl_message(
     };
     match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
         Ok(ctrl) => {
-            receive_aqc_ctrl(
-                daemon.clone(),
-                ctrl.team_id,
-                ctrl.ctrl,
-                server_keys,
-                channel_map,
-            )
-            .await?;
+            receive_aqc_ctrl(daemon, ctrl.team_id, ctrl.ctrl, server_keys, channel_map).await?;
             // Send an ACK back
             let ack_msg = AqcAckMessage::Success;
             let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
@@ -483,7 +476,7 @@ pub(crate) struct AqcClient {
     /// Map of PSK identity to channel type
     channels: HashMap<Vec<u8>, AqcChannelId>,
     server: Server,
-    daemon: Arc<DaemonApiClient>,
+    daemon: DaemonApiClient,
     identity_rx: mpsc::Receiver<Vec<u8>>,
 }
 
@@ -495,7 +488,7 @@ impl AqcClient {
         server_keys: Arc<ServerPresharedKeys>,
         identity_rx: mpsc::Receiver<Vec<u8>>,
         server: Server,
-        daemon: Arc<DaemonApiClient>,
+        daemon: DaemonApiClient,
     ) -> Result<AqcClient, AqcError> {
         let quic_client = Client::builder()
             .with_tls(provider)?

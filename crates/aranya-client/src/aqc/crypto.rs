@@ -84,13 +84,13 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
 
 #[derive(Debug)]
 pub struct ClientPresharedKeys {
-    keys: Arc<Mutex<Vec<Arc<PresharedKey>>>>,
+    keys: Mutex<Vec<Arc<PresharedKey>>>,
 }
 
 impl ClientPresharedKeys {
     pub fn new(key: Arc<PresharedKey>) -> Self {
         Self {
-            keys: Arc::new(Mutex::new(vec![key])),
+            keys: Mutex::new(vec![key]),
         }
     }
 
@@ -142,12 +142,12 @@ fn suite_hash(suite: CipherSuiteId) -> HashAlgorithm {
 // without having to rely on the server certificate.
 
 #[derive(Debug)]
-pub struct SkipServerVerification(Arc<CryptoProvider>);
+pub struct SkipServerVerification(&'static CryptoProvider);
 
 impl SkipServerVerification {
     pub fn new() -> Arc<Self> {
         let provider = CryptoProvider::get_default().expect("Default crypto provider not found");
-        Arc::new(Self(provider.clone()))
+        Arc::new(Self(provider))
     }
 }
 

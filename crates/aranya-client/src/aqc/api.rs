@@ -57,7 +57,7 @@ impl AqcChannelsImpl {
     pub(crate) async fn new(
         device_id: DeviceId,
         aqc_addr: SocketAddr,
-        daemon: Arc<DaemonApiClient>,
+        daemon: DaemonApiClient,
     ) -> Result<(Self, SocketAddr), AqcError> {
         debug!("device ID: {:?}", device_id);
 

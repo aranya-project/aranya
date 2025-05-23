@@ -1,6 +1,6 @@
 //! Client-daemon connection.
 
-use std::{io, net::SocketAddr, path::Path, sync::Arc};
+use std::{io, net::SocketAddr, path::Path};
 
 use anyhow::Context;
 use aranya_crypto::Rng;
@@ -140,7 +140,7 @@ impl<'a> ClientBuilder<'a> {
 #[derive(Debug)]
 pub struct Client {
     /// RPC connection to the daemon
-    pub(crate) daemon: Arc<DaemonApiClient>,
+    pub(crate) daemon: DaemonApiClient,
     /// Support for AQC
     pub(crate) aqc: AqcChannelsImpl,
 }
@@ -206,7 +206,6 @@ impl Client {
             .map_err(error::other)?
             .next()
             .expect("expected AQC server address");
-        let daemon = Arc::new(daemon);
         let (aqc, aqc_server_addr) =
             AqcChannelsImpl::new(device_id, aqc_addr, daemon.clone()).await?;
         let client = Self { daemon, aqc };
