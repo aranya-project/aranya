@@ -16,13 +16,7 @@ use aranya_daemon_api::{
 use buggy::{Bug, BugExt as _};
 use bytes::Bytes;
 use futures_util::task::noop_waker;
-use s2n_quic::{
-    client::Connect,
-    connection::Handle,
-    provider,
-    stream::{PeerStream, ReceiveStream, SendStream},
-    Client, Connection, Server,
-};
+use s2n_quic::{self, client::Connect, provider, Client, Connection, Server};
 use tarpc::context;
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
@@ -32,6 +26,8 @@ use super::{
     crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_KEY, PSK_IDENTITY_CTRL},
 };
 use crate::error::{aranya_error, AqcError, IpcError};
+
+pub mod channels;
 
 /// An AQC control message.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -89,19 +85,19 @@ async fn receive_aqc_ctrl(
     Ok(())
 }
 
-fn create_peer_channel(conn: Connection, channel_id: &AqcChannelId) -> AqcPeerChannel {
+fn create_peer_channel(conn: Connection, channel_id: &AqcChannelId) -> channels::AqcPeerChannel {
     match channel_id {
         AqcChannelId::Bidirectional(id) => {
             // Once we accept a valid connection, let's turn it into an AQC Channel that we can
             // then open an arbitrary number of streams on.
-            let channel = AqcBidirectionalChannel::new(LabelId::default(), *id, conn);
-            AqcPeerChannel::Bidirectional(channel)
+            let channel = channels::AqcBidirectionalChannel::new(LabelId::default(), *id, conn);
+            channels::AqcPeerChannel::Bidirectional(channel)
         }
         AqcChannelId::Unidirectional(id) => {
             // Once we accept a valid connection, let's turn it into an AQC Channel that we can
             // then open an arbitrary number of streams on.
-            let receiver = AqcReceiverChannel::new(LabelId::default(), *id, conn);
-            AqcPeerChannel::Receiver(receiver)
+            let receiver = channels::AqcReceiverChannel::new(LabelId::default(), *id, conn);
+            channels::AqcPeerChannel::Receiver(receiver)
         }
     }
 }
@@ -112,13 +108,12 @@ async fn receive_ctrl_message(
     channel_map: &mut HashMap<Vec<u8>, AqcChannelId>,
     conn: &mut Connection,
 ) -> crate::Result<()> {
-    let stream = conn
+    let mut stream = conn
         .accept_bidirectional_stream()
         .await
         .map_err(AqcError::ConnectionError)?
         .ok_or(AqcError::ConnectionClosed)?;
-    let (mut recv, mut send) = stream.split();
-    let Ok(Some(ctrl_bytes)) = recv.receive().await else {
+    let Ok(Some(ctrl_bytes)) = stream.receive().await else {
         error!("Failed to receive control message or stream closed");
         return Err(AqcError::ConnectionClosed.into());
     };
@@ -128,329 +123,23 @@ async fn receive_ctrl_message(
             // Send an ACK back
             let ack_msg = AqcAckMessage::Success;
             let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
-            send.send(Bytes::from(ack_bytes))
+            stream
+                .send(Bytes::from(ack_bytes))
                 .await
                 .map_err(AqcError::from)?;
-            send.close().await.map_err(AqcError::from)?;
+            stream.close().await.map_err(AqcError::from)?;
         }
         Err(e) => {
             error!("Failed to deserialize AqcCtrlMessage: {}", e);
             let ack_msg =
                 AqcAckMessage::Failure(format!("Failed to deserialize AqcCtrlMessage: {}", e));
             let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
-            let _ = send.send(Bytes::from(ack_bytes)).await;
-            let _ = send.close().await;
+            let _ = stream.send(Bytes::from(ack_bytes)).await;
+            let _ = stream.close().await;
             return Err(AqcError::Serde(e).into());
         }
     }
     Ok(())
-}
-
-/// A channel opened by a peer.
-#[derive(Debug)]
-pub enum AqcPeerChannel {
-    /// Used to receive data from a peer.
-    Receiver(AqcReceiverChannel),
-    /// Used to send and receive data with a peer.
-    Bidirectional(AqcBidirectionalChannel),
-}
-
-/// The sending end of a unidirectional channel.
-/// Allows sending data streams over a channel.
-#[derive(Debug)]
-pub struct AqcSenderChannel {
-    label_id: LabelId,
-    handle: Handle,
-    id: UniChannelId,
-}
-
-impl AqcSenderChannel {
-    /// Create a new channel with the given id and conection handle.
-    ///
-    /// Returns the new channel and the sender used to send new streams to the
-    /// channel.
-    pub fn new(label_id: LabelId, id: UniChannelId, handle: Handle) -> Self {
-        Self {
-            label_id,
-            id,
-            handle,
-        }
-    }
-
-    /// Get the channel label id.
-    pub fn label_id(&self) -> LabelId {
-        self.label_id
-    }
-
-    /// Get the channel id.
-    pub fn aqc_id(&self) -> UniChannelId {
-        self.id
-    }
-
-    /// Creates a new unidirectional stream for the channel.
-    pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream, AqcError> {
-        let send = self.handle.open_send_stream().await?;
-        Ok(AqcSendStream { send })
-    }
-
-    /// Close the channel if it's open. If the channel is already closed, do nothing.
-    pub fn close(&mut self) {
-        const ERROR_CODE: u32 = 0;
-        self.handle.close(ERROR_CODE.into());
-    }
-}
-
-impl Drop for AqcSenderChannel {
-    fn drop(&mut self) {
-        self.close();
-    }
-}
-
-impl std::fmt::Display for AqcSenderChannel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "AqcSenderChannel(label_id: {}, id: {})",
-            self.label_id, self.id
-        )
-    }
-}
-
-/// The receive end of a unidirectional channel.
-/// Allows receiving data streams over a channel.
-#[derive(Debug)]
-pub struct AqcReceiverChannel {
-    label_id: LabelId,
-    aqc_id: UniChannelId,
-    conn: Connection,
-}
-
-impl AqcReceiverChannel {
-    /// Create a new channel with the given conection handle.
-    ///
-    /// Returns the new channel and the sender used to send new streams to the
-    /// channel.
-    pub fn new(label_id: LabelId, aqc_id: UniChannelId, conn: Connection) -> Self {
-        Self {
-            label_id,
-            aqc_id,
-            conn,
-        }
-    }
-
-    /// Get the channel id.
-    pub fn label_id(&self) -> LabelId {
-        self.label_id
-    }
-
-    /// Get the aqc id.
-    pub fn aqc_id(&self) -> UniChannelId {
-        self.aqc_id
-    }
-
-    /// Returns the next unidirectional stream.
-    pub async fn receive_uni_stream(&mut self) -> Result<AqcReceiveStream, AqcError> {
-        match self.conn.accept_receive_stream().await {
-            Ok(Some(stream)) => Ok(AqcReceiveStream { receive: stream }),
-            Ok(None) => Err(AqcError::ConnectionClosed),
-            Err(e) => Err(AqcError::ConnectionError(e)),
-        }
-    }
-
-    /// Receive a unidirectional stream if one is available. If there is no stream available,
-    /// return Empty. If the stream is disconnected, return Disconnected. If disconnected
-    /// is returned no streams will be available until a new channel is created.
-    pub fn try_receive_uni_stream(&mut self) -> Result<AqcReceiveStream, TryReceiveError> {
-        let waker = noop_waker();
-        let mut cx = CoreContext::from_waker(&waker);
-        match self.conn.poll_accept_receive_stream(&mut cx) {
-            Poll::Ready(Ok(Some(stream))) => Ok(AqcReceiveStream { receive: stream }),
-            Poll::Ready(Ok(None)) => Err(TryReceiveError::Empty),
-            Poll::Ready(Err(e)) => Err(TryReceiveError::Error(AqcError::ConnectionError(e))),
-            Poll::Pending => Err(TryReceiveError::Empty),
-        }
-    }
-}
-
-/// A unique channel between two peers.
-/// Allows sending and receiving data streams over a channel.
-#[derive(Debug)]
-pub struct AqcBidirectionalChannel {
-    label_id: LabelId,
-    aqc_id: BidiChannelId,
-    conn: Connection,
-}
-
-impl AqcBidirectionalChannel {
-    /// Create a new bidirectional channel with the given id and conection handle.
-    pub fn new(label_id: LabelId, aqc_id: BidiChannelId, conn: Connection) -> Self {
-        Self {
-            label_id,
-            aqc_id,
-            conn,
-        }
-    }
-
-    /// Get the channel label id.
-    pub fn label_id(&self) -> LabelId {
-        self.label_id
-    }
-
-    /// Get the aqc id.
-    pub fn aqc_id(&self) -> BidiChannelId {
-        self.aqc_id
-    }
-
-    /// Returns the next available stream.
-    /// If the stream is bidirectional, return a tuple of the send and receive streams.
-    /// If the stream is unidirectional, return a tuple of None and the receive stream.
-    pub async fn receive_stream(
-        &mut self,
-    ) -> Result<(Option<AqcSendStream>, AqcReceiveStream), AqcError> {
-        match self.conn.accept().await {
-            Ok(Some(stream)) => match stream {
-                PeerStream::Bidirectional(stream) => {
-                    let (recv, send) = stream.split();
-                    Ok((
-                        Some(AqcSendStream { send }),
-                        AqcReceiveStream { receive: recv },
-                    ))
-                }
-                PeerStream::Receive(recv) => Ok((None, AqcReceiveStream { receive: recv })),
-            },
-            Ok(None) => Err(AqcError::ConnectionClosed),
-            Err(e) => Err(AqcError::ConnectionError(e)),
-        }
-    }
-
-    /// Receive a stream if one is available. If there is no stream available,
-    /// return Empty. If the channel is closed, return Disconnected. If disconnected
-    /// is returned no streams will be available until a new channel is created.
-    pub fn try_receive_stream(
-        &mut self,
-    ) -> Result<(Option<AqcSendStream>, AqcReceiveStream), TryReceiveError> {
-        let waker = noop_waker();
-        let mut cx = CoreContext::from_waker(&waker);
-
-        match self.conn.poll_accept(&mut cx) {
-            Poll::Ready(Ok(Some(peer_stream))) => match peer_stream {
-                PeerStream::Bidirectional(stream) => {
-                    let (recv, send) = stream.split();
-                    Ok((
-                        Some(AqcSendStream { send }),
-                        AqcReceiveStream { receive: recv },
-                    ))
-                }
-                PeerStream::Receive(recv) => Ok((None, AqcReceiveStream { receive: recv })),
-            },
-            Poll::Ready(Ok(None)) => {
-                // Connection closed by peer, no more streams will be accepted.
-                Err(TryReceiveError::Error(AqcError::ConnectionClosed))
-            }
-            Poll::Ready(Err(e)) => {
-                // An error occurred on the connection while trying to accept a stream.
-                // This likely means the connection is unusable for new streams.
-                Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
-            }
-            Poll::Pending => {
-                // No stream is immediately available.
-                Err(TryReceiveError::Empty)
-            }
-        }
-    }
-
-    /// Creates a new unidirectional stream for the channel.
-    pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream, AqcError> {
-        let send = self.conn.open_send_stream().await?;
-        Ok(AqcSendStream { send })
-    }
-
-    /// Creates a new bidirectional stream for the channel.
-    pub async fn create_bidi_stream(
-        &mut self,
-    ) -> Result<(AqcSendStream, AqcReceiveStream), AqcError> {
-        let (receive, send) = self.conn.open_bidirectional_stream().await?.split();
-        Ok((AqcSendStream { send }, AqcReceiveStream { receive }))
-    }
-
-    /// Close the channel if it's open. If the channel is already closed, do nothing.
-    pub fn close(&mut self) {
-        const ERROR_CODE: u32 = 0;
-        self.conn.close(ERROR_CODE.into());
-    }
-}
-
-impl Drop for AqcBidirectionalChannel {
-    fn drop(&mut self) {
-        self.close();
-    }
-}
-
-impl std::fmt::Display for AqcBidirectionalChannel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "AqcBidirectionalChannel(label_id: {}, aqc_id: {})",
-            self.label_id, self.aqc_id
-        )
-    }
-}
-
-/// Used to receive data from a peer.
-pub struct AqcReceiveStream {
-    receive: ReceiveStream,
-}
-
-impl AqcReceiveStream {
-    /// Receive the next available data from a stream. If the stream has
-    /// been closed, return None.
-    ///
-    /// This method will block until data is available to return.
-    /// The data is not guaranteed to be complete, and may need to be called
-    /// multiple times to receive all data from a message.
-    pub async fn receive(&mut self) -> Result<Option<Bytes>, AqcError> {
-        match self.receive.receive().await {
-            Ok(Some(chunk)) => Ok(Some(chunk)),
-            Ok(None) => Ok(None),
-            Err(e) => Err(e.into()),
-        }
-    }
-
-    /// Receive the next available data from a stream.
-    ///
-    /// This method will return immediately with an error if there is no data available.
-    /// The errors are:
-    /// - Empty: No data available.
-    /// - Closed: The stream is closed.
-    pub fn try_receive(&mut self) -> Result<Bytes, TryReceiveError> {
-        let waker = noop_waker();
-        let mut cx = CoreContext::from_waker(&waker);
-        match self.receive.poll_receive(&mut cx) {
-            Poll::Ready(Ok(Some(chunk))) => Ok(chunk),
-            Poll::Ready(Ok(None)) => Err(TryReceiveError::Closed),
-            Poll::Ready(Err(_e)) => Err(TryReceiveError::Closed),
-            Poll::Pending => Err(TryReceiveError::Empty),
-        }
-    }
-}
-
-/// Used to send data to a peer.
-pub struct AqcSendStream {
-    send: SendStream,
-}
-
-impl AqcSendStream {
-    /// Send data to the given stream.
-    pub async fn send(&mut self, data: &[u8]) -> Result<(), AqcError> {
-        self.send.send(Bytes::copy_from_slice(data)).await?;
-        Ok(())
-    }
-
-    /// Close the stream.
-    pub async fn close(&mut self) -> Result<(), AqcError> {
-        self.send.close().await?;
-        Ok(())
-    }
 }
 
 /// An error that occurs when trying to receive a channel or stream.
@@ -518,7 +207,7 @@ impl AqcClient {
 
     /// Receive the next available channel. If the channel is closed, return None.
     /// This method will return a channel created by a peer that hasn't been received yet.
-    pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
+    pub async fn receive_channel(&mut self) -> crate::Result<channels::AqcPeerChannel> {
         loop {
             // Accept a new connection
             let mut conn = self
@@ -567,7 +256,9 @@ impl AqcClient {
     /// Receive the next available channel. If there is no channel available,
     /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
     /// is returned no channels will be available until the application is restarted.
-    pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
+    pub fn try_receive_channel(
+        &mut self,
+    ) -> Result<channels::AqcPeerChannel, TryReceiveError<crate::Error>> {
         let waker = noop_waker();
         let mut cx = CoreContext::from_waker(&waker);
         loop {
@@ -642,7 +333,7 @@ impl AqcClient {
         addr: SocketAddr,
         label_id: LabelId,
         psks: AqcUniPsks,
-    ) -> Result<AqcSenderChannel, AqcError> {
+    ) -> Result<channels::AqcSenderChannel, AqcError> {
         let channel_id = UniChannelId::from(*psks.channel_id());
         self.client_keys.load_psks(AqcPsks::Uni(psks));
         let mut conn = self
@@ -650,7 +341,11 @@ impl AqcClient {
             .connect(Connect::new(addr).with_server_name("localhost"))
             .await?;
         conn.keep_alive(true)?;
-        Ok(AqcSenderChannel::new(label_id, channel_id, conn.handle()))
+        Ok(channels::AqcSenderChannel::new(
+            label_id,
+            channel_id,
+            conn.handle(),
+        ))
     }
 
     /// Creates a new bidirectional channel to the given address.
@@ -659,7 +354,7 @@ impl AqcClient {
         addr: SocketAddr,
         label_id: LabelId,
         psks: AqcBidiPsks,
-    ) -> Result<AqcBidirectionalChannel, AqcError> {
+    ) -> Result<channels::AqcBidirectionalChannel, AqcError> {
         let channel_id = BidiChannelId::from(*psks.channel_id());
         self.client_keys.load_psks(AqcPsks::Bidi(psks));
         let mut conn = self
@@ -667,7 +362,9 @@ impl AqcClient {
             .connect(Connect::new(addr).with_server_name("localhost"))
             .await?;
         conn.keep_alive(true)?;
-        Ok(AqcBidirectionalChannel::new(label_id, channel_id, conn))
+        Ok(channels::AqcBidirectionalChannel::new(
+            label_id, channel_id, conn,
+        ))
     }
 
     /// Send a control message to the given address.

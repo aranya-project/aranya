@@ -22,7 +22,8 @@ use super::{
     crypto::{
         ClientPresharedKeys, NoCertResolver, ServerPresharedKeys, SkipServerVerification, CTRL_KEY,
     },
-    net::{AqcBidirectionalChannel, AqcClient, AqcPeerChannel, AqcSenderChannel, TryReceiveError},
+    net::{AqcClient, TryReceiveError},
+    AqcBidirectionalChannel, AqcPeerChannel, AqcSenderChannel,
 };
 use crate::{
     error::{aranya_error, no_addr, AqcError, IpcError},
