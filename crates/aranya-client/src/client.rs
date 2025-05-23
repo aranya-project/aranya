@@ -291,6 +291,16 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    /// Add a team to a device's local store
+    pub async fn add_team(&self, cfg: TeamConfig) -> Result<()> {
+        self.client
+            .daemon
+            .add_team(context::current(), self.id, cfg.into())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Close the team and stop all operations on the graph.
     pub async fn close_team(&mut self) -> Result<()> {
         self.client
