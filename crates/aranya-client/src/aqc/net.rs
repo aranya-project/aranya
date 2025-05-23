@@ -3,13 +3,17 @@
 //! The AQC network implementation.
 
 use core::task::{Context as CoreContext, Poll};
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{
+    collections::HashMap,
+    net::{Ipv4Addr, SocketAddr},
+    sync::Arc,
+};
 
-use anyhow::{Context, Result};
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{
     AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
 };
+use buggy::{Bug, BugExt as _};
 use bytes::Bytes;
 use futures_util::task::noop_waker;
 use s2n_quic::{
@@ -26,7 +30,7 @@ use tracing::{debug, error, warn};
 use super::api::CTRL_KEY;
 use crate::{
     aqc::api::{AqcChannel, ClientPresharedKeys, ServerPresharedKeys, PSK_IDENTITY_CTRL},
-    error::{self, AqcError, IpcError},
+    error::{aranya_error, AqcError, IpcError},
 };
 
 /// An AQC control message.
@@ -59,8 +63,7 @@ async fn receive_aqc_ctrl(
         .receive_aqc_ctrl(context::current(), team, ctrl)
         .await
         .map_err(IpcError::new)?
-        .context("unable to receive aqc ctrl")
-        .map_err(error::other)?;
+        .map_err(aranya_error)?;
 
     server_keys.load_psks(psks.clone());
 
@@ -112,58 +115,43 @@ async fn receive_ctrl_message(
     server_keys: &ServerPresharedKeys,
     channel_map: &mut HashMap<Vec<u8>, AqcChannel>,
     conn: &mut Connection,
-) -> Result<(), AqcError> {
-    match conn.accept_bidirectional_stream().await {
-        Ok(Some(stream)) => {
-            let (mut recv, mut send) = stream.split();
-            let Ok(Some(ctrl_bytes)) = recv.receive().await else {
-                error!("Failed to receive control message or stream closed");
-                return Err(AqcError::ConnectionClosed);
-            };
-            match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
-                Ok(ctrl) => {
-                    receive_aqc_ctrl(
-                        daemon.clone(),
-                        ctrl.team_id,
-                        ctrl.ctrl,
-                        server_keys,
-                        channel_map,
-                    )
-                    .await
-                    .map_err(anyhow::Error::new)?;
-                    // Send an ACK back
-                    let ack_msg = AqcAckMessage::Success;
-                    let ack_bytes = postcard::to_stdvec(&ack_msg)
-                        .map_err(|e_postcard| AqcError::Other(anyhow::Error::new(e_postcard)))?;
-                    send.send(Bytes::from(ack_bytes))
-                        .await
-                        .map_err(|e| AqcError::ConnectionError(e.to_string()))?;
-                    send.close()
-                        .await
-                        .map_err(|e| AqcError::ConnectionError(e.to_string()))?;
-                }
-                Err(e) => {
-                    error!("Failed to deserialize AqcCtrlMessage: {}", e);
-                    let ack_msg = AqcAckMessage::Failure(format!(
-                        "Failed to deserialize AqcCtrlMessage: {}",
-                        e
-                    ));
-                    let ack_bytes = postcard::to_stdvec(&ack_msg)
-                        .map_err(|e_postcard| AqcError::Other(anyhow::Error::new(e_postcard)))?;
-                    let _ = send.send(Bytes::from(ack_bytes)).await;
-                    let _ = send.close().await;
-                    return Err(AqcError::Other(anyhow::anyhow!(
-                        "Failed to deserialize AqcCtrlMessage: {}",
-                        e
-                    )));
-                }
-            }
-        }
-        Ok(None) => {
-            return Err(AqcError::ConnectionClosed);
+) -> crate::Result<()> {
+    let stream = conn
+        .accept_bidirectional_stream()
+        .await
+        .map_err(AqcError::ConnectionError)?
+        .ok_or(AqcError::ConnectionClosed)?;
+    let (mut recv, mut send) = stream.split();
+    let Ok(Some(ctrl_bytes)) = recv.receive().await else {
+        error!("Failed to receive control message or stream closed");
+        return Err(AqcError::ConnectionClosed.into());
+    };
+    match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
+        Ok(ctrl) => {
+            receive_aqc_ctrl(
+                daemon.clone(),
+                ctrl.team_id,
+                ctrl.ctrl,
+                server_keys,
+                channel_map,
+            )
+            .await?;
+            // Send an ACK back
+            let ack_msg = AqcAckMessage::Success;
+            let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
+            send.send(Bytes::from(ack_bytes))
+                .await
+                .map_err(AqcError::from)?;
+            send.close().await.map_err(AqcError::from)?;
         }
         Err(e) => {
-            return Err(AqcError::ConnectionError(e.to_string()));
+            error!("Failed to deserialize AqcCtrlMessage: {}", e);
+            let ack_msg =
+                AqcAckMessage::Failure(format!("Failed to deserialize AqcCtrlMessage: {}", e));
+            let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
+            let _ = send.send(Bytes::from(ack_bytes)).await;
+            let _ = send.close().await;
+            return Err(AqcError::Serde(e).into());
         }
     }
     Ok(())
@@ -217,7 +205,7 @@ impl AqcSenderChannel {
     }
 
     /// Creates a new unidirectional stream for the channel.
-    pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream> {
+    pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream, AqcError> {
         let send = self.handle.open_send_stream().await?;
         Ok(AqcSendStream { send })
     }
@@ -282,7 +270,7 @@ impl AqcReceiverChannel {
         match self.conn.accept_receive_stream().await {
             Ok(Some(stream)) => Ok(AqcReceiveStream { receive: stream }),
             Ok(None) => Err(AqcError::ConnectionClosed),
-            Err(e) => Err(AqcError::ConnectionError(e.to_string())),
+            Err(e) => Err(AqcError::ConnectionError(e)),
         }
     }
 
@@ -295,9 +283,7 @@ impl AqcReceiverChannel {
         match self.conn.poll_accept_receive_stream(&mut cx) {
             Poll::Ready(Ok(Some(stream))) => Ok(AqcReceiveStream { receive: stream }),
             Poll::Ready(Ok(None)) => Err(TryReceiveError::Empty),
-            Poll::Ready(Err(e)) => Err(TryReceiveError::AqcError(AqcError::ConnectionError(
-                e.to_string(),
-            ))),
+            Poll::Ready(Err(e)) => Err(TryReceiveError::Error(AqcError::ConnectionError(e))),
             Poll::Pending => Err(TryReceiveError::Empty),
         }
     }
@@ -350,7 +336,7 @@ impl AqcBidirectionalChannel {
                 PeerStream::Receive(recv) => Ok((None, AqcReceiveStream { receive: recv })),
             },
             Ok(None) => Err(AqcError::ConnectionClosed),
-            Err(e) => Err(AqcError::ConnectionError(e.to_string())),
+            Err(e) => Err(AqcError::ConnectionError(e)),
         }
     }
 
@@ -376,14 +362,12 @@ impl AqcBidirectionalChannel {
             },
             Poll::Ready(Ok(None)) => {
                 // Connection closed by peer, no more streams will be accepted.
-                Err(TryReceiveError::AqcError(AqcError::ConnectionClosed))
+                Err(TryReceiveError::Error(AqcError::ConnectionClosed))
             }
             Poll::Ready(Err(e)) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
-                Err(TryReceiveError::AqcError(AqcError::ConnectionError(
-                    e.to_string(),
-                )))
+                Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
             }
             Poll::Pending => {
                 // No stream is immediately available.
@@ -393,13 +377,15 @@ impl AqcBidirectionalChannel {
     }
 
     /// Creates a new unidirectional stream for the channel.
-    pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream> {
+    pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream, AqcError> {
         let send = self.conn.open_send_stream().await?;
         Ok(AqcSendStream { send })
     }
 
     /// Creates a new bidirectional stream for the channel.
-    pub async fn create_bidi_stream(&mut self) -> Result<(AqcSendStream, AqcReceiveStream)> {
+    pub async fn create_bidi_stream(
+        &mut self,
+    ) -> Result<(AqcSendStream, AqcReceiveStream), AqcError> {
         let (receive, send) = self.conn.open_bidirectional_stream().await?.split();
         Ok((AqcSendStream { send }, AqcReceiveStream { receive }))
     }
@@ -439,7 +425,7 @@ impl AqcReceiveStream {
     /// This method will block until data is available to return.
     /// The data is not guaranteed to be complete, and may need to be called
     /// multiple times to receive all data from a message.
-    pub async fn receive(&mut self) -> Result<Option<Bytes>> {
+    pub async fn receive(&mut self) -> Result<Option<Bytes>, AqcError> {
         match self.receive.receive().await {
             Ok(Some(chunk)) => Ok(Some(chunk)),
             Ok(None) => Ok(None),
@@ -472,13 +458,13 @@ pub struct AqcSendStream {
 
 impl AqcSendStream {
     /// Send data to the given stream.
-    pub async fn send(&mut self, data: &[u8]) -> Result<()> {
+    pub async fn send(&mut self, data: &[u8]) -> Result<(), AqcError> {
         self.send.send(Bytes::copy_from_slice(data)).await?;
         Ok(())
     }
 
     /// Close the stream.
-    pub async fn close(&mut self) -> Result<()> {
+    pub async fn close(&mut self) -> Result<(), AqcError> {
         self.send.close().await?;
         Ok(())
     }
@@ -486,13 +472,13 @@ impl AqcSendStream {
 
 /// An error that occurs when trying to receive a channel or stream.
 #[derive(Debug, thiserror::Error)]
-pub enum TryReceiveError {
+pub enum TryReceiveError<E = AqcError> {
     /// The channel or stream is empty.
     #[error("channel or stream is empty")]
     Empty,
-    /// An AQC error occurred.
-    #[error("an AQC error occurred")]
-    AqcError(AqcError),
+    /// An error occurred.
+    #[error("an error occurred")]
+    Error(E),
     /// The channel or stream is closed.
     #[error("channel or stream is closed")]
     Closed,
@@ -520,10 +506,11 @@ impl AqcClient {
         identity_rx: mpsc::Receiver<Vec<u8>>,
         server: Server,
         daemon: Arc<DaemonApiClient>,
-    ) -> Result<AqcClient> {
+    ) -> Result<AqcClient, AqcError> {
         let quic_client = Client::builder()
             .with_tls(provider)?
-            .with_io("0.0.0.0:0")?
+            .with_io((Ipv4Addr::UNSPECIFIED, 0))
+            .assume("can set aqc client addr")?
             .start()?;
         Ok(AqcClient {
             quic_client,
@@ -537,133 +524,129 @@ impl AqcClient {
     }
 
     /// Get the local address of the client.
-    pub async fn local_addr(&self) -> Result<SocketAddr> {
-        Ok(self.quic_client.local_addr()?)
+    pub fn local_addr(&self) -> Result<SocketAddr, Bug> {
+        self.quic_client.local_addr().assume("can get local addr")
     }
 
     /// Receive the next available channel. If the channel is closed, return None.
     /// This method will return a channel created by a peer that hasn't been received yet.
-    pub async fn receive_channel(&mut self) -> Result<AqcReceiveChannelType, AqcError> {
+    pub async fn receive_channel(&mut self) -> crate::Result<AqcReceiveChannelType> {
         loop {
             // Accept a new connection
-            match self.server.accept().await {
-                Some(mut conn) => {
-                    // Receive a PSK identity hint.
-                    // TODO: Instead of receiving the PSK identity hint here, we should
-                    // pull it directly from the connection.
-                    let Some(identity) = self.identity_rx.recv().await else {
-                        error!("Identity hint channel closed. Unable to create channel.");
-                        return Err(AqcError::NoIdentityHint);
-                    };
-                    debug!(
-                        "Processing connection accepted after seeing PSK identity hint: {:02x?}",
-                        identity
-                    );
-                    // If the PSK identity hint is the control PSK, receive a control message.
-                    // This will update the channel map with the PSK and associate it with an
-                    // AqcChannel.
-                    if identity == PSK_IDENTITY_CTRL {
-                        receive_ctrl_message(
-                            &self.daemon,
-                            &self.server_keys,
-                            &mut self.channels,
-                            &mut conn,
-                        )
-                        .await?;
-                    // If the PSK identity hint is not the control PSK, check if it's in the channel map.
-                    // If it is, create a channel of the appropriate type. We should have already received
-                    // the control message for this PSK, if we don't we can't create a channel.
-                    } else {
-                        match self.channels.get(&identity) {
-                            Some(channel_info) => {
-                                return Ok(create_channel_type(conn, channel_info));
-                            }
-                            None => {
-                                debug!(
-                                    "No channel info found in map for identity hint {:02x?}",
-                                    identity
-                                );
-                                return Err(AqcError::NoChannelInfoFound);
-                            }
-                        }
-                    }
-                }
-                None => {
-                    return Err(AqcError::ServerConnectionTerminated);
-                }
+            let mut conn = self
+                .server
+                .accept()
+                .await
+                .ok_or(AqcError::ServerConnectionTerminated)?;
+            // Receive a PSK identity hint.
+            // TODO: Instead of receiving the PSK identity hint here, we should
+            // pull it directly from the connection.
+            let identity = self
+                .identity_rx
+                .try_recv()
+                .assume("identity received after accepting connection")?;
+            debug!(
+                "Processing connection accepted after seeing PSK identity hint: {:02x?}",
+                identity
+            );
+            // If the PSK identity hint is the control PSK, receive a control message.
+            // This will update the channel map with the PSK and associate it with an
+            // AqcChannel.
+            if identity == PSK_IDENTITY_CTRL {
+                receive_ctrl_message(
+                    &self.daemon,
+                    &self.server_keys,
+                    &mut self.channels,
+                    &mut conn,
+                )
+                .await?;
+                continue;
             }
+            // If the PSK identity hint is not the control PSK, check if it's in the channel map.
+            // If it is, create a channel of the appropriate type. We should have already received
+            // the control message for this PSK, if we don't we can't create a channel.
+            let channel_info = self.channels.get(&identity).ok_or_else(|| {
+                debug!(
+                    "No channel info found in map for identity hint {:02x?}",
+                    identity
+                );
+                AqcError::NoChannelInfoFound
+            })?;
+            return Ok(create_channel_type(conn, channel_info));
         }
     }
 
     /// Receive the next available channel. If there is no channel available,
     /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
     /// is returned no channels will be available until the application is restarted.
-    pub fn try_receive_channel(&mut self) -> Result<AqcReceiveChannelType, TryReceiveError> {
+    pub fn try_receive_channel(
+        &mut self,
+    ) -> Result<AqcReceiveChannelType, TryReceiveError<crate::Error>> {
+        let waker = noop_waker();
+        let mut cx = CoreContext::from_waker(&waker);
         loop {
-            let waker = noop_waker();
-            let mut cx = CoreContext::from_waker(&waker);
             // Accept a new connection
-            match self.server.poll_accept(&mut cx) {
-                Poll::Ready(Some(mut conn)) => {
-                    // Receive a PSK identity hint.
-                    // TODO: Instead of receiving the PSK identity hint here, we should
-                    // pull it directly from the connection.
-                    let Ok(identity) = self.identity_rx.try_recv() else {
-                        error!("Identity hint channel closed. Unable to create channel.");
-                        return Err(TryReceiveError::AqcError(AqcError::NoIdentityHint));
-                    };
-                    debug!(
-                        "Processing connection accepted after seeing PSK identity hint: {:02x?}",
-                        identity
-                    );
-                    // If the PSK identity hint is the control PSK, receive a control message.
-                    // This will update the channel map with the PSK and associate it with an
-                    // AqcChannel.
-                    if identity == PSK_IDENTITY_CTRL {
-                        // Block on the async function
-                        let result = futures_lite::future::block_on(async {
-                            receive_ctrl_message(
-                                &self.daemon,
-                                &self.server_keys,
-                                &mut self.channels,
-                                &mut conn,
-                            )
-                            .await
-                        });
-
-                        if let Err(e) = result {
-                            // The original function logged an error and returned ControlFlow::Break
-                            // which implies the loop should terminate or an error state.
-                            // For try_receive_channel, this might mean the connection is unusable for ctrl messages.
-                            warn!("Receiving control message failed: {}, potential issue with connection.", e);
-                            // Depending on desired behavior, you might return an error or continue.
-                            // For now, let's assume it's an error if control message processing fails critically.
-                            return Err(TryReceiveError::AqcError(AqcError::Other(
-                                anyhow::anyhow!("Control message processing failed: {}", e),
-                            )));
-                        }
-                    // If the PSK identity hint is not the control PSK, check if it's in the channel map.
-                    // If it is, create a channel of the appropriate type. We should have already received
-                    // the control message for this PSK, if we don't we can't create a channel.
-                    } else if let Some(channel_info) = self.channels.get(&identity) {
-                        return Ok(create_channel_type(conn, channel_info));
-                    } else {
-                        debug!(
-                            "No channel info found in map for identity hint {:02x?}",
-                            identity
-                        );
-                        return Err(TryReceiveError::AqcError(AqcError::NoChannelInfoFound));
-                    }
-                }
+            let mut conn = match self.server.poll_accept(&mut cx) {
+                Poll::Ready(Some(conn)) => conn,
                 Poll::Ready(None) => {
-                    return Err(TryReceiveError::AqcError(
-                        AqcError::ServerConnectionTerminated,
+                    return Err(TryReceiveError::Error(
+                        AqcError::ServerConnectionTerminated.into(),
                     ));
                 }
                 Poll::Pending => {
                     return Err(TryReceiveError::Empty);
                 }
+            };
+            // Receive a PSK identity hint.
+            // TODO: Instead of receiving the PSK identity hint here, we should
+            // pull it directly from the connection.
+            let identity = self
+                .identity_rx
+                .try_recv()
+                .assume("identity received after accepting connection")
+                .map_err(|e| TryReceiveError::Error(e.into()))?;
+            debug!(
+                "Processing connection accepted after seeing PSK identity hint: {:02x?}",
+                identity
+            );
+            // If the PSK identity hint is the control PSK, receive a control message.
+            // This will update the channel map with the PSK and associate it with an
+            // AqcChannel.
+            if identity == PSK_IDENTITY_CTRL {
+                // Block on the async function
+                let result = futures_lite::future::block_on(receive_ctrl_message(
+                    &self.daemon,
+                    &self.server_keys,
+                    &mut self.channels,
+                    &mut conn,
+                ));
+
+                if let Err(e) = result {
+                    // The original function logged an error and returned ControlFlow::Break
+                    // which implies the loop should terminate or an error state.
+                    // For try_receive_channel, this might mean the connection is unusable for ctrl messages.
+                    warn!(
+                        "Receiving control message failed: {}, potential issue with connection.",
+                        e
+                    );
+                    // Depending on desired behavior, you might return an error or continue.
+                    // For now, let's assume it's an error if control message processing fails critically.
+                    return Err(TryReceiveError::Error(e));
+                }
+
+                continue;
             }
+            // If the PSK identity hint is not the control PSK, check if it's in the channel map.
+            // If it is, create a channel of the appropriate type. We should have already received
+            // the control message for this PSK, if we don't we can't create a channel.
+            let channel_info = self.channels.get(&identity).ok_or_else(|| {
+                debug!(
+                    "No channel info found in map for identity hint {:02x?}",
+                    identity
+                );
+                TryReceiveError::Error(AqcError::NoChannelInfoFound.into())
+            })?;
+            return Ok(create_channel_type(conn, channel_info));
         }
     }
 
@@ -673,7 +656,7 @@ impl AqcClient {
         addr: SocketAddr,
         label_id: LabelId,
         psks: AqcUniPsks,
-    ) -> Result<AqcSenderChannel> {
+    ) -> Result<AqcSenderChannel, AqcError> {
         let channel_id = UniChannelId::from(*psks.channel_id());
         self.client_keys.load_psks(AqcPsks::Uni(psks));
         let mut conn = self
@@ -690,7 +673,7 @@ impl AqcClient {
         addr: SocketAddr,
         label_id: LabelId,
         psks: AqcBidiPsks,
-    ) -> Result<AqcBidirectionalChannel> {
+    ) -> Result<AqcBidirectionalChannel, AqcError> {
         let channel_id = BidiChannelId::from(*psks.channel_id());
         self.client_keys.load_psks(AqcPsks::Bidi(psks));
         let mut conn = self
@@ -707,7 +690,7 @@ impl AqcClient {
         addr: SocketAddr,
         ctrl: AqcCtrl,
         team_id: TeamId,
-    ) -> Result<()> {
+    ) -> Result<(), AqcError> {
         self.client_keys.set_key(CTRL_KEY.clone());
         let mut conn = self
             .quic_client
@@ -716,13 +699,13 @@ impl AqcClient {
         conn.keep_alive(true)?;
         let (mut recv, mut send) = conn.open_bidirectional_stream().await?.split();
         let msg = AqcCtrlMessage { team_id, ctrl };
-        let msg_bytes = postcard::to_stdvec(&msg)?;
+        let msg_bytes = postcard::to_stdvec(&msg).assume("can serialize")?;
         send.send(Bytes::from_owner(msg_bytes)).await?;
         if let Some(msg_bytes) = recv.receive().await? {
-            let msg = postcard::from_bytes::<AqcAckMessage>(&msg_bytes)?;
+            let msg = postcard::from_bytes::<AqcAckMessage>(&msg_bytes).map_err(AqcError::Serde)?;
             match msg {
                 AqcAckMessage::Success => (),
-                AqcAckMessage::Failure(e) => return Err(anyhow::anyhow!(e)),
+                AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
             }
         }
         Ok(())

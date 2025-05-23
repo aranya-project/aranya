@@ -18,7 +18,7 @@ use aranya_daemon_api::{
     AqcBidiPsks, AqcPsks, AqcUniPsks, CipherSuiteId, DaemonApiClient, DeviceId, Directed, LabelId,
     NetIdentifier, TeamId,
 };
-use buggy::BugExt as _;
+use buggy::{Bug, BugExt as _};
 use rustls::crypto::{hash::HashAlgorithm, CryptoProvider};
 use s2n_quic::{
     provider::{
@@ -34,7 +34,7 @@ use tracing::{debug, error, instrument};
 use super::net::{AqcSenderChannel, TryReceiveError};
 use crate::{
     aqc::net::{AqcBidirectionalChannel, AqcClient, AqcReceiveChannelType},
-    error::{aranya_error, AqcError, IpcError},
+    error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
 };
 
@@ -78,7 +78,7 @@ impl AqcChannelsImpl {
     #[allow(deprecated)]
     pub(crate) async fn new(
         device_id: DeviceId,
-        aqc_addr: &SocketAddr,
+        aqc_addr: SocketAddr,
         daemon: Arc<DaemonApiClient>,
     ) -> Result<(Self, SocketAddr), AqcError> {
         debug!("device ID: {:?}", device_id);
@@ -118,14 +118,12 @@ impl AqcChannelsImpl {
 
         // Use the rustls server provider
         let server = Server::builder()
-            .with_tls(tls_server_provider) // Use the wrapped server config
-            .map_err(|e| AqcError::TlsConfig(e.to_string()))?
-            .with_io(*aqc_addr)
-            .map_err(|e| AqcError::IoConfig(e.to_string()))?
-            .with_congestion_controller(Bbr::default())
-            .map_err(|e| AqcError::CongestionConfig(e.to_string()))?
+            .with_tls(tls_server_provider)? // Use the wrapped server config
+            .with_io(aqc_addr)
+            .assume("can set aqc server addr")?
+            .with_congestion_controller(Bbr::default())?
             .start()
-            .map_err(|e| AqcError::ServerStart(e.to_string()))?;
+            .map_err(AqcError::ServerStart)?;
         let client = AqcClient::new(
             tls_client_provider,
             client_keys,
@@ -134,12 +132,12 @@ impl AqcChannelsImpl {
             server,
             daemon,
         )?;
-        Ok((Self { client }, *aqc_addr))
+        Ok((Self { client }, aqc_addr))
     }
 
     /// Returns the local address that AQC is bound to.
-    pub async fn local_addr(&self) -> Result<SocketAddr, AqcError> {
-        Ok(self.client.local_addr().await?)
+    pub fn local_addr(&self) -> Result<SocketAddr, Bug> {
+        self.client.local_addr()
     }
 
     /// Creates a bidirectional AQC channel with a peer.
@@ -152,7 +150,6 @@ impl AqcChannelsImpl {
         self.client
             .create_bidi_channel(peer_addr, label_id, psks)
             .await
-            .map_err(AqcError::Other)
     }
 
     /// Creates a unidirectional AQC channel with a peer.
@@ -165,16 +162,17 @@ impl AqcChannelsImpl {
         self.client
             .create_uni_channel(peer_addr, label_id, psks)
             .await
-            .map_err(AqcError::Other)
     }
 
     /// Receives a channel.
-    pub async fn receive_channel(&mut self) -> Result<AqcReceiveChannelType, AqcError> {
+    pub async fn receive_channel(&mut self) -> crate::Result<AqcReceiveChannelType> {
         self.client.receive_channel().await
     }
 
     /// Attempts to receive a channel.
-    pub fn try_receive_channel(&mut self) -> Result<AqcReceiveChannelType, TryReceiveError> {
+    pub fn try_receive_channel(
+        &mut self,
+    ) -> Result<AqcReceiveChannelType, TryReceiveError<crate::Error>> {
         self.client.try_receive_channel()
     }
 }
@@ -340,7 +338,7 @@ impl<'a> AqcChannels<'a> {
     /// Returns the address that AQC is bound to. This address is used to
     /// make connections to other peers.
     pub async fn local_addr(&self) -> Result<SocketAddr, AqcError> {
-        self.client.aqc.local_addr().await
+        Ok(self.client.aqc.local_addr()?)
     }
 
     /// Creates a bidirectional AQC channel with a peer.
@@ -373,14 +371,13 @@ impl<'a> AqcChannels<'a> {
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
-            .assume("invalid peer address")?;
+            .ok_or_else(no_addr)?;
 
         self.client
             .aqc
             .client
             .send_ctrl(peer_addr, aqc_ctrl, team_id)
-            .await
-            .map_err(AqcError::Other)?;
+            .await?;
         let channel = self
             .client
             .aqc
@@ -419,14 +416,13 @@ impl<'a> AqcChannels<'a> {
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
-            .assume("invalid peer address")?;
+            .ok_or_else(no_addr)?;
 
         self.client
             .aqc
             .client
             .send_ctrl(peer_addr, aqc_ctrl, team_id)
-            .await
-            .map_err(AqcError::Other)?;
+            .await?;
 
         let channel = self
             .client
@@ -472,14 +468,16 @@ impl<'a> AqcChannels<'a> {
     /// Waits for a peer to create an AQC channel with this client. Returns
     /// None if channels can no longer be received. If this happens, the
     /// application should be restarted.
-    pub async fn receive_channel(&mut self) -> Result<AqcReceiveChannelType, AqcError> {
+    pub async fn receive_channel(&mut self) -> crate::Result<AqcReceiveChannelType> {
         self.client.aqc.receive_channel().await
     }
 
     /// Returns the next available channel. If there is no channel available,
     /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
     /// is returned no channels will be available until the application is restarted.
-    pub fn try_receive_channel(&mut self) -> Result<AqcReceiveChannelType, TryReceiveError> {
+    pub fn try_receive_channel(
+        &mut self,
+    ) -> Result<AqcReceiveChannelType, TryReceiveError<crate::Error>> {
         self.client.aqc.try_receive_channel()
     }
 }

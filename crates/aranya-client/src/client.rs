@@ -208,7 +208,7 @@ impl Client {
             .expect("expected AQC server address");
         let daemon = Arc::new(daemon);
         let (aqc, aqc_server_addr) =
-            AqcChannelsImpl::new(device_id, &aqc_addr, daemon.clone()).await?;
+            AqcChannelsImpl::new(device_id, aqc_addr, daemon.clone()).await?;
         let client = Self { daemon, aqc };
 
         Ok((client, aqc_server_addr))
@@ -225,7 +225,7 @@ impl Client {
 
     /// Returns the address that the AQC server is bound to.
     pub async fn aqc_local_addr(&self) -> Result<SocketAddr> {
-        Ok(self.aqc.local_addr().await?)
+        Ok(self.aqc.local_addr()?)
     }
 
     /// Gets the public key bundle for this device.
