@@ -119,8 +119,8 @@ impl TeamConfigBuilder {
     }
 
     /// Configures the psk fields.
-    pub fn psk<S: Into<Secret>>(mut self, idenitity: Box<[u8]>, secret: S) -> Self {
-        self.psk_idenitity = Some(idenitity);
+    pub fn psk<I: Into<Box<[u8]>>, S: Into<Secret>>(mut self, idenitity: I, secret: S) -> Self {
+        self.psk_idenitity = Some(idenitity.into());
         self.psk_secret = Some(secret.into());
 
         self

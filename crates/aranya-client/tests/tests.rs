@@ -349,8 +349,8 @@ async fn test_sync_now() -> Result<()> {
     info!(?team_id);
 
     let cfg = {
-        let idenitity = psk.idenitity().to_vec().into_boxed_slice();
-        let secret = psk.raw_secret_bytes().to_vec().into_boxed_slice();
+        let idenitity = psk.idenitity();
+        let secret = psk.raw_secret_bytes();
         TeamConfig::builder().psk(idenitity, secret).build()?
     };
 
@@ -413,8 +413,8 @@ async fn test_query_functions() -> Result<()> {
     info!(?team_id);
 
     let cfg = {
-        let idenitity = psk.idenitity().to_vec().into_boxed_slice();
-        let secret = psk.raw_secret_bytes().to_vec().into_boxed_slice();
+        let idenitity = psk.idenitity();
+        let secret = psk.raw_secret_bytes();
         TeamConfig::builder().psk(idenitity, secret).build()?
     };
 
@@ -471,8 +471,8 @@ async fn test_add_team() -> Result<()> {
     info!(?team_id);
 
     let cfg = {
-        let idenitity = psk.idenitity().to_vec().into_boxed_slice();
-        let secret = psk.raw_secret_bytes().to_vec().into_boxed_slice();
+        let idenitity = psk.idenitity();
+        let secret = psk.raw_secret_bytes();
         TeamConfig::builder().psk(idenitity, secret).build()?
     };
 
