@@ -15,7 +15,7 @@ use ::rustls::{
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
 use aranya_daemon_api::{
-    AqcBidiPsks, AqcPsks, AqcUniPsks, CipherSuiteId, DaemonApiClient, DeviceId, Directed, LabelId,
+    AqcBidiPsks, AqcPsk, AqcPsks, AqcUniPsks, CipherSuiteId, DaemonApiClient, DeviceId, LabelId,
     NetIdentifier, TeamId,
 };
 use buggy::{Bug, BugExt as _};
@@ -212,35 +212,11 @@ impl ServerPresharedKeys {
 
     pub(crate) fn load_psks(&self, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
-        match psks {
-            AqcPsks::Bidi(psks) => {
-                for (suite, psk) in psks {
-                    let key = PresharedKey::external(
-                        psk.identity.as_bytes(),
-                        psk.secret.raw_secret_bytes(),
-                    )
-                    .expect("valid psk")
-                    .with_hash_alg(suite_hash(suite))
-                    .expect("valid hash alg");
-                    keys.insert(psk.identity.as_bytes().to_vec(), Arc::new(key));
-                }
-            }
-            AqcPsks::Uni(psks) => {
-                for (suite, psk) in psks {
-                    let key = PresharedKey::external(
-                        psk.identity.as_bytes(),
-                        match &psk.secret {
-                            Directed::Send(s) => s.raw_secret_bytes(),
-                            Directed::Recv(s) => s.raw_secret_bytes(),
-                        },
-                    )
-                    .expect("valid psk")
-                    .with_hash_alg(suite_hash(suite))
-                    .expect("valid hash alg");
-                    keys.insert(psk.identity.as_bytes().to_vec(), Arc::new(key));
-                }
-            }
-        };
+        for (suite, psk) in psks {
+            let identity = psk.identity().as_bytes().to_vec();
+            let key = make_preshared_key(suite, psk).expect("can make psk");
+            keys.insert(identity, key);
+        }
     }
 }
 
@@ -276,34 +252,25 @@ impl ClientPresharedKeys {
     }
 
     pub(crate) fn load_psks(&self, psks: AqcPsks) {
-        let keys = match psks {
-            AqcPsks::Bidi(psks) => psks
-                .into_iter()
-                .map(|(suite, psk)| {
-                    PresharedKey::external(psk.identity.as_bytes(), psk.secret.raw_secret_bytes())
-                        .expect("valid psk")
-                        .with_hash_alg(suite_hash(suite))
-                        .expect("valid hash alg")
-                })
-                .map(Arc::new)
-                .collect(),
-            AqcPsks::Uni(psks) => psks
-                .into_iter()
-                .map(|(suite, psk)| {
-                    let secret = match &psk.secret {
-                        Directed::Send(s) => s.raw_secret_bytes(),
-                        Directed::Recv(s) => s.raw_secret_bytes(),
-                    };
-                    PresharedKey::external(psk.identity.as_bytes(), secret)
-                        .expect("valid psk")
-                        .with_hash_alg(suite_hash(suite))
-                        .expect("valid hash alg")
-                })
-                .map(Arc::new)
-                .collect(),
-        };
+        let keys = psks
+            .into_iter()
+            .map(|(suite, psk)| make_preshared_key(suite, psk))
+            .collect::<Option<Vec<_>>>()
+            .expect("can create psks");
         *self.keys.lock().expect("poisoned") = keys;
     }
+}
+
+impl PresharedKeyStore for ClientPresharedKeys {
+    fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
+        self.keys.lock().expect("Client PSK mutex poisoned").clone()
+    }
+}
+
+fn make_preshared_key(suite: CipherSuiteId, psk: AqcPsk) -> Option<Arc<PresharedKey>> {
+    let key = PresharedKey::external(psk.identity().as_bytes(), psk.secret())?
+        .with_hash_alg(suite_hash(suite))?;
+    Some(Arc::new(key))
 }
 
 fn suite_hash(suite: CipherSuiteId) -> HashAlgorithm {
@@ -314,12 +281,6 @@ fn suite_hash(suite: CipherSuiteId) -> HashAlgorithm {
         CipherSuiteId::TlsAes128CcmSha256 => HashAlgorithm::SHA256,
         CipherSuiteId::TlsAes128Ccm8Sha256 => HashAlgorithm::SHA256,
         _ => HashAlgorithm::SHA256,
-    }
-}
-
-impl PresharedKeyStore for ClientPresharedKeys {
-    fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
-        self.keys.lock().expect("Client PSK mutex poisoned").clone()
     }
 }
 
