@@ -27,11 +27,11 @@ use tarpc::context;
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
-use super::api::CTRL_KEY;
-use crate::{
-    aqc::api::{AqcChannelId, ClientPresharedKeys, ServerPresharedKeys, PSK_IDENTITY_CTRL},
-    error::{aranya_error, AqcError, IpcError},
+use super::{
+    api::AqcChannelId,
+    crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_KEY, PSK_IDENTITY_CTRL},
 };
+use crate::error::{aranya_error, AqcError, IpcError};
 
 /// An AQC control message.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]

@@ -18,7 +18,7 @@ use tokio::net::UnixStream;
 use tracing::{debug, info, instrument};
 
 use crate::{
-    aqc::api::{AqcChannels, AqcChannelsImpl},
+    aqc::{AqcChannels, AqcChannelsImpl},
     config::{SyncPeerConfig, TeamConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
 };

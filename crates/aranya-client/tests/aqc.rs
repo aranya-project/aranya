@@ -2,7 +2,7 @@ use std::time::Duration;
 
 mod common;
 use anyhow::Result;
-use aranya_client::{aqc::net::AqcPeerChannel, TeamConfig};
+use aranya_client::{aqc::AqcPeerChannel, TeamConfig};
 use aranya_crypto::csprng::rand;
 use aranya_daemon_api::ChanOp;
 use buggy::BugExt;

@@ -3,7 +3,7 @@ use std::{convert::Infallible, io};
 use aranya_daemon_api as api;
 use tarpc::client::RpcError;
 
-use crate::aqc::api::AqcVersion;
+use crate::aqc::AqcVersion;
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
