@@ -16,8 +16,12 @@ use tracing::error;
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
 #[derive(Clone)]
-pub(crate) enum Msg {
+/// Insertion and Removal updates.
+/// Used by [`ClientPresharedKeys`] and [`ServerPresharedKeys`].
+pub enum Msg {
+    /// Insertion update
     Insert(TeamIdPSKPair),
+    /// Removal update
     Remove(TeamId),
 }
 
@@ -69,7 +73,8 @@ impl ServerPresharedKeys {
         Ok(())
     }
 
-    pub(crate) fn handle_msg(&self, msg: Msg) {
+    /// Handle PSK insertion and removal updates.
+    pub fn handle_msg(&self, msg: Msg) {
         match msg {
             Msg::Insert((team_id, psk)) => {
                 let _ = self
@@ -134,7 +139,8 @@ impl ClientPresharedKeys {
         Ok(())
     }
 
-    pub(crate) fn handle_msg(&self, msg: Msg) {
+    /// Handle PSK insertion and removal updates.
+    pub fn handle_msg(&self, msg: Msg) {
         match msg {
             Msg::Insert((team_id, psk)) => {
                 let _ = self

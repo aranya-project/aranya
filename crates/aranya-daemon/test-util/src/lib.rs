@@ -23,7 +23,10 @@ use aranya_daemon::{
     actions::Actions,
     aranya,
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
-    sync,
+    sync::{
+        self,
+        task::quic::{ClientPresharedKeys, Msg, ServerPresharedKeys},
+    },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore,
 };
@@ -34,7 +37,7 @@ use aranya_runtime::{
     ClientState, GraphId,
 };
 use aranya_util::Addr;
-use rustls::crypto::PresharedKey;
+use rustls::crypto::{hash::HashAlgorithm, PresharedKey};
 use tempfile::{tempdir, TempDir};
 use tokio::{
     sync::{
@@ -58,10 +61,12 @@ pub type TestServer = sync::task::quic::Server<
     LinearStorageProvider<FileManager>,
 >;
 
-const TEST_TEAM_ID: TeamId = TeamId::default();
-
-const TEST_PSK: LazyLock<PresharedKey> =
-    LazyLock::new(|| PresharedKey::external(b"identity", b"secret").expect("should not fail"));
+const TEST_PSK: LazyLock<PresharedKey> = LazyLock::new(|| {
+    PresharedKey::external(b"identity", b"secret")
+        .expect("should not fail")
+        .with_hash_alg(HashAlgorithm::SHA384)
+        .expect("valid hash algorithm")
+});
 
 // checks if effects vector contains a particular type of effect.
 #[macro_export]
@@ -83,19 +88,21 @@ pub struct TestDevice {
     /// Public keys
     pub pk: PublicKeys<DefaultCipherSuite>,
     effect_recv: Receiver<(GraphId, Vec<Effect>)>,
+    server_keys: Arc<ServerPresharedKeys>,
+    client_keys: Arc<ClientPresharedKeys>,
 }
 
 impl TestDevice {
     pub fn new(
         client: TestClient,
         server: TestServer,
+        server_keys: Arc<ServerPresharedKeys>,
         local_addr: Addr,
         pk: PublicKeys<DefaultCipherSuite>,
         graph_id: GraphId,
     ) -> Result<Self> {
         let handle = task::spawn(async { server.serve().await }).abort_handle();
-        let initial_keys = [(TEST_TEAM_ID, Arc::new(TEST_PSK.clone()))];
-        let (state, _client_keys) = TestState::new(initial_keys)?;
+        let (state, client_keys) = TestState::new([])?;
         let (send, effect_recv) = mpsc::channel(1);
         let (syncer, _sync_peers) = TestSyncer::new(client, send, TEST_SYNC_PROTOCOL, state);
         Ok(Self {
@@ -105,6 +112,8 @@ impl TestDevice {
             handle,
             pk,
             effect_recv,
+            server_keys,
+            client_keys,
         })
     }
 }
@@ -132,6 +141,32 @@ impl TestDevice {
         DefaultEngine<Rng>,
     > {
         self.syncer.client.actions(&self.graph_id)
+    }
+
+    async fn create_team(
+        &self,
+        owner_keys: DeviceKeyBundle,
+        nonce: Option<&[u8]>,
+    ) -> Result<(GraphId, Vec<Effect>, Arc<PresharedKey>)> {
+        match self.syncer.client.create_team(owner_keys, nonce).await {
+            Ok((graph_id, effects)) => {
+                let team_id = TeamId::from(*graph_id.as_array());
+                let psk = Arc::new(TEST_PSK.clone());
+                self.server_keys
+                    .handle_msg(Msg::Insert((team_id, psk.clone())));
+                self.client_keys
+                    .handle_msg(Msg::Insert((team_id, psk.clone())));
+
+                Ok((graph_id, effects, psk))
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    async fn add_team(&self, psk: Arc<PresharedKey>) {
+        let id = TeamId::from(*self.graph_id.as_array());
+        self.server_keys.handle_msg(Msg::Insert((id, psk.clone())));
+        self.client_keys.handle_msg(Msg::Insert((id, psk)));
     }
 }
 
@@ -221,7 +256,7 @@ impl TestCtx {
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
 
-        let (client, server, local_addr, pk) = {
+        let (client, server, server_keys, local_addr, pk) = {
             let mut store = {
                 let path = root.join("keystore");
                 fs::create_dir_all(&path)?;
@@ -248,52 +283,63 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let (server, _) = TestServer::new(
-                client.clone(),
-                &addr,
-                TEST_SYNC_PROTOCOL,
-                [(TEST_TEAM_ID, Arc::new(TEST_PSK.clone()))],
-            )
-            .await?;
+            let (server, server_keys) =
+                TestServer::new(client.clone(), &addr, TEST_SYNC_PROTOCOL, []).await?;
             let local_addr = server.local_addr()?;
-            (client, server, local_addr, pk)
+            (client, server, server_keys, local_addr, pk)
         };
 
-        TestDevice::new(client, server, local_addr.into(), pk, id)
+        TestDevice::new(client, server, server_keys, local_addr.into(), pk, id)
     }
 
     /// Creates `n` members.
-    pub async fn new_group(&mut self, n: usize) -> Result<Vec<TestDevice>> {
+    pub async fn new_group(&mut self, n: usize) -> Result<(Vec<TestDevice>, Arc<PresharedKey>)> {
         let mut clients = Vec::<TestDevice>::new();
-        for i in 0..n {
+        let mut members = 0..n;
+
+        let Some(_) = members.next() else {
+            bail!("Empty group");
+        };
+
+        // First member is the team owner
+        let (graph_id, psk) = {
             let name = format!("client_{}", self.id);
             self.id += 1;
 
-            let id = if i == 0 {
-                GraphId::default()
-            } else {
-                clients[0].graph_id
-            };
+            let id = GraphId::default();
             let mut client = self
                 .new_client(&name, id)
                 .await
                 .with_context(|| format!("unable to create client {name}"))?;
-            // Eww, gross.
-            if id == GraphId::default() {
-                let nonce = &mut [0u8; 16];
-                Rng.fill_bytes(nonce);
-                (client.graph_id, _) = client
-                    .create_team(DeviceKeyBundle::try_from(&client.pk)?, Some(nonce))
-                    .await?;
-            }
-            clients.push(client)
+            let nonce = &mut [0u8; 16];
+            Rng.fill_bytes(nonce);
+            let (graph_id, _, psk) = client
+                .create_team(DeviceKeyBundle::try_from(&client.pk)?, Some(nonce))
+                .await?;
+            client.graph_id = graph_id;
+            clients.push(client);
+
+            (graph_id, psk)
+        };
+
+        for _ in members {
+            let name = format!("client_{}", self.id);
+            self.id += 1;
+
+            let mut client = self
+                .new_client(&name, graph_id)
+                .await
+                .with_context(|| format!("unable to create client {name}"))?;
+
+            client.graph_id = graph_id;
+            clients.push(client);
         }
-        Ok(clients)
+        Ok((clients, psk))
     }
 
     /// Creates default team.
     pub async fn new_team(&mut self) -> Result<Vec<TestDevice>> {
-        let clients = self
+        let (clients, psk) = self
             .new_group(5)
             .await
             .context("unable to create clients")?;
@@ -303,6 +349,10 @@ impl TestCtx {
         let operator = &mut team.operator;
         let membera = &mut team.membera;
         let memberb = &mut team.memberb;
+
+        for member in [&admin, &operator, &membera, &memberb] {
+            member.add_team(psk.clone()).await;
+        }
 
         // team setup
         owner
