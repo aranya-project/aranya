@@ -21,9 +21,7 @@ debug = []
 aranya-daemon-api = { workspace = true }
 futures-util = { workspace = true }
 
-aranya-aqc-util = { workspace = true }
 aranya-crypto = { workspace = true }
-aranya-fast-channels = { workspace = true, features = ["std", "posix"] }
 aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
