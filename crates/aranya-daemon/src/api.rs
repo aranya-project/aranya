@@ -19,7 +19,7 @@ use aranya_runtime::GraphId;
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::{pin_mut, StreamExt, TryStreamExt};
-use rustls::crypto::PresharedKey;
+use rustls::crypto::{hash::HashAlgorithm, PresharedKey};
 use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
@@ -368,7 +368,9 @@ impl DaemonApi for Api {
             return Err(anyhow::anyhow!("Invalid Team Config for `add_team`. Expected `psk_idenitity` and `psk_secret` fields to be set").into());
         };
         let psk = PresharedKey::external(&identity, secret.raw_secret_bytes())
-            .context("unable to create PSK")?;
+            .context("unable to create PSK")?
+            .with_hash_alg(HashAlgorithm::SHA384)
+            .expect("Valid hash algorithm");
         self.psk_send.send(Msg::Insert((team, Arc::new(psk))))?;
         // TODO(Steve): Store PSK in credential store. What else is left?
 
@@ -404,7 +406,9 @@ impl DaemonApi for Api {
         {
             let psk_ref = Arc::new(
                 PresharedKey::external(psk.idenitity(), psk.raw_secret_bytes())
-                    .context("unable to create PSK")?,
+                    .context("unable to create PSK")?
+                    .with_hash_alg(HashAlgorithm::SHA384)
+                    .expect("Valid hash algorithm"),
             );
             let team_id = api::TeamId::from(*graph_id.as_array());
             self.psk_send.send(Msg::Insert((team_id, psk_ref)))?;

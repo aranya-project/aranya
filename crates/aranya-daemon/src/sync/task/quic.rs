@@ -349,7 +349,7 @@ where
             .with_no_client_auth()
             .with_single_cert(certs.clone(), key)?;
         server_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
-        server_config.preshared_keys = PresharedKeySelection::Enabled(server_keys.clone());
+        server_config.preshared_keys = PresharedKeySelection::Required(server_keys.clone());
 
         let tls_server_provider = rustls_provider::Server::new(server_config);
 
