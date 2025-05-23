@@ -557,7 +557,7 @@ impl DaemonApi for Api {
         self.handler.handle_effects(graph, &effects).await?;
 
         let psks = self.aqc.uni_channel_created(e).await?;
-        info!(num = psks.len(), "bidi channel created");
+        info!(num = psks.len(), "uni channel created");
 
         Ok((ctrl, psks))
     }
@@ -600,7 +600,7 @@ impl DaemonApi for Api {
             let effect = effects.iter().find(|e| match e {
                 Effect::AqcBidiChannelReceived(e) => e.peer_id == our_device_id.into(),
                 Effect::AqcUniChannelReceived(e) => {
-                    e.sender_id != our_device_id.into() && e.receiver_id != our_device_id.into()
+                    e.sender_id != our_device_id.into() && e.receiver_id == our_device_id.into()
                 }
                 _ => false,
             });

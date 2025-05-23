@@ -306,6 +306,33 @@ pub enum AqcPsks {
     Uni(AqcUniPsks),
 }
 
+impl IntoIterator for AqcPsks {
+    type IntoIter = AqcPsksIntoIter;
+    type Item = <Self::IntoIter as Iterator>::Item;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            AqcPsks::Bidi(psks) => AqcPsksIntoIter::Bidi(psks.into_iter()),
+            AqcPsks::Uni(psks) => AqcPsksIntoIter::Uni(psks.into_iter()),
+        }
+    }
+}
+
+pub enum AqcPsksIntoIter {
+    Bidi(IntoPsks<AqcBidiPsk>),
+    Uni(IntoPsks<AqcUniPsk>),
+}
+
+impl Iterator for AqcPsksIntoIter {
+    type Item = (CipherSuiteId, AqcPsk);
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            AqcPsksIntoIter::Bidi(it) => it.next().map(|(s, k)| (s, AqcPsk::Bidi(k))),
+            AqcPsksIntoIter::Uni(it) => it.next().map(|(s, k)| (s, AqcPsk::Uni(k))),
+        }
+    }
+}
+
 /// An iterator over an AQC channel's PSKs.
 #[derive(Debug)]
 pub struct IntoPsks<V> {
@@ -497,6 +524,13 @@ impl AqcPskId {
         match self {
             Self::Bidi(v) => v.cipher_suite(),
             Self::Uni(v) => v.cipher_suite(),
+        }
+    }
+
+    pub fn as_bytes(&self) -> &[u8; 34] {
+        match self {
+            Self::Bidi(v) => v.as_bytes(),
+            Self::Uni(v) => v.as_bytes(),
         }
     }
 }
