@@ -246,7 +246,7 @@ async fn test_aqc_chans_not_auth_label() -> Result<()> {
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans", work_dir).await?;
+    let mut team = TeamCtx::new("test_aqc_chans_not_auth_label", work_dir).await?;
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
