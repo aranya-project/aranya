@@ -1,42 +1,32 @@
 //! AQC support.
 
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    net::SocketAddr,
-    sync::{Arc, LazyLock, Mutex},
-};
+use std::{net::SocketAddr, sync::Arc};
 
-use ::rustls::{
-    client::PresharedKeyStore,
-    crypto::PresharedKey,
-    server::{PresharedKeySelection, SelectsPresharedKeys},
-    ClientConfig, ServerConfig,
-};
-use anyhow::Context;
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
-pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
 use aranya_daemon_api::{
-    AqcBidiPsks, AqcPsks, AqcUniPsks, CipherSuiteId, DaemonApiClient, DeviceId, Directed, LabelId,
-    NetIdentifier, TeamId,
+    AqcBidiPsks, AqcUniPsks, DaemonApiClient, DeviceId, LabelId, NetIdentifier, TeamId,
 };
-use buggy::BugExt as _;
-use rustls::crypto::{hash::HashAlgorithm, CryptoProvider};
-use rustls_pemfile::{certs, private_key};
+use buggy::{Bug, BugExt as _};
+use rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig};
 use s2n_quic::{
     provider::{
         congestion_controller::Bbr,
-        tls::rustls::{self as rustls_provider, rustls::pki_types::ServerName},
+        tls::rustls::{self as rustls_provider},
     },
     Server,
 };
 use tarpc::context;
-use tokio::sync::mpsc;
-use tracing::{debug, error, instrument};
+use tracing::{debug, instrument};
 
-use super::net::{AqcSenderChannel, TryReceiveError};
+use super::{
+    crypto::{
+        ClientPresharedKeys, NoCertResolver, ServerPresharedKeys, SkipServerVerification, CTRL_KEY,
+    },
+    net::{AqcClient, TryReceiveError},
+    AqcBidirectionalChannel, AqcPeerChannel, AqcSenderChannel,
+};
 use crate::{
-    aqc::net::{AqcBidirectionalChannel, AqcClient, AqcReceiveChannelType},
-    error::{aranya_error, AqcError, IpcError},
+    error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
 };
 
@@ -47,33 +37,13 @@ pub type AqcVersion = u16;
 // TODO: return `VersionMismatch` error if peer version does not match this version.
 pub const AQC_VERSION: AqcVersion = 1;
 
-/// TODO: remove this.
-/// NOTE: this certificate is to be used for demonstration purposes only!
-pub static CERT_PEM: &str = include_str!("./cert.pem");
-/// TODO: remove this.
-/// NOTE: this certificate is to be used for demonstration purposes only!
-pub static KEY_PEM: &str = include_str!("./key.pem");
-
 /// ALPN protocol identifier for Aranya QUIC Channels
 const ALPN_AQC: &[u8] = b"aqc";
 
-// Define constant PSK identity and bytes
-pub(super) const PSK_IDENTITY_CTRL: &[u8; 16] = b"aranya-ctrl-psk!"; // 16 bytes
-const PSK_BYTES_CTRL: &[u8; 32] = b"this-is-a-32-byte-secret-psk!!!!"; // 32 bytes
-
-pub(super) static CTRL_KEY: LazyLock<Arc<PresharedKey>> = LazyLock::new(|| {
-    let psk = PresharedKey::external(PSK_IDENTITY_CTRL, PSK_BYTES_CTRL)
-        .expect("identity and bytes are small and nonzero");
-    let psk = psk
-        .with_hash_alg(HashAlgorithm::SHA384)
-        .expect("valid hash alg");
-    Arc::new(psk)
-});
-
 #[derive(Debug)]
-pub enum AqcChannel {
-    Bidirectional { id: BidiChannelId },
-    Unidirectional { id: UniChannelId },
+pub enum AqcChannelId {
+    Bidirectional(BidiChannelId),
+    Unidirectional(UniChannelId),
 }
 
 /// Sends and receives AQC messages.
@@ -87,22 +57,12 @@ impl AqcChannelsImpl {
     #[allow(deprecated)]
     pub(crate) async fn new(
         device_id: DeviceId,
-        aqc_addr: &SocketAddr,
-        daemon: Arc<DaemonApiClient>,
+        aqc_addr: SocketAddr,
+        daemon: DaemonApiClient,
     ) -> Result<(Self, SocketAddr), AqcError> {
         debug!("device ID: {:?}", device_id);
 
         // --- Start Rustls Setup ---
-        // Load Cert and Key
-        let certs = certs(&mut CERT_PEM.as_bytes())
-            .collect::<Result<Vec<_>, _>>()
-            .context("Failed to load CERT_PEM")
-            .map_err(|e| AqcError::TlsConfig(e.to_string()))?;
-        let key = private_key(&mut KEY_PEM.as_bytes())
-            .context("Failed to load KEY_PEM")
-            .map_err(|e| AqcError::TlsConfig(e.to_string()))?
-            .ok_or_else(|| AqcError::TlsConfig("No private key found in KEY_PEM".into()))?;
-
         let client_keys = Arc::new(ClientPresharedKeys::new(CTRL_KEY.clone()));
 
         // Create Client Config (INSECURE: Skips server cert verification)
@@ -123,8 +83,7 @@ impl AqcChannelsImpl {
         // Create Server Config
         let mut server_config = ServerConfig::builder()
             .with_no_client_auth()
-            .with_single_cert(certs.clone(), key)
-            .map_err(|e| AqcError::TlsConfig(e.to_string()))?;
+            .with_cert_resolver(Arc::new(NoCertResolver::default()));
         server_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
         server_config.preshared_keys =
             PresharedKeySelection::Required(Arc::clone(&server_keys) as _);
@@ -138,14 +97,12 @@ impl AqcChannelsImpl {
 
         // Use the rustls server provider
         let server = Server::builder()
-            .with_tls(tls_server_provider) // Use the wrapped server config
-            .map_err(|e| AqcError::TlsConfig(e.to_string()))?
-            .with_io(*aqc_addr)
-            .map_err(|e| AqcError::IoConfig(e.to_string()))?
-            .with_congestion_controller(Bbr::default())
-            .map_err(|e| AqcError::CongestionConfig(e.to_string()))?
+            .with_tls(tls_server_provider)? // Use the wrapped server config
+            .with_io(aqc_addr)
+            .assume("can set aqc server addr")?
+            .with_congestion_controller(Bbr::default())?
             .start()
-            .map_err(|e| AqcError::ServerStart(e.to_string()))?;
+            .map_err(AqcError::ServerStart)?;
         let client = AqcClient::new(
             tls_client_provider,
             client_keys,
@@ -154,12 +111,17 @@ impl AqcChannelsImpl {
             server,
             daemon,
         )?;
-        Ok((Self { client }, *aqc_addr))
+        Ok((Self { client }, aqc_addr))
     }
 
-    /// Returns the local address that AQC is bound to.
-    pub async fn local_addr(&self) -> Result<SocketAddr, AqcError> {
-        Ok(self.client.local_addr().await?)
+    /// Returns the local address that the AQC client is bound to.
+    pub fn client_addr(&self) -> Result<SocketAddr, Bug> {
+        self.client.client_addr()
+    }
+
+    /// Returns the local address that the AQC server is bound to.
+    pub fn server_addr(&self) -> Result<SocketAddr, Bug> {
+        self.client.server_addr()
     }
 
     /// Creates a bidirectional AQC channel with a peer.
@@ -172,7 +134,6 @@ impl AqcChannelsImpl {
         self.client
             .create_bidi_channel(peer_addr, label_id, psks)
             .await
-            .map_err(AqcError::Other)
     }
 
     /// Creates a unidirectional AQC channel with a peer.
@@ -185,163 +146,16 @@ impl AqcChannelsImpl {
         self.client
             .create_uni_channel(peer_addr, label_id, psks)
             .await
-            .map_err(AqcError::Other)
     }
 
     /// Receives a channel.
-    pub async fn receive_channel(&mut self) -> Result<AqcReceiveChannelType, AqcError> {
+    pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
         self.client.receive_channel().await
     }
 
     /// Attempts to receive a channel.
-    pub fn try_receive_channel(&mut self) -> Result<AqcReceiveChannelType, TryReceiveError> {
+    pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         self.client.try_receive_channel()
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct ServerPresharedKeys {
-    keys: Mutex<HashMap<Vec<u8>, Arc<PresharedKey>>>,
-    // Optional sender to report the selected identity
-    identity_sender: mpsc::Sender<Vec<u8>>,
-}
-
-impl ServerPresharedKeys {
-    fn new() -> (Self, mpsc::Receiver<Vec<u8>>) {
-        // Create the mpsc channel for PSK identities
-        let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(10);
-
-        (
-            Self {
-                keys: Mutex::default(),
-                identity_sender: identity_tx,
-            },
-            identity_rx,
-        )
-    }
-
-    fn insert(&self, psk: Arc<PresharedKey>) {
-        let identity = psk.identity().to_vec();
-        match self.keys.lock().expect("poisoned").entry(identity.clone()) {
-            Entry::Vacant(v) => {
-                v.insert(psk);
-            }
-            Entry::Occupied(_) => {
-                error!("Duplicate PSK identity inserted: {:?}", identity);
-            }
-        }
-    }
-
-    pub(crate) fn load_psks(&self, psks: AqcPsks) {
-        let mut keys = self.keys.lock().expect("poisoned");
-        match psks {
-            AqcPsks::Bidi(psks) => {
-                for (suite, psk) in psks {
-                    let key = PresharedKey::external(
-                        psk.identity.as_bytes(),
-                        psk.secret.raw_secret_bytes(),
-                    )
-                    .expect("valid psk")
-                    .with_hash_alg(suite_hash(suite))
-                    .expect("valid hash alg");
-                    keys.insert(psk.identity.as_bytes().to_vec(), Arc::new(key));
-                }
-            }
-            AqcPsks::Uni(psks) => {
-                for (suite, psk) in psks {
-                    let key = PresharedKey::external(
-                        psk.identity.as_bytes(),
-                        match &psk.secret {
-                            Directed::Send(s) => s.raw_secret_bytes(),
-                            Directed::Recv(s) => s.raw_secret_bytes(),
-                        },
-                    )
-                    .expect("valid psk")
-                    .with_hash_alg(suite_hash(suite))
-                    .expect("valid hash alg");
-                    keys.insert(psk.identity.as_bytes().to_vec(), Arc::new(key));
-                }
-            }
-        };
-    }
-}
-
-impl SelectsPresharedKeys for ServerPresharedKeys {
-    fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
-        self.keys.lock().expect("poisoned").get(identity).cloned()
-    }
-
-    fn chosen(&self, identity: &[u8]) {
-        // Use try_send for non-blocking behavior.
-        self.identity_sender
-            .try_send(identity.to_vec())
-            .expect("Failed to send identity");
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct ClientPresharedKeys {
-    keys: Arc<Mutex<Vec<Arc<PresharedKey>>>>,
-}
-
-impl ClientPresharedKeys {
-    fn new(key: Arc<PresharedKey>) -> Self {
-        Self {
-            keys: Arc::new(Mutex::new(vec![key])),
-        }
-    }
-
-    pub(crate) fn set_key(&self, key: Arc<PresharedKey>) {
-        let mut keys_guard = self.keys.lock().expect("Client PSK mutex poisoned");
-        keys_guard.clear();
-        keys_guard.push(key);
-    }
-
-    pub(crate) fn load_psks(&self, psks: AqcPsks) {
-        let keys = match psks {
-            AqcPsks::Bidi(psks) => psks
-                .into_iter()
-                .map(|(suite, psk)| {
-                    PresharedKey::external(psk.identity.as_bytes(), psk.secret.raw_secret_bytes())
-                        .expect("valid psk")
-                        .with_hash_alg(suite_hash(suite))
-                        .expect("valid hash alg")
-                })
-                .map(Arc::new)
-                .collect(),
-            AqcPsks::Uni(psks) => psks
-                .into_iter()
-                .map(|(suite, psk)| {
-                    let secret = match &psk.secret {
-                        Directed::Send(s) => s.raw_secret_bytes(),
-                        Directed::Recv(s) => s.raw_secret_bytes(),
-                    };
-                    PresharedKey::external(psk.identity.as_bytes(), secret)
-                        .expect("valid psk")
-                        .with_hash_alg(suite_hash(suite))
-                        .expect("valid hash alg")
-                })
-                .map(Arc::new)
-                .collect(),
-        };
-        *self.keys.lock().expect("poisoned") = keys;
-    }
-}
-
-fn suite_hash(suite: CipherSuiteId) -> HashAlgorithm {
-    match suite {
-        CipherSuiteId::TlsAes128GcmSha256 => HashAlgorithm::SHA256,
-        CipherSuiteId::TlsAes256GcmSha384 => HashAlgorithm::SHA384,
-        CipherSuiteId::TlsChaCha20Poly1305Sha256 => HashAlgorithm::SHA256,
-        CipherSuiteId::TlsAes128CcmSha256 => HashAlgorithm::SHA256,
-        CipherSuiteId::TlsAes128Ccm8Sha256 => HashAlgorithm::SHA256,
-        _ => HashAlgorithm::SHA256,
-    }
-}
-
-impl PresharedKeyStore for ClientPresharedKeys {
-    fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
-        self.keys.lock().expect("Client PSK mutex poisoned").clone()
     }
 }
 
@@ -357,10 +171,16 @@ impl<'a> AqcChannels<'a> {
         Self { client }
     }
 
-    /// Returns the address that AQC is bound to. This address is used to
+    /// Returns the address that the AQC client is bound to. This address is used to
     /// make connections to other peers.
-    pub async fn local_addr(&self) -> Result<SocketAddr, AqcError> {
-        self.client.aqc.local_addr().await
+    pub fn client_addr(&self) -> Result<SocketAddr, AqcError> {
+        Ok(self.client.aqc.client_addr()?)
+    }
+
+    /// Returns the address that the AQC server is bound to. This address is used by
+    /// peers to connect to this instance.
+    pub fn server_addr(&self) -> Result<SocketAddr, AqcError> {
+        Ok(self.client.aqc.server_addr()?)
     }
 
     /// Creates a bidirectional AQC channel with a peer.
@@ -393,14 +213,13 @@ impl<'a> AqcChannels<'a> {
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
-            .assume("invalid peer address")?;
+            .ok_or_else(no_addr)?;
 
         self.client
             .aqc
             .client
             .send_ctrl(peer_addr, aqc_ctrl, team_id)
-            .await
-            .map_err(AqcError::Other)?;
+            .await?;
         let channel = self
             .client
             .aqc
@@ -439,14 +258,13 @@ impl<'a> AqcChannels<'a> {
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
-            .assume("invalid peer address")?;
+            .ok_or_else(no_addr)?;
 
         self.client
             .aqc
             .client
             .send_ctrl(peer_addr, aqc_ctrl, team_id)
-            .await
-            .map_err(AqcError::Other)?;
+            .await?;
 
         let channel = self
             .client
@@ -492,81 +310,14 @@ impl<'a> AqcChannels<'a> {
     /// Waits for a peer to create an AQC channel with this client. Returns
     /// None if channels can no longer be received. If this happens, the
     /// application should be restarted.
-    pub async fn receive_channel(&mut self) -> Result<AqcReceiveChannelType, AqcError> {
+    pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
         self.client.aqc.receive_channel().await
     }
 
     /// Returns the next available channel. If there is no channel available,
     /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
     /// is returned no channels will be available until the application is restarted.
-    pub fn try_receive_channel(&mut self) -> Result<AqcReceiveChannelType, TryReceiveError> {
+    pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         self.client.aqc.try_receive_channel()
     }
 }
-
-// --- Start SkipServerVerification ---
-// INSECURE: Allows connecting to any server certificate.
-// Requires the `dangerous_configuration` feature on the `rustls` crate.
-// Use full paths for traits and types
-// TODO: remove this once we have a way to exclusively use PSKs.
-// Currently, we use this to allow the server to be set up to use PSKs
-// without having to rely on the server certificate.
-
-#[derive(Debug)]
-struct SkipServerVerification(Arc<CryptoProvider>);
-
-impl SkipServerVerification {
-    fn new() -> Arc<Self> {
-        let provider = CryptoProvider::get_default().expect("Default crypto provider not found");
-        Arc::new(Self(provider.clone()))
-    }
-}
-
-// Use full trait path
-impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
-    fn verify_server_cert(
-        &self,
-        _end_entity: &rustls::pki_types::CertificateDer<'_>,
-        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
-        _server_name: &ServerName<'_>,
-        _ocsp_response: &[u8],
-        _now: rustls::pki_types::UnixTime,
-    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
-        Ok(rustls::client::danger::ServerCertVerified::assertion())
-    }
-
-    fn verify_tls12_signature(
-        &self,
-        message: &[u8],
-        cert: &rustls::pki_types::CertificateDer<'_>,
-        dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-        // Use the selected provider's verification algorithms
-        rustls::crypto::verify_tls12_signature(
-            message,
-            cert,
-            dss,
-            &self.0.signature_verification_algorithms,
-        )
-    }
-
-    fn verify_tls13_signature(
-        &self,
-        message: &[u8],
-        cert: &rustls::pki_types::CertificateDer<'_>,
-        dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-        // Use the selected provider's verification algorithms
-        rustls::crypto::verify_tls13_signature(
-            message,
-            cert,
-            dss,
-            &self.0.signature_verification_algorithms,
-        )
-    }
-
-    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-        self.0.signature_verification_algorithms.supported_schemes()
-    }
-}
-// --- End SkipServerVerification ---

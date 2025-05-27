@@ -1,6 +1,6 @@
 //! Client-daemon connection.
 
-use std::{io, net::SocketAddr, path::Path, sync::Arc};
+use std::{io, net::SocketAddr, path::Path};
 
 use anyhow::Context;
 use aranya_crypto::Rng;
@@ -18,7 +18,7 @@ use tokio::net::UnixStream;
 use tracing::{debug, info, instrument};
 
 use crate::{
-    aqc::api::{AqcChannels, AqcChannelsImpl},
+    aqc::{AqcChannels, AqcChannelsImpl},
     config::{SyncPeerConfig, TeamConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
 };
@@ -140,7 +140,7 @@ impl<'a> ClientBuilder<'a> {
 #[derive(Debug)]
 pub struct Client {
     /// RPC connection to the daemon
-    pub(crate) daemon: Arc<DaemonApiClient>,
+    pub(crate) daemon: DaemonApiClient,
     /// Support for AQC
     pub(crate) aqc: AqcChannelsImpl,
 }
@@ -206,9 +206,8 @@ impl Client {
             .map_err(error::other)?
             .next()
             .expect("expected AQC server address");
-        let daemon = Arc::new(daemon);
         let (aqc, aqc_server_addr) =
-            AqcChannelsImpl::new(device_id, &aqc_addr, daemon.clone()).await?;
+            AqcChannelsImpl::new(device_id, aqc_addr, daemon.clone()).await?;
         let client = Self { daemon, aqc };
 
         Ok((client, aqc_server_addr))
@@ -223,9 +222,9 @@ impl Client {
             .map_err(aranya_error)
     }
 
-    /// Returns the address that the AQC server is bound to.
-    pub async fn aqc_local_addr(&self) -> Result<SocketAddr> {
-        Ok(self.aqc.local_addr().await?)
+    /// Returns the address that the AQC client is bound to.
+    pub async fn aqc_client_addr(&self) -> Result<SocketAddr> {
+        Ok(self.aqc.client_addr()?)
     }
 
     /// Gets the public key bundle for this device.

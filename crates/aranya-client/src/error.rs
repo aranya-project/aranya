@@ -1,9 +1,9 @@
-use std::io;
+use std::{convert::Infallible, io};
 
 use aranya_daemon_api as api;
 use tarpc::client::RpcError;
 
-use crate::aqc::api::AqcVersion;
+use crate::aqc::AqcVersion;
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
@@ -113,27 +113,9 @@ pub(crate) enum IpcRepr {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum AqcError {
-    #[error("unable to create channel")]
-    ChannelCreation(aranya_aqc_util::Error),
-
-    #[error("unable to parse encap")]
-    Encap(anyhow::Error),
-
-    /// No control message was found.
-    #[error("no control message found")]
-    NoCtrlMessage,
-
-    /// The channel was not found.
-    #[error("channel not found")]
-    ChannelNotFound,
-
     /// The server connection was terminated.
     #[error("server connection terminated")]
     ServerConnectionTerminated,
-
-    /// No identity hint was found.
-    #[error("no identity hint found")]
-    NoIdentityHint,
 
     /// No channel info found.
     #[error("no channel info found")]
@@ -145,109 +127,26 @@ pub enum AqcError {
 
     /// The connection error.
     #[error("connection error: {0}")]
-    ConnectionError(String),
+    ConnectionError(#[from] s2n_quic::connection::Error),
 
-    /// Received an unexpected channel type.
-    #[error("received unexpected channel type: {0}")]
-    UnexpectedChannelType(String),
-
-    // Connection-related errors
-    /// Unable to bind a network addresss.
-    #[error("unable to bind address: {0}")]
-    Bind(io::Error),
-
-    /// DNS lookup failed.
-    #[error("DNS lookup failed: {0}")]
-    DnsLookup(io::Error),
+    /// The stream error.
+    #[error("stream error: {0}")]
+    StreamError(#[from] s2n_quic::stream::Error),
 
     /// Failed to resolve address.
     #[error("failed to resolve address: {0}")]
     AddrResolution(io::Error),
 
-    /// Address not found.
-    #[error("unable to parse address: {0}")]
-    AddrParse(std::net::AddrParseError),
-
-    /// Address not found.
-    #[error("address not found: {0}")]
-    AddrNotFound(String),
-
-    /// TLS configuration error.
-    #[error("TLS configuration error: {0}")]
-    TlsConfig(String),
-
-    /// IO configuration error.
-    #[error("IO configuration error: {0}")]
-    IoConfig(String),
-
-    /// Congestion controller configuration error.
-    #[error("Congestion controller configuration error: {0}")]
-    CongestionConfig(String),
-
     /// Server start error.
     #[error("Server start error: {0}")]
-    ServerStart(String),
-
-    /// Local address failure.
-    #[error("unable to get local address: {0}")]
-    RouterAddr(io::Error),
-
-    /// Unable to parse shm path.
-    #[error("unable to parse shared memory path: {0}")]
-    ShmPathParse(aranya_fast_channels::shm::InvalidPathError),
-
-    /// Unable to open the shm read state.
-    #[error("unable to open shared memory `ReadState`: {0}")]
-    ShmReadState(anyhow::Error),
-
-    /// Unable to accept a QUIC stream.
-    #[error("unable to accept to QUIC stream: {0}")]
-    StreamAccept(io::Error),
-
-    /// Unable to create a QUIC stream.
-    #[error("unable to connect to QUIC stream: {0}")]
-    StreamConnect(io::Error),
-
-    /// Unable to read from QUIC stream.
-    #[error("unable to read from QUIC stream: {0}")]
-    StreamRead(io::Error),
-
-    /// Unable to write to QUIC stream.
-    #[error("unable to write to QUIC stream: {0}")]
-    StreamWrite(io::Error),
-
-    /// Unable to shutdown QUIC stream.
-    #[error("unable to shutdown QUIC stream: {0}")]
-    StreamShutdown(io::Error),
-
-    /// Unable to get the remote peer's address.
-    #[error("unable to get remote peer's address: {0}")]
-    StreamPeerAddr(io::Error),
-
-    /// The stream was not found.
-    #[error("stream not found: {0}")]
-    StreamNotFound(std::net::SocketAddr),
-
-    /// The message length prefix was larger than the maximum
-    /// allowed size.
-    #[error("message too large: {got} > {max}")]
-    MsgTooLarge { got: usize, max: usize },
-
-    /// Payload is too small to be ciphertext.
-    #[error("payload is too small to be ciphertext")]
-    PayloadTooSmall,
-
-    /// AQC message decryption failure.
-    #[error("decryption failure: {0}")]
-    Decryption(aranya_fast_channels::Error),
-
-    /// AQC message encryption failure.
-    #[error("encryption failure: {0}")]
-    Encryption(aranya_fast_channels::Error),
+    ServerStart(#[from] s2n_quic::provider::StartError),
 
     /// Serde serialization/deserialization error.
     #[error("serialization/deserialization error: {0}")]
     Serde(postcard::Error),
+
+    #[error("error from peer processing control message: {0}")]
+    CtrlFailure(String),
 
     /// AQC version mismatch.
     #[error("AQC version mismatch: got {actual:?}, expected {expected:?}")]
@@ -259,9 +158,14 @@ pub enum AqcError {
     /// An internal bug was discovered.
     #[error("internal bug: {0}")]
     Bug(#[from] buggy::Bug),
+}
 
-    // General errors
-    /// Some other error.
-    #[error("{0}")]
-    Other(#[from] anyhow::Error),
+impl From<Infallible> for AqcError {
+    fn from(value: Infallible) -> Self {
+        match value {}
+    }
+}
+
+pub(crate) fn no_addr() -> AqcError {
+    AqcError::AddrResolution(io::Error::new(io::ErrorKind::NotFound, "no address found"))
 }

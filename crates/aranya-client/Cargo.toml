@@ -21,15 +21,12 @@ debug = []
 aranya-daemon-api = { workspace = true }
 futures-util = { workspace = true }
 
-aranya-aqc-util = { workspace = true }
 aranya-crypto = { workspace = true }
-aranya-fast-channels = { workspace = true, features = ["std", "posix"] }
 aranya-util = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
 futures-lite = { workspace = true }
 rustls = { workspace = true }
-rustls-pemfile = { workspace = true }
 s2n-quic = { workspace = true }
 
 anyhow = { workspace = true }
@@ -44,7 +41,6 @@ tracing = { workspace = true }
 aranya-daemon = { path = "../aranya-daemon" }
 
 backon = { workspace = true }
-rcgen = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }

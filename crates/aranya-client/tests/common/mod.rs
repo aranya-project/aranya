@@ -282,8 +282,8 @@ impl DeviceCtx {
         Ok(self.client.local_addr().await?)
     }
 
-    pub async fn aqc_local_addr(&self) -> Result<SocketAddr> {
-        Ok(self.client.aqc_local_addr().await?)
+    pub async fn aqc_client_addr(&self) -> Result<SocketAddr> {
+        Ok(self.client.aqc_client_addr().await?)
     }
 }
 
