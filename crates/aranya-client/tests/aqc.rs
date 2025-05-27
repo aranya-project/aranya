@@ -570,14 +570,14 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 }
 
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_aqc_chans_delete_chan() -> Result<()> {
+async fn test_aqc_chans_delete_chan_send() -> Result<()> {
     let interval = Duration::from_millis(100);
     let sleep_interval = interval * 6;
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans_delete_chan", work_dir).await?;
+    let mut team = TeamCtx::new("test_aqc_chans_delete_chan_send", work_dir).await?;
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
@@ -711,6 +711,151 @@ async fn test_aqc_chans_delete_chan() -> Result<()> {
             .send(msg2.clone())
             .await
             .expect_err("expected to fail sending");
+    }
+
+    Ok(())
+}
+
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_aqc_chans_delete_chan_recv() -> Result<()> {
+    let interval = Duration::from_millis(100);
+    let sleep_interval = interval * 6;
+
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
+    let mut team = TeamCtx::new("test_aqc_chans_delete_chan_recv", work_dir).await?;
+
+    let cfg = TeamConfig::builder().build()?;
+    // create team.
+    let team_id = team
+        .owner
+        .client
+        .create_team(cfg)
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // Tell all peers to sync with one another, and assign their roles.
+    team.add_all_sync_peers(team_id).await?;
+    team.add_all_device_roles(team_id).await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    let mut operator_team = team.operator.client.team(team_id);
+    operator_team
+        .assign_aqc_net_identifier(
+            team.membera.id,
+            NetIdentifier(team.membera.client.aqc().server_addr()?.to_string()),
+        )
+        .await?;
+    operator_team
+        .assign_aqc_net_identifier(
+            team.memberb.id,
+            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+        )
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // wait for ctrl message to be sent.
+    sleep(Duration::from_millis(100)).await;
+
+    let label1 = operator_team.create_label("label1".to_string()).await?;
+    let op = ChanOp::SendRecv;
+    operator_team
+        .assign_label(team.membera.id, label1, op)
+        .await?;
+    operator_team
+        .assign_label(team.memberb.id, label1, op)
+        .await?;
+
+    let label2 = operator_team.create_label("label2".to_string()).await?;
+    let op = ChanOp::SendRecv;
+    operator_team
+        .assign_label(team.membera.id, label2, op)
+        .await?;
+    operator_team
+        .assign_label(team.memberb.id, label2, op)
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    {
+        let (mut bidi_chan1, peer_channel) = try_join(
+            team.membera.client.aqc().create_bidi_channel(
+                team_id,
+                NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+                label1,
+            ),
+            team.memberb.client.aqc().receive_channel(),
+        )
+        .await
+        .expect("can create and receive channel");
+
+        let mut bidi_chan2 = match peer_channel {
+            AqcPeerChannel::Bidi(channel) => channel,
+            _ => buggy::bug!("Expected a bidirectional channel on memberb"),
+        };
+
+        let mut send1_1 = bidi_chan1.create_uni_stream().await?;
+
+        // Test sending streams
+
+        // Send from 1 to 2 with a unidirectional stream
+        let msg1 = Bytes::from_static(b"hello");
+        send1_1.send(msg1.clone()).await?;
+        // Receive a unidirectional stream from peer 1
+        let mut recv2_1 = bidi_chan2
+            .receive_stream()
+            .await
+            .unwrap()
+            .into_receive()
+            .ok()
+            .unwrap();
+        let bytes = recv2_1.receive().await?.assume("no data received")?;
+        assert_eq!(bytes, msg1);
+
+        let mut bidi1_2 = bidi_chan1.create_bidi_stream().await?;
+        // Send from 1 to 2 with a bidirectional stream
+        let msg2 = Bytes::from_static(b"hello2");
+        bidi1_2.send(msg2.clone()).await?;
+        let mut bidi2_2 = bidi_chan2
+            .receive_stream()
+            .await
+            .unwrap()
+            .into_bidi()
+            .ok()
+            .unwrap();
+        let bytes = bidi2_2.receive().await?.assume("no data received")?;
+        assert_eq!(bytes, msg2);
+        // Send from 2 to 1 with a bidirectional stream
+        let msg3 = Bytes::from_static(b"hello3");
+        bidi2_2.send(msg3.clone()).await?;
+        let bytes = bidi1_2.receive().await?.assume("no data received")?;
+        assert_eq!(bytes, msg3);
+
+        team.membera
+            .client
+            .aqc()
+            .delete_bidi_channel(bidi_chan1)
+            .await?;
+        team.memberb
+            .client
+            .aqc()
+            .delete_bidi_channel(bidi_chan2)
+            .await?;
+
+        // wait for ctrl message to be sent.
+        sleep(Duration::from_millis(100)).await;
+
+        bidi1_2
+            .receive()
+            .await
+            .expect_err("expected receive on deleted channel to fail");
     }
 
     Ok(())
