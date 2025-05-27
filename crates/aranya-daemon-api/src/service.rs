@@ -2,7 +2,7 @@
 
 use core::{
     borrow::Borrow,
-    error, fmt,
+    fmt,
     hash::{Hash, Hasher},
     net::SocketAddr,
     ops::Deref,

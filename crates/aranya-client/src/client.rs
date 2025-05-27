@@ -178,7 +178,7 @@ impl<'a> TryFrom<&'a CStr> for NetIdentifier<'a> {
     }
 }
 
-impl<'a> TryFrom<String> for NetIdentifier<'a> {
+impl TryFrom<String> for NetIdentifier<'_> {
     type Error = InvalidNetIdentifier;
 
     #[inline]

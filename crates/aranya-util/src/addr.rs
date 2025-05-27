@@ -453,10 +453,10 @@ impl FmtBuf {
             self.write(base16((x >> 12) as u8));
         }
         if x >= 0x100 {
-            self.write(base16((x >> 8 & 0xf) as u8));
+            self.write(base16(((x >> 8) & 0xf) as u8));
         }
         if x >= 0x10 {
-            self.write(base16((x >> 4 & 0x0f) as u8));
+            self.write(base16(((x >> 4) & 0x0f) as u8));
         }
         self.write(base16((x & 0x0f) as u8));
     }

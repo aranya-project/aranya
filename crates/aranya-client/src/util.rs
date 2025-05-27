@@ -25,6 +25,14 @@ macro_rules! custom_id {
         }
 
         #[doc(hidden)]
+        impl From<aranya_crypto::Id> for $name {
+            #[inline]
+            fn from(id: aranya_crypto::Id) -> Self {
+                Self(id.into())
+            }
+        }
+
+        #[doc(hidden)]
         impl From<[u8; 32]> for $name {
             #[inline]
             fn from(id: [u8; 32]) -> Self {

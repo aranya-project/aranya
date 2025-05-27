@@ -1,7 +1,7 @@
 use core::{
     ffi::{c_char, CStr},
     fmt,
-    ops::{Deref, DerefMut},
+    ops::DerefMut,
     ptr,
 };
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
@@ -215,7 +215,7 @@ pub unsafe fn client_init(
 pub type Client = Safe<imp::Client>;
 
 /// The size in bytes of an ID
-pub const ARANYA_ID_LEN: usize = 64;
+pub const ARANYA_ID_LEN: usize = 32;
 
 const _: () = {
     assert!(ARANYA_ID_LEN == size_of::<aranya_crypto::Id>());
@@ -571,7 +571,7 @@ impl Addr {
 #[derive(Copy, Clone, Debug)]
 pub struct NetIdentifier(*const c_char);
 
-impl<'a> TryFrom<NetIdentifier> for aranya_client::NetIdentifier<'a> {
+impl TryFrom<NetIdentifier> for aranya_client::NetIdentifier<'_> {
     type Error = aranya_client::InvalidNetIdentifier;
 
     fn try_from(id: NetIdentifier) -> Result<Self, Self::Error> {
@@ -876,7 +876,7 @@ pub fn sync_peer_config_build(
 /// @param cfg a pointer to the builder for a sync config
 /// @param interval Set the interval at which syncing occurs
 pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
-    cfg.imp().interval(interval);
+    cfg.deref_mut().interval(interval);
 }
 
 /// Updates the config to enable immediate syncing with the peer.
@@ -888,7 +888,7 @@ pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, in
 /// @param cfg a pointer to the builder for a sync config
 // TODO: aranya-core#129
 pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
-    cfg.imp().sync_now(true);
+    cfg.deref_mut().sync_now(true);
 }
 
 /// Updates the config to disable immediate syncing with the peer.
@@ -930,7 +930,7 @@ pub fn create_role(
     let r = client
         .rt
         .block_on(client.inner.team(team.into()).create_role(name))?;
-    Safe::init(role, r.clone().try_into()?);
+    Role::init(role, r.clone().try_into()?);
     Ok(())
 }
 
@@ -1073,7 +1073,7 @@ pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
 /// @param cfg a pointer to the builder for a sync config
 // TODO: aranya-core#129
 pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
-    cfg.imp().sync_now(false);
+    cfg.deref_mut().sync_now(false);
 }
 
 /// Assign device precedence.
@@ -1242,7 +1242,7 @@ pub fn create_label(
             .team(team.into())
             .create_label(name, managing_role_id.into()),
     )?;
-    Safe::init(label, l.clone().try_into()?);
+    Label::init(label, l.clone().try_into()?);
     Ok(())
 }
 
@@ -1615,7 +1615,7 @@ pub fn query_device_label_assignments(
     }
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.try_into()?)
+        Label::init(dst, src.try_into()?)
     }
     *labels_len = len;
     Ok(())
@@ -1687,7 +1687,7 @@ pub fn query_labels(
     }
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.try_into()?);
+        Label::init(dst, src.try_into()?);
     }
     *labels_len = len;
     Ok(())
@@ -1729,7 +1729,7 @@ pub fn query_roles_on_team(
     }
     let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.try_into()?);
+        Role::init(dst, src.try_into()?);
     }
     *roles_len = len;
     Ok(())

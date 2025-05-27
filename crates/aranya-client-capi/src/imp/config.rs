@@ -1,12 +1,12 @@
 use core::{ffi::c_char, mem::MaybeUninit, ptr};
 
 use aranya_capi_core::{
-    safe::{Safe, TypeId, Typed},
+    safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
 
 use super::Error;
-use crate::api::defs::Duration;
+use crate::api::defs::{self, Duration};
 
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]

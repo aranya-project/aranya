@@ -2,7 +2,7 @@
 
 use core::{fmt, net::SocketAddr};
 
-use aranya_daemon_api::{AqcCtrl, AqcPsk};
+use aranya_daemon_api::{AqcCtrl, AqcPsks};
 use tarpc::context;
 use tracing::{debug, instrument};
 
