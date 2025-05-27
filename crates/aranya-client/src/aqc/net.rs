@@ -68,7 +68,7 @@ async fn receive_aqc_ctrl(
             for (_suite, psk) in psks {
                 channel_map.insert(
                     psk.identity.as_bytes().to_vec(),
-                    AqcChannelId::Bidirectional(*psk.identity.channel_id()),
+                    AqcChannelId::Bidi(*psk.identity.channel_id()),
                 );
             }
         }
@@ -76,7 +76,7 @@ async fn receive_aqc_ctrl(
             for (_suite, psk) in psks {
                 channel_map.insert(
                     psk.identity.as_bytes().to_vec(),
-                    AqcChannelId::Unidirectional(*psk.identity.channel_id()),
+                    AqcChannelId::Uni(*psk.identity.channel_id()),
                 );
             }
         }
@@ -87,17 +87,17 @@ async fn receive_aqc_ctrl(
 
 fn create_peer_channel(conn: Connection, channel_id: &AqcChannelId) -> channels::AqcPeerChannel {
     match channel_id {
-        AqcChannelId::Bidirectional(id) => {
+        AqcChannelId::Bidi(id) => {
             // Once we accept a valid connection, let's turn it into an AQC Channel that we can
             // then open an arbitrary number of streams on.
             let channel = channels::AqcBidirectionalChannel::new(LabelId::default(), *id, conn);
-            channels::AqcPeerChannel::Bidirectional(channel)
+            channels::AqcPeerChannel::Bidi(channel)
         }
-        AqcChannelId::Unidirectional(id) => {
+        AqcChannelId::Uni(id) => {
             // Once we accept a valid connection, let's turn it into an AQC Channel that we can
             // then open an arbitrary number of streams on.
-            let receiver = channels::AqcReceiverChannel::new(LabelId::default(), *id, conn);
-            channels::AqcPeerChannel::Receiver(receiver)
+            let receiver = channels::AqcReceiveChannel::new(LabelId::default(), *id, conn);
+            channels::AqcPeerChannel::Receive(receiver)
         }
     }
 }

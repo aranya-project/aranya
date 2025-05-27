@@ -17,9 +17,9 @@ use crate::error::AqcError;
 #[derive(Debug)]
 pub enum AqcPeerChannel {
     /// Used to receive data from a peer.
-    Receiver(AqcReceiverChannel),
+    Receive(AqcReceiveChannel),
     /// Used to send and receive data with a peer.
-    Bidirectional(AqcBidirectionalChannel),
+    Bidi(AqcBidirectionalChannel),
 }
 
 /// The sending end of a unidirectional channel.
@@ -86,13 +86,13 @@ impl std::fmt::Display for AqcSenderChannel {
 /// The receive end of a unidirectional channel.
 /// Allows receiving data streams over a channel.
 #[derive(Debug)]
-pub struct AqcReceiverChannel {
+pub struct AqcReceiveChannel {
     pub(crate) label_id: LabelId,
     pub(crate) aqc_id: UniChannelId,
     pub(crate) conn: Connection,
 }
 
-impl AqcReceiverChannel {
+impl AqcReceiveChannel {
     /// Create a new channel with the given conection handle.
     ///
     /// Returns the new channel and the sender used to send new streams to the

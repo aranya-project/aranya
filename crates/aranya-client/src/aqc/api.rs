@@ -42,8 +42,8 @@ const ALPN_AQC: &[u8] = b"aqc";
 
 #[derive(Debug)]
 pub enum AqcChannelId {
-    Bidirectional(BidiChannelId),
-    Unidirectional(UniChannelId),
+    Bidi(BidiChannelId),
+    Uni(UniChannelId),
 }
 
 /// Sends and receives AQC messages.

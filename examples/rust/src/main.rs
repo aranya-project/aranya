@@ -393,7 +393,7 @@ async fn main() -> Result<()> {
     let mut received_aqc_chan = loop {
         let chan = memberb.client.aqc().receive_channel().await?;
         match chan {
-            AqcReceiveChannelType::Bidirectional { channel } => break channel,
+            AqcReceiveChannelType::Bidi { channel } => break channel,
             _ => bail!("expected a bidirectional channel"),
         }
     };
