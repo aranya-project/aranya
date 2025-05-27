@@ -23,7 +23,7 @@ use super::{
         ClientPresharedKeys, NoCertResolver, ServerPresharedKeys, SkipServerVerification, CTRL_KEY,
     },
     net::{AqcClient, TryReceiveError},
-    AqcBidirectionalChannel, AqcPeerChannel, AqcSenderChannel,
+    AqcBidiChannel, AqcPeerChannel, AqcSenderChannel,
 };
 use crate::{
     error::{aranya_error, no_addr, AqcError, IpcError},
@@ -130,7 +130,7 @@ impl AqcChannelsImpl {
         peer_addr: SocketAddr,
         label_id: LabelId,
         psks: AqcBidiPsks,
-    ) -> Result<AqcBidirectionalChannel, AqcError> {
+    ) -> Result<AqcBidiChannel, AqcError> {
         self.client
             .create_bidi_channel(peer_addr, label_id, psks)
             .await
@@ -197,7 +197,7 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> crate::Result<AqcBidirectionalChannel> {
+    ) -> crate::Result<AqcBidiChannel> {
         debug!("creating bidi channel");
 
         let (aqc_ctrl, psks) = self
@@ -277,10 +277,7 @@ impl<'a> AqcChannels<'a> {
     /// Deletes an AQC bidi channel.
     /// It is an error if the channel does not exist
     #[instrument(skip_all, fields(?chan))]
-    pub async fn delete_bidi_channel(
-        &mut self,
-        mut chan: AqcBidirectionalChannel,
-    ) -> crate::Result<()> {
+    pub async fn delete_bidi_channel(&mut self, mut chan: AqcBidiChannel) -> crate::Result<()> {
         // let _ctrl = self
         //     .client
         //     .daemon

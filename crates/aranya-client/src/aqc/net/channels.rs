@@ -19,7 +19,7 @@ pub enum AqcPeerChannel {
     /// Used to receive data from a peer.
     Receive(AqcReceiveChannel),
     /// Used to send and receive data with a peer.
-    Bidi(AqcBidirectionalChannel),
+    Bidi(AqcBidiChannel),
 }
 
 impl AqcPeerChannel {
@@ -28,7 +28,7 @@ impl AqcPeerChannel {
             AqcChannelId::Bidi(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let channel = AqcBidirectionalChannel::new(label_id, id, conn);
+                let channel = AqcBidiChannel::new(label_id, id, conn);
                 AqcPeerChannel::Bidi(channel)
             }
             AqcChannelId::Uni(id) => {
@@ -161,13 +161,13 @@ impl AqcReceiveChannel {
 /// A unique channel between two peers.
 /// Allows sending and receiving data streams over a channel.
 #[derive(Debug)]
-pub struct AqcBidirectionalChannel {
+pub struct AqcBidiChannel {
     pub(crate) label_id: LabelId,
     pub(crate) aqc_id: BidiChannelId,
     pub(crate) conn: Connection,
 }
 
-impl AqcBidirectionalChannel {
+impl AqcBidiChannel {
     /// Create a new bidirectional channel with the given id and conection handle.
     pub(crate) fn new(label_id: LabelId, aqc_id: BidiChannelId, conn: Connection) -> Self {
         Self {
@@ -258,13 +258,13 @@ impl AqcBidirectionalChannel {
     }
 }
 
-impl Drop for AqcBidirectionalChannel {
+impl Drop for AqcBidiChannel {
     fn drop(&mut self) {
         self.close();
     }
 }
 
-impl std::fmt::Display for AqcBidirectionalChannel {
+impl std::fmt::Display for AqcBidiChannel {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -274,7 +274,7 @@ impl std::fmt::Display for AqcBidirectionalChannel {
     }
 }
 
-// Used to send and receive data with a peer.
+/// Used to send and receive data with a peer.
 pub struct AqcBidiStream(s2n_quic::stream::BidirectionalStream);
 
 impl AqcBidiStream {

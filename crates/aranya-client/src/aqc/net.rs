@@ -106,7 +106,7 @@ impl AqcClient {
         addr: SocketAddr,
         label_id: LabelId,
         psks: AqcBidiPsks,
-    ) -> Result<channels::AqcBidirectionalChannel, AqcError> {
+    ) -> Result<channels::AqcBidiChannel, AqcError> {
         let channel_id = BidiChannelId::from(*psks.channel_id());
         self.client_keys.load_psks(AqcPsks::Bidi(psks));
         let mut conn = self
@@ -114,9 +114,7 @@ impl AqcClient {
             .connect(Connect::new(addr).with_server_name("localhost"))
             .await?;
         conn.keep_alive(true)?;
-        Ok(channels::AqcBidirectionalChannel::new(
-            label_id, channel_id, conn,
-        ))
+        Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
     }
 
     /// Receive the next available channel. If the channel is closed, return None.
