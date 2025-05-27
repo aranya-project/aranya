@@ -1,12 +1,12 @@
 use core::{ffi::c_char, mem::MaybeUninit, ptr};
 
 use aranya_capi_core::{
-    safe::{TypeId, Typed},
+    safe::{Safe, TypeId, Typed},
     Builder, InvalidArg,
 };
 
 use super::Error;
-use crate::api::defs::{self, Duration};
+use crate::api::defs::Duration;
 
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
@@ -61,7 +61,7 @@ impl Typed for ClientConfigBuilder {
 }
 
 impl Builder for ClientConfigBuilder {
-    type Output = defs::ClientConfig;
+    type Output = Safe<ClientConfig>;
     type Error = Error;
 
     /// # Safety
@@ -85,7 +85,7 @@ impl Builder for ClientConfigBuilder {
             pk: pk.clone(),
             _aqc: aqc,
         };
-        Self::Output::init(out, cfg);
+        Safe::init(out, cfg);
         Ok(())
     }
 }
@@ -127,7 +127,7 @@ impl AqcConfigBuilder {
 }
 
 impl Builder for AqcConfigBuilder {
-    type Output = defs::AqcConfig;
+    type Output = Safe<AqcConfig>;
     type Error = Error;
 
     /// # Safety
@@ -140,7 +140,7 @@ impl Builder for AqcConfigBuilder {
 
         let cfg = AqcConfig { _addr: self.addr };
 
-        Self::Output::init(out, cfg);
+        Safe::init(out, cfg);
         Ok(())
     }
 }
@@ -204,7 +204,7 @@ impl SyncPeerConfigBuilder {
 }
 
 impl Builder for SyncPeerConfigBuilder {
-    type Output = defs::SyncPeerConfig;
+    type Output = Safe<SyncPeerConfig>;
     type Error = Error;
 
     /// # Safety
@@ -219,7 +219,7 @@ impl Builder for SyncPeerConfigBuilder {
             interval,
             sync_now: self.sync_now,
         };
-        Self::Output::init(out, cfg);
+        Safe::init(out, cfg);
         Ok(())
     }
 }
@@ -254,14 +254,14 @@ impl Typed for TeamConfigBuilder {
 }
 
 impl Builder for TeamConfigBuilder {
-    type Output = defs::TeamConfig;
+    type Output = Safe<TeamConfig>;
     type Error = Error;
 
     /// # Safety
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Self::Output::init(out, TeamConfig {});
+        Safe::init(out, TeamConfig {});
         Ok(())
     }
 }

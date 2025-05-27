@@ -2,15 +2,25 @@
 
 use core::{fmt, net::SocketAddr};
 
-pub use aranya_daemon_api::{AqcBidiChannelId, AqcUniChannelId};
-use aranya_daemon_api::{AqcCtrl, AqcPsks, LabelId, NetIdentifier, TeamId};
+use aranya_daemon_api::{AqcCtrl, AqcPsk};
 use tarpc::context;
 use tracing::{debug, instrument};
 
 use crate::{
-    error::{aranya_error, AqcError, IpcError},
-    Client, Result,
+    client::{Client, InvalidNetIdentifier, LabelId, NetIdentifier, TeamId},
+    error::{aranya_error, AqcError, IpcError, Result},
+    util::custom_id,
 };
+
+custom_id! {
+    /// An AQC bidi channel ID.
+    pub struct BidiChannelId => AqcBidiChannelId;
+}
+
+custom_id! {
+    /// An AQC uni channel ID.
+    pub struct UniChannelId => AqcUniChannelId;
+}
 
 /// Sends and receives AQC messages.
 pub(crate) struct AqcChannelsImpl {}
@@ -54,30 +64,38 @@ impl<'a> AqcChannels<'a> {
     /// # Cancellation Safety
     ///
     /// It is NOT safe to cancel the resulting future. Doing so might lose data.
-    #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
-    pub async fn create_bidi_channel(
+    #[instrument(skip(self))]
+    pub async fn create_bidi_channel<I>(
         &mut self,
         team_id: TeamId,
-        peer: NetIdentifier,
+        peer: I,
         label_id: LabelId,
-    ) -> Result<AqcBidiChannelId> {
+    ) -> Result<BidiChannelId>
+    where
+        I: TryInto<NetIdentifier<'a>, Error = InvalidNetIdentifier> + fmt::Debug,
+    {
         debug!("creating bidi channel");
 
-        let (ctrl, psks) = self
+        let (ctrl, psk) = self
             .client
             .daemon
-            .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), label_id)
+            .create_aqc_bidi_channel(
+                context::current(),
+                team_id.into_api(),
+                peer.try_into()?.into_api(),
+                label_id.into_api(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        debug!(%label_id, num_psks = psks.len(), "created bidi channel");
+        debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
 
-        let chan_id = *psks.channel_id();
+        let chan_id = BidiChannelId::from_api(psk.identity.into());
 
         // TODO: send ctrl msg via network.
         let _ = ctrl;
 
-        Ok(chan_id.into())
+        Ok(chan_id)
     }
 
     /// Creates a unidirectional AQC channel with a peer.
@@ -88,40 +106,48 @@ impl<'a> AqcChannels<'a> {
     /// # Cancellation Safety
     ///
     /// It is NOT safe to cancel the resulting future. Doing so might lose data.
-    #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
-    pub async fn create_uni_channel(
+    #[instrument(skip(self))]
+    pub async fn create_uni_channel<I>(
         &mut self,
         team_id: TeamId,
-        peer: NetIdentifier,
+        peer: I,
         label_id: LabelId,
-    ) -> Result<AqcUniChannelId> {
+    ) -> Result<UniChannelId>
+    where
+        I: TryInto<NetIdentifier<'a>, Error = InvalidNetIdentifier> + fmt::Debug,
+    {
         debug!("creating aqc uni channel");
 
-        let (ctrl, psks) = self
+        let (ctrl, psk) = self
             .client
             .daemon
-            .create_aqc_uni_channel(context::current(), team_id, peer.clone(), label_id)
+            .create_aqc_uni_channel(
+                context::current(),
+                team_id.into_api(),
+                peer.try_into()?.into_api(),
+                label_id.into_api(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
-        debug!(%label_id, num_psks = psks.len(), "created bidi channel");
+        debug!(%label_id, psk_ident = ?psk.identity, "created bidi channel");
 
-        let chan_id = *psks.channel_id();
+        let chan_id = UniChannelId::from_api(psk.identity.into());
 
         // TODO: send ctrl msg via network.
         let _ = ctrl;
 
-        Ok(chan_id.into())
+        Ok(chan_id)
     }
 
     /// Deletes an AQC bidi channel.
     /// It is an error if the channel does not exist
     #[instrument(skip_all, fields(%chan))]
-    pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannelId) -> Result<()> {
+    pub async fn delete_bidi_channel(&mut self, chan: BidiChannelId) -> Result<()> {
         let _ctrl = self
             .client
             .daemon
-            .delete_aqc_bidi_channel(context::current(), chan)
+            .delete_aqc_bidi_channel(context::current(), chan.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -132,11 +158,11 @@ impl<'a> AqcChannels<'a> {
     /// Deletes an AQC uni channel.
     /// It is an error if the channel does not exist
     #[instrument(skip_all, fields(%chan))]
-    pub async fn delete_uni_channel(&mut self, chan: AqcUniChannelId) -> Result<()> {
+    pub async fn delete_uni_channel(&mut self, chan: UniChannelId) -> Result<()> {
         let _ctrl = self
             .client
             .daemon
-            .delete_aqc_uni_channel(context::current(), chan)
+            .delete_aqc_uni_channel(context::current(), chan.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -149,24 +175,20 @@ impl<'a> AqcChannels<'a> {
     // In final AQC implementation, it will only be invoked when a ctrl msg is received via the network.
     #[instrument(skip_all, fields(%team))]
     async fn receive_aqc_ctrl(&mut self, team: TeamId, ctrl: AqcCtrl) -> Result<()> {
-        let (_net_id, psks) = self
+        let (_net_id, psk) = self
             .client
             .daemon
-            .receive_aqc_ctrl(context::current(), team, ctrl)
+            .receive_aqc_ctrl(context::current(), team.into_api(), ctrl)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
 
-        match psks {
-            AqcPsks::Bidi(psks) => {
-                for (suite, psk) in psks {
-                    debug!(identity = ?psk.identity, %suite, "bidi psk");
-                }
+        match psk {
+            AqcPsk::Bidi(psk) => {
+                debug!(identity = ?psk.identity, "bidi psk identity");
             }
-            AqcPsks::Uni(psks) => {
-                for (suite, psk) in psks {
-                    debug!(identity = ?psk.identity, %suite, "uni psk");
-                }
+            AqcPsk::Uni(psk) => {
+                debug!(identity = ?psk.identity, "uni psk identity");
             }
         }
 

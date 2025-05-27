@@ -8,7 +8,9 @@
 
 // Note: this file is formatted with `clang-format`.
 
+#include <assert.h>
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,14 +30,11 @@
         }                                                                      \
     } while (0)
 
-// Macro for printing client AranyaError to stderr and returning the error.
-// Does nothing if error value is ARANYA_SUCCESS.
-#define CLIENT_EXPECT(M, N, E)                                                 \
+#define EXPECT2(err, format, ...)                                              \
     do {                                                                       \
-        err = (E);                                                             \
-        if (err != ARANYA_ERROR_SUCCESS) {                                     \
-            fprintf(stderr, "%s %s: %s\n", (M), (N),                           \
-                    aranya_error_to_str(err));                                 \
+        if ((err) != ARANYA_ERROR_SUCCESS) {                                   \
+            fprintf(stderr, "%s:%d: " format "\n", __FILE__, __LINE__,         \
+                    ##__VA_ARGS__);                                            \
             goto exit;                                                         \
         }                                                                      \
     } while (0)
@@ -45,6 +44,73 @@
 
 // Number of clients on an Aranya team.
 #define NUM_CLIENTS 5
+
+// Number of roles on Aranya team (excluding owner role).
+#define NUM_ROLES 3
+
+static bool streq(const char *lhs, const char *rhs) {
+    return strcmp(lhs, rhs) == 0;
+}
+
+static AranyaError create_label(AranyaClient *client,
+                                const AranyaTeamId *team_id, const char *name,
+                                const AranyaRoleId *managing_role_id,
+                                AranyaLabel *label) {
+    assert(client != NULL);
+    assert(team_id != NULL);
+    assert(name != NULL);
+    assert(managing_role_id != NULL);
+    assert(label != NULL);
+
+    printf("creating label %s\n", name);
+
+    AranyaError err =
+        aranya_create_label(client, team_id, name, managing_role_id, label);
+    EXPECT2(err, "unable to create label: %s", name);
+
+    const char *got_name = "";
+    err                  = aranya_label_get_name(label, &got_name);
+    EXPECT2(err, "unable to retrieve label name");
+
+    if (!streq(name, got_name)) {
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+
+exit:
+    if (err != ARANYA_ERROR_SUCCESS) {
+        (void)aranya_label_cleanup(label);
+    }
+    return err;
+}
+
+static void cleanup_roles(AranyaRole *roles, size_t n) {
+    if (roles == NULL) {
+        assert(n == 0);
+    }
+    for (size_t i = 0; i < n; i++) {
+        AranyaError err = aranya_role_cleanup(&roles[i]);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to clean up role %zu: %s\n", i,
+                    aranya_error_to_str(err));
+            continue;
+        }
+    }
+}
+
+static void cleanup_labels(AranyaLabel *labels, size_t n) {
+    if (labels == NULL) {
+        assert(n == 0);
+    }
+    for (size_t i = 0; i < n; i++) {
+        AranyaError err = aranya_label_cleanup(&labels[i]);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to clean up label %zu: %s\n", i,
+                    aranya_error_to_str(err));
+            continue;
+        }
+    }
+}
 
 static AranyaError read_api_pk(uint8_t **api_pk, size_t *api_pk_len,
                                const char *name) {
@@ -205,24 +271,55 @@ typedef struct {
         } clients;
         Client clients_arr[NUM_CLIENTS];
     };
+    union {
+        struct {
+            // Admin role.
+            AranyaRoleId admin;
+            // Operator role.
+            AranyaRoleId operator;
+            // Member role.
+            AranyaRoleId member;
+        } roles;
+        AranyaRoleId roles_arr[NUM_ROLES];
+    };
 } Team;
+
+enum { num_default_roles = 3 };
 
 // Forward Declarations
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                         const uint8_t *api_pk, size_t api_pk_len,
                         const char *aqc_addr);
 AranyaError init_team(Team *t);
+AranyaError cleanup_team(Team *t);
 AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg);
 AranyaError run(Team *t);
 AranyaError run_aqc_example(Team *t);
-AranyaError cleanup_team(Team *t);
+AranyaError init_roles(Team *t);
+AranyaError revoke_roles(Team *t);
+AranyaError setup_default_roles(Team *t, AranyaRole **roles, size_t *roles_len,
+                                size_t *roles_cap);
+
+// Query functions.
+AranyaError query_devices_on_team(Client *client, AranyaTeamId *team_id,
+                                  AranyaDeviceId **devices, size_t *devices_len,
+                                  size_t *devices_cap);
+AranyaError query_roles_on_team(Client *client, AranyaTeamId *team_id,
+                                AranyaRole **roles, size_t *roles_len,
+                                size_t *roles_cap);
+AranyaError query_device_roles(Client *client, AranyaTeamId *team_id,
+                               AranyaDeviceId *device, AranyaRole **roles,
+                               size_t *roles_len, size_t *roles_cap);
+AranyaError query_role_operations(Client *client, AranyaTeamId *team_id,
+                                  AranyaRoleId *role, AranyaOp **ops,
+                                  size_t *ops_len, size_t *ops_cap);
 
 // Initialize an Aranya `Client` with the given parameters.
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
                         const uint8_t *api_pk, size_t api_pk_len,
                         const char *aqc_addr) {
-    AranyaError err;
-    c->name = name;
+    AranyaError err = ARANYA_ERROR_OTHER;
+    c->name         = name;
 
     struct AranyaAqcConfigBuilder aqc_builder;
     err = aranya_aqc_config_builder_init(&aqc_builder);
@@ -302,7 +399,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     // `pk_len` is intentionally set to small size to show how to
     // handle reallocations.
     c->pk_len = 1;
-    c->pk     = malloc(c->pk_len);
+    c->pk     = calloc(c->pk_len, 1);
     if (c->pk == NULL) {
         abort();
     }
@@ -329,7 +426,9 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 // Initialize the Aranya `Team` by first initializing the team's clients and
 // then creates the team.
 AranyaError init_team(Team *t) {
-    AranyaError err;
+    printf("initializing team\n");
+
+    AranyaError err = ARANYA_ERROR_OTHER;
 
     // initialize team clients.
     for (int i = 0; i < NUM_CLIENTS; i++) {
@@ -402,12 +501,12 @@ AranyaError init_team(Team *t) {
         return ARANYA_ERROR_OTHER;
     }
 
-    return ARANYA_ERROR_SUCCESS;
+    return init_roles(t);
 }
 
 // Cleanup Aranya `Team`.
 AranyaError cleanup_team(Team *t) {
-    AranyaError err;
+    AranyaError err    = ARANYA_ERROR_OTHER;
     AranyaError retErr = ARANYA_ERROR_SUCCESS;
 
     for (int i = 0; i < NUM_CLIENTS; i++) {
@@ -426,7 +525,7 @@ AranyaError cleanup_team(Team *t) {
 // This creates a complete graph where each Aranya client can sync with all
 // the other Aranya client peers on the network.
 AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg) {
-    AranyaError err;
+    AranyaError err = ARANYA_ERROR_OTHER;
 
     for (int i = 0; i < NUM_CLIENTS; i++) {
         for (int j = 0; j < NUM_CLIENTS; j++) {
@@ -451,11 +550,23 @@ AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg) {
 
 // Run the example.
 AranyaError run(Team *t) {
-    AranyaError err;
+    AranyaError err = ARANYA_ERROR_OTHER;
+
+    size_t devices_cap      = 0;
+    size_t devices_len      = 0;
     AranyaDeviceId *devices = NULL;
+
+    size_t roles_len  = 0;
+    size_t roles_cap  = 0;
+    AranyaRole *roles = NULL;
+
+    size_t ops_cap = 0;
+    size_t ops_len = 0;
+    AranyaOp *ops  = NULL;
+
     Client *owner = &t->clients.owner;
     Client *admin = &t->clients.admin;
-    Client *operator= &t->clients.operator;
+    Client *operator= & t->clients.operator;
 
     // initialize logging.
     printf("initializing logging\n");
@@ -463,43 +574,37 @@ AranyaError run(Team *t) {
     EXPECT("error initializing logging", err);
 
     // initialize the Aranya team.
-    printf("initializing team\n");
     err = init_team(t);
     EXPECT("unable to initialize team", err);
 
     // add admin to team.
-    err =
-        aranya_add_device_to_team(&owner->client, &t->id,
-                                  admin->pk, admin->pk_len);
+    AranyaDevicePrecedence precedence = 9000;
+    err = aranya_add_device_to_team(&owner->client, &t->id, &precedence,
+                                    admin->pk, admin->pk_len);
     EXPECT("error adding admin to team", err);
+    precedence = 8500;
+    err = aranya_assign_device_precedence(&owner->client, &t->id, &admin->id,
+                                          &precedence);
+    EXPECT("error assigning new device precedence to admin", err);
 
     // add operator to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id,
-                                    operator->pk,
-                                    operator->pk_len);
+    precedence = 8000;
+    err        = aranya_add_device_to_team(
+        &owner->client, &t->id, &precedence, operator->pk, operator->pk_len);
     EXPECT("error adding operator to team", err);
 
+    // Sync now
+    err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER], NULL);
+    EXPECT("error calling `sync_now` to sync with peer", err);
+
     // upgrade role to admin.
-    err = aranya_assign_role(&owner->client, &t->id,
-                             &admin->id, ARANYA_ROLE_ADMIN);
+    err =
+        aranya_assign_role(&owner->client, &t->id, &admin->id, &t->roles.admin);
     EXPECT("error assigning admin role", err);
 
     // upgrade role to operator.
-    err = aranya_assign_role(&admin->client, &t->id,
-                             &operator->id, ARANYA_ROLE_OPERATOR);
-    if (err == ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "application failed: expected role assignment to fail");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-
-    err = aranya_sync_now(&admin->client, &t->id, sync_addrs[OWNER],
-                          NULL);
-    EXPECT("error calling `sync_now` to sync with peer", err);
-
-    sleep(1);
-    err = aranya_assign_role(&admin->client, &t->id,
-                             &operator->id, ARANYA_ROLE_OPERATOR);
+    err = aranya_assign_role(&owner->client, &t->id, &operator->id,
+                             &t->roles.operator);
     EXPECT("error assigning operator role", err);
 
     // Initialize the builder
@@ -536,42 +641,43 @@ AranyaError run(Team *t) {
     // something like `scp`.
 
     // add membera to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id,
-                                    t->clients.membera.pk,
-                                    t->clients.membera.pk_len);
+    precedence = 7000;
+    err        = aranya_add_device_to_team(&owner->client, &t->id, &precedence,
+                                           t->clients.membera.pk,
+                                           t->clients.membera.pk_len);
     EXPECT("error adding membera to team", err);
+    err = aranya_assign_role(&owner->client, &t->id, &t->clients.membera.id,
+                             &t->roles.member);
+    EXPECT("error assigning membera the member role", err);
 
     // add memberb to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id,
+    err = aranya_add_device_to_team(&owner->client, &t->id, &precedence,
                                     t->clients.memberb.pk,
                                     t->clients.memberb.pk_len);
     EXPECT("error adding memberb to team", err);
+    err = aranya_assign_role(&owner->client, &t->id, &t->clients.memberb.id,
+                             &t->roles.member);
+    EXPECT("error assigning memberb the member role", err);
 
     sleep(1);
 
     // assign AQC network addresses.
-    err = aranya_aqc_assign_net_identifier(&operator->client, &t->id,
-                                           &t->clients.membera.id,
-                                           aqc_addrs[MEMBERA]);
+    err = aranya_aqc_assign_net_identifier(
+        &operator->client, &t->id, &t->clients.membera.id, aqc_addrs[MEMBERA]);
     EXPECT("error assigning aqc net name to membera", err);
 
-    err = aranya_aqc_assign_net_identifier(&operator->client, &t->id,
-                                           &t->clients.memberb.id,
-                                           aqc_addrs[MEMBERB]);
+    err = aranya_aqc_assign_net_identifier(
+        &operator->client, &t->id, &t->clients.memberb.id, aqc_addrs[MEMBERB]);
     EXPECT("error assigning aqc net name to memberb", err);
 
     sleep(1);
 
     // Queries
     printf("running factdb queries\n");
+    printf("querying devices on team\n");
 
-    size_t devices_len = 256;
-    devices            = calloc(devices_len, sizeof(AranyaDeviceId));
-    if (devices == NULL) {
-        abort();
-    }
-    err = aranya_query_devices_on_team(&operator->client, &t->id,
-                                       devices, &devices_len);
+    err = query_devices_on_team(&t->clients.operator, & t->id, &devices,
+                                &devices_len, &devices_cap);
     EXPECT("error querying devices on team", err);
 
     for (size_t i = 0; i < devices_len; i++) {
@@ -596,11 +702,59 @@ AranyaError run(Team *t) {
         }
     }
 
+    printf("querying roles on team\n");
+    err = query_roles_on_team(&t->clients.operator, & t->id, &roles, &roles_len,
+                              &roles_cap);
+    EXPECT("error querying roles on team", err);
+
+    printf("found %zu roles on team\n", roles_len);
+    for (size_t i = 0; i < roles_len; i++) {
+        AranyaRole *role = &roles[i];
+
+        const char *role_name = "";
+        err                   = aranya_role_get_name(role, &role_name);
+        EXPECT("unable to get role name", err);
+
+        printf("role: %s at index: %zu/%zu \n", role_name, i, roles_len);
+    }
+    cleanup_roles(roles, roles_len);
+
+    err =
+        query_device_roles(&t->clients.operator, & t->id, &t->clients.admin.id,
+                           &roles, &roles_len, &roles_cap);
+    EXPECT("error querying device roles", err);
+
+    for (size_t i = 0; i < roles_len; i++) {
+        AranyaRole *role = &roles[i];
+
+        const char *role_name = "";
+        err                   = aranya_role_get_name(role, &role_name);
+        EXPECT("unable to get role name", err);
+
+        printf("role: %s at index: %zu/%zu \n", role_name, i, roles_len);
+    }
+
+    printf("querying admin role permissions\n");
+    err = query_role_operations(&t->clients.operator, & t->id, &t->roles.admin,
+                                &ops, &ops_len, &ops_cap);
+    EXPECT("error querying role ops", err);
+
+    for (size_t i = 0; i < ops_len; i++) {
+        AranyaOp op = ops[i];
+
+        char op_str[256]  = {0};
+        size_t op_str_len = sizeof(op_str);
+        err               = aranya_op_to_str(op, op_str, &op_str_len);
+        EXPECT("unable to get op name", err);
+
+        printf("op: %s at index: %zu/%zu \n", op_str, i, ops_len);
+    }
+
     uint8_t memberb_keybundle[256] = {0};
     size_t memberb_keybundle_len   = sizeof(memberb_keybundle);
     err                            = aranya_query_device_keybundle(
-        &operator->client, &t->id, &t->clients.memberb.id,
-        memberb_keybundle, &memberb_keybundle_len);
+        &operator->client, &t->id, &t->clients.memberb.id, memberb_keybundle,
+        &memberb_keybundle_len);
     EXPECT("error querying memberb key bundle", err);
     printf(
         "%s key bundle len: %zu"
@@ -625,9 +779,8 @@ AranyaError run(Team *t) {
            memberb_aqc_net_identifier);
 
     // Remove the net identifier.
-    err = aranya_aqc_remove_net_identifier(&operator->client, &t->id,
-                                           &t->clients.memberb.id,
-                                           aqc_addrs[MEMBERB]);
+    err = aranya_aqc_remove_net_identifier(
+        &operator->client, &t->id, &t->clients.memberb.id, aqc_addrs[MEMBERB]);
     EXPECT("error removing memberb aqc net identifier", err);
     printf("removed aqc net identifier `%s` from `%s`\n",
            memberb_aqc_net_identifier, t->clients_arr[MEMBERB].name);
@@ -646,103 +799,128 @@ AranyaError run(Team *t) {
     }
 
     // Add the net identifier back.
-    err = aranya_aqc_assign_net_identifier(&operator->client, &t->id,
-                                           &t->clients.memberb.id,
-                                           aqc_addrs[MEMBERB]);
+    err = aranya_aqc_assign_net_identifier(
+        &operator->client, &t->id, &t->clients.memberb.id, aqc_addrs[MEMBERB]);
     EXPECT("error assigning aqc net name to memberb", err);
 
     err = run_aqc_example(t);
     EXPECT("error running aqc example", err);
 
+    err = revoke_roles(t);
+    EXPECT("error cleaning up roles", err);
+
 exit:
     free(devices);
-    return ARANYA_ERROR_SUCCESS;
+    if (roles != NULL) {
+        cleanup_roles(roles, roles_len);
+        free(roles);
+    }
+    free(ops);
+    return err;
 }
 
 // Run the AQC example.
 AranyaError run_aqc_example(Team *t) {
-    AranyaError err       = ARANYA_ERROR_OTHER;
-    AranyaLabelId *labels = NULL;
-    Client *admin = &t->clients.admin;
-    Client *operator= &t->clients.operator;
+    AranyaError err = ARANYA_ERROR_OTHER;
+
+    size_t labels_len   = 0;
+    AranyaLabel *labels = NULL;
+
+    Client *operator= & t->clients.operator;
 
     printf("running AQC demo \n");
 
-    // Create label and assign it to members
+    AranyaRole managing_role;
+    err = aranya_create_role(&t->clients.owner.client, &t->id, "managing role",
+                             &managing_role);
+    EXPECT("unable to create role", err);
+
+    AranyaRoleId managing_role_id;
+    err = aranya_role_get_id(&managing_role, &managing_role_id);
+    EXPECT("unable to get managing role ID", err);
+
+    err = aranya_assign_role(&t->clients.owner.client, &t->id,
+                             &t->clients.operator.id, &managing_role_id);
+    EXPECT("unable to assign managing role", err);
+
+    sleep(1);
+
     printf("creating labels\n");
 
-    const char *label1_name = "label1";
-    AranyaLabelId label1_id;
-    err = aranya_create_label(&operator->client, &t->id, label1_name,
-                              &label1_id);
+    AranyaLabel label1;
+    err = create_label(&t->clients.operator.client, &t->id, "label1",
+                       &managing_role_id, &label1);
     EXPECT("error creating label1", err);
 
-    const char *label2_name = "label2";
-    AranyaLabelId label2_id;
-    err = aranya_create_label(&operator->client, &t->id, label2_name,
-                              &label2_id);
+    AranyaLabelId label1_id;
+    err = aranya_label_get_id(&label1, &label1_id);
+    EXPECT("error getting label1 ID", err);
+
+    // Create label2 and assign it to members
+    AranyaLabel label2;
+    err = create_label(&t->clients.operator.client, &t->id, "label2",
+                       &managing_role_id, &label2);
     EXPECT("error creating label2", err);
 
-    printf("assigning label to members\n");
-    AranyaChanOp op = ARANYA_CHAN_OP_SEND_RECV;
-    err             = aranya_assign_label(&operator->client, &t->id,
-                                          &t->clients.membera.id, &label1_id, op);
+    AranyaLabelId label2_id;
+    err = aranya_label_get_id(&label2, &label2_id);
+    EXPECT("error getting label2 ID", err);
+
+    printf("assigning label to members \n");
+
+    err = aranya_assign_label(&operator->client, &t->id, &t->clients.membera.id,
+                              &label1_id, ARANYA_CHAN_OP_SEND_RECV);
     EXPECT("error assigning label1 to membera", err);
 
-    err = aranya_assign_label(&operator->client, &t->id,
-                              &t->clients.memberb.id, &label1_id, op);
+    err = aranya_assign_label(&operator->client, &t->id, &t->clients.memberb.id,
+                              &label1_id, ARANYA_CHAN_OP_SEND_RECV);
     EXPECT("error assigning label2 to memberb", err);
 
-    err = aranya_assign_label(&operator->client, &t->id,
-                              &t->clients.membera.id, &label2_id, op);
+    err = aranya_assign_label(&operator->client, &t->id, &t->clients.membera.id,
+                              &label2_id, ARANYA_CHAN_OP_SEND_RECV);
     EXPECT("error assigning label2 to membera", err);
 
-    err = aranya_assign_label(&operator->client, &t->id,
-                              &t->clients.memberb.id, &label2_id, op);
+    err = aranya_assign_label(&operator->client, &t->id, &t->clients.memberb.id,
+                              &label2_id, ARANYA_CHAN_OP_SEND_RECV);
     EXPECT("error assigning label2 to memberb", err);
     sleep(1);
 
     // Queries
-    printf("query if label exists on team \n");
-    bool exists = false;
-    err         = aranya_query_label_exists(&t->clients.membera.client, &t->id,
-                                            &label1_id, &exists);
-    EXPECT("error querying label exists", err);
-    printf("%s label exists: %s \n", t->clients_arr[MEMBERB].name,
-           exists ? "true" : "false");
-
     char device_str[ARANYA_ID_STR_LEN] = {0};
     size_t device_str_len              = sizeof(device_str);
     err = aranya_id_to_str(&t->clients.memberb.id.id, device_str,
                            &device_str_len);
     EXPECT("unable to convert ID to string", err);
+
     printf("query labels assigned to device: %s\n", device_str);
     // `labels_len` is intentionally set to 1 when there are 2 labels to test
     // `ARANYA_ERROR_BUFFER_TOO_SMALL` error handling.
-    size_t labels_len = 1;
-    labels            = calloc(labels_len, sizeof(AranyaLabelId));
+    labels_len = 1;
+    labels     = calloc(labels_len, sizeof(AranyaLabel));
     if (labels == NULL) {
         abort();
     }
-    err = aranya_query_device_label_assignments(&operator->client,
-                                                &t->id, &t->clients.memberb.id,
-                                                labels, &labels_len);
+    err = aranya_query_device_label_assignments(
+        &operator->client, &t->id, &t->clients.memberb.id, labels, &labels_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error\n");
-        labels = realloc(labels, labels_len * sizeof(AranyaLabelId));
-        err = aranya_query_labels(&operator->client, &t->id, labels,
-                                  &labels_len);
+        labels = realloc(labels, labels_len * sizeof(AranyaLabel));
+        if (labels == NULL) {
+            abort();
+        }
+        err =
+            aranya_query_labels(&operator->client, &t->id, labels, &labels_len);
     }
     EXPECT("error querying labels assigned to device", err);
 
     for (size_t i = 0; i < labels_len; i++) {
-        AranyaLabelId label_id            = labels[i];
-        char label_str[ARANYA_ID_STR_LEN] = {0};
-        size_t label_str_len              = sizeof(label_str);
-        err = aranya_id_to_str(&label_id.id, label_str, &label_str_len);
-        EXPECT("unable to convert ID to string", err);
-        printf("label_id: %s at index: %zu/%zu \n", label_str, i, labels_len);
+        const char *label_name = "";
+        err                    = aranya_label_get_name(&labels[i], &label_name);
+        EXPECT2(err, "unable to get label name");
+
+        printf("label: %s at index: %zu/%zu \n", label_name, i, labels_len);
     }
+    cleanup_labels(labels, labels_len);
 
     char team_str[ARANYA_ID_STR_LEN] = {0};
     size_t team_str_len              = sizeof(team_str);
@@ -753,23 +931,24 @@ AranyaError run_aqc_example(Team *t) {
     // `labels_len` is intentionally set to 1 when there are 2 labels to test
     // `ARANYA_ERROR_BUFFER_TOO_SMALL` error handling.
     labels_len = 1;
-    err = aranya_query_labels(&operator->client, &t->id, labels,
-                              &labels_len);
+    err = aranya_query_labels(&operator->client, &t->id, labels, &labels_len);
     if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
         printf("handling buffer too small error\n");
-        labels = realloc(labels, labels_len * sizeof(AranyaLabelId));
-        err = aranya_query_labels(&operator->client, &t->id, labels,
-                                  &labels_len);
+        labels = realloc(labels, labels_len * sizeof(AranyaLabel));
+        if (labels == NULL) {
+            abort();
+        }
+        err =
+            aranya_query_labels(&operator->client, &t->id, labels, &labels_len);
     }
     EXPECT("error querying labels on team", err);
 
     for (size_t i = 0; i < labels_len; i++) {
-        AranyaLabelId label_id            = labels[i];
-        char label_str[ARANYA_ID_STR_LEN] = {0};
-        size_t label_str_len              = sizeof(label_str);
-        err = aranya_id_to_str(&label_id.id, label_str, &label_str_len);
-        EXPECT("unable to convert ID to string", err);
-        printf("label_id: %s at index: %zu/%zu \n", label_str, i, labels_len);
+        const char *label_name = NULL;
+        aranya_label_get_name(&labels[i], &label_name);
+        EXPECT("unable to get label name", err);
+
+        printf("label: %s at index: %zu/%zu \n", label_name, i, labels_len);
     }
 
     // Create channel using Member A's client
@@ -784,17 +963,366 @@ AranyaError run_aqc_example(Team *t) {
 
     // Revoke/delete label using the Operator
     printf("revoke/delete label \n");
-    err = aranya_revoke_label(&operator->client, &t->id,
-                              &t->clients.membera.id, &label1_id);
+    err = aranya_revoke_label(&operator->client, &t->id, &t->clients.membera.id,
+                              &label1_id);
     EXPECT("error revoking label from membera", err);
-    err = aranya_revoke_label(&operator->client, &t->id,
-                              &t->clients.memberb.id, &label1_id);
+
+    err = aranya_revoke_label(&operator->client, &t->id, &t->clients.memberb.id,
+                              &label1_id);
     EXPECT("error revoking label from memberb", err);
-    err = aranya_delete_label(&admin->client, &t->id, &label1_id);
-    EXPECT("error deleting label", err);
+
+    // TODO: delete label.
 
 exit:
-    free(labels);
+    if (labels != NULL) {
+        cleanup_labels(labels, labels_len);
+        free(labels);
+    }
+    aranya_role_cleanup(&managing_role);
+    return err;
+}
+
+AranyaError init_roles(Team *t) {
+    AranyaError err   = ARANYA_ERROR_OTHER;
+    size_t roles_cap  = 0;
+    size_t roles_len  = 0;
+    AranyaRole *roles = NULL;
+    AranyaRole dummy;
+
+    printf("initializing roles\n");
+
+    // Create default roles.
+    err = setup_default_roles(t, &roles, &roles_len, &roles_cap);
+    EXPECT("unable to setup default roles", err);
+
+    for (size_t i = 0; i < roles_len; i++) {
+        AranyaRoleId role_id;
+        err = aranya_role_get_id(&roles[i], &role_id);
+        EXPECT("error getting role ID", err);
+
+        const char *role_name;
+        err = aranya_role_get_name(&roles[i], &role_name);
+        EXPECT("unable to get role name", err);
+
+        printf("setup role: %s\n", role_name);
+        if (streq(role_name, "admin")) {
+            t->roles.admin = role_id;
+        } else if (streq(role_name, "operator")) {
+            t->roles.operator= role_id;
+        } else if (streq(role_name, "member")) {
+            t->roles.member = role_id;
+        } else if (streq(role_name, "owner")) {
+            // OK
+        } else {
+            fprintf(stderr, "unknown default role name: %s\n", role_name);
+            err = ARANYA_ERROR_OTHER;
+            goto exit;
+        }
+    }
+
+    // create a dummy role.
+    err = aranya_create_role(&t->clients.owner.client, &t->id, "dummy", &dummy);
+    EXPECT("expected to be able to create role", err);
+
+    AranyaRoleId dummy_role_id;
+    err = aranya_role_get_id(&dummy, &dummy_role_id);
+    EXPECT("error getting dummy role id", err);
+
+    // assign an operation to admin.
+    err = aranya_assign_operation_to_role(&t->clients.owner.client, &t->id,
+                                          &t->roles.admin,
+                                          ARANYA_OP_DELETE_LABEL);
+    EXPECT("error assigning delete label op to admin", err);
+
+exit:
+    if (roles != NULL) {
+        cleanup_roles(roles, roles_len);
+        free(roles);
+    }
+    // TODO(eric): check if role has been initialized first.
+    (void)aranya_role_cleanup(&dummy);
+    return err;
+}
+
+AranyaError revoke_roles(Team *t) {
+    AranyaError err = ARANYA_ERROR_OTHER;
+
+    size_t roles_cap  = 0;
+    size_t roles_len  = 0;
+    AranyaRole *roles = NULL;
+
+    size_t devices_cap      = 0;
+    size_t devices_len      = 0;
+    AranyaDeviceId *devices = NULL;
+
+    size_t ops_cap = 0;
+    size_t ops_len = 0;
+    AranyaOp *ops  = NULL;
+
+    printf("cleaning up roles\n");
+
+    AranyaRoleId owner_role_id;
+    err = query_devices_on_team(&t->clients.operator, & t->id, &devices,
+                                &devices_len, &devices_cap);
+    EXPECT("error querying devices on team", err);
+
+    for (size_t i = 0; i < devices_len; i++) {
+        err = query_device_roles(&t->clients.operator, & t->id, &devices[i],
+                                 &roles, &roles_len, &roles_cap);
+        EXPECT("error querying device roles", err);
+
+        for (size_t j = 0; j < roles_len; j++) {
+            AranyaRoleId role_id;
+            err = aranya_role_get_id(&roles[j], &role_id);
+            if (!memcmp(&t->clients.owner.id, &devices[i],
+                        sizeof(AranyaDeviceId))) {
+                owner_role_id = role_id;
+            } else {
+                const char *role_name = "";
+                err = aranya_role_get_name(&roles[j], &role_name);
+                EXPECT("error getting role ID", err);
+
+                printf("revoking role: %s\n", role_name);
+                err = aranya_revoke_role(&t->clients.owner.client, &t->id,
+                                         &devices[i], &role_id);
+                EXPECT("error revoking role", err);
+            }
+        }
+    }
+
+    // Revoke operation permissions from roles.
+    err = query_roles_on_team(&t->clients.operator, & t->id, &roles, &roles_len,
+                              &roles_cap);
+    EXPECT("error querying roles on team", err);
+
+    for (size_t i = 0; i < roles_len; i++) {
+        AranyaRoleId role_id;
+        err = aranya_role_get_id(&roles[i], &role_id);
+        EXPECT("error getting role ID", err);
+
+        const char *role_name = "";
+        err                   = aranya_role_get_name(&roles[i], &role_name);
+        EXPECT("unable to get role name", err);
+        printf("revoking ops for role: %s\n", role_name);
+
+        err = query_role_operations(&t->clients.operator, & t->id, &role_id,
+                                    &ops, &ops_len, &ops_cap);
+        EXPECT("error querying role permissions", err);
+        printf("ops_len: %zu\n", ops_len);
+
+        for (size_t j = 0; j < ops_len; j++) {
+            if (memcmp(&owner_role_id, &role_id, sizeof(AranyaRoleId))) {
+                err = aranya_revoke_role_operation(&t->clients.owner.client,
+                                                   &t->id, &role_id, ops[j]);
+                EXPECT("error revoking role op", err);
+
+                char op_str[256]  = {0};
+                size_t op_str_len = sizeof(op_str);
+                err = aranya_op_to_str(ops[j], op_str, &op_str_len);
+                EXPECT("error getting op name", err);
+
+                printf("revoked role op: %s\n", op_str);
+            }
+        }
+        err = aranya_role_cleanup(&roles[i]);
+        EXPECT("unable to cleanup role", err);
+    }
+
+    // TODO: delete roles.
+
+exit:
+    if (roles != NULL) {
+        cleanup_roles(roles, roles_len);
+        free(roles);
+    }
+    free(devices);
+    free(ops);
+    return err;
+}
+
+AranyaError query_devices_on_team(Client *client, AranyaTeamId *team_id,
+                                  AranyaDeviceId **devices, size_t *devices_len,
+                                  size_t *devices_cap) {
+    assert(client != NULL);
+    assert(team_id != NULL);
+    assert(devices != NULL);
+    assert(devices_cap != NULL);
+    assert(devices_len != NULL);
+
+    assert(*devices_cap >= *devices_len);
+    if (*devices_cap > 0) {
+        assert(*devices != NULL);
+    }
+
+    AranyaError err     = ARANYA_ERROR_OTHER;
+    size_t cap          = *devices_cap;
+    size_t len          = *devices_len;
+    AranyaDeviceId *ptr = *devices;
+
+    len = cap;
+    err = aranya_query_devices_on_team(&client->client, team_id, ptr, &len);
+    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        ptr = realloc(ptr, len * sizeof(AranyaDeviceId));
+        if (ptr == NULL) {
+            abort();
+        }
+        cap = len;
+        err = aranya_query_devices_on_team(&client->client, team_id, ptr, &len);
+    }
+    if (err != ARANYA_ERROR_SUCCESS) {
+        len = 0;
+    }
+    *devices     = ptr;
+    *devices_len = len;
+    *devices_cap = cap;
+    return err;
+}
+
+AranyaError setup_default_roles(Team *t, AranyaRole **roles, size_t *roles_len,
+                                size_t *roles_cap) {
+    assert(t != NULL);
+    assert(roles != NULL);
+    assert(roles_len != NULL);
+    assert(roles_cap != NULL);
+
+    AranyaError err =
+        aranya_setup_default_roles(&t->clients.owner.client, &t->id);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        return err;
+    }
+    return query_roles_on_team(&t->clients.owner, &t->id, roles, roles_len,
+                               roles_cap);
+}
+
+AranyaError query_roles_on_team(Client *client, AranyaTeamId *team_id,
+                                AranyaRole **roles, size_t *roles_len,
+                                size_t *roles_cap) {
+    assert(client != NULL);
+    assert(team_id != NULL);
+    assert(roles != NULL);
+    assert(roles_len != NULL);
+    assert(roles_cap != NULL);
+
+    assert(*roles_cap >= *roles_len);
+    if (*roles_cap > 0) {
+        assert(*roles != NULL);
+    }
+
+    AranyaError err = ARANYA_ERROR_OTHER;
+    size_t cap      = *roles_cap;
+    size_t len      = *roles_len;
+    AranyaRole *ptr = *roles;
+
+    if (len > 0) {
+        cleanup_roles(ptr, len);
+        len = 0;
+    }
+
+    len = cap;
+    err = aranya_query_roles_on_team(&client->client, team_id, ptr, &len);
+    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        ptr = realloc(ptr, len * sizeof(AranyaRole));
+        if (ptr == NULL) {
+            abort();
+        }
+        cap = len;
+        err = aranya_query_roles_on_team(&client->client, team_id, ptr, &len);
+    }
+    if (err != ARANYA_ERROR_SUCCESS) {
+        len = 0;
+    }
+    *roles     = ptr;
+    *roles_len = len;
+    *roles_cap = cap;
+    return err;
+}
+
+// Query device roles. Returned `roles` ptr must be freed.
+AranyaError query_device_roles(Client *client, AranyaTeamId *team_id,
+                               AranyaDeviceId *device, AranyaRole **roles,
+                               size_t *roles_len, size_t *roles_cap) {
+    assert(client != NULL);
+    assert(team_id != NULL);
+    assert(device != NULL);
+    assert(roles != NULL);
+    assert(roles_len != NULL);
+    assert(roles_cap != NULL);
+
+    assert(*roles_cap >= *roles_len);
+    if (*roles_cap > 0) {
+        assert(*roles != NULL);
+    }
+
+    AranyaError err = ARANYA_ERROR_OTHER;
+    size_t cap      = *roles_cap;
+    size_t len      = *roles_len;
+    AranyaRole *ptr = *roles;
+
+    if (len > 0) {
+        cleanup_roles(ptr, len);
+        len = 0;
+    }
+
+    len = cap;
+    err =
+        aranya_query_device_roles(&client->client, team_id, device, ptr, &len);
+    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        ptr = realloc(ptr, len * sizeof(AranyaRole));
+        if (ptr == NULL) {
+            abort();
+        }
+        cap = len;
+        err = aranya_query_device_roles(&client->client, team_id, device, ptr,
+                                        &len);
+    }
+    if (err != ARANYA_ERROR_SUCCESS) {
+        len = 0;
+    }
+    *roles     = ptr;
+    *roles_len = len;
+    *roles_cap = cap;
+    return err;
+}
+
+// Query role permissions. Returned `ops` ptr must be freed.
+AranyaError query_role_operations(Client *client, AranyaTeamId *team_id,
+                                  AranyaRoleId *role, AranyaOp **ops,
+                                  size_t *ops_len, size_t *ops_cap) {
+    assert(client != NULL);
+    assert(team_id != NULL);
+    assert(role != NULL);
+    assert(ops != NULL);
+    assert(ops_len != NULL);
+    assert(ops_cap != NULL);
+
+    assert(*ops_cap >= *ops_len);
+    if (*ops_cap > 0) {
+        assert(*ops != NULL);
+    }
+
+    AranyaError err = ARANYA_ERROR_OTHER;
+    size_t cap      = *ops_cap;
+    size_t len      = *ops_len;
+    AranyaOp *ptr   = *ops;
+
+    len = cap;
+    err =
+        aranya_query_role_operations(&client->client, team_id, role, ptr, &len);
+    if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+        ptr = realloc(ptr, len * sizeof(AranyaOp));
+        if (ptr == NULL) {
+            abort();
+        }
+        cap = len;
+        err = aranya_query_role_operations(&client->client, team_id, role, ptr,
+                                           &len);
+    }
+    if (err != ARANYA_ERROR_SUCCESS) {
+        len = 0;
+    }
+    *ops     = ptr;
+    *ops_len = len;
+    *ops_cap = cap;
     return err;
 }
 
