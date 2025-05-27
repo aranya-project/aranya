@@ -76,7 +76,7 @@ impl AqcSenderChannel {
     /// Creates a new unidirectional stream for the channel.
     pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream, AqcError> {
         let send = self.handle.open_send_stream().await?;
-        Ok(AqcSendStream { send })
+        Ok(AqcSendStream(send))
     }
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
@@ -89,16 +89,6 @@ impl AqcSenderChannel {
 impl Drop for AqcSenderChannel {
     fn drop(&mut self) {
         self.close();
-    }
-}
-
-impl std::fmt::Display for AqcSenderChannel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "AqcSenderChannel(label_id: {}, id: {})",
-            self.label_id, self.id
-        )
     }
 }
 
@@ -137,7 +127,7 @@ impl AqcReceiveChannel {
     /// Returns the next unidirectional stream.
     pub async fn receive_uni_stream(&mut self) -> Result<AqcReceiveStream, AqcError> {
         match self.conn.accept_receive_stream().await {
-            Ok(Some(stream)) => Ok(AqcReceiveStream { receive: stream }),
+            Ok(Some(stream)) => Ok(AqcReceiveStream(stream)),
             Ok(None) => Err(AqcError::ConnectionClosed),
             Err(e) => Err(AqcError::ConnectionError(e)),
         }
@@ -150,7 +140,7 @@ impl AqcReceiveChannel {
         let waker = noop_waker();
         let mut cx = CoreContext::from_waker(&waker);
         match self.conn.poll_accept_receive_stream(&mut cx) {
-            Poll::Ready(Ok(Some(stream))) => Ok(AqcReceiveStream { receive: stream }),
+            Poll::Ready(Ok(Some(stream))) => Ok(AqcReceiveStream(stream)),
             Poll::Ready(Ok(None)) => Err(TryReceiveError::Empty),
             Poll::Ready(Err(e)) => Err(TryReceiveError::Error(AqcError::ConnectionError(e))),
             Poll::Pending => Err(TryReceiveError::Empty),
@@ -194,9 +184,7 @@ impl AqcBidiChannel {
         match self.conn.accept().await {
             Ok(Some(stream)) => match stream {
                 PeerStream::Bidirectional(stream) => Ok(AqcPeerStream::Bidi(AqcBidiStream(stream))),
-                PeerStream::Receive(recv) => {
-                    Ok(AqcPeerStream::Receive(AqcReceiveStream { receive: recv }))
-                }
+                PeerStream::Receive(recv) => Ok(AqcPeerStream::Receive(AqcReceiveStream(recv))),
             },
             Ok(None) => Err(AqcError::ConnectionClosed),
             Err(e) => Err(AqcError::ConnectionError(e)),
@@ -216,12 +204,9 @@ impl AqcBidiChannel {
             Poll::Ready(Ok(Some(peer_stream))) => match peer_stream {
                 PeerStream::Bidirectional(stream) => {
                     let (recv, send) = stream.split();
-                    Ok((
-                        Some(AqcSendStream { send }),
-                        AqcReceiveStream { receive: recv },
-                    ))
+                    Ok((Some(AqcSendStream(send)), AqcReceiveStream(recv)))
                 }
-                PeerStream::Receive(recv) => Ok((None, AqcReceiveStream { receive: recv })),
+                PeerStream::Receive(recv) => Ok((None, AqcReceiveStream(recv))),
             },
             Poll::Ready(Ok(None)) => {
                 // Connection closed by peer, no more streams will be accepted.
@@ -242,7 +227,7 @@ impl AqcBidiChannel {
     /// Creates a new unidirectional stream for the channel.
     pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream, AqcError> {
         let send = self.conn.open_send_stream().await?;
-        Ok(AqcSendStream { send })
+        Ok(AqcSendStream(send))
     }
 
     /// Creates a new bidirectional stream for the channel.
@@ -264,17 +249,8 @@ impl Drop for AqcBidiChannel {
     }
 }
 
-impl std::fmt::Display for AqcBidiChannel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "AqcBidirectionalChannel(label_id: {}, aqc_id: {})",
-            self.label_id, self.aqc_id
-        )
-    }
-}
-
 /// Used to send and receive data with a peer.
+#[derive(Debug)]
 pub struct AqcBidiStream(s2n_quic::stream::BidirectionalStream);
 
 impl AqcBidiStream {
@@ -319,9 +295,8 @@ impl AqcBidiStream {
 }
 
 /// Used to receive data from a peer.
-pub struct AqcReceiveStream {
-    pub(crate) receive: ReceiveStream,
-}
+#[derive(Debug)]
+pub struct AqcReceiveStream(pub(crate) ReceiveStream);
 
 impl AqcReceiveStream {
     /// Receive the next available data from a stream. If the stream has
@@ -331,7 +306,7 @@ impl AqcReceiveStream {
     /// The data is not guaranteed to be complete, and may need to be called
     /// multiple times to receive all data from a message.
     pub async fn receive(&mut self) -> Result<Option<Bytes>, AqcError> {
-        Ok(self.receive.receive().await?)
+        Ok(self.0.receive().await?)
     }
 
     /// Receive the next available data from a stream.
@@ -343,7 +318,7 @@ impl AqcReceiveStream {
     pub fn try_receive(&mut self) -> Result<Bytes, TryReceiveError> {
         let waker = noop_waker();
         let mut cx = CoreContext::from_waker(&waker);
-        match self.receive.poll_receive(&mut cx) {
+        match self.0.poll_receive(&mut cx) {
             Poll::Ready(Ok(Some(chunk))) => Ok(chunk),
             Poll::Ready(Ok(None)) => Err(TryReceiveError::Closed),
             Poll::Ready(Err(_e)) => Err(TryReceiveError::Closed),
@@ -353,24 +328,24 @@ impl AqcReceiveStream {
 }
 
 /// Used to send data to a peer.
-pub struct AqcSendStream {
-    pub(crate) send: SendStream,
-}
+#[derive(Debug)]
+pub struct AqcSendStream(pub(crate) SendStream);
 
 impl AqcSendStream {
     /// Send data to the given stream.
     pub async fn send(&mut self, data: Bytes) -> Result<(), AqcError> {
-        self.send.send(data).await?;
+        self.0.send(data).await?;
         Ok(())
     }
     /// Close the stream.
     pub async fn close(&mut self) -> Result<(), AqcError> {
-        self.send.close().await?;
+        self.0.close().await?;
         Ok(())
     }
 }
 
 /// A stream accepted from a peer.
+#[derive(Debug)]
 pub enum AqcPeerStream {
     /// A bidirectional stream.
     Bidi(AqcBidiStream),

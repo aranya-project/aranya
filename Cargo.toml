@@ -22,7 +22,6 @@ unsafe_op_in_unsafe_fn = "warn"
 unused_lifetimes = "warn"
 unused_qualifications = "warn"
 
-
 [workspace.lints.clippy]
 cast_lossless = "warn"
 cast_possible_wrap = "warn"

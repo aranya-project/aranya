@@ -318,6 +318,7 @@ impl IntoIterator for AqcPsks {
     }
 }
 
+#[derive(Debug)]
 pub enum AqcPsksIntoIter {
     Bidi(IntoPsks<AqcBidiPsk>),
     Uni(IntoPsks<AqcUniPsk>),
