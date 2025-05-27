@@ -190,45 +190,31 @@ impl DerefMut for TestDevice {
     }
 }
 
-pub struct TestTeam {
-    pub owner: TestDevice,
-    pub admin: TestDevice,
-    pub operator: TestDevice,
-    pub membera: TestDevice,
-    pub memberb: TestDevice,
+pub struct TestTeam<'a> {
+    pub owner: &'a mut TestDevice,
+    pub admin: &'a mut TestDevice,
+    pub operator: &'a mut TestDevice,
+    pub membera: &'a mut TestDevice,
+    pub memberb: &'a mut TestDevice,
 }
 
-impl TestTeam {
-    pub fn new(clients: Vec<TestDevice>) -> Self {
+impl<'a> TestTeam<'a> {
+    pub fn new(clients: &'a mut [TestDevice]) -> Self {
         assert!(clients.len() >= 5);
-        let mut iter = clients.into_iter();
+        // TODO: Replace with https://doc.rust-lang.org/std/primitive.slice.html#method.get_disjoint_mut when we upgrade to 1.86
+        let (owner, rest) = clients.split_at_mut(1);
+        let (admin, rest) = rest.split_at_mut(1);
+        let (operator, rest) = rest.split_at_mut(1);
+        let (membera, rest) = rest.split_at_mut(1);
+        let (memberb, _) = rest.split_at_mut(1);
 
-        let (owner, admin, operator, membera, memberb) = (
-            iter.next().unwrap(),
-            iter.next().unwrap(),
-            iter.next().unwrap(),
-            iter.next().unwrap(),
-            iter.next().unwrap(),
-        );
         TestTeam {
-            owner,
-            admin,
-            operator,
-            membera,
-            memberb,
+            owner: &mut owner[0],
+            admin: &mut admin[0],
+            operator: &mut operator[0],
+            membera: &mut membera[0],
+            memberb: &mut memberb[0],
         }
-    }
-}
-
-impl From<TestTeam> for Vec<TestDevice> {
-    fn from(value: TestTeam) -> Self {
-        vec![
-            value.owner,
-            value.admin,
-            value.operator,
-            value.membera,
-            value.memberb,
-        ]
     }
 }
 
@@ -339,18 +325,18 @@ impl TestCtx {
 
     /// Creates default team.
     pub async fn new_team(&mut self) -> Result<Vec<TestDevice>> {
-        let (clients, psk) = self
+        let (mut clients, psk) = self
             .new_group(5)
             .await
             .context("unable to create clients")?;
-        let mut team = TestTeam::new(clients);
-        let owner = &mut team.owner;
-        let admin = &mut team.admin;
-        let operator = &mut team.operator;
-        let membera = &mut team.membera;
-        let memberb = &mut team.memberb;
+        let team = TestTeam::new(clients.as_mut_slice());
+        let owner = team.owner;
+        let mut admin = team.admin;
+        let mut operator = team.operator;
+        let mut membera = team.membera;
+        let mut memberb = team.memberb;
 
-        for member in [&admin, &operator, &membera, &memberb] {
+        for member in [&mut admin, &mut operator, &mut membera, &mut memberb] {
             member.add_team(psk.clone()).await;
         }
 
@@ -395,6 +381,6 @@ impl TestCtx {
         membera.sync(operator).await?;
         memberb.sync(operator).await?;
 
-        Ok(team.into())
+        Ok(clients)
     }
 }

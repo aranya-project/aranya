@@ -62,7 +62,7 @@ pub(crate) struct DaemonApiServer {
     sk: ApiKey<CS>,
     /// The UDS path we serve the API on.
     uds_path: PathBuf,
-    /// The Aranya actions client.
+    /// The Aranya client.
     client: Client,
     /// The local network address for the `Client`'s sync server.
     local_addr: SocketAddr,
