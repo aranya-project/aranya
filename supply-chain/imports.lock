@@ -2,62 +2,62 @@
 # cargo-vet imports lock
 
 [[publisher.aranya-aqc-util]]
-version = "0.2.0"
-when = "2025-04-21"
+version = "0.3.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-codegen]]
-version = "0.2.3"
-when = "2025-04-08"
+version = "0.3.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-core]]
-version = "0.3.0"
-when = "2025-04-21"
+version = "0.4.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-macro]]
-version = "0.2.2"
-when = "2025-04-08"
+version = "0.3.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto]]
-version = "0.5.0"
-when = "2025-04-10"
+version = "0.6.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto-ffi]]
-version = "0.7.0"
-when = "2025-04-21"
+version = "0.8.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-device-ffi]]
-version = "0.7.0"
-when = "2025-04-21"
+version = "0.8.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-envelope-ffi]]
-version = "0.7.0"
-when = "2025-04-21"
+version = "0.8.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-fast-channels]]
-version = "0.6.0"
-when = "2025-04-10"
+version = "0.7.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-idam-ffi]]
-version = "0.7.0"
-when = "2025-04-21"
+version = "0.8.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -68,38 +68,38 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-perspective-ffi]]
-version = "0.7.0"
-when = "2025-04-21"
+version = "0.8.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ast]]
-version = "0.4.0"
-when = "2025-04-21"
+version = "0.4.1"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-compiler]]
-version = "0.7.0"
-when = "2025-04-21"
+version = "0.8.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-derive]]
-version = "0.5.0"
-when = "2025-04-21"
+version = "0.5.1"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen]]
-version = "0.7.0"
-when = "2025-04-21"
+version = "0.8.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-build]]
-version = "0.4.0"
-when = "2025-04-21"
+version = "0.4.1"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -110,26 +110,26 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-lang]]
-version = "0.4.0"
-when = "2025-04-21"
+version = "0.4.1"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-module]]
-version = "0.7.0"
-when = "2025-04-21"
+version = "0.8.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-vm]]
-version = "0.7.0"
-when = "2025-04-21"
+version = "0.8.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-runtime]]
-version = "0.7.0"
-when = "2025-04-21"
+version = "0.8.0"
+when = "2025-05-19"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -154,6 +154,21 @@ user-id = 73222
 user-login = "wasmtime-publish"
 
 [audits.actix.audits]
+
+[[audits.aranya-core.audits.elain]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.3.1"
+
+[[audits.aranya-core.audits.zerocopy]]
+who = "Eric Lagergren <elagergren@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.7.35 -> 0.8.25"
+
+[[audits.aranya-core.audits.zerocopy-derive]]
+who = "Eric Lagergren <elagergren@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.7.35 -> 0.8.25"
 
 [[audits.bytecode-alliance.wildcard-audits.bumpalo]]
 who = "Nick Fitzgerald <fitzgen@gmail.com>"
@@ -263,6 +278,21 @@ notes = "Just a dependency version bump and a bug fix for redox"
 who = "Dan Gohman <dev@sunfishcode.online>"
 criteria = "safe-to-deploy"
 delta = "0.3.9 -> 0.3.10"
+
+[[audits.bytecode-alliance.audits.fastrand]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "2.0.0 -> 2.0.1"
+notes = """
+This update had a few doc updates but no otherwise-substantial source code
+updates.
+"""
+
+[[audits.bytecode-alliance.audits.fastrand]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "2.1.1 -> 2.3.0"
+notes = "Minor refactoring, nothing new."
 
 [[audits.bytecode-alliance.audits.futures]]
 who = "Joel Dice <joel.dice@gmail.com>"
@@ -508,6 +538,16 @@ criteria = "safe-to-deploy"
 delta = "1.0.1 -> 1.0.2"
 notes = "No changes to any .rs files or Rust code."
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
+
+[[audits.google.audits.fastrand]]
+who = "George Burgess IV <gbiv@google.com>"
+criteria = "safe-to-deploy"
+version = "1.9.0"
+notes = """
+`does-not-implement-crypto` is certified because this crate explicitly says
+that the RNG here is not cryptographically secure.
+"""
+aggregated-from = "https://chromium.googlesource.com/chromiumos/third_party/rust_crates/+/refs/heads/main/cargo-vet/audits.toml?format=TEXT"
 
 [[audits.google.audits.heck]]
 who = "Lukasz Anforowicz <lukasza@chromium.org>"
@@ -1454,6 +1494,25 @@ aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-ch
 who = "Mike Hommey <mh+mozilla@glandium.org>"
 criteria = "safe-to-deploy"
 delta = "0.3.1 -> 0.3.3"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.fastrand]]
+who = "Mike Hommey <mh+mozilla@glandium.org>"
+criteria = "safe-to-deploy"
+delta = "1.9.0 -> 2.0.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.fastrand]]
+who = "Mike Hommey <mh+mozilla@glandium.org>"
+criteria = "safe-to-deploy"
+delta = "2.0.1 -> 2.1.0"
+aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
+
+[[audits.mozilla.audits.fastrand]]
+who = "Chris Martin <cmartin@mozilla.com>"
+criteria = "safe-to-deploy"
+delta = "2.1.0 -> 2.1.1"
+notes = "Fairly trivial changes, no chance of security regression."
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.fnv]]

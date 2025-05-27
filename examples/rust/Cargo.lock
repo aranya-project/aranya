@@ -84,9 +84,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-crypto"
-version = "0.5.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e19bd18f91c86681abafb6fd4d33e13ab1462732506f3f8572b6c829ddc604f"
+checksum = "9ef7649eb26ccaac46800248d215e374f752083723754e5f24e261a7bdc2dd34"
 dependencies = [
  "buggy",
  "byteorder",
@@ -101,6 +101,7 @@ dependencies = [
  "spideroak-base58",
  "spideroak-crypto",
  "thiserror 2.0.12",
+ "zerocopy",
 ]
 
 [[package]]
@@ -141,9 +142,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-fast-channels"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4eeb9a850d354b99fa5c460119dfd1f6430ce20d9f11eb215b78d8283f117af6"
+checksum = "92381ca0694401c40f95d0441be52e70100dd1c1c30b444c87829b7093281de2"
 dependencies = [
  "aranya-crypto",
  "buggy",
