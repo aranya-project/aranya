@@ -6,7 +6,7 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_daemon_api::SyncPeerConfig;
@@ -132,7 +132,7 @@ type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
 pub struct Syncer {
     /// Aranya client to allow syncing the Aranya graph with another peer.
-    client: Arc<Client>,
+    client: Client,
     /// Keeps track of peer info.
     peers: HashMap<SyncPeer, PeerInfo>,
     /// Receives added/removed peers.
@@ -152,7 +152,7 @@ struct PeerInfo {
 
 impl Syncer {
     /// Creates a new `Syncer`.
-    pub fn new(client: Arc<Client>, send_effects: EffectSender) -> (Self, SyncPeers) {
+    pub fn new(client: Client, send_effects: EffectSender) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (

@@ -100,7 +100,7 @@ impl Daemon {
                 )
                 .await?;
             let local_addr = server.local_addr()?;
-            let client = Arc::new(client);
+            let client = client;
             set.spawn(async move { server.serve().await });
 
             (client, local_addr)
@@ -108,7 +108,7 @@ impl Daemon {
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-        let (mut syncer, peers) = Syncer::new(Arc::clone(&client), send_effects);
+        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects);
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
