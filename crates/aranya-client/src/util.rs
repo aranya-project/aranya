@@ -25,15 +25,15 @@ macro_rules! custom_id {
         }
 
         #[doc(hidden)]
-        impl From<[u8; 64]> for $name {
+        impl From<[u8; 32]> for $name {
             #[inline]
-            fn from(id: [u8; 64]) -> Self {
+            fn from(id: [u8; 32]) -> Self {
                 Self(id.into())
             }
         }
 
         #[doc(hidden)]
-        impl From<$name> for [u8;64] {
+        impl From<$name> for [u8; 32] {
             #[inline]
             fn from(id: $name) -> Self {
                 id.0.into()

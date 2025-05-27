@@ -205,7 +205,7 @@ pub unsafe fn client_init(
             .connect()
     })?;
 
-    Safe::init(client, imp::Client { rt, inner });
+    Client::init(client, imp::Client { rt, inner });
     Ok(())
 }
 
@@ -630,15 +630,6 @@ const _: [(); 96] = [(); size_of::<Role>()];
 pub type Label = Safe<imp::Label>;
 const _: [(); 96] = [(); size_of::<Label>()];
 
-/// Sync Peer config.
-#[aranya_capi_core::opaque(size = 32, align = 8)]
-pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
-
-/// Builder for a Sync Peer config.
-#[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
-pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
-
 /// Initializes logging.
 ///
 /// Assumes the `ARANYA_CAPI` environment variable has been set to the desired tracing log level.
@@ -685,7 +676,7 @@ pub unsafe fn get_key_bundle(
     keybundle: *mut MaybeUninit<u8>,
     keybundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let keys = client.rt.block_on(client.inner.get_key_bundle())?;
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
     unsafe { imp::key_bundle_serialize(&keys, keybundle, keybundle_len)? };
@@ -739,7 +730,7 @@ pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
 ///
 /// @relates AranyaClient.
 pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let id = client.rt.block_on(client.inner.get_device_id())?;
     Ok(id.into())
 }
@@ -835,7 +826,7 @@ pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *cons
 /// @param cfg a pointer to the client config builder
 /// @param aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
 pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
-    cfg.aqc(aqc_config.deref().clone());
+    cfg.aqc((**aqc_config).clone());
 }
 
 #[aranya_capi_core::opaque(size = 24, align = 8)]
@@ -885,7 +876,7 @@ pub fn sync_peer_config_build(
 /// @param cfg a pointer to the builder for a sync config
 /// @param interval Set the interval at which syncing occurs
 pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
-    cfg.deref_mut().interval(interval);
+    cfg.imp().interval(interval);
 }
 
 /// Updates the config to enable immediate syncing with the peer.
@@ -897,7 +888,7 @@ pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, in
 /// @param cfg a pointer to the builder for a sync config
 // TODO: aranya-core#129
 pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
-    cfg.deref_mut().sync_now(true);
+    cfg.imp().sync_now(true);
 }
 
 /// Updates the config to disable immediate syncing with the peer.
@@ -906,7 +897,7 @@ pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
 ///
 /// @relates AranyaClient.
 pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client
         .rt
         .block_on(client.inner.team(team.into()).close_team())?;
@@ -931,7 +922,7 @@ pub fn create_role(
     name: RoleName,
     role: &mut MaybeUninit<Role>,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
 
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
@@ -959,7 +950,7 @@ pub fn assign_operation_to_role(
     role_id: &RoleId,
     op: Op,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
 
     client.rt.block_on(
         client
@@ -986,7 +977,7 @@ pub unsafe fn revoke_role_operation(
     role_id: &RoleId,
     op: Op,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
 
     client.rt.block_on(
         client
@@ -1009,7 +1000,7 @@ pub unsafe fn revoke_role_operation(
 /// @relates AranyaClient.
 pub unsafe fn setup_default_roles(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
     std::println!("Team={team:}");
-    let client = client.deref_mut();
+    let client = client.imp();
     client
         .rt
         .block_on(client.inner.team(team.into()).setup_default_roles())?;
@@ -1033,7 +1024,7 @@ pub unsafe fn add_device_to_team(
     precedence: &DevicePrecedence,
     keybundle: &[u8],
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
     client.rt.block_on(
@@ -1059,7 +1050,7 @@ pub fn remove_device_from_team(
     team: &TeamId,
     device: &DeviceId,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1069,11 +1060,20 @@ pub fn remove_device_from_team(
     Ok(())
 }
 
+/// Sync Peer config.
+#[aranya_capi_core::opaque(size = 32, align = 8)]
+pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
+
+/// Builder for a Sync Peer config.
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
+pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
+
 /// By default, the peer is synced with immediately.
 /// @param cfg a pointer to the builder for a sync config
 // TODO: aranya-core#129
 pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
-    cfg.deref_mut().sync_now(false);
+    cfg.imp().sync_now(false);
 }
 
 /// Assign device precedence.
@@ -1092,7 +1092,7 @@ pub fn assign_device_precedence(
     device: &DeviceId,
     precedence: &DevicePrecedence,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1120,7 +1120,7 @@ pub fn assign_role(
     device: &DeviceId,
     role: &RoleId,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1146,7 +1146,7 @@ pub fn revoke_role(
     device: &DeviceId,
     role: &RoleId,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1176,7 +1176,7 @@ pub unsafe fn aqc_assign_net_identifier(
     device: &DeviceId,
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1202,7 +1202,7 @@ pub unsafe fn aqc_remove_net_identifier(
     device: &DeviceId,
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1233,7 +1233,7 @@ pub fn create_label(
     managing_role_id: &RoleId,
     label: &mut MaybeUninit<Label>,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
     let l = client.rt.block_on(
@@ -1342,7 +1342,7 @@ pub fn assign_label(
     label_id: &LabelId,
     op: ChanOp,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client
         .rt
         .block_on(client.inner.team(team.into()).assign_label(
@@ -1369,7 +1369,7 @@ pub fn revoke_label(
     device: &DeviceId,
     label_id: &LabelId,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client.rt.block_on(
         client
             .inner
@@ -1388,7 +1388,7 @@ pub fn revoke_label(
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let cfg = aranya_client::TeamConfig::builder().build()?;
     let id = client.rt.block_on(client.inner.create_team(cfg))?;
     Ok(id.into())
@@ -1405,7 +1405,7 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let cfg = aranya_client::TeamConfig::builder().build()?;
     client
         .rt
@@ -1420,7 +1420,7 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
 ///
 /// @relates AranyaClient.
 pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client.rt.block_on(client.inner.remove_team(team.into()))?;
     Ok(())
 }
@@ -1443,7 +1443,7 @@ pub unsafe fn add_sync_peer(
     addr: Addr,
     config: &SyncPeerConfig,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
     client.rt.block_on(
@@ -1467,7 +1467,7 @@ pub unsafe fn remove_sync_peer(
     team: &TeamId,
     addr: Addr,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
     client
@@ -1498,7 +1498,7 @@ pub unsafe fn sync_now(
     addr: Addr,
     config: Option<&SyncPeerConfig>,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
     client.rt.block_on(
@@ -1524,7 +1524,7 @@ pub fn query_devices_on_team(
     devices: Option<&mut MaybeUninit<DeviceId>>,
     devices_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let data = client
         .rt
         .block_on(client.inner.queries(team.into()).devices_on_team())?;
@@ -1562,7 +1562,7 @@ pub unsafe fn query_device_keybundle(
     keybundle: *mut MaybeUninit<u8>,
     keybundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let keys = client.rt.block_on(
         client
             .inner
@@ -1596,7 +1596,7 @@ pub fn query_device_label_assignments(
     labels: Option<&mut MaybeUninit<Label>>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let data = client.rt.block_on(
         client
             .inner
@@ -1636,7 +1636,7 @@ pub unsafe fn query_aqc_net_identifier(
     ident: &mut MaybeUninit<c_char>,
     ident_len: &mut usize,
 ) -> Result<bool, imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let Some(net_identifier) = client.rt.block_on(
         client
             .inner
@@ -1671,7 +1671,7 @@ pub fn query_labels(
     labels: Option<&mut MaybeUninit<Label>>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let data = client
         .rt
         .block_on(client.inner.queries(team.into()).labels())?;
@@ -1713,7 +1713,7 @@ pub fn query_roles_on_team(
     roles: Option<&mut MaybeUninit<Role>>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let data = client
         .rt
         .block_on(client.inner.queries(team.into()).roles_on_team())?;
@@ -1757,7 +1757,7 @@ pub fn query_device_roles(
     roles: Option<&mut MaybeUninit<Role>>,
     roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let data = client.rt.block_on(
         client
             .inner
@@ -1776,7 +1776,7 @@ pub fn query_device_roles(
     }
     let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        Safe::init(dst, src.try_into()?);
+        Role::init(dst, src.try_into()?);
     }
     *roles_len = len;
     Ok(())
@@ -1804,7 +1804,7 @@ pub fn query_role_operations(
     ops: Option<&mut MaybeUninit<AranyaOp>>,
     ops_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let data = client
         .rt
         .block_on(client.inner.queries(team.into()).role_ops(role.into()))?;
@@ -1846,7 +1846,7 @@ pub unsafe fn aqc_create_bidi_channel(
     peer: NetIdentifier,
     label_id: &LabelId,
 ) -> Result<AqcBidiChannelId, imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     let chan_id = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
         peer,
@@ -1865,7 +1865,7 @@ pub fn aqc_delete_bidi_channel(
     client: &mut Client,
     chan: &AqcBidiChannelId,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client
         .rt
         .block_on(client.inner.aqc().delete_bidi_channel(chan.into()))?;
@@ -1882,7 +1882,7 @@ pub fn aqc_delete_uni_channel(
     client: &mut Client,
     chan: &AqcUniChannelId,
 ) -> Result<(), imp::Error> {
-    let client = client.deref_mut();
+    let client = client.imp();
     client
         .rt
         .block_on(client.inner.aqc().delete_uni_channel(chan.into()))?;
