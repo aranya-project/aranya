@@ -602,7 +602,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer: api::NetIdentifier,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsk)> {
+    ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsks)> {
         info!("creating bidi channel");
 
         let graph = GraphId::from(team.into_id());
@@ -623,15 +623,15 @@ impl DaemonApi for Api {
         let Some(Effect::AqcBidiChannelCreated(e)) =
             find_effect!(&effects, Effect::AqcBidiChannelCreated(e) if e.author_id == id.into())
         else {
-            return Err(anyhow!("unable to find AqcBidiChannelCreated effect").into());
+            return Err(anyhow!("unable to find `AqcBidiChannelCreated` effect").into());
         };
 
         self.handler.handle_effects(graph, &effects).await?;
 
-        let psk = self.aqc.bidi_channel_created(e).await?;
-        info!(identity = %psk.identity, "psk identity");
+        let psks = self.aqc.uni_channel_created(e).await?;
+        info!(num = psks.len(), "bidi channel created");
 
-        Ok((ctrl, psk))
+        Ok((ctrl, psks))
     }
 
     #[instrument(skip(self))]
@@ -641,7 +641,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer: api::NetIdentifier,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AqcUniPsk)> {
+    ) -> api::Result<(api::AqcCtrl, api::AqcUniPsks)> {
         info!("creating uni channel");
 
         let graph = GraphId::from(team.into_id());
@@ -662,15 +662,15 @@ impl DaemonApi for Api {
         let Some(Effect::AqcUniChannelCreated(e)) =
             find_effect!(&effects, Effect::AqcUniChannelCreated(e) if e.author_id == id.into())
         else {
-            return Err(anyhow!("unable to find AqcUniChannelCreated effect").into());
+            return Err(anyhow!("unable to find `AqcUniChannelCreated` effect").into());
         };
 
         self.handler.handle_effects(graph, &effects).await?;
 
-        let psk = self.aqc.uni_channel_created(e).await?;
-        info!(identity = %psk.identity, "psk identity");
+        let psks = self.aqc.uni_channel_created(e).await?;
+        info!(num = psks.len(), "uni channel created");
 
-        Ok((ctrl, psk))
+        Ok((ctrl, psks))
     }
 
     #[instrument(skip(self))]
@@ -699,7 +699,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AqcCtrl,
-    ) -> api::Result<(api::NetIdentifier, api::AqcPsk)> {
+    ) -> api::Result<(api::NetIdentifier, api::AqcPsks)> {
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
@@ -717,7 +717,7 @@ impl DaemonApi for Api {
             });
             match effect {
                 Some(Effect::AqcBidiChannelReceived(e)) => {
-                    let psk = self.aqc.bidi_channel_received(e).await?;
+                    let psks = self.aqc.bidi_channel_received(e).await?;
                     let net_id = self
                         .aqc
                         .find_net_id(graph, e.author_id.into())
@@ -725,10 +725,10 @@ impl DaemonApi for Api {
                         .context("missing net identifier for channel author")?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok((net_id, api::AqcPsk::Bidi(psk)));
+                    return Ok((net_id, psks));
                 }
                 Some(Effect::AqcUniChannelReceived(e)) => {
-                    let psk = self.aqc.uni_channel_received(e).await?;
+                    let psks = self.aqc.uni_channel_received(e).await?;
                     let net_id = self
                         .aqc
                         .find_net_id(graph, e.author_id.into())
@@ -736,7 +736,7 @@ impl DaemonApi for Api {
                         .context("missing net identifier for channel author")?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok((net_id, api::AqcPsk::Uni(psk)));
+                    return Ok((net_id, psks));
                 }
                 Some(_) | None => {}
             }

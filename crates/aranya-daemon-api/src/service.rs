@@ -1,12 +1,20 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
 use core::{
-    borrow::Borrow, fmt, hash::Hash, net::SocketAddr, ops::Deref, str::FromStr, time::Duration,
+    borrow::Borrow,
+    error, fmt,
+    hash::{Hash, Hasher},
+    net::SocketAddr,
+    ops::Deref,
+    str::FromStr,
+    time::Duration,
 };
+use std::collections::hash_map::{self, HashMap};
 
-use anyhow::Context as _;
+use anyhow::{bail, Context as _};
+pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
-    aqc::{BidiPskId, CipherSuiteId, UniPskId},
+    aqc::{BidiPskId, UniPskId},
     custom_id,
     default::{DefaultCipherSuite, DefaultEngine},
     subtle::{Choice, ConstantTimeEq},
@@ -99,6 +107,142 @@ pub struct KeyBundle {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TeamConfig {
     // TODO(nikki): any fields added to this should be public
+}
+
+macro_rules! psk_map {
+    (
+        $(#[$meta:meta])*
+        $vis:vis struct $name:ident(PskMap<$psk:ty>);
+    ) => {
+        $(#[$meta])*
+        #[derive(Clone, Debug, Serialize, Deserialize)]
+        #[cfg_attr(test, derive(PartialEq))]
+        $vis struct $name {
+            id: Id,
+            psks: HashMap<CsId, $psk>
+        }
+
+        impl $name {
+            /// Returns the number of PSKs.
+            pub fn len(&self) -> usize {
+                self.psks.len()
+            }
+
+            /// Reports whether `self` is empty.
+            pub fn is_empty(&self) -> bool {
+                self.psks.is_empty()
+            }
+
+            /// Returns the channel ID.
+            pub fn channel_id(&self) -> &Id {
+                &self.id
+            }
+
+            /// Returns the PSK for the cipher suite.
+            pub fn get(&self, suite: CipherSuiteId) -> Option<&$psk> {
+                self.psks.get(&CsId(suite))
+            }
+
+            /// Creates a PSK map from a function that generates
+            /// a PSK for a cipher suite.
+            pub fn try_from_fn<I, E, F>(id: I, mut f: F) -> anyhow::Result<Self>
+            where
+                I: Into<Id>,
+                anyhow::Error: From<E>,
+                F: FnMut(CipherSuiteId) -> Result<$psk, E>,
+            {
+                let id = id.into();
+                let mut psks = HashMap::new();
+                for &suite in CipherSuiteId::all() {
+                    let psk = f(suite)?;
+                    if !bool::from(psk.identity().channel_id().into_id().ct_eq(&id)) {
+                        bail!("PSK identity does not match channel ID");
+                    }
+                    psks.insert(CsId(suite), psk);
+                }
+                Ok(Self { id, psks })
+            }
+        }
+
+        impl IntoIterator for $name {
+            type Item = (CipherSuiteId, $psk);
+            type IntoIter = IntoPsks<$psk>;
+
+            fn into_iter(self) -> Self::IntoIter {
+                IntoPsks {
+                    iter: self.psks.into_iter(),
+                }
+            }
+        }
+
+        #[cfg(test)]
+        impl tests::PskMap for $name {
+            type Psk = $psk;
+
+            fn new() -> Self {
+                Self {
+                    // TODO
+                    id: Id::default(),
+                    psks: HashMap::new(),
+                }
+            }
+
+            fn len(&self) -> usize {
+                self.psks.len()
+            }
+
+            fn insert(&mut self, psk: Self::Psk) {
+                let suite = psk.cipher_suite();
+                let opt = self.psks.insert(CsId(suite), psk);
+                assert!(opt.is_none());
+            }
+        }
+    };
+}
+psk_map! {
+    /// An injective mapping of PSKs to cipher suites for
+    /// a single bidirectional channel.
+    pub struct AqcBidiPsks(PskMap<AqcBidiPsk>);
+}
+
+psk_map! {
+    /// An injective mapping of PSKs to cipher suites for
+    /// a single unidirectional channel.
+    pub struct AqcUniPsks(PskMap<AqcUniPsk>);
+}
+
+/// An injective mapping of PSKs to cipher suites for a single
+/// bidirectional or unidirectional channel.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum AqcPsks {
+    Bidi(AqcBidiPsks),
+    Uni(AqcUniPsks),
+}
+
+/// An iterator over an AQC channel's PSKs.
+#[derive(Debug)]
+pub struct IntoPsks<V> {
+    iter: hash_map::IntoIter<CsId, V>,
+}
+
+impl<V> Iterator for IntoPsks<V> {
+    type Item = (CipherSuiteId, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(|(k, v)| (k.0, v))
+    }
+}
+
+// TODO(eric): Get rid of this once `CipherSuiteId` implements
+// `Hash`.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+struct CsId(CipherSuiteId);
+
+impl Hash for CsId {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_bytes().hash(state);
+    }
 }
 
 /// A device's network identifier.
@@ -586,19 +730,19 @@ pub trait DaemonApi {
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcBidiPsk)>;
+    ) -> Result<(AqcCtrl, AqcBidiPsks)>;
     /// Create a unidirectional QUIC channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcUniPsk)>;
+    ) -> Result<(AqcCtrl, AqcUniPsks)>;
     /// Delete a QUIC bidi channel.
     async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
     /// Delete a QUIC uni channel.
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
     /// Receive AQC ctrl message.
-    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(NetIdentifier, AqcPsk)>;
+    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(NetIdentifier, AqcPsks)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
