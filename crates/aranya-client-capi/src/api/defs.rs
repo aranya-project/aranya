@@ -1475,7 +1475,6 @@ pub unsafe fn aqc_create_uni_channel(
     Ok(())
 }
 
-/* TODO(nikki): these will panic currently, so let's stub them
 /// Delete a bidirectional AQC channel.
 ///
 /// @param[in] client the Aranya Client [`Client`].
@@ -1509,7 +1508,6 @@ pub fn aqc_delete_uni_channel(
         .block_on(client.inner.aqc().delete_uni_channel(channel.into()))?;
     Ok(())
 }
-*/
 
 /// Tries to poll AQC to see if any channels have been received.
 ///

@@ -2170,6 +2170,52 @@ AranyaError aranya_aqc_create_uni_channel_ext(struct AranyaClient *client,
                                               struct AranyaExtError *__ext_err);
 
 /**
+ * Delete a bidirectional AQC channel.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_delete_bidi_channel(struct AranyaClient *client,
+                                           const struct AranyaAqcBidiChannel *channel);
+
+/**
+ * Delete a bidirectional AQC channel.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
+                                               const struct AranyaAqcBidiChannel *channel,
+                                               struct AranyaExtError *__ext_err);
+
+/**
+ * Delete a unidirectional AQC channel.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] channel the AQC Channel [`AranyaAqcSenderChannel`](@ref AranyaAqcSenderChannel) to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_delete_uni_channel(struct AranyaClient *client,
+                                          const struct AranyaAqcSenderChannel *channel);
+
+/**
+ * Delete a unidirectional AQC channel.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] channel the AQC Channel [`AranyaAqcSenderChannel`](@ref AranyaAqcSenderChannel) to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaClient *client,
+                                              const struct AranyaAqcSenderChannel *channel,
+                                              struct AranyaExtError *__ext_err);
+
+/**
  * Tries to poll AQC to see if any channels have been received.
  *
  * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
