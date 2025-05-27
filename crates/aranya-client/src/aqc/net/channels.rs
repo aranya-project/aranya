@@ -1,9 +1,8 @@
-use core::task::{Context, Poll};
+use core::task::{Context, Poll, Waker};
 
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::LabelId;
 use bytes::Bytes;
-use futures_util::task::noop_waker;
 
 use super::TryReceiveError;
 use crate::{aqc::api::AqcChannelId, error::AqcError};
@@ -140,8 +139,7 @@ impl AqcReceiveChannel {
     /// return Empty. If the stream is disconnected, return Disconnected. If disconnected
     /// is returned no streams will be available until a new channel is created.
     pub fn try_receive_uni_stream(&mut self) -> Result<AqcReceiveStream, TryReceiveError> {
-        let waker = noop_waker();
-        let mut cx = Context::from_waker(&waker);
+        let mut cx = Context::from_waker(Waker::noop());
         match self.conn.poll_accept_receive_stream(&mut cx) {
             Poll::Ready(Ok(Some(stream))) => Ok(AqcReceiveStream(stream)),
             Poll::Ready(Ok(None)) => Err(TryReceiveError::Empty),
@@ -204,8 +202,7 @@ impl AqcBidiChannel {
     pub fn try_receive_stream(
         &mut self,
     ) -> Result<(Option<AqcSendStream>, AqcReceiveStream), TryReceiveError> {
-        let waker = noop_waker();
-        let mut cx = Context::from_waker(&waker);
+        let mut cx = Context::from_waker(Waker::noop());
 
         match self.conn.poll_accept(&mut cx) {
             Poll::Ready(Ok(Some(peer_stream))) => match peer_stream {
@@ -290,8 +287,7 @@ impl AqcBidiStream {
     /// - Empty: No data available.
     /// - Closed: The stream is closed.
     pub fn try_receive(&mut self) -> Result<Bytes, TryReceiveError> {
-        let waker = noop_waker();
-        let mut cx = Context::from_waker(&waker);
+        let mut cx = Context::from_waker(Waker::noop());
         match self.0.poll_receive(&mut cx) {
             Poll::Ready(Ok(Some(chunk))) => Ok(chunk),
             Poll::Ready(Ok(None)) => Err(TryReceiveError::Closed),
@@ -323,8 +319,7 @@ impl AqcReceiveStream {
     /// - Empty: No data available.
     /// - Closed: The stream is closed.
     pub fn try_receive(&mut self) -> Result<Bytes, TryReceiveError> {
-        let waker = noop_waker();
-        let mut cx = Context::from_waker(&waker);
+        let mut cx = Context::from_waker(Waker::noop());
         match self.0.poll_receive(&mut cx) {
             Poll::Ready(Ok(Some(chunk))) => Ok(chunk),
             Poll::Ready(Ok(None)) => Err(TryReceiveError::Closed),

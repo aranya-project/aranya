@@ -2,11 +2,11 @@
 
 //! The AQC network implementation.
 
-use core::task::{Context as CoreContext, Poll};
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, SocketAddr},
     sync::Arc,
+    task::{Context, Poll, Waker},
 };
 
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
@@ -16,7 +16,6 @@ use aranya_daemon_api::{
 use buggy::{Bug, BugExt as _};
 use bytes::Bytes;
 use channels::AqcPeerChannel;
-use futures_util::task::noop_waker;
 use s2n_quic::{self, client::Connect, provider, Client, Connection, Server};
 use tarpc::context;
 use tokio::sync::mpsc;
@@ -167,8 +166,7 @@ impl AqcClient {
     /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
     /// is returned no channels will be available until the application is restarted.
     pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
-        let waker = noop_waker();
-        let mut cx = CoreContext::from_waker(&waker);
+        let mut cx = Context::from_waker(Waker::noop());
         loop {
             // Accept a new connection
             let mut conn = match self.server.poll_accept(&mut cx) {
