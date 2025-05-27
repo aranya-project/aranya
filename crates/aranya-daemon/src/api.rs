@@ -16,7 +16,7 @@ use aranya_daemon_api::{
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
-use aranya_util::Addr;
+use aranya_util::{Addr, NonEmptyString};
 use buggy::BugExt;
 use futures_util::{pin_mut, StreamExt, TryStreamExt};
 use rustls::crypto::{hash::HashAlgorithm, PresharedKey};
@@ -75,6 +75,9 @@ pub(crate) struct DaemonApiServer {
     /// Channel for sending PSK updates
     // Should this be optional since there will be other syncer types in the future?
     psk_send: broadcast::Sender<Msg>,
+
+    /// See [`crate::config::Config::service_name`]
+    service_name: NonEmptyString,
 }
 
 impl DaemonApiServer {
@@ -91,6 +94,7 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
         aqc: Aqc<CE, KS>,
         psk_send: PSKSender,
+        service_name: NonEmptyString,
     ) -> Result<Self> {
         Ok(Self {
             uds_path,
@@ -102,6 +106,7 @@ impl DaemonApiServer {
             peers,
             aqc,
             psk_send,
+            service_name,
         })
     }
 
@@ -135,6 +140,7 @@ impl DaemonApiServer {
                 aqc: Arc::clone(&aqc),
             },
             psk_send: self.psk_send,
+            service_name: self.service_name,
         }));
 
         let server = {
@@ -259,6 +265,7 @@ struct ApiInner {
     handler: EffectHandler,
     aqc: Arc<Aqc<CE, KS>>,
     psk_send: broadcast::Sender<Msg>,
+    service_name: NonEmptyString,
 }
 
 impl ApiInner {
@@ -372,7 +379,13 @@ impl DaemonApi for Api {
             .with_hash_alg(HashAlgorithm::SHA384)
             .expect("Valid hash algorithm");
         self.psk_send.send(Msg::Insert((team, Arc::new(psk))))?;
-        // TODO(Steve): Store PSK in credential store. What else is left?
+        // TODO(Steve): What else is left?
+        insert_psk(
+            &self.service_name,
+            &team,
+            &identity,
+            secret.raw_secret_bytes(),
+        )?;
 
         Ok(())
     }
@@ -380,7 +393,8 @@ impl DaemonApi for Api {
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
         self.psk_send.send(Msg::Remove(team))?;
-        todo!("Remove PSK from crendential store? Should remove graph data from storage provider");
+        delete_psk(&self.service_name, &team)?;
+        todo!("Should remove graph data from storage provider");
     }
 
     #[instrument(skip(self))]
@@ -986,4 +1000,45 @@ impl From<ChanOp> for api::ChanOp {
             ChanOp::SendOnly => api::ChanOp::SendOnly,
         }
     }
+}
+
+/// Inserts a PSK's identity and secret in the platform's credential store
+fn insert_psk(
+    service_name: &NonEmptyString,
+    id: &api::TeamId,
+    identity: &[u8],
+    secret: &[u8],
+) -> Result<()> {
+    {
+        let user_string = format!("{id}-identity");
+        let entry = keyring::Entry::new(service_name, &user_string)?;
+        // Entry may already exist
+        let _ = entry.set_secret(identity).inspect_err(|e| error!(%e));
+    }
+
+    {
+        let user_string = format!("{id}-secret");
+        let entry = keyring::Entry::new(service_name, &user_string)?;
+        let _ = entry.set_secret(secret).inspect_err(|e| error!(%e));
+    }
+
+    Ok(())
+}
+
+/// Deletes a PSK's identity and secret in the platform's credential store
+fn delete_psk(service_name: &NonEmptyString, id: &api::TeamId) -> Result<()> {
+    {
+        let user_string = format!("{id}-identity");
+        let entry = keyring::Entry::new(service_name, &user_string)?;
+        // Entry may already exist
+        let _ = entry.delete_credential().inspect_err(|e| error!(%e));
+    }
+
+    {
+        let user_string = format!("{id}-secret");
+        let entry = keyring::Entry::new(service_name, &user_string)?;
+        let _ = entry.delete_credential().inspect_err(|e| error!(%e));
+    }
+
+    Ok(())
 }

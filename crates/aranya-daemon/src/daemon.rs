@@ -14,7 +14,7 @@ use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, StorageProvider,
 };
-use aranya_util::{Addr, NonEmptyString};
+use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::BugExt;
 use ciborium as cbor;
@@ -37,7 +37,7 @@ use crate::{
     sync::{
         prot::SyncProtocol,
         task::{
-            quic::{Msg, ServerPresharedKeys, State as QuicSyncState, TeamIdPSKPair},
+            quic::{ServerPresharedKeys, State as QuicSyncState, TeamIdPSKPair},
             Syncer,
         },
     },
@@ -169,27 +169,6 @@ impl Daemon {
             Ok(())
         });
 
-        // Async task for inserting and removing PSK idenitities and secrets
-        // in the platform's credential store.
-        let mut psk_recv3 = psk_send.subscribe();
-        let service_name = self.cfg.service_name.clone();
-        set.spawn(async move {
-            loop {
-                match psk_recv3.recv().await {
-                    Ok(msg) => {
-                        let _ = Self::handle_psk_message(&service_name, msg);
-                    }
-                    Err(RecvError::Closed) => break,
-                    Err(err) => {
-                        error!(err = ?err, "unable to receive psk on broadcast channel")
-                    }
-                }
-            }
-
-            info!("PSK broadcast channel closed");
-            Ok(())
-        });
-
         let graph_ids = client
             .aranya
             .lock()
@@ -227,6 +206,7 @@ impl Daemon {
             recv_effects,
             aqc,
             psk_send,
+            self.cfg.service_name.clone(),
         )?;
         api.serve().await?;
 
@@ -393,35 +373,6 @@ impl Daemon {
     pub fn cleanup(&self) -> impl FnOnce() -> Result<()> {
         // FIXME: Replace this to clean up the entries in the credential store
         move || Ok(())
-    }
-
-    #[inline]
-    fn handle_psk_message(service_name: &NonEmptyString, msg: Msg) -> Result<()> {
-        match msg {
-            Msg::Insert((id, psk)) => {
-                {
-                    let user_string = format!("{id}-idenitity");
-                    let entry = keyring::Entry::new(service_name, &user_string)?;
-                    // Entry may already exist
-                    let _ = entry.set_secret(psk.identity()).inspect_err(|e| error!(%e));
-                }
-
-                {
-                    let user_string = format!("{id}-secret");
-                    let _entry = keyring::Entry::new(service_name, &user_string)?;
-                    // entry.set_secret(psk.secret()).inspect_err(|e| error!(%e))} Can't do this because secret() is not public
-                }
-            }
-            Msg::Remove(id) => {
-                for user_string in [format!("{id}-idenitity"), format!("{id}-secret")] {
-                    let entry = keyring::Entry::new(service_name, &user_string)?;
-                    let _ = entry.delete_credential().inspect_err(|e| error!(%e));
-                    // Entry may not exist
-                }
-            }
-        }
-
-        Ok(())
     }
 }
 
