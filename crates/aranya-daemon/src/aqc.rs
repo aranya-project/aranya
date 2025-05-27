@@ -146,7 +146,6 @@ where
                 secret: Secret::from(psk.raw_secret_bytes()),
             })
         })
-        .map_err(Into::into)
     }
 
     /// Handles the [`AqcBidiChannelReceived`] effect, returning

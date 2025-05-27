@@ -23,7 +23,7 @@ use super::{
         ClientPresharedKeys, NoCertResolver, ServerPresharedKeys, SkipServerVerification, CTRL_KEY,
     },
     net::{AqcClient, TryReceiveError},
-    AqcBidirectionalChannel, AqcPeerChannel, AqcSenderChannel,
+    AqcBidiChannel, AqcPeerChannel, AqcSenderChannel,
 };
 use crate::{
     error::{aranya_error, no_addr, AqcError, IpcError},
@@ -40,21 +40,20 @@ pub const AQC_VERSION: AqcVersion = 1;
 /// ALPN protocol identifier for Aranya QUIC Channels
 const ALPN_AQC: &[u8] = b"aqc";
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub enum AqcChannelId {
-    Bidirectional(BidiChannelId),
-    Unidirectional(UniChannelId),
+    Bidi(BidiChannelId),
+    Uni(UniChannelId),
 }
 
 /// Sends and receives AQC messages.
 #[derive(Debug)]
 pub(crate) struct AqcChannelsImpl {
-    pub(crate) client: AqcClient,
+    client: AqcClient,
 }
 
 impl AqcChannelsImpl {
     /// Creates a new `QuicChannelsImpl` listening for connections on `address`.
-    #[allow(deprecated)]
     pub(crate) async fn new(
         device_id: DeviceId,
         aqc_addr: SocketAddr,
@@ -88,7 +87,9 @@ impl AqcChannelsImpl {
         server_config.preshared_keys =
             PresharedKeySelection::Required(Arc::clone(&server_keys) as _);
 
+        #[allow(deprecated)]
         let tls_client_provider = rustls_provider::Client::new(client_config);
+        #[allow(deprecated)]
         let tls_server_provider = rustls_provider::Server::new(server_config);
         // --- End Rustls Setup ---
 
@@ -130,7 +131,7 @@ impl AqcChannelsImpl {
         peer_addr: SocketAddr,
         label_id: LabelId,
         psks: AqcBidiPsks,
-    ) -> Result<AqcBidirectionalChannel, AqcError> {
+    ) -> Result<AqcBidiChannel, AqcError> {
         self.client
             .create_bidi_channel(peer_addr, label_id, psks)
             .await
@@ -197,7 +198,7 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> crate::Result<AqcBidirectionalChannel> {
+    ) -> crate::Result<AqcBidiChannel> {
         debug!("creating bidi channel");
 
         let (aqc_ctrl, psks) = self
@@ -277,10 +278,7 @@ impl<'a> AqcChannels<'a> {
     /// Deletes an AQC bidi channel.
     /// It is an error if the channel does not exist
     #[instrument(skip_all, fields(?chan))]
-    pub async fn delete_bidi_channel(
-        &mut self,
-        mut chan: AqcBidirectionalChannel,
-    ) -> crate::Result<()> {
+    pub async fn delete_bidi_channel(&mut self, mut chan: AqcBidiChannel) -> crate::Result<()> {
         // let _ctrl = self
         //     .client
         //     .daemon

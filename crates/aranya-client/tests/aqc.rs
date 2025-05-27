@@ -89,7 +89,7 @@ async fn test_aqc_chans() -> Result<()> {
         .expect("can create and receive channel");
 
         let mut bidi_chan2 = match peer_channel {
-            AqcPeerChannel::Bidirectional(channel) => channel,
+            AqcPeerChannel::Bidi(channel) => channel,
             _ => buggy::bug!("Expected a bidirectional channel on memberb"),
         };
 
@@ -175,7 +175,7 @@ async fn test_aqc_chans() -> Result<()> {
         .expect("can create uni channel");
 
         let mut uni_chan2 = match peer_channel {
-            AqcPeerChannel::Receiver(receiver) => receiver,
+            AqcPeerChannel::Receive(receiver) => receiver,
             _ => panic!("Expected a unidirectional channel"),
         };
 
@@ -214,7 +214,7 @@ async fn test_aqc_chans() -> Result<()> {
         .expect("can create and receive with try_receive_channel");
 
         let mut bidi_chan2 = match peer_channel {
-            AqcPeerChannel::Bidirectional(channel) => channel,
+            AqcPeerChannel::Bidi(channel) => channel,
             _ => buggy::bug!("Expected a bidirectional channel on memberb"),
         };
 

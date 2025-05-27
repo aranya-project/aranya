@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{aqc::net::AqcReceiveChannelType, client::Client, Error, SyncPeerConfig, TeamConfig};
+use aranya_client::{aqc::AqcPeerChannel, client::Client, Error, SyncPeerConfig, TeamConfig};
 use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -79,7 +79,12 @@ struct ClientCtx {
 }
 
 impl ClientCtx {
-    pub async fn new(team_name: &str, user_name: &str, daemon_path: &DaemonPath, port: u16) -> Result<Self> {
+    pub async fn new(
+        team_name: &str,
+        user_name: &str,
+        daemon_path: &DaemonPath,
+        port: u16,
+    ) -> Result<Self> {
         info!(team_name, user_name, "creating `ClientCtx`");
         let aqc_addr = Addr::new("127.0.0.1", port).expect("unable to init AQC address");
 
@@ -393,7 +398,7 @@ async fn main() -> Result<()> {
     let mut received_aqc_chan = loop {
         let chan = memberb.client.aqc().receive_channel().await?;
         match chan {
-            AqcReceiveChannelType::Bidirectional { channel } => break channel,
+            AqcPeerChannel::Bidi(channel) => break channel,
             _ => bail!("expected a bidirectional channel"),
         }
     };
@@ -403,31 +408,28 @@ async fn main() -> Result<()> {
         .await
         .context("Task for membera creating bidi channel panicked")?;
     membera = membera_returned; // Assign the moved membera back
-    let mut created_aqc_chan = created_aqc_chan_result
-        .context("Membera failed to create bidi channel")?;
+    let mut created_aqc_chan =
+        created_aqc_chan_result.context("Membera failed to create bidi channel")?;
 
     // membera creates a new stream on the channel.
     info!("membera creating aqc bidi stream");
-    let (mut send1, _recv1) = created_aqc_chan.create_bidi_stream().await?;
+    let mut bidi1 = created_aqc_chan.create_bidi_stream().await?;
 
     // membera sends data via the aqc stream.
     info!("membera sending aqc data");
-    let msg = Bytes::from("hello");
-    send1.send(&msg).await?;
+    let msg = Bytes::from_static(b"hello");
+    bidi1.send(msg.clone()).await?;
 
     // memberb receives channel stream created by membera.
     info!("memberb receiving aqc bidi stream");
-    let (_send2, mut recv2) = received_aqc_chan
+    let mut peer2 = received_aqc_chan
         .receive_stream()
         .await
         .assume("stream not received")?;
 
     // memberb receives data from stream.
     info!("memberb receiving acq data");
-    let bytes = recv2
-        .receive()
-        .await?
-        .assume("no data received")?;
+    let bytes = peer2.receive().await?.assume("no data received")?;
     assert_eq!(bytes, msg);
 
     info!("revoking label from membera");

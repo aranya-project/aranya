@@ -12,7 +12,7 @@ authors = ["SpiderOak, Inc."]
 edition = "2021"
 license = "AGPL-3.0-only"
 repository = "https://github.com/aranya-project/aranya"
-rust-version = "1.81"
+rust-version = "1.85"
 
 
 [workspace.lints.rust]
@@ -21,7 +21,6 @@ rust_2018_idioms = { level = "warn", priority = -1 }
 unsafe_op_in_unsafe_fn = "warn"
 unused_lifetimes = "warn"
 unused_qualifications = "warn"
-
 
 [workspace.lints.clippy]
 cast_lossless = "warn"

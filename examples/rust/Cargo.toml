@@ -45,4 +45,4 @@ tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 
 # TODO: remove this patch before merging PR
 [patch.crates-io]
-rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "648a02550dd319360664f9af79862716be2879ff" }
+rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "fc478a5e9d8e2ab08b7d2d3b62f57b422033a18c" }
