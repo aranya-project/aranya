@@ -16,6 +16,14 @@ skip_rust_env_info = true
 description = "List tasks"
 script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 
+[tasks.check-external-types]
+category = "correctness"
+description = "Check external types"
+cwd = "crates/aranya-client"
+toolchain = "${NIGHTLY}"
+command = "cargo"
+args = ["check-external-types"]
+dependencies = ["install-nightly"]
 
 # Build
 [tasks.build]
