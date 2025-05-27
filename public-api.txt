@@ -1,0 +1,1688 @@
+gknopf@geoffreys-macbook-pro aranya % cargo public-api -p aranya-client
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling libc v0.2.170
+   Compiling libm v0.2.11
+   Compiling num-traits v0.2.19
+   Compiling zerocopy v0.8.24
+   Compiling shlex v1.3.0
+   Compiling dunce v1.0.5
+   Compiling zerocopy-derive v0.7.35
+   Compiling zerocopy-derive v0.8.24
+    Checking zeroize v1.8.1
+   Compiling fs_extra v1.3.0
+    Checking futures-io v0.3.31
+   Compiling aws-lc-rs v1.13.0
+    Checking futures-util v0.3.31
+    Checking generic-array v0.14.7
+    Checking der v0.7.9
+   Compiling crossbeam-utils v0.8.21
+   Compiling getrandom v0.1.16
+   Compiling getrandom v0.3.1
+    Checking crypto-common v0.1.6
+    Checking block-buffer v0.10.4
+    Checking crypto-bigint v0.5.5
+    Checking zerocopy v0.7.35
+    Checking digest v0.10.7
+    Checking inout v0.1.4
+    Checking sec1 v0.7.3
+    Checking hmac v0.12.1
+    Checking signature v2.2.0
+    Checking cipher v0.4.4
+    Checking sha2 v0.10.8
+    Checking hkdf v0.12.4
+    Checking rfc6979 v0.4.0
+    Checking spki v0.7.3
+    Checking universal-hash v0.5.1
+   Compiling jobserver v0.1.32
+    Checking aes v0.8.4
+    Checking ctr v0.9.2
+    Checking ed25519 v2.2.3
+    Checking polyval v0.6.2
+    Checking curve25519-dalek v4.1.3
+    Checking aead v0.5.2
+    Checking atomic-waker v1.1.2
+   Compiling cc v1.2.18
+    Checking ghash v0.5.1
+    Checking hex-literal v0.4.1
+    Checking siphasher v1.0.1
+    Checking untrusted v0.7.1
+    Checking generic-array v1.1.1
+    Checking aes-gcm v0.10.3
+   Compiling memoffset v0.9.1
+    Checking rustls-pki-types v1.11.0
+    Checking rand_core v0.5.1
+    Checking num-integer v0.1.46
+    Checking ed25519-dalek v2.1.1
+    Checking elliptic-curve v0.13.8
+    Checking ppv-lite86 v0.2.20
+    Checking rmp v0.8.14
+    Checking untrusted v0.9.0
+   Compiling rustls v0.23.26 (https://github.com/elagergren-spideroak/rustls?rev=fc478a5e9d8e2ab08b7d2d3b62f57b422033a18c#fc478a5e)
+    Checking rand_core v0.9.3
+    Checking foldhash v0.1.5
+    Checking equivalent v1.0.2
+    Checking num-rational v0.4.2
+    Checking rand_chacha v0.3.1
+    Checking primeorder v0.13.6
+    Checking ecdsa v0.16.9
+    Checking futures-executor v0.3.31
+    Checking rmp-serde v1.3.0
+    Checking rand_chacha v0.2.2
+    Checking allocator-api2 v0.2.21
+   Compiling s2n-quic-platform v0.57.0
+    Checking futures v0.3.31
+    Checking rand v0.7.3
+    Checking intrusive-collections v0.9.7
+   Compiling cmake v0.1.54
+    Checking rand v0.8.5
+    Checking rand_chacha v0.9.0
+    Checking rustls-pemfile v2.2.0
+    Checking p384 v0.13.1
+    Checking p256 v0.13.2
+    Checking hashbrown v0.15.2
+    Checking tokio-serde v0.9.0
+    Checking smallvec v1.14.0
+    Checking hash_hasher v2.0.3
+    Checking parking v2.2.1
+    Checking fastrand v2.3.0
+    Checking s2n-codec v0.57.0
+    Checking rand v0.9.0
+    Checking cuckoofilter v0.5.0
+    Checking spideroak-crypto v0.2.1
+    Checking opentelemetry_sdk v0.26.0
+   Compiling aws-lc-sys v0.28.0
+    Checking futures-lite v2.6.0
+    Checking s2n-quic-core v0.57.0
+    Checking tracing-opentelemetry v0.27.0
+    Checking tarpc v0.35.0
+    Checking aranya-crypto v0.6.0
+    Checking aranya-fast-channels v0.7.0
+    Checking aranya-util v0.5.1 (/Users/gknopf/scm/aranya/crates/aranya-util)
+    Checking aranya-daemon-api v0.5.1 (/Users/gknopf/scm/aranya/crates/aranya-daemon-api)
+warning: variable does not need to be mutable
+   --> crates/aranya-daemon-api/src/crypto/txp.rs:121:13
+    |
+121 |         let mut codec = MessagePack::<Item, SinkItem>::default();
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+   --> crates/aranya-daemon-api/src/crypto/txp.rs:153:13
+    |
+153 |         let mut codec = MessagePack::<Item, SinkItem>::default();
+    |             ----^^^^^
+    |             |
+    |             help: remove this `mut`
+
+warning: `aranya-daemon-api` (lib) generated 2 warnings (run `cargo fix --lib -p aranya-daemon-api` to apply 2 suggestions)
+    Checking s2n-quic-transport v0.57.0
+    Checking rustls-webpki v0.103.1
+    Checking s2n-quic-crypto v0.57.0
+    Checking s2n-quic-rustls v0.57.0
+    Checking s2n-quic v1.57.0
+ Documenting aranya-client v0.5.1 (/Users/gknopf/scm/aranya/crates/aranya-client)
+    Finished `dev` profile [optimized + debuginfo] target(s) in 51.88s
+pub mod aranya_client
+pub mod aranya_client::aqc
+pub enum aranya_client::aqc::AqcPeerChannel
+pub aranya_client::aqc::AqcPeerChannel::Bidi(aranya_client::aqc::AqcBidiChannel)
+pub aranya_client::aqc::AqcPeerChannel::Receive(aranya_client::aqc::AqcReceiveChannel)
+impl core::fmt::Debug for aranya_client::aqc::AqcPeerChannel
+pub fn aranya_client::aqc::AqcPeerChannel::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::aqc::AqcPeerChannel
+impl core::marker::Send for aranya_client::aqc::AqcPeerChannel
+impl core::marker::Sync for aranya_client::aqc::AqcPeerChannel
+impl core::marker::Unpin for aranya_client::aqc::AqcPeerChannel
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::aqc::AqcPeerChannel
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::aqc::AqcPeerChannel
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::aqc::AqcPeerChannel
+pub fn aranya_client::aqc::AqcPeerChannel::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::aqc::AqcPeerChannel where U: core::convert::From<T>
+pub fn aranya_client::aqc::AqcPeerChannel::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::aqc::AqcPeerChannel where U: core::convert::Into<T>
+pub type aranya_client::aqc::AqcPeerChannel::Error = core::convert::Infallible
+pub fn aranya_client::aqc::AqcPeerChannel::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::aqc::AqcPeerChannel where U: core::convert::TryFrom<T>
+pub type aranya_client::aqc::AqcPeerChannel::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::aqc::AqcPeerChannel::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::aqc::AqcPeerChannel where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::aqc::AqcPeerChannel::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::aqc::AqcPeerChannel where T: 'static + ?core::marker::Sized
+pub fn aranya_client::aqc::AqcPeerChannel::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::aqc::AqcPeerChannel where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcPeerChannel::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::aqc::AqcPeerChannel where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcPeerChannel::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::aqc::AqcPeerChannel
+pub fn aranya_client::aqc::AqcPeerChannel::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::aqc::AqcPeerChannel
+impl<T> tracing::instrument::Instrument for aranya_client::aqc::AqcPeerChannel
+impl<T> tracing::instrument::WithSubscriber for aranya_client::aqc::AqcPeerChannel
+impl<T> typenum::type_operators::Same for aranya_client::aqc::AqcPeerChannel
+pub type aranya_client::aqc::AqcPeerChannel::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::aqc::AqcPeerChannel where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::aqc::AqcPeerChannel::vzip(self) -> V
+pub enum aranya_client::aqc::AqcPeerStream
+pub aranya_client::aqc::AqcPeerStream::Bidi(aranya_client::aqc::AqcBidiStream)
+pub aranya_client::aqc::AqcPeerStream::Receive(aranya_client::aqc::AqcReceiveStream)
+impl aranya_client::aqc::AqcPeerStream
+pub fn aranya_client::aqc::AqcPeerStream::into_bidi(self) -> core::result::Result<aranya_client::aqc::AqcBidiStream, Self>
+pub fn aranya_client::aqc::AqcPeerStream::into_receive(self) -> core::result::Result<aranya_client::aqc::AqcReceiveStream, Self>
+pub async fn aranya_client::aqc::AqcPeerStream::receive(&mut self) -> core::result::Result<core::option::Option<bytes::bytes::Bytes>, aranya_client::error::AqcError>
+pub fn aranya_client::aqc::AqcPeerStream::try_receive(&mut self) -> core::result::Result<bytes::bytes::Bytes, aranya_client::aqc::net::TryReceiveError>
+impl core::fmt::Debug for aranya_client::aqc::AqcPeerStream
+pub fn aranya_client::aqc::AqcPeerStream::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::aqc::AqcPeerStream
+impl core::marker::Send for aranya_client::aqc::AqcPeerStream
+impl core::marker::Sync for aranya_client::aqc::AqcPeerStream
+impl core::marker::Unpin for aranya_client::aqc::AqcPeerStream
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::aqc::AqcPeerStream
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::aqc::AqcPeerStream
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::aqc::AqcPeerStream
+pub fn aranya_client::aqc::AqcPeerStream::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::aqc::AqcPeerStream where U: core::convert::From<T>
+pub fn aranya_client::aqc::AqcPeerStream::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::aqc::AqcPeerStream where U: core::convert::Into<T>
+pub type aranya_client::aqc::AqcPeerStream::Error = core::convert::Infallible
+pub fn aranya_client::aqc::AqcPeerStream::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::aqc::AqcPeerStream where U: core::convert::TryFrom<T>
+pub type aranya_client::aqc::AqcPeerStream::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::aqc::AqcPeerStream::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::aqc::AqcPeerStream where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::aqc::AqcPeerStream::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::aqc::AqcPeerStream where T: 'static + ?core::marker::Sized
+pub fn aranya_client::aqc::AqcPeerStream::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::aqc::AqcPeerStream where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcPeerStream::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::aqc::AqcPeerStream where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcPeerStream::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::aqc::AqcPeerStream
+pub fn aranya_client::aqc::AqcPeerStream::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::aqc::AqcPeerStream
+impl<T> tracing::instrument::Instrument for aranya_client::aqc::AqcPeerStream
+impl<T> tracing::instrument::WithSubscriber for aranya_client::aqc::AqcPeerStream
+impl<T> typenum::type_operators::Same for aranya_client::aqc::AqcPeerStream
+pub type aranya_client::aqc::AqcPeerStream::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::aqc::AqcPeerStream where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::aqc::AqcPeerStream::vzip(self) -> V
+pub struct aranya_client::aqc::AqcBidiChannel
+impl aranya_client::aqc::AqcBidiChannel
+pub fn aranya_client::aqc::AqcBidiChannel::aqc_id(&self) -> aranya_crypto::aqc::bidi::BidiChannelId
+pub fn aranya_client::aqc::AqcBidiChannel::close(&mut self)
+pub async fn aranya_client::aqc::AqcBidiChannel::create_bidi_stream(&mut self) -> core::result::Result<aranya_client::aqc::AqcBidiStream, aranya_client::error::AqcError>
+pub async fn aranya_client::aqc::AqcBidiChannel::create_uni_stream(&mut self) -> core::result::Result<aranya_client::aqc::AqcSendStream, aranya_client::error::AqcError>
+pub fn aranya_client::aqc::AqcBidiChannel::label_id(&self) -> aranya_daemon_api::service::LabelId
+pub async fn aranya_client::aqc::AqcBidiChannel::receive_stream(&mut self) -> core::result::Result<aranya_client::aqc::AqcPeerStream, aranya_client::error::AqcError>
+pub fn aranya_client::aqc::AqcBidiChannel::try_receive_stream(&mut self) -> core::result::Result<(core::option::Option<aranya_client::aqc::AqcSendStream>, aranya_client::aqc::AqcReceiveStream), aranya_client::aqc::net::TryReceiveError>
+impl core::fmt::Debug for aranya_client::aqc::AqcBidiChannel
+pub fn aranya_client::aqc::AqcBidiChannel::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::ops::drop::Drop for aranya_client::aqc::AqcBidiChannel
+pub fn aranya_client::aqc::AqcBidiChannel::drop(&mut self)
+impl core::marker::Freeze for aranya_client::aqc::AqcBidiChannel
+impl core::marker::Send for aranya_client::aqc::AqcBidiChannel
+impl core::marker::Sync for aranya_client::aqc::AqcBidiChannel
+impl core::marker::Unpin for aranya_client::aqc::AqcBidiChannel
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::aqc::AqcBidiChannel
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::aqc::AqcBidiChannel
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::aqc::AqcBidiChannel
+pub fn aranya_client::aqc::AqcBidiChannel::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::aqc::AqcBidiChannel where U: core::convert::From<T>
+pub fn aranya_client::aqc::AqcBidiChannel::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::aqc::AqcBidiChannel where U: core::convert::Into<T>
+pub type aranya_client::aqc::AqcBidiChannel::Error = core::convert::Infallible
+pub fn aranya_client::aqc::AqcBidiChannel::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::aqc::AqcBidiChannel where U: core::convert::TryFrom<T>
+pub type aranya_client::aqc::AqcBidiChannel::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::aqc::AqcBidiChannel::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::aqc::AqcBidiChannel where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::aqc::AqcBidiChannel::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::aqc::AqcBidiChannel where T: 'static + ?core::marker::Sized
+pub fn aranya_client::aqc::AqcBidiChannel::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::aqc::AqcBidiChannel where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcBidiChannel::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::aqc::AqcBidiChannel where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcBidiChannel::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::aqc::AqcBidiChannel
+pub fn aranya_client::aqc::AqcBidiChannel::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::aqc::AqcBidiChannel
+impl<T> tracing::instrument::Instrument for aranya_client::aqc::AqcBidiChannel
+impl<T> tracing::instrument::WithSubscriber for aranya_client::aqc::AqcBidiChannel
+impl<T> typenum::type_operators::Same for aranya_client::aqc::AqcBidiChannel
+pub type aranya_client::aqc::AqcBidiChannel::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::aqc::AqcBidiChannel where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::aqc::AqcBidiChannel::vzip(self) -> V
+pub struct aranya_client::aqc::AqcBidiStream(_)
+impl aranya_client::aqc::AqcBidiStream
+pub async fn aranya_client::aqc::AqcBidiStream::close(&mut self) -> core::result::Result<(), aranya_client::error::AqcError>
+pub async fn aranya_client::aqc::AqcBidiStream::receive(&mut self) -> core::result::Result<core::option::Option<bytes::bytes::Bytes>, aranya_client::error::AqcError>
+pub async fn aranya_client::aqc::AqcBidiStream::send(&mut self, data: bytes::bytes::Bytes) -> core::result::Result<(), aranya_client::error::AqcError>
+pub fn aranya_client::aqc::AqcBidiStream::try_receive(&mut self) -> core::result::Result<bytes::bytes::Bytes, aranya_client::aqc::net::TryReceiveError>
+impl core::fmt::Debug for aranya_client::aqc::AqcBidiStream
+pub fn aranya_client::aqc::AqcBidiStream::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::aqc::AqcBidiStream
+impl core::marker::Send for aranya_client::aqc::AqcBidiStream
+impl core::marker::Sync for aranya_client::aqc::AqcBidiStream
+impl core::marker::Unpin for aranya_client::aqc::AqcBidiStream
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::aqc::AqcBidiStream
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::aqc::AqcBidiStream
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::aqc::AqcBidiStream
+pub fn aranya_client::aqc::AqcBidiStream::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::aqc::AqcBidiStream where U: core::convert::From<T>
+pub fn aranya_client::aqc::AqcBidiStream::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::aqc::AqcBidiStream where U: core::convert::Into<T>
+pub type aranya_client::aqc::AqcBidiStream::Error = core::convert::Infallible
+pub fn aranya_client::aqc::AqcBidiStream::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::aqc::AqcBidiStream where U: core::convert::TryFrom<T>
+pub type aranya_client::aqc::AqcBidiStream::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::aqc::AqcBidiStream::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::aqc::AqcBidiStream where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::aqc::AqcBidiStream::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::aqc::AqcBidiStream where T: 'static + ?core::marker::Sized
+pub fn aranya_client::aqc::AqcBidiStream::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::aqc::AqcBidiStream where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcBidiStream::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::aqc::AqcBidiStream where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcBidiStream::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::aqc::AqcBidiStream
+pub fn aranya_client::aqc::AqcBidiStream::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::aqc::AqcBidiStream
+impl<T> tracing::instrument::Instrument for aranya_client::aqc::AqcBidiStream
+impl<T> tracing::instrument::WithSubscriber for aranya_client::aqc::AqcBidiStream
+impl<T> typenum::type_operators::Same for aranya_client::aqc::AqcBidiStream
+pub type aranya_client::aqc::AqcBidiStream::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::aqc::AqcBidiStream where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::aqc::AqcBidiStream::vzip(self) -> V
+pub struct aranya_client::aqc::AqcChannels<'a>
+impl<'a> aranya_client::aqc::AqcChannels<'a>
+pub fn aranya_client::aqc::AqcChannels<'a>::client_addr(&self) -> core::result::Result<core::net::socket_addr::SocketAddr, aranya_client::error::AqcError>
+pub async fn aranya_client::aqc::AqcChannels<'a>::create_bidi_channel(&mut self, team_id: aranya_daemon_api::service::TeamId, peer: aranya_daemon_api::service::NetIdentifier, label_id: aranya_daemon_api::service::LabelId) -> aranya_client::error::Result<aranya_client::aqc::AqcBidiChannel>
+pub async fn aranya_client::aqc::AqcChannels<'a>::create_uni_channel(&mut self, team_id: aranya_daemon_api::service::TeamId, peer: aranya_daemon_api::service::NetIdentifier, label_id: aranya_daemon_api::service::LabelId) -> aranya_client::error::Result<aranya_client::aqc::AqcSenderChannel>
+pub async fn aranya_client::aqc::AqcChannels<'a>::delete_bidi_channel(&mut self, chan: aranya_client::aqc::AqcBidiChannel) -> aranya_client::error::Result<()>
+pub async fn aranya_client::aqc::AqcChannels<'a>::delete_uni_channel(&mut self, chan: aranya_client::aqc::AqcSenderChannel) -> aranya_client::error::Result<()>
+pub async fn aranya_client::aqc::AqcChannels<'a>::receive_channel(&mut self) -> aranya_client::error::Result<aranya_client::aqc::AqcPeerChannel>
+pub fn aranya_client::aqc::AqcChannels<'a>::server_addr(&self) -> core::result::Result<core::net::socket_addr::SocketAddr, aranya_client::error::AqcError>
+pub fn aranya_client::aqc::AqcChannels<'a>::try_receive_channel(&mut self) -> core::result::Result<aranya_client::aqc::AqcPeerChannel, aranya_client::aqc::net::TryReceiveError<aranya_client::error::Error>>
+impl<'a> core::fmt::Debug for aranya_client::aqc::AqcChannels<'a>
+pub fn aranya_client::aqc::AqcChannels<'a>::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl<'a> core::marker::Freeze for aranya_client::aqc::AqcChannels<'a>
+impl<'a> core::marker::Send for aranya_client::aqc::AqcChannels<'a>
+impl<'a> core::marker::Sync for aranya_client::aqc::AqcChannels<'a>
+impl<'a> core::marker::Unpin for aranya_client::aqc::AqcChannels<'a>
+impl<'a> !core::panic::unwind_safe::RefUnwindSafe for aranya_client::aqc::AqcChannels<'a>
+impl<'a> !core::panic::unwind_safe::UnwindSafe for aranya_client::aqc::AqcChannels<'a>
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::aqc::AqcChannels<'a>
+pub fn aranya_client::aqc::AqcChannels<'a>::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::aqc::AqcChannels<'a> where U: core::convert::From<T>
+pub fn aranya_client::aqc::AqcChannels<'a>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::aqc::AqcChannels<'a> where U: core::convert::Into<T>
+pub type aranya_client::aqc::AqcChannels<'a>::Error = core::convert::Infallible
+pub fn aranya_client::aqc::AqcChannels<'a>::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::aqc::AqcChannels<'a> where U: core::convert::TryFrom<T>
+pub type aranya_client::aqc::AqcChannels<'a>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::aqc::AqcChannels<'a>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::aqc::AqcChannels<'a> where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::aqc::AqcChannels<'a>::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::aqc::AqcChannels<'a> where T: 'static + ?core::marker::Sized
+pub fn aranya_client::aqc::AqcChannels<'a>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::aqc::AqcChannels<'a> where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcChannels<'a>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::aqc::AqcChannels<'a> where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcChannels<'a>::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::aqc::AqcChannels<'a>
+pub fn aranya_client::aqc::AqcChannels<'a>::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::aqc::AqcChannels<'a>
+impl<T> tracing::instrument::Instrument for aranya_client::aqc::AqcChannels<'a>
+impl<T> tracing::instrument::WithSubscriber for aranya_client::aqc::AqcChannels<'a>
+impl<T> typenum::type_operators::Same for aranya_client::aqc::AqcChannels<'a>
+pub type aranya_client::aqc::AqcChannels<'a>::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::aqc::AqcChannels<'a> where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::aqc::AqcChannels<'a>::vzip(self) -> V
+pub struct aranya_client::aqc::AqcReceiveChannel
+impl aranya_client::aqc::AqcReceiveChannel
+pub fn aranya_client::aqc::AqcReceiveChannel::aqc_id(&self) -> aranya_crypto::aqc::uni::UniChannelId
+pub fn aranya_client::aqc::AqcReceiveChannel::label_id(&self) -> aranya_daemon_api::service::LabelId
+pub async fn aranya_client::aqc::AqcReceiveChannel::receive_uni_stream(&mut self) -> core::result::Result<aranya_client::aqc::AqcReceiveStream, aranya_client::error::AqcError>
+pub fn aranya_client::aqc::AqcReceiveChannel::try_receive_uni_stream(&mut self) -> core::result::Result<aranya_client::aqc::AqcReceiveStream, aranya_client::aqc::net::TryReceiveError>
+impl core::fmt::Debug for aranya_client::aqc::AqcReceiveChannel
+pub fn aranya_client::aqc::AqcReceiveChannel::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::aqc::AqcReceiveChannel
+impl core::marker::Send for aranya_client::aqc::AqcReceiveChannel
+impl core::marker::Sync for aranya_client::aqc::AqcReceiveChannel
+impl core::marker::Unpin for aranya_client::aqc::AqcReceiveChannel
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::aqc::AqcReceiveChannel
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::aqc::AqcReceiveChannel
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::aqc::AqcReceiveChannel
+pub fn aranya_client::aqc::AqcReceiveChannel::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::aqc::AqcReceiveChannel where U: core::convert::From<T>
+pub fn aranya_client::aqc::AqcReceiveChannel::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::aqc::AqcReceiveChannel where U: core::convert::Into<T>
+pub type aranya_client::aqc::AqcReceiveChannel::Error = core::convert::Infallible
+pub fn aranya_client::aqc::AqcReceiveChannel::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::aqc::AqcReceiveChannel where U: core::convert::TryFrom<T>
+pub type aranya_client::aqc::AqcReceiveChannel::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::aqc::AqcReceiveChannel::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::aqc::AqcReceiveChannel where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::aqc::AqcReceiveChannel::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::aqc::AqcReceiveChannel where T: 'static + ?core::marker::Sized
+pub fn aranya_client::aqc::AqcReceiveChannel::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::aqc::AqcReceiveChannel where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcReceiveChannel::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::aqc::AqcReceiveChannel where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcReceiveChannel::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::aqc::AqcReceiveChannel
+pub fn aranya_client::aqc::AqcReceiveChannel::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::aqc::AqcReceiveChannel
+impl<T> tracing::instrument::Instrument for aranya_client::aqc::AqcReceiveChannel
+impl<T> tracing::instrument::WithSubscriber for aranya_client::aqc::AqcReceiveChannel
+impl<T> typenum::type_operators::Same for aranya_client::aqc::AqcReceiveChannel
+pub type aranya_client::aqc::AqcReceiveChannel::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::aqc::AqcReceiveChannel where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::aqc::AqcReceiveChannel::vzip(self) -> V
+pub struct aranya_client::aqc::AqcReceiveStream(_)
+impl aranya_client::aqc::AqcReceiveStream
+pub async fn aranya_client::aqc::AqcReceiveStream::receive(&mut self) -> core::result::Result<core::option::Option<bytes::bytes::Bytes>, aranya_client::error::AqcError>
+pub fn aranya_client::aqc::AqcReceiveStream::try_receive(&mut self) -> core::result::Result<bytes::bytes::Bytes, aranya_client::aqc::net::TryReceiveError>
+impl core::fmt::Debug for aranya_client::aqc::AqcReceiveStream
+pub fn aranya_client::aqc::AqcReceiveStream::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::aqc::AqcReceiveStream
+impl core::marker::Send for aranya_client::aqc::AqcReceiveStream
+impl core::marker::Sync for aranya_client::aqc::AqcReceiveStream
+impl core::marker::Unpin for aranya_client::aqc::AqcReceiveStream
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::aqc::AqcReceiveStream
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::aqc::AqcReceiveStream
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::aqc::AqcReceiveStream
+pub fn aranya_client::aqc::AqcReceiveStream::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::aqc::AqcReceiveStream where U: core::convert::From<T>
+pub fn aranya_client::aqc::AqcReceiveStream::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::aqc::AqcReceiveStream where U: core::convert::Into<T>
+pub type aranya_client::aqc::AqcReceiveStream::Error = core::convert::Infallible
+pub fn aranya_client::aqc::AqcReceiveStream::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::aqc::AqcReceiveStream where U: core::convert::TryFrom<T>
+pub type aranya_client::aqc::AqcReceiveStream::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::aqc::AqcReceiveStream::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::aqc::AqcReceiveStream where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::aqc::AqcReceiveStream::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::aqc::AqcReceiveStream where T: 'static + ?core::marker::Sized
+pub fn aranya_client::aqc::AqcReceiveStream::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::aqc::AqcReceiveStream where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcReceiveStream::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::aqc::AqcReceiveStream where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcReceiveStream::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::aqc::AqcReceiveStream
+pub fn aranya_client::aqc::AqcReceiveStream::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::aqc::AqcReceiveStream
+impl<T> tracing::instrument::Instrument for aranya_client::aqc::AqcReceiveStream
+impl<T> tracing::instrument::WithSubscriber for aranya_client::aqc::AqcReceiveStream
+impl<T> typenum::type_operators::Same for aranya_client::aqc::AqcReceiveStream
+pub type aranya_client::aqc::AqcReceiveStream::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::aqc::AqcReceiveStream where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::aqc::AqcReceiveStream::vzip(self) -> V
+pub struct aranya_client::aqc::AqcSendStream(_)
+impl aranya_client::aqc::AqcSendStream
+pub async fn aranya_client::aqc::AqcSendStream::close(&mut self) -> core::result::Result<(), aranya_client::error::AqcError>
+pub async fn aranya_client::aqc::AqcSendStream::send(&mut self, data: bytes::bytes::Bytes) -> core::result::Result<(), aranya_client::error::AqcError>
+impl core::fmt::Debug for aranya_client::aqc::AqcSendStream
+pub fn aranya_client::aqc::AqcSendStream::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::aqc::AqcSendStream
+impl core::marker::Send for aranya_client::aqc::AqcSendStream
+impl core::marker::Sync for aranya_client::aqc::AqcSendStream
+impl core::marker::Unpin for aranya_client::aqc::AqcSendStream
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::aqc::AqcSendStream
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::aqc::AqcSendStream
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::aqc::AqcSendStream
+pub fn aranya_client::aqc::AqcSendStream::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::aqc::AqcSendStream where U: core::convert::From<T>
+pub fn aranya_client::aqc::AqcSendStream::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::aqc::AqcSendStream where U: core::convert::Into<T>
+pub type aranya_client::aqc::AqcSendStream::Error = core::convert::Infallible
+pub fn aranya_client::aqc::AqcSendStream::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::aqc::AqcSendStream where U: core::convert::TryFrom<T>
+pub type aranya_client::aqc::AqcSendStream::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::aqc::AqcSendStream::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::aqc::AqcSendStream where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::aqc::AqcSendStream::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::aqc::AqcSendStream where T: 'static + ?core::marker::Sized
+pub fn aranya_client::aqc::AqcSendStream::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::aqc::AqcSendStream where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcSendStream::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::aqc::AqcSendStream where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcSendStream::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::aqc::AqcSendStream
+pub fn aranya_client::aqc::AqcSendStream::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::aqc::AqcSendStream
+impl<T> tracing::instrument::Instrument for aranya_client::aqc::AqcSendStream
+impl<T> tracing::instrument::WithSubscriber for aranya_client::aqc::AqcSendStream
+impl<T> typenum::type_operators::Same for aranya_client::aqc::AqcSendStream
+pub type aranya_client::aqc::AqcSendStream::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::aqc::AqcSendStream where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::aqc::AqcSendStream::vzip(self) -> V
+pub struct aranya_client::aqc::AqcSenderChannel
+impl aranya_client::aqc::AqcSenderChannel
+pub fn aranya_client::aqc::AqcSenderChannel::aqc_id(&self) -> aranya_crypto::aqc::uni::UniChannelId
+pub fn aranya_client::aqc::AqcSenderChannel::close(&mut self)
+pub async fn aranya_client::aqc::AqcSenderChannel::create_uni_stream(&mut self) -> core::result::Result<aranya_client::aqc::AqcSendStream, aranya_client::error::AqcError>
+pub fn aranya_client::aqc::AqcSenderChannel::label_id(&self) -> aranya_daemon_api::service::LabelId
+impl core::fmt::Debug for aranya_client::aqc::AqcSenderChannel
+pub fn aranya_client::aqc::AqcSenderChannel::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::ops::drop::Drop for aranya_client::aqc::AqcSenderChannel
+pub fn aranya_client::aqc::AqcSenderChannel::drop(&mut self)
+impl core::marker::Freeze for aranya_client::aqc::AqcSenderChannel
+impl core::marker::Send for aranya_client::aqc::AqcSenderChannel
+impl core::marker::Sync for aranya_client::aqc::AqcSenderChannel
+impl core::marker::Unpin for aranya_client::aqc::AqcSenderChannel
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::aqc::AqcSenderChannel
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::aqc::AqcSenderChannel
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::aqc::AqcSenderChannel
+pub fn aranya_client::aqc::AqcSenderChannel::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::aqc::AqcSenderChannel where U: core::convert::From<T>
+pub fn aranya_client::aqc::AqcSenderChannel::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::aqc::AqcSenderChannel where U: core::convert::Into<T>
+pub type aranya_client::aqc::AqcSenderChannel::Error = core::convert::Infallible
+pub fn aranya_client::aqc::AqcSenderChannel::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::aqc::AqcSenderChannel where U: core::convert::TryFrom<T>
+pub type aranya_client::aqc::AqcSenderChannel::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::aqc::AqcSenderChannel::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::aqc::AqcSenderChannel where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::aqc::AqcSenderChannel::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::aqc::AqcSenderChannel where T: 'static + ?core::marker::Sized
+pub fn aranya_client::aqc::AqcSenderChannel::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::aqc::AqcSenderChannel where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcSenderChannel::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::aqc::AqcSenderChannel where T: ?core::marker::Sized
+pub fn aranya_client::aqc::AqcSenderChannel::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::aqc::AqcSenderChannel
+pub fn aranya_client::aqc::AqcSenderChannel::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::aqc::AqcSenderChannel
+impl<T> tracing::instrument::Instrument for aranya_client::aqc::AqcSenderChannel
+impl<T> tracing::instrument::WithSubscriber for aranya_client::aqc::AqcSenderChannel
+impl<T> typenum::type_operators::Same for aranya_client::aqc::AqcSenderChannel
+pub type aranya_client::aqc::AqcSenderChannel::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::aqc::AqcSenderChannel where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::aqc::AqcSenderChannel::vzip(self) -> V
+pub const aranya_client::aqc::AQC_VERSION: aranya_client::aqc::AqcVersion
+pub type aranya_client::aqc::AqcVersion = u16
+pub mod aranya_client::client
+pub struct aranya_client::client::Client
+impl aranya_client::client::Client
+pub async fn aranya_client::client::Client::add_team(&mut self, team: aranya_daemon_api::service::TeamId, cfg: aranya_client::config::TeamConfig) -> aranya_client::error::Result<()>
+pub fn aranya_client::client::Client::aqc(&mut self) -> aranya_client::aqc::AqcChannels<'_>
+pub async fn aranya_client::client::Client::aqc_client_addr(&self) -> aranya_client::error::Result<core::net::socket_addr::SocketAddr>
+pub fn aranya_client::client::Client::builder<'a>() -> aranya_client::client::ClientBuilder<'a>
+pub async fn aranya_client::client::Client::create_team(&mut self, cfg: aranya_client::config::TeamConfig) -> aranya_client::error::Result<aranya_daemon_api::service::TeamId>
+pub async fn aranya_client::client::Client::get_device_id(&mut self) -> aranya_client::error::Result<aranya_daemon_api::service::DeviceId>
+pub async fn aranya_client::client::Client::get_key_bundle(&mut self) -> aranya_client::error::Result<aranya_daemon_api::service::KeyBundle>
+pub async fn aranya_client::client::Client::local_addr(&self) -> aranya_client::error::Result<core::net::socket_addr::SocketAddr>
+pub fn aranya_client::client::Client::queries(&mut self, id: aranya_daemon_api::service::TeamId) -> aranya_client::client::Queries<'_>
+pub async fn aranya_client::client::Client::remove_team(&mut self, _team: aranya_daemon_api::service::TeamId) -> aranya_client::error::Result<()>
+pub fn aranya_client::client::Client::team(&mut self, id: aranya_daemon_api::service::TeamId) -> aranya_client::client::Team<'_>
+impl core::fmt::Debug for aranya_client::client::Client
+pub fn aranya_client::client::Client::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::client::Client
+impl core::marker::Send for aranya_client::client::Client
+impl core::marker::Sync for aranya_client::client::Client
+impl core::marker::Unpin for aranya_client::client::Client
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::client::Client
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::client::Client
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::client::Client
+pub fn aranya_client::client::Client::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::client::Client where U: core::convert::From<T>
+pub fn aranya_client::client::Client::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::client::Client where U: core::convert::Into<T>
+pub type aranya_client::client::Client::Error = core::convert::Infallible
+pub fn aranya_client::client::Client::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::client::Client where U: core::convert::TryFrom<T>
+pub type aranya_client::client::Client::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::client::Client::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::client::Client where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::client::Client::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::client::Client where T: 'static + ?core::marker::Sized
+pub fn aranya_client::client::Client::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::client::Client where T: ?core::marker::Sized
+pub fn aranya_client::client::Client::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::client::Client where T: ?core::marker::Sized
+pub fn aranya_client::client::Client::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::client::Client
+pub fn aranya_client::client::Client::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::client::Client
+impl<T> tracing::instrument::Instrument for aranya_client::client::Client
+impl<T> tracing::instrument::WithSubscriber for aranya_client::client::Client
+impl<T> typenum::type_operators::Same for aranya_client::client::Client
+pub type aranya_client::client::Client::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::client::Client where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::client::Client::vzip(self) -> V
+pub struct aranya_client::client::ClientBuilder<'a>
+impl aranya_client::client::ClientBuilder<'_>
+pub async fn aranya_client::client::ClientBuilder<'_>::connect(self) -> aranya_client::error::Result<(aranya_client::client::Client, core::net::socket_addr::SocketAddr)>
+pub fn aranya_client::client::ClientBuilder<'_>::new() -> Self
+impl<'a> aranya_client::client::ClientBuilder<'a>
+pub fn aranya_client::client::ClientBuilder<'a>::with_daemon_api_pk(self, pk: &'a [u8]) -> Self
+pub fn aranya_client::client::ClientBuilder<'a>::with_daemon_aqc_addr(self, addr: &'a aranya_util::addr::Addr) -> Self
+pub fn aranya_client::client::ClientBuilder<'a>::with_daemon_uds_path(self, sock: &'a std::path::Path) -> Self
+impl core::default::Default for aranya_client::client::ClientBuilder<'_>
+pub fn aranya_client::client::ClientBuilder<'_>::default() -> Self
+impl<'a> core::marker::Freeze for aranya_client::client::ClientBuilder<'a>
+impl<'a> core::marker::Send for aranya_client::client::ClientBuilder<'a>
+impl<'a> core::marker::Sync for aranya_client::client::ClientBuilder<'a>
+impl<'a> core::marker::Unpin for aranya_client::client::ClientBuilder<'a>
+impl<'a> core::panic::unwind_safe::RefUnwindSafe for aranya_client::client::ClientBuilder<'a>
+impl<'a> core::panic::unwind_safe::UnwindSafe for aranya_client::client::ClientBuilder<'a>
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::client::ClientBuilder<'a>
+pub fn aranya_client::client::ClientBuilder<'a>::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::client::ClientBuilder<'a> where U: core::convert::From<T>
+pub fn aranya_client::client::ClientBuilder<'a>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::client::ClientBuilder<'a> where U: core::convert::Into<T>
+pub type aranya_client::client::ClientBuilder<'a>::Error = core::convert::Infallible
+pub fn aranya_client::client::ClientBuilder<'a>::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::client::ClientBuilder<'a> where U: core::convert::TryFrom<T>
+pub type aranya_client::client::ClientBuilder<'a>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::client::ClientBuilder<'a>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::client::ClientBuilder<'a> where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::client::ClientBuilder<'a>::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::client::ClientBuilder<'a> where T: 'static + ?core::marker::Sized
+pub fn aranya_client::client::ClientBuilder<'a>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::client::ClientBuilder<'a> where T: ?core::marker::Sized
+pub fn aranya_client::client::ClientBuilder<'a>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::client::ClientBuilder<'a> where T: ?core::marker::Sized
+pub fn aranya_client::client::ClientBuilder<'a>::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::client::ClientBuilder<'a>
+pub fn aranya_client::client::ClientBuilder<'a>::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::client::ClientBuilder<'a>
+impl<T> tracing::instrument::Instrument for aranya_client::client::ClientBuilder<'a>
+impl<T> tracing::instrument::WithSubscriber for aranya_client::client::ClientBuilder<'a>
+impl<T> typenum::type_operators::Same for aranya_client::client::ClientBuilder<'a>
+pub type aranya_client::client::ClientBuilder<'a>::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::client::ClientBuilder<'a> where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::client::ClientBuilder<'a>::vzip(self) -> V
+pub struct aranya_client::client::Devices
+impl aranya_client::client::Devices
+pub fn aranya_client::client::Devices::iter(&self) -> impl core::iter::traits::iterator::Iterator<Item = &aranya_daemon_api::service::DeviceId>
+impl core::marker::Freeze for aranya_client::client::Devices
+impl core::marker::Send for aranya_client::client::Devices
+impl core::marker::Sync for aranya_client::client::Devices
+impl core::marker::Unpin for aranya_client::client::Devices
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::client::Devices
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::client::Devices
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::client::Devices
+pub fn aranya_client::client::Devices::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::client::Devices where U: core::convert::From<T>
+pub fn aranya_client::client::Devices::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::client::Devices where U: core::convert::Into<T>
+pub type aranya_client::client::Devices::Error = core::convert::Infallible
+pub fn aranya_client::client::Devices::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::client::Devices where U: core::convert::TryFrom<T>
+pub type aranya_client::client::Devices::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::client::Devices::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::client::Devices where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::client::Devices::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::client::Devices where T: 'static + ?core::marker::Sized
+pub fn aranya_client::client::Devices::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::client::Devices where T: ?core::marker::Sized
+pub fn aranya_client::client::Devices::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::client::Devices where T: ?core::marker::Sized
+pub fn aranya_client::client::Devices::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::client::Devices
+pub fn aranya_client::client::Devices::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::client::Devices
+impl<T> tracing::instrument::Instrument for aranya_client::client::Devices
+impl<T> tracing::instrument::WithSubscriber for aranya_client::client::Devices
+impl<T> typenum::type_operators::Same for aranya_client::client::Devices
+pub type aranya_client::client::Devices::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::client::Devices where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::client::Devices::vzip(self) -> V
+pub struct aranya_client::client::Labels
+impl aranya_client::client::Labels
+pub fn aranya_client::client::Labels::iter(&self) -> impl core::iter::traits::iterator::Iterator<Item = &aranya_daemon_api::service::Label>
+impl core::marker::Freeze for aranya_client::client::Labels
+impl core::marker::Send for aranya_client::client::Labels
+impl core::marker::Sync for aranya_client::client::Labels
+impl core::marker::Unpin for aranya_client::client::Labels
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::client::Labels
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::client::Labels
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::client::Labels
+pub fn aranya_client::client::Labels::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::client::Labels where U: core::convert::From<T>
+pub fn aranya_client::client::Labels::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::client::Labels where U: core::convert::Into<T>
+pub type aranya_client::client::Labels::Error = core::convert::Infallible
+pub fn aranya_client::client::Labels::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::client::Labels where U: core::convert::TryFrom<T>
+pub type aranya_client::client::Labels::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::client::Labels::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::client::Labels where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::client::Labels::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::client::Labels where T: 'static + ?core::marker::Sized
+pub fn aranya_client::client::Labels::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::client::Labels where T: ?core::marker::Sized
+pub fn aranya_client::client::Labels::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::client::Labels where T: ?core::marker::Sized
+pub fn aranya_client::client::Labels::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::client::Labels
+pub fn aranya_client::client::Labels::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::client::Labels
+impl<T> tracing::instrument::Instrument for aranya_client::client::Labels
+impl<T> tracing::instrument::WithSubscriber for aranya_client::client::Labels
+impl<T> typenum::type_operators::Same for aranya_client::client::Labels
+pub type aranya_client::client::Labels::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::client::Labels where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::client::Labels::vzip(self) -> V
+pub struct aranya_client::client::Queries<'a>
+impl aranya_client::client::Queries<'_>
+pub async fn aranya_client::client::Queries<'_>::aqc_net_identifier(&mut self, device: aranya_daemon_api::service::DeviceId) -> aranya_client::error::Result<core::option::Option<aranya_daemon_api::service::NetIdentifier>>
+pub async fn aranya_client::client::Queries<'_>::device_keybundle(&mut self, device: aranya_daemon_api::service::DeviceId) -> aranya_client::error::Result<aranya_daemon_api::service::KeyBundle>
+pub async fn aranya_client::client::Queries<'_>::device_label_assignments(&mut self, device: aranya_daemon_api::service::DeviceId) -> aranya_client::error::Result<aranya_client::client::Labels>
+pub async fn aranya_client::client::Queries<'_>::device_role(&mut self, device: aranya_daemon_api::service::DeviceId) -> aranya_client::error::Result<aranya_daemon_api::service::Role>
+pub async fn aranya_client::client::Queries<'_>::devices_on_team(&mut self) -> aranya_client::error::Result<aranya_client::client::Devices>
+pub async fn aranya_client::client::Queries<'_>::label_exists(&mut self, label_id: aranya_daemon_api::service::LabelId) -> aranya_client::error::Result<bool>
+pub async fn aranya_client::client::Queries<'_>::labels(&mut self) -> aranya_client::error::Result<aranya_client::client::Labels>
+impl<'a> core::marker::Freeze for aranya_client::client::Queries<'a>
+impl<'a> core::marker::Send for aranya_client::client::Queries<'a>
+impl<'a> core::marker::Sync for aranya_client::client::Queries<'a>
+impl<'a> core::marker::Unpin for aranya_client::client::Queries<'a>
+impl<'a> !core::panic::unwind_safe::RefUnwindSafe for aranya_client::client::Queries<'a>
+impl<'a> !core::panic::unwind_safe::UnwindSafe for aranya_client::client::Queries<'a>
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::client::Queries<'a>
+pub fn aranya_client::client::Queries<'a>::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::client::Queries<'a> where U: core::convert::From<T>
+pub fn aranya_client::client::Queries<'a>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::client::Queries<'a> where U: core::convert::Into<T>
+pub type aranya_client::client::Queries<'a>::Error = core::convert::Infallible
+pub fn aranya_client::client::Queries<'a>::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::client::Queries<'a> where U: core::convert::TryFrom<T>
+pub type aranya_client::client::Queries<'a>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::client::Queries<'a>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::client::Queries<'a> where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::client::Queries<'a>::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::client::Queries<'a> where T: 'static + ?core::marker::Sized
+pub fn aranya_client::client::Queries<'a>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::client::Queries<'a> where T: ?core::marker::Sized
+pub fn aranya_client::client::Queries<'a>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::client::Queries<'a> where T: ?core::marker::Sized
+pub fn aranya_client::client::Queries<'a>::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::client::Queries<'a>
+pub fn aranya_client::client::Queries<'a>::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::client::Queries<'a>
+impl<T> tracing::instrument::Instrument for aranya_client::client::Queries<'a>
+impl<T> tracing::instrument::WithSubscriber for aranya_client::client::Queries<'a>
+impl<T> typenum::type_operators::Same for aranya_client::client::Queries<'a>
+pub type aranya_client::client::Queries<'a>::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::client::Queries<'a> where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::client::Queries<'a>::vzip(self) -> V
+pub struct aranya_client::client::Team<'a>
+impl aranya_client::client::Team<'_>
+pub async fn aranya_client::client::Team<'_>::add_device_to_team(&mut self, keys: aranya_daemon_api::service::KeyBundle) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::add_sync_peer(&mut self, addr: aranya_util::addr::Addr, config: aranya_client::config::SyncPeerConfig) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::assign_aqc_net_identifier(&mut self, device: aranya_daemon_api::service::DeviceId, net_identifier: aranya_daemon_api::service::NetIdentifier) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::assign_label(&mut self, device: aranya_daemon_api::service::DeviceId, label_id: aranya_daemon_api::service::LabelId, op: aranya_daemon_api::service::ChanOp) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::assign_role(&mut self, device: aranya_daemon_api::service::DeviceId, role: aranya_daemon_api::service::Role) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::close_team(&mut self) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::create_label(&mut self, label_name: alloc::string::String) -> aranya_client::error::Result<aranya_daemon_api::service::LabelId>
+pub async fn aranya_client::client::Team<'_>::delete_label(&mut self, label_id: aranya_daemon_api::service::LabelId) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::remove_aqc_net_identifier(&mut self, device: aranya_daemon_api::service::DeviceId, net_identifier: aranya_daemon_api::service::NetIdentifier) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::remove_device_from_team(&mut self, device: aranya_daemon_api::service::DeviceId) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::remove_sync_peer(&mut self, addr: aranya_util::addr::Addr) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::revoke_label(&mut self, device: aranya_daemon_api::service::DeviceId, label_id: aranya_daemon_api::service::LabelId) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::revoke_role(&mut self, device: aranya_daemon_api::service::DeviceId, role: aranya_daemon_api::service::Role) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::sync_now(&mut self, addr: aranya_util::addr::Addr, cfg: core::option::Option<aranya_client::config::SyncPeerConfig>) -> aranya_client::error::Result<()>
+impl<'a> core::marker::Freeze for aranya_client::client::Team<'a>
+impl<'a> core::marker::Send for aranya_client::client::Team<'a>
+impl<'a> core::marker::Sync for aranya_client::client::Team<'a>
+impl<'a> core::marker::Unpin for aranya_client::client::Team<'a>
+impl<'a> !core::panic::unwind_safe::RefUnwindSafe for aranya_client::client::Team<'a>
+impl<'a> !core::panic::unwind_safe::UnwindSafe for aranya_client::client::Team<'a>
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::client::Team<'a>
+pub fn aranya_client::client::Team<'a>::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::client::Team<'a> where U: core::convert::From<T>
+pub fn aranya_client::client::Team<'a>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::client::Team<'a> where U: core::convert::Into<T>
+pub type aranya_client::client::Team<'a>::Error = core::convert::Infallible
+pub fn aranya_client::client::Team<'a>::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::client::Team<'a> where U: core::convert::TryFrom<T>
+pub type aranya_client::client::Team<'a>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::client::Team<'a>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::client::Team<'a> where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::client::Team<'a>::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::client::Team<'a> where T: 'static + ?core::marker::Sized
+pub fn aranya_client::client::Team<'a>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::client::Team<'a> where T: ?core::marker::Sized
+pub fn aranya_client::client::Team<'a>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::client::Team<'a> where T: ?core::marker::Sized
+pub fn aranya_client::client::Team<'a>::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::client::Team<'a>
+pub fn aranya_client::client::Team<'a>::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::client::Team<'a>
+impl<T> tracing::instrument::Instrument for aranya_client::client::Team<'a>
+impl<T> tracing::instrument::WithSubscriber for aranya_client::client::Team<'a>
+impl<T> typenum::type_operators::Same for aranya_client::client::Team<'a>
+pub type aranya_client::client::Team<'a>::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::client::Team<'a> where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::client::Team<'a>::vzip(self) -> V
+pub mod aranya_client::config
+pub struct aranya_client::config::SyncPeerConfig
+impl aranya_client::config::SyncPeerConfig
+pub fn aranya_client::config::SyncPeerConfig::builder() -> aranya_client::config::SyncPeerConfigBuilder
+impl core::clone::Clone for aranya_client::config::SyncPeerConfig
+pub fn aranya_client::config::SyncPeerConfig::clone(&self) -> aranya_client::config::SyncPeerConfig
+impl core::convert::From<aranya_client::config::SyncPeerConfig> for aranya_daemon_api::service::SyncPeerConfig
+pub fn aranya_daemon_api::service::SyncPeerConfig::from(value: aranya_client::config::SyncPeerConfig) -> Self
+impl core::fmt::Debug for aranya_client::config::SyncPeerConfig
+pub fn aranya_client::config::SyncPeerConfig::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::config::SyncPeerConfig
+impl core::marker::Send for aranya_client::config::SyncPeerConfig
+impl core::marker::Sync for aranya_client::config::SyncPeerConfig
+impl core::marker::Unpin for aranya_client::config::SyncPeerConfig
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::config::SyncPeerConfig
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::config::SyncPeerConfig
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::config::SyncPeerConfig
+pub fn aranya_client::config::SyncPeerConfig::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::config::SyncPeerConfig where U: core::convert::From<T>
+pub fn aranya_client::config::SyncPeerConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::config::SyncPeerConfig where U: core::convert::Into<T>
+pub type aranya_client::config::SyncPeerConfig::Error = core::convert::Infallible
+pub fn aranya_client::config::SyncPeerConfig::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::config::SyncPeerConfig where U: core::convert::TryFrom<T>
+pub type aranya_client::config::SyncPeerConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::config::SyncPeerConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::config::SyncPeerConfig where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::config::SyncPeerConfig::upcast(self) -> T
+impl<T> alloc::borrow::ToOwned for aranya_client::config::SyncPeerConfig where T: core::clone::Clone
+pub type aranya_client::config::SyncPeerConfig::Owned = T
+pub fn aranya_client::config::SyncPeerConfig::clone_into(&self, target: &mut T)
+pub fn aranya_client::config::SyncPeerConfig::to_owned(&self) -> T
+impl<T> core::any::Any for aranya_client::config::SyncPeerConfig where T: 'static + ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::config::SyncPeerConfig where T: ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::config::SyncPeerConfig where T: ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for aranya_client::config::SyncPeerConfig where T: core::clone::Clone
+pub unsafe fn aranya_client::config::SyncPeerConfig::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for aranya_client::config::SyncPeerConfig
+pub fn aranya_client::config::SyncPeerConfig::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::config::SyncPeerConfig
+impl<T> tracing::instrument::Instrument for aranya_client::config::SyncPeerConfig
+impl<T> tracing::instrument::WithSubscriber for aranya_client::config::SyncPeerConfig
+impl<T> typenum::type_operators::Same for aranya_client::config::SyncPeerConfig
+pub type aranya_client::config::SyncPeerConfig::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::config::SyncPeerConfig where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::config::SyncPeerConfig::vzip(self) -> V
+pub struct aranya_client::config::SyncPeerConfigBuilder
+impl aranya_client::config::SyncPeerConfigBuilder
+pub fn aranya_client::config::SyncPeerConfigBuilder::build(self) -> aranya_client::error::Result<aranya_client::config::SyncPeerConfig>
+pub fn aranya_client::config::SyncPeerConfigBuilder::interval(self, duration: core::time::Duration) -> Self
+pub fn aranya_client::config::SyncPeerConfigBuilder::new() -> Self
+pub fn aranya_client::config::SyncPeerConfigBuilder::sync_now(self, sync_now: bool) -> Self
+impl core::default::Default for aranya_client::config::SyncPeerConfigBuilder
+pub fn aranya_client::config::SyncPeerConfigBuilder::default() -> Self
+impl core::marker::Freeze for aranya_client::config::SyncPeerConfigBuilder
+impl core::marker::Send for aranya_client::config::SyncPeerConfigBuilder
+impl core::marker::Sync for aranya_client::config::SyncPeerConfigBuilder
+impl core::marker::Unpin for aranya_client::config::SyncPeerConfigBuilder
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::config::SyncPeerConfigBuilder
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::config::SyncPeerConfigBuilder
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::config::SyncPeerConfigBuilder
+pub fn aranya_client::config::SyncPeerConfigBuilder::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::config::SyncPeerConfigBuilder where U: core::convert::From<T>
+pub fn aranya_client::config::SyncPeerConfigBuilder::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::config::SyncPeerConfigBuilder where U: core::convert::Into<T>
+pub type aranya_client::config::SyncPeerConfigBuilder::Error = core::convert::Infallible
+pub fn aranya_client::config::SyncPeerConfigBuilder::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::config::SyncPeerConfigBuilder where U: core::convert::TryFrom<T>
+pub type aranya_client::config::SyncPeerConfigBuilder::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::config::SyncPeerConfigBuilder::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::config::SyncPeerConfigBuilder where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::config::SyncPeerConfigBuilder::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::config::SyncPeerConfigBuilder where T: 'static + ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfigBuilder::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::config::SyncPeerConfigBuilder where T: ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfigBuilder::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::config::SyncPeerConfigBuilder where T: ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfigBuilder::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::config::SyncPeerConfigBuilder
+pub fn aranya_client::config::SyncPeerConfigBuilder::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::config::SyncPeerConfigBuilder
+impl<T> tracing::instrument::Instrument for aranya_client::config::SyncPeerConfigBuilder
+impl<T> tracing::instrument::WithSubscriber for aranya_client::config::SyncPeerConfigBuilder
+impl<T> typenum::type_operators::Same for aranya_client::config::SyncPeerConfigBuilder
+pub type aranya_client::config::SyncPeerConfigBuilder::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::config::SyncPeerConfigBuilder where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::config::SyncPeerConfigBuilder::vzip(self) -> V
+pub struct aranya_client::config::TeamConfig
+impl aranya_client::config::TeamConfig
+pub fn aranya_client::config::TeamConfig::builder() -> aranya_client::config::TeamConfigBuilder
+impl core::convert::From<aranya_client::config::TeamConfig> for aranya_daemon_api::service::TeamConfig
+pub fn aranya_daemon_api::service::TeamConfig::from(_value: aranya_client::config::TeamConfig) -> Self
+impl core::marker::Freeze for aranya_client::config::TeamConfig
+impl core::marker::Send for aranya_client::config::TeamConfig
+impl core::marker::Sync for aranya_client::config::TeamConfig
+impl core::marker::Unpin for aranya_client::config::TeamConfig
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::config::TeamConfig
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::config::TeamConfig
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::config::TeamConfig
+pub fn aranya_client::config::TeamConfig::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::config::TeamConfig where U: core::convert::From<T>
+pub fn aranya_client::config::TeamConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::config::TeamConfig where U: core::convert::Into<T>
+pub type aranya_client::config::TeamConfig::Error = core::convert::Infallible
+pub fn aranya_client::config::TeamConfig::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::config::TeamConfig where U: core::convert::TryFrom<T>
+pub type aranya_client::config::TeamConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::config::TeamConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::config::TeamConfig where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::config::TeamConfig::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::config::TeamConfig where T: 'static + ?core::marker::Sized
+pub fn aranya_client::config::TeamConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::config::TeamConfig where T: ?core::marker::Sized
+pub fn aranya_client::config::TeamConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::config::TeamConfig where T: ?core::marker::Sized
+pub fn aranya_client::config::TeamConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::config::TeamConfig
+pub fn aranya_client::config::TeamConfig::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::config::TeamConfig
+impl<T> tracing::instrument::Instrument for aranya_client::config::TeamConfig
+impl<T> tracing::instrument::WithSubscriber for aranya_client::config::TeamConfig
+impl<T> typenum::type_operators::Same for aranya_client::config::TeamConfig
+pub type aranya_client::config::TeamConfig::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::config::TeamConfig where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::config::TeamConfig::vzip(self) -> V
+pub struct aranya_client::config::TeamConfigBuilder
+impl aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::build(self) -> aranya_client::error::Result<aranya_client::config::TeamConfig>
+pub fn aranya_client::config::TeamConfigBuilder::new() -> Self
+impl core::clone::Clone for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::clone(&self) -> aranya_client::config::TeamConfigBuilder
+impl core::cmp::Eq for aranya_client::config::TeamConfigBuilder
+impl core::cmp::PartialEq for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::eq(&self, other: &aranya_client::config::TeamConfigBuilder) -> bool
+impl core::default::Default for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::default() -> aranya_client::config::TeamConfigBuilder
+impl core::fmt::Debug for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for aranya_client::config::TeamConfigBuilder
+impl core::marker::Freeze for aranya_client::config::TeamConfigBuilder
+impl core::marker::Send for aranya_client::config::TeamConfigBuilder
+impl core::marker::Sync for aranya_client::config::TeamConfigBuilder
+impl core::marker::Unpin for aranya_client::config::TeamConfigBuilder
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::config::TeamConfigBuilder
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::config::TeamConfigBuilder
+impl<Q, K> equivalent::Equivalent<K> for aranya_client::config::TeamConfigBuilder where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn aranya_client::config::TeamConfigBuilder::equivalent(&self, key: &K) -> bool
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::config::TeamConfigBuilder where U: core::convert::From<T>
+pub fn aranya_client::config::TeamConfigBuilder::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::config::TeamConfigBuilder where U: core::convert::Into<T>
+pub type aranya_client::config::TeamConfigBuilder::Error = core::convert::Infallible
+pub fn aranya_client::config::TeamConfigBuilder::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::config::TeamConfigBuilder where U: core::convert::TryFrom<T>
+pub type aranya_client::config::TeamConfigBuilder::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::config::TeamConfigBuilder::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::config::TeamConfigBuilder where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::config::TeamConfigBuilder::upcast(self) -> T
+impl<T> alloc::borrow::ToOwned for aranya_client::config::TeamConfigBuilder where T: core::clone::Clone
+pub type aranya_client::config::TeamConfigBuilder::Owned = T
+pub fn aranya_client::config::TeamConfigBuilder::clone_into(&self, target: &mut T)
+pub fn aranya_client::config::TeamConfigBuilder::to_owned(&self) -> T
+impl<T> core::any::Any for aranya_client::config::TeamConfigBuilder where T: 'static + ?core::marker::Sized
+pub fn aranya_client::config::TeamConfigBuilder::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::config::TeamConfigBuilder where T: ?core::marker::Sized
+pub fn aranya_client::config::TeamConfigBuilder::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::config::TeamConfigBuilder where T: ?core::marker::Sized
+pub fn aranya_client::config::TeamConfigBuilder::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for aranya_client::config::TeamConfigBuilder where T: core::clone::Clone
+pub unsafe fn aranya_client::config::TeamConfigBuilder::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::config::TeamConfigBuilder
+impl<T> tracing::instrument::Instrument for aranya_client::config::TeamConfigBuilder
+impl<T> tracing::instrument::WithSubscriber for aranya_client::config::TeamConfigBuilder
+impl<T> typenum::type_operators::Same for aranya_client::config::TeamConfigBuilder
+pub type aranya_client::config::TeamConfigBuilder::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::config::TeamConfigBuilder where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::config::TeamConfigBuilder::vzip(self) -> V
+pub mod aranya_client::error
+#[non_exhaustive] pub enum aranya_client::error::AqcError
+pub aranya_client::error::AqcError::AddrResolution(std::io::error::Error)
+pub aranya_client::error::AqcError::Bug(buggy::Bug)
+pub aranya_client::error::AqcError::ConnectionClosed
+pub aranya_client::error::AqcError::ConnectionError(s2n_quic_core::connection::error::Error)
+pub aranya_client::error::AqcError::CtrlFailure(alloc::string::String)
+pub aranya_client::error::AqcError::NoChannelInfoFound
+pub aranya_client::error::AqcError::Serde(postcard::error::Error)
+pub aranya_client::error::AqcError::ServerConnectionTerminated
+pub aranya_client::error::AqcError::ServerStart(s2n_quic::provider::StartError)
+pub aranya_client::error::AqcError::StreamError(s2n_quic_core::stream::error::StreamError)
+pub aranya_client::error::AqcError::VersionMismatch
+pub aranya_client::error::AqcError::VersionMismatch::actual: aranya_client::aqc::AqcVersion
+pub aranya_client::error::AqcError::VersionMismatch::expected: aranya_client::aqc::AqcVersion
+impl core::convert::From<aranya_client::error::AqcError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::AqcError) -> Self
+impl core::convert::From<buggy::Bug> for aranya_client::error::AqcError
+pub fn aranya_client::error::AqcError::from(source: buggy::Bug) -> Self
+impl core::convert::From<core::convert::Infallible> for aranya_client::error::AqcError
+pub fn aranya_client::error::AqcError::from(value: core::convert::Infallible) -> Self
+impl core::convert::From<s2n_quic::provider::StartError> for aranya_client::error::AqcError
+pub fn aranya_client::error::AqcError::from(source: s2n_quic::provider::StartError) -> Self
+impl core::convert::From<s2n_quic_core::connection::error::Error> for aranya_client::error::AqcError
+pub fn aranya_client::error::AqcError::from(source: s2n_quic_core::connection::error::Error) -> Self
+impl core::convert::From<s2n_quic_core::stream::error::StreamError> for aranya_client::error::AqcError
+pub fn aranya_client::error::AqcError::from(source: s2n_quic_core::stream::error::StreamError) -> Self
+impl core::error::Error for aranya_client::error::AqcError
+pub fn aranya_client::error::AqcError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for aranya_client::error::AqcError
+pub fn aranya_client::error::AqcError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for aranya_client::error::AqcError
+pub fn aranya_client::error::AqcError::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::error::AqcError
+impl core::marker::Send for aranya_client::error::AqcError
+impl core::marker::Sync for aranya_client::error::AqcError
+impl core::marker::Unpin for aranya_client::error::AqcError
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::error::AqcError
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::error::AqcError
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::error::AqcError
+pub fn aranya_client::error::AqcError::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::error::AqcError where U: core::convert::From<T>
+pub fn aranya_client::error::AqcError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::error::AqcError where U: core::convert::Into<T>
+pub type aranya_client::error::AqcError::Error = core::convert::Infallible
+pub fn aranya_client::error::AqcError::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::error::AqcError where U: core::convert::TryFrom<T>
+pub type aranya_client::error::AqcError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::error::AqcError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::error::AqcError where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::error::AqcError::upcast(self) -> T
+impl<T> alloc::string::ToString for aranya_client::error::AqcError where T: core::fmt::Display + ?core::marker::Sized
+pub fn aranya_client::error::AqcError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for aranya_client::error::AqcError where T: 'static + ?core::marker::Sized
+pub fn aranya_client::error::AqcError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::error::AqcError where T: ?core::marker::Sized
+pub fn aranya_client::error::AqcError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::error::AqcError where T: ?core::marker::Sized
+pub fn aranya_client::error::AqcError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::error::AqcError
+pub fn aranya_client::error::AqcError::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::error::AqcError
+impl<T> tracing::instrument::Instrument for aranya_client::error::AqcError
+impl<T> tracing::instrument::WithSubscriber for aranya_client::error::AqcError
+impl<T> typenum::type_operators::Same for aranya_client::error::AqcError
+pub type aranya_client::error::AqcError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::error::AqcError where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::error::AqcError::vzip(self) -> V
+#[non_exhaustive] pub enum aranya_client::error::ConfigError
+pub aranya_client::error::ConfigError::InvalidArg(aranya_client::error::InvalidArg)
+impl core::convert::From<aranya_client::error::ConfigError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::ConfigError) -> Self
+impl core::convert::From<aranya_client::error::InvalidArg> for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::from(source: aranya_client::error::InvalidArg) -> Self
+impl core::error::Error for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::error::ConfigError
+impl core::marker::Send for aranya_client::error::ConfigError
+impl core::marker::Sync for aranya_client::error::ConfigError
+impl core::marker::Unpin for aranya_client::error::ConfigError
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::error::ConfigError
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::error::ConfigError
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::error::ConfigError where U: core::convert::From<T>
+pub fn aranya_client::error::ConfigError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::error::ConfigError where U: core::convert::Into<T>
+pub type aranya_client::error::ConfigError::Error = core::convert::Infallible
+pub fn aranya_client::error::ConfigError::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::error::ConfigError where U: core::convert::TryFrom<T>
+pub type aranya_client::error::ConfigError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::error::ConfigError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::error::ConfigError where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::error::ConfigError::upcast(self) -> T
+impl<T> alloc::string::ToString for aranya_client::error::ConfigError where T: core::fmt::Display + ?core::marker::Sized
+pub fn aranya_client::error::ConfigError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for aranya_client::error::ConfigError where T: 'static + ?core::marker::Sized
+pub fn aranya_client::error::ConfigError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::error::ConfigError where T: ?core::marker::Sized
+pub fn aranya_client::error::ConfigError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::error::ConfigError where T: ?core::marker::Sized
+pub fn aranya_client::error::ConfigError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::error::ConfigError
+impl<T> tracing::instrument::Instrument for aranya_client::error::ConfigError
+impl<T> tracing::instrument::WithSubscriber for aranya_client::error::ConfigError
+impl<T> typenum::type_operators::Same for aranya_client::error::ConfigError
+pub type aranya_client::error::ConfigError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::error::ConfigError where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::error::ConfigError::vzip(self) -> V
+#[non_exhaustive] pub enum aranya_client::error::Error
+pub aranya_client::error::Error::Aqc(aranya_client::error::AqcError)
+pub aranya_client::error::Error::Aranya(aranya_client::error::AranyaError)
+pub aranya_client::error::Error::Bug(buggy::Bug)
+pub aranya_client::error::Error::Config(aranya_client::error::ConfigError)
+pub aranya_client::error::Error::Ipc(aranya_client::error::IpcError)
+pub aranya_client::error::Error::Other(aranya_client::error::OtherError)
+impl core::convert::From<aranya_client::error::AqcError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::AqcError) -> Self
+impl core::convert::From<aranya_client::error::AranyaError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::AranyaError) -> Self
+impl core::convert::From<aranya_client::error::ConfigError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::ConfigError) -> Self
+impl core::convert::From<aranya_client::error::IpcError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::IpcError) -> Self
+impl core::convert::From<aranya_client::error::OtherError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::OtherError) -> Self
+impl core::convert::From<buggy::Bug> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: buggy::Bug) -> Self
+impl core::error::Error for aranya_client::error::Error
+pub fn aranya_client::error::Error::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for aranya_client::error::Error
+pub fn aranya_client::error::Error::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for aranya_client::error::Error
+pub fn aranya_client::error::Error::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::error::Error
+impl core::marker::Send for aranya_client::error::Error
+impl core::marker::Sync for aranya_client::error::Error
+impl core::marker::Unpin for aranya_client::error::Error
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::error::Error
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::error::Error
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::error::Error
+pub fn aranya_client::error::Error::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::error::Error where U: core::convert::From<T>
+pub fn aranya_client::error::Error::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::error::Error where U: core::convert::Into<T>
+pub type aranya_client::error::Error::Error = core::convert::Infallible
+pub fn aranya_client::error::Error::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::error::Error where U: core::convert::TryFrom<T>
+pub type aranya_client::error::Error::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::error::Error::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::error::Error where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::error::Error::upcast(self) -> T
+impl<T> alloc::string::ToString for aranya_client::error::Error where T: core::fmt::Display + ?core::marker::Sized
+pub fn aranya_client::error::Error::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for aranya_client::error::Error where T: 'static + ?core::marker::Sized
+pub fn aranya_client::error::Error::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::error::Error where T: ?core::marker::Sized
+pub fn aranya_client::error::Error::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::error::Error where T: ?core::marker::Sized
+pub fn aranya_client::error::Error::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::error::Error
+impl<T> tracing::instrument::Instrument for aranya_client::error::Error
+impl<T> tracing::instrument::WithSubscriber for aranya_client::error::Error
+impl<T> typenum::type_operators::Same for aranya_client::error::Error
+pub type aranya_client::error::Error::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::error::Error where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::error::Error::vzip(self) -> V
+pub struct aranya_client::error::AranyaError
+impl core::convert::From<aranya_client::error::AranyaError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::AranyaError) -> Self
+impl core::convert::From<aranya_daemon_api::service::Error> for aranya_client::error::AranyaError
+pub fn aranya_client::error::AranyaError::from(source: aranya_daemon_api::service::Error) -> Self
+impl core::error::Error for aranya_client::error::AranyaError
+pub fn aranya_client::error::AranyaError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for aranya_client::error::AranyaError
+pub fn aranya_client::error::AranyaError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for aranya_client::error::AranyaError
+pub fn aranya_client::error::AranyaError::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::error::AranyaError
+impl core::marker::Send for aranya_client::error::AranyaError
+impl core::marker::Sync for aranya_client::error::AranyaError
+impl core::marker::Unpin for aranya_client::error::AranyaError
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::error::AranyaError
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::error::AranyaError
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::error::AranyaError
+pub fn aranya_client::error::AranyaError::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::error::AranyaError where U: core::convert::From<T>
+pub fn aranya_client::error::AranyaError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::error::AranyaError where U: core::convert::Into<T>
+pub type aranya_client::error::AranyaError::Error = core::convert::Infallible
+pub fn aranya_client::error::AranyaError::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::error::AranyaError where U: core::convert::TryFrom<T>
+pub type aranya_client::error::AranyaError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::error::AranyaError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::error::AranyaError where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::error::AranyaError::upcast(self) -> T
+impl<T> alloc::string::ToString for aranya_client::error::AranyaError where T: core::fmt::Display + ?core::marker::Sized
+pub fn aranya_client::error::AranyaError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for aranya_client::error::AranyaError where T: 'static + ?core::marker::Sized
+pub fn aranya_client::error::AranyaError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::error::AranyaError where T: ?core::marker::Sized
+pub fn aranya_client::error::AranyaError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::error::AranyaError where T: ?core::marker::Sized
+pub fn aranya_client::error::AranyaError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::error::AranyaError
+pub fn aranya_client::error::AranyaError::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::error::AranyaError
+impl<T> tracing::instrument::Instrument for aranya_client::error::AranyaError
+impl<T> tracing::instrument::WithSubscriber for aranya_client::error::AranyaError
+impl<T> typenum::type_operators::Same for aranya_client::error::AranyaError
+pub type aranya_client::error::AranyaError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::error::AranyaError where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::error::AranyaError::vzip(self) -> V
+pub struct aranya_client::error::InvalidArg
+impl core::convert::From<aranya_client::error::InvalidArg> for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::from(source: aranya_client::error::InvalidArg) -> Self
+impl core::error::Error for aranya_client::error::InvalidArg
+impl core::fmt::Debug for aranya_client::error::InvalidArg
+pub fn aranya_client::error::InvalidArg::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for aranya_client::error::InvalidArg
+pub fn aranya_client::error::InvalidArg::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::error::InvalidArg
+impl core::marker::Send for aranya_client::error::InvalidArg
+impl core::marker::Sync for aranya_client::error::InvalidArg
+impl core::marker::Unpin for aranya_client::error::InvalidArg
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::error::InvalidArg
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::error::InvalidArg
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::error::InvalidArg
+pub fn aranya_client::error::InvalidArg::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::error::InvalidArg where U: core::convert::From<T>
+pub fn aranya_client::error::InvalidArg::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::error::InvalidArg where U: core::convert::Into<T>
+pub type aranya_client::error::InvalidArg::Error = core::convert::Infallible
+pub fn aranya_client::error::InvalidArg::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::error::InvalidArg where U: core::convert::TryFrom<T>
+pub type aranya_client::error::InvalidArg::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::error::InvalidArg::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::error::InvalidArg where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::error::InvalidArg::upcast(self) -> T
+impl<T> alloc::string::ToString for aranya_client::error::InvalidArg where T: core::fmt::Display + ?core::marker::Sized
+pub fn aranya_client::error::InvalidArg::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for aranya_client::error::InvalidArg where T: 'static + ?core::marker::Sized
+pub fn aranya_client::error::InvalidArg::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::error::InvalidArg where T: ?core::marker::Sized
+pub fn aranya_client::error::InvalidArg::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::error::InvalidArg where T: ?core::marker::Sized
+pub fn aranya_client::error::InvalidArg::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::error::InvalidArg
+pub fn aranya_client::error::InvalidArg::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::error::InvalidArg
+impl<T> tracing::instrument::Instrument for aranya_client::error::InvalidArg
+impl<T> tracing::instrument::WithSubscriber for aranya_client::error::InvalidArg
+impl<T> typenum::type_operators::Same for aranya_client::error::InvalidArg
+pub type aranya_client::error::InvalidArg::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::error::InvalidArg where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::error::InvalidArg::vzip(self) -> V
+pub struct aranya_client::error::IpcError(_)
+impl core::convert::From<aranya_client::error::IpcError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::IpcError) -> Self
+impl core::error::Error for aranya_client::error::IpcError
+pub fn aranya_client::error::IpcError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for aranya_client::error::IpcError
+pub fn aranya_client::error::IpcError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for aranya_client::error::IpcError
+pub fn aranya_client::error::IpcError::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::error::IpcError
+impl core::marker::Send for aranya_client::error::IpcError
+impl core::marker::Sync for aranya_client::error::IpcError
+impl core::marker::Unpin for aranya_client::error::IpcError
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::error::IpcError
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::error::IpcError
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::error::IpcError
+pub fn aranya_client::error::IpcError::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::error::IpcError where U: core::convert::From<T>
+pub fn aranya_client::error::IpcError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::error::IpcError where U: core::convert::Into<T>
+pub type aranya_client::error::IpcError::Error = core::convert::Infallible
+pub fn aranya_client::error::IpcError::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::error::IpcError where U: core::convert::TryFrom<T>
+pub type aranya_client::error::IpcError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::error::IpcError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::error::IpcError where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::error::IpcError::upcast(self) -> T
+impl<T> alloc::string::ToString for aranya_client::error::IpcError where T: core::fmt::Display + ?core::marker::Sized
+pub fn aranya_client::error::IpcError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for aranya_client::error::IpcError where T: 'static + ?core::marker::Sized
+pub fn aranya_client::error::IpcError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::error::IpcError where T: ?core::marker::Sized
+pub fn aranya_client::error::IpcError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::error::IpcError where T: ?core::marker::Sized
+pub fn aranya_client::error::IpcError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::error::IpcError
+pub fn aranya_client::error::IpcError::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::error::IpcError
+impl<T> tracing::instrument::Instrument for aranya_client::error::IpcError
+impl<T> tracing::instrument::WithSubscriber for aranya_client::error::IpcError
+impl<T> typenum::type_operators::Same for aranya_client::error::IpcError
+pub type aranya_client::error::IpcError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::error::IpcError where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::error::IpcError::vzip(self) -> V
+pub struct aranya_client::error::OtherError
+impl core::convert::From<anyhow::Error> for aranya_client::error::OtherError
+pub fn aranya_client::error::OtherError::from(source: anyhow::Error) -> Self
+impl core::convert::From<aranya_client::error::OtherError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::OtherError) -> Self
+impl core::error::Error for aranya_client::error::OtherError
+pub fn aranya_client::error::OtherError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for aranya_client::error::OtherError
+pub fn aranya_client::error::OtherError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for aranya_client::error::OtherError
+pub fn aranya_client::error::OtherError::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::error::OtherError
+impl core::marker::Send for aranya_client::error::OtherError
+impl core::marker::Sync for aranya_client::error::OtherError
+impl core::marker::Unpin for aranya_client::error::OtherError
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::error::OtherError
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::error::OtherError
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::error::OtherError
+pub fn aranya_client::error::OtherError::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::error::OtherError where U: core::convert::From<T>
+pub fn aranya_client::error::OtherError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::error::OtherError where U: core::convert::Into<T>
+pub type aranya_client::error::OtherError::Error = core::convert::Infallible
+pub fn aranya_client::error::OtherError::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::error::OtherError where U: core::convert::TryFrom<T>
+pub type aranya_client::error::OtherError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::error::OtherError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::error::OtherError where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::error::OtherError::upcast(self) -> T
+impl<T> alloc::string::ToString for aranya_client::error::OtherError where T: core::fmt::Display + ?core::marker::Sized
+pub fn aranya_client::error::OtherError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for aranya_client::error::OtherError where T: 'static + ?core::marker::Sized
+pub fn aranya_client::error::OtherError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::error::OtherError where T: ?core::marker::Sized
+pub fn aranya_client::error::OtherError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::error::OtherError where T: ?core::marker::Sized
+pub fn aranya_client::error::OtherError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::error::OtherError
+pub fn aranya_client::error::OtherError::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::error::OtherError
+impl<T> tracing::instrument::Instrument for aranya_client::error::OtherError
+impl<T> tracing::instrument::WithSubscriber for aranya_client::error::OtherError
+impl<T> typenum::type_operators::Same for aranya_client::error::OtherError
+pub type aranya_client::error::OtherError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::error::OtherError where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::error::OtherError::vzip(self) -> V
+pub type aranya_client::error::Result<T, E> = core::result::Result<T, E>
+#[non_exhaustive] pub enum aranya_client::ConfigError
+pub aranya_client::ConfigError::InvalidArg(aranya_client::error::InvalidArg)
+impl core::convert::From<aranya_client::error::ConfigError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::ConfigError) -> Self
+impl core::convert::From<aranya_client::error::InvalidArg> for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::from(source: aranya_client::error::InvalidArg) -> Self
+impl core::error::Error for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::error::ConfigError
+impl core::marker::Send for aranya_client::error::ConfigError
+impl core::marker::Sync for aranya_client::error::ConfigError
+impl core::marker::Unpin for aranya_client::error::ConfigError
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::error::ConfigError
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::error::ConfigError
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::error::ConfigError where U: core::convert::From<T>
+pub fn aranya_client::error::ConfigError::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::error::ConfigError where U: core::convert::Into<T>
+pub type aranya_client::error::ConfigError::Error = core::convert::Infallible
+pub fn aranya_client::error::ConfigError::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::error::ConfigError where U: core::convert::TryFrom<T>
+pub type aranya_client::error::ConfigError::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::error::ConfigError::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::error::ConfigError where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::error::ConfigError::upcast(self) -> T
+impl<T> alloc::string::ToString for aranya_client::error::ConfigError where T: core::fmt::Display + ?core::marker::Sized
+pub fn aranya_client::error::ConfigError::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for aranya_client::error::ConfigError where T: 'static + ?core::marker::Sized
+pub fn aranya_client::error::ConfigError::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::error::ConfigError where T: ?core::marker::Sized
+pub fn aranya_client::error::ConfigError::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::error::ConfigError where T: ?core::marker::Sized
+pub fn aranya_client::error::ConfigError::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::error::ConfigError
+pub fn aranya_client::error::ConfigError::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::error::ConfigError
+impl<T> tracing::instrument::Instrument for aranya_client::error::ConfigError
+impl<T> tracing::instrument::WithSubscriber for aranya_client::error::ConfigError
+impl<T> typenum::type_operators::Same for aranya_client::error::ConfigError
+pub type aranya_client::error::ConfigError::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::error::ConfigError where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::error::ConfigError::vzip(self) -> V
+#[non_exhaustive] pub enum aranya_client::Error
+pub aranya_client::Error::Aqc(aranya_client::error::AqcError)
+pub aranya_client::Error::Aranya(aranya_client::error::AranyaError)
+pub aranya_client::Error::Bug(buggy::Bug)
+pub aranya_client::Error::Config(aranya_client::error::ConfigError)
+pub aranya_client::Error::Ipc(aranya_client::error::IpcError)
+pub aranya_client::Error::Other(aranya_client::error::OtherError)
+impl core::convert::From<aranya_client::error::AqcError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::AqcError) -> Self
+impl core::convert::From<aranya_client::error::AranyaError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::AranyaError) -> Self
+impl core::convert::From<aranya_client::error::ConfigError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::ConfigError) -> Self
+impl core::convert::From<aranya_client::error::IpcError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::IpcError) -> Self
+impl core::convert::From<aranya_client::error::OtherError> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: aranya_client::error::OtherError) -> Self
+impl core::convert::From<buggy::Bug> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(source: buggy::Bug) -> Self
+impl core::error::Error for aranya_client::error::Error
+pub fn aranya_client::error::Error::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for aranya_client::error::Error
+pub fn aranya_client::error::Error::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for aranya_client::error::Error
+pub fn aranya_client::error::Error::fmt(&self, __formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::error::Error
+impl core::marker::Send for aranya_client::error::Error
+impl core::marker::Sync for aranya_client::error::Error
+impl core::marker::Unpin for aranya_client::error::Error
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::error::Error
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::error::Error
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::error::Error
+pub fn aranya_client::error::Error::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::error::Error where U: core::convert::From<T>
+pub fn aranya_client::error::Error::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::error::Error where U: core::convert::Into<T>
+pub type aranya_client::error::Error::Error = core::convert::Infallible
+pub fn aranya_client::error::Error::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::error::Error where U: core::convert::TryFrom<T>
+pub type aranya_client::error::Error::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::error::Error::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::error::Error where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::error::Error::upcast(self) -> T
+impl<T> alloc::string::ToString for aranya_client::error::Error where T: core::fmt::Display + ?core::marker::Sized
+pub fn aranya_client::error::Error::to_string(&self) -> alloc::string::String
+impl<T> core::any::Any for aranya_client::error::Error where T: 'static + ?core::marker::Sized
+pub fn aranya_client::error::Error::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::error::Error where T: ?core::marker::Sized
+pub fn aranya_client::error::Error::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::error::Error where T: ?core::marker::Sized
+pub fn aranya_client::error::Error::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::error::Error
+pub fn aranya_client::error::Error::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::error::Error
+impl<T> tracing::instrument::Instrument for aranya_client::error::Error
+impl<T> tracing::instrument::WithSubscriber for aranya_client::error::Error
+impl<T> typenum::type_operators::Same for aranya_client::error::Error
+pub type aranya_client::error::Error::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::error::Error where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::error::Error::vzip(self) -> V
+pub struct aranya_client::Client
+impl aranya_client::client::Client
+pub async fn aranya_client::client::Client::add_team(&mut self, team: aranya_daemon_api::service::TeamId, cfg: aranya_client::config::TeamConfig) -> aranya_client::error::Result<()>
+pub fn aranya_client::client::Client::aqc(&mut self) -> aranya_client::aqc::AqcChannels<'_>
+pub async fn aranya_client::client::Client::aqc_client_addr(&self) -> aranya_client::error::Result<core::net::socket_addr::SocketAddr>
+pub fn aranya_client::client::Client::builder<'a>() -> aranya_client::client::ClientBuilder<'a>
+pub async fn aranya_client::client::Client::create_team(&mut self, cfg: aranya_client::config::TeamConfig) -> aranya_client::error::Result<aranya_daemon_api::service::TeamId>
+pub async fn aranya_client::client::Client::get_device_id(&mut self) -> aranya_client::error::Result<aranya_daemon_api::service::DeviceId>
+pub async fn aranya_client::client::Client::get_key_bundle(&mut self) -> aranya_client::error::Result<aranya_daemon_api::service::KeyBundle>
+pub async fn aranya_client::client::Client::local_addr(&self) -> aranya_client::error::Result<core::net::socket_addr::SocketAddr>
+pub fn aranya_client::client::Client::queries(&mut self, id: aranya_daemon_api::service::TeamId) -> aranya_client::client::Queries<'_>
+pub async fn aranya_client::client::Client::remove_team(&mut self, _team: aranya_daemon_api::service::TeamId) -> aranya_client::error::Result<()>
+pub fn aranya_client::client::Client::team(&mut self, id: aranya_daemon_api::service::TeamId) -> aranya_client::client::Team<'_>
+impl core::fmt::Debug for aranya_client::client::Client
+pub fn aranya_client::client::Client::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::client::Client
+impl core::marker::Send for aranya_client::client::Client
+impl core::marker::Sync for aranya_client::client::Client
+impl core::marker::Unpin for aranya_client::client::Client
+impl !core::panic::unwind_safe::RefUnwindSafe for aranya_client::client::Client
+impl !core::panic::unwind_safe::UnwindSafe for aranya_client::client::Client
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::client::Client
+pub fn aranya_client::client::Client::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::client::Client where U: core::convert::From<T>
+pub fn aranya_client::client::Client::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::client::Client where U: core::convert::Into<T>
+pub type aranya_client::client::Client::Error = core::convert::Infallible
+pub fn aranya_client::client::Client::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::client::Client where U: core::convert::TryFrom<T>
+pub type aranya_client::client::Client::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::client::Client::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::client::Client where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::client::Client::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::client::Client where T: 'static + ?core::marker::Sized
+pub fn aranya_client::client::Client::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::client::Client where T: ?core::marker::Sized
+pub fn aranya_client::client::Client::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::client::Client where T: ?core::marker::Sized
+pub fn aranya_client::client::Client::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::client::Client
+pub fn aranya_client::client::Client::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::client::Client
+impl<T> tracing::instrument::Instrument for aranya_client::client::Client
+impl<T> tracing::instrument::WithSubscriber for aranya_client::client::Client
+impl<T> typenum::type_operators::Same for aranya_client::client::Client
+pub type aranya_client::client::Client::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::client::Client where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::client::Client::vzip(self) -> V
+pub struct aranya_client::SyncPeerConfig
+impl aranya_client::config::SyncPeerConfig
+pub fn aranya_client::config::SyncPeerConfig::builder() -> aranya_client::config::SyncPeerConfigBuilder
+impl core::clone::Clone for aranya_client::config::SyncPeerConfig
+pub fn aranya_client::config::SyncPeerConfig::clone(&self) -> aranya_client::config::SyncPeerConfig
+impl core::convert::From<aranya_client::config::SyncPeerConfig> for aranya_daemon_api::service::SyncPeerConfig
+pub fn aranya_daemon_api::service::SyncPeerConfig::from(value: aranya_client::config::SyncPeerConfig) -> Self
+impl core::fmt::Debug for aranya_client::config::SyncPeerConfig
+pub fn aranya_client::config::SyncPeerConfig::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Freeze for aranya_client::config::SyncPeerConfig
+impl core::marker::Send for aranya_client::config::SyncPeerConfig
+impl core::marker::Sync for aranya_client::config::SyncPeerConfig
+impl core::marker::Unpin for aranya_client::config::SyncPeerConfig
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::config::SyncPeerConfig
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::config::SyncPeerConfig
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::config::SyncPeerConfig
+pub fn aranya_client::config::SyncPeerConfig::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::config::SyncPeerConfig where U: core::convert::From<T>
+pub fn aranya_client::config::SyncPeerConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::config::SyncPeerConfig where U: core::convert::Into<T>
+pub type aranya_client::config::SyncPeerConfig::Error = core::convert::Infallible
+pub fn aranya_client::config::SyncPeerConfig::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::config::SyncPeerConfig where U: core::convert::TryFrom<T>
+pub type aranya_client::config::SyncPeerConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::config::SyncPeerConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::config::SyncPeerConfig where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::config::SyncPeerConfig::upcast(self) -> T
+impl<T> alloc::borrow::ToOwned for aranya_client::config::SyncPeerConfig where T: core::clone::Clone
+pub type aranya_client::config::SyncPeerConfig::Owned = T
+pub fn aranya_client::config::SyncPeerConfig::clone_into(&self, target: &mut T)
+pub fn aranya_client::config::SyncPeerConfig::to_owned(&self) -> T
+impl<T> core::any::Any for aranya_client::config::SyncPeerConfig where T: 'static + ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::config::SyncPeerConfig where T: ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::config::SyncPeerConfig where T: ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for aranya_client::config::SyncPeerConfig where T: core::clone::Clone
+pub unsafe fn aranya_client::config::SyncPeerConfig::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for aranya_client::config::SyncPeerConfig
+pub fn aranya_client::config::SyncPeerConfig::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::config::SyncPeerConfig
+impl<T> tracing::instrument::Instrument for aranya_client::config::SyncPeerConfig
+impl<T> tracing::instrument::WithSubscriber for aranya_client::config::SyncPeerConfig
+impl<T> typenum::type_operators::Same for aranya_client::config::SyncPeerConfig
+pub type aranya_client::config::SyncPeerConfig::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::config::SyncPeerConfig where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::config::SyncPeerConfig::vzip(self) -> V
+pub struct aranya_client::SyncPeerConfigBuilder
+impl aranya_client::config::SyncPeerConfigBuilder
+pub fn aranya_client::config::SyncPeerConfigBuilder::build(self) -> aranya_client::error::Result<aranya_client::config::SyncPeerConfig>
+pub fn aranya_client::config::SyncPeerConfigBuilder::interval(self, duration: core::time::Duration) -> Self
+pub fn aranya_client::config::SyncPeerConfigBuilder::new() -> Self
+pub fn aranya_client::config::SyncPeerConfigBuilder::sync_now(self, sync_now: bool) -> Self
+impl core::default::Default for aranya_client::config::SyncPeerConfigBuilder
+pub fn aranya_client::config::SyncPeerConfigBuilder::default() -> Self
+impl core::marker::Freeze for aranya_client::config::SyncPeerConfigBuilder
+impl core::marker::Send for aranya_client::config::SyncPeerConfigBuilder
+impl core::marker::Sync for aranya_client::config::SyncPeerConfigBuilder
+impl core::marker::Unpin for aranya_client::config::SyncPeerConfigBuilder
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::config::SyncPeerConfigBuilder
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::config::SyncPeerConfigBuilder
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::config::SyncPeerConfigBuilder
+pub fn aranya_client::config::SyncPeerConfigBuilder::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::config::SyncPeerConfigBuilder where U: core::convert::From<T>
+pub fn aranya_client::config::SyncPeerConfigBuilder::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::config::SyncPeerConfigBuilder where U: core::convert::Into<T>
+pub type aranya_client::config::SyncPeerConfigBuilder::Error = core::convert::Infallible
+pub fn aranya_client::config::SyncPeerConfigBuilder::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::config::SyncPeerConfigBuilder where U: core::convert::TryFrom<T>
+pub type aranya_client::config::SyncPeerConfigBuilder::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::config::SyncPeerConfigBuilder::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::config::SyncPeerConfigBuilder where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::config::SyncPeerConfigBuilder::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::config::SyncPeerConfigBuilder where T: 'static + ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfigBuilder::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::config::SyncPeerConfigBuilder where T: ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfigBuilder::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::config::SyncPeerConfigBuilder where T: ?core::marker::Sized
+pub fn aranya_client::config::SyncPeerConfigBuilder::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::config::SyncPeerConfigBuilder
+pub fn aranya_client::config::SyncPeerConfigBuilder::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::config::SyncPeerConfigBuilder
+impl<T> tracing::instrument::Instrument for aranya_client::config::SyncPeerConfigBuilder
+impl<T> tracing::instrument::WithSubscriber for aranya_client::config::SyncPeerConfigBuilder
+impl<T> typenum::type_operators::Same for aranya_client::config::SyncPeerConfigBuilder
+pub type aranya_client::config::SyncPeerConfigBuilder::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::config::SyncPeerConfigBuilder where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::config::SyncPeerConfigBuilder::vzip(self) -> V
+pub struct aranya_client::Team<'a>
+impl aranya_client::client::Team<'_>
+pub async fn aranya_client::client::Team<'_>::add_device_to_team(&mut self, keys: aranya_daemon_api::service::KeyBundle) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::add_sync_peer(&mut self, addr: aranya_util::addr::Addr, config: aranya_client::config::SyncPeerConfig) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::assign_aqc_net_identifier(&mut self, device: aranya_daemon_api::service::DeviceId, net_identifier: aranya_daemon_api::service::NetIdentifier) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::assign_label(&mut self, device: aranya_daemon_api::service::DeviceId, label_id: aranya_daemon_api::service::LabelId, op: aranya_daemon_api::service::ChanOp) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::assign_role(&mut self, device: aranya_daemon_api::service::DeviceId, role: aranya_daemon_api::service::Role) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::close_team(&mut self) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::create_label(&mut self, label_name: alloc::string::String) -> aranya_client::error::Result<aranya_daemon_api::service::LabelId>
+pub async fn aranya_client::client::Team<'_>::delete_label(&mut self, label_id: aranya_daemon_api::service::LabelId) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::remove_aqc_net_identifier(&mut self, device: aranya_daemon_api::service::DeviceId, net_identifier: aranya_daemon_api::service::NetIdentifier) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::remove_device_from_team(&mut self, device: aranya_daemon_api::service::DeviceId) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::remove_sync_peer(&mut self, addr: aranya_util::addr::Addr) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::revoke_label(&mut self, device: aranya_daemon_api::service::DeviceId, label_id: aranya_daemon_api::service::LabelId) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::revoke_role(&mut self, device: aranya_daemon_api::service::DeviceId, role: aranya_daemon_api::service::Role) -> aranya_client::error::Result<()>
+pub async fn aranya_client::client::Team<'_>::sync_now(&mut self, addr: aranya_util::addr::Addr, cfg: core::option::Option<aranya_client::config::SyncPeerConfig>) -> aranya_client::error::Result<()>
+impl<'a> core::marker::Freeze for aranya_client::client::Team<'a>
+impl<'a> core::marker::Send for aranya_client::client::Team<'a>
+impl<'a> core::marker::Sync for aranya_client::client::Team<'a>
+impl<'a> core::marker::Unpin for aranya_client::client::Team<'a>
+impl<'a> !core::panic::unwind_safe::RefUnwindSafe for aranya_client::client::Team<'a>
+impl<'a> !core::panic::unwind_safe::UnwindSafe for aranya_client::client::Team<'a>
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::client::Team<'a>
+pub fn aranya_client::client::Team<'a>::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::client::Team<'a> where U: core::convert::From<T>
+pub fn aranya_client::client::Team<'a>::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::client::Team<'a> where U: core::convert::Into<T>
+pub type aranya_client::client::Team<'a>::Error = core::convert::Infallible
+pub fn aranya_client::client::Team<'a>::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::client::Team<'a> where U: core::convert::TryFrom<T>
+pub type aranya_client::client::Team<'a>::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::client::Team<'a>::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::client::Team<'a> where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::client::Team<'a>::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::client::Team<'a> where T: 'static + ?core::marker::Sized
+pub fn aranya_client::client::Team<'a>::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::client::Team<'a> where T: ?core::marker::Sized
+pub fn aranya_client::client::Team<'a>::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::client::Team<'a> where T: ?core::marker::Sized
+pub fn aranya_client::client::Team<'a>::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::client::Team<'a>
+pub fn aranya_client::client::Team<'a>::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::client::Team<'a>
+impl<T> tracing::instrument::Instrument for aranya_client::client::Team<'a>
+impl<T> tracing::instrument::WithSubscriber for aranya_client::client::Team<'a>
+impl<T> typenum::type_operators::Same for aranya_client::client::Team<'a>
+pub type aranya_client::client::Team<'a>::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::client::Team<'a> where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::client::Team<'a>::vzip(self) -> V
+pub struct aranya_client::TeamConfig
+impl aranya_client::config::TeamConfig
+pub fn aranya_client::config::TeamConfig::builder() -> aranya_client::config::TeamConfigBuilder
+impl core::convert::From<aranya_client::config::TeamConfig> for aranya_daemon_api::service::TeamConfig
+pub fn aranya_daemon_api::service::TeamConfig::from(_value: aranya_client::config::TeamConfig) -> Self
+impl core::marker::Freeze for aranya_client::config::TeamConfig
+impl core::marker::Send for aranya_client::config::TeamConfig
+impl core::marker::Sync for aranya_client::config::TeamConfig
+impl core::marker::Unpin for aranya_client::config::TeamConfig
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::config::TeamConfig
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::config::TeamConfig
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::config::TeamConfig
+pub fn aranya_client::config::TeamConfig::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::config::TeamConfig where U: core::convert::From<T>
+pub fn aranya_client::config::TeamConfig::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::config::TeamConfig where U: core::convert::Into<T>
+pub type aranya_client::config::TeamConfig::Error = core::convert::Infallible
+pub fn aranya_client::config::TeamConfig::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::config::TeamConfig where U: core::convert::TryFrom<T>
+pub type aranya_client::config::TeamConfig::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::config::TeamConfig::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::config::TeamConfig where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::config::TeamConfig::upcast(self) -> T
+impl<T> core::any::Any for aranya_client::config::TeamConfig where T: 'static + ?core::marker::Sized
+pub fn aranya_client::config::TeamConfig::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::config::TeamConfig where T: ?core::marker::Sized
+pub fn aranya_client::config::TeamConfig::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::config::TeamConfig where T: ?core::marker::Sized
+pub fn aranya_client::config::TeamConfig::borrow_mut(&mut self) -> &mut T
+impl<T> core::convert::From<T> for aranya_client::config::TeamConfig
+pub fn aranya_client::config::TeamConfig::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::config::TeamConfig
+impl<T> tracing::instrument::Instrument for aranya_client::config::TeamConfig
+impl<T> tracing::instrument::WithSubscriber for aranya_client::config::TeamConfig
+impl<T> typenum::type_operators::Same for aranya_client::config::TeamConfig
+pub type aranya_client::config::TeamConfig::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::config::TeamConfig where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::config::TeamConfig::vzip(self) -> V
+pub struct aranya_client::TeamConfigBuilder
+impl aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::build(self) -> aranya_client::error::Result<aranya_client::config::TeamConfig>
+pub fn aranya_client::config::TeamConfigBuilder::new() -> Self
+impl core::clone::Clone for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::clone(&self) -> aranya_client::config::TeamConfigBuilder
+impl core::cmp::Eq for aranya_client::config::TeamConfigBuilder
+impl core::cmp::PartialEq for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::eq(&self, other: &aranya_client::config::TeamConfigBuilder) -> bool
+impl core::default::Default for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::default() -> aranya_client::config::TeamConfigBuilder
+impl core::fmt::Debug for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for aranya_client::config::TeamConfigBuilder
+impl core::marker::Freeze for aranya_client::config::TeamConfigBuilder
+impl core::marker::Send for aranya_client::config::TeamConfigBuilder
+impl core::marker::Sync for aranya_client::config::TeamConfigBuilder
+impl core::marker::Unpin for aranya_client::config::TeamConfigBuilder
+impl core::panic::unwind_safe::RefUnwindSafe for aranya_client::config::TeamConfigBuilder
+impl core::panic::unwind_safe::UnwindSafe for aranya_client::config::TeamConfigBuilder
+impl<Q, K> equivalent::Equivalent<K> for aranya_client::config::TeamConfigBuilder where Q: core::cmp::Eq + ?core::marker::Sized, K: core::borrow::Borrow<Q> + ?core::marker::Sized
+pub fn aranya_client::config::TeamConfigBuilder::equivalent(&self, key: &K) -> bool
+impl<T, B> s2n_quic_core::number::UpcastFrom<s2n_quic_core::counter::Counter<T, B>> for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::upcast_from(value: s2n_quic_core::counter::Counter<T, B>) -> T
+impl<T, U> core::convert::Into<U> for aranya_client::config::TeamConfigBuilder where U: core::convert::From<T>
+pub fn aranya_client::config::TeamConfigBuilder::into(self) -> U
+impl<T, U> core::convert::TryFrom<U> for aranya_client::config::TeamConfigBuilder where U: core::convert::Into<T>
+pub type aranya_client::config::TeamConfigBuilder::Error = core::convert::Infallible
+pub fn aranya_client::config::TeamConfigBuilder::try_from(value: U) -> core::result::Result<T, <T as core::convert::TryFrom<U>>::Error>
+impl<T, U> core::convert::TryInto<U> for aranya_client::config::TeamConfigBuilder where U: core::convert::TryFrom<T>
+pub type aranya_client::config::TeamConfigBuilder::Error = <U as core::convert::TryFrom<T>>::Error
+pub fn aranya_client::config::TeamConfigBuilder::try_into(self) -> core::result::Result<U, <U as core::convert::TryFrom<T>>::Error>
+impl<T, U> s2n_quic_core::number::Upcast<T> for aranya_client::config::TeamConfigBuilder where T: s2n_quic_core::number::UpcastFrom<U>
+pub fn aranya_client::config::TeamConfigBuilder::upcast(self) -> T
+impl<T> alloc::borrow::ToOwned for aranya_client::config::TeamConfigBuilder where T: core::clone::Clone
+pub type aranya_client::config::TeamConfigBuilder::Owned = T
+pub fn aranya_client::config::TeamConfigBuilder::clone_into(&self, target: &mut T)
+pub fn aranya_client::config::TeamConfigBuilder::to_owned(&self) -> T
+impl<T> core::any::Any for aranya_client::config::TeamConfigBuilder where T: 'static + ?core::marker::Sized
+pub fn aranya_client::config::TeamConfigBuilder::type_id(&self) -> core::any::TypeId
+impl<T> core::borrow::Borrow<T> for aranya_client::config::TeamConfigBuilder where T: ?core::marker::Sized
+pub fn aranya_client::config::TeamConfigBuilder::borrow(&self) -> &T
+impl<T> core::borrow::BorrowMut<T> for aranya_client::config::TeamConfigBuilder where T: ?core::marker::Sized
+pub fn aranya_client::config::TeamConfigBuilder::borrow_mut(&mut self) -> &mut T
+impl<T> core::clone::CloneToUninit for aranya_client::config::TeamConfigBuilder where T: core::clone::Clone
+pub unsafe fn aranya_client::config::TeamConfigBuilder::clone_to_uninit(&self, dest: *mut u8)
+impl<T> core::convert::From<T> for aranya_client::config::TeamConfigBuilder
+pub fn aranya_client::config::TeamConfigBuilder::from(t: T) -> T
+impl<T> opentelemetry::trace::context::FutureExt for aranya_client::config::TeamConfigBuilder
+impl<T> tracing::instrument::Instrument for aranya_client::config::TeamConfigBuilder
+impl<T> tracing::instrument::WithSubscriber for aranya_client::config::TeamConfigBuilder
+impl<T> typenum::type_operators::Same for aranya_client::config::TeamConfigBuilder
+pub type aranya_client::config::TeamConfigBuilder::Output = T
+impl<V, T> ppv_lite86::types::VZip<V> for aranya_client::config::TeamConfigBuilder where V: ppv_lite86::types::MultiLane<T>
+pub fn aranya_client::config::TeamConfigBuilder::vzip(self) -> V
+pub type aranya_client::Result<T, E> = core::result::Result<T, E>
