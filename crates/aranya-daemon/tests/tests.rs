@@ -41,8 +41,8 @@ async fn test_create_team() -> Result<()> {
 async fn test_remove_members() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 
-    let clients = ctx.new_team().await?;
-    let team = TestTeam::new(&clients);
+    let mut clients = ctx.new_team().await?;
+    let team = TestTeam::new(clients.as_mut_slice());
 
     let effects = team
         .operator

@@ -30,7 +30,7 @@ use crate::{
     config::Config,
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::task::Syncer,
+    sync::{task::Syncer, tcp::State as TCPSyncState},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
@@ -108,7 +108,7 @@ impl Daemon {
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects);
+        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects, TCPSyncState);
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
@@ -200,7 +200,7 @@ impl Daemon {
             let listener = TcpListener::bind(external_sync_addr.to_socket_addrs())
                 .await
                 .context("unable to bind TCP listener")?;
-            TcpSyncServer::new(Arc::clone(&aranya), listener)
+            TcpSyncServer::new(client.clone(), listener)
         };
 
         info!(device_id = %device_id, "set up Aranya");

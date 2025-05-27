@@ -1,69 +1,57 @@
 //! Aranya TCP client and server for syncing Aranya graph commands.
 
 use core::net::SocketAddr;
-use std::sync::Arc;
 
 use anyhow::{bail, Context, Result};
 use aranya_crypto::Rng;
-use aranya_policy_ifgen::VmEffect;
 use aranya_runtime::{
-    ClientState, Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder,
-    SyncType, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
+    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder,
+    SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::Addr;
 use buggy::bug;
-use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    sync::Mutex,
     task::JoinSet,
 };
 use tracing::{debug, error, info_span, instrument, Instrument};
 
-use crate::aranya::Client;
+use super::task::{SyncResponse, SyncState};
+use crate::aranya::Client as AranyaClient;
 
-/// A response to a sync request.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum SyncResponse {
-    /// Success.
-    Ok(Box<[u8]>),
-    /// Failure.
-    Err(String),
-}
+/// Data used for sending sync requests and processing sync responses
+pub struct State;
 
-/// TCP Syncing related functions
-impl<EN, SP, CE> Client<EN, SP>
-where
-    EN: Engine<Policy = VmPolicy<CE>, Effect = VmEffect> + Send + 'static,
-    SP: StorageProvider + Send + 'static,
-    CE: aranya_crypto::Engine + Send + Sync + 'static,
-{
-    // TODO(Steve): Make this more generic and not specific to TCP.
+impl SyncState for State {
     /// Syncs with the peer.
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
-    #[instrument(skip_all)]
-    pub async fn sync_peer_tcp<S>(&self, id: GraphId, sink: &mut S, addr: &Addr) -> Result<()>
+    async fn sync_impl<S>(
+        syncer: &mut super::task::Syncer<Self>,
+        id: GraphId,
+        sink: &mut S,
+        peer: &Addr,
+    ) -> Result<()>
     where
-        S: Sink<<EN as Engine>::Effect>,
+        S: Sink<<crate::EN as Engine>::Effect>,
     {
         // send the sync request.
 
         // TODO: Real server address.
         let server_addr = ();
-        let mut syncer = SyncRequester::new(id, &mut Rng, server_addr);
+        let mut sync_requester = SyncRequester::new(id, &mut Rng, server_addr);
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let (len, _) = {
-            let mut client = self.aranya.lock().await;
+            let mut client = syncer.client.lock().await;
             // TODO: save PeerCache somewhere.
-            syncer
+            sync_requester
                 .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
                 .context("sync poll failed")?
         };
         debug!(?len, "sync poll finished");
         send_buf.truncate(len);
-        let mut stream = TcpStream::connect(addr.to_socket_addrs()).await?;
+        let mut stream = TcpStream::connect(peer.to_socket_addrs()).await?;
         let addr = stream.peer_addr()?;
 
         stream
@@ -92,10 +80,10 @@ where
             debug!("nothing to sync");
             return Ok(());
         }
-        if let Some(cmds) = syncer.receive(&data)? {
+        if let Some(cmds) = sync_requester.receive(&data)? {
             debug!(num = cmds.len(), "received commands");
             if !cmds.is_empty() {
-                let mut client = self.aranya.lock().await;
+                let mut client = syncer.client.lock().await;
                 let mut trx = client.transaction(id);
                 // TODO: save PeerCache somewhere.
                 client
@@ -120,7 +108,7 @@ where
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
-    aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    aranya: AranyaClient<EN, SP>,
     /// Used to receive sync requests and send responses.
     listener: TcpListener,
     /// Tracks running tasks.
@@ -130,7 +118,7 @@ pub struct Server<EN, SP> {
 impl<EN, SP> Server<EN, SP> {
     /// Creates a new `Server`.
     #[inline]
-    pub fn new(aranya: Arc<Mutex<ClientState<EN, SP>>>, listener: TcpListener) -> Self {
+    pub fn new(aranya: AranyaClient<EN, SP>, listener: TcpListener) -> Self {
         Self {
             aranya,
             listener,
@@ -164,7 +152,7 @@ where
             };
             debug!(?addr, "received sync request");
 
-            let client = Arc::clone(&self.aranya);
+            let client = self.aranya.clone();
             self.set.spawn(
                 async move {
                     if let Err(err) = Self::sync(client, &mut stream, addr).await {
@@ -179,7 +167,7 @@ where
     /// Responds to a sync.
     #[instrument(skip_all, fields(addr = %addr))]
     async fn sync(
-        client: Arc<Mutex<ClientState<EN, SP>>>,
+        client: AranyaClient<EN, SP>,
         stream: &mut TcpStream,
         addr: SocketAddr,
     ) -> Result<()> {
@@ -211,10 +199,7 @@ where
 
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
-    async fn sync_respond(
-        client: Arc<Mutex<ClientState<EN, SP>>>,
-        request: &[u8],
-    ) -> Result<Box<[u8]>> {
+    async fn sync_respond(client: AranyaClient<EN, SP>, request: &[u8]) -> Result<Box<[u8]>> {
         // TODO: Use real server address
         let server_address = ();
         let mut resp = SyncResponder::new(server_address);

@@ -6,7 +6,7 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
@@ -17,7 +17,7 @@ use aranya_daemon::{
     aranya,
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync,
-    vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
+    vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore,
 };
 use aranya_keygen::{KeyBundle, PublicKeys};
@@ -29,13 +29,20 @@ use aranya_util::Addr;
 use tempfile::{tempdir, TempDir};
 use tokio::{
     net::TcpListener,
-    sync::Mutex,
+    sync::{
+        mpsc::{self, Receiver},
+        Mutex,
+    },
     task::{self, AbortHandle},
 };
 
-// Aranya sync client for testing.
+// Aranya graph client for testing.
 pub type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
+
+type TestState = sync::tcp::State;
+// Aranya sync client for testing.
+pub type TestSyncer = sync::task::Syncer<TestState>;
 
 // Aranya sync server for testing.
 pub type TestServer =
@@ -51,7 +58,7 @@ macro_rules! contains_effect {
 
 pub struct TestDevice {
     /// Aranya sync client.
-    aranya: TestClient,
+    pub syncer: TestSyncer,
     /// The Aranya graph ID.
     pub graph_id: GraphId,
     /// The address that the server is listening on.
@@ -60,6 +67,7 @@ pub struct TestDevice {
     handle: AbortHandle,
     /// Public keys
     pub pk: PublicKeys<DefaultCipherSuite>,
+    effect_recv: Receiver<(GraphId, Vec<Effect>)>,
 }
 
 impl TestDevice {
@@ -71,23 +79,33 @@ impl TestDevice {
         graph_id: GraphId,
     ) -> Result<Self> {
         let handle = task::spawn(async { server.serve().await }).abort_handle();
+        let (send_effects, effect_recv) = mpsc::channel(1);
+        let (syncer, _sync_peers) = TestSyncer::new(client, send_effects, TestState {});
         Ok(Self {
-            aranya: client,
+            syncer,
             graph_id,
             local_addr,
             handle,
             pk,
+            effect_recv,
         })
     }
 }
 
 impl TestDevice {
-    pub async fn sync(&self, device: &TestDevice) -> Result<Vec<Effect>> {
-        let mut sink = VecSink::new();
-        self.sync_peer_tcp(self.graph_id, &mut sink, &device.local_addr)
+    pub async fn sync(&mut self, device: &TestDevice) -> Result<Vec<Effect>> {
+        self.syncer
+            .sync(&self.graph_id, &device.local_addr)
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.local_addr))?;
-        Ok(sink.collect()?)
+
+        while let Some((graph_id, effects)) = self.effect_recv.recv().await {
+            if graph_id == self.graph_id {
+                return Ok(effects);
+            }
+        }
+
+        bail!("Channel closed or nothing to receive")
     }
 
     pub fn actions(
@@ -97,7 +115,7 @@ impl TestDevice {
         LinearStorageProvider<FileManager>,
         DefaultEngine<Rng>,
     > {
-        self.aranya.actions(&self.graph_id)
+        self.syncer.client.actions(&self.graph_id)
     }
 }
 
@@ -111,33 +129,40 @@ impl Deref for TestDevice {
     type Target = TestClient;
 
     fn deref(&self) -> &Self::Target {
-        &self.aranya
+        &self.syncer.client
     }
 }
 
 impl DerefMut for TestDevice {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.aranya
+        &mut self.syncer.client
     }
 }
 
 pub struct TestTeam<'a> {
-    pub owner: &'a TestDevice,
-    pub admin: &'a TestDevice,
-    pub operator: &'a TestDevice,
-    pub membera: &'a TestDevice,
-    pub memberb: &'a TestDevice,
+    pub owner: &'a mut TestDevice,
+    pub admin: &'a mut TestDevice,
+    pub operator: &'a mut TestDevice,
+    pub membera: &'a mut TestDevice,
+    pub memberb: &'a mut TestDevice,
 }
 
 impl<'a> TestTeam<'a> {
-    pub fn new(clients: &'a [TestDevice]) -> Self {
+    pub fn new(clients: &'a mut [TestDevice]) -> Self {
         assert!(clients.len() >= 5);
+        // TODO: Replace with https://doc.rust-lang.org/std/primitive.slice.html#method.get_disjoint_mut when we upgrade to 1.86
+        let (owner, rest) = clients.split_at_mut(1);
+        let (admin, rest) = rest.split_at_mut(1);
+        let (operator, rest) = rest.split_at_mut(1);
+        let (membera, rest) = rest.split_at_mut(1);
+        let (memberb, _) = rest.split_at_mut(1);
+
         TestTeam {
-            owner: &clients[0],
-            admin: &clients[1],
-            operator: &clients[2],
-            membera: &clients[3],
-            memberb: &clients[4],
+            owner: &mut owner[0],
+            admin: &mut admin[0],
+            operator: &mut operator[0],
+            membera: &mut membera[0],
+            memberb: &mut memberb[0],
         }
     }
 }
@@ -203,7 +228,7 @@ impl TestCtx {
             let server: sync::tcp::Server<
                 PolicyEngine<DefaultEngine, Store>,
                 LinearStorageProvider<FileManager>,
-            > = TestServer::new(Arc::clone(&aranya), listener);
+            > = TestServer::new(client.clone(), listener);
             (client, server, local_addr, pk)
         };
 
@@ -231,7 +256,6 @@ impl TestCtx {
                 let nonce = &mut [0u8; 16];
                 Rng.fill_bytes(nonce);
                 (client.graph_id, _) = client
-                    .aranya
                     .create_team(DeviceKeyBundle::try_from(&client.pk)?, Some(nonce))
                     .await?;
             }
@@ -242,16 +266,16 @@ impl TestCtx {
 
     /// Creates default team.
     pub async fn new_team(&mut self) -> Result<Vec<TestDevice>> {
-        let clients = self
+        let mut clients = self
             .new_group(5)
             .await
             .context("unable to create clients")?;
-        let team = TestTeam::new(&clients);
-        let owner = team.owner;
-        let admin = team.admin;
-        let operator = team.operator;
-        let membera = team.membera;
-        let memberb = team.memberb;
+        let mut team = TestTeam::new(&mut clients);
+        let owner = &mut team.owner;
+        let admin = &mut team.admin;
+        let operator = &mut team.operator;
+        let membera = &mut team.membera;
+        let memberb = &mut team.memberb;
 
         // team setup
         owner
