@@ -11,7 +11,7 @@ use s2n_quic::{
 };
 
 use super::TryReceiveError;
-use crate::error::AqcError;
+use crate::{aqc::api::AqcChannelId, error::AqcError};
 
 /// A channel opened by a peer.
 #[derive(Debug)]
@@ -20,6 +20,25 @@ pub enum AqcPeerChannel {
     Receive(AqcReceiveChannel),
     /// Used to send and receive data with a peer.
     Bidi(AqcBidirectionalChannel),
+}
+
+impl AqcPeerChannel {
+    pub(crate) fn new(label_id: LabelId, channel_id: AqcChannelId, conn: Connection) -> Self {
+        match channel_id {
+            AqcChannelId::Bidi(id) => {
+                // Once we accept a valid connection, let's turn it into an AQC Channel that we can
+                // then open an arbitrary number of streams on.
+                let channel = AqcBidirectionalChannel::new(label_id, id, conn);
+                AqcPeerChannel::Bidi(channel)
+            }
+            AqcChannelId::Uni(id) => {
+                // Once we accept a valid connection, let's turn it into an AQC Channel that we can
+                // then open an arbitrary number of streams on.
+                let receiver = AqcReceiveChannel::new(label_id, id, conn);
+                AqcPeerChannel::Receive(receiver)
+            }
+        }
+    }
 }
 
 /// The sending end of a unidirectional channel.
@@ -36,7 +55,7 @@ impl AqcSenderChannel {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub fn new(label_id: LabelId, id: UniChannelId, handle: Handle) -> Self {
+    pub(crate) fn new(label_id: LabelId, id: UniChannelId, handle: Handle) -> Self {
         Self {
             label_id,
             id,
@@ -97,7 +116,7 @@ impl AqcReceiveChannel {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub fn new(label_id: LabelId, aqc_id: UniChannelId, conn: Connection) -> Self {
+    pub(crate) fn new(label_id: LabelId, aqc_id: UniChannelId, conn: Connection) -> Self {
         Self {
             label_id,
             aqc_id,
@@ -150,7 +169,7 @@ pub struct AqcBidirectionalChannel {
 
 impl AqcBidirectionalChannel {
     /// Create a new bidirectional channel with the given id and conection handle.
-    pub fn new(label_id: LabelId, aqc_id: BidiChannelId, conn: Connection) -> Self {
+    pub(crate) fn new(label_id: LabelId, aqc_id: BidiChannelId, conn: Connection) -> Self {
         Self {
             label_id,
             aqc_id,
