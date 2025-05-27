@@ -153,13 +153,14 @@ fact DeviceSignKey[device_id id]=>{key_id id, key bytes}
 // A device's public EncryptionKey.
 fact DeviceEncKey[device_id id]=>{key_id id, key bytes}
 
-// An RBAC role on the team.
+// An RBAC role.
 fact Role[role_id id]=>{name string, author_id id}
 
-// Records that a role was assigned to a device.
+// Records that a device has been assigned a role.
 fact AssignedRole[role_id id, device_id id]=>{}
 
-// Records that a role was assigned permission to execute a certain operation.
+// Records that a device must possess a certain role in order to
+// perform the operation.
 // TODO: use enum permission key.
 fact OpRequiresRole[op string]=>{role_id id}
 
@@ -495,8 +496,8 @@ command CreateTeam {
             assign_op_role("AssignDevicePrecedence", role.role_id)
             assign_op_role("CreateRole", role.role_id)
             assign_op_role("DeleteRole", role.role_id)
-            assign_op_role("SetupAdminRole", role.role_id)
             assign_op_role("SetupOperatorRole", role.role_id)
+            assign_op_role("SetupAdminRole", role.role_id)
             assign_op_role("SetupMemberRole", role.role_id)
             assign_op_role("AssignRole", role.role_id)
             assign_op_role("RevokeRole", role.role_id)
@@ -617,7 +618,7 @@ command SetupAdminRole {
             create_role_fact(role)
             assign_op_role("DeleteLabel", role.role_id)
 
-            emit QueriedRole {
+            emit RoleCreated {
                 role: role
             }
         }
@@ -653,7 +654,7 @@ command SetupOperatorRole {
             assign_op_role("AssignLabel", role.role_id)
             assign_op_role("RevokeLabel", role.role_id)
 
-            emit QueriedRole {
+            emit RoleCreated {
                 role: role
             }
         }
@@ -686,7 +687,7 @@ command SetupMemberRole {
             assign_op_role("AqcCreateBidiChannel", role.role_id)
             assign_op_role("AqcCreateUniChannel", role.role_id)
 
-            emit QueriedRole {
+            emit RoleCreated {
                 role: role
             }
         }
@@ -1784,13 +1785,22 @@ Establishes a whitelist of labels that can be assigned to Members.
 ```policy
 // Records a label.
 //
-// `name` is a short description of the label. E.g., "TELEMETRY".
+// - `name` is a short description of the label, like
+//   "TELEMETRY".
+// - `author_id` is the ID of the device that created the label.
 fact Label[label_id id]=>{name string, author_id id}
 
 // Creates a label.
-action create_label(name string) {
+//
+// - `name` is a short description of the label, like
+//   "TELEMETRY".
+// - `managing_role_id` specifies the ID of the role required to
+//    grant other devices permission to use the label. Devices
+//    are never allowed to assign labels to themselves.
+action create_label(name string, managing_role_id id) {
     publish CreateLabel {
         label_name: name,
+        managing_role_id: managing_role_id,
     }
 }
 
@@ -1798,6 +1808,9 @@ command CreateLabel {
     fields {
         // The label name.
         label_name string,
+        // The ID of the role required to grant *other* devices
+        // permission to use the label.
+        managing_role_id id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -1811,7 +1824,7 @@ command CreateLabel {
         // A label's ID is the ID of the command that created it.
         let label_id = envelope::command_id(envelope)
 
-        check device_can_execute_op(author.device_id, "CreateLabel")
+        let role = check_unwrap query Role[role_id: this.managing_role_id]
 
         // Verify that the label does not already exist.
         //
@@ -1828,9 +1841,13 @@ command CreateLabel {
 
         finish {
             create Label[label_id: label_id]=>{name: this.label_name, author_id: author.device_id}
+            create CanAssignLabel[label_id: label_id]=>{managing_role_id: role.role_id}
 
             emit LabelCreated {
-                label: label,
+                label_id: label_id,
+                label_name: this.label_name,
+                label_author_id: author.device_id,
+                managing_role_id: role.role_id,
             }
         }
     }
@@ -1839,8 +1856,15 @@ command CreateLabel {
 // The effect emitted when the `CreateLabel` command is
 // successfully processed.
 effect LabelCreated {
-    // Label info.
-    label struct LabelInfo,
+    // Uniquely identifies the label.
+    label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
+    // The ID of the role required to grant *other* devices
+    // permission to use the label.
+    managing_role_id id,
 }
 ```
 
@@ -1852,7 +1876,8 @@ effect LabelCreated {
 
 ##### DeleteLabel
 
-Removes a label from the whitelist. This operation will result in the label revocation across all Members that were assigned to it.
+Deletes a label. This operation revokes access from all devices
+who have been granted permission to use it.
 
 ```policy
 action delete_label(label_id id) {
@@ -1916,6 +1941,89 @@ effect LabelDeleted {
 
 - Only Owners and Admins are allowed to delete labels.
 
+##### Update Label Managing Role
+
+```policy
+// Records that a particular role is required in order to grant
+// *other* devices permission to use the label.
+//
+// Devices with the role are allowed to grant any *other* device
+// permission to use the label. Devices cannot grant themselves
+// permission to use the label, even if they have the requisite
+// role.
+fact CanAssignLabel[label_id id]=>{managing_role_id id}
+
+// Changes the role required to grant *other* devices permission
+// to use the label.
+//
+// Devices with the role are allowed to grant any *other* device
+// permission to use the label. Devices cannot grant themselves
+// permission to use the label, even if they have the requisite
+// role.
+action change_label_managing_role(label_id id, managing_role_id id) {
+    publish ChangeLabelManagingRole {
+        label_id: label_id,
+        managing_role_id: managing_role_id,
+    }
+}
+
+command ChangeLabelManagingRole {
+    fields {
+        // The label to update.
+        label_id id,
+        // The ID of the role required to grant *other* devices
+        // permission to use the label.
+        managing_role_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let author = get_valid_device(envelope::author_id(envelope))
+
+        check device_can_execute_op(author.device_id, "ChangeLabelManagingRole")
+
+        let label = check_unwrap query Label[label_id: this.label_id]
+
+        // Only the author of the label is allowed to change the
+        // managing role.
+        check author.device_id == label.author_id
+        let ctx = check_unwrap query CanAssignLabel[label_id: label.label_id]
+        let old_managing_role_id = ctx.managing_role_id
+
+        // Make sure the role exists.
+        let role = check_unwrap query Role[role_id: this.managing_role_id]
+        let new_managing_role_id = this.managing_role_id
+
+        finish {
+            update CanAssignLabel[label_id: label.label_id]=>{managing_role_id: old_managing_role_id} to {managing_role_id: new_managing_role_id}
+
+            emit LabelUpdated {
+                label_id: label.label_id,
+                label_name: label.name,
+                label_author_id: label.author_id,
+                managing_role_id: new_managing_role_id,
+            }
+        }
+    }
+}
+
+// The effect emitted when the `ChangeLabelManagingRole` command
+// is successfully processed.
+effect LabelUpdated {
+    // Uniquely identifies the label.
+    label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
+    // The ID of the role required to grant *other* devices
+    // permission to use the label.
+    managing_role_id id,
+}
+```
+
 ##### Assign Label
 
 Assigns a label to a Member.
@@ -1927,6 +2035,10 @@ fact AssignedLabel[label_id id, device_id id]=>{op enum ChanOp}
 
 // Grants the device permission to use the label.
 //
+// - It is an error if the author does not have the role required
+//   to assign this label.
+// - It is an error if `device_id` refers to the author (devices
+//   are never allowed to assign roles to themselves).
 // - It is an error if the device does not exist.
 // - It is an error if the label does not exist.
 // - It is an error if the device has already been granted
@@ -1959,11 +2071,22 @@ command AssignLabel {
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
+        // Devices are never allowed to assign labels to
+        // themselves.
+        //
+        // Perform this check before we make more fact database
+        // queries.
+        check target.device_id != author.device_id
+
         check device_can_execute_op(author.device_id, "AssignLabel")
-        check author_dominates_target(author.device_id, target.device_id)
 
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
+
+        // The author must have been granted permission to manage
+        // this label.
+        let ctx = check_unwrap query CanAssignLabel[label_id: label.label_id]
+        let role = check_unwrap query AssignedRole[role_id: ctx.managing_role_id, device_id: author.device_id]
 
         // Verify that the device has not already been granted
         // permission to use the label.
@@ -2047,7 +2170,13 @@ command RevokeLabel {
         check device_can_execute_op(author.device_id, "RevokeLabel")
         check author_dominates_target(author.device_id, target.device_id)
 
+        // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
+
+        // The author must have been granted permission to manage
+        // this label.
+        let ctx = check_unwrap query CanAssignLabel[label_id: label.label_id]
+        let role = check_unwrap query AssignedRole[role_id: ctx.managing_role_id, device_id: author.device_id]
 
         // Verify that the device has been granted permission to
         // use the label.

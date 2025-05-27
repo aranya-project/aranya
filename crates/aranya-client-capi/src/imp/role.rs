@@ -1,7 +1,7 @@
 use std::{ffi::CString, mem::MaybeUninit};
 
 use aranya_capi_core::safe::{TypeId, Typed};
-use aranya_daemon_api::RoleId;
+use aranya_client::RoleId;
 use buggy::BugExt;
 
 /// A role on the team.
@@ -15,10 +15,10 @@ impl Typed for Role {
     const TYPE_ID: TypeId = TypeId::new(0xbcafb41c);
 }
 
-impl TryFrom<aranya_daemon_api::Role> for Role {
+impl TryFrom<aranya_client::Role> for Role {
     type Error = crate::imp::Error;
 
-    fn try_from(value: aranya_daemon_api::Role) -> Result<Self, Self::Error> {
+    fn try_from(value: aranya_client::Role) -> Result<Self, Self::Error> {
         Ok(Self {
             id: value.id,
             name: CString::new(value.name).assume("should not have null byte")?,

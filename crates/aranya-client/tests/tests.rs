@@ -12,9 +12,9 @@
 use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
-use aranya_client::{Client, SyncPeerConfig, TeamConfig};
+use aranya_client::{Client, DeviceId, Role, SyncPeerConfig, TeamConfig, TeamId};
 use aranya_daemon::{config::Config, Daemon};
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Op, Role, TeamId};
+use aranya_daemon_api::{KeyBundle, Op};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use test_log::test;
@@ -428,7 +428,7 @@ async fn test_revoke_operation() -> Result<()> {
 
     // Verify that operator can execute operation.
     operator
-        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1010".to_string()))
+        .assign_aqc_net_identifier(membera_id, "127.0.0.1:1010")
         .await
         .expect("expected aqc net identifier assignment to succeed");
 
@@ -442,7 +442,7 @@ async fn test_revoke_operation() -> Result<()> {
 
     // Verify that operator cannot execute operation.
     operator
-        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1020".to_string()))
+        .assign_aqc_net_identifier(membera_id, "127.0.0.1:1020")
         .await
         .expect_err("expected aqc net identifier assignment to fail");
 
@@ -487,7 +487,7 @@ async fn test_revoke_role() -> Result<()> {
 
     // Verify that operator can execute operation.
     operator
-        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1010".to_string()))
+        .assign_aqc_net_identifier(membera_id, "127.0.0.1:1010")
         .await
         .expect("expected aqc net identifier assignment to succeed");
 
@@ -499,7 +499,7 @@ async fn test_revoke_role() -> Result<()> {
 
     // Verify that operator cannot execute operation.
     operator
-        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1020".to_string()))
+        .assign_aqc_net_identifier(membera_id, "127.0.0.1:1020")
         .await
         .expect_err("expected aqc net identifier assignment to fail");
 
@@ -543,7 +543,7 @@ async fn test_device_precedence() -> Result<()> {
 
     // Verify that operator can execute operation.
     operator
-        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1010".to_string()))
+        .assign_aqc_net_identifier(membera_id, "127.0.0.1:1010")
         .await
         .expect("expected aqc net identifier assignment to succeed");
 
@@ -555,7 +555,7 @@ async fn test_device_precedence() -> Result<()> {
 
     // Verify that operator cannot execute operation.
     operator
-        .assign_aqc_net_identifier(membera_id, NetIdentifier("127.0.0.1:1020".to_string()))
+        .assign_aqc_net_identifier(membera_id, "127.0.0.1:1020")
         .await
         .expect_err("expected aqc net identifier assignment to fail");
 
