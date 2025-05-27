@@ -19,18 +19,17 @@ debug = []
 
 [dependencies]
 aranya-daemon-api = { workspace = true }
-futures-util = { workspace = true }
-
-aranya-crypto = { workspace = true }
 aranya-util = { workspace = true }
+
+anyhow = { workspace = true }
+aranya-crypto = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
 futures-lite = { workspace = true }
+futures-util = { workspace = true }
+postcard = { workspace = true }
 rustls = { workspace = true }
 s2n-quic = { workspace = true }
-
-anyhow = { workspace = true }
-postcard = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
