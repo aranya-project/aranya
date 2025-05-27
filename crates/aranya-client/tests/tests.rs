@@ -23,7 +23,7 @@ use common::{sleep, TeamCtx, SLEEP_INTERVAL}; // Import from common
 async fn test_sync_now() -> Result<()> {
     // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
-    let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
+    let mut team = TeamCtx::new("test_sync_now", work_dir, 8060).await?;
 
     // Create the initial team, and get our TeamId.
     let cfg = TeamConfig::builder().build()?;
@@ -83,7 +83,7 @@ async fn test_sync_now() -> Result<()> {
 async fn test_query_functions() -> Result<()> {
     // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
-    let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
+    let mut team = TeamCtx::new("test_query_functions", work_dir, 8020).await?;
 
     // Create the initial team, and get our TeamId.
     let cfg = TeamConfig::builder().build()?;

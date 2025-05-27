@@ -113,12 +113,52 @@ pub struct TeamCtx {
 }
 
 impl TeamCtx {
-    pub async fn new(name: &str, work_dir: PathBuf) -> Result<Self> {
-        let owner = DeviceCtx::new(name, "owner", work_dir.join("owner"), 9001).await?;
-        let admin = DeviceCtx::new(name, "admin", work_dir.join("admin"), 9002).await?;
-        let operator = DeviceCtx::new(name, "operator", work_dir.join("operator"), 9003).await?;
-        let membera = DeviceCtx::new(name, "membera", work_dir.join("membera"), 9004).await?;
-        let memberb = DeviceCtx::new(name, "memberb", work_dir.join("memberb"), 9005).await?;
+    pub async fn new(name: &str, work_dir: PathBuf, port_start: u16) -> Result<Self> {
+        let owner = DeviceCtx::new(
+            name,
+            "owner",
+            work_dir.join("owner"),
+            port_start
+                .checked_add(1)
+                .expect("expected to choose port number"),
+        )
+        .await?;
+        let admin = DeviceCtx::new(
+            name,
+            "admin",
+            work_dir.join("admin"),
+            port_start
+                .checked_add(2)
+                .expect("expected to choose port number"),
+        )
+        .await?;
+        let operator = DeviceCtx::new(
+            name,
+            "operator",
+            work_dir.join("operator"),
+            port_start
+                .checked_add(3)
+                .expect("expected to choose port number"),
+        )
+        .await?;
+        let membera = DeviceCtx::new(
+            name,
+            "membera",
+            work_dir.join("membera"),
+            port_start
+                .checked_add(4)
+                .expect("expected to choose port number"),
+        )
+        .await?;
+        let memberb = DeviceCtx::new(
+            name,
+            "memberb",
+            work_dir.join("memberb"),
+            port_start
+                .checked_add(5)
+                .expect("expected to choose port number"),
+        )
+        .await?;
 
         Ok(Self {
             owner,
