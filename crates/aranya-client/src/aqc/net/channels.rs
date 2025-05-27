@@ -351,12 +351,17 @@ impl AqcSendStream {
     }
 }
 
+/// A stream accepted from a peer.
 pub enum AqcPeerStream {
+    /// A bidirectional stream.
     Bidi(AqcBidiStream),
+    /// A receive-only stream.
     Receive(AqcReceiveStream),
 }
 
 impl AqcPeerStream {
+    /// Tries to converts the peer stream into a bidi stream.
+    #[allow(clippy::result_large_err)]
     pub fn into_bidi(self) -> Result<AqcBidiStream, Self> {
         if let Self::Bidi(s) = self {
             Ok(s)
@@ -365,6 +370,8 @@ impl AqcPeerStream {
         }
     }
 
+    /// Tries to converts the peer stream into a bidi stream.
+    #[allow(clippy::result_large_err)]
     pub fn into_receive(self) -> Result<AqcReceiveStream, Self> {
         if let Self::Receive(s) = self {
             Ok(s)
