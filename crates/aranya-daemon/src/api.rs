@@ -588,7 +588,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AqcCtrl,
-    ) -> api::Result<(api::NetIdentifier, api::AqcPsks)> {
+    ) -> api::Result<(api::NetIdentifier, api::LabelId, api::AqcPsks)> {
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
@@ -614,7 +614,7 @@ impl DaemonApi for Api {
                         .context("missing net identifier for channel author")?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok((net_id, psks));
+                    return Ok((net_id, e.label_id.into(), psks));
                 }
                 Some(Effect::AqcUniChannelReceived(e)) => {
                     let psks = self.aqc.uni_channel_received(e).await?;
@@ -625,7 +625,7 @@ impl DaemonApi for Api {
                         .context("missing net identifier for channel author")?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok((net_id, psks));
+                    return Ok((net_id, e.label_id.into(), psks));
                 }
                 Some(_) | None => {}
             }
