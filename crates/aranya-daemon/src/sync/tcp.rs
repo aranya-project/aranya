@@ -5,8 +5,8 @@ use core::net::SocketAddr;
 use anyhow::{bail, Context, Result};
 use aranya_crypto::Rng;
 use aranya_runtime::{
-    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder,
-    SyncType, MAX_SYNC_MESSAGE_SIZE,
+    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder, SyncType,
+    MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::Addr;
 use buggy::bug;

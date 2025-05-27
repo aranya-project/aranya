@@ -270,12 +270,12 @@ impl TestCtx {
             .new_group(5)
             .await
             .context("unable to create clients")?;
-        let mut team = TestTeam::new(&mut clients);
-        let owner = &mut team.owner;
-        let admin = &mut team.admin;
-        let operator = &mut team.operator;
-        let membera = &mut team.membera;
-        let memberb = &mut team.memberb;
+        let team = TestTeam::new(&mut clients);
+        let owner = team.owner;
+        let admin = team.admin;
+        let operator = team.operator;
+        let membera = team.membera;
+        let memberb = team.memberb;
 
         // team setup
         owner
