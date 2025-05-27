@@ -239,14 +239,14 @@ async fn test_aqc_chans() -> Result<()> {
 }
 
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
-async fn test_aqc_chans_not_auth_label() -> Result<()> {
+async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     let interval = Duration::from_millis(100);
     let sleep_interval = interval * 6;
 
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans_not_auth_label", work_dir, 9020).await?;
+    let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_sender", work_dir, 9020).await?;
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
@@ -298,6 +298,12 @@ async fn test_aqc_chans_not_auth_label() -> Result<()> {
         .await?;
 
     let label3 = operator_team.create_label("label3".to_string()).await?;
+    let op = ChanOp::SendRecv;
+    // assign label 3 to only the receiver, we are testing if the sender can create
+    // a channel without the label assignment
+    operator_team
+        .assign_label(team.memberb.id, label3, op)
+        .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -377,6 +383,8 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     let label3 = operator_team.create_label("label3".to_string()).await?;
     let op = ChanOp::SendRecv;
+    // assign label 3 to only the sender, we are testing if the receiver can receive
+    // a channel without the label assignment
     operator_team
         .assign_label(team.membera.id, label3, op)
         .await?;
