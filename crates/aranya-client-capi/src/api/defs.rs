@@ -1,5 +1,6 @@
 use core::{
     ffi::{c_char, CStr},
+    fmt,
     ops::DerefMut,
     ptr,
 };
@@ -10,6 +11,7 @@ use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
 use aranya_crypto::hex;
 use tracing::error;
 
+use super::AranyaOp;
 use crate::imp;
 
 /// An error code.
@@ -221,7 +223,7 @@ const _: () = {
 
 // Aranya ID
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct Id {
     bytes: [u8; ARANYA_ID_LEN],
 }
@@ -241,6 +243,12 @@ impl From<aranya_crypto::Id> for Id {
     }
 }
 
+impl fmt::Display for Id {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        aranya_crypto::Id::from(self.bytes).fmt(f)
+    }
+}
+
 /// Team ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -248,8 +256,8 @@ pub struct TeamId {
     id: Id,
 }
 
-impl From<aranya_daemon_api::TeamId> for TeamId {
-    fn from(value: aranya_daemon_api::TeamId) -> Self {
+impl From<aranya_client::TeamId> for TeamId {
+    fn from(value: aranya_client::TeamId) -> Self {
         Self {
             id: Id {
                 bytes: value.into(),
@@ -258,21 +266,27 @@ impl From<aranya_daemon_api::TeamId> for TeamId {
     }
 }
 
-impl From<&TeamId> for aranya_daemon_api::TeamId {
+impl From<&TeamId> for aranya_client::TeamId {
     fn from(value: &TeamId) -> Self {
         value.id.bytes.into()
     }
 }
 
+impl fmt::Display for TeamId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
+}
+
 /// Device ID.
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub struct DeviceId {
     id: Id,
 }
 
-impl From<aranya_daemon_api::DeviceId> for DeviceId {
-    fn from(value: aranya_daemon_api::DeviceId) -> Self {
+impl From<aranya_client::DeviceId> for DeviceId {
+    fn from(value: aranya_client::DeviceId) -> Self {
         Self {
             id: Id {
                 bytes: value.into(),
@@ -281,33 +295,231 @@ impl From<aranya_daemon_api::DeviceId> for DeviceId {
     }
 }
 
-impl From<&DeviceId> for aranya_daemon_api::DeviceId {
+impl From<&DeviceId> for aranya_client::DeviceId {
     fn from(value: &DeviceId) -> Self {
         value.id.bytes.into()
     }
 }
 
-/// An enum containing team roles defined in the Aranya policy.
-#[repr(u8)]
-#[derive(Copy, Clone, Debug)]
-pub enum Role {
-    /// Owner role.
-    Owner,
-    /// Admin role.
-    Admin,
-    /// Operator role.
-    Operator,
-    /// Member role.
-    Member,
+impl fmt::Display for DeviceId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
 }
 
-impl From<Role> for aranya_daemon_api::Role {
-    fn from(value: Role) -> Self {
+/// Role ID.
+#[repr(C)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub struct RoleId {
+    id: Id,
+}
+
+impl From<aranya_client::RoleId> for RoleId {
+    fn from(value: aranya_client::RoleId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&RoleId> for aranya_client::RoleId {
+    fn from(value: &RoleId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
+impl fmt::Display for RoleId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
+}
+
+/// Label ID.
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct LabelId {
+    id: Id,
+}
+
+impl From<aranya_client::LabelId> for LabelId {
+    fn from(value: aranya_client::LabelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&LabelId> for aranya_client::LabelId {
+    fn from(value: &LabelId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
+impl fmt::Display for LabelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
+}
+
+/// Channel ID for AQC bidi channel.
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct AqcBidiChannelId {
+    id: Id,
+}
+
+impl From<aranya_client::aqc::BidiChannelId> for AqcBidiChannelId {
+    fn from(value: aranya_client::aqc::BidiChannelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&AqcBidiChannelId> for aranya_client::aqc::BidiChannelId {
+    fn from(value: &AqcBidiChannelId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
+impl fmt::Display for AqcBidiChannelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
+}
+
+/// Channel ID for AQC uni channel.
+#[repr(C)]
+#[derive(Copy, Clone, Debug)]
+pub struct AqcUniChannelId {
+    id: Id,
+}
+
+impl From<aranya_client::aqc::UniChannelId> for AqcUniChannelId {
+    fn from(value: aranya_client::aqc::UniChannelId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
+        }
+    }
+}
+
+impl From<&AqcUniChannelId> for aranya_client::aqc::UniChannelId {
+    fn from(value: &AqcUniChannelId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
+impl fmt::Display for AqcUniChannelId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)
+    }
+}
+
+/// Valid operations that roles can perform.
+#[repr(u8)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Op {
+    /// Add a member device to team.
+    AddMember,
+    /// Remove a member device from team.
+    RemoveMember,
+    /// Assign device precedence to a device.
+    AssignDevicePrecedence,
+    /// Create a role on team.
+    CreateRole,
+    /// Delete a role from team.
+    DeleteRole,
+    /// Setup admin role.
+    SetupAdminRole,
+    /// Setup operator role.
+    SetupOperatorRole,
+    /// Setup member role.
+    SetupMemberRole,
+    /// Assign a role to a device.
+    AssignRole,
+    /// Revoke a role from a device.
+    RevokeRole,
+    /// Assign operation to a role.
+    AssignRoleOp,
+    /// Revoke operation from a role.
+    RevokeRoleOp,
+    /// Create a label on team.
+    CreateLabel,
+    /// Delete a label from team.
+    DeleteLabel,
+    /// Assign a label to a device.
+    AssignLabel,
+    /// Revoke a label from a device.
+    RevokeLabel,
+    /// Set an AQC network name.
+    SetAqcNetworkName,
+    /// Unset an AQC network name.
+    UnsetAqcNetworkName,
+    /// Create an AQC bidi channel.
+    AqcCreateBidiChannel,
+    /// Create an AQC uni channel.
+    AqcCreateUniChannel,
+}
+
+impl From<Op> for aranya_client::Op {
+    fn from(value: Op) -> Self {
         match value {
-            Role::Owner => Self::Owner,
-            Role::Admin => Self::Admin,
-            Role::Operator => Self::Operator,
-            Role::Member => Self::Member,
+            Op::AddMember => Self::AddMember,
+            Op::RemoveMember => Self::RemoveMember,
+            Op::AssignDevicePrecedence => Self::AssignDevicePrecedence,
+            Op::CreateRole => Self::CreateRole,
+            Op::DeleteRole => Self::DeleteRole,
+            Op::SetupAdminRole => Self::SetupAdminRole,
+            Op::SetupOperatorRole => Self::SetupOperatorRole,
+            Op::SetupMemberRole => Self::SetupMemberRole,
+            Op::AssignRole => Self::AssignRole,
+            Op::RevokeRole => Self::RevokeRole,
+            Op::AssignRoleOp => Self::AssignRoleOp,
+            Op::RevokeRoleOp => Self::RevokeRoleOp,
+            Op::CreateLabel => Self::CreateLabel,
+            Op::DeleteLabel => Self::DeleteLabel,
+            Op::AssignLabel => Self::AssignLabel,
+            Op::RevokeLabel => Self::RevokeLabel,
+            Op::SetAqcNetworkName => Self::SetAqcNetworkName,
+            Op::UnsetAqcNetworkName => Self::UnsetAqcNetworkName,
+            Op::AqcCreateBidiChannel => Self::AqcCreateBidiChannel,
+            Op::AqcCreateUniChannel => Self::AqcCreateUniChannel,
+        }
+    }
+}
+
+impl From<aranya_client::Op> for Op {
+    fn from(value: aranya_client::Op) -> Self {
+        use aranya_client::Op::*;
+        match value {
+            AddMember => Self::AddMember,
+            RemoveMember => Self::RemoveMember,
+            AssignDevicePrecedence => Self::AssignDevicePrecedence,
+            CreateRole => Self::CreateRole,
+            DeleteRole => Self::DeleteRole,
+            SetupAdminRole => Self::SetupAdminRole,
+            SetupMemberRole => Self::SetupMemberRole,
+            SetupOperatorRole => Self::SetupOperatorRole,
+            AssignRole => Self::AssignRole,
+            RevokeRole => Self::RevokeRole,
+            AssignRoleOp => Self::AssignRoleOp,
+            RevokeRoleOp => Self::RevokeRoleOp,
+            CreateLabel => Self::CreateLabel,
+            DeleteLabel => Self::DeleteLabel,
+            AssignLabel => Self::AssignLabel,
+            RevokeLabel => Self::RevokeLabel,
+            SetAqcNetworkName => Self::SetAqcNetworkName,
+            UnsetAqcNetworkName => Self::UnsetAqcNetworkName,
+            AqcCreateBidiChannel => Self::AqcCreateBidiChannel,
+            AqcCreateUniChannel => Self::AqcCreateUniChannel,
         }
     }
 }
@@ -327,51 +539,13 @@ pub enum ChanOp {
     SendRecv,
 }
 
-impl From<ChanOp> for aranya_daemon_api::ChanOp {
+impl From<ChanOp> for aranya_client::ChanOp {
     fn from(value: ChanOp) -> Self {
         match value {
             ChanOp::RecvOnly => Self::RecvOnly,
             ChanOp::SendOnly => Self::SendOnly,
             ChanOp::SendRecv => Self::SendRecv,
         }
-    }
-}
-
-/// Label ID.
-#[repr(C)]
-#[derive(Copy, Clone, Debug)]
-pub struct LabelId {
-    id: Id,
-}
-
-impl From<aranya_daemon_api::LabelId> for LabelId {
-    fn from(value: aranya_daemon_api::LabelId) -> Self {
-        Self {
-            id: Id {
-                bytes: value.into(),
-            },
-        }
-    }
-}
-
-impl From<&LabelId> for aranya_daemon_api::LabelId {
-    fn from(value: &LabelId) -> Self {
-        value.id.bytes.into()
-    }
-}
-
-/// An AQC label name.
-///
-/// E.g. "TELEMETRY_LABEL"
-#[repr(transparent)]
-#[derive(Copy, Clone, Debug)]
-pub struct LabelName(*const c_char);
-
-impl LabelName {
-    unsafe fn as_underlying(self) -> Result<String, imp::Error> {
-        // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(String::from(cstr.to_str()?))
     }
 }
 
@@ -397,61 +571,64 @@ impl Addr {
 #[derive(Copy, Clone, Debug)]
 pub struct NetIdentifier(*const c_char);
 
-impl NetIdentifier {
-    unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
+impl TryFrom<NetIdentifier> for aranya_client::NetIdentifier<'_> {
+    type Error = aranya_client::InvalidNetIdentifier;
+
+    fn try_from(id: NetIdentifier) -> Result<Self, Self::Error> {
+        // SAFETY: We have to trust that the pointer is a valid
+        // C string.
+        let cstr = unsafe { CStr::from_ptr(id.0) };
+        aranya_client::NetIdentifier::try_from(cstr)
+    }
+}
+
+/// A role name.
+///
+/// E.g. "owner"
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct RoleName(*const c_char);
+
+impl RoleName {
+    unsafe fn as_underlying(self) -> Result<String, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(aranya_daemon_api::NetIdentifier(String::from(
-            cstr.to_str()?,
-        )))
+        Ok(String::from(cstr.to_str()?))
     }
 }
 
-/// Channel ID for AQC bidi channel.
-#[repr(C)]
+/// A device precedence.
+///
+/// Determines whether the author of a graph command has permission
+/// to execute a command on a target device with lower priority.
+#[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-pub struct AqcBidiChannelId {
-    id: Id,
-}
+pub struct DevicePrecedence(i64);
 
-impl From<aranya_daemon_api::AqcBidiChannelId> for AqcBidiChannelId {
-    fn from(value: aranya_daemon_api::AqcBidiChannelId) -> Self {
-        Self {
-            id: Id {
-                bytes: value.into(),
-            },
-        }
-    }
-}
-
-impl From<&AqcBidiChannelId> for aranya_daemon_api::AqcBidiChannelId {
-    fn from(value: &AqcBidiChannelId) -> Self {
-        value.id.bytes.into()
-    }
-}
-
-/// Channel ID for AQC uni channel.
-#[repr(C)]
+/// An AQC label name.
+///
+/// E.g. "TELEMETRY_LABEL"
+#[repr(transparent)]
 #[derive(Copy, Clone, Debug)]
-pub struct AqcUniChannelId {
-    id: Id,
-}
+pub struct LabelName(*const c_char);
 
-impl From<aranya_daemon_api::AqcUniChannelId> for AqcUniChannelId {
-    fn from(value: aranya_daemon_api::AqcUniChannelId) -> Self {
-        Self {
-            id: Id {
-                bytes: value.into(),
-            },
-        }
+impl LabelName {
+    unsafe fn as_underlying(self) -> Result<String, imp::Error> {
+        // SAFETY: Caller must ensure the pointer is a valid C String.
+        let cstr = unsafe { CStr::from_ptr(self.0) };
+        Ok(String::from(cstr.to_str()?))
     }
 }
 
-impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
-    fn from(value: &AqcUniChannelId) -> Self {
-        value.id.bytes.into()
-    }
-}
+/// A role.
+#[aranya_capi_core::opaque(size = 96, align = 8)]
+pub type Role = Safe<imp::Role>;
+const _: [(); 96] = [(); size_of::<Role>()];
+
+/// A label.
+#[aranya_capi_core::opaque(size = 96, align = 8)]
+pub type Label = Safe<imp::Label>;
+const _: [(); 96] = [(); size_of::<Label>()];
 
 /// Initializes logging.
 ///
@@ -675,15 +852,6 @@ pub fn team_config_build(
     Ok(())
 }
 
-/// Sync Peer config.
-#[aranya_capi_core::opaque(size = 32, align = 8)]
-pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
-
-/// Builder for a Sync Peer config.
-#[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 40, align = 8)]
-pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
-
 /// Attempts to build a [`SyncPeerConfig`].
 ///
 /// This function consumes and releases any resources associated
@@ -727,11 +895,211 @@ pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
 ///
 /// Overrides [`sync_peer_config_builder_set_sync_now`] if invoked afterward.
 ///
+/// @relates AranyaClient.
+pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+    let client = client.imp();
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).close_team())?;
+    Ok(())
+}
+
+/// Create a custom role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param name role name string [`RoleName`].
+///
+/// Output params:
+/// @param role returns the created role [`Role`].
+///
+/// @relates AranyaClient.
+pub fn create_role(
+    client: &mut Client,
+    team: &TeamId,
+    name: RoleName,
+    role: &mut MaybeUninit<Role>,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+
+    // SAFETY: Caller must ensure `name` is a valid C String.
+    let name = unsafe { name.as_underlying() }?;
+
+    let r = client
+        .rt
+        .block_on(client.inner.team(team.into()).create_role(name))?;
+    Role::init(role, r.clone().try_into()?);
+    Ok(())
+}
+
+/// Assign permission to execute an operation to a role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param role_id the role ID [`RoleId`] to assign an operation to.
+/// @param op the operation to assign to the role [`Op`].
+///
+/// @relates AranyaClient.
+pub fn assign_operation_to_role(
+    client: &mut Client,
+    team: &TeamId,
+    role_id: &RoleId,
+    op: Op,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .assign_operation_to_role(role_id.into(), op.into()),
+    )?;
+    Ok(())
+}
+
+/// Revoke role operation.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param role_id the role ID [`RoleId`] to revoke an operation from.
+/// @param op the operation to revoke from the role [`Op`].
+///
+/// @relates AranyaClient.
+pub unsafe fn revoke_role_operation(
+    client: &mut Client,
+    team: &TeamId,
+    role_id: &RoleId,
+    op: Op,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .revoke_role_operation(role_id.into(), op.into()),
+    )?;
+    Ok(())
+}
+
+/// Setup default roles on team.
+///
+/// This sets up the admin, operator, and member roles with default permissions as defined in the Aranya policy.
+/// The caller should invoke this method right after team creation in order to use default RBAC from the policy.
+/// If this method is not invoked, the application must manually create roles and assign permissions to them.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+///
+/// @relates AranyaClient.
+pub unsafe fn setup_default_roles(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+    std::println!("Team={team:}");
+    let client = client.imp();
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).setup_default_roles())?;
+    Ok(())
+}
+
+/// Add a device to the team with the default role.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param precedence is the device's precedence [`DevicePrecedence`].
+/// @param keybundle serialized keybundle byte buffer `KeyBundle`.
+/// @param keybundle_len is the length of the serialized keybundle.
+///
+/// @relates AranyaClient.
+pub unsafe fn add_device_to_team(
+    client: &mut Client,
+    team: &TeamId,
+    precedence: &DevicePrecedence,
+    keybundle: &[u8],
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    let keybundle = imp::key_bundle_deserialize(keybundle)?;
+
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .add_device_to_team(keybundle, precedence.0),
+    )?;
+    Ok(())
+}
+
+/// Remove a device from the team.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+///
+/// @relates AranyaClient.
+pub fn remove_device_from_team(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .remove_device_from_team(device.into()),
+    )?;
+    Ok(())
+}
+
+/// Sync Peer config.
+#[aranya_capi_core::opaque(size = 32, align = 8)]
+pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
+
+/// Builder for a Sync Peer config.
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 40, align = 8)]
+pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
+
 /// By default, the peer is synced with immediately.
 /// @param cfg a pointer to the builder for a sync config
 // TODO: aranya-core#129
 pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
     cfg.deref_mut().sync_now(false);
+}
+
+/// Assign device precedence.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param precedence is the device's precedence [`DevicePrecedence`].
+///
+/// @relates AranyaClient.
+pub fn assign_device_precedence(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    precedence: &DevicePrecedence,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .assign_device_precedence(device.into(), precedence.0),
+    )?;
+    Ok(())
 }
 
 /// Assign a role to a device.
@@ -750,7 +1118,7 @@ pub fn assign_role(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    role: Role,
+    role: &RoleId,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
     client.rt.block_on(
@@ -776,7 +1144,7 @@ pub fn revoke_role(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    role: Role,
+    role: &RoleId,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
     client.rt.block_on(
@@ -788,6 +1156,62 @@ pub fn revoke_role(
     Ok(())
 }
 
+/// Associate a network identifier to a device for use with AQC.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// If the address already exists for this device, it is replaced with the new address. Capable
+/// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
+/// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param net_identifier the device's network identifier [`NetIdentifier`].
+///
+/// @relates AranyaClient.
+pub unsafe fn aqc_assign_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    net_identifier: NetIdentifier,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .assign_aqc_net_identifier(device.into(), net_identifier),
+    )?;
+    Ok(())
+}
+
+/// Disassociate an AQC network identifier from a device.
+///
+/// Permission to perform this operation is checked against the Aranya policy.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param device the device's ID [`DeviceId`].
+/// @param net_identifier the device's network identifier [`NetIdentifier`].
+///
+/// @relates AranyaClient.
+pub unsafe fn aqc_remove_net_identifier(
+    client: &mut Client,
+    team: &TeamId,
+    device: &DeviceId,
+    net_identifier: NetIdentifier,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .remove_aqc_net_identifier(device.into(), net_identifier),
+    )?;
+    Ok(())
+}
+
 /// Create a channel label.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
@@ -795,40 +1219,109 @@ pub fn revoke_role(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param name label name string [`LabelName`].
+/// @param managing_role_id the ID of the role that is required
+///        in order to grant *other* devices permission to use
+///        this label.
+/// Output params:
+/// @param role returns the created label [`Label`].
 ///
 /// @relates AranyaClient.
 pub fn create_label(
     client: &mut Client,
     team: &TeamId,
     name: LabelName,
-) -> Result<LabelId, imp::Error> {
+    managing_role_id: &RoleId,
+    label: &mut MaybeUninit<Label>,
+) -> Result<(), imp::Error> {
     let client = client.imp();
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
-    let label_id = client
-        .rt
-        .block_on(client.inner.team(team.into()).create_label(name))?;
-    Ok(label_id.into())
+    let l = client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .create_label(name, managing_role_id.into()),
+    )?;
+    Label::init(label, l.clone().try_into()?);
+    Ok(())
 }
 
-/// Delete a channel label.
+/// Get ID of role.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// @param role the role [`Role`].
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param label_id the channel label ID [`LabelId`] to delete.
+/// Returns the role's ID [`RoleId`].
+pub fn role_get_id(role: &Role) -> RoleId {
+    role.id.into()
+}
+
+/// Get name of role.
 ///
-/// @relates AranyaClient.
-pub fn delete_label(
-    client: &mut Client,
-    team: &TeamId,
-    label_id: &LabelId,
+/// @param role the role [`Role`].
+///
+/// Returns a C string pointer to the role's name.
+#[aranya_capi_core::no_ext_error]
+pub fn role_get_name(role: &Role) -> *const c_char {
+    role.name.as_ptr()
+}
+
+/// Releases any resources used by the [`Role`].
+///
+/// @param role the role [`Role`].
+pub unsafe fn role_cleanup(role: OwnedPtr<Role>) {
+    // SAFETY: Caller must ensure `role` is a valid object.
+    unsafe {
+        role.drop_in_place();
+    }
+}
+
+/// Get ID of label.
+///
+/// @param label the label [`Label`].
+///
+/// Returns the label's ID [`LabelId`].
+pub fn label_get_id(label: &Label) -> LabelId {
+    label.id.into()
+}
+
+/// Get name of label.
+///
+/// @param label the label [`Label`].
+///
+/// Returns a C string pointer to the label's name.
+#[aranya_capi_core::no_ext_error]
+pub fn label_get_name(label: &Label) -> *const c_char {
+    label.name.as_ptr()
+}
+
+/// Releases any resources used by the [`Label`].
+///
+/// @param label the label [`Label`].
+pub unsafe fn label_cleanup(label: OwnedPtr<Label>) {
+    // SAFETY: Caller must ensure `label` is a valid object.
+    unsafe {
+        label.drop_in_place();
+    }
+}
+
+/// Writes `Op` to `str`.
+///
+/// To always succeed, `str` must be large enough to contain the operation string.
+///
+/// @param op the operation [`Op`].
+/// @param str Op string [`Id`].
+/// @param str_len returns the length of `str`
+///
+/// @relates AranyaId.
+#[aranya_capi_core::no_ext_error]
+pub fn op_to_str(
+    op: Op,
+    str: &mut MaybeUninit<c_char>,
+    str_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    let client = client.imp();
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).delete_label(label_id.into()))?;
+    let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
+    let op: aranya_client::Op = op.into();
+    aranya_capi_core::write_c_str(str, &op.to_string(), str_len)?;
     Ok(())
 }
 
@@ -929,68 +1422,6 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
 pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.imp();
     client.rt.block_on(client.inner.remove_team(team.into()))?;
-    Ok(())
-}
-
-/// Close the team and stop all operations on the graph.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-///
-/// @relates AranyaClient.
-pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
-    let client = client.imp();
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).close_team())?;
-    Ok(())
-}
-
-/// Add a device to the team with the default role.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param keybundle serialized keybundle byte buffer `KeyBundle`.
-/// @param keybundle_len is the length of the serialized keybundle.
-///
-/// @relates AranyaClient.
-pub unsafe fn add_device_to_team(
-    client: &mut Client,
-    team: &TeamId,
-    keybundle: &[u8],
-) -> Result<(), imp::Error> {
-    let client = client.imp();
-    let keybundle = imp::key_bundle_deserialize(keybundle)?;
-
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).add_device_to_team(keybundle))?;
-    Ok(())
-}
-
-/// Remove a device from the team.
-///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-///
-/// @relates AranyaClient.
-pub fn remove_device_from_team(
-    client: &mut Client,
-    team: &TeamId,
-    device: &DeviceId,
-) -> Result<(), imp::Error> {
-    let client = client.imp();
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .remove_device_from_team(device.into()),
-    )?;
     Ok(())
 }
 
@@ -1098,23 +1529,22 @@ pub fn query_devices_on_team(
         .rt
         .block_on(client.inner.queries(team.into()).devices_on_team())?;
     let data = data.__data();
+    let len = data.len();
     let Some(devices) = devices else {
-        *devices_len = data.len();
+        *devices_len = len;
         return Err(imp::Error::BufferTooSmall);
     };
-    let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
-    if *devices_len < data.len() {
-        *devices_len = data.len();
+    if *devices_len < len {
+        *devices_len = len;
         return Err(imp::Error::BufferTooSmall);
     }
+    let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write((*src).into());
     }
     *devices_len = data.len();
     Ok(())
 }
-
-// TODO: query_device_role
 
 /// Query device's keybundle.
 ///
@@ -1163,7 +1593,7 @@ pub fn query_device_label_assignments(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    labels: Option<&mut MaybeUninit<LabelId>>,
+    labels: Option<&mut MaybeUninit<Label>>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
@@ -1173,83 +1603,22 @@ pub fn query_device_label_assignments(
             .queries(team.into())
             .device_label_assignments(device.into()),
     )?;
-    let data = data.__data();
+    let data = data.__into_data();
+    let len = data.len();
     let Some(labels) = labels else {
-        *labels_len = data.len();
+        *labels_len = len;
         return Err(imp::Error::BufferTooSmall);
     };
-    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
-    if *labels_len < data.len() {
-        *labels_len = data.len();
+    if *labels_len < len {
+        *labels_len = len;
         return Err(imp::Error::BufferTooSmall);
     }
-    for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.id.into());
-    }
-    *labels_len = data.len();
-    Ok(())
-}
-
-/// Query for list of existing labels.
-///
-/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
-/// Writes the number of labels that would have been returned to `labels_len`.
-/// The application can use `labels_len` to allocate a larger buffer.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-///
-/// Output params:
-/// @param labels returns a list of labels [`LabelId`].
-/// @param labels_len returns the length of the labels list [`LabelId`].
-///
-/// @relates AranyaClient.
-pub fn query_labels(
-    client: &mut Client,
-    team: &TeamId,
-    labels: Option<&mut MaybeUninit<LabelId>>,
-    labels_len: &mut usize,
-) -> Result<(), imp::Error> {
-    let client = client.imp();
-    let data = client
-        .rt
-        .block_on(client.inner.queries(team.into()).labels())?;
-    let data = data.__data();
-    let Some(labels) = labels else {
-        *labels_len = data.len();
-        return Err(imp::Error::BufferTooSmall);
-    };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
-        dst.write(src.id.into());
+        Label::init(dst, src.try_into()?)
     }
-    if *labels_len < data.len() {
-        *labels_len = data.len();
-        return Err(imp::Error::BufferTooSmall);
-    }
-    *labels_len = data.len();
+    *labels_len = len;
     Ok(())
-}
-
-/// Query if a label exists.
-///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param label the label [`LabelId`].
-/// @param __output boolean indicating whether the label exists.
-///
-/// @relates AranyaClient.
-pub unsafe fn query_label_exists(
-    client: &mut Client,
-    team: &TeamId,
-    label: &LabelId,
-) -> Result<bool, imp::Error> {
-    let client = client.imp();
-    let exists = client
-        .rt
-        .block_on(client.inner.queries(team.into()).label_exists(label.into()))?;
-    Ok(exists)
 }
 
 /// Query device's AQC network identifier.
@@ -1282,63 +1651,178 @@ pub unsafe fn query_aqc_net_identifier(
     Ok(true)
 }
 
-/// Associate a network identifier to a device for use with AQC.
+/// Query for list of existing labels.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
-///
-/// If the address already exists for this device, it is replaced with the new address. Capable
-/// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
-/// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the labels.
+/// Writes the number of labels that would have been returned to `labels_len`.
+/// The application can use `labels_len` to allocate a larger buffer.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
+///
+/// Output params:
+/// @param labels returns a list of labels [`LabelId`].
+/// @param labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn aqc_assign_net_identifier(
+pub fn query_labels(
     client: &mut Client,
     team: &TeamId,
-    device: &DeviceId,
-    net_identifier: NetIdentifier,
+    labels: Option<&mut MaybeUninit<Label>>,
+    labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
-    let net_identifier = unsafe { net_identifier.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .assign_aqc_net_identifier(device.into(), net_identifier),
-    )?;
+    let data = client
+        .rt
+        .block_on(client.inner.queries(team.into()).labels())?;
+    let data = data.__into_data();
+    let len = data.len();
+    let Some(labels) = labels else {
+        *labels_len = len;
+        return Err(imp::Error::BufferTooSmall);
+    };
+    if *labels_len < len {
+        *labels_len = len;
+        return Err(imp::Error::BufferTooSmall);
+    }
+    let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        Label::init(dst, src.try_into()?);
+    }
+    *labels_len = len;
     Ok(())
 }
 
-/// Disassociate an AQC network identifier from a device.
+/// Query for list of roles on team.
 ///
-/// Permission to perform this operation is checked against the Aranya policy.
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+/// The application can use `roles_len` to allocate a larger buffer.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+///
+/// Output params:
+/// @param roles returns a list of roles [`Role`].
+/// @param roles_len returns the length of the roles list [`Role`].
+///
+/// @relates AranyaClient.
+pub fn query_roles_on_team(
+    client: &mut Client,
+    team: &TeamId,
+    roles: Option<&mut MaybeUninit<Role>>,
+    roles_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    let data = client
+        .rt
+        .block_on(client.inner.queries(team.into()).roles_on_team())?;
+    let data = data.__into_data();
+    let len = data.len();
+    let Some(roles) = roles else {
+        *roles_len = len;
+        return Err(imp::Error::BufferTooSmall);
+    };
+    if *roles_len < len {
+        *roles_len = len;
+        return Err(imp::Error::BufferTooSmall);
+    }
+    let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        Role::init(dst, src.try_into()?);
+    }
+    *roles_len = len;
+    Ok(())
+}
+
+/// Query for list of roles assigned to a device.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the roles.
+/// Writes the number of roles that would have been returned to `roles_len`.
+/// The application can use `roles_len` to allocate a larger buffer.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
+///
+/// Output params:
+/// @param roles returns a list of roles [`RoleId`].
+/// @param roles_len returns the length of the roles list [`RoleId`].
 ///
 /// @relates AranyaClient.
-pub unsafe fn aqc_remove_net_identifier(
+pub fn query_device_roles(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    net_identifier: NetIdentifier,
+    roles: Option<&mut MaybeUninit<Role>>,
+    roles_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
-    let net_identifier = unsafe { net_identifier.as_underlying() }?;
-    client.rt.block_on(
+    let data = client.rt.block_on(
         client
             .inner
-            .team(team.into())
-            .remove_aqc_net_identifier(device.into(), net_identifier),
+            .queries(team.into())
+            .device_roles(device.into()),
     )?;
+    let data = data.__into_data();
+    let len = data.len();
+    let Some(roles) = roles else {
+        *roles_len = len;
+        return Err(imp::Error::BufferTooSmall);
+    };
+    if *roles_len < len {
+        *roles_len = len;
+        return Err(imp::Error::BufferTooSmall);
+    }
+    let out = aranya_capi_core::try_as_mut_slice!(roles, *roles_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        Role::init(dst, src.try_into()?);
+    }
+    *roles_len = len;
+    Ok(())
+}
+
+/// Query for list of operations assigned to the role.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the operations.
+/// Writes the number of roles that would have been returned to `op_len`.
+/// The application can use `op_len` to allocate a larger buffer.
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+/// @param role the role's ID [`RoleId`].
+///
+/// Output params:
+/// @param ops returns a list of operations [`Op`].
+/// @param ops_len returns the length of the operations list [`RoleId`].
+///
+/// @relates AranyaClient.
+pub fn query_role_operations(
+    client: &mut Client,
+    team: &TeamId,
+    role: &RoleId,
+    ops: Option<&mut MaybeUninit<AranyaOp>>,
+    ops_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    let data = client
+        .rt
+        .block_on(client.inner.queries(team.into()).role_ops(role.into()))?;
+    let data = data.__into_data();
+    let len = data.len();
+    let Some(ops) = ops else {
+        *ops_len = len;
+        return Err(imp::Error::BufferTooSmall);
+    };
+    if *ops_len < len {
+        *ops_len = len;
+        return Err(imp::Error::BufferTooSmall);
+    }
+    let out = aranya_capi_core::try_as_mut_slice!(ops, *ops_len);
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src.into());
+    }
+    *ops_len = len;
     Ok(())
 }
 
@@ -1363,8 +1847,6 @@ pub unsafe fn aqc_create_bidi_channel(
     label_id: &LabelId,
 ) -> Result<AqcBidiChannelId, imp::Error> {
     let client = client.imp();
-    // SAFETY: Caller must ensure `peer` is a valid C String.
-    let peer = unsafe { peer.as_underlying() }?;
     let chan_id = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
         peer,

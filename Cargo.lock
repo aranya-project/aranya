@@ -209,7 +209,6 @@ dependencies = [
  "aranya-capi-core",
  "aranya-client",
  "aranya-crypto",
- "aranya-daemon-api",
  "aranya-util",
  "buggy",
  "postcard",
@@ -240,7 +239,7 @@ dependencies = [
  "spideroak-base58",
  "spideroak-crypto",
  "thiserror 2.0.12",
- "zerocopy",
+ "zerocopy 0.8.25",
 ]
 
 [[package]]
@@ -459,9 +458,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-ifgen-build"
-version = "0.4.1"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a63a5c52567b89c08dff9268e6baa26bf7f0b256407084935a8af8a5761f5f4"
+checksum = "270551af0e503d605ac6ea5449ea90f0dbcc564c502c981d98d922af4bbd5203"
 dependencies = [
  "anyhow",
  "aranya-policy-ast",
@@ -1743,11 +1742,11 @@ dependencies = [
 
 [[package]]
 name = "ppv-lite86"
-version = "0.2.21"
+version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85eae3c4ed2f50dcfe72643da4befc30deadb458a9b590d720cde2f2b1e97da9"
+checksum = "77957b295656769bb8ad2b6a6b09d897d94f05c41b069aede1fcdaa675eaea04"
 dependencies = [
- "zerocopy",
+ "zerocopy 0.7.35",
 ]
 
 [[package]]
@@ -2915,11 +2914,32 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
+version = "0.7.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b9b4fd18abc82b8136838da5d50bae7bdea537c574d8dc1a34ed098d6c166f0"
+dependencies = [
+ "byteorder",
+ "zerocopy-derive 0.7.35",
+]
+
+[[package]]
+name = "zerocopy"
 version = "0.8.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a1702d9583232ddb9174e01bb7c15a2ab8fb1bc6f227aa1233858c351a3ba0cb"
 dependencies = [
- "zerocopy-derive",
+ "zerocopy-derive 0.8.25",
+]
+
+[[package]]
+name = "zerocopy-derive"
+version = "0.7.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fa4f8080344d4671fb4e831a13ad1e68092748387dfc4f55e356242fae12ce3e"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.99",
 ]
 
 [[package]]

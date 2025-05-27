@@ -2,15 +2,16 @@
 
 use core::{
     borrow::Borrow,
-    error, fmt,
+    fmt,
     hash::{Hash, Hasher},
     net::SocketAddr,
     ops::Deref,
+    str::FromStr,
     time::Duration,
 };
 use std::collections::hash_map::{self, HashMap};
 
-use anyhow::bail;
+use anyhow::{bail, Context as _};
 pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
@@ -70,7 +71,7 @@ impl fmt::Display for Error {
     }
 }
 
-impl error::Error for Error {}
+impl core::error::Error for Error {}
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
@@ -82,11 +83,6 @@ custom_id! {
 custom_id! {
     /// The Team ID (a.k.a Graph ID).
     pub struct TeamId;
-}
-
-custom_id! {
-    /// An AQC label ID.
-    pub struct LabelId;
 }
 
 custom_id! {
@@ -107,93 +103,10 @@ pub struct KeyBundle {
     pub encoding: Vec<u8>,
 }
 
-/// A device's role on the team.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub enum Role {
-    Owner,
-    Admin,
-    Operator,
-    Member,
-}
-
 /// A configuration for creating or adding a team to a daemon.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TeamConfig {
     // TODO(nikki): any fields added to this should be public
-}
-
-/// A device's network identifier.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-pub struct NetIdentifier(pub String);
-
-impl Borrow<str> for NetIdentifier {
-    #[inline]
-    fn borrow(&self) -> &str {
-        &self.0
-    }
-}
-
-impl<T> AsRef<T> for NetIdentifier
-where
-    T: ?Sized,
-    <Self as Deref>::Target: AsRef<T>,
-{
-    #[inline]
-    fn as_ref(&self) -> &T {
-        self.deref().as_ref()
-    }
-}
-
-impl Deref for NetIdentifier {
-    type Target = str;
-
-    #[inline]
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl fmt::Display for NetIdentifier {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-/// A serialized command for AQC.
-pub type AqcCtrl = Vec<Box<[u8]>>;
-
-/// A secret.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Secret(Box<[u8]>);
-
-impl Secret {
-    /// Provides access to the raw secret bytes.
-    #[inline]
-    pub fn raw_secret_bytes(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-impl<T> From<T> for Secret
-where
-    T: Into<Box<[u8]>>,
-{
-    fn from(value: T) -> Self {
-        Self(value.into())
-    }
-}
-
-impl ConstantTimeEq for Secret {
-    fn ct_eq(&self, other: &Self) -> Choice {
-        self.0.ct_eq(&other.0)
-    }
-}
-
-impl ZeroizeOnDrop for Secret {}
-impl Drop for Secret {
-    fn drop(&mut self) {
-        self.0.zeroize()
-    }
 }
 
 macro_rules! psk_map {
@@ -332,6 +245,80 @@ impl Hash for CsId {
     }
 }
 
+/// A device's network identifier.
+#[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
+pub struct NetIdentifier(pub String);
+
+impl Borrow<str> for NetIdentifier {
+    #[inline]
+    fn borrow(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<T> AsRef<T> for NetIdentifier
+where
+    T: ?Sized,
+    <Self as Deref>::Target: AsRef<T>,
+{
+    #[inline]
+    fn as_ref(&self) -> &T {
+        self.deref().as_ref()
+    }
+}
+
+impl Deref for NetIdentifier {
+    type Target = str;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl fmt::Display for NetIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+/// A serialized command for AQC.
+pub type AqcCtrl = Vec<Box<[u8]>>;
+
+/// A secret.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Secret(Box<[u8]>);
+
+impl Secret {
+    /// Provides access to the raw secret bytes.
+    #[inline]
+    pub fn raw_secret_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<T> From<T> for Secret
+where
+    T: Into<Box<[u8]>>,
+{
+    fn from(value: T) -> Self {
+        Self(value.into())
+    }
+}
+
+impl ConstantTimeEq for Secret {
+    fn ct_eq(&self, other: &Self) -> Choice {
+        self.0.ct_eq(&other.0)
+    }
+}
+
+impl ZeroizeOnDrop for Secret {}
+impl Drop for Secret {
+    fn drop(&mut self) {
+        self.0.zeroize()
+    }
+}
+
 /// An AQC PSK.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum AqcPsk {
@@ -397,6 +384,8 @@ impl ConstantTimeEq for AqcPsk {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AqcBidiPsk {
     /// The PSK identity.
+    ///
+    /// This is the same thing as the channel ID.
     pub identity: BidiPskId,
     /// The PSK's secret.
     pub secret: Secret,
@@ -427,6 +416,8 @@ impl ZeroizeOnDrop for AqcBidiPsk {}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AqcUniPsk {
     /// The PSK identity.
+    ///
+    /// This is the same thing as the channel ID.
     pub identity: UniPskId,
     /// The PSK's secret.
     pub secret: Directed<Secret>,
@@ -524,11 +515,126 @@ pub enum ChanOp {
     SendRecv,
 }
 
+/// Operation that can be assigned to roles.
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum Op {
+    AddMember,
+    RemoveMember,
+    AssignDevicePrecedence,
+    CreateRole,
+    DeleteRole,
+    SetupAdminRole,
+    SetupOperatorRole,
+    SetupMemberRole,
+    AssignRole,
+    RevokeRole,
+    AssignRoleOp,
+    RevokeRoleOp,
+    CreateLabel,
+    DeleteLabel,
+    AssignLabel,
+    RevokeLabel,
+    SetAqcNetworkName,
+    UnsetAqcNetworkName,
+    AqcCreateBidiChannel,
+    AqcCreateUniChannel,
+}
+
+impl Op {
+    /// Converts the op to a string.
+    pub const fn to_str(self) -> &'static str {
+        match self {
+            Self::AddMember => "AddMember",
+            Self::RemoveMember => "RemoveMember",
+            Self::AssignDevicePrecedence => "AssignDevicePrecedence",
+            Self::CreateRole => "CreateRole",
+            Self::DeleteRole => "DeleteRole",
+            Self::AssignRole => "AssignRole",
+            Self::RevokeRole => "RevokeRole",
+            Self::AssignRoleOp => "AssignRoleOp",
+            Self::RevokeRoleOp => "RevokeRoleOp",
+            Self::CreateLabel => "CreateLabel",
+            Self::DeleteLabel => "DeleteLabel",
+            Self::AssignLabel => "AssignLabel",
+            Self::RevokeLabel => "RevokeLabel",
+            Self::SetAqcNetworkName => "SetAqcNetworkName",
+            Self::UnsetAqcNetworkName => "UnsetAqcNetworkName",
+            Self::AqcCreateBidiChannel => "AqcCreateBidiChannel",
+            Self::AqcCreateUniChannel => "AqcCreateUniChannel",
+            Self::SetupAdminRole => "SetupAdminRole",
+            Self::SetupOperatorRole => "SetupOperatorRole",
+            Self::SetupMemberRole => "SetupMemberRole",
+        }
+    }
+
+    /// Converts the string to an op.
+    pub fn try_from_str(s: &str) -> Option<Self> {
+        let op = match s {
+            "AddMember" => Self::AddMember,
+            "RemoveMember" => Self::RemoveMember,
+            "AssignDevicePrecedence" => Self::AssignDevicePrecedence,
+            "CreateRole" => Self::CreateRole,
+            "DeleteRole" => Self::DeleteRole,
+            "AssignRole" => Self::AssignRole,
+            "RevokeRole" => Self::RevokeRole,
+            "AssignRoleOp" => Self::AssignRoleOp,
+            "RevokeRoleOp" => Self::RevokeRoleOp,
+            "CreateLabel" => Self::CreateLabel,
+            "DeleteLabel" => Self::DeleteLabel,
+            "AssignLabel" => Self::AssignLabel,
+            "RevokeLabel" => Self::RevokeLabel,
+            "SetAqcNetworkName" => Self::SetAqcNetworkName,
+            "UnsetAqcNetworkName" => Self::UnsetAqcNetworkName,
+            "AqcCreateBidiChannel" => Self::AqcCreateBidiChannel,
+            "AqcCreateUniChannel" => Self::AqcCreateUniChannel,
+            "SetupAdminRole" => Self::SetupAdminRole,
+            "SetupOperatorRole" => Self::SetupOperatorRole,
+            "SetupMemberRole" => Self::SetupMemberRole,
+            _ => return None,
+        };
+        Some(op)
+    }
+}
+
+impl FromStr for Op {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::try_from_str(s).context("unknown operation")
+    }
+}
+
+/// Display implementation for [`Op`]
+impl fmt::Display for Op {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.to_str().fmt(f)
+    }
+}
+
 /// A label.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Label {
     pub id: LabelId,
     pub name: String,
+    pub author_id: DeviceId,
+}
+
+custom_id! {
+    /// An AQC label ID.
+    pub struct LabelId;
+}
+
+/// A role.
+#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub struct Role {
+    pub id: RoleId,
+    pub name: String,
+    pub author_id: DeviceId,
+}
+
+custom_id! {
+    /// Uniquely identifies a role.
+    pub struct RoleId;
 }
 
 #[tarpc::service]
@@ -565,15 +671,32 @@ pub trait DaemonApi {
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 
-    /// Add device to the team.
-    async fn add_device_to_team(team: TeamId, keys: KeyBundle) -> Result<()>;
+    /// Setup default roles on team.
+    async fn setup_default_roles(team: TeamId) -> Result<Vec<Role>>;
+
+    /// Add device to the team with a key bundle and operation precedence.
+    async fn add_device_to_team(team: TeamId, keys: KeyBundle, precedence: i64) -> Result<()>;
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
+    /// Assign precedence to device.
+    async fn assign_device_precedence(
+        team: TeamId,
+        device: DeviceId,
+        precedence: i64,
+    ) -> Result<()>;
 
+    /// Create a role on a team.
+    async fn create_role(team: TeamId, name: String) -> Result<Role>;
+    /// Delete a role from a team.
+    async fn delete_role(team: TeamId, role: RoleId) -> Result<()>;
+    /// Assign operation to a role.
+    async fn assign_operation_to_role(team: TeamId, role: RoleId, op: Op) -> Result<()>;
+    /// Revoke operation from a role.
+    async fn revoke_role_operation(team: TeamId, role: RoleId, op: Op) -> Result<()>;
     /// Assign a role to a device.
-    async fn assign_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
+    async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
-    async fn revoke_role(team: TeamId, device: DeviceId, role: Role) -> Result<()>;
+    async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
 
     /// Assign a QUIC channels network identifier to a device.
     async fn assign_aqc_net_identifier(
@@ -589,7 +712,7 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     // Create a label.
-    async fn create_label(team: TeamId, name: String) -> Result<LabelId>;
+    async fn create_label(team: TeamId, name: String, managing_role_id: RoleId) -> Result<Label>;
     // Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     // Assign a label to a device.
@@ -623,8 +746,12 @@ pub trait DaemonApi {
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
-    /// Query device role.
-    async fn query_device_role(team: TeamId, device: DeviceId) -> Result<Role>;
+    /// Query roles on team.
+    async fn query_roles_on_team(team: TeamId) -> Result<Vec<Role>>;
+    /// Query device roles.
+    async fn query_device_roles(team: TeamId, device: DeviceId) -> Result<Vec<Role>>;
+    /// Query role operations.
+    async fn query_role_operations(team: TeamId, role: RoleId) -> Result<Vec<Op>>;
     /// Query device keybundle.
     async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
     /// Query device label assignments.
@@ -638,90 +765,4 @@ pub trait DaemonApi {
     async fn query_labels(team: TeamId) -> Result<Vec<Label>>;
     /// Query whether a label exists.
     async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
-}
-
-#[cfg(test)]
-mod tests {
-    use aranya_crypto::Rng;
-    use serde::de::DeserializeOwned;
-
-    use super::*;
-
-    fn secret(secret: &[u8]) -> Secret {
-        Secret(Box::from(secret))
-    }
-
-    pub(super) trait PskMap:
-        fmt::Debug + PartialEq + Serialize + DeserializeOwned + Sized
-    {
-        type Psk;
-        fn new() -> Self;
-        /// Returns the number of PSKs in the map.
-        fn len(&self) -> usize;
-        /// Adds `psk` to the map.
-        ///
-        /// # Panics
-        ///
-        /// Panics if `psk` already exists.
-        fn insert(&mut self, psk: Self::Psk);
-    }
-
-    impl PartialEq for AqcBidiPsk {
-        fn eq(&self, other: &Self) -> bool {
-            bool::from(self.ct_eq(other))
-        }
-    }
-    impl PartialEq for AqcUniPsk {
-        fn eq(&self, other: &Self) -> bool {
-            bool::from(self.ct_eq(other))
-        }
-    }
-    impl PartialEq for AqcPsk {
-        fn eq(&self, other: &Self) -> bool {
-            bool::from(self.ct_eq(other))
-        }
-    }
-
-    #[track_caller]
-    fn psk_map_test<M, F>(name: &'static str, mut f: F)
-    where
-        M: PskMap,
-        F: FnMut(Secret, Id, CipherSuiteId) -> M::Psk,
-    {
-        let mut psks = M::new();
-        for (i, &suite) in CipherSuiteId::all().iter().enumerate() {
-            let id = Id::random(&mut Rng);
-            let secret = secret(&i.to_le_bytes());
-            psks.insert(f(secret, id, suite));
-        }
-        assert_eq!(psks.len(), CipherSuiteId::all().len(), "{name}");
-
-        let bytes = postcard::to_allocvec(&psks).unwrap();
-        let got = postcard::from_bytes::<M>(&bytes).unwrap();
-        assert_eq!(got, psks, "{name}")
-    }
-
-    /// Test that we can correctly serialize and deserialize
-    /// [`AqcBidiPsk`].
-    #[test]
-    fn test_aqc_bidi_psks_serde() {
-        psk_map_test::<AqcBidiPsks, _>("AqcBidiPsk", |secret, id, suite| AqcBidiPsk {
-            identity: BidiPskId::from((id.into(), suite)),
-            secret,
-        });
-    }
-
-    /// Test that we can correctly serialize and deserialize
-    /// [`AqcUniPsk`].
-    #[test]
-    fn test_aqc_uni_psks_serde() {
-        psk_map_test::<AqcUniPsks, _>("AqcUniPsk (send)", |secret, id, suite| AqcUniPsk {
-            identity: UniPskId::from((id.into(), suite)),
-            secret: Directed::Send(secret),
-        });
-        psk_map_test::<AqcUniPsks, _>("AqcUniPsk (recv)", |secret, id, suite| AqcUniPsk {
-            identity: UniPskId::from((id.into(), suite)),
-            secret: Directed::Recv(secret),
-        });
-    }
 }

@@ -5,9 +5,9 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Context as _, Result};
-use aranya_client::{client::Client, Error, SyncPeerConfig, TeamConfig};
-use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use anyhow::{Context as _, Result};
+use aranya_client::{client::Client, SyncPeerConfig, TeamConfig};
+use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier};
 use backon::{ExponentialBuilder, Retryable};
 use tempfile::TempDir;
 use tokio::{
@@ -226,32 +226,32 @@ async fn main() -> Result<()> {
     let mut membera_team = membera.client.team(team_id);
     let mut memberb_team = memberb.client.team(team_id);
 
+    let roles = owner_team.setup_default_roles().await?;
+    assert_eq!(roles.iter().count(), 3);
+    let mut roles_iter = roles.iter();
+    let admin_role = roles_iter.next().expect("expected admin role");
+    assert_eq!(admin_role.name, "admin");
+    let operator_role = roles_iter.next().expect("expected operator role");
+    assert_eq!(operator_role.name, "operator");
+    let member_role = roles_iter.next().expect("expected member role");
+    assert_eq!(member_role.name, "member");
+
+    // add admin to team.
     info!("adding admin to team");
-    owner_team.add_device_to_team(admin.pk).await?;
-    owner_team.assign_role(admin.id, Role::Admin).await?;
+    owner_team.add_device_to_team(admin.pk, 9000).await?;
+    info!("assigning new device precedence to admin");
+    owner_team.assign_device_precedence(admin.id, 8500).await?;
+    owner_team.assign_role(admin.id, admin_role.id).await?;
 
     sleep(sleep_interval).await;
 
     info!("adding operator to team");
-    owner_team.add_device_to_team(operator.pk).await?;
+    owner_team.add_device_to_team(operator.pk, 8000).await?;
 
     sleep(sleep_interval).await;
-
-    // Admin tries to assign a role
-    match admin_team.assign_role(operator.id, Role::Operator).await {
-        Ok(()) => bail!("expected role assignment to fail"),
-        Err(Error::Aranya(_)) => {}
-        Err(err) => bail!("unexpected error: {err:?}"),
-    }
-
-    // Admin syncs with the Owner peer and retries the role
-    // assignment command
-    admin_team.sync_now(owner_addr.into(), None).await?;
-
-    sleep(sleep_interval).await;
-
-    info!("assigning role");
-    admin_team.assign_role(operator.id, Role::Operator).await?;
+    owner_team
+        .assign_role(operator.id, operator_role.id)
+        .await?;
 
     info!("adding sync peers");
     owner_team
@@ -315,11 +315,17 @@ async fn main() -> Result<()> {
 
     // add membera to team.
     info!("adding membera to team");
-    operator_team.add_device_to_team(membera.pk).await?;
+    owner_team.add_device_to_team(membera.pk, 7000).await?;
+    owner_team
+        .assign_role(membera.id, member_role.id)
+        .await?;
 
     // add memberb to team.
     info!("adding memberb to team");
-    operator_team.add_device_to_team(memberb.pk).await?;
+    owner_team.add_device_to_team(memberb.pk, 7000).await?;
+    owner_team
+        .assign_role(memberb.id, member_role.id)
+        .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -337,10 +343,24 @@ async fn main() -> Result<()> {
 
     // fact database queries
     let mut queries = membera.client.queries(team_id);
+    info!("query list of devices on team:");
     let devices = queries.devices_on_team().await?;
+    for device in devices.iter() {
+        info!("device: {}", device);
+    }
+    info!("query list of roles on team:");
+    let roles = queries.roles_on_team().await?;
+    for role in roles.iter() {
+        info!("role: {:?}", role);
+    }
     info!("membera devices on team: {:?}", devices.iter().count());
-    let role = queries.device_role(membera.id).await?;
-    info!("membera role: {:?}", role);
+    for device in devices.iter() {
+        info!("querying roles assigned to device: {}", device);
+        let roles = queries.device_roles(*device).await?;
+        for role in roles.iter() {
+            info!("role: {:?}, device: {}", role, device);
+        }
+    }
     let keybundle = queries.device_keybundle(membera.id).await?;
     info!("membera keybundle: {:?}", keybundle);
     let queried_membera_net_ident = queries.aqc_net_identifier(membera.id).await?;
@@ -362,9 +382,13 @@ async fn main() -> Result<()> {
     let label3 = operator_team.create_label("label3".to_string()).await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
-    operator_team.assign_label(membera.id, label3, op).await?;
+    operator_team
+        .assign_label(membera.id, label3.id, op)
+        .await?;
     info!("assigning label to memberb");
-    operator_team.assign_label(memberb.id, label3, op).await?;
+    operator_team
+        .assign_label(memberb.id, label3.id, op)
+        .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -374,17 +398,16 @@ async fn main() -> Result<()> {
     let _aqc_id1 = membera
         .client
         .aqc()
-        .create_bidi_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label3)
+        .create_bidi_channel(team_id, NetIdentifier(memberb_aqc_addr.to_string()), label3.id)
         .await?;
     info!("receiving acq bidi channel");
 
     // TODO: send AQC data.
     info!("revoking label from membera");
-    operator_team.revoke_label(membera.id, label3).await?;
+    operator_team.revoke_label(membera.id, label3.id).await?;
     info!("revoking label from memberb");
-    operator_team.revoke_label(memberb.id, label3).await?;
-    info!("deleting label");
-    admin_team.delete_label(label3).await?;
+    operator_team.revoke_label(memberb.id, label3.id).await?;
+    // TODO: delete label.
 
     info!("completed aqc demo");
 
