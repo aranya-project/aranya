@@ -237,3 +237,81 @@ async fn test_aqc_chans() -> Result<()> {
 
     Ok(())
 }
+
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_aqc_chans_not_auth_label() -> Result<()> {
+    let interval = Duration::from_millis(100);
+    let sleep_interval = interval * 6;
+
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
+    let mut team = TeamCtx::new("test_aqc_chans", work_dir).await?;
+
+    let cfg = TeamConfig::builder().build()?;
+    // create team.
+    let team_id = team
+        .owner
+        .client
+        .create_team(cfg)
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // Tell all peers to sync with one another, and assign their roles.
+    team.add_all_sync_peers(team_id).await?;
+    team.add_all_device_roles(team_id).await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    let mut operator_team = team.operator.client.team(team_id);
+    operator_team
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_addr.clone())
+        .await?;
+    operator_team
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_addr.clone())
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // wait for ctrl message to be sent.
+    sleep(Duration::from_millis(100)).await;
+
+    let label1 = operator_team.create_label("label1".to_string()).await?;
+    let op = ChanOp::SendRecv;
+    operator_team
+        .assign_label(team.membera.id, label1, op)
+        .await?;
+    operator_team
+        .assign_label(team.memberb.id, label1, op)
+        .await?;
+
+    let label2 = operator_team.create_label("label2".to_string()).await?;
+    let op = ChanOp::SendRecv;
+    operator_team
+        .assign_label(team.membera.id, label2, op)
+        .await?;
+    operator_team
+        .assign_label(team.memberb.id, label2, op)
+        .await?;
+
+    let label3 = operator_team.create_label("label3".to_string()).await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    try_join(
+        team.membera.client.aqc().create_bidi_channel(
+            team_id,
+            team.memberb.aqc_addr.clone(),
+            label3,
+        ),
+        team.memberb.client.aqc().receive_channel(),
+    )
+    .await
+    .expect_err("can create and receive channel");
+
+    Ok(())
+}
