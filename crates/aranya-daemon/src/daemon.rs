@@ -46,7 +46,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 /// EF = Policy Effect
 pub(crate) type EF = policy::Effect;
 
-pub(crate) type Client = aranya::Client<EN, SP, CE>;
+pub(crate) type Client = aranya::Client<EN, SP>;
 type TcpSyncServer = crate::sync::tcp::Server<EN, SP>;
 
 /// The daemon itself.

@@ -34,11 +34,8 @@ use tokio::{
 };
 
 // Aranya sync client for testing.
-pub type TestClient = aranya::Client<
-    PolicyEngine<DefaultEngine, Store>,
-    LinearStorageProvider<FileManager>,
-    DefaultEngine,
->;
+pub type TestClient =
+    aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
 // Aranya sync server for testing.
 pub type TestServer =
