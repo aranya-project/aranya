@@ -1,0 +1,38 @@
+name: "API Stability"
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      workflow:
+        required: true
+        type: string
+
+env:
+  REV: ${{ github.run_id }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  check-external-types:
+    strategy:
+      matrix:
+        include:
+          - runner: "ubuntu-latest"
+            artifact: "aranya-daemon-x86_64-unknown-linux-gnu"
+    name: check external types ${{ matrix.artifact }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+
+      - name: Check external types
+        run: |
+          cargo make check-external-types
