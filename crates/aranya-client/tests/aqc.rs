@@ -6,7 +6,7 @@ mod common;
 use anyhow::Result;
 use aranya_client::{aqc::AqcPeerChannel, TeamConfig};
 use aranya_crypto::csprng::rand;
-use aranya_daemon_api::ChanOp;
+use aranya_daemon_api::{ChanOp, NetIdentifier};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
 use common::{sleep, TeamCtx};
@@ -22,7 +22,7 @@ async fn test_aqc_chans() -> Result<()> {
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans", work_dir, 9000).await?;
+    let mut team = TeamCtx::new("test_aqc_chans", work_dir).await?;
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
@@ -43,10 +43,16 @@ async fn test_aqc_chans() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_addr.clone())
+        .assign_aqc_net_identifier(
+            team.membera.id,
+            NetIdentifier(team.membera.client.aqc().server_addr()?.to_string()),
+        )
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_addr.clone())
+        .assign_aqc_net_identifier(
+            team.memberb.id,
+            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+        )
         .await?;
 
     // wait for syncing.
@@ -80,7 +86,7 @@ async fn test_aqc_chans() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                team.memberb.aqc_addr.clone(),
+                NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),
@@ -166,7 +172,7 @@ async fn test_aqc_chans() -> Result<()> {
         let (mut uni_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_uni_channel(
                 team_id,
-                team.memberb.aqc_addr.clone(),
+                NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),
@@ -197,7 +203,7 @@ async fn test_aqc_chans() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                team.memberb.aqc_addr.clone(),
+                NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
                 label2,
             ),
             async {
@@ -246,7 +252,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_sender", work_dir, 9020).await?;
+    let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_sender", work_dir).await?;
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
@@ -267,10 +273,16 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_addr.clone())
+        .assign_aqc_net_identifier(
+            team.membera.id,
+            NetIdentifier(team.membera.client.aqc().server_addr()?.to_string()),
+        )
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_addr.clone())
+        .assign_aqc_net_identifier(
+            team.memberb.id,
+            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+        )
         .await?;
 
     // wait for syncing.
@@ -311,7 +323,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     try_join(
         team.membera.client.aqc().create_bidi_channel(
             team_id,
-            team.memberb.aqc_addr.clone(),
+            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
             label3,
         ),
         team.memberb.client.aqc().receive_channel(),
@@ -330,7 +342,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_recvr", work_dir, 9040).await?;
+    let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_recvr", work_dir).await?;
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
@@ -351,10 +363,16 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_addr.clone())
+        .assign_aqc_net_identifier(
+            team.membera.id,
+            NetIdentifier(team.membera.client.aqc().server_addr()?.to_string()),
+        )
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_addr.clone())
+        .assign_aqc_net_identifier(
+            team.memberb.id,
+            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+        )
         .await?;
 
     // wait for syncing.
@@ -395,7 +413,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     try_join(
         team.membera.client.aqc().create_bidi_channel(
             team_id,
-            team.memberb.aqc_addr.clone(),
+            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
             label3,
         ),
         team.memberb.client.aqc().receive_channel(),
@@ -414,7 +432,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans_close_sender_stream", work_dir, 9010).await?;
+    let mut team = TeamCtx::new("test_aqc_chans_close_sender_stream", work_dir).await?;
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
@@ -435,10 +453,16 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_addr.clone())
+        .assign_aqc_net_identifier(
+            team.membera.id,
+            NetIdentifier(team.membera.client.aqc().server_addr()?.to_string()),
+        )
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_addr.clone())
+        .assign_aqc_net_identifier(
+            team.memberb.id,
+            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+        )
         .await?;
 
     // wait for syncing.
@@ -472,7 +496,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                team.memberb.aqc_addr.clone(),
+                NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),
@@ -553,7 +577,7 @@ async fn test_aqc_chans_delete_chan() -> Result<()> {
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans_delete_chan", work_dir, 9030).await?;
+    let mut team = TeamCtx::new("test_aqc_chans_delete_chan", work_dir).await?;
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
@@ -574,10 +598,16 @@ async fn test_aqc_chans_delete_chan() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_addr.clone())
+        .assign_aqc_net_identifier(
+            team.membera.id,
+            NetIdentifier(team.membera.client.aqc().server_addr()?.to_string()),
+        )
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_addr.clone())
+        .assign_aqc_net_identifier(
+            team.memberb.id,
+            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+        )
         .await?;
 
     // wait for syncing.
@@ -611,7 +641,7 @@ async fn test_aqc_chans_delete_chan() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                team.memberb.aqc_addr.clone(),
+                NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),

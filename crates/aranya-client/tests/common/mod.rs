@@ -113,52 +113,12 @@ pub struct TeamCtx {
 }
 
 impl TeamCtx {
-    pub async fn new(name: &str, work_dir: PathBuf, port_start: u16) -> Result<Self> {
-        let owner = DeviceCtx::new(
-            name,
-            "owner",
-            work_dir.join("owner"),
-            port_start
-                .checked_add(1)
-                .expect("expected to choose port number"),
-        )
-        .await?;
-        let admin = DeviceCtx::new(
-            name,
-            "admin",
-            work_dir.join("admin"),
-            port_start
-                .checked_add(2)
-                .expect("expected to choose port number"),
-        )
-        .await?;
-        let operator = DeviceCtx::new(
-            name,
-            "operator",
-            work_dir.join("operator"),
-            port_start
-                .checked_add(3)
-                .expect("expected to choose port number"),
-        )
-        .await?;
-        let membera = DeviceCtx::new(
-            name,
-            "membera",
-            work_dir.join("membera"),
-            port_start
-                .checked_add(4)
-                .expect("expected to choose port number"),
-        )
-        .await?;
-        let memberb = DeviceCtx::new(
-            name,
-            "memberb",
-            work_dir.join("memberb"),
-            port_start
-                .checked_add(5)
-                .expect("expected to choose port number"),
-        )
-        .await?;
+    pub async fn new(name: &str, work_dir: PathBuf) -> Result<Self> {
+        let owner = DeviceCtx::new(name, "owner", work_dir.join("owner"), 0).await?;
+        let admin = DeviceCtx::new(name, "admin", work_dir.join("admin"), 0).await?;
+        let operator = DeviceCtx::new(name, "operator", work_dir.join("operator"), 0).await?;
+        let membera = DeviceCtx::new(name, "membera", work_dir.join("membera"), 0).await?;
+        let memberb = DeviceCtx::new(name, "memberb", work_dir.join("memberb"), 0).await?;
 
         Ok(Self {
             owner,
@@ -293,7 +253,7 @@ impl DeviceCtx {
         sleep(SLEEP_INTERVAL).await;
 
         // Initialize the user library.
-        let (mut client, _aqc_addr) = (|| {
+        let (mut client, aqc_addr) = (|| {
             Client::builder()
                 .with_daemon_uds_path(&uds_api_path)
                 .with_daemon_api_pk(&pk_bytes)
