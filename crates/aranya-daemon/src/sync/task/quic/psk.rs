@@ -8,10 +8,14 @@ use std::{
 use ::rustls::{client::PresharedKeyStore, crypto::PresharedKey, server::SelectsPresharedKeys};
 use anyhow::{bail, Result};
 use aranya_daemon_api::TeamId;
+use aranya_runtime::StorageProvider;
+use aranya_util::NonEmptyString;
 use buggy::BugExt as _;
 use s2n_quic::provider::tls::rustls::rustls::pki_types::ServerName;
 use tokio::sync::mpsc;
-use tracing::error;
+use tracing::{debug, error};
+
+use super::AranyaClient;
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
@@ -163,30 +167,100 @@ impl PresharedKeyStore for ClientPresharedKeys {
     }
 }
 
-// pub(super) async fn get_existing_psks<EN, SP: StorageProvider>(
-//     client: AranyaClient<EN, SP>,
-//     service_name: &NonEmptyString,
-// ) -> Result<Vec<PresharedKey>> {
-//     let mut aranya_client = client.lock().await;
-//     let graph_id_iter = aranya_client.provider().list_graph_ids()?.flatten();
+#[inline(always)]
+fn identity_user_str(id: &TeamId) -> String {
+    format!("{id}-identity")
+}
 
-//     let mut keys = Vec::new();
-//     for id in graph_id_iter {
-//         let id_string = id.to_string();
-//         let Ok(entry) = keyring::Entry::new(service_name, &id_string) else {
-//             continue;
-//         };
-//         let Ok(secret) = entry.get_secret() else {
-//             debug!("Unable to get PSK secret for graph_id {id_string}");
-//             continue;
-//         };
+#[inline(always)]
+fn secret_user_str(id: &TeamId) -> String {
+    format!("{id}-secret")
+}
 
-//         let Some(psk) = PresharedKey::external(id_string.as_bytes(), &secret) else {
-//             debug!("Unable to create external PSK for graph_id {id_string}");
-//             continue;
-//         };
-//         keys.push(psk);
-//     }
+pub(crate) async fn get_existing_psks<EN, SP: StorageProvider>(
+    client: AranyaClient<EN, SP>,
+    service_name: &NonEmptyString,
+) -> Result<Vec<TeamIdPSKPair>> {
+    let mut aranya_client = client.lock().await;
+    let graph_id_iter = aranya_client
+        .provider()
+        .list_graph_ids()?
+        .flatten()
+        .map(|id| TeamId::from(*id.as_array()));
 
-//     Ok(keys)
-// }
+    let mut keys = Vec::new();
+    for id in graph_id_iter {
+        let identity = {
+            let user_string = identity_user_str(&id);
+            let Ok(entry) = keyring::Entry::new(service_name, &user_string) else {
+                continue;
+            };
+            let Ok(identity) = entry.get_secret().inspect_err(|e| error!(%e)) else {
+                debug!("Unable to get PSK identity for graph_id: {id}");
+                continue;
+            };
+            identity
+        };
+
+        let secret = {
+            let user_string = secret_user_str(&id);
+            let Ok(entry) = keyring::Entry::new(service_name, &user_string) else {
+                continue;
+            };
+            let Ok(secret) = entry.get_secret().inspect_err(|e| error!(%e)) else {
+                debug!("Unable to get PSK secret for graph_id: {id}");
+                continue;
+            };
+            secret
+        };
+
+        let Some(psk) = PresharedKey::external(&identity, &secret) else {
+            debug!("Unable to create external PSK for graph_id: {id}");
+            continue;
+        };
+        keys.push((id, Arc::new(psk)));
+    }
+
+    Ok(keys)
+}
+
+/// Inserts a PSK's identity and secret in the platform's credential store
+pub(crate) fn insert_psk(
+    service_name: &NonEmptyString,
+    id: &TeamId,
+    identity: &[u8],
+    secret: &[u8],
+) -> Result<()> {
+    {
+        let user_string = identity_user_str(id);
+        let entry = keyring::Entry::new(service_name, &user_string)?;
+        // Entry may already exist
+        let _ = entry.set_secret(identity).inspect_err(|e| error!(%e));
+    }
+
+    {
+        let user_string = secret_user_str(id);
+        let entry = keyring::Entry::new(service_name, &user_string)?;
+        let _ = entry.set_secret(secret).inspect_err(|e| error!(%e));
+    }
+
+    Ok(())
+}
+
+/// Deletes a PSK's identity and secret in the platform's credential store
+pub(crate) fn delete_psk(service_name: &NonEmptyString, id: &TeamId) -> Result<()> {
+    {
+        let user_string = identity_user_str(id);
+        let entry = keyring::Entry::new(service_name, &user_string)?;
+        // Entry may already exist
+        let _ = entry.delete_credential().inspect_err(|e| error!(%e));
+    }
+
+    {
+        let user_string = secret_user_str(id);
+        let entry = keyring::Entry::new(service_name, &user_string)?;
+        let _ = entry.delete_credential().inspect_err(|e| error!(%e));
+    }
+
+    Ok(())
+}

@@ -37,7 +37,7 @@ use crate::{
     sync::{
         prot::SyncProtocol,
         task::{
-            quic::{ServerPresharedKeys, State as QuicSyncState, TeamIdPSKPair},
+            quic::{get_existing_psks, ServerPresharedKeys, State as QuicSyncState, TeamIdPSKPair},
             Syncer,
         },
     },
@@ -59,8 +59,6 @@ pub(crate) type EF = policy::Effect;
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
 pub(crate) const DEFAULT_SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
-
-// pub(crate) const SERVICE_NAME: &str = "Aranya-QUIC-Sync";
 
 /// The daemon itself.
 pub struct Daemon {
@@ -100,12 +98,9 @@ impl Daemon {
         let mut local_store = self.load_local_keystore().await?;
         let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
 
-        // TODO: Load graph IDs from storage
-        let initial_keys = [];
-
         // Initialize the Aranya client and sync server.
-        let (client, local_addr, server_keys) = {
-            let (client, server, server_keys) = self
+        let (client, local_addr, server_keys, initial_keys) = {
+            let (client, server, server_keys, initial_keys) = self
                 .setup_aranya(
                     eng.clone(),
                     aranya_store
@@ -113,13 +108,12 @@ impl Daemon {
                         .context("unable to clone keystore")?,
                     &pk,
                     self.cfg.sync_addr,
-                    initial_keys.clone(),
                 )
                 .await?;
             let local_addr = server.local_addr()?;
             set.spawn(async move { server.serve().await });
 
-            (client, local_addr, server_keys)
+            (client, local_addr, server_keys, initial_keys)
         };
 
         // Sync in the background at some specified interval.
@@ -237,8 +231,12 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-        initial_keys: impl IntoIterator<Item = TeamIdPSKPair>,
-    ) -> Result<(Client, SyncServer, Arc<ServerPresharedKeys>)> {
+    ) -> Result<(
+        Client,
+        SyncServer,
+        Arc<ServerPresharedKeys>,
+        Vec<TeamIdPSKPair>,
+    )> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -250,6 +248,7 @@ impl Daemon {
         )));
 
         let client = Client::new(Arc::clone(&aranya));
+        let initial_keys = get_existing_psks(client.clone(), &self.cfg.service_name).await?;
 
         let (server, server_keys) = {
             info!(addr = %external_sync_addr, "starting QUIC sync server");
@@ -257,7 +256,7 @@ impl Daemon {
                 client.clone(),
                 &external_sync_addr,
                 DEFAULT_SYNC_PROTOCOL,
-                initial_keys,
+                initial_keys.clone(),
             )
             .await
             .context("unable to initialize QUIC sync server")?
@@ -265,7 +264,7 @@ impl Daemon {
 
         info!(device_id = %device_id, "set up Aranya");
 
-        Ok((client, server, server_keys))
+        Ok((client, server, server_keys, initial_keys))
     }
 
     /// Loads the crypto engine.

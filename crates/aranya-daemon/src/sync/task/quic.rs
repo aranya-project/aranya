@@ -56,7 +56,7 @@ pub static CERT_PEM: &str = include_str!("./cert.pem");
 pub static KEY_PEM: &str = include_str!("./key.pem");
 
 mod psk;
-pub(crate) use psk::TeamIdPSKPair;
+pub(crate) use psk::{delete_psk, get_existing_psks, insert_psk, TeamIdPSKPair};
 pub use psk::{ClientPresharedKeys, Msg, ServerPresharedKeys};
 
 /// Data used for sending sync requests and processing sync responses

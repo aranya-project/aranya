@@ -36,7 +36,10 @@ use crate::{
     aqc::Aqc,
     daemon::KS,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::task::{quic::Msg, SyncPeers},
+    sync::task::{
+        quic::{delete_psk, insert_psk, Msg},
+        SyncPeers,
+    },
     Client, EF,
 };
 
@@ -1000,45 +1003,4 @@ impl From<ChanOp> for api::ChanOp {
             ChanOp::SendOnly => api::ChanOp::SendOnly,
         }
     }
-}
-
-/// Inserts a PSK's identity and secret in the platform's credential store
-fn insert_psk(
-    service_name: &NonEmptyString,
-    id: &api::TeamId,
-    identity: &[u8],
-    secret: &[u8],
-) -> Result<()> {
-    {
-        let user_string = format!("{id}-identity");
-        let entry = keyring::Entry::new(service_name, &user_string)?;
-        // Entry may already exist
-        let _ = entry.set_secret(identity).inspect_err(|e| error!(%e));
-    }
-
-    {
-        let user_string = format!("{id}-secret");
-        let entry = keyring::Entry::new(service_name, &user_string)?;
-        let _ = entry.set_secret(secret).inspect_err(|e| error!(%e));
-    }
-
-    Ok(())
-}
-
-/// Deletes a PSK's identity and secret in the platform's credential store
-fn delete_psk(service_name: &NonEmptyString, id: &api::TeamId) -> Result<()> {
-    {
-        let user_string = format!("{id}-identity");
-        let entry = keyring::Entry::new(service_name, &user_string)?;
-        // Entry may already exist
-        let _ = entry.delete_credential().inspect_err(|e| error!(%e));
-    }
-
-    {
-        let user_string = format!("{id}-secret");
-        let entry = keyring::Entry::new(service_name, &user_string)?;
-        let _ = entry.delete_credential().inspect_err(|e| error!(%e));
-    }
-
-    Ok(())
 }
