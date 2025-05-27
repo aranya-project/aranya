@@ -45,9 +45,9 @@ impl AqcPeerChannel {
 /// Allows sending data streams over a channel.
 #[derive(Debug)]
 pub struct AqcSenderChannel {
-    pub(crate) label_id: LabelId,
-    pub(crate) handle: Handle,
-    pub(crate) id: UniChannelId,
+    label_id: LabelId,
+    handle: Handle,
+    id: UniChannelId,
 }
 
 impl AqcSenderChannel {
@@ -81,7 +81,7 @@ impl AqcSenderChannel {
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
     pub fn close(&mut self) {
-        pub(crate) const ERROR_CODE: u32 = 0;
+        const ERROR_CODE: u32 = 0;
         self.handle.close(ERROR_CODE.into());
     }
 }
@@ -96,9 +96,9 @@ impl Drop for AqcSenderChannel {
 /// Allows receiving data streams over a channel.
 #[derive(Debug)]
 pub struct AqcReceiveChannel {
-    pub(crate) label_id: LabelId,
-    pub(crate) aqc_id: UniChannelId,
-    pub(crate) conn: Connection,
+    label_id: LabelId,
+    aqc_id: UniChannelId,
+    conn: Connection,
 }
 
 impl AqcReceiveChannel {
@@ -152,9 +152,9 @@ impl AqcReceiveChannel {
 /// Allows sending and receiving data streams over a channel.
 #[derive(Debug)]
 pub struct AqcBidiChannel {
-    pub(crate) label_id: LabelId,
-    pub(crate) aqc_id: BidiChannelId,
-    pub(crate) conn: Connection,
+    label_id: LabelId,
+    aqc_id: BidiChannelId,
+    conn: Connection,
 }
 
 impl AqcBidiChannel {
@@ -296,7 +296,7 @@ impl AqcBidiStream {
 
 /// Used to receive data from a peer.
 #[derive(Debug)]
-pub struct AqcReceiveStream(pub(crate) ReceiveStream);
+pub struct AqcReceiveStream(ReceiveStream);
 
 impl AqcReceiveStream {
     /// Receive the next available data from a stream. If the stream has
@@ -329,7 +329,7 @@ impl AqcReceiveStream {
 
 /// Used to send data to a peer.
 #[derive(Debug)]
-pub struct AqcSendStream(pub(crate) SendStream);
+pub struct AqcSendStream(SendStream);
 
 impl AqcSendStream {
     /// Send data to the given stream.

@@ -49,12 +49,11 @@ pub enum AqcChannelId {
 /// Sends and receives AQC messages.
 #[derive(Debug)]
 pub(crate) struct AqcChannelsImpl {
-    pub(crate) client: AqcClient,
+    client: AqcClient,
 }
 
 impl AqcChannelsImpl {
     /// Creates a new `QuicChannelsImpl` listening for connections on `address`.
-    #[allow(deprecated)]
     pub(crate) async fn new(
         device_id: DeviceId,
         aqc_addr: SocketAddr,
@@ -88,7 +87,9 @@ impl AqcChannelsImpl {
         server_config.preshared_keys =
             PresharedKeySelection::Required(Arc::clone(&server_keys) as _);
 
+        #[allow(deprecated)]
         let tls_client_provider = rustls_provider::Client::new(client_config);
+        #[allow(deprecated)]
         let tls_server_provider = rustls_provider::Server::new(server_config);
         // --- End Rustls Setup ---
 
