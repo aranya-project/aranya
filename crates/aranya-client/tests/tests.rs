@@ -29,7 +29,7 @@ use tokio::{
     task::{self, AbortHandle},
     time::{self, Sleep},
 };
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, info, instrument};
 
 const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
@@ -231,7 +231,6 @@ struct DeviceCtx {
     pk: KeyBundle,
     id: DeviceId,
     daemon: AbortHandle,
-    cleanup: Option<Box<dyn FnOnce() -> Result<()>>>,
 }
 
 impl DeviceCtx {
@@ -259,9 +258,6 @@ impl DeviceCtx {
         let daemon = Daemon::load(cfg.clone())
             .await
             .context("unable to init daemon")?;
-
-        // Generate the cleanup routine for this daemon.
-        let cleanup = daemon.cleanup();
 
         // Start daemon.
         let handle = task::spawn(async move {
@@ -301,7 +297,6 @@ impl DeviceCtx {
             pk,
             id,
             daemon: handle,
-            cleanup: Some(Box::new(cleanup)),
         })
     }
 
@@ -323,9 +318,6 @@ impl DeviceCtx {
 
 impl Drop for DeviceCtx {
     fn drop(&mut self) {
-        if let Some(cleanup_fn) = self.cleanup.take() {
-            let _ = cleanup_fn().inspect_err(|e| error!(%e));
-        }
         self.daemon.abort();
     }
 }

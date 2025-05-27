@@ -1,3 +1,5 @@
+#[cfg(feature = "testing")]
+use std::collections::HashSet;
 use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -26,6 +28,8 @@ use tokio::{
 };
 use tracing::{error, info, info_span, Instrument as _};
 
+#[cfg(feature = "testing")]
+use crate::sync::task::quic::{delete_psk, Msg};
 use crate::{
     actions::Actions,
     api::{ApiKey, DaemonApiServer, PublicApiKey},
@@ -63,12 +67,18 @@ pub(crate) const DEFAULT_SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
 /// The daemon itself.
 pub struct Daemon {
     cfg: Config,
+    #[cfg(feature = "testing")]
+    delete_bucket: HashSet<aranya_daemon_api::TeamId>,
 }
 
 impl Daemon {
     /// Loads a `Daemon` using its config.
     pub async fn load(cfg: Config) -> Result<Self> {
-        Ok(Self { cfg })
+        Ok(Self {
+            cfg,
+            #[cfg(feature = "testing")]
+            delete_bucket: Default::default(),
+        })
     }
 
     /// Returns the daemon's public API key.
@@ -82,9 +92,9 @@ impl Daemon {
     }
 
     /// The daemon's entrypoint.
-    pub async fn run(self) -> Result<()> {
+    pub async fn run(mut self) -> Result<()> {
         // Setup environment for daemon's working directory.
-        // E.g. creating subdirectories.
+        // E.g. creating subdirectories.s
         self.setup_env().await?;
 
         let mut set = JoinSet::new();
@@ -189,18 +199,47 @@ impl Daemon {
             Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
         };
 
-        // TODO: Use `psk_send` in create_team and add_team API calls
+        // Declare here because self is moved into the closure below
+        let service_name = self.cfg.service_name.clone();
+        let uds_path = self.cfg.uds_api_path.clone();
+
+        #[cfg(feature = "testing")]
+        {
+            let mut cleanup_recv = psk_send.subscribe();
+            set.spawn(async move {
+                loop {
+                    match cleanup_recv.recv().await {
+                        Ok(msg) => match msg {
+                            Msg::Insert((id, _)) => {
+                                self.delete_bucket.insert(id);
+                            }
+                            Msg::Remove(id) => {
+                                self.delete_bucket.remove(&id);
+                            }
+                        },
+                        Err(RecvError::Closed) => break,
+                        Err(err) => {
+                            error!(err = ?err, "unable to receive psk on broadcast channel")
+                        }
+                    }
+                }
+
+                info!("PSK broadcast channel closed");
+                Ok(())
+            });
+        }
+
         let api = DaemonApiServer::new(
             client,
             local_addr,
-            self.cfg.uds_api_path.clone(),
+            uds_path,
             api_sk,
             pk,
             peers,
             recv_effects,
             aqc,
             psk_send,
-            self.cfg.service_name.clone(),
+            service_name,
         )?;
         api.serve().await?;
 
@@ -365,19 +404,16 @@ impl Daemon {
             }
         }
     }
-
-    /// Clean up routine.
-    ///
-    /// For testing purposes only.
-    pub fn cleanup(&self) -> impl FnOnce() -> Result<()> {
-        // FIXME: Replace this to clean up the entries in the credential store
-        move || Ok(())
-    }
 }
 
 impl Drop for Daemon {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.cfg.uds_api_path);
+
+        #[cfg(feature = "testing")]
+        for id in &self.delete_bucket {
+            let _ = delete_psk(&self.cfg.service_name, &id);
+        }
     }
 }
 
@@ -480,10 +516,8 @@ mod tests {
             .await
             .expect("should be able to load `Daemon`");
 
-        let cleanup = Box::new(daemon.cleanup());
-        let run_result = time::timeout(Duration::from_secs(1), daemon.run()).await;
-
-        let _ = cleanup();
-        run_result.expect_err("`Timeout` should return Elapsed");
+        time::timeout(Duration::from_secs(1), daemon.run())
+            .await
+            .expect_err("`Timeout` should return Elapsed");
     }
 }
