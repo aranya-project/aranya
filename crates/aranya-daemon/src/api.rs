@@ -588,7 +588,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AqcCtrl,
-    ) -> api::Result<(api::NetIdentifier, api::AqcPsks)> {
+    ) -> api::Result<api::AqcPsks> {
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
@@ -607,25 +607,15 @@ impl DaemonApi for Api {
             match effect {
                 Some(Effect::AqcBidiChannelReceived(e)) => {
                     let psks = self.aqc.bidi_channel_received(e).await?;
-                    let net_id = self
-                        .aqc
-                        .find_net_id(graph, e.author_id.into())
-                        .await
-                        .context("missing net identifier for channel author")?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok((net_id, psks));
+                    return Ok(psks);
                 }
                 Some(Effect::AqcUniChannelReceived(e)) => {
                     let psks = self.aqc.uni_channel_received(e).await?;
-                    let net_id = self
-                        .aqc
-                        .find_net_id(graph, e.author_id.into())
-                        .await
-                        .context("missing net identifier for channel author")?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok((net_id, psks));
+                    return Ok(psks);
                 }
                 Some(_) | None => {}
             }
