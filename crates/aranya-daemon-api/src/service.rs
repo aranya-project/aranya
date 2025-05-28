@@ -318,6 +318,7 @@ impl IntoIterator for AqcPsks {
     }
 }
 
+/// An iterator over an AQC channel's PSKs.
 #[derive(Debug)]
 pub enum AqcPsksIntoIter {
     Bidi(IntoPsks<AqcBidiPsk>),
@@ -528,6 +529,7 @@ impl AqcPskId {
         }
     }
 
+    /// Converts the ID to its byte encoding.
     pub fn as_bytes(&self) -> &[u8; 34] {
         match self {
             Self::Bidi(v) => v.as_bytes(),
@@ -654,10 +656,7 @@ pub trait DaemonApi {
     /// Delete a QUIC uni channel.
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
     /// Receive AQC ctrl message.
-    async fn receive_aqc_ctrl(
-        team: TeamId,
-        ctrl: AqcCtrl,
-    ) -> Result<(NetIdentifier, LabelId, AqcPsks)>;
+    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;

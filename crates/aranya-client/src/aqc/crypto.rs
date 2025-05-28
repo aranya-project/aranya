@@ -17,7 +17,7 @@ use tracing::error;
 pub(super) const PSK_IDENTITY_CTRL: &[u8; 16] = b"aranya-ctrl-psk!"; // 16 bytes
 const PSK_BYTES_CTRL: &[u8; 32] = b"this-is-a-32-byte-secret-psk!!!!"; // 32 bytes
 
-pub(super) static CTRL_KEY: LazyLock<Arc<PresharedKey>> = LazyLock::new(|| {
+pub(super) static CTRL_PSK: LazyLock<Arc<PresharedKey>> = LazyLock::new(|| {
     let psk = PresharedKey::external(PSK_IDENTITY_CTRL, PSK_BYTES_CTRL)
         .expect("identity and bytes are small and nonzero");
     let psk = psk
@@ -36,7 +36,7 @@ pub(crate) struct ServerPresharedKeys {
 impl ServerPresharedKeys {
     pub fn new() -> (Self, mpsc::Receiver<Vec<u8>>) {
         // Create the mpsc channel for PSK identities
-        let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(10);
+        let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(1);
 
         (
             Self {
@@ -118,19 +118,19 @@ impl PresharedKeyStore for ClientPresharedKeys {
 
 fn make_preshared_key(suite: CipherSuiteId, psk: AqcPsk) -> Option<Arc<PresharedKey>> {
     let key = PresharedKey::external(psk.identity().as_bytes(), psk.secret())?
-        .with_hash_alg(suite_hash(suite))?;
+        .with_hash_alg(suite_hash(suite)?)?;
     Some(Arc::new(key))
 }
 
-fn suite_hash(suite: CipherSuiteId) -> HashAlgorithm {
-    match suite {
+fn suite_hash(suite: CipherSuiteId) -> Option<HashAlgorithm> {
+    Some(match suite {
         CipherSuiteId::TlsAes128GcmSha256 => HashAlgorithm::SHA256,
         CipherSuiteId::TlsAes256GcmSha384 => HashAlgorithm::SHA384,
         CipherSuiteId::TlsChaCha20Poly1305Sha256 => HashAlgorithm::SHA256,
         CipherSuiteId::TlsAes128CcmSha256 => HashAlgorithm::SHA256,
         CipherSuiteId::TlsAes128Ccm8Sha256 => HashAlgorithm::SHA256,
-        _ => HashAlgorithm::SHA256,
-    }
+        _ => return None,
+    })
 }
 
 // --- Start SkipServerVerification ---

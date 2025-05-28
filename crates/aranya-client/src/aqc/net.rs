@@ -23,7 +23,7 @@ use tracing::{debug, error, warn};
 
 use super::{
     api::AqcChannelId,
-    crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_KEY, PSK_IDENTITY_CTRL},
+    crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL},
 };
 use crate::error::{aranya_error, AqcError, IpcError};
 
@@ -32,15 +32,30 @@ pub mod channels;
 /// An AQC client. Used to create and receive channels.
 #[derive(Debug)]
 pub(crate) struct AqcClient {
+    /// Quic client used to create channels with peers.
     quic_client: Client,
+    /// Key provider for `quic_client`.
+    ///
+    /// Modifying this will change the keys used by `quic_client`.
     client_keys: Arc<ClientPresharedKeys>,
+
+    /// Quic server used to accept channels from peers.
+    quic_server: Server,
+    /// Key provider for `quic_server`.
+    ///
+    /// Inserting to this will add keys which the `server` will accept.
     server_keys: Arc<ServerPresharedKeys>,
+    /// Receives latest selected PSK for accepted channel from server PSK provider.
+    identity_rx: mpsc::Receiver<PskIdentity>,
+
     /// Map of PSK identity to channel type
-    channels: HashMap<Vec<u8>, AqcChannelInfo>,
-    server: Server,
+    channels: HashMap<PskIdentity, AqcChannelInfo>,
+
     daemon: DaemonApiClient,
-    identity_rx: mpsc::Receiver<Vec<u8>>,
 }
+
+/// Identity of a preshared key.
+type PskIdentity = Vec<u8>;
 
 impl AqcClient {
     /// Create an Aqc client with the given certificate chain.
@@ -62,7 +77,7 @@ impl AqcClient {
             client_keys,
             server_keys,
             channels: HashMap::new(),
-            server,
+            quic_server: server,
             daemon,
             identity_rx,
         })
@@ -75,7 +90,7 @@ impl AqcClient {
 
     /// Get the server address.
     pub fn server_addr(&self) -> Result<SocketAddr, Bug> {
-        self.server.local_addr().assume("can get local addr")
+        self.quic_server.local_addr().assume("can get local addr")
     }
 
     /// Creates a new unidirectional channel to the given address.
@@ -89,7 +104,7 @@ impl AqcClient {
         self.client_keys.load_psks(AqcPsks::Uni(psks));
         let mut conn = self
             .quic_client
-            .connect(Connect::new(addr).with_server_name("localhost"))
+            .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
             .await?;
         conn.keep_alive(true)?;
         Ok(channels::AqcSenderChannel::new(
@@ -110,19 +125,18 @@ impl AqcClient {
         self.client_keys.load_psks(AqcPsks::Bidi(psks));
         let mut conn = self
             .quic_client
-            .connect(Connect::new(addr).with_server_name("localhost"))
+            .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
             .await?;
         conn.keep_alive(true)?;
         Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
     }
 
-    /// Receive the next available channel. If the channel is closed, return None.
-    /// This method will return a channel created by a peer that hasn't been received yet.
+    /// Receive the next available channel.
     pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
         loop {
             // Accept a new connection
             let mut conn = self
-                .server
+                .quic_server
                 .accept()
                 .await
                 .ok_or(AqcError::ServerConnectionTerminated)?;
@@ -148,7 +162,7 @@ impl AqcClient {
             // If it is, create a channel of the appropriate type. We should have already received
             // the control message for this PSK, if we don't we can't create a channel.
             let channel_info = self.channels.get(&identity).ok_or_else(|| {
-                debug!(
+                warn!(
                     "No channel info found in map for identity hint {:02x?}",
                     identity
                 );
@@ -162,14 +176,15 @@ impl AqcClient {
         }
     }
 
-    /// Receive the next available channel. If there is no channel available,
-    /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
-    /// is returned no channels will be available until the application is restarted.
+    /// Receive the next available channel.
+    ///
+    /// If there is no channel available, return Empty.
+    /// If the channel is closed, return Closed.
     pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         let mut cx = Context::from_waker(Waker::noop());
         loop {
             // Accept a new connection
-            let mut conn = match self.server.poll_accept(&mut cx) {
+            let mut conn = match self.quic_server.poll_accept(&mut cx) {
                 Poll::Ready(Some(conn)) => conn,
                 Poll::Ready(None) => {
                     return Err(TryReceiveError::Error(
@@ -239,10 +254,10 @@ impl AqcClient {
         ctrl: AqcCtrl,
         team_id: TeamId,
     ) -> Result<(), AqcError> {
-        self.client_keys.set_key(CTRL_KEY.clone());
+        self.client_keys.set_key(CTRL_PSK.clone());
         let mut conn = self
             .quic_client
-            .connect(Connect::new(addr).with_server_name("localhost"))
+            .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
             .await?;
         conn.keep_alive(true)?;
         let (mut recv, mut send) = conn.open_bidirectional_stream().await?.split();
@@ -296,7 +311,7 @@ impl AqcClient {
 
     /// Receives an AQC ctrl message.
     async fn process_ctrl_message(&mut self, team: TeamId, ctrl: AqcCtrl) -> crate::Result<()> {
-        let (_peer, label_id, psks) = self
+        let (label_id, psks) = self
             .daemon
             .receive_aqc_ctrl(context::current(), team, ctrl)
             .await
