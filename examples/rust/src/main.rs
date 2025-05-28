@@ -126,7 +126,7 @@ impl ClientCtx {
         // Give the daemon time to start up.
         sleep(Duration::from_millis(100)).await;
 
-        let (mut client, aqc_server_addr) = (|| {
+        let mut client = (|| {
             Client::builder()
                 .with_daemon_api_pk(&pk)
                 .with_daemon_uds_path(&uds_api_path)
@@ -137,6 +137,7 @@ impl ClientCtx {
         .await
         .context("unable to initialize client")?;
 
+        let aqc_server_addr = client.aqc().server_addr().context("exepcted server addr")?;
         let pk = client
             .get_key_bundle()
             .await
