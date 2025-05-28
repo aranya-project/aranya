@@ -276,7 +276,6 @@ impl<'a> AqcChannels<'a> {
     }
 
     /// Deletes an AQC bidi channel.
-    /// It is an error if the channel does not exist
     #[instrument(skip_all, fields(?chan))]
     pub async fn delete_bidi_channel(&mut self, mut chan: AqcBidiChannel) -> crate::Result<()> {
         // let _ctrl = self
@@ -291,7 +290,6 @@ impl<'a> AqcChannels<'a> {
     }
 
     /// Deletes an AQC uni channel.
-    /// It is an error if the channel does not exist
     #[instrument(skip_all, fields(?chan))]
     pub async fn delete_uni_channel(&mut self, mut chan: AqcSenderChannel) -> crate::Result<()> {
         // let _ctrl = self
@@ -305,16 +303,15 @@ impl<'a> AqcChannels<'a> {
         Ok(())
     }
 
-    /// Waits for a peer to create an AQC channel with this client. Returns
-    /// None if channels can no longer be received. If this happens, the
-    /// application should be restarted.
+    /// Waits for a peer to create an AQC channel with this client.
     pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
         self.client.aqc.receive_channel().await
     }
 
-    /// Returns the next available channel. If there is no channel available,
-    /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
-    /// is returned no channels will be available until the application is restarted.
+    /// Receive the next available channel.
+    ///
+    /// If there is no channel available, return Empty.
+    /// If the channel is closed, return Closed.
     pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         self.client.aqc.try_receive_channel()
     }

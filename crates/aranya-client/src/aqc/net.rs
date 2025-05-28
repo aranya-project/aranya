@@ -131,8 +131,7 @@ impl AqcClient {
         Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
     }
 
-    /// Receive the next available channel. If the channel is closed, return None.
-    /// This method will return a channel created by a peer that hasn't been received yet.
+    /// Receive the next available channel.
     pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
         loop {
             // Accept a new connection
@@ -177,9 +176,10 @@ impl AqcClient {
         }
     }
 
-    /// Receive the next available channel. If there is no channel available,
-    /// return Empty. If the channel is disconnected, return Disconnected. If disconnected
-    /// is returned no channels will be available until the application is restarted.
+    /// Receive the next available channel.
+    ///
+    /// If there is no channel available, return Empty.
+    /// If the channel is closed, return Closed.
     pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         let mut cx = Context::from_waker(Waker::noop());
         loop {
