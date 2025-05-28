@@ -30,13 +30,6 @@ use crate::{
     Client,
 };
 
-/// AQC version.
-pub type AqcVersion = u16;
-
-/// Current AQC version.
-// TODO: return `VersionMismatch` error if peer version does not match this version.
-pub const AQC_VERSION: AqcVersion = 1;
-
 /// ALPN protocol identifier for Aranya QUIC Channels
 const ALPN_AQC: &[u8] = b"aqc-v1";
 
