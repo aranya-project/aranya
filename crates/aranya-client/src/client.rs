@@ -76,7 +76,7 @@ impl ClientBuilder<'_> {
     }
 
     /// Connects to the daemon.
-    pub async fn connect(self) -> Result<(Client, SocketAddr)> {
+    pub async fn connect(self) -> Result<Client> {
         let Some(sock) = self.uds_path else {
             return Err(IpcError::new(InvalidArg::new(
                 "with_daemon_uds_path",
@@ -153,7 +153,7 @@ impl Client {
 
     /// Creates a client connection to the daemon.
     #[instrument(skip_all, fields(?path))]
-    async fn connect(path: &Path, pk: &[u8], aqc_addr: &Addr) -> Result<(Self, SocketAddr)> {
+    async fn connect(path: &Path, pk: &[u8], aqc_addr: &Addr) -> Result<Self> {
         info!("starting Aranya client");
 
         let daemon = {
@@ -199,18 +199,17 @@ impl Client {
             .context("unable to retrieve device id")
             .map_err(error::other)?;
         debug!(?device_id);
-        let aqc_addr = aqc_addr
+        let aqc_server_addr = aqc_addr
             .lookup()
             .await
             .context("unable to resolve AQC server address")
             .map_err(error::other)?
             .next()
             .expect("expected AQC server address");
-        let (aqc, aqc_server_addr) =
-            AqcChannelsImpl::new(device_id, aqc_addr, daemon.clone()).await?;
+        let aqc = AqcChannelsImpl::new(device_id, aqc_server_addr, daemon.clone()).await?;
         let client = Self { daemon, aqc };
 
-        Ok((client, aqc_server_addr))
+        Ok(client)
     }
 
     /// Returns the address that the Aranya sync server is bound to.

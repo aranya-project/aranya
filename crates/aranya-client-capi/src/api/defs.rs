@@ -214,14 +214,13 @@ pub unsafe fn client_init(
 
     let rt = tokio::runtime::Runtime::new().context("unable to construct tokio runtime")?;
 
-    // TODO: configure AQC server address.
     // SAFETY: Caller must ensure pointer is a valid C String.
     let aqc_str = unsafe { CStr::from_ptr(config.aqc_addr()) }
         .to_str()
         .context("unable to convert to string")?;
 
     let aqc_addr = aranya_util::Addr::from_str(aqc_str)?;
-    let (inner, _aqc_addr) = rt.block_on({
+    let inner = rt.block_on({
         aranya_client::Client::builder()
             .with_daemon_uds_path(daemon_socket)
             .with_daemon_api_pk(config.daemon_api_pk())

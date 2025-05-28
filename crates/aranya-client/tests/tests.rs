@@ -16,7 +16,7 @@ use test_log::test;
 use tracing::{debug, info};
 
 mod common;
-use common::{sleep, TeamCtx, SLEEP_INTERVAL}; // Import from common
+use common::{sleep, TeamCtx, SLEEP_INTERVAL};
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
