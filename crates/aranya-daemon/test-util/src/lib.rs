@@ -150,19 +150,16 @@ pub struct TestTeam<'a> {
 impl<'a> TestTeam<'a> {
     pub fn new(clients: &'a mut [TestDevice]) -> Self {
         assert!(clients.len() >= 5);
-        // TODO: Replace with https://doc.rust-lang.org/std/primitive.slice.html#method.get_disjoint_mut when we upgrade to 1.86
-        let (owner, rest) = clients.split_at_mut(1);
-        let (admin, rest) = rest.split_at_mut(1);
-        let (operator, rest) = rest.split_at_mut(1);
-        let (membera, rest) = rest.split_at_mut(1);
-        let (memberb, _) = rest.split_at_mut(1);
+        let [owner, admin, operator, membera, memberb, ..] = clients else {
+            panic!("need at least 5 clients");
+        };
 
         TestTeam {
-            owner: &mut owner[0],
-            admin: &mut admin[0],
-            operator: &mut operator[0],
-            membera: &mut membera[0],
-            memberb: &mut memberb[0],
+            owner,
+            admin,
+            operator,
+            membera,
+            memberb,
         }
     }
 }

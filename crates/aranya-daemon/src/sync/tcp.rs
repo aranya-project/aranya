@@ -1,6 +1,7 @@
 //! Aranya TCP client and server for syncing Aranya graph commands.
 
 use core::net::SocketAddr;
+use std::future::Future;
 
 use anyhow::{bail, Context, Result};
 use aranya_crypto::Rng;
@@ -24,83 +25,86 @@ use crate::aranya::Client as AranyaClient;
 pub struct State;
 
 impl SyncState for State {
+    #[allow(clippy::manual_async_fn)]
     /// Syncs with the peer.
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
-    async fn sync_impl<S>(
+    fn sync_impl<S>(
         syncer: &mut super::task::Syncer<Self>,
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> Result<()>
+    ) -> impl Future<Output = Result<()>> + Send
     where
-        S: Sink<<crate::EN as Engine>::Effect>,
+        S: Sink<<crate::EN as Engine>::Effect> + Send,
     {
-        // send the sync request.
+        async move {
+            // send the sync request.
 
-        // TODO: Real server address.
-        let server_addr = ();
-        let mut sync_requester = SyncRequester::new(id, &mut Rng, server_addr);
-        let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+            // TODO: Real server address.
+            let server_addr = ();
+            let mut sync_requester = SyncRequester::new(id, &mut Rng, server_addr);
+            let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
-        let (len, _) = {
-            let mut client = syncer.client.lock().await;
-            // TODO: save PeerCache somewhere.
-            sync_requester
-                .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
-                .context("sync poll failed")?
-        };
-        debug!(?len, "sync poll finished");
-        send_buf.truncate(len);
-        let mut stream = TcpStream::connect(peer.to_socket_addrs()).await?;
-        let addr = stream.peer_addr()?;
-
-        stream
-            .write_all(&send_buf)
-            .await
-            .context("failed to write sync request")?;
-        stream.shutdown().await?;
-        debug!(?addr, "sent sync request");
-
-        // get the sync response.
-        let mut recv = Vec::new();
-        stream
-            .read_to_end(&mut recv)
-            .await
-            .context("failed to read sync response")?;
-        debug!(?addr, n = recv.len(), "received sync response");
-
-        // process the sync response.
-        let resp =
-            postcard::from_bytes(&recv).context("postcard unable to deserialize sync response")?;
-        let data = match resp {
-            SyncResponse::Ok(data) => data,
-            SyncResponse::Err(msg) => bail!("sync error: {msg}"),
-        };
-        if data.is_empty() {
-            debug!("nothing to sync");
-            return Ok(());
-        }
-        if let Some(cmds) = sync_requester.receive(&data)? {
-            debug!(num = cmds.len(), "received commands");
-            if !cmds.is_empty() {
+            let (len, _) = {
                 let mut client = syncer.client.lock().await;
-                let mut trx = client.transaction(id);
                 // TODO: save PeerCache somewhere.
-                client
-                    .add_commands(&mut trx, sink, &cmds)
-                    .context("unable to add received commands")?;
-                client.commit(&mut trx, sink).context("commit failed")?;
-                // TODO: Update heads
-                // client.update_heads(
-                //     id,
-                //     cmds.iter().filter_map(|cmd| cmd.address().ok()),
-                //     heads,
-                // )?;
-                debug!("committed");
-            }
-        }
+                sync_requester
+                    .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
+                    .context("sync poll failed")?
+            };
+            debug!(?len, "sync poll finished");
+            send_buf.truncate(len);
+            let mut stream = TcpStream::connect(peer.to_socket_addrs()).await?;
+            let addr = stream.peer_addr()?;
 
-        Ok(())
+            stream
+                .write_all(&send_buf)
+                .await
+                .context("failed to write sync request")?;
+            stream.shutdown().await?;
+            debug!(?addr, "sent sync request");
+
+            // get the sync response.
+            let mut recv = Vec::new();
+            stream
+                .read_to_end(&mut recv)
+                .await
+                .context("failed to read sync response")?;
+            debug!(?addr, n = recv.len(), "received sync response");
+
+            // process the sync response.
+            let resp = postcard::from_bytes(&recv)
+                .context("postcard unable to deserialize sync response")?;
+            let data = match resp {
+                SyncResponse::Ok(data) => data,
+                SyncResponse::Err(msg) => bail!("sync error: {msg}"),
+            };
+            if data.is_empty() {
+                debug!("nothing to sync");
+                return Ok(());
+            }
+            if let Some(cmds) = sync_requester.receive(&data)? {
+                debug!(num = cmds.len(), "received commands");
+                if !cmds.is_empty() {
+                    let mut client = syncer.client.lock().await;
+                    let mut trx = client.transaction(id);
+                    // TODO: save PeerCache somewhere.
+                    client
+                        .add_commands(&mut trx, sink, &cmds)
+                        .context("unable to add received commands")?;
+                    client.commit(&mut trx, sink).context("commit failed")?;
+                    // TODO: Update heads
+                    // client.update_heads(
+                    //     id,
+                    //     cmds.iter().filter_map(|cmd| cmd.address().ok()),
+                    //     heads,
+                    // )?;
+                    debug!("committed");
+                }
+            }
+
+            Ok(())
+        }
     }
 }
 

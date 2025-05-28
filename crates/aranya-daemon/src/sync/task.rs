@@ -6,7 +6,7 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, future::Future, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_daemon_api::SyncPeerConfig;
@@ -165,16 +165,15 @@ struct PeerInfo {
 /// Types that contain additional data that are part of a [`Syncer`]
 /// object.
 pub trait SyncState: Sized {
-    #[allow(async_fn_in_trait)] // SyncState should be  a sealed trait?
     /// Syncs with the peer.
-    async fn sync_impl<S>(
+    fn sync_impl<S>(
         syncer: &mut Syncer<Self>,
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> Result<()>
+    ) -> impl Future<Output = Result<()>> + Send
     where
-        S: Sink<<crate::EN as Engine>::Effect>;
+        S: Sink<<crate::EN as Engine>::Effect> + Send;
 }
 
 impl<ST> Syncer<ST> {

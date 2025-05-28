@@ -100,7 +100,6 @@ impl Daemon {
                 )
                 .await?;
             let local_addr = server.local_addr()?;
-            let client = client;
             set.spawn(async move { server.serve().await });
 
             (client, local_addr)
