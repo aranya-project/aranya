@@ -32,15 +32,30 @@ pub mod channels;
 /// An AQC client. Used to create and receive channels.
 #[derive(Debug)]
 pub(crate) struct AqcClient {
+    /// Quic client used to create channels with peers.
     quic_client: Client,
+    /// Key provider for `quic_client`.
+    ///
+    /// Modifying this will change the keys used by `quic_client`.
     client_keys: Arc<ClientPresharedKeys>,
+
+    /// Quic server used to accept channels from peers.
+    quic_server: Server,
+    /// Key provider for `quic_server`.
+    ///
+    /// Inserting to this will add keys which the `server` will accept.
     server_keys: Arc<ServerPresharedKeys>,
+    /// Receives latest selected PSK for accepted channel from server PSK provider.
+    identity_rx: mpsc::Receiver<PskIdentity>,
+
     /// Map of PSK identity to channel type
-    channels: HashMap<Vec<u8>, AqcChannelInfo>,
-    server: Server,
+    channels: HashMap<PskIdentity, AqcChannelInfo>,
+
     daemon: DaemonApiClient,
-    identity_rx: mpsc::Receiver<Vec<u8>>,
 }
+
+/// Identity of a preshared key.
+type PskIdentity = Vec<u8>;
 
 impl AqcClient {
     /// Create an Aqc client with the given certificate chain.
@@ -62,7 +77,7 @@ impl AqcClient {
             client_keys,
             server_keys,
             channels: HashMap::new(),
-            server,
+            quic_server: server,
             daemon,
             identity_rx,
         })
@@ -75,7 +90,7 @@ impl AqcClient {
 
     /// Get the server address.
     pub fn server_addr(&self) -> Result<SocketAddr, Bug> {
-        self.server.local_addr().assume("can get local addr")
+        self.quic_server.local_addr().assume("can get local addr")
     }
 
     /// Creates a new unidirectional channel to the given address.
@@ -122,7 +137,7 @@ impl AqcClient {
         loop {
             // Accept a new connection
             let mut conn = self
-                .server
+                .quic_server
                 .accept()
                 .await
                 .ok_or(AqcError::ServerConnectionTerminated)?;
@@ -169,7 +184,7 @@ impl AqcClient {
         let mut cx = Context::from_waker(Waker::noop());
         loop {
             // Accept a new connection
-            let mut conn = match self.server.poll_accept(&mut cx) {
+            let mut conn = match self.quic_server.poll_accept(&mut cx) {
                 Poll::Ready(Some(conn)) => conn,
                 Poll::Ready(None) => {
                     return Err(TryReceiveError::Error(

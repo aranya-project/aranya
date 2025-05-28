@@ -160,8 +160,8 @@ impl AqcChannelsImpl {
     }
 }
 
-/// Aranya QUIC Channels client that allows for opening and closing channels and
-/// sending data between peers.
+/// Aranya QUIC Channels client for managing channels which allow sending and
+/// receiving data with peers.
 #[derive(Debug)]
 pub struct AqcChannels<'a> {
     client: &'a mut Client,
