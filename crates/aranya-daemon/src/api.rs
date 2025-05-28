@@ -4,7 +4,7 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref};
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, pin::pin, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
 use aranya_crypto::{Csprng, Rng};
@@ -18,7 +18,7 @@ use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::Addr;
 use buggy::BugExt;
-use futures_util::{pin_mut, StreamExt, TryStreamExt};
+use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
@@ -162,7 +162,7 @@ impl DaemonApiServer {
                     .inspect_err(|err| warn!(?err, "channel failure"))
                     .take_while(|r| future::ready(r.is_ok()))
                     .filter_map(|r| async { r.ok() });
-                pin_mut!(requests);
+                let mut requests = pin!(requests);
                 while let Some(req) = requests.next().await {
                     reqs.spawn(req.execute(api.clone().serve()));
                 }
@@ -557,7 +557,7 @@ impl DaemonApi for Api {
         self.handler.handle_effects(graph, &effects).await?;
 
         let psks = self.aqc.uni_channel_created(e).await?;
-        info!(num = psks.len(), "bidi channel created");
+        info!(num = psks.len(), "uni channel created");
 
         Ok((ctrl, psks))
     }
@@ -588,7 +588,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AqcCtrl,
-    ) -> api::Result<api::AqcPsks> {
+    ) -> api::Result<(api::LabelId, api::AqcPsks)> {
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
@@ -600,7 +600,7 @@ impl DaemonApi for Api {
             let effect = effects.iter().find(|e| match e {
                 Effect::AqcBidiChannelReceived(e) => e.peer_id == our_device_id.into(),
                 Effect::AqcUniChannelReceived(e) => {
-                    e.sender_id != our_device_id.into() && e.receiver_id != our_device_id.into()
+                    e.sender_id != our_device_id.into() && e.receiver_id == our_device_id.into()
                 }
                 _ => false,
             });
@@ -609,13 +609,13 @@ impl DaemonApi for Api {
                     let psks = self.aqc.bidi_channel_received(e).await?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok(psks);
+                    return Ok((e.label_id.into(), psks));
                 }
                 Some(Effect::AqcUniChannelReceived(e)) => {
                     let psks = self.aqc.uni_channel_received(e).await?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok(psks);
+                    return Ok((e.label_id.into(), psks));
                 }
                 Some(_) | None => {}
             }

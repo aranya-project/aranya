@@ -17,7 +17,7 @@ use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
-use tracing::{error, info, instrument};
+use tracing::{error, instrument, trace};
 
 use crate::{
     daemon::{Client, EF},
@@ -251,8 +251,7 @@ impl<ST: SyncState> Syncer<ST> {
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
     pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
-        info!(?peer, "syncing with peer");
-
+        trace!("syncing with peer");
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
             <ST as SyncState>::sync_impl(self, *id, &mut sink, peer)
@@ -266,7 +265,7 @@ impl<ST: SyncState> Syncer<ST> {
             .send((*id, effects))
             .await
             .context("unable to send effects")?;
-        info!(?peer, ?n, "completed sync");
+        trace!(?n, "completed sync");
         Ok(())
     }
 }

@@ -14,7 +14,7 @@ pub struct ClientConfig {
     daemon_addr: *const c_char,
     // The daemon's public API key.
     pk: Vec<u8>,
-    _aqc: AqcConfig,
+    aqc: AqcConfig,
 }
 
 impl ClientConfig {
@@ -24,6 +24,10 @@ impl ClientConfig {
 
     pub(crate) fn daemon_api_pk(&self) -> &[u8] {
         &self.pk
+    }
+
+    pub(crate) fn aqc_addr(&self) -> *const c_char {
+        self.aqc.addr
     }
 }
 
@@ -83,7 +87,7 @@ impl Builder for ClientConfigBuilder {
         let cfg = ClientConfig {
             daemon_addr: self.daemon_addr,
             pk: pk.clone(),
-            _aqc: aqc,
+            aqc,
         };
         Self::Output::init(out, cfg);
         Ok(())
@@ -104,7 +108,7 @@ impl Default for ClientConfigBuilder {
 #[derive(Clone, Debug)]
 pub struct AqcConfig {
     /// Address to bind AQC server to.
-    _addr: *const c_char,
+    pub addr: *const c_char,
 }
 
 impl Typed for AqcConfig {
@@ -138,7 +142,7 @@ impl Builder for AqcConfigBuilder {
             return Err(InvalidArg::new("addr", "field not set").into());
         }
 
-        let cfg = AqcConfig { _addr: self.addr };
+        let cfg = AqcConfig { addr: self.addr };
 
         Self::Output::init(out, cfg);
         Ok(())
