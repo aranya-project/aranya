@@ -4,7 +4,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     write_c_str, ExtendedError, InvalidArg, WriteCStrError,
 };
-use aranya_client::aqc::net::TryReceiveError;
+use aranya_client::{aqc::TryReceiveError, error::AqcError};
 use buggy::Bug;
 use tracing::warn;
 
@@ -24,7 +24,13 @@ pub enum Error {
     BufferTooSmall,
 
     #[error(transparent)]
-    TryReceive(#[from] TryReceiveError),
+    Aqc(#[from] AqcError),
+
+    #[error("haven't received any data yet")]
+    Empty,
+
+    #[error("connection was unexpectedly closed")]
+    Closed,
 
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),
@@ -43,6 +49,16 @@ pub enum Error {
 
     #[error("{0}")]
     Other(#[from] anyhow::Error),
+}
+
+impl<T: core::fmt::Display> From<TryReceiveError<T>> for Error {
+    fn from(value: TryReceiveError<T>) -> Self {
+        match value {
+            TryReceiveError::Empty => Self::Empty,
+            TryReceiveError::Closed => Self::Closed,
+            TryReceiveError::Error(e) => Self::Other(anyhow::anyhow!("{e}")),
+        }
+    }
 }
 
 impl From<WriteCStrError> for Error {

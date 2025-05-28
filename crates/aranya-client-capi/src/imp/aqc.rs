@@ -1,9 +1,9 @@
 use aranya_capi_core::safe::{TypeId, Typed};
-use aranya_client::aqc::net::{self as aqc};
+use aranya_client::aqc;
 
 /// An AQC channel that can both send and receive data.
 pub struct AqcBidiChannel {
-    pub(crate) inner: aqc::AqcBidirectionalChannel,
+    pub(crate) inner: aqc::AqcBidiChannel,
 }
 
 impl Typed for AqcBidiChannel {
@@ -11,7 +11,7 @@ impl Typed for AqcBidiChannel {
 }
 
 impl AqcBidiChannel {
-    pub fn new(channel: aqc::AqcBidirectionalChannel) -> Self {
+    pub fn new(channel: aqc::AqcBidiChannel) -> Self {
         Self { inner: channel }
     }
 }
@@ -33,7 +33,7 @@ impl AqcSenderChannel {
 
 /// An AQC channel that can only receive data.
 pub struct AqcReceiverChannel {
-    pub(crate) inner: aqc::AqcReceiverChannel,
+    pub(crate) inner: aqc::AqcReceiveChannel,
 }
 
 impl Typed for AqcReceiverChannel {
@@ -41,7 +41,7 @@ impl Typed for AqcReceiverChannel {
 }
 
 impl AqcReceiverChannel {
-    pub fn new(channel: aqc::AqcReceiverChannel) -> Self {
+    pub fn new(channel: aqc::AqcReceiveChannel) -> Self {
         Self { inner: channel }
     }
 }
@@ -50,21 +50,36 @@ impl AqcReceiverChannel {
 ///
 /// This needs to be destructured before it can be used, since C doesn't have
 /// dataful enums.
-pub struct AqcChannel {
-    pub(crate) inner: aqc::AqcReceiveChannelType,
+pub struct AqcPeerChannel {
+    pub(crate) inner: aqc::AqcPeerChannel,
 }
 
-impl Typed for AqcChannel {
+impl Typed for AqcPeerChannel {
     const TYPE_ID: TypeId = TypeId::new(0x7A1D7BE9);
 }
 
-impl AqcChannel {
-    pub fn new(channel: aqc::AqcReceiveChannelType) -> Self {
+impl AqcPeerChannel {
+    pub fn new(channel: aqc::AqcPeerChannel) -> Self {
         Self { inner: channel }
     }
 }
 
-/// The sender end of an AQC stream.
+/// An AQC stream that can both send and receive data.
+pub struct AqcBidiStream {
+    pub(crate) inner: aqc::AqcBidiStream,
+}
+
+impl Typed for AqcBidiStream {
+    const TYPE_ID: TypeId = TypeId::new(0xE084F73B);
+}
+
+impl AqcBidiStream {
+    pub fn new(stream: aqc::AqcBidiStream) -> Self {
+        Self { inner: stream }
+    }
+}
+
+/// An AQC stream that can only send data.
 pub struct AqcSendStream {
     pub(crate) inner: aqc::AqcSendStream,
 }
@@ -74,12 +89,12 @@ impl Typed for AqcSendStream {
 }
 
 impl AqcSendStream {
-    pub fn new(channel: aqc::AqcSendStream) -> Self {
-        Self { inner: channel }
+    pub fn new(stream: aqc::AqcSendStream) -> Self {
+        Self { inner: stream }
     }
 }
 
-/// The receiver end of an AQC stream.
+/// An AQC stream that can only receive data.
 pub struct AqcReceiveStream {
     pub(crate) inner: aqc::AqcReceiveStream,
     pub(crate) data: Option<bytes::Bytes>,
@@ -90,9 +105,9 @@ impl Typed for AqcReceiveStream {
 }
 
 impl AqcReceiveStream {
-    pub fn new(channel: aqc::AqcReceiveStream) -> Self {
+    pub fn new(stream: aqc::AqcReceiveStream) -> Self {
         Self {
-            inner: channel,
+            inner: stream,
             data: None,
         }
     }
