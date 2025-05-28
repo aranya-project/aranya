@@ -40,8 +40,9 @@ pub const AQC_VERSION: AqcVersion = 1;
 /// ALPN protocol identifier for Aranya QUIC Channels
 const ALPN_AQC: &[u8] = b"aqc-v1";
 
+/// An AQC Channel ID.
 #[derive(Copy, Clone, Debug)]
-pub enum AqcChannelId {
+pub(crate) enum AqcChannelId {
     Bidi(BidiChannelId),
     Uni(UniChannelId),
 }
