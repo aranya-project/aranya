@@ -7,7 +7,7 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::net::SocketAddr;
-use std::{collections::BTreeMap, sync::Arc};
+use std::{collections::BTreeMap, future::Future, sync::Arc};
 
 use ::rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig};
 use anyhow::{bail, Context, Result as AnyResult};
@@ -69,36 +69,39 @@ pub struct State {
 }
 
 impl SyncState for State {
+    #[allow(clippy::manual_async_fn)]
     /// Syncs with the peer.
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
-    async fn sync_impl<S>(
+    fn sync_impl<S>(
         syncer: &mut Syncer<Self>,
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> AnyResult<()>
+    ) -> impl Future<Output = AnyResult<()>> + Send
     where
-        S: Sink<<crate::EN as Engine>::Effect>,
+        S: Sink<<crate::EN as Engine>::Effect> + Send,
     {
-        let stream = syncer.connect(peer).await?;
-        // TODO: spawn a task for send/recv?
-        let (mut recv, mut send) = stream.split();
+        async move {
+            let stream = syncer.connect(peer).await?;
+            // TODO: spawn a task for send/recv?
+            let (mut recv, mut send) = stream.split();
 
-        // TODO: Real server address.
-        let server_addr = ();
-        let mut sync_requester = SyncRequester::new(id, &mut Rng, server_addr);
+            // TODO: Real server address.
+            let server_addr = ();
+            let mut sync_requester = SyncRequester::new(id, &mut Rng, server_addr);
 
-        // send sync request.
-        syncer
-            .send_sync_request(&mut send, &mut sync_requester, peer)
-            .await?;
+            // send sync request.
+            syncer
+                .send_sync_request(&mut send, &mut sync_requester, peer)
+                .await?;
 
-        // receive sync response.
-        syncer
-            .receive_sync_response(&mut recv, &mut sync_requester, &id, sink, peer)
-            .await?;
+            // receive sync response.
+            syncer
+                .receive_sync_response(&mut recv, &mut sync_requester, &id, sink, peer)
+                .await?;
 
-        Ok(())
+            Ok(())
+        }
     }
 }
 
