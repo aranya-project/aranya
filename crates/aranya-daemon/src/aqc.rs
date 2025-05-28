@@ -61,19 +61,6 @@ impl<E, KS> Aqc<E, KS> {
             .copied()
     }
 
-    /// Returns the peer's net ID that corresponds with `id`.
-    #[instrument(skip(self))]
-    pub(crate) async fn find_net_id(&self, graph: GraphId, id: DeviceId) -> Option<NetIdentifier> {
-        debug!("looking for peer's net ID");
-
-        self.peers
-            .lock()
-            .await
-            .get(&graph)
-            .and_then(|map| map.get_by_right(&id))
-            .cloned()
-    }
-
     /// Adds a peer.
     #[instrument(skip(self))]
     pub(crate) async fn add_peer(&self, graph: GraphId, net_id: NetIdentifier, id: DeviceId) {

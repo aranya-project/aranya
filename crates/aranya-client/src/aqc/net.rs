@@ -311,7 +311,7 @@ impl AqcClient {
 
     /// Receives an AQC ctrl message.
     async fn process_ctrl_message(&mut self, team: TeamId, ctrl: AqcCtrl) -> crate::Result<()> {
-        let (_peer, label_id, psks) = self
+        let (label_id, psks) = self
             .daemon
             .receive_aqc_ctrl(context::current(), team, ctrl)
             .await
