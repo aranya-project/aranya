@@ -104,7 +104,7 @@ impl AqcClient {
         self.client_keys.load_psks(AqcPsks::Uni(psks));
         let mut conn = self
             .quic_client
-            .connect(Connect::new(addr).with_server_name("localhost"))
+            .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
             .await?;
         conn.keep_alive(true)?;
         Ok(channels::AqcSenderChannel::new(
@@ -125,7 +125,7 @@ impl AqcClient {
         self.client_keys.load_psks(AqcPsks::Bidi(psks));
         let mut conn = self
             .quic_client
-            .connect(Connect::new(addr).with_server_name("localhost"))
+            .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
             .await?;
         conn.keep_alive(true)?;
         Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
@@ -257,7 +257,7 @@ impl AqcClient {
         self.client_keys.set_key(CTRL_PSK.clone());
         let mut conn = self
             .quic_client
-            .connect(Connect::new(addr).with_server_name("localhost"))
+            .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
             .await?;
         conn.keep_alive(true)?;
         let (mut recv, mut send) = conn.open_bidirectional_stream().await?.split();
