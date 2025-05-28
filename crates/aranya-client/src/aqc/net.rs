@@ -23,7 +23,7 @@ use tracing::{debug, error, warn};
 
 use super::{
     api::AqcChannelId,
-    crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_KEY, PSK_IDENTITY_CTRL},
+    crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL},
 };
 use crate::error::{aranya_error, AqcError, IpcError};
 
@@ -148,7 +148,7 @@ impl AqcClient {
             // If it is, create a channel of the appropriate type. We should have already received
             // the control message for this PSK, if we don't we can't create a channel.
             let channel_info = self.channels.get(&identity).ok_or_else(|| {
-                debug!(
+                warn!(
                     "No channel info found in map for identity hint {:02x?}",
                     identity
                 );
@@ -239,7 +239,7 @@ impl AqcClient {
         ctrl: AqcCtrl,
         team_id: TeamId,
     ) -> Result<(), AqcError> {
-        self.client_keys.set_key(CTRL_KEY.clone());
+        self.client_keys.set_key(CTRL_PSK.clone());
         let mut conn = self
             .quic_client
             .connect(Connect::new(addr).with_server_name("localhost"))

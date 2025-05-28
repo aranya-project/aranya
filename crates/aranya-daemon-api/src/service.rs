@@ -318,6 +318,7 @@ impl IntoIterator for AqcPsks {
     }
 }
 
+/// An iterator over an AQC channel's PSKs.
 #[derive(Debug)]
 pub enum AqcPsksIntoIter {
     Bidi(IntoPsks<AqcBidiPsk>),
@@ -528,6 +529,7 @@ impl AqcPskId {
         }
     }
 
+    /// Converts the ID to its byte encoding.
     pub fn as_bytes(&self) -> &[u8; 34] {
         match self {
             Self::Bidi(v) => v.as_bytes(),

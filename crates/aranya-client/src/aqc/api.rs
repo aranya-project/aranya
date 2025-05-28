@@ -20,7 +20,7 @@ use tracing::{debug, instrument};
 
 use super::{
     crypto::{
-        ClientPresharedKeys, NoCertResolver, ServerPresharedKeys, SkipServerVerification, CTRL_KEY,
+        ClientPresharedKeys, NoCertResolver, ServerPresharedKeys, SkipServerVerification, CTRL_PSK,
     },
     net::{AqcClient, TryReceiveError},
     AqcBidiChannel, AqcPeerChannel, AqcSenderChannel,
@@ -38,7 +38,7 @@ pub type AqcVersion = u16;
 pub const AQC_VERSION: AqcVersion = 1;
 
 /// ALPN protocol identifier for Aranya QUIC Channels
-const ALPN_AQC: &[u8] = b"aqc";
+const ALPN_AQC: &[u8] = b"aqc-v1";
 
 #[derive(Copy, Clone, Debug)]
 pub enum AqcChannelId {
@@ -53,16 +53,16 @@ pub(crate) struct AqcChannelsImpl {
 }
 
 impl AqcChannelsImpl {
-    /// Creates a new `QuicChannelsImpl` listening for connections on `address`.
+    /// Creates a new [`AqcChannelsImpl`] listening for connections on `server_addr`.
     pub(crate) async fn new(
         device_id: DeviceId,
-        aqc_addr: SocketAddr,
+        server_addr: SocketAddr,
         daemon: DaemonApiClient,
-    ) -> Result<(Self, SocketAddr), AqcError> {
+    ) -> Result<Self, AqcError> {
         debug!("device ID: {:?}", device_id);
 
         // --- Start Rustls Setup ---
-        let client_keys = Arc::new(ClientPresharedKeys::new(CTRL_KEY.clone()));
+        let client_keys = Arc::new(ClientPresharedKeys::new(CTRL_PSK.clone()));
 
         // Create Client Config (INSECURE: Skips server cert verification)
         let mut client_config = ClientConfig::builder()
@@ -76,7 +76,7 @@ impl AqcChannelsImpl {
         // client_config.psk_kex_modes = vec![PskKexMode::PskOnly];
 
         let (server_keys, identity_rx) = ServerPresharedKeys::new();
-        server_keys.insert(CTRL_KEY.clone());
+        server_keys.insert(CTRL_PSK.clone());
         let server_keys = Arc::new(server_keys);
 
         // Create Server Config
@@ -99,7 +99,7 @@ impl AqcChannelsImpl {
         // Use the rustls server provider
         let server = Server::builder()
             .with_tls(tls_server_provider)? // Use the wrapped server config
-            .with_io(aqc_addr)
+            .with_io(server_addr)
             .assume("can set aqc server addr")?
             .with_congestion_controller(Bbr::default())?
             .start()
@@ -112,7 +112,7 @@ impl AqcChannelsImpl {
             server,
             daemon,
         )?;
-        Ok((Self { client }, aqc_addr))
+        Ok(Self { client })
     }
 
     /// Returns the local address that the AQC client is bound to.
@@ -191,7 +191,7 @@ impl<'a> AqcChannels<'a> {
     ///
     /// # Cancellation Safety
     ///
-    /// It is NOT safe to cancel the resulting future. Doing so might lose data.
+    /// This method is NOT cancellation safe. Cancelling the resulting future might lose data.
     #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
     pub async fn create_bidi_channel(
         &mut self,
@@ -236,7 +236,7 @@ impl<'a> AqcChannels<'a> {
     ///
     /// # Cancellation Safety
     ///
-    /// It is NOT safe to cancel the resulting future. Doing so might lose data.
+    /// This method is NOT cancellation safe. Cancelling the resulting future might lose data.
     #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
     pub async fn create_uni_channel(
         &mut self,

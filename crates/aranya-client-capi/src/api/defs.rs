@@ -196,7 +196,6 @@ pub unsafe fn client_init(
 
     let rt = tokio::runtime::Runtime::new().context("unable to construct tokio runtime")?;
 
-    // TODO: configure AQC server address.
     // SAFETY: Caller must ensure pointer is a valid C String.
     let aqc_str = unsafe { CStr::from_ptr(config.aqc_addr()) }
         .to_str()

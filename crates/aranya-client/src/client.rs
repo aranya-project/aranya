@@ -199,15 +199,14 @@ impl Client {
             .context("unable to retrieve device id")
             .map_err(error::other)?;
         debug!(?device_id);
-        let aqc_addr = aqc_addr
+        let aqc_server_addr = aqc_addr
             .lookup()
             .await
             .context("unable to resolve AQC server address")
             .map_err(error::other)?
             .next()
             .expect("expected AQC server address");
-        let (aqc, aqc_server_addr) =
-            AqcChannelsImpl::new(device_id, aqc_addr, daemon.clone()).await?;
+        let aqc = AqcChannelsImpl::new(device_id, aqc_server_addr, daemon.clone()).await?;
         let client = Self { daemon, aqc };
 
         Ok((client, aqc_server_addr))
