@@ -306,6 +306,35 @@ pub enum AqcPsks {
     Uni(AqcUniPsks),
 }
 
+impl IntoIterator for AqcPsks {
+    type IntoIter = AqcPsksIntoIter;
+    type Item = <Self::IntoIter as Iterator>::Item;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match self {
+            AqcPsks::Bidi(psks) => AqcPsksIntoIter::Bidi(psks.into_iter()),
+            AqcPsks::Uni(psks) => AqcPsksIntoIter::Uni(psks.into_iter()),
+        }
+    }
+}
+
+/// An iterator over an AQC channel's PSKs.
+#[derive(Debug)]
+pub enum AqcPsksIntoIter {
+    Bidi(IntoPsks<AqcBidiPsk>),
+    Uni(IntoPsks<AqcUniPsk>),
+}
+
+impl Iterator for AqcPsksIntoIter {
+    type Item = (CipherSuiteId, AqcPsk);
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            AqcPsksIntoIter::Bidi(it) => it.next().map(|(s, k)| (s, AqcPsk::Bidi(k))),
+            AqcPsksIntoIter::Uni(it) => it.next().map(|(s, k)| (s, AqcPsk::Uni(k))),
+        }
+    }
+}
+
 /// An iterator over an AQC channel's PSKs.
 #[derive(Debug)]
 pub struct IntoPsks<V> {
@@ -499,6 +528,14 @@ impl AqcPskId {
             Self::Uni(v) => v.cipher_suite(),
         }
     }
+
+    /// Converts the ID to its byte encoding.
+    pub fn as_bytes(&self) -> &[u8; 34] {
+        match self {
+            Self::Bidi(v) => v.as_bytes(),
+            Self::Uni(v) => v.as_bytes(),
+        }
+    }
 }
 
 /// Configuration values for syncing with a peer
@@ -619,7 +656,7 @@ pub trait DaemonApi {
     /// Delete a QUIC uni channel.
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
     /// Receive AQC ctrl message.
-    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<AqcPsks>;
+    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;

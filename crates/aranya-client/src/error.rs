@@ -1,4 +1,4 @@
-use std::io;
+use std::{convert::Infallible, io};
 
 use aranya_daemon_api as api;
 use tarpc::client::RpcError;
@@ -111,11 +111,53 @@ pub(crate) enum IpcRepr {
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum AqcError {
+    /// The server connection was terminated.
+    #[error("server connection terminated")]
+    ServerConnectionTerminated,
+
+    /// No channel info found.
+    #[error("no channel info found")]
+    NoChannelInfoFound,
+
+    /// The connection was closed.
+    #[error("connection closed")]
+    ConnectionClosed,
+
+    /// The connection error.
+    #[error("connection error: {0}")]
+    ConnectionError(#[from] s2n_quic::connection::Error),
+
+    /// The stream error.
+    #[error("stream error: {0}")]
+    StreamError(#[from] s2n_quic::stream::Error),
+
+    /// Failed to resolve address.
+    #[error("failed to resolve address: {0}")]
+    AddrResolution(io::Error),
+
+    /// Server start error.
+    #[error("Server start error: {0}")]
+    ServerStart(#[from] s2n_quic::provider::StartError),
+
+    /// Serde serialization/deserialization error.
+    #[error("serialization/deserialization error: {0}")]
+    Serde(postcard::Error),
+
+    /// Peer failed to process control message.
+    #[error("error from peer processing control message: {0}")]
+    CtrlFailure(String),
+
     /// An internal bug was discovered.
     #[error("internal bug: {0}")]
     Bug(#[from] buggy::Bug),
+}
 
-    /// Some other error.
-    #[error("{0}")]
-    Other(#[from] anyhow::Error),
+impl From<Infallible> for AqcError {
+    fn from(value: Infallible) -> Self {
+        match value {}
+    }
+}
+
+pub(crate) fn no_addr() -> AqcError {
+    AqcError::AddrResolution(io::Error::new(io::ErrorKind::NotFound, "no address found"))
 }

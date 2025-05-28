@@ -391,13 +391,6 @@ typedef struct AranyaAqcBidiChannelId {
     struct AranyaId id;
 } AranyaAqcBidiChannelId;
 
-/**
- * Channel ID for AQC uni channel.
- */
-typedef struct AranyaAqcUniChannelId {
-    struct AranyaId id;
-} AranyaAqcUniChannelId;
-
 #ifdef __cplusplus
 extern "C" {
 #endif // __cplusplus
@@ -1932,52 +1925,6 @@ AranyaError aranya_aqc_create_bidi_channel_ext(struct AranyaClient *client,
                                                const struct AranyaLabelId *label_id,
                                                struct AranyaAqcBidiChannelId *__output,
                                                struct AranyaExtError *__ext_err);
-
-/**
- * Delete a bidirectional AQC channel.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId) of the channel to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_bidi_channel(struct AranyaClient *client,
-                                           const struct AranyaAqcBidiChannelId *chan);
-
-/**
- * Delete a bidirectional AQC channel.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaAqcBidiChannelId`](@ref AranyaAqcBidiChannelId) of the channel to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
-                                               const struct AranyaAqcBidiChannelId *chan,
-                                               struct AranyaExtError *__ext_err);
-
-/**
- * Delete a unidirectional AQC channel.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaAqcUniChannelId`](@ref AranyaAqcUniChannelId) of the channel to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_uni_channel(struct AranyaClient *client,
-                                          const struct AranyaAqcUniChannelId *chan);
-
-/**
- * Delete a unidirectional AQC channel.
- *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param chan the AQC channel ID [`AranyaAqcUniChannelId`](@ref AranyaAqcUniChannelId) of the channel to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaClient *client,
-                                              const struct AranyaAqcUniChannelId *chan,
-                                              struct AranyaExtError *__ext_err);
 
 #ifdef __cplusplus
 }  // extern "C"
