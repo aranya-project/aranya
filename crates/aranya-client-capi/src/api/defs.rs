@@ -1402,7 +1402,7 @@ pub type AqcReceiverChannel = Safe<imp::AqcReceiverChannel>;
 
 /// An AQC Bidirectional Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 152, align = 8)]
+#[aranya_capi_core::opaque(size = 184, align = 8)]
 pub type AqcBidiStream = Safe<imp::AqcBidiStream>;
 
 /// An AQC Sender Stream Object.
@@ -1641,6 +1641,91 @@ pub fn aqc_bidi_create_bidi_stream(
     Ok(())
 }
 
+/// Send some data over an Aranya QUIC Channel bidirectional stream.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] stream the sending side of a stream [`AqcBidiStream`].
+/// @param[in] data pointer to the data to send.
+/// @param[in] data_len length of the data to send.
+///
+/// @relates AranyaClient.
+pub fn aqc_bidi_stream_send(
+    client: &mut Client,
+    stream: &mut AqcBidiStream,
+    data: &[u8],
+) -> Result<(), imp::Error> {
+    let data = Bytes::from(Vec::from(data));
+    Ok(client.deref_mut().rt.block_on(stream.inner.send(data))?)
+}
+
+/// Receive some data from an Aranya QUIC Channel bidirectional stream.
+///
+/// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+/// received yet which is considered a non-fatal error.
+///
+/// @param[in]  stream the receiving side of a stream [`AqcBidiStream`].
+/// @param[out] buffer pointer to the target buffer.
+/// @param[out] buffer_len length of the target buffer.
+/// @param[out] __output the number of bytes written to the buffer.
+///
+/// @relates AranyaClient.
+pub fn aqc_bidi_stream_try_recv(
+    stream: &mut AqcBidiStream,
+    buffer: &mut [MaybeUninit<u8>],
+) -> Result<usize, imp::Error> {
+    // First, let's check to see if we have any leftover data from last call.
+    let requested = buffer.len();
+    let mut written = 0;
+
+    // If we do, grab it and set data to None
+    if let Some(mut data) = stream.data.take() {
+        // Check to see if we still have leftover data
+        let length = core::cmp::min(data.len(), requested);
+        let left = data.split_off(length);
+        if !left.is_empty() {
+            stream.data = Some(left);
+        }
+
+        // Copy as many bytes as we can to the buffer, either filling it up or depleting data.
+        for (dst, src) in core::iter::zip(&mut buffer[..length], data) {
+            dst.write(src);
+        }
+
+        written += length;
+    }
+
+    // If we still have space left in the buffer, let's try to receive more data.
+    while written < requested {
+        match stream.inner.try_receive() {
+            Ok(mut data) => {
+                // Check to see if we still have leftover data
+                let length = core::cmp::min(data.len(), requested - written);
+                let left = data.split_off(length);
+                if !left.is_empty() {
+                    stream.data = Some(left);
+                }
+
+                // Copy as many bytes as we can to the buffer, hopefully filling the buffer.
+                for (dst, src) in core::iter::zip(&mut buffer[written..written + length], data) {
+                    dst.write(src);
+                }
+
+                written += length;
+            }
+            Err(e) => {
+                // If we get an error, let's check to see if we've written any
+                // amount of data, and if so let's just return.
+                if written != 0 {
+                    break;
+                }
+                return Err(e.into());
+            }
+        }
+    }
+
+    Ok(written)
+}
+
 /// Create a unidirectional stream from an [`AqcBidiChannel`].
 ///
 /// Note that the recipient will not be able to receive the stream until data is
@@ -1748,7 +1833,7 @@ pub fn aqc_recv_try_receive_uni_stream(
     Ok(())
 }
 
-/// Send some data over an Aranya QUIC Channel stream.
+/// Send some data over an Aranya QUIC Channel send stream.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] stream the sending side of a stream [`AqcSendStream`].
@@ -1756,19 +1841,16 @@ pub fn aqc_recv_try_receive_uni_stream(
 /// @param[in] data_len length of the data to send.
 ///
 /// @relates AranyaClient.
-pub fn aqc_send_data(
+pub fn aqc_send_stream_send(
     client: &mut Client,
     stream: &mut AqcSendStream,
     data: &[u8],
 ) -> Result<(), imp::Error> {
     let data = Bytes::from(Vec::from(data));
-    Ok(client
-        .deref_mut()
-        .rt
-        .block_on(stream.inner.send(Bytes::from(data)))?)
+    Ok(client.deref_mut().rt.block_on(stream.inner.send(data))?)
 }
 
-/// Receive some data from an Aranya QUIC Channel stream.
+/// Receive some data from an Aranya QUIC Channel receive stream.
 ///
 /// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
 /// received yet which is considered a non-fatal error.
@@ -1779,7 +1861,7 @@ pub fn aqc_send_data(
 /// @param[out] __output the number of bytes written to the buffer.
 ///
 /// @relates AranyaClient.
-pub fn aqc_try_receive_data(
+pub fn aqc_recv_stream_try_recv(
     stream: &mut AqcReceiveStream,
     buffer: &mut [MaybeUninit<u8>],
 ) -> Result<usize, imp::Error> {

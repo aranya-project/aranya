@@ -67,6 +67,7 @@ impl AqcPeerChannel {
 /// An AQC stream that can both send and receive data.
 pub struct AqcBidiStream {
     pub(crate) inner: aqc::AqcBidiStream,
+    pub(crate) data: Option<bytes::Bytes>,
 }
 
 impl Typed for AqcBidiStream {
@@ -75,7 +76,10 @@ impl Typed for AqcBidiStream {
 
 impl AqcBidiStream {
     pub fn new(stream: aqc::AqcBidiStream) -> Self {
-        Self { inner: stream }
+        Self {
+            inner: stream,
+            data: None,
+        }
     }
 }
 

@@ -476,7 +476,7 @@ AranyaError run(Team *t) {
 
     Client *owner = &t->clients.owner;
     Client *admin = &t->clients.admin;
-    Client *operator = &t->clients.operator;
+    Client *operator= & t->clients.operator;
     Client *membera = &t->clients.membera;
     Client *memberb = &t->clients.memberb;
 
@@ -687,18 +687,17 @@ static void *membera_aqc_thread(void *arg) {
     channel_context_t *ctx = (channel_context_t *)arg;
     AranyaError err;
 
-    AranyaAqcBidiChannel bidi_send;
-    AranyaAqcChannel uni_channel;
+    AranyaAqcBidiChannel bidi_chan;
+    AranyaAqcPeerChannel uni_channel;
     AranyaAqcChannelType uni_channel_type;
     AranyaAqcReceiverChannel uni_recv;
 
-    AranyaAqcSendStream bidi_send_stream;
-    AranyaAqcReceiveStream bidi_recv_stream;
+    AranyaAqcBidiStream bidi_stream;
 
     // First, let's create a bidirectional channel to Member B.
     printf("creating AQC bidi channel \n");
     err = aranya_aqc_create_bidi_channel(
-        ctx->client, &ctx->id, aqc_addrs[MEMBERB], &ctx->label1, &bidi_send);
+        ctx->client, &ctx->id, aqc_addrs[MEMBERB], &ctx->label1, &bidi_chan);
     EXPECT("error creating aqc bidi channel", err);
 
     sleep(1);
@@ -720,17 +719,17 @@ static void *membera_aqc_thread(void *arg) {
     }
 
     // Now, let's create a bidirectional stream on our new channel.
-    err = aranya_aqc_bidi_create_bidi_stream(
-        ctx->client, &bidi_send, &bidi_send_stream, &bidi_recv_stream);
+    err = aranya_aqc_bidi_create_bidi_stream(ctx->client, &bidi_chan,
+                                             &bidi_stream);
     EXPECT("error creating an aqc bidi stream", err);
 
     sleep(1);
 
     // Send some data to make sure it works.
     const char *bidi_string = "hello from aqc membera!";
-    aranya_aqc_send_data(ctx->client, &bidi_send_stream,
-                         (const uint8_t *)bidi_string,
-                         strnlen(bidi_string, BUFFER_LEN - 1) + 1);
+    aranya_aqc_bidi_stream_send(ctx->client, &bidi_stream,
+                                (const uint8_t *)bidi_string,
+                                strnlen(bidi_string, BUFFER_LEN - 1) + 1);
 
     sleep(1);
 
@@ -738,8 +737,8 @@ static void *membera_aqc_thread(void *arg) {
     size_t bidi_recv_length;
     memset(bidi_buffer, 0, BUFFER_LEN);
     printf("Trying to receive the stream data\n");
-    POLL(aranya_aqc_try_receive_data(&bidi_recv_stream, (uint8_t *)bidi_buffer,
-                                     BUFFER_LEN, &bidi_recv_length),
+    POLL(aranya_aqc_bidi_stream_try_recv(&bidi_stream, (uint8_t *)bidi_buffer,
+                                         BUFFER_LEN, &bidi_recv_length),
          "error receving aqc stream data");
 
     if (strncmp("hello from aqc memberb!", bidi_buffer, BUFFER_LEN)) {
@@ -757,7 +756,7 @@ static void *memberb_aqc_thread(void *arg) {
     channel_context_t *ctx = (channel_context_t *)arg;
     AranyaError err;
 
-    AranyaAqcChannel bidi_channel;
+    AranyaAqcPeerChannel bidi_channel;
     AranyaAqcChannelType bidi_channel_type;
     AranyaAqcBidiChannel bidi_recv;
     AranyaAqcSenderChannel uni_send;
@@ -809,8 +808,9 @@ static void *memberb_aqc_thread(void *arg) {
     size_t bidi_recv_length;
     memset(bidi_buffer, 0, BUFFER_LEN);
     printf("Trying to receive the stream data\n");
-    POLL(aranya_aqc_try_receive_data(&bidi_recv_stream, (uint8_t *)bidi_buffer,
-                                     BUFFER_LEN, &bidi_recv_length),
+    POLL(aranya_aqc_recv_stream_try_recv(&bidi_recv_stream,
+                                         (uint8_t *)bidi_buffer, BUFFER_LEN,
+                                         &bidi_recv_length),
          "error receving aqc stream data");
 
     if (strncmp("hello from aqc membera!", bidi_buffer, BUFFER_LEN)) {
@@ -822,9 +822,9 @@ static void *memberb_aqc_thread(void *arg) {
 
     // Send some data to make sure it works.
     const char *bidi_string = "hello from aqc memberb!";
-    aranya_aqc_send_data(ctx->client, &bidi_send_stream,
-                         (const uint8_t *)bidi_string,
-                         strnlen(bidi_string, BUFFER_LEN - 1) + 1);
+    aranya_aqc_send_stream_send(ctx->client, &bidi_send_stream,
+                                (const uint8_t *)bidi_string,
+                                strnlen(bidi_string, BUFFER_LEN - 1) + 1);
 
 exit:
     return NULL;
@@ -836,7 +836,7 @@ AranyaError run_aqc_example(Team *t) {
     AranyaLabelId *labels = NULL;
 
     Client *admin = &t->clients.admin;
-    Client *operator = &t->clients.operator;
+    Client *operator= & t->clients.operator;
     Client *membera = &t->clients.membera;
     Client *memberb = &t->clients.memberb;
 

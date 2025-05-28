@@ -96,7 +96,7 @@
 #define ARANYA_ID_STR_LEN (((ARANYA_ID_LEN * 1375) / 1000) + 1)
 
 /**
- * An enum containing all [`AranyaAqcChannel`](@ref AranyaAqcChannel) variants.
+ * An enum containing all [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) variants.
  */
 enum AranyaAqcChannelType
 #ifdef __cplusplus
@@ -418,14 +418,14 @@ typedef const char *AranyaNetIdentifier;
  * `try_receive_channel`, and is invalidated after calling
  * `get_bidirectional_channel`/`get_receiver_channel`.
  */
-typedef struct ARANYA_ALIGNED(8) AranyaAqcChannel {
+typedef struct ARANYA_ALIGNED(8) AranyaAqcPeerChannel {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
     uint8_t __for_size_only[120];
-} AranyaAqcChannel;
+} AranyaAqcPeerChannel;
 
 /**
  * An AQC Bidirectional Channel Object.
@@ -436,7 +436,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[176];
+    uint8_t __for_size_only[112];
 } AranyaAqcBidiChannel;
 
 /**
@@ -448,7 +448,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcSenderChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[176];
+    uint8_t __for_size_only[112];
 } AranyaAqcSenderChannel;
 
 /**
@@ -460,8 +460,20 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiverChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[176];
+    uint8_t __for_size_only[112];
 } AranyaAqcReceiverChannel;
+
+/**
+ * An AQC Bidirectional Stream Object.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiStream {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[184];
+} AranyaAqcBidiStream;
 
 /**
  * An AQC Sender Stream Object.
@@ -1980,21 +1992,21 @@ AranyaError aranya_aqc_remove_net_identifier_ext(struct AranyaClient *client,
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_aqc_channel_init`.
+ * `ptr` must either be null or initialized by `::aranya_aqc_peer_channel_init`.
  *
- * @relates AranyaAqcChannel
+ * @relates AranyaAqcPeerChannel
  */
-AranyaError aranya_aqc_channel_cleanup(struct AranyaAqcChannel *ptr);
+AranyaError aranya_aqc_peer_channel_cleanup(struct AranyaAqcPeerChannel *ptr);
 
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_aqc_channel_init`.
+ * `ptr` must either be null or initialized by `::aranya_aqc_peer_channel_init`.
  *
- * @relates AranyaAqcChannel
+ * @relates AranyaAqcPeerChannel
  */
-AranyaError aranya_aqc_channel_cleanup_ext(struct AranyaAqcChannel *ptr,
-                                           struct AranyaExtError *__ext_err);
+AranyaError aranya_aqc_peer_channel_cleanup_ext(struct AranyaAqcPeerChannel *ptr,
+                                                struct AranyaExtError *__ext_err);
 
 /**
  * Releases any resources associated with `ptr`.
@@ -2052,6 +2064,25 @@ AranyaError aranya_aqc_receiver_channel_cleanup(struct AranyaAqcReceiverChannel 
  */
 AranyaError aranya_aqc_receiver_channel_cleanup_ext(struct AranyaAqcReceiverChannel *ptr,
                                                     struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_aqc_bidi_stream_init`.
+ *
+ * @relates AranyaAqcBidiStream
+ */
+AranyaError aranya_aqc_bidi_stream_cleanup(struct AranyaAqcBidiStream *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_aqc_bidi_stream_init`.
+ *
+ * @relates AranyaAqcBidiStream
+ */
+AranyaError aranya_aqc_bidi_stream_cleanup_ext(struct AranyaAqcBidiStream *ptr,
+                                               struct AranyaExtError *__ext_err);
 
 /**
  * Releases any resources associated with `ptr`.
@@ -2170,60 +2201,14 @@ AranyaError aranya_aqc_create_uni_channel_ext(struct AranyaClient *client,
                                               struct AranyaExtError *__ext_err);
 
 /**
- * Delete a bidirectional AQC channel.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_bidi_channel(struct AranyaClient *client,
-                                           const struct AranyaAqcBidiChannel *channel);
-
-/**
- * Delete a bidirectional AQC channel.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
-                                               const struct AranyaAqcBidiChannel *channel,
-                                               struct AranyaExtError *__ext_err);
-
-/**
- * Delete a unidirectional AQC channel.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] channel the AQC Channel [`AranyaAqcSenderChannel`](@ref AranyaAqcSenderChannel) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_uni_channel(struct AranyaClient *client,
-                                          const struct AranyaAqcSenderChannel *channel);
-
-/**
- * Delete a unidirectional AQC channel.
- *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in] channel the AQC Channel [`AranyaAqcSenderChannel`](@ref AranyaAqcSenderChannel) to delete.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaClient *client,
-                                              const struct AranyaAqcSenderChannel *channel,
-                                              struct AranyaExtError *__ext_err);
-
-/**
  * Tries to poll AQC to see if any channels have been received.
  *
  * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
  * channels received yet which is considered a non-fatal error.
  *
- * Note that the [`AranyaAqcChannel`](@ref AranyaAqcChannel) must be converted before it can be used:
+ * Note that the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) must be converted before it can be used:
  * ```C
- * AranyaAqcChannel channel;
+ * AranyaAqcPeerChannel channel;
  * AranyaAqcChannelType channel_type;
  * AranyaAqcBidiChannel bidi;
  * AranyaAqcReceiverChannel receiver;
@@ -2240,13 +2225,13 @@ AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaClient *client,
  * ```
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[out] channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel).
+ * @param[out] channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
  * @param[out] __output the corresponding AQC channel type [`AranyaAqcChannelType`](@ref AranyaAqcChannelType).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_try_receive_channel(struct AranyaClient *client,
-                                           struct AranyaAqcChannel *channel,
+                                           struct AranyaAqcPeerChannel *channel,
                                            AranyaAqcChannelType *__output);
 
 /**
@@ -2255,9 +2240,9 @@ AranyaError aranya_aqc_try_receive_channel(struct AranyaClient *client,
  * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
  * channels received yet which is considered a non-fatal error.
  *
- * Note that the [`AranyaAqcChannel`](@ref AranyaAqcChannel) must be converted before it can be used:
+ * Note that the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) must be converted before it can be used:
  * ```C
- * AranyaAqcChannel channel;
+ * AranyaAqcPeerChannel channel;
  * AranyaAqcChannelType channel_type;
  * AranyaAqcBidiChannel bidi;
  * AranyaAqcReceiverChannel receiver;
@@ -2274,75 +2259,75 @@ AranyaError aranya_aqc_try_receive_channel(struct AranyaClient *client,
  * ```
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[out] channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel).
+ * @param[out] channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
  * @param[out] __output the corresponding AQC channel type [`AranyaAqcChannelType`](@ref AranyaAqcChannelType).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_try_receive_channel_ext(struct AranyaClient *client,
-                                               struct AranyaAqcChannel *channel,
+                                               struct AranyaAqcPeerChannel *channel,
                                                AranyaAqcChannelType *__output,
                                                struct AranyaExtError *__ext_err);
 
 /**
- * Converts the [`AranyaAqcChannel`](@ref AranyaAqcChannel)` into an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) for sending/receiving data.
+ * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) for sending/receiving data.
  *
- * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
+ * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcPeerChannel is the wrong type.
  *
- * Note that this function takes ownership of the [`AranyaAqcChannel`](@ref AranyaAqcChannel) and invalidates any further use.
+ * Note that this function takes ownership of the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) and invalidates any further use.
  *
- * @param[in]  channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel) that holds a channel object.
+ * @param[in]  channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) that holds a channel object.
  * @param[out] bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_get_bidirectional_channel(struct AranyaAqcChannel *channel,
+AranyaError aranya_aqc_get_bidirectional_channel(struct AranyaAqcPeerChannel *channel,
                                                  struct AranyaAqcBidiChannel *bidi);
 
 /**
- * Converts the [`AranyaAqcChannel`](@ref AranyaAqcChannel)` into an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) for sending/receiving data.
+ * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) for sending/receiving data.
  *
- * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
+ * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcPeerChannel is the wrong type.
  *
- * Note that this function takes ownership of the [`AranyaAqcChannel`](@ref AranyaAqcChannel) and invalidates any further use.
+ * Note that this function takes ownership of the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) and invalidates any further use.
  *
- * @param[in]  channel the AQC channel holder [`AranyaAqcChannel`](@ref AranyaAqcChannel) that holds a channel object.
+ * @param[in]  channel the AQC channel holder [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) that holds a channel object.
  * @param[out] bidi the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) that holds channel info.
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_get_bidirectional_channel_ext(struct AranyaAqcChannel *channel,
+AranyaError aranya_aqc_get_bidirectional_channel_ext(struct AranyaAqcPeerChannel *channel,
                                                      struct AranyaAqcBidiChannel *bidi,
                                                      struct AranyaExtError *__ext_err);
 
 /**
- * Converts the [`AranyaAqcChannel`](@ref AranyaAqcChannel)` into an [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel) for receiving data.
+ * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel) for receiving data.
  *
- * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
+ * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcPeerChannel is the wrong type.
  *
- * Note that this function takes ownership of the [`AranyaAqcChannel`](@ref AranyaAqcChannel) and invalidates any further use.
+ * Note that this function takes ownership of the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) and invalidates any further use.
  *
- * @param[in]  channel the AQC channel container [`AranyaAqcChannel`](@ref AranyaAqcChannel).
+ * @param[in]  channel the AQC channel container [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
  * @param[out] receiver the AQC channel object [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel).
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_get_receiver_channel(struct AranyaAqcChannel *channel,
+AranyaError aranya_aqc_get_receiver_channel(struct AranyaAqcPeerChannel *channel,
                                             struct AranyaAqcReceiverChannel *receiver);
 
 /**
- * Converts the [`AranyaAqcChannel`](@ref AranyaAqcChannel)` into an [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel) for receiving data.
+ * Converts the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel)` into an [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel) for receiving data.
  *
- * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcChannel is the wrong type.
+ * Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcPeerChannel is the wrong type.
  *
- * Note that this function takes ownership of the [`AranyaAqcChannel`](@ref AranyaAqcChannel) and invalidates any further use.
+ * Note that this function takes ownership of the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) and invalidates any further use.
  *
- * @param[in]  channel the AQC channel container [`AranyaAqcChannel`](@ref AranyaAqcChannel).
+ * @param[in]  channel the AQC channel container [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel).
  * @param[out] receiver the AQC channel object [`AranyaAqcReceiverChannel`](@ref AranyaAqcReceiverChannel).
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_get_receiver_channel_ext(struct AranyaAqcChannel *channel,
+AranyaError aranya_aqc_get_receiver_channel_ext(struct AranyaAqcPeerChannel *channel,
                                                 struct AranyaAqcReceiverChannel *receiver,
                                                 struct AranyaExtError *__ext_err);
 
@@ -2354,15 +2339,13 @@ AranyaError aranya_aqc_get_receiver_channel_ext(struct AranyaAqcChannel *channel
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- * @param[out] send_stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- * @param[out] recv_stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
+ * @param[out] stream the bidirectional AQC stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_bidi_create_bidi_stream(struct AranyaClient *client,
                                                struct AranyaAqcBidiChannel *channel,
-                                               struct AranyaAqcSendStream *send_stream,
-                                               struct AranyaAqcReceiveStream *recv_stream);
+                                               struct AranyaAqcBidiStream *stream);
 
 /**
  * Create a bidirectional stream from a [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
@@ -2372,16 +2355,82 @@ AranyaError aranya_aqc_bidi_create_bidi_stream(struct AranyaClient *client,
  *
  * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in]  channel the AQC channel object [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- * @param[out] send_stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- * @param[out] recv_stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
+ * @param[out] stream the bidirectional AQC stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_bidi_create_bidi_stream_ext(struct AranyaClient *client,
                                                    struct AranyaAqcBidiChannel *channel,
-                                                   struct AranyaAqcSendStream *send_stream,
-                                                   struct AranyaAqcReceiveStream *recv_stream,
+                                                   struct AranyaAqcBidiStream *stream,
                                                    struct AranyaExtError *__ext_err);
+
+/**
+ * Send some data over an Aranya QUIC Channel bidirectional stream.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] stream the sending side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
+ * @param[in] data pointer to the data to send.
+ * @param[in] data_len length of the data to send.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_bidi_stream_send(struct AranyaClient *client,
+                                        struct AranyaAqcBidiStream *stream,
+                                        const uint8_t *data,
+                                        size_t data_len);
+
+/**
+ * Send some data over an Aranya QUIC Channel bidirectional stream.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] stream the sending side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
+ * @param[in] data pointer to the data to send.
+ * @param[in] data_len length of the data to send.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_bidi_stream_send_ext(struct AranyaClient *client,
+                                            struct AranyaAqcBidiStream *stream,
+                                            const uint8_t *data,
+                                            size_t data_len,
+                                            struct AranyaExtError *__ext_err);
+
+/**
+ * Receive some data from an Aranya QUIC Channel bidirectional stream.
+ *
+ * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+ * received yet which is considered a non-fatal error.
+ *
+ * @param[in]  stream the receiving side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
+ * @param[out] buffer pointer to the target buffer.
+ * @param[out] buffer_len length of the target buffer.
+ * @param[out] __output the number of bytes written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_bidi_stream_try_recv(struct AranyaAqcBidiStream *stream,
+                                            uint8_t *buffer,
+                                            size_t buffer_len,
+                                            size_t *__output);
+
+/**
+ * Receive some data from an Aranya QUIC Channel bidirectional stream.
+ *
+ * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+ * received yet which is considered a non-fatal error.
+ *
+ * @param[in]  stream the receiving side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
+ * @param[out] buffer pointer to the target buffer.
+ * @param[out] buffer_len length of the target buffer.
+ * @param[out] __output the number of bytes written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_bidi_stream_try_recv_ext(struct AranyaAqcBidiStream *stream,
+                                                uint8_t *buffer,
+                                                size_t buffer_len,
+                                                size_t *__output,
+                                                struct AranyaExtError *__ext_err);
 
 /**
  * Create a unidirectional stream from an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
@@ -2532,7 +2581,7 @@ AranyaError aranya_aqc_recv_try_receive_uni_stream_ext(struct AranyaAqcReceiverC
                                                        struct AranyaExtError *__ext_err);
 
 /**
- * Send some data over an Aranya QUIC Channel stream.
+ * Send some data over an Aranya QUIC Channel send stream.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
@@ -2541,13 +2590,13 @@ AranyaError aranya_aqc_recv_try_receive_uni_stream_ext(struct AranyaAqcReceiverC
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_send_data(struct AranyaClient *client,
-                                 struct AranyaAqcSendStream *stream,
-                                 const uint8_t *data,
-                                 size_t data_len);
+AranyaError aranya_aqc_send_stream_send(struct AranyaClient *client,
+                                        struct AranyaAqcSendStream *stream,
+                                        const uint8_t *data,
+                                        size_t data_len);
 
 /**
- * Send some data over an Aranya QUIC Channel stream.
+ * Send some data over an Aranya QUIC Channel send stream.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] stream the sending side of a stream [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
@@ -2556,14 +2605,14 @@ AranyaError aranya_aqc_send_data(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_send_data_ext(struct AranyaClient *client,
-                                     struct AranyaAqcSendStream *stream,
-                                     const uint8_t *data,
-                                     size_t data_len,
-                                     struct AranyaExtError *__ext_err);
+AranyaError aranya_aqc_send_stream_send_ext(struct AranyaClient *client,
+                                            struct AranyaAqcSendStream *stream,
+                                            const uint8_t *data,
+                                            size_t data_len,
+                                            struct AranyaExtError *__ext_err);
 
 /**
- * Receive some data from an Aranya QUIC Channel stream.
+ * Receive some data from an Aranya QUIC Channel receive stream.
  *
  * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
  * received yet which is considered a non-fatal error.
@@ -2575,29 +2624,29 @@ AranyaError aranya_aqc_send_data_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_try_receive_data(struct AranyaAqcReceiveStream *stream,
-                                        uint8_t *buffer,
-                                        size_t buffer_len,
-                                        size_t *__output);
-
-/**
- * Receive some data from an Aranya QUIC Channel stream.
- *
- * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
- * received yet which is considered a non-fatal error.
- *
- * @param[in]  stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- * @param[out] buffer pointer to the target buffer.
- * @param[out] buffer_len length of the target buffer.
- * @param[out] __output the number of bytes written to the buffer.
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_try_receive_data_ext(struct AranyaAqcReceiveStream *stream,
+AranyaError aranya_aqc_recv_stream_try_recv(struct AranyaAqcReceiveStream *stream,
                                             uint8_t *buffer,
                                             size_t buffer_len,
-                                            size_t *__output,
-                                            struct AranyaExtError *__ext_err);
+                                            size_t *__output);
+
+/**
+ * Receive some data from an Aranya QUIC Channel receive stream.
+ *
+ * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+ * received yet which is considered a non-fatal error.
+ *
+ * @param[in]  stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
+ * @param[out] buffer pointer to the target buffer.
+ * @param[out] buffer_len length of the target buffer.
+ * @param[out] __output the number of bytes written to the buffer.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_recv_stream_try_recv_ext(struct AranyaAqcReceiveStream *stream,
+                                                uint8_t *buffer,
+                                                size_t buffer_len,
+                                                size_t *__output,
+                                                struct AranyaExtError *__ext_err);
 
 #ifdef __cplusplus
 }  // extern "C"
