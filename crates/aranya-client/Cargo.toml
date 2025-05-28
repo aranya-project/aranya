@@ -31,7 +31,7 @@ tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
-aranya-daemon = { path = "../aranya-daemon", features = ["testing"]}
+aranya-daemon = { path = "../aranya-daemon", features = ["testing"] }
 
 backon = { workspace = true }
 keyring = { workspace = true }

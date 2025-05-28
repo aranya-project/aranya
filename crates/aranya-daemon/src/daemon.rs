@@ -23,13 +23,16 @@ use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{
     fs,
-    sync::{broadcast::error::RecvError, Mutex},
+    sync::{
+        broadcast::{error::RecvError, Receiver},
+        Mutex,
+    },
     task::JoinSet,
 };
 use tracing::{error, info, info_span, Instrument as _};
 
 #[cfg(feature = "testing")]
-use crate::sync::task::quic::{delete_psk, Msg};
+use crate::sync::task::quic::delete_psk;
 use crate::{
     actions::Actions,
     api::{ApiKey, DaemonApiServer, PublicApiKey},
@@ -41,7 +44,7 @@ use crate::{
     sync::{
         prot::SyncProtocol,
         task::{
-            quic::{get_existing_psks, ServerPresharedKeys, State as QuicSyncState, TeamIdPSKPair},
+            quic::{get_existing_psks, Msg, State as QuicSyncState, TeamIdPSKPair},
             Syncer,
         },
     },
@@ -108,9 +111,11 @@ impl Daemon {
         let mut local_store = self.load_local_keystore().await?;
         let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
 
+        let (psk_send, psk_recv) = tokio::sync::broadcast::channel(16);
+
         // Initialize the Aranya client and sync server.
-        let (client, local_addr, server_keys, initial_keys) = {
-            let (client, server, server_keys, initial_keys) = self
+        let (client, local_addr, initial_keys) = {
+            let (client, server, initial_keys) = self
                 .setup_aranya(
                     eng.clone(),
                     aranya_store
@@ -118,18 +123,19 @@ impl Daemon {
                         .context("unable to clone keystore")?,
                     &pk,
                     self.cfg.sync_addr,
+                    psk_send.subscribe(),
                 )
                 .await?;
             let local_addr = server.local_addr()?;
             set.spawn(async move { server.serve().await });
 
-            (client, local_addr, server_keys, initial_keys)
+            (client, local_addr, initial_keys)
         };
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
-        let (state, client_keys) = QuicSyncState::new(initial_keys)?;
+        let state = QuicSyncState::new(initial_keys, psk_recv)?;
         let (mut syncer, peers) =
             Syncer::new(client.clone(), send_effects, DEFAULT_SYNC_PROTOCOL, state);
         set.spawn(async move {
@@ -138,39 +144,6 @@ impl Daemon {
                     error!(err = ?err, "client unable to sync with peer");
                 }
             }
-        });
-
-        // New PSK received from add_team/create_team or a PSK should be removed due to remove_team
-        let (psk_send, mut psk_recv) = tokio::sync::broadcast::channel(16);
-        set.spawn(async move {
-            loop {
-                match psk_recv.recv().await {
-                    Ok(msg) => server_keys.handle_msg(msg),
-                    Err(RecvError::Closed) => break,
-                    Err(err) => {
-                        error!(err = ?err, "unable to receive psk on broadcast channel")
-                    }
-                }
-            }
-
-            info!("PSK broadcast channel closed");
-            Ok(())
-        });
-
-        let mut psk_recv2 = psk_send.subscribe();
-        set.spawn(async move {
-            loop {
-                match psk_recv2.recv().await {
-                    Ok(msg) => client_keys.handle_msg(msg),
-                    Err(RecvError::Closed) => break,
-                    Err(err) => {
-                        error!(err = ?err, "unable to receive psk on broadcast channel")
-                    }
-                }
-            }
-
-            info!("PSK broadcast channel closed");
-            Ok(())
         });
 
         let graph_ids = client
@@ -270,12 +243,8 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-    ) -> Result<(
-        Client,
-        SyncServer,
-        Arc<ServerPresharedKeys>,
-        Vec<TeamIdPSKPair>,
-    )> {
+        recv: Receiver<Msg>,
+    ) -> Result<(Client, SyncServer, Vec<TeamIdPSKPair>)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -289,21 +258,20 @@ impl Daemon {
         let client = Client::new(Arc::clone(&aranya));
         let initial_keys = get_existing_psks(client.clone(), &self.cfg.service_name).await?;
 
-        let (server, server_keys) = {
-            info!(addr = %external_sync_addr, "starting QUIC sync server");
-            SyncServer::new(
-                client.clone(),
-                &external_sync_addr,
-                DEFAULT_SYNC_PROTOCOL,
-                initial_keys.clone(),
-            )
-            .await
-            .context("unable to initialize QUIC sync server")?
-        };
+        info!(addr = %external_sync_addr, "starting QUIC sync server");
+        let server = SyncServer::new(
+            client.clone(),
+            &external_sync_addr,
+            DEFAULT_SYNC_PROTOCOL,
+            initial_keys.clone(),
+            recv,
+        )
+        .await
+        .context("unable to initialize QUIC sync server")?;
 
         info!(device_id = %device_id, "set up Aranya");
 
-        Ok((client, server, server_keys, initial_keys))
+        Ok((client, server, initial_keys))
     }
 
     /// Loads the crypto engine.

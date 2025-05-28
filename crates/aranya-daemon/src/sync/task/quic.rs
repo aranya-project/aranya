@@ -32,7 +32,14 @@ use s2n_quic::{
     Client as QuicClient, Connection, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{io::AsyncReadExt, sync::mpsc, task::JoinSet};
+use tokio::{
+    io::AsyncReadExt,
+    sync::{
+        broadcast::{error::RecvError, Receiver},
+        mpsc,
+    },
+    task::JoinSet,
+};
 use tracing::{debug, error, info, instrument};
 
 use super::SyncResponse;
@@ -107,7 +114,7 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub fn new<I>(initial_keys: I) -> AnyResult<(Self, Arc<ClientPresharedKeys>)>
+    pub fn new<I>(initial_keys: I, mut recv: Receiver<Msg>) -> AnyResult<Self>
     where
         I: IntoIterator<Item = TeamIdPSKPair>,
     {
@@ -129,13 +136,24 @@ impl State {
             .with_io("0.0.0.0:0")?
             .start()?;
 
-        Ok((
-            Self {
-                client,
-                conns: BTreeMap::new(),
-            },
-            client_keys,
-        ))
+        tokio::spawn(async move {
+            loop {
+                match recv.recv().await {
+                    Ok(msg) => client_keys.handle_msg(msg),
+                    Err(RecvError::Closed) => break,
+                    Err(err) => {
+                        error!(err = ?err, "unable to receive psk on broadcast channel")
+                    }
+                }
+            }
+
+            info!("PSK broadcast channel closed");
+        });
+
+        Ok(Self {
+            client,
+            conns: BTreeMap::new(),
+        })
     }
 }
 
@@ -331,7 +349,8 @@ where
         addr: &Addr,
         protocol: SyncProtocol,
         initial_psks: I,
-    ) -> AnyResult<(Self, Arc<ServerPresharedKeys>)>
+        mut recv: Receiver<Msg>,
+    ) -> AnyResult<Self>
     where
         I: IntoIterator<Item = TeamIdPSKPair>,
     {
@@ -368,16 +387,29 @@ where
             .with_congestion_controller(Bbr::default())?
             .start()?;
 
-        Ok((
-            Self {
-                aranya,
-                server,
-                set: JoinSet::new(),
-                _identity_rx,
-                protocol,
-            },
-            server_keys,
-        ))
+        let mut set = JoinSet::new();
+
+        set.spawn(async move {
+            loop {
+                match recv.recv().await {
+                    Ok(msg) => server_keys.handle_msg(msg),
+                    Err(RecvError::Closed) => break,
+                    Err(err) => {
+                        error!(err = ?err, "unable to receive psk on broadcast channel")
+                    }
+                }
+            }
+
+            info!("PSK broadcast channel closed");
+        });
+
+        Ok(Self {
+            aranya,
+            server,
+            set,
+            _identity_rx,
+            protocol,
+        })
     }
 
     /// Begins accepting incoming requests.

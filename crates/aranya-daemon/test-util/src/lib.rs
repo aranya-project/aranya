@@ -23,10 +23,7 @@ use aranya_daemon::{
     actions::Actions,
     aranya,
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
-    sync::{
-        self,
-        task::quic::{ClientPresharedKeys, Msg, ServerPresharedKeys},
-    },
+    sync::{self, task::quic::Msg},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore,
 };
@@ -41,6 +38,7 @@ use rustls::crypto::{hash::HashAlgorithm, PresharedKey};
 use tempfile::{tempdir, TempDir};
 use tokio::{
     sync::{
+        broadcast::{self, Receiver as BReceiver, Sender},
         mpsc::{self, Receiver},
         Mutex,
     },
@@ -88,21 +86,23 @@ pub struct TestDevice {
     /// Public keys
     pub pk: PublicKeys<DefaultCipherSuite>,
     effect_recv: Receiver<(GraphId, Vec<Effect>)>,
-    server_keys: Arc<ServerPresharedKeys>,
-    client_keys: Arc<ClientPresharedKeys>,
+    psk_send: Sender<Msg>,
 }
 
 impl TestDevice {
     pub fn new(
         client: TestClient,
         server: TestServer,
-        server_keys: Arc<ServerPresharedKeys>,
         local_addr: Addr,
         pk: PublicKeys<DefaultCipherSuite>,
         graph_id: GraphId,
+        psk_send: Sender<Msg>,  // Quic Syncer specific
+        psk_rx: BReceiver<Msg>, // Quic Syncer specific
     ) -> Result<Self> {
         let handle = task::spawn(async { server.serve().await }).abort_handle();
-        let (state, client_keys) = TestState::new([])?;
+
+        let state = TestState::new([], psk_rx.resubscribe())?;
+
         let (send, effect_recv) = mpsc::channel(1);
         let (syncer, _sync_peers) = TestSyncer::new(client, send, TEST_SYNC_PROTOCOL, state);
         Ok(Self {
@@ -112,8 +112,7 @@ impl TestDevice {
             handle,
             pk,
             effect_recv,
-            server_keys,
-            client_keys,
+            psk_send,
         })
     }
 }
@@ -152,10 +151,7 @@ impl TestDevice {
             Ok((graph_id, effects)) => {
                 let team_id = TeamId::from(*graph_id.as_array());
                 let psk = Arc::new(TEST_PSK.clone());
-                self.server_keys
-                    .handle_msg(Msg::Insert((team_id, psk.clone())));
-                self.client_keys
-                    .handle_msg(Msg::Insert((team_id, psk.clone())));
+                self.psk_send.send(Msg::Insert((team_id, psk.clone())))?;
 
                 Ok((graph_id, effects, psk))
             }
@@ -163,10 +159,11 @@ impl TestDevice {
         }
     }
 
-    async fn add_team(&self, psk: Arc<PresharedKey>) {
-        let id = TeamId::from(*self.graph_id.as_array());
-        self.server_keys.handle_msg(Msg::Insert((id, psk.clone())));
-        self.client_keys.handle_msg(Msg::Insert((id, psk)));
+    async fn add_team(&self, psk: Arc<PresharedKey>) -> Result<()> {
+        let team_id = TeamId::from(*self.graph_id.as_array());
+        self.psk_send.send(Msg::Insert((team_id, psk.clone())))?;
+
+        Ok(())
     }
 }
 
@@ -239,7 +236,9 @@ impl TestCtx {
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
 
-        let (client, server, server_keys, local_addr, pk) = {
+        let (send, rx) = broadcast::channel(16);
+
+        let (client, server, local_addr, pk) = {
             let mut store = {
                 let path = root.join("keystore");
                 fs::create_dir_all(&path)?;
@@ -266,13 +265,19 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let (server, server_keys) =
-                TestServer::new(client.clone(), &addr, TEST_SYNC_PROTOCOL, []).await?;
+            let server = TestServer::new(
+                client.clone(),
+                &addr,
+                TEST_SYNC_PROTOCOL,
+                [],
+                send.subscribe(),
+            )
+            .await?;
             let local_addr = server.local_addr()?;
-            (client, server, server_keys, local_addr, pk)
+            (client, server, local_addr, pk)
         };
 
-        TestDevice::new(client, server, server_keys, local_addr.into(), pk, id)
+        TestDevice::new(client, server, local_addr.into(), pk, id, send, rx)
     }
 
     /// Creates `n` members.
@@ -334,7 +339,7 @@ impl TestCtx {
         let mut memberb = team.memberb;
 
         for member in [&mut admin, &mut operator, &mut membera, &mut memberb] {
-            member.add_team(psk.clone()).await;
+            member.add_team(psk.clone()).await?;
         }
 
         // team setup

@@ -19,7 +19,7 @@ use super::AranyaClient;
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 /// Insertion and Removal updates.
 /// Used by [`ClientPresharedKeys`] and [`ServerPresharedKeys`].
 pub enum Msg {
