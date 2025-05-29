@@ -7,7 +7,7 @@ pub(super) use api::AqcChannelsImpl;
 pub use net::{
     channels::{
         AqcBidiChannel, AqcBidiStream, AqcPeerChannel, AqcPeerStream, AqcReceiveChannel,
-        AqcReceiveStream, AqcSendStream, AqcSenderChannel,
+        AqcReceiveStream, AqcSendChannel, AqcSendStream,
     },
     TryReceiveError,
 };

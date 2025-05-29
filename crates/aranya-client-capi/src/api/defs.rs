@@ -66,10 +66,6 @@ pub enum Error {
     #[capi(msg = "no response ready yet")]
     Empty,
 
-    /// A connection got disconnected.
-    #[capi(msg = "connection got disconnected")]
-    Disconnected,
-
     /// A connection got unexpectedly closed.
     #[capi(msg = "connection got closed")]
     Closed,
@@ -1371,7 +1367,7 @@ pub unsafe fn aqc_remove_net_identifier(
 ///
 /// Note that this data is only valid after a successful call to
 /// `try_receive_channel`, and is invalidated after calling
-/// `get_bidirectional_channel`/`get_receiver_channel`.
+/// `get_bidi_channel`/`get_receive_channel`.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 120, align = 8)]
 pub type AqcPeerChannel = Safe<imp::AqcPeerChannel>;
@@ -1392,12 +1388,12 @@ pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
 /// An AQC Sender Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 112, align = 8)]
-pub type AqcSenderChannel = Safe<imp::AqcSenderChannel>;
+pub type AqcSendChannel = Safe<imp::AqcSendChannel>;
 
 /// An AQC Receiver Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 112, align = 8)]
-pub type AqcReceiverChannel = Safe<imp::AqcReceiverChannel>;
+pub type AqcReceiveChannel = Safe<imp::AqcReceiveChannel>;
 
 /// An AQC Bidirectional Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
@@ -1454,7 +1450,7 @@ pub unsafe fn aqc_create_bidi_channel(
 /// @param[in]  team the team's ID [`TeamId`].
 /// @param[in]  peer the peer's network identifier [`NetIdentifier`].
 /// @param[in]  label_id the AQC channel label ID [`LabelId`] to create the channel with.
-/// @param[out] channel the AQC channel object [`AqcSenderChannel`].
+/// @param[out] channel the AQC channel object [`AqcSendChannel`].
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_uni_channel(
@@ -1462,7 +1458,7 @@ pub unsafe fn aqc_create_uni_channel(
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
-    channel: &mut MaybeUninit<AqcSenderChannel>,
+    channel: &mut MaybeUninit<AqcSendChannel>,
 ) -> Result<(), imp::Error> {
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
@@ -1474,12 +1470,13 @@ pub unsafe fn aqc_create_uni_channel(
         label_id.into(),
     ))?;
 
-    AqcSenderChannel::init(channel, imp::AqcSenderChannel::new(chan));
+    AqcSendChannel::init(channel, imp::AqcSendChannel::new(chan));
     Ok(())
 }
 
-/* TODO(nikki): fixme
 /// Delete a bidirectional AQC channel.
+///
+/// Note that this function takes ownership of the [`AqcBidiChannel`] and invalidates any further use.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] channel the AQC Channel [`AqcBidiChannel`] to delete.
@@ -1487,32 +1484,39 @@ pub unsafe fn aqc_create_uni_channel(
 /// @relates AranyaClient.
 pub fn aqc_delete_bidi_channel(
     client: &mut Client,
-    channel: &AqcBidiChannel,
+    channel: OwnedPtr<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
+    // SAFETY: the user is responsible for passing in a valid AqcBidiChannel pointer.
+    let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
+
     let client = client.imp();
     client
         .rt
-        .block_on(client.inner.aqc().delete_bidi_channel(channel.into()))?;
+        .block_on(client.inner.aqc().delete_bidi_channel(channel))?;
     Ok(())
 }
 
 /// Delete a unidirectional AQC channel.
 ///
+/// Note that this function takes ownership of the [`AqcSendChannel`] and invalidates any further use.
+///
 /// @param[in] client the Aranya Client [`Client`].
-/// @param[in] channel the AQC Channel [`AqcSenderChannel`] to delete.
+/// @param[in] channel the AQC Channel [`AqcSendChannel`] to delete.
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_uni_channel(
     client: &mut Client,
-    channel: &AqcSenderChannel,
+    channel: OwnedPtr<AqcSendChannel>,
 ) -> Result<(), imp::Error> {
+    // SAFETY: the user is responsible for passing in a valid AqcSendChannel pointer.
+    let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
+
     let client = client.imp();
     client
         .rt
-        .block_on(client.inner.aqc().delete_uni_channel(channel.into()))?;
+        .block_on(client.inner.aqc().delete_uni_channel(channel))?;
     Ok(())
 }
-*/
 
 /// Tries to poll AQC to see if any channels have been received.
 ///
@@ -1524,15 +1528,15 @@ pub fn aqc_delete_uni_channel(
 /// AranyaAqcPeerChannel channel;
 /// AranyaAqcChannelType channel_type;
 /// AranyaAqcBidiChannel bidi;
-/// AranyaAqcReceiverChannel receiver;
+/// AranyaAqcReceiveChannel receiver;
 ///
 /// aranya_aqc_try_receive_channel(&client, &channel, &channel_type);
 /// switch (channel_type) {
 ///     case ARANYA_AQC_CHANNEL_TYPE_BIDIRECTIONAL:
-///         aranya_aqc_get_bidirectional_channel(&channel, &bidi);
+///         aranya_aqc_get_bidi_channel(&channel, &bidi);
 ///         break;
 ///     case ARANYA_AQC_CHANNEL_TYPE_RECEIVER:
-///         aranya_aqc_get_receiver_channel(&channel, &receiver);
+///         aranya_aqc_get_receive_channel(&channel, &receiver);
 ///         break;
 /// }
 /// ```
@@ -1568,7 +1572,7 @@ pub fn aqc_try_receive_channel(
 /// @param[out] bidi the AQC channel object [`AqcBidiChannel`] that holds channel info.
 ///
 /// @relates AranyaClient.
-pub fn aqc_get_bidirectional_channel(
+pub fn aqc_get_bidi_channel(
     channel: OwnedPtr<AqcPeerChannel>,
     bidi: &mut MaybeUninit<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
@@ -1580,32 +1584,32 @@ pub fn aqc_get_bidirectional_channel(
         Ok(())
     } else {
         Err(InvalidArg::new(
-                "channel",
-                "Tried to call get_bidirectional_channel with a `AqcPeerChannel` that wasn't Bidirectional!",
+            "channel",
+            "Tried to call get_bidi_channel with a `AqcPeerChannel` that wasn't Bidirectional!",
         )
         .into())
     }
 }
 
-/// Converts the [`AqcPeerChannel`]` into an [`AqcReceiverChannel`] for receiving data.
+/// Converts the [`AqcPeerChannel`]` into an [`AqcReceiveChannel`] for receiving data.
 ///
 /// Returns `ARANYA_ERROR_INVALID_ARGUMENT` if called when the AqcPeerChannel is the wrong type.
 ///
 /// Note that this function takes ownership of the [`AqcPeerChannel`] and invalidates any further use.
 ///
 /// @param[in]  channel the AQC channel container [`AqcPeerChannel`].
-/// @param[out] receiver the AQC channel object [`AqcReceiverChannel`].
+/// @param[out] receiver the AQC channel object [`AqcReceiveChannel`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_get_receiver_channel(
+pub fn aqc_get_receive_channel(
     channel: OwnedPtr<AqcPeerChannel>,
-    receiver: &mut MaybeUninit<AqcReceiverChannel>,
+    receiver: &mut MaybeUninit<AqcReceiveChannel>,
 ) -> Result<(), imp::Error> {
     if let aqc::AqcPeerChannel::Receive(recv) =
         // SAFETY: the user is responsible for passing in a valid AqcPeerChannel pointer.
         unsafe { Opaque::into_inner(channel.read()).into_inner().inner }
     {
-        AqcReceiverChannel::init(receiver, imp::AqcReceiverChannel::new(recv));
+        AqcReceiveChannel::init(receiver, imp::AqcReceiveChannel::new(recv));
         Ok(())
     } else {
         Err(InvalidArg::new(
@@ -1640,7 +1644,7 @@ pub fn aqc_bidi_create_bidi_stream(
     Ok(())
 }
 
-/// Send some data over an Aranya QUIC Channel bidirectional stream.
+/// Send some data to a peer using an [`AqcBidiStream`].
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] stream the sending side of a stream [`AqcBidiStream`].
@@ -1657,7 +1661,7 @@ pub fn aqc_bidi_stream_send(
     Ok(client.deref_mut().rt.block_on(stream.inner.send(data))?)
 }
 
-/// Receive some data from an Aranya QUIC Channel bidirectional stream.
+/// Receive some data from an [`AqcBidiStream`].
 ///
 /// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
 /// received yet which is considered a non-fatal error.
@@ -1786,19 +1790,19 @@ pub fn aqc_bidi_try_receive_stream(
     Ok(())
 }
 
-/// Create a unidirectional stream from an [`AqcSenderChannel`].
+/// Create a unidirectional stream from an [`AqcSendChannel`].
 ///
 /// Note that the recipient will not be able to receive the stream until data is
 /// sent over the stream.
 ///
 /// @param[in]  client the Aranya Client [`Client`].
-/// @param[in]  channel the AQC channel object [`AqcSenderChannel`].
+/// @param[in]  channel the AQC channel object [`AqcSendChannel`].
 /// @param[out] stream the sending side of a stream [`AqcSendStream`].
 ///
 /// @relates AranyaClient.
 pub fn aqc_send_create_uni_stream(
     client: &mut Client,
-    channel: &mut AqcSenderChannel,
+    channel: &mut AqcSendChannel,
     stream: &mut MaybeUninit<AqcSendStream>,
 ) -> Result<(), imp::Error> {
     let send = client
@@ -1810,7 +1814,7 @@ pub fn aqc_send_create_uni_stream(
     Ok(())
 }
 
-/// Receives the stream from an [`AqcReceiverChannel`].
+/// Receives the stream from an [`AqcReceiveChannel`].
 ///
 /// Note that the recipient will not be able to receive the stream until data is
 /// sent over the stream.
@@ -1818,12 +1822,12 @@ pub fn aqc_send_create_uni_stream(
 /// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
 /// received yet which is considered a non-fatal error.
 ///
-/// @param[in]  channel the AQC channel object [`AqcReceiverChannel`].
+/// @param[in]  channel the AQC channel object [`AqcReceiveChannel`].
 /// @param[out] stream the receiving side of a stream [`AqcReceiveStream`].
 ///
 /// @relates AranyaClient.
 pub fn aqc_recv_try_receive_uni_stream(
-    channel: &mut AqcReceiverChannel,
+    channel: &mut AqcReceiveChannel,
     stream: &mut MaybeUninit<AqcReceiveStream>,
 ) -> Result<(), imp::Error> {
     let recv = channel.inner.try_receive_uni_stream()?;
@@ -1832,7 +1836,7 @@ pub fn aqc_recv_try_receive_uni_stream(
     Ok(())
 }
 
-/// Send some data over an Aranya QUIC Channel send stream.
+/// Send some data over an [`AqcSendStream`]m.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] stream the sending side of a stream [`AqcSendStream`].
@@ -1849,7 +1853,7 @@ pub fn aqc_send_stream_send(
     Ok(client.deref_mut().rt.block_on(stream.inner.send(data))?)
 }
 
-/// Receive some data from an Aranya QUIC Channel receive stream.
+/// Receive some data from an [`AqcReceiveStream`].
 ///
 /// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
 /// received yet which is considered a non-fatal error.

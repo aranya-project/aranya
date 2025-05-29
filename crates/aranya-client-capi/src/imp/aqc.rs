@@ -17,30 +17,30 @@ impl AqcBidiChannel {
 }
 
 /// An AQC channel that can only send data.
-pub struct AqcSenderChannel {
-    pub(crate) inner: aqc::AqcSenderChannel,
+pub struct AqcSendChannel {
+    pub(crate) inner: aqc::AqcSendChannel,
 }
 
-impl Typed for AqcSenderChannel {
+impl Typed for AqcSendChannel {
     const TYPE_ID: TypeId = TypeId::new(0x302D3843);
 }
 
-impl AqcSenderChannel {
-    pub fn new(channel: aqc::AqcSenderChannel) -> Self {
+impl AqcSendChannel {
+    pub fn new(channel: aqc::AqcSendChannel) -> Self {
         Self { inner: channel }
     }
 }
 
 /// An AQC channel that can only receive data.
-pub struct AqcReceiverChannel {
+pub struct AqcReceiveChannel {
     pub(crate) inner: aqc::AqcReceiveChannel,
 }
 
-impl Typed for AqcReceiverChannel {
+impl Typed for AqcReceiveChannel {
     const TYPE_ID: TypeId = TypeId::new(0x62A97986);
 }
 
-impl AqcReceiverChannel {
+impl AqcReceiveChannel {
     pub fn new(channel: aqc::AqcReceiveChannel) -> Self {
         Self { inner: channel }
     }

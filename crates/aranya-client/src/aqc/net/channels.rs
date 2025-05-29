@@ -46,13 +46,13 @@ impl AqcPeerChannel {
 /// The sending end of a unidirectional channel.
 /// Allows sending data streams over a channel.
 #[derive(Debug)]
-pub struct AqcSenderChannel {
+pub struct AqcSendChannel {
     label_id: LabelId,
     handle: s2n::Handle,
     id: UniChannelId,
 }
 
-impl AqcSenderChannel {
+impl AqcSendChannel {
     /// Create a new channel with the given id and conection handle.
     ///
     /// Returns the new channel and the sender used to send new streams to the
@@ -88,7 +88,7 @@ impl AqcSenderChannel {
     }
 }
 
-impl Drop for AqcSenderChannel {
+impl Drop for AqcSendChannel {
     fn drop(&mut self) {
         self.close();
     }
