@@ -237,10 +237,12 @@ async fn test_aqc_chans() -> Result<()> {
         send1_1.send(msg1.clone()).await?;
         tokio::time::sleep(Duration::from_millis(100)).await;
         // Receive a unidirectional stream from peer 1
-        let (maybe_send2_1, mut recv2_1) = bidi_chan2
+        let mut recv2_1 = bidi_chan2
             .try_receive_stream()
-            .assume("stream not received")?;
-        assert!(maybe_send2_1.is_none(), "Expected unidirectional stream");
+            .assume("stream not received")?
+            .into_receive()
+            .ok()
+            .assume("is recv stream")?;
         let bytes = recv2_1.receive().await?.assume("no data received")?;
         assert_eq!(bytes, msg1);
     }
