@@ -476,7 +476,7 @@ AranyaError run(Team *t) {
 
     Client *owner = &t->clients.owner;
     Client *admin = &t->clients.admin;
-    Client *operator= & t->clients.operator;
+    Client *operator = &t->clients.operator;
     Client *membera = &t->clients.membera;
     Client *memberb = &t->clients.memberb;
 
@@ -729,24 +729,26 @@ static void *membera_aqc_thread(void *arg) {
     // Send some data to make sure it works.
     printf("Sending bidi stream data\n");
     const char *bidi_string = "hello from aqc membera!";
-    aranya_aqc_bidi_stream_send(ctx->client, &bidi_stream,
-                                (const uint8_t *)bidi_string,
-                                strnlen(bidi_string, BUFFER_LEN - 1) + 1);
+    err = aranya_aqc_bidi_stream_send(ctx->client, &bidi_stream,
+                                      (const uint8_t *)bidi_string,
+                                      strnlen(bidi_string, BUFFER_LEN - 1) + 1);
+    EXPECT("Unable to send bidi data from Member A", err);
 
     sleep(1);
 
     printf("Creating a uni stream\n");
-    err = aranya_aqc_bidi_create_uni_stream(ctx->client, &bidi_chan,
-                                             &uni_stream);
+    err =
+        aranya_aqc_bidi_create_uni_stream(ctx->client, &bidi_chan, &uni_stream);
     EXPECT("error creating an aqc bidi stream", err);
 
     sleep(1);
 
     printf("Sending uni stream data\n");
     const char *uni_string = "hello from aqc uni membera!";
-    aranya_aqc_send_stream_send(ctx->client, &uni_stream,
-                                (const uint8_t *)uni_string,
-                                strnlen(uni_string, BUFFER_LEN - 1) + 1);
+    err = aranya_aqc_send_stream_send(ctx->client, &uni_stream,
+                                      (const uint8_t *)uni_string,
+                                      strnlen(uni_string, BUFFER_LEN - 1) + 1);
+    EXPECT("Unable to send uni data from Member A", err);
 
     sleep(1);
 
@@ -756,7 +758,7 @@ static void *membera_aqc_thread(void *arg) {
     printf("Trying to receive member b's stream data\n");
     POLL(aranya_aqc_bidi_stream_try_recv(&bidi_stream, (uint8_t *)bidi_buffer,
                                          BUFFER_LEN, &bidi_recv_length),
-         "error receving aqc stream data");
+         "error receiving aqc stream data");
 
     if (strncmp("hello from aqc memberb!", bidi_buffer, BUFFER_LEN)) {
         fprintf(stderr, "received string doesn't match\n");
@@ -788,7 +790,8 @@ static void *membera_aqc_thread(void *arg) {
     printf("Received AQC bidi stream data: \"%s\"\n", uni_buffer);
 
 exit:
-    aranya_aqc_delete_bidi_channel(ctx->client, &bidi_chan);
+    err         = aranya_aqc_delete_bidi_channel(ctx->client, &bidi_chan);
+    ctx->result = err;
     return NULL;
 }
 
@@ -869,8 +872,7 @@ static void *memberb_aqc_thread(void *arg) {
          "error receiving an aqc bidi stream");
     // Validate that we never got a send stream on this one since it's a uni.
     if (uni_send_init) {
-        fprintf(stderr,
-                "received an AQC send stream for a uni stream\n");
+        fprintf(stderr, "received an AQC send stream for a uni stream\n");
         err = ARANYA_ERROR_AQC;
         goto exit;
     }
@@ -881,10 +883,10 @@ static void *memberb_aqc_thread(void *arg) {
     size_t uni_recv_length;
     memset(uni_buffer, 0, BUFFER_LEN);
     printf("Trying to receive the uni stream data\n");
-    POLL(aranya_aqc_recv_stream_try_recv(&uni_recv_stream,
-                                         (uint8_t *)uni_buffer, BUFFER_LEN,
-                                         &uni_recv_length),
-         "error receving aqc stream data");
+    POLL(
+        aranya_aqc_recv_stream_try_recv(&uni_recv_stream, (uint8_t *)uni_buffer,
+                                        BUFFER_LEN, &uni_recv_length),
+        "error receving aqc stream data");
 
     if (strncmp("hello from aqc uni membera!", uni_buffer, BUFFER_LEN)) {
         fprintf(stderr, "received string doesn't match\n");
@@ -896,25 +898,30 @@ static void *memberb_aqc_thread(void *arg) {
     // Send some data to make sure it works.
     printf("Sending some data back from member b\n");
     const char *bidi_string = "hello from aqc memberb!";
-    aranya_aqc_send_stream_send(ctx->client, &bidi_send_stream,
-                                (const uint8_t *)bidi_string,
-                                strnlen(bidi_string, BUFFER_LEN - 1) + 1);
+    err = aranya_aqc_send_stream_send(ctx->client, &bidi_send_stream,
+                                      (const uint8_t *)bidi_string,
+                                      strnlen(bidi_string, BUFFER_LEN - 1) + 1);
+    EXPECT("Unable to send bidi data from Member B", err);
 
     sleep(1);
 
     // Let's also test a unidirectional channel, just because.
-    aranya_aqc_send_create_uni_stream(ctx->client, &uni_send, &uni_send_stream);
+    err = aranya_aqc_send_create_uni_stream(ctx->client, &uni_send,
+                                            &uni_send_stream);
+    EXPECT("Unable to open a uni stream from Member B", err);
 
     // Need to send data to make sure Member A actually receives our stream.
     const char *uni_string = "hello from aqc uni memberb!";
-    aranya_aqc_send_stream_send(ctx->client, &uni_send_stream,
-                                (const uint8_t *)uni_string,
-                                strnlen(uni_string, BUFFER_LEN - 1) + 1);
+    err = aranya_aqc_send_stream_send(ctx->client, &uni_send_stream,
+                                      (const uint8_t *)uni_string,
+                                      strnlen(uni_string, BUFFER_LEN - 1) + 1);
+    EXPECT("Unable to send uni data from Member B", err);
 
     sleep(2);
 
 exit:
-    aranya_aqc_delete_uni_channel(ctx->client, &uni_send);
+    err         = aranya_aqc_delete_uni_channel(ctx->client, &uni_send);
+    ctx->result = err;
     return NULL;
 }
 
@@ -924,7 +931,7 @@ AranyaError run_aqc_example(Team *t) {
     AranyaLabelId *labels = NULL;
 
     Client *admin = &t->clients.admin;
-    Client *operator= & t->clients.operator;
+    Client *operator = &t->clients.operator;
     Client *membera = &t->clients.membera;
     Client *memberb = &t->clients.memberb;
 
