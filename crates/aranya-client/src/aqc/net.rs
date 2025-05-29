@@ -260,11 +260,11 @@ impl AqcClient {
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
             .await?;
         conn.keep_alive(true)?;
-        let (mut recv, mut send) = conn.open_bidirectional_stream().await?.split();
+        let mut stream = conn.open_bidirectional_stream().await?;
         let msg = AqcCtrlMessage { team_id, ctrl };
         let msg_bytes = postcard::to_stdvec(&msg).assume("can serialize")?;
-        send.send(Bytes::from_owner(msg_bytes)).await?;
-        if let Some(msg_bytes) = recv.receive().await? {
+        stream.send(Bytes::from_owner(msg_bytes)).await?;
+        if let Some(msg_bytes) = stream.receive().await? {
             let msg = postcard::from_bytes::<AqcAckMessage>(&msg_bytes).map_err(AqcError::Serde)?;
             match msg {
                 AqcAckMessage::Success => (),
