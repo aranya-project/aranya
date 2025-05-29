@@ -484,7 +484,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcSendStream {
 } AranyaAqcSendStream;
 
 /**
- * An AQC Sender Stream Object.
+ * An AQC Receiver Stream Object.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveStream {
     /**

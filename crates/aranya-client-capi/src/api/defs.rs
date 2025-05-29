@@ -1656,7 +1656,7 @@ pub fn aqc_bidi_stream_send(
     stream: &mut AqcBidiStream,
     data: &[u8],
 ) -> Result<(), imp::Error> {
-    let data = Bytes::from(Vec::from(data));
+    let data = Bytes::copy_from_slice(data);
     Ok(client.deref_mut().rt.block_on(stream.inner.send(data))?)
 }
 
