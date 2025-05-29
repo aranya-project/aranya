@@ -21,7 +21,6 @@ use tracing::{error, instrument, trace};
 
 use crate::{
     daemon::{Client, EF},
-    sync::prot::SyncProtocol,
     vm_policy::VecSink,
 };
 
@@ -154,8 +153,6 @@ pub struct Syncer<ST> {
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
-    /// Sync Protocol version.
-    protocol: SyncProtocol,
     /// Additional state used by the syncer
     state: ST,
 }
@@ -183,12 +180,7 @@ pub trait SyncState: Sized {
 
 impl<ST> Syncer<ST> {
     /// Creates a new `Syncer`.
-    pub fn new(
-        client: Client,
-        send_effects: EffectSender,
-        protocol: SyncProtocol,
-        state: ST,
-    ) -> (Self, SyncPeers) {
+    pub fn new(client: Client, send_effects: EffectSender, state: ST) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -198,7 +190,6 @@ impl<ST> Syncer<ST> {
                 recv,
                 queue: DelayQueue::new(),
                 send_effects,
-                protocol,
                 state,
             },
             peers,

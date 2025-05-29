@@ -10,7 +10,9 @@ mod error {
     #[derive(Error, Debug)]
     pub(super) enum SyncError {
         #[error("Protocol mismatch error")]
-        Protocol,
+        _Protocol,
+        #[error("Version mismatch error")]
+        Version,
         #[error(transparent)]
         Bug(#[from] buggy::Bug),
         #[error(transparent)]

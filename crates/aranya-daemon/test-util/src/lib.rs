@@ -45,7 +45,6 @@ use tokio::{
     task::{self, AbortHandle},
 };
 
-const TEST_SYNC_PROTOCOL: sync::prot::SyncProtocol = sync::prot::SyncProtocol::V1;
 type TestState = sync::task::quic::State;
 // Aranya sync client for testing.
 pub type TestSyncer = sync::task::Syncer<TestState>;
@@ -104,7 +103,7 @@ impl TestDevice {
         let state = TestState::new([], psk_rx.resubscribe())?;
 
         let (send, effect_recv) = mpsc::channel(1);
-        let (syncer, _sync_peers) = TestSyncer::new(client, send, TEST_SYNC_PROTOCOL, state);
+        let (syncer, _sync_peers) = TestSyncer::new(client, send, state);
         Ok(Self {
             syncer,
             graph_id,
@@ -265,14 +264,7 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let server = TestServer::new(
-                client.clone(),
-                &addr,
-                TEST_SYNC_PROTOCOL,
-                [],
-                send.subscribe(),
-            )
-            .await?;
+            let server = TestServer::new(client.clone(), &addr, [], send.subscribe()).await?;
             let local_addr = server.local_addr()?;
             (client, server, local_addr, pk)
         };

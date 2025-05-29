@@ -64,7 +64,7 @@ pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
-pub(crate) const DEFAULT_SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
+pub(crate) const SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
 
 /// The daemon itself.
 pub struct Daemon {
@@ -135,8 +135,7 @@ impl Daemon {
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
         let state = QuicSyncState::new(initial_keys, psk_recv)?;
-        let (mut syncer, peers) =
-            Syncer::new(client.clone(), send_effects, DEFAULT_SYNC_PROTOCOL, state);
+        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects, state);
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
@@ -261,7 +260,6 @@ impl Daemon {
         let server = SyncServer::new(
             client.clone(),
             &external_sync_addr,
-            DEFAULT_SYNC_PROTOCOL,
             initial_keys.clone(),
             recv,
         )

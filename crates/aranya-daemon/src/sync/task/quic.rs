@@ -41,19 +41,29 @@ use tokio::{
     task::JoinSet,
 };
 use tracing::{debug, error, info, instrument};
+use version::VERSION_ERR;
 
 use super::SyncResponse;
 use crate::{
     aranya::Client as AranyaClient,
     sync::{
-        prot::{SyncProtocol, PROTOCOL_ERR},
+        prot::SyncProtocol,
         task::{SyncState, Syncer},
         SyncError,
     },
 };
 
 /// ALPN protocol identifier for Aranya QUIC sync.
-const ALPN_QUIC_SYNC: &[u8] = b"quic_sync";
+const ALPN_QUIC_SYNC: &[u8] = const {
+    use crate::daemon::SYNC_PROTOCOL;
+
+    match SYNC_PROTOCOL {
+        SyncProtocol::V1 => b"quic_sync_v1",
+    }
+};
+
+/// QUIC Syncer Version
+const QUIC_SYNC_VERSION: Version = Version::V1;
 
 /// TODO: remove this.
 /// NOTE: this certificate is to be used for demonstration purposes only!
@@ -63,8 +73,11 @@ pub static CERT_PEM: &str = include_str!("./cert.pem");
 pub static KEY_PEM: &str = include_str!("./key.pem");
 
 mod psk;
+mod version;
+
 pub(crate) use psk::{delete_psk, get_existing_psks, insert_psk, TeamIdPSKPair};
 pub use psk::{ClientPresharedKeys, Msg, ServerPresharedKeys};
+pub use version::Version;
 
 /// Data used for sending sync requests and processing sync responses
 pub struct State {
@@ -236,7 +249,8 @@ impl Syncer<State> {
         send_buf.truncate(len);
 
         // TODO: `send_all`?
-        send.send(Bytes::from_owner([self.protocol as u8])).await?;
+        send.send(Bytes::from_owner([QUIC_SYNC_VERSION as u8]))
+            .await?;
         send.send(Bytes::from_owner(send_buf)).await?;
         send.close().await?;
         debug!(?peer, "sent sync request");
@@ -270,13 +284,13 @@ impl Syncer<State> {
             bail!("Empty sync response");
         };
 
-        let version = match version_byte {
-            &PROTOCOL_ERR => bail!("Recieved protocol error byte"),
-            v => SyncProtocol::try_from(*v)?,
+        let server_version = match version_byte {
+            &VERSION_ERR => bail!("Recieved version error byte"),
+            v => Version::try_from(*v)?,
         };
 
-        if version != self.protocol {
-            bail!(SyncError::Protocol)
+        if server_version != QUIC_SYNC_VERSION {
+            bail!(SyncError::Version)
         }
 
         // process the sync response.
@@ -325,8 +339,6 @@ pub struct Server<EN, SP> {
     set: JoinSet<()>,
     /// Identity Receiver.
     _identity_rx: mpsc::Receiver<Vec<u8>>,
-    /// Sync Protocol version.
-    protocol: SyncProtocol,
 }
 
 impl<EN, SP> Server<EN, SP> {
@@ -347,7 +359,6 @@ where
     pub async fn new<I>(
         aranya: AranyaClient<EN, SP>,
         addr: &Addr,
-        protocol: SyncProtocol,
         initial_psks: I,
         mut recv: Receiver<Msg>,
     ) -> AnyResult<Self>
@@ -408,7 +419,6 @@ where
             server,
             set,
             _identity_rx,
-            protocol,
         })
     }
 
@@ -434,9 +444,7 @@ where
                     match conn.accept_bidirectional_stream().await {
                         Ok(Some(stream)) => {
                             debug!(?peer, "received incoming QUIC stream");
-                            if let Err(e) =
-                                Self::sync(client.clone(), peer, stream, self.protocol).await
-                            {
+                            if let Err(e) = Self::sync(client.clone(), peer, stream).await {
                                 error!(?e, ?peer, "server unable to sync with peer");
                                 break;
                             }
@@ -463,7 +471,6 @@ where
         client: AranyaClient<EN, SP>,
         peer: SocketAddr,
         stream: BidirectionalStream,
-        protocol: SyncProtocol,
     ) -> AnyResult<()> {
         info!(?peer, "server received a sync request");
 
@@ -475,14 +482,14 @@ where
         debug!(?peer, n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let sync_response_res = Self::sync_respond(client, &recv_buf, protocol)
+        let sync_response_res = Self::sync_respond(client, &recv_buf)
             .await
             .inspect_err(|e| error!(?e, "error responding to sync request"));
 
         let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
-            Err(SyncError::Protocol) => {
-                send.send(Bytes::from_owner([PROTOCOL_ERR])).await?;
+            Err(SyncError::Version) => {
+                send.send(Bytes::from_owner([VERSION_ERR])).await?;
                 send.close().await?;
                 return Ok(());
             }
@@ -494,7 +501,8 @@ where
 
         // TODO: `send_all`?
         let data_len = data.len();
-        send.send(Bytes::from_owner([protocol as u8])).await?;
+        send.send(Bytes::from_owner([QUIC_SYNC_VERSION as u8]))
+            .await?;
         send.send(Bytes::from_owner(data)).await?;
         send.close().await?;
         debug!(?peer, n = data_len, "server sent sync response");
@@ -507,7 +515,6 @@ where
     async fn sync_respond(
         client: AranyaClient<EN, SP>,
         request_data: &[u8],
-        protocol: SyncProtocol,
     ) -> Result<Box<[u8]>, SyncError> {
         info!("server responding to sync request");
 
@@ -516,14 +523,13 @@ where
             return Err(anyhow::anyhow!("Empty sync request").into());
         };
 
-        let version = match version_byte {
-            &PROTOCOL_ERR => return Err(anyhow::anyhow!("Recieved protocol error byte").into()),
-            v => SyncProtocol::try_from(*v)?,
+        let client_version = match version_byte {
+            &VERSION_ERR => return Err(anyhow::anyhow!("Recieved protocol error byte").into()),
+            v => Version::try_from(*v)?,
         };
 
-        debug_assert!(version == protocol);
-        if version != protocol {
-            return Err(SyncError::Protocol);
+        if QUIC_SYNC_VERSION != client_version {
+            return Err(SyncError::Version);
         }
 
         // TODO: Use real server address
