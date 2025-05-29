@@ -183,14 +183,7 @@ impl AqcBidiChannel {
     /// If the stream is unidirectional, return a tuple of None and the receive stream.
     pub async fn receive_stream(&mut self) -> Result<AqcPeerStream, AqcError> {
         match self.conn.accept().await {
-            Ok(Some(stream)) => match stream {
-                s2n::PeerStream::Bidirectional(stream) => {
-                    Ok(AqcPeerStream::Bidi(AqcBidiStream(stream)))
-                }
-                s2n::PeerStream::Receive(recv) => {
-                    Ok(AqcPeerStream::Receive(AqcReceiveStream(recv)))
-                }
-            },
+            Ok(Some(stream)) => Ok(AqcPeerStream::new(stream)),
             Ok(None) => Err(AqcError::ConnectionClosed),
             Err(e) => Err(AqcError::ConnectionError(e)),
         }
@@ -199,19 +192,11 @@ impl AqcBidiChannel {
     /// Receive a stream if one is available. If there is no stream available,
     /// return Empty. If the channel is closed, return Disconnected. If disconnected
     /// is returned no streams will be available until a new channel is created.
-    pub fn try_receive_stream(
-        &mut self,
-    ) -> Result<(Option<AqcSendStream>, AqcReceiveStream), TryReceiveError> {
+    pub fn try_receive_stream(&mut self) -> Result<AqcPeerStream, TryReceiveError> {
         let mut cx = Context::from_waker(Waker::noop());
 
         match self.conn.poll_accept(&mut cx) {
-            Poll::Ready(Ok(Some(peer_stream))) => match peer_stream {
-                s2n::PeerStream::Bidirectional(stream) => {
-                    let (recv, send) = stream.split();
-                    Ok((Some(AqcSendStream(send)), AqcReceiveStream(recv)))
-                }
-                s2n::PeerStream::Receive(recv) => Ok((None, AqcReceiveStream(recv))),
-            },
+            Poll::Ready(Ok(Some(stream))) => Ok(AqcPeerStream::new(stream)),
             Poll::Ready(Ok(None)) => {
                 // Connection closed by peer, no more streams will be accepted.
                 Err(TryReceiveError::Error(AqcError::ConnectionClosed))
@@ -258,6 +243,12 @@ impl Drop for AqcBidiChannel {
 pub struct AqcBidiStream(s2n::BidirectionalStream);
 
 impl AqcBidiStream {
+    /// Split a bidi stream into send and receive halves.
+    pub fn split(self) -> (AqcSendStream, AqcReceiveStream) {
+        let (recv, send) = self.0.split();
+        (AqcSendStream(send), AqcReceiveStream(recv))
+    }
+
     /// Send data to the given stream.
     pub async fn send(&mut self, data: Bytes) -> Result<(), AqcError> {
         self.0.send(data).await?;
@@ -356,6 +347,13 @@ pub enum AqcPeerStream {
 }
 
 impl AqcPeerStream {
+    fn new(stream: s2n_quic::stream::PeerStream) -> Self {
+        match stream {
+            s2n::PeerStream::Bidirectional(stream) => Self::Bidi(AqcBidiStream(stream)),
+            s2n::PeerStream::Receive(recv) => Self::Receive(AqcReceiveStream(recv)),
+        }
+    }
+
     /// Tries to converts the peer stream into a bidi stream.
     #[allow(clippy::result_large_err)]
     pub fn into_bidi(self) -> Result<AqcBidiStream, Self> {
