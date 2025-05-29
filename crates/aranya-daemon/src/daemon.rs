@@ -96,7 +96,7 @@ impl Daemon {
     /// The daemon's entrypoint.
     pub async fn run(mut self) -> Result<()> {
         // Setup environment for daemon's working directory.
-        // E.g. creating subdirectories.s
+        // E.g. creating subdirectories.
         self.setup_env().await?;
 
         let mut set = JoinSet::new();
@@ -437,7 +437,6 @@ mod tests {
 
     use std::{path::PathBuf, time::Duration};
 
-    use aranya_util::NonEmptyString;
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;
@@ -458,7 +457,7 @@ mod tests {
             .and_then(|s| s.into_string().ok())
             .unwrap_or_else(|| String::from("test-device"));
         let pid = std::process::id();
-        let serice_name = format!("{exe_name}-daemon-{pid}");
+        let service_name = format!("{exe_name}-daemon-{pid}");
 
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
@@ -467,8 +466,7 @@ mod tests {
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
-            service_name: NonEmptyString::try_from(serice_name)
-                .expect("this is a non-empty string"),
+            service_name,
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,

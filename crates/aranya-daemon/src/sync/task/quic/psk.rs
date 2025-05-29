@@ -9,7 +9,6 @@ use ::rustls::{client::PresharedKeyStore, crypto::PresharedKey, server::SelectsP
 use anyhow::{bail, Result};
 use aranya_daemon_api::TeamId;
 use aranya_runtime::StorageProvider;
-use aranya_util::NonEmptyString;
 use buggy::BugExt as _;
 use s2n_quic::provider::tls::rustls::rustls::pki_types::ServerName;
 use tokio::sync::mpsc;
@@ -179,7 +178,7 @@ fn secret_user_str(id: &TeamId) -> String {
 
 pub(crate) async fn get_existing_psks<EN, SP: StorageProvider>(
     client: AranyaClient<EN, SP>,
-    service_name: &NonEmptyString,
+    service_name: &str,
 ) -> Result<Vec<TeamIdPSKPair>> {
     let mut aranya_client = client.lock().await;
     let graph_id_iter = aranya_client
@@ -226,7 +225,7 @@ pub(crate) async fn get_existing_psks<EN, SP: StorageProvider>(
 
 /// Inserts a PSK's identity and secret in the platform's credential store
 pub(crate) fn insert_psk(
-    service_name: &NonEmptyString,
+    service_name: &str,
     id: &TeamId,
     identity: &[u8],
     secret: &[u8],
@@ -248,7 +247,7 @@ pub(crate) fn insert_psk(
 }
 
 /// Deletes a PSK's identity and secret in the platform's credential store
-pub(crate) fn delete_psk(service_name: &NonEmptyString, id: &TeamId) -> Result<()> {
+pub(crate) fn delete_psk(service_name: &str, id: &TeamId) -> Result<()> {
     {
         let user_string = identity_user_str(id);
         let entry = keyring::Entry::new(service_name, &user_string)?;

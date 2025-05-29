@@ -6,7 +6,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use aranya_util::{Addr, NonEmptyString};
+use aranya_util::Addr;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 /// Options for configuring the daemon.
@@ -32,8 +32,8 @@ pub struct Config {
     /// See the documentation for each Platform's credential store
     /// to see what the service name maps to.
     ///
-    /// This value cannot be blank.
-    pub service_name: NonEmptyString,
+    /// This value should not be blank.
+    pub service_name: String,
 
     /// AFC configuration.
     #[serde(default)]
@@ -152,7 +152,7 @@ mod tests {
             uds_api_path: "/var/run/uds.sock".parse()?,
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
-            service_name: NonEmptyString::try_from("Aranya-QUIC-sync")?,
+            service_name: "Aranya-QUIC-sync".into(),
             afc: None,
             aqc: None,
         };

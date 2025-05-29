@@ -1,12 +1,8 @@
 //! General utility functions and types.
 
-use std::{
-    fmt::Display, fs::Permissions, ops::Deref, os::unix::fs::PermissionsExt, path::Path,
-    str::FromStr,
-};
+use std::{fs::Permissions, os::unix::fs::PermissionsExt, path::Path, str::FromStr};
 
 use aranya_fast_channels::shm;
-use serde::{Deserialize, Serialize};
 use tokio::{fs, io};
 use tracing::warn;
 
@@ -100,42 +96,5 @@ impl TryFrom<String> for ShmPathBuf {
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
         s.parse::<Self>()
-    }
-}
-
-/// An immutable [`String`] that can't be blank.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[serde(try_from = "String")]
-pub struct NonEmptyString(String);
-
-impl Deref for NonEmptyString {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl TryFrom<String> for NonEmptyString {
-    type Error = anyhow::Error;
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        if value.is_empty() {
-            anyhow::bail!("Invalid String. NonEmptyString can't be blank")
-        } else {
-            Ok(Self(value))
-        }
-    }
-}
-
-impl TryFrom<&str> for NonEmptyString {
-    type Error = anyhow::Error;
-    fn try_from(value: &str) -> Result<Self, Self::Error> {
-        Self::try_from(value.to_owned())
-    }
-}
-
-impl Display for NonEmptyString {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
     }
 }

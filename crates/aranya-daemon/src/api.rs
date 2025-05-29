@@ -16,7 +16,7 @@ use aranya_daemon_api::{
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
-use aranya_util::{Addr, NonEmptyString};
+use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
 use rustls::crypto::{hash::HashAlgorithm, PresharedKey};
@@ -80,7 +80,7 @@ pub(crate) struct DaemonApiServer {
     psk_send: broadcast::Sender<Msg>,
 
     /// See [`crate::config::Config::service_name`]
-    service_name: NonEmptyString,
+    service_name: String,
 }
 
 impl DaemonApiServer {
@@ -97,7 +97,7 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
         aqc: Aqc<CE, KS>,
         psk_send: PSKSender,
-        service_name: NonEmptyString,
+        service_name: String,
     ) -> Result<Self> {
         Ok(Self {
             uds_path,
@@ -268,7 +268,7 @@ struct ApiInner {
     handler: EffectHandler,
     aqc: Arc<Aqc<CE, KS>>,
     psk_send: broadcast::Sender<Msg>,
-    service_name: NonEmptyString,
+    service_name: String,
 }
 
 impl ApiInner {
