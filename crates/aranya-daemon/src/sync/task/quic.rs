@@ -41,7 +41,7 @@ use tokio::{
     task::JoinSet,
 };
 use tracing::{debug, error, info, instrument};
-use version::VERSION_ERR;
+use version::{check_version, VERSION_ERR};
 
 use super::SyncResponse;
 use crate::{
@@ -278,20 +278,12 @@ impl Syncer<State> {
             .context("failed to read sync response")?;
         debug!(?peer, n = recv_buf.len(), "received sync response");
 
-        // check protocol version
+        // check sync version
         let Some((version_byte, sync_response)) = recv_buf.split_first() else {
             error!("Empty sync response");
             bail!("Empty sync response");
         };
-
-        let server_version = match version_byte {
-            &VERSION_ERR => bail!("Recieved version error byte"),
-            v => Version::try_from(*v)?,
-        };
-
-        if server_version != QUIC_SYNC_VERSION {
-            bail!(SyncError::Version)
-        }
+        check_version(*version_byte, QUIC_SYNC_VERSION)?;
 
         // process the sync response.
         let resp = postcard::from_bytes(sync_response)
@@ -518,19 +510,12 @@ where
     ) -> Result<Box<[u8]>, SyncError> {
         info!("server responding to sync request");
 
+        // Check sync version
         let Some((version_byte, sync_request)) = request_data.split_first() else {
             error!("Empty sync request");
             return Err(anyhow::anyhow!("Empty sync request").into());
         };
-
-        let client_version = match version_byte {
-            &VERSION_ERR => return Err(anyhow::anyhow!("Recieved protocol error byte").into()),
-            v => Version::try_from(*v)?,
-        };
-
-        if QUIC_SYNC_VERSION != client_version {
-            return Err(SyncError::Version);
-        }
+        check_version(*version_byte, QUIC_SYNC_VERSION)?;
 
         // TODO: Use real server address
         let server_address = ();
