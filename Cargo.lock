@@ -303,7 +303,6 @@ dependencies = [
  "postcard",
  "pretty_assertions",
  "rustls",
- "rustls-pemfile",
  "s2n-quic",
  "serde",
  "serial_test",

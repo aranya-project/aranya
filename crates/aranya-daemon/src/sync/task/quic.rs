@@ -20,7 +20,6 @@ use aranya_util::Addr;
 use buggy::{bug, BugExt as _};
 use bytes::Bytes;
 use rustls::crypto::CryptoProvider;
-use rustls_pemfile::{certs, private_key};
 use s2n_quic::{
     client::Connect,
     connection::Error as ConnErr,
@@ -64,13 +63,6 @@ const ALPN_QUIC_SYNC: &[u8] = const {
 
 /// QUIC Syncer Version
 const QUIC_SYNC_VERSION: Version = Version::V1;
-
-/// TODO: remove this.
-/// NOTE: this certificate is to be used for demonstration purposes only!
-pub static CERT_PEM: &str = include_str!("./cert.pem");
-/// TODO: remove this.
-/// NOTE: this certificate is to be used for demonstration purposes only!
-pub static KEY_PEM: &str = include_str!("./key.pem");
 
 mod psk;
 mod version;
@@ -141,7 +133,8 @@ impl State {
         client_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
         client_config.preshared_keys = client_keys.clone(); // Pass the Arc<ClientPresharedKeys>
 
-        #[allow(deprecated)] //FIXME(Steve) - temporary for CI build
+        // Client builder doesn't support adding preshared keys
+        #[allow(deprecated)]
         let provider = rustls_provider::Client::new(client_config);
 
         let client = QuicClient::builder()
@@ -357,23 +350,14 @@ where
     where
         I: IntoIterator<Item = TeamIdPSKPair>,
     {
-        // Load Cert and Key
-        let certs = certs(&mut CERT_PEM.as_bytes()).collect::<AnyResult<Vec<_>, _>>()?;
-        let key = private_key(&mut KEY_PEM.as_bytes())?.assume("expected private key")?;
-
         let (server_keys, _identity_rx) = ServerPresharedKeys::new();
         let server_keys = Arc::new(server_keys);
         server_keys.extend(initial_psks)?;
 
-        // Load existing PSKs from secure storage
-        // for psk in get_existing_psks(aranya.clone()).await? {
-        //     server_keys.insert(psk);
-        // }
-
         // Create Server Config
         let mut server_config = ServerConfig::builder()
             .with_no_client_auth()
-            .with_single_cert(certs.clone(), key)?;
+            .with_cert_resolver(Arc::new(NoCertResolver::default()));
         server_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
         server_config.preshared_keys = PresharedKeySelection::Required(server_keys.clone());
 
@@ -614,3 +598,34 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
     }
 }
 // --- End SkipServerVerification ---
+
+// TODO: Move into util crate?
+// crates/aranya-client/src/aqc/crypto.rs
+#[derive(Debug, Default)]
+struct NoCertResolver(Arc<NoSigningKey>);
+impl rustls::server::ResolvesServerCert for NoCertResolver {
+    fn resolve(
+        &self,
+        _client_hello: rustls::server::ClientHello<'_>,
+    ) -> Option<Arc<rustls::sign::CertifiedKey>> {
+        Some(Arc::new(rustls::sign::CertifiedKey::new(
+            vec![],
+            Arc::clone(&self.0) as _,
+        )))
+    }
+}
+
+#[derive(Debug, Default)]
+struct NoSigningKey;
+impl rustls::sign::SigningKey for NoSigningKey {
+    fn choose_scheme(
+        &self,
+        _offered: &[rustls::SignatureScheme],
+    ) -> Option<Box<dyn rustls::sign::Signer>> {
+        None
+    }
+
+    fn algorithm(&self) -> rustls::SignatureAlgorithm {
+        rustls::SignatureAlgorithm::ECDSA
+    }
+}
