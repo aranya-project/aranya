@@ -107,7 +107,6 @@ impl From<&imp::Error> for Error {
             },
             imp::Error::Empty => Self::Empty,
             imp::Error::Closed => Self::Closed,
-            imp::Error::Aqc(_) => Self::Aqc,
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
             imp::Error::Other(_) => Self::Other,

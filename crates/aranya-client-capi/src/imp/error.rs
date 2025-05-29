@@ -23,9 +23,6 @@ pub enum Error {
     #[error("buffer too small")]
     BufferTooSmall,
 
-    #[error(transparent)]
-    Aqc(#[from] AqcError),
-
     #[error("haven't received any data yet")]
     Empty,
 
@@ -51,12 +48,18 @@ pub enum Error {
     Other(#[from] anyhow::Error),
 }
 
+impl From<AqcError> for Error {
+    fn from(value: AqcError) -> Self {
+        Self::Client(aranya_client::Error::Aqc(value))
+    }
+}
+
 impl From<TryReceiveError<AqcError>> for Error {
     fn from(value: TryReceiveError<AqcError>) -> Self {
         match value {
             TryReceiveError::Closed => Self::Closed,
             TryReceiveError::Empty => Self::Empty,
-            TryReceiveError::Error(e) => Self::Aqc(e),
+            TryReceiveError::Error(e) => Self::Client(aranya_client::Error::Aqc(e)),
         }
     }
 }
