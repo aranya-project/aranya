@@ -8,7 +8,7 @@ use std::{ffi::OsStr, os::unix::ffi::OsStrExt, str::FromStr};
 
 use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
-use aranya_client::aqc;
+use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_crypto::hex;
 use bytes::Bytes;
 use tracing::error;
@@ -1775,15 +1775,16 @@ pub fn aqc_bidi_try_receive_stream(
     send_stream: &mut MaybeUninit<AqcSendStream>,
     send_init: &mut MaybeUninit<bool>,
 ) -> Result<(), imp::Error> {
-    let (send, recv) = channel.inner.try_receive_stream()?;
-
-    AqcReceiveStream::init(recv_stream, imp::AqcReceiveStream::new(recv));
-    match send {
-        Some(send) => {
+    let stream = channel.inner.try_receive_stream()?;
+    match stream {
+        AqcPeerStream::Bidi(bidi) => {
+            let (send, recv) = bidi.split();
+            AqcReceiveStream::init(recv_stream, imp::AqcReceiveStream::new(recv));
             AqcSendStream::init(send_stream, imp::AqcSendStream::new(send));
             send_init.write(true);
         }
-        None => {
+        AqcPeerStream::Receive(recv) => {
+            AqcReceiveStream::init(recv_stream, imp::AqcReceiveStream::new(recv));
             send_init.write(false);
         }
     }
