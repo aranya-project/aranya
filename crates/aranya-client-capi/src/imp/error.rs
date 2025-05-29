@@ -51,12 +51,22 @@ pub enum Error {
     Other(#[from] anyhow::Error),
 }
 
-impl<T: core::fmt::Display> From<TryReceiveError<T>> for Error {
-    fn from(value: TryReceiveError<T>) -> Self {
+impl From<TryReceiveError<AqcError>> for Error {
+    fn from(value: TryReceiveError<AqcError>) -> Self {
         match value {
-            TryReceiveError::Empty => Self::Empty,
             TryReceiveError::Closed => Self::Closed,
-            TryReceiveError::Error(e) => Self::Other(anyhow::anyhow!("{e}")),
+            TryReceiveError::Empty => Self::Empty,
+            TryReceiveError::Error(e) => Self::Aqc(e),
+        }
+    }
+}
+
+impl From<TryReceiveError<aranya_client::Error>> for Error {
+    fn from(value: TryReceiveError<aranya_client::Error>) -> Self {
+        match value {
+            TryReceiveError::Closed => Self::Closed,
+            TryReceiveError::Empty => Self::Empty,
+            TryReceiveError::Error(e) => Self::Client(e),
         }
     }
 }
