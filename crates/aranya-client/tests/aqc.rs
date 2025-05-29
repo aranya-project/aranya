@@ -325,7 +325,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    try_join(
+    let err = try_join(
         team.membera.client.aqc().create_bidi_channel(
             team_id,
             NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
@@ -334,7 +334,9 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         team.memberb.client.aqc().receive_channel(),
     )
     .await
-    .expect_err("can not create and receive channel");
+    .err()
+    .unwrap();
+    assert!(matches!(err, aranya_client::error::Error::Aranya(_)));
 
     Ok(())
 }
@@ -416,7 +418,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    try_join(
+    let err = try_join(
         team.membera.client.aqc().create_bidi_channel(
             team_id,
             NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
@@ -425,7 +427,9 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         team.memberb.client.aqc().receive_channel(),
     )
     .await
-    .expect_err("can not receive channel");
+    .err()
+    .unwrap();
+    assert!(matches!(err, aranya_client::error::Error::Aranya(_)));
 
     Ok(())
 }
@@ -715,16 +719,18 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
         // try sending after channels are closed
         let msg2 = Bytes::from_static(b"hello2");
-        bidi1_2
-            .send(msg2.clone())
-            .await
-            .expect_err("expected to fail sending");
+        let err = bidi1_2.send(msg2.clone()).await.err().unwrap();
+        assert!(matches!(
+            err,
+            aranya_client::error::AqcError::StreamError(_)
+        ));
 
         // try receiving after channels are closed.
-        bidi1_2
-            .receive()
-            .await
-            .expect_err("expected receive on deleted channel to fail");
+        let err = bidi1_2.receive().await.err().unwrap();
+        assert!(matches!(
+            err,
+            aranya_client::error::AqcError::StreamError(_)
+        ));
     }
 
     Ok(())
