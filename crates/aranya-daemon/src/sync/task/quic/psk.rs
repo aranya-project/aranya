@@ -233,14 +233,13 @@ pub(crate) fn insert_psk(
     {
         let user_string = identity_user_str(id);
         let entry = keyring::Entry::new(service_name, &user_string)?;
-        // Entry may already exist
-        let _ = entry.set_secret(identity).inspect_err(|e| error!(%e));
+        entry.set_secret(identity).inspect_err(|e| error!(%e))?;
     }
 
     {
         let user_string = secret_user_str(id);
         let entry = keyring::Entry::new(service_name, &user_string)?;
-        let _ = entry.set_secret(secret).inspect_err(|e| error!(%e));
+        entry.set_secret(secret).inspect_err(|e| error!(%e))?;
     }
 
     Ok(())
@@ -251,14 +250,13 @@ pub(crate) fn delete_psk(service_name: &str, id: &TeamId) -> Result<()> {
     {
         let user_string = identity_user_str(id);
         let entry = keyring::Entry::new(service_name, &user_string)?;
-        // Entry may already exist
-        let _ = entry.delete_credential().inspect_err(|e| error!(%e));
+        entry.delete_credential().inspect_err(|e| error!(%e))?;
     }
 
     {
         let user_string = secret_user_str(id);
         let entry = keyring::Entry::new(service_name, &user_string)?;
-        let _ = entry.delete_credential().inspect_err(|e| error!(%e));
+        entry.delete_credential().inspect_err(|e| error!(%e))?;
     }
 
     Ok(())

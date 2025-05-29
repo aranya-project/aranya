@@ -225,7 +225,7 @@ pub struct DeviceCtx {
 }
 
 impl DeviceCtx {
-    async fn new(_team_name: &str, name: &str, work_dir: PathBuf, port: u16) -> Result<Self> {
+    async fn new(team_name: &str, name: &str, work_dir: PathBuf, port: u16) -> Result<Self> {
         let aqc_addr = Addr::new("127.0.0.1", port).expect("unable to init AQC address");
         fs::create_dir_all(work_dir.clone()).await?;
 
@@ -233,7 +233,8 @@ impl DeviceCtx {
         let uds_api_path = work_dir.join("uds.sock");
 
         // Reduce chance of having a collision in the storage
-        let service_name = Self::gen_service_name(name, &mut Rng);
+        let combined_name = format!("{team_name}-{name}");
+        let service_name = Self::gen_service_name(&combined_name, &mut Rng);
 
         let cfg = Config {
             name: "daemon".into(),
