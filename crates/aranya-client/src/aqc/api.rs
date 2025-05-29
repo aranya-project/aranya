@@ -7,11 +7,13 @@ use aranya_daemon_api::{
     AqcBidiPsks, AqcUniPsks, DaemonApiClient, DeviceId, LabelId, NetIdentifier, TeamId,
 };
 use buggy::{Bug, BugExt as _};
-use rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig};
 use s2n_quic::{
     provider::{
         congestion_controller::Bbr,
-        tls::rustls::{self as rustls_provider},
+        tls::rustls::{
+            self as rustls_provider,
+            rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig},
+        },
     },
     Server,
 };
