@@ -1404,7 +1404,7 @@ pub type AqcBidiStream = Safe<imp::AqcBidiStream>;
 #[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AqcSendStream = Safe<imp::AqcSendStream>;
 
-/// An AQC Sender Stream Object.
+/// An AQC Receiver Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
 #[aranya_capi_core::opaque(size = 184, align = 8)]
 pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
