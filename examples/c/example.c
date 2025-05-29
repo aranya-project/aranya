@@ -836,7 +836,7 @@ static void *memberb_aqc_thread(void *arg) {
     POLL(aranya_aqc_bidi_try_receive_stream(&bidi_recv, &bidi_recv_stream,
                                             &bidi_send_stream, &bidi_send_init),
          "error receiving an aqc bidi stream");
-    // Validate that we got a send stream since this is a uni stream.
+    // Validate that we got a send stream since this is a bidi stream.
     if (!bidi_send_init) {
         fprintf(stderr,
                 "didn't receive an AQC send stream for a bidi stream\n");
