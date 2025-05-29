@@ -4,12 +4,13 @@ use std::{
 };
 
 use aranya_daemon_api::{AqcPsk, AqcPsks, CipherSuiteId};
-use rustls::{
+#[allow(deprecated)]
+use s2n_quic::provider::tls::rustls::rustls::{
+    self,
     client::PresharedKeyStore,
     crypto::{hash::HashAlgorithm, CryptoProvider, PresharedKey},
     server::SelectsPresharedKeys,
 };
-use s2n_quic::provider::tls::rustls::rustls::pki_types::ServerName;
 use tokio::sync::mpsc;
 use tracing::error;
 
@@ -111,7 +112,7 @@ impl ClientPresharedKeys {
 }
 
 impl PresharedKeyStore for ClientPresharedKeys {
-    fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
+    fn psks(&self, _server_name: &rustls::pki_types::ServerName<'_>) -> Vec<Arc<PresharedKey>> {
         self.keys.lock().expect("Client PSK mutex poisoned").clone()
     }
 }
@@ -157,7 +158,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
         &self,
         _end_entity: &rustls::pki_types::CertificateDer<'_>,
         _intermediates: &[rustls::pki_types::CertificateDer<'_>],
-        _server_name: &ServerName<'_>,
+        _server_name: &rustls::pki_types::ServerName<'_>,
         _ocsp_response: &[u8],
         _now: rustls::pki_types::UnixTime,
     ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
