@@ -3,7 +3,7 @@ use core::{
     ops::DerefMut,
     ptr,
 };
-use std::{ffi::OsStr, ops::Deref, os::unix::ffi::OsStrExt};
+use std::{ffi::OsStr, ops::Deref, os::unix::ffi::OsStrExt, str::FromStr};
 
 use anyhow::Context as _;
 use aranya_capi_core::{prelude::*, ErrorCode, InvalidArg};
@@ -196,10 +196,17 @@ pub unsafe fn client_init(
 
     let rt = tokio::runtime::Runtime::new().context("unable to construct tokio runtime")?;
 
+    // SAFETY: Caller must ensure pointer is a valid C String.
+    let aqc_str = unsafe { CStr::from_ptr(config.aqc_addr()) }
+        .to_str()
+        .context("unable to convert to string")?;
+
+    let aqc_addr = aranya_util::Addr::from_str(aqc_str)?;
     let inner = rt.block_on({
         aranya_client::Client::builder()
             .with_daemon_uds_path(daemon_socket)
             .with_daemon_api_pk(config.daemon_api_pk())
+            .with_daemon_aqc_addr(&aqc_addr)
             .connect()
     })?;
 
@@ -1372,9 +1379,12 @@ pub unsafe fn aqc_create_bidi_channel(
         peer,
         label_id.into(),
     ))?;
-    Ok(chan_id.into())
+    Ok(AqcBidiChannelId {
+        id: chan_id.aqc_id().into_id().into(),
+    })
 }
 
+/*
 /// Delete a bidirectional AQC channel.
 ///
 /// @param client the Aranya Client [`Client`].
@@ -1408,3 +1418,4 @@ pub fn aqc_delete_uni_channel(
         .block_on(client.inner.aqc().delete_uni_channel(chan.into()))?;
     Ok(())
 }
+*/

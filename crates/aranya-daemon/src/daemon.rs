@@ -85,7 +85,7 @@ impl Daemon {
     }
 
     /// Returns the daemon's public API key.
-    pub async fn public_api_key(self) -> Result<PublicApiKey<CS>> {
+    pub async fn public_api_key(&self) -> Result<PublicApiKey<CS>> {
         self.setup_env().await?;
 
         let mut eng = self.load_crypto_engine().await?;
