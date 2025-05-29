@@ -213,10 +213,10 @@ impl Syncer<State> {
         Ok(stream)
     }
 
-    async fn send_sync_request<'a, A>(
+    async fn send_sync_request<A>(
         &self,
         send: &mut SendStream,
-        syncer: &mut SyncRequester<'a, A>,
+        syncer: &mut SyncRequester<'_, A>,
         peer: &Addr,
     ) -> AnyResult<()>
     where
@@ -244,10 +244,10 @@ impl Syncer<State> {
         Ok(())
     }
 
-    async fn receive_sync_response<'a, S, A>(
+    async fn receive_sync_response<S, A>(
         &self,
         recv: &mut ReceiveStream,
-        syncer: &mut SyncRequester<'a, A>,
+        syncer: &mut SyncRequester<'_, A>,
         id: &GraphId,
         sink: &mut S,
         peer: &Addr,

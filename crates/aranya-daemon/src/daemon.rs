@@ -21,12 +21,11 @@ use bimap::BiBTreeMap;
 use buggy::BugExt;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
+#[cfg(feature = "testing")]
+use tokio::sync::broadcast::error::RecvError;
 use tokio::{
     fs,
-    sync::{
-        broadcast::{error::RecvError, Receiver},
-        Mutex,
-    },
+    sync::{broadcast::Receiver, Mutex},
     task::JoinSet,
 };
 use tracing::{error, info, info_span, Instrument as _};
@@ -380,7 +379,7 @@ impl Drop for Daemon {
 
         #[cfg(feature = "testing")]
         for id in &self.delete_bucket {
-            let _ = delete_psk(&self.cfg.service_name, &id);
+            let _ = delete_psk(&self.cfg.service_name, id);
         }
     }
 }
