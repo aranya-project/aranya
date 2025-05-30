@@ -14,9 +14,11 @@ aranya-crypto = { workspace = true, features = ["alloc", "fs-keystore", "std"] }
 aranya-runtime = { workspace = true }
 aranya-util = { workspace = true }
 
-aranya-daemon = { workspace = true }
+aranya-daemon = { workspace = true, features = ["testing"] }
+aranya-daemon-api = { workspace = true }
 aranya-keygen = { workspace = true }
 
 anyhow = { workspace = true }
+s2n-quic = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }

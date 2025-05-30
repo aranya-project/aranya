@@ -9,8 +9,8 @@ use aranya_daemon_api::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Version, CS,
+    ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, QuicSyncPSK, Role,
+    TeamId, Version, CS,
 };
 use aranya_util::Addr;
 use tarpc::context;
@@ -245,7 +245,7 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
+    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<(TeamId, Option<QuicSyncPSK>)> {
         self.daemon
             .create_team(context::current(), cfg.into())
             .await
@@ -327,6 +327,16 @@ impl Team<'_> {
         self.client
             .daemon
             .remove_sync_peer(context::current(), addr, self.id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Add a team to a device's local store
+    pub async fn add_team(&self, cfg: TeamConfig) -> Result<()> {
+        self.client
+            .daemon
+            .add_team(context::current(), self.id, cfg.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

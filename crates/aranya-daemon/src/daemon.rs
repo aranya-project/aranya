@@ -1,3 +1,5 @@
+#[cfg(feature = "testing")]
+use std::collections::HashSet;
 use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -19,18 +21,32 @@ use bimap::BiBTreeMap;
 use buggy::BugExt;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
+#[cfg(feature = "testing")]
+use tokio::sync::broadcast::error::RecvError;
+use tokio::{
+    fs,
+    sync::{broadcast::Receiver, Mutex},
+    task::JoinSet,
+};
 use tracing::{error, info, info_span, Instrument as _};
 
+#[cfg(feature = "testing")]
+use crate::sync::task::quic::delete_psk;
 use crate::{
     actions::Actions,
-    api::{ApiKey, DaemonApiServer, PublicApiKey},
+    api::{ApiKey, DaemonApiServer, PublicApiKey, QSData},
     aqc::Aqc,
     aranya,
     config::Config,
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::{task::Syncer, tcp::State as TCPSyncState},
+    sync::{
+        prot::SyncProtocol,
+        task::{
+            quic::{get_existing_psks, Msg, State as QuicSyncState, TeamIdPSKPair},
+            Syncer,
+        },
+    },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
@@ -47,17 +63,24 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-type TcpSyncServer = crate::sync::tcp::Server<EN, SP>;
+pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
+pub(crate) const SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
 
 /// The daemon itself.
 pub struct Daemon {
     cfg: Config,
+    #[cfg(feature = "testing")]
+    delete_bucket: HashSet<aranya_daemon_api::TeamId>,
 }
 
 impl Daemon {
     /// Loads a `Daemon` using its config.
     pub async fn load(cfg: Config) -> Result<Self> {
-        Ok(Self { cfg })
+        Ok(Self {
+            cfg,
+            #[cfg(feature = "testing")]
+            delete_bucket: Default::default(),
+        })
     }
 
     /// Returns the daemon's public API key.
@@ -71,7 +94,7 @@ impl Daemon {
     }
 
     /// The daemon's entrypoint.
-    pub async fn run(self) -> Result<()> {
+    pub async fn run(mut self) -> Result<()> {
         // Setup environment for daemon's working directory.
         // E.g. creating subdirectories.
         self.setup_env().await?;
@@ -87,9 +110,11 @@ impl Daemon {
         let mut local_store = self.load_local_keystore().await?;
         let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
 
-        // Initialize Aranya syncer client.
-        let (client, local_addr) = {
-            let (client, server) = self
+        let (psk_send, psk_recv) = tokio::sync::broadcast::channel(16);
+
+        // Initialize the Aranya client and sync server.
+        let (client, local_addr, initial_keys) = {
+            let (client, server, initial_keys) = self
                 .setup_aranya(
                     eng.clone(),
                     aranya_store
@@ -97,21 +122,24 @@ impl Daemon {
                         .context("unable to clone keystore")?,
                     &pk,
                     self.cfg.sync_addr,
+                    psk_send.subscribe(),
                 )
                 .await?;
             let local_addr = server.local_addr()?;
             set.spawn(async move { server.serve().await });
 
-            (client, local_addr)
+            (client, local_addr, initial_keys)
         };
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects, TCPSyncState);
+
+        let state = QuicSyncState::new(initial_keys, psk_recv)?;
+        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects, state);
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
-                    error!(err = ?err, "unable to sync with peer");
+                    error!(err = ?err, "client unable to sync with peer");
                 }
             }
         });
@@ -142,15 +170,54 @@ impl Daemon {
             Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
         };
 
+        // TODO: Fix this when other syncer types are supported
+        let Some(qs_config) = &self.cfg.quic_sync else {
+            anyhow::bail!("Supply a valid QUIC sync config")
+        };
+        // Declare here because self is moved into the closure below
+        let service_name = qs_config.service_name.clone();
+        let uds_path = self.cfg.uds_api_path.clone();
+
+        #[cfg(feature = "testing")]
+        {
+            let mut cleanup_recv = psk_send.subscribe();
+            set.spawn(async move {
+                loop {
+                    match cleanup_recv.recv().await {
+                        Ok(msg) => match msg {
+                            Msg::Insert((id, _)) => {
+                                self.delete_bucket.insert(id);
+                            }
+                            Msg::Remove(id) => {
+                                self.delete_bucket.remove(&id);
+                            }
+                        },
+                        Err(RecvError::Closed) => break,
+                        Err(err) => {
+                            error!(err = ?err, "unable to receive psk on broadcast channel")
+                        }
+                    }
+                }
+
+                info!("PSK broadcast channel closed");
+                Ok(())
+            });
+        }
+
+        let data = QSData {
+            psk_send,
+            service_name,
+        };
         let api = DaemonApiServer::new(
             client,
             local_addr,
-            self.cfg.uds_api_path.clone(),
+            uds_path,
             api_sk,
             pk,
             peers,
             recv_effects,
             aqc,
+            Some(data),
         )?;
         api.serve().await?;
 
@@ -174,14 +241,15 @@ impl Daemon {
         Ok(())
     }
 
-    /// Creates the Aranya client and server.
+    /// Creates the Aranya client and sync server.
     async fn setup_aranya(
         &self,
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-    ) -> Result<(Client, TcpSyncServer)> {
+        recv: Receiver<Msg>,
+    ) -> Result<(Client, SyncServer, Vec<TeamIdPSKPair>)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -194,17 +262,25 @@ impl Daemon {
 
         let client = Client::new(Arc::clone(&aranya));
 
-        let server = {
-            info!(addr = %external_sync_addr, "starting TCP server");
-            let listener = TcpListener::bind(external_sync_addr.to_socket_addrs())
-                .await
-                .context("unable to bind TCP listener")?;
-            TcpSyncServer::new(client.clone(), listener)
+        // TODO: Fix this when other syncer types are supported
+        let Some(qs_config) = &self.cfg.quic_sync else {
+            anyhow::bail!("Supply a valid QUIC sync config")
         };
+        let initial_keys = get_existing_psks(client.clone(), &qs_config.service_name).await?;
+
+        info!(addr = %external_sync_addr, "starting QUIC sync server");
+        let server = SyncServer::new(
+            client.clone(),
+            &external_sync_addr,
+            initial_keys.clone(),
+            recv,
+        )
+        .await
+        .context("unable to initialize QUIC sync server")?;
 
         info!(device_id = %device_id, "set up Aranya");
 
-        Ok((client, server))
+        Ok((client, server, initial_keys))
     }
 
     /// Loads the crypto engine.
@@ -310,6 +386,15 @@ impl Daemon {
 impl Drop for Daemon {
     fn drop(&mut self) {
         let _ = std::fs::remove_file(&self.cfg.uds_api_path);
+
+        #[cfg(feature = "testing")]
+        {
+            if let Some(cfg) = self.cfg.quic_sync.as_ref() {
+                for id in &self.delete_bucket {
+                    let _ = delete_psk(&cfg.service_name, id);
+                }
+            }
+        }
     }
 }
 
@@ -364,20 +449,29 @@ async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
 mod tests {
     #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-    use std::time::Duration;
+    use std::{path::PathBuf, time::Duration};
 
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;
 
     use super::*;
-    use crate::config::AfcConfig;
+    use crate::config::{AfcConfig, QSConfig};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
     async fn test_daemon_run() {
         let dir = tempdir().expect("should be able to create temp dir");
         let work_dir = dir.path().join("work");
+
+        // Reduce chance of having a collision in the storage
+        let exe_name = std::env::current_exe()
+            .ok()
+            .map(PathBuf::into_os_string)
+            .and_then(|s| s.into_string().ok())
+            .unwrap_or_else(|| String::from("test-device"));
+        let pid = std::process::id();
+        let service_name = format!("{exe_name}-daemon-{pid}");
 
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
@@ -386,6 +480,7 @@ mod tests {
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
+            quic_sync: Some(QSConfig { service_name }),
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,

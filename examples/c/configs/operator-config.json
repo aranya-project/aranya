@@ -15,4 +15,7 @@
 
 	// Aranya sync server address.
 	"sync_addr": "127.0.0.1:10003",
+
+	// QUIC syncer config
+	"quic_sync": { "service_name": "Aranya-QUIC-sync-c-example" },
 }

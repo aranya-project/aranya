@@ -19,10 +19,13 @@ use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, instrument, trace};
 
+use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
     vm_policy::VecSink,
 };
+
+pub mod quic;
 
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
@@ -152,7 +155,7 @@ pub struct Syncer<ST> {
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
     /// Additional state used by the syncer
-    _state: ST,
+    state: ST,
 }
 
 struct PeerInfo {
@@ -171,14 +174,14 @@ pub trait SyncState: Sized {
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> impl Future<Output = Result<()>> + Send
+    ) -> impl Future<Output = SyncResult<()>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
 }
 
 impl<ST> Syncer<ST> {
     /// Creates a new `Syncer`.
-    pub fn new(client: Client, send_effects: EffectSender, _state: ST) -> (Self, SyncPeers) {
+    pub fn new(client: Client, send_effects: EffectSender, state: ST) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -188,7 +191,7 @@ impl<ST> Syncer<ST> {
                 recv,
                 queue: DelayQueue::new(),
                 send_effects,
-                _state,
+                state,
             },
             peers,
         )
