@@ -1,5 +1,8 @@
+use core::mem::{self, MaybeUninit};
+
 use aranya_capi_core::safe::{TypeId, Typed};
 use aranya_client::aqc;
+use bytes::{Buf as _, Bytes};
 
 /// An AQC channel that can both send and receive data.
 pub struct AqcBidiChannel {
@@ -67,7 +70,7 @@ impl AqcPeerChannel {
 /// An AQC stream that can both send and receive data.
 pub struct AqcBidiStream {
     pub(crate) inner: aqc::AqcBidiStream,
-    pub(crate) data: Option<bytes::Bytes>,
+    pub(crate) data: Bytes,
 }
 
 impl Typed for AqcBidiStream {
@@ -78,7 +81,7 @@ impl AqcBidiStream {
     pub fn new(stream: aqc::AqcBidiStream) -> Self {
         Self {
             inner: stream,
-            data: None,
+            data: Bytes::new(),
         }
     }
 }
@@ -101,7 +104,7 @@ impl AqcSendStream {
 /// An AQC stream that can only receive data.
 pub struct AqcReceiveStream {
     pub(crate) inner: aqc::AqcReceiveStream,
-    pub(crate) data: Option<bytes::Bytes>,
+    pub(crate) data: Bytes,
 }
 
 impl Typed for AqcReceiveStream {
@@ -112,7 +115,24 @@ impl AqcReceiveStream {
     pub fn new(stream: aqc::AqcReceiveStream) -> Self {
         Self {
             inner: stream,
-            data: None,
+            data: Bytes::new(),
         }
     }
+}
+
+/// Writes bytes into `buffer` from `bytes`, advancing them both.
+///
+/// Returns the number of bytes written.
+pub(crate) fn consume_bytes(buffer: &mut &mut [MaybeUninit<u8>], bytes: &mut Bytes) -> usize {
+    let len = core::cmp::min(bytes.len(), buffer.len());
+
+    // SAFETY: &[T] and &[MaybeUninit<T>] have the same layout.
+    let src = unsafe { mem::transmute::<&[u8], &[MaybeUninit<u8>]>(&bytes[..len]) };
+    let dst = &mut (*buffer)[..len];
+    dst.copy_from_slice(src);
+
+    *buffer = &mut mem::take(buffer)[len..];
+    bytes.advance(len);
+
+    len
 }

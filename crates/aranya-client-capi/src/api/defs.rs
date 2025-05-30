@@ -1,7 +1,6 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 use core::{
     ffi::{c_char, CStr},
-    ops::DerefMut,
     ptr,
 };
 use std::{ffi::OsStr, os::unix::ffi::OsStrExt, str::FromStr};
@@ -13,7 +12,7 @@ use aranya_crypto::hex;
 use bytes::Bytes;
 use tracing::error;
 
-use crate::imp;
+use crate::{imp, imp::aqc::consume_bytes};
 
 /// An error code.
 ///
@@ -728,7 +727,7 @@ pub fn sync_peer_config_build(
 /// @param cfg a pointer to the builder for a sync config
 /// @param interval Set the interval at which syncing occurs
 pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
-    cfg.deref_mut().interval(interval);
+    cfg.interval(interval);
 }
 
 /// Updates the config to enable immediate syncing with the peer.
@@ -740,7 +739,7 @@ pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, in
 /// @param cfg a pointer to the builder for a sync config
 // TODO: aranya-core#129
 pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
-    cfg.deref_mut().sync_now(true);
+    cfg.sync_now(true);
 }
 
 /// Updates the config to disable immediate syncing with the peer.
@@ -751,7 +750,7 @@ pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
 /// @param cfg a pointer to the builder for a sync config
 // TODO: aranya-core#129
 pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) {
-    cfg.deref_mut().sync_now(false);
+    cfg.sync_now(false);
 }
 
 /// Assign a role to a device.
@@ -1549,7 +1548,7 @@ pub fn aqc_try_receive_channel(
     client: &mut Client,
     channel: &mut MaybeUninit<AqcPeerChannel>,
 ) -> Result<AqcChannelType, imp::Error> {
-    let chan = client.deref_mut().inner.aqc().try_receive_channel()?;
+    let chan = client.inner.aqc().try_receive_channel()?;
 
     let chan_type = match chan {
         aqc::AqcPeerChannel::Bidi { .. } => AqcChannelType::Bidirectional,
@@ -1634,10 +1633,7 @@ pub fn aqc_bidi_create_bidi_stream(
     channel: &mut AqcBidiChannel,
     stream: &mut MaybeUninit<AqcBidiStream>,
 ) -> Result<(), imp::Error> {
-    let bidi = client
-        .deref_mut()
-        .rt
-        .block_on(channel.inner.create_bidi_stream())?;
+    let bidi = client.rt.block_on(channel.inner.create_bidi_stream())?;
 
     AqcBidiStream::init(stream, imp::AqcBidiStream::new(bidi));
     Ok(())
@@ -1657,7 +1653,7 @@ pub fn aqc_bidi_stream_send(
     data: &[u8],
 ) -> Result<(), imp::Error> {
     let data = Bytes::copy_from_slice(data);
-    Ok(client.deref_mut().rt.block_on(stream.inner.send(data))?)
+    Ok(client.rt.block_on(stream.inner.send(data))?)
 }
 
 /// Receive some data from an [`AqcBidiStream`].
@@ -1667,64 +1663,25 @@ pub fn aqc_bidi_stream_send(
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcBidiStream`].
 /// @param[out] buffer pointer to the target buffer.
-/// @param[out] buffer_len length of the target buffer.
+/// @param[in] buffer_len length of the target buffer.
 /// @param[out] __output the number of bytes written to the buffer.
 ///
 /// @relates AranyaClient.
 pub fn aqc_bidi_stream_try_recv(
     stream: &mut AqcBidiStream,
-    buffer: &mut [MaybeUninit<u8>],
+    mut buffer: &mut [MaybeUninit<u8>],
 ) -> Result<usize, imp::Error> {
-    // First, let's check to see if we have any leftover data from last call.
-    let requested = buffer.len();
     let mut written = 0;
-
-    // If we do, grab it and set data to None
-    if let Some(mut data) = stream.data.take() {
-        // Check to see if we still have leftover data
-        let length = core::cmp::min(data.len(), requested);
-        let left = data.split_off(length);
-        if !left.is_empty() {
-            stream.data = Some(left);
-        }
-
-        // Copy as many bytes as we can to the buffer, either filling it up or depleting data.
-        for (dst, src) in core::iter::zip(&mut buffer[..length], data) {
-            dst.write(src);
-        }
-
-        written += length;
-    }
-
-    // If we still have space left in the buffer, let's try to receive more data.
-    while written < requested {
+    while {
+        written += consume_bytes(&mut buffer, &mut stream.data);
+        !buffer.is_empty()
+    } {
         match stream.inner.try_receive() {
-            Ok(mut data) => {
-                // Check to see if we still have leftover data
-                let length = core::cmp::min(data.len(), requested - written);
-                let left = data.split_off(length);
-                if !left.is_empty() {
-                    stream.data = Some(left);
-                }
-
-                // Copy as many bytes as we can to the buffer, hopefully filling the buffer.
-                for (dst, src) in core::iter::zip(&mut buffer[written..written + length], data) {
-                    dst.write(src);
-                }
-
-                written += length;
-            }
-            Err(e) => {
-                // If we get an error, let's check to see if we've written any
-                // amount of data, and if so let's just return.
-                if written != 0 {
-                    break;
-                }
-                return Err(e.into());
-            }
+            Ok(data) => stream.data = data,
+            Err(_) if written > 0 => break,
+            Err(e) => return Err(e.into()),
         }
     }
-
     Ok(written)
 }
 
@@ -1743,10 +1700,7 @@ pub fn aqc_bidi_create_uni_stream(
     channel: &mut AqcBidiChannel,
     stream: &mut MaybeUninit<AqcSendStream>,
 ) -> Result<(), imp::Error> {
-    let send = client
-        .deref_mut()
-        .rt
-        .block_on(channel.inner.create_uni_stream())?;
+    let send = client.rt.block_on(channel.inner.create_uni_stream())?;
 
     AqcSendStream::init(stream, imp::AqcSendStream::new(send));
     Ok(())
@@ -1805,10 +1759,7 @@ pub fn aqc_send_create_uni_stream(
     channel: &mut AqcSendChannel,
     stream: &mut MaybeUninit<AqcSendStream>,
 ) -> Result<(), imp::Error> {
-    let send = client
-        .deref_mut()
-        .rt
-        .block_on(channel.inner.create_uni_stream())?;
+    let send = client.rt.block_on(channel.inner.create_uni_stream())?;
 
     AqcSendStream::init(stream, imp::AqcSendStream::new(send));
     Ok(())
@@ -1849,8 +1800,8 @@ pub fn aqc_send_stream_send(
     stream: &mut AqcSendStream,
     data: &[u8],
 ) -> Result<(), imp::Error> {
-    let data = Bytes::from(Vec::from(data));
-    Ok(client.deref_mut().rt.block_on(stream.inner.send(data))?)
+    let data = Bytes::copy_from_slice(data);
+    Ok(client.rt.block_on(stream.inner.send(data))?)
 }
 
 /// Receive some data from an [`AqcReceiveStream`].
@@ -1860,63 +1811,24 @@ pub fn aqc_send_stream_send(
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcReceiveStream`].
 /// @param[out] buffer pointer to the target buffer.
-/// @param[out] buffer_len length of the target buffer.
+/// @param[in] buffer_len length of the target buffer.
 /// @param[out] __output the number of bytes written to the buffer.
 ///
 /// @relates AranyaClient.
 pub fn aqc_recv_stream_try_recv(
     stream: &mut AqcReceiveStream,
-    buffer: &mut [MaybeUninit<u8>],
+    mut buffer: &mut [MaybeUninit<u8>],
 ) -> Result<usize, imp::Error> {
-    // First, let's check to see if we have any leftover data from last call.
-    let requested = buffer.len();
     let mut written = 0;
-
-    // If we do, grab it and set data to None
-    if let Some(mut data) = stream.data.take() {
-        // Check to see if we still have leftover data
-        let length = core::cmp::min(data.len(), requested);
-        let left = data.split_off(length);
-        if !left.is_empty() {
-            stream.data = Some(left);
-        }
-
-        // Copy as many bytes as we can to the buffer, either filling it up or depleting data.
-        for (dst, src) in core::iter::zip(&mut buffer[..length], data) {
-            dst.write(src);
-        }
-
-        written += length;
-    }
-
-    // If we still have space left in the buffer, let's try to receive more data.
-    while written < requested {
+    while {
+        written += consume_bytes(&mut buffer, &mut stream.data);
+        !buffer.is_empty()
+    } {
         match stream.inner.try_receive() {
-            Ok(mut data) => {
-                // Check to see if we still have leftover data
-                let length = core::cmp::min(data.len(), requested - written);
-                let left = data.split_off(length);
-                if !left.is_empty() {
-                    stream.data = Some(left);
-                }
-
-                // Copy as many bytes as we can to the buffer, hopefully filling the buffer.
-                for (dst, src) in core::iter::zip(&mut buffer[written..written + length], data) {
-                    dst.write(src);
-                }
-
-                written += length;
-            }
-            Err(e) => {
-                // If we get an error, let's check to see if we've written any
-                // amount of data, and if so let's just return.
-                if written != 0 {
-                    break;
-                }
-                return Err(e.into());
-            }
+            Ok(data) => stream.data = data,
+            Err(_) if written > 0 => break,
+            Err(e) => return Err(e.into()),
         }
     }
-
     Ok(written)
 }
