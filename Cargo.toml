@@ -70,7 +70,7 @@ keyring = { version = "3.6", features = ["apple-native", "linux-native"] }
 heapless = { version = "0.8", default-features = false }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
-s2n-quic = { version = "1.51.0", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"] }
+s2n-quic = { version = "1.58.0-psk.1", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"], package = "aranya-internal-s2n-quic" }
 semver = { version = "1", features = ["serde"] }
 serde = "1"
 serial_test = { version = "3" }
@@ -82,7 +82,6 @@ tokio = { version = "1.44" }
 tokio-util = { version = "0.7.12" }
 tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "fc478a5e9d8e2ab08b7d2d3b62f57b422033a18c" }
 
 [profile.dev]
 opt-level = 1
@@ -98,6 +97,3 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
-
-[patch.crates-io]
-rustls = { git = "https://github.com/elagergren-spideroak/rustls", rev = "fc478a5e9d8e2ab08b7d2d3b62f57b422033a18c" }

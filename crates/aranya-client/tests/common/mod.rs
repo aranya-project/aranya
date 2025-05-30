@@ -123,11 +123,11 @@ pub struct TeamCtx {
 
 impl TeamCtx {
     pub async fn new(name: &str, work_dir: PathBuf) -> Result<Self> {
-        let owner = DeviceCtx::new(name, "owner", work_dir.join("owner"), 9001).await?;
-        let admin = DeviceCtx::new(name, "admin", work_dir.join("admin"), 9002).await?;
-        let operator = DeviceCtx::new(name, "operator", work_dir.join("operator"), 9003).await?;
-        let membera = DeviceCtx::new(name, "membera", work_dir.join("membera"), 9004).await?;
-        let memberb = DeviceCtx::new(name, "memberb", work_dir.join("memberb"), 9005).await?;
+        let owner = DeviceCtx::new(name, "owner", work_dir.join("owner"), 0).await?;
+        let admin = DeviceCtx::new(name, "admin", work_dir.join("admin"), 0).await?;
+        let operator = DeviceCtx::new(name, "operator", work_dir.join("operator"), 0).await?;
+        let membera = DeviceCtx::new(name, "membera", work_dir.join("membera"), 0).await?;
+        let memberb = DeviceCtx::new(name, "memberb", work_dir.join("memberb"), 0).await?;
 
         Ok(Self {
             owner,

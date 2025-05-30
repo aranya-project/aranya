@@ -28,7 +28,6 @@ bytes = { workspace = true }
 futures-lite = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
-rustls = { workspace = true }
 s2n-quic = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
