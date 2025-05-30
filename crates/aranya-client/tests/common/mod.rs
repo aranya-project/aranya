@@ -4,7 +4,7 @@ use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 use anyhow::{Context, Result};
 use aranya_client::{client::Client, SyncPeerConfig};
 use aranya_daemon::{config::Config, Daemon};
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId};
+use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use tokio::{
@@ -214,8 +214,6 @@ pub struct DeviceCtx {
     pub pk: KeyBundle,
     pub id: DeviceId,
     pub daemon: AbortHandle,
-    pub aqc_addr: NetIdentifier,
-    pub port: u16,
 }
 
 impl DeviceCtx {
@@ -273,8 +271,6 @@ impl DeviceCtx {
             pk,
             id,
             daemon: handle,
-            aqc_addr: NetIdentifier(aqc_addr.to_string()),
-            port,
         })
     }
 
