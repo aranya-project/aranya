@@ -36,6 +36,13 @@ pub type CS = DefaultCipherSuite;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Error(String);
 
+impl Error {
+    pub fn from_err<E: error::Error>(err: E) -> Self {
+        error!(?err);
+        Self(format!("{err:?}"))
+    }
+}
+
 impl From<Bug> for Error {
     fn from(err: Bug) -> Self {
         error!(?err);

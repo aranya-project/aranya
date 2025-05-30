@@ -19,6 +19,7 @@ use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, instrument, trace};
 
+use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
     vm_policy::VecSink,
@@ -173,7 +174,7 @@ pub trait SyncState: Sized {
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> impl Future<Output = Result<()>> + Send
+    ) -> impl Future<Output = SyncResult<()>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
 }

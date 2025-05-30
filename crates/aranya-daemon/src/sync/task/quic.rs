@@ -7,10 +7,14 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::net::SocketAddr;
-use std::{collections::BTreeMap, future::Future, sync::Arc};
+use std::{
+    collections::{btree_map::Entry, BTreeMap},
+    future::Future,
+    sync::Arc,
+};
 
 use ::rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig};
-use anyhow::{bail, Context, Result as AnyResult};
+use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_runtime::{
     Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder, SyncType,
@@ -48,7 +52,7 @@ use crate::{
     sync::{
         prot::SyncProtocol,
         task::{SyncState, Syncer},
-        SyncError,
+        Result as SyncResult, SyncError,
     },
 };
 
@@ -89,7 +93,7 @@ impl SyncState for State {
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> impl Future<Output = AnyResult<()>> + Send
+    ) -> impl Future<Output = SyncResult<()>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send,
     {
@@ -119,7 +123,7 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub fn new<I>(initial_keys: I, mut recv: Receiver<Msg>) -> AnyResult<Self>
+    pub fn new<I>(initial_keys: I, mut recv: Receiver<Msg>) -> SyncResult<Self>
     where
         I: IntoIterator<Item = TeamIdPSKPair>,
     {
@@ -138,9 +142,12 @@ impl State {
         let provider = rustls_provider::Client::new(client_config);
 
         let client = QuicClient::builder()
-            .with_tls(provider)?
-            .with_io("0.0.0.0:0")?
-            .start()?;
+            .with_tls(provider)
+            .context("QUIC client tls config")?
+            .with_io("0.0.0.0:0")
+            .context("QUIC client io config")?
+            .start()
+            .context("Could not start quic client")?;
 
         tokio::spawn(async move {
             loop {
@@ -164,35 +171,37 @@ impl State {
 }
 
 impl Syncer<State> {
-    async fn connect(&mut self, peer: &Addr) -> AnyResult<BidirectionalStream> {
+    async fn connect(&mut self, peer: &Addr) -> SyncResult<BidirectionalStream> {
         info!(?peer, "client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
         let conns = &mut self.state.conns;
         let client = &self.state.client;
-        if !conns.contains_key(peer) {
-            debug!(?peer, "existing quic connection not found");
 
-            let addr = tokio::net::lookup_host(peer.to_socket_addrs())
-                .await?
-                .next()
-                .assume("invalid peer address")?;
-            // Note: cert is not used but server name must be set to connect.
-            debug!(?peer, "attempting to create new quic connection");
-            let mut conn = client
-                .connect(Connect::new(addr).with_server_name("127.0.0.1"))
-                .await?;
-            conn.keep_alive(true)?;
-            debug!(?peer, "created new quic connection");
-            conns.insert(*peer, conn);
-        } else {
-            debug!("client is able to reuse existing quic connection");
-        }
+        let conn = match conns.entry(*peer) {
+            Entry::Occupied(e) => {
+                info!("Client is able to re-use existing QUIC connection");
+                e.into_mut()
+            }
+            Entry::Vacant(e) => {
+                info!(?peer, "existing QUIC connection not found");
 
-        let Some(conn) = conns.get(peer) else {
-            error!(?peer, "unable to lookup quic connection");
-            bail!("unable to get connection");
+                let addr = tokio::net::lookup_host(peer.to_socket_addrs())
+                    .await
+                    .context("DNS lookup on for peer address")?
+                    .next()
+                    .assume("invalid peer address")?;
+                // Note: cert is not used but server name must be set to connect.
+                debug!(?peer, "attempting to create new quic connection");
+                let mut conn = client
+                    .connect(Connect::new(addr).with_server_name("127.0.0.1"))
+                    .await?;
+                conn.keep_alive(true)?;
+                debug!(?peer, "created new quic connection");
+                e.insert(conn)
+            }
         };
+
         info!("client connected to QUIC sync server");
 
         let open_stream_res = conn
@@ -203,15 +212,15 @@ impl Syncer<State> {
         let stream = match open_stream_res {
             Ok(stream) => stream,
             // Retry for these errors?
-            Err(ConnErr::StatelessReset { .. })
-            | Err(ConnErr::StreamIdExhausted { .. })
-            | Err(ConnErr::MaxHandshakeDurationExceeded { .. }) => {
-                bail!("unable to open bidi stream");
+            Err(e @ ConnErr::StatelessReset { .. })
+            | Err(e @ ConnErr::StreamIdExhausted { .. })
+            | Err(e @ ConnErr::MaxHandshakeDurationExceeded { .. }) => {
+                return Err(SyncError::QuicConnectionError(e));
             }
             // Other errors means the stream has closed
             Err(e) => {
                 conns.remove(peer);
-                bail!("connection closed: {e}");
+                return Err(SyncError::QuicConnectionError(e));
             }
         };
 
@@ -224,7 +233,7 @@ impl Syncer<State> {
         send: &mut SendStream,
         syncer: &mut SyncRequester<'_, A>,
         peer: &Addr,
-    ) -> AnyResult<()>
+    ) -> SyncResult<()>
     where
         A: Serialize + DeserializeOwned + Clone,
     {
@@ -258,7 +267,7 @@ impl Syncer<State> {
         id: &GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> AnyResult<()>
+    ) -> SyncResult<()>
     where
         S: Sink<<crate::EN as Engine>::Effect>,
         A: Serialize + DeserializeOwned + Clone,
@@ -274,7 +283,7 @@ impl Syncer<State> {
         // check sync version
         let Some((version_byte, sync_response)) = recv_buf.split_first() else {
             error!("Empty sync response");
-            bail!("Empty sync response");
+            return Err(anyhow::anyhow!("Empty sync request").into());
         };
         check_version(*version_byte, QUIC_SYNC_VERSION)?;
 
@@ -283,7 +292,7 @@ impl Syncer<State> {
             .context("postcard unable to deserialize sync response")?;
         let data = match resp {
             SyncResponse::Ok(data) => data,
-            SyncResponse::Err(msg) => bail!("sync error: {msg}"),
+            SyncResponse::Err(msg) => return Err(anyhow::anyhow!("sync error: {msg}").into()),
         };
         if data.is_empty() {
             debug!("nothing to sync");
@@ -328,7 +337,7 @@ pub struct Server<EN, SP> {
 
 impl<EN, SP> Server<EN, SP> {
     /// Returns the local address the sync server bound to.
-    pub fn local_addr(&self) -> AnyResult<SocketAddr> {
+    pub fn local_addr(&self) -> anyhow::Result<SocketAddr> {
         Ok(self.server.local_addr()?)
     }
 }
@@ -346,7 +355,7 @@ where
         addr: &Addr,
         initial_psks: I,
         mut recv: Receiver<Msg>,
-    ) -> AnyResult<Self>
+    ) -> SyncResult<Self>
     where
         I: IntoIterator<Item = TeamIdPSKPair>,
     {
@@ -364,15 +373,20 @@ where
         let tls_server_provider = rustls_provider::Server::new(server_config);
 
         let addr = tokio::net::lookup_host(addr.to_socket_addrs())
-            .await?
+            .await
+            .context("DNS lookup on for peer address")?
             .next()
             .assume("invalid server address")?;
         // Use the rustls server provider
         let server = QuicServer::builder()
-            .with_tls(tls_server_provider)? // Use the wrapped server config
-            .with_io(addr)?
-            .with_congestion_controller(Bbr::default())?
-            .start()?;
+            .with_tls(tls_server_provider)
+            .context("QUIC server tls config")? // Use the wrapped server config
+            .with_io(addr)
+            .context("QUIC server io config")?
+            .with_congestion_controller(Bbr::default())
+            .context("QUIC server congestion controller config")?
+            .start()
+            .context("Could not start QUIC server")?;
 
         let mut set = JoinSet::new();
 
@@ -400,10 +414,10 @@ where
 
     /// Begins accepting incoming requests.
     #[instrument(skip_all)]
-    pub async fn serve(mut self) -> AnyResult<()> {
+    pub async fn serve(mut self) -> SyncResult<()> {
         info!(
             "QUIC sync server listening for incoming connections: {}",
-            self.local_addr()?
+            self.local_addr().map_err(SyncError::Other)?
         );
 
         // Accept incoming QUIC connections
@@ -437,7 +451,10 @@ where
                 }
             });
         }
-        error!("server terminated: {}", self.local_addr()?);
+        error!(
+            "server terminated: {}",
+            self.local_addr().map_err(SyncError::Other)?
+        );
         Ok(())
     }
 
@@ -447,7 +464,7 @@ where
         client: AranyaClient<EN, SP>,
         peer: SocketAddr,
         stream: BidirectionalStream,
-    ) -> AnyResult<()> {
+    ) -> SyncResult<()> {
         info!(?peer, "server received a sync request");
 
         let mut recv_buf = Vec::new();
@@ -478,8 +495,11 @@ where
         // TODO: `send_all`?
         let data_len = data.len();
         send.send(Bytes::from_owner([QUIC_SYNC_VERSION as u8]))
-            .await?;
-        send.send(Bytes::from_owner(data)).await?;
+            .await
+            .context("Could not send version byte")?;
+        send.send(Bytes::from_owner(data))
+            .await
+            .context("Could not send sync response")?;
         send.close().await?;
         debug!(?peer, n = data_len, "server sent sync response");
 
@@ -491,7 +511,7 @@ where
     async fn sync_respond(
         client: AranyaClient<EN, SP>,
         request_data: &[u8],
-    ) -> Result<Box<[u8]>, SyncError> {
+    ) -> SyncResult<Box<[u8]>> {
         info!("server responding to sync request");
 
         // Check sync version
@@ -559,7 +579,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
         _server_name: &ServerName<'_>,
         _ocsp_response: &[u8],
         _now: rustls::pki_types::UnixTime,
-    ) -> AnyResult<rustls::client::danger::ServerCertVerified, rustls::Error> {
+    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
         Ok(rustls::client::danger::ServerCertVerified::assertion())
     }
 
@@ -568,7 +588,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
         message: &[u8],
         cert: &rustls::pki_types::CertificateDer<'_>,
         dss: &rustls::DigitallySignedStruct,
-    ) -> AnyResult<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
         // Use the selected provider's verification algorithms
         rustls::crypto::verify_tls12_signature(
             message,
@@ -583,7 +603,7 @@ impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
         message: &[u8],
         cert: &rustls::pki_types::CertificateDer<'_>,
         dss: &rustls::DigitallySignedStruct,
-    ) -> AnyResult<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
+    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
         // Use the selected provider's verification algorithms
         rustls::crypto::verify_tls13_signature(
             message,

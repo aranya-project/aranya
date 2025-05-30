@@ -1,7 +1,7 @@
 //! QUIC Syncer supported versions.
 //! New versions must be added to the end of this list since versions can never change.
 
-use crate::sync::SyncError;
+use crate::sync::{Result as SyncResult, SyncError};
 
 /// 0 indicates an error.
 pub const VERSION_ERR: u8 = 0;
@@ -15,12 +15,12 @@ pub enum Version {
 }
 
 impl TryFrom<u8> for Version {
-    type Error = anyhow::Error;
+    type Error = SyncError;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
             1 => Ok(Version::V1),
-            _ => anyhow::bail!("Unknown version"),
+            _ => Err(SyncError::UnknownVersion),
         }
     }
 }
@@ -32,14 +32,14 @@ impl Default for Version {
     }
 }
 
-pub(super) fn check_version(version_byte: u8, expected: Version) -> anyhow::Result<()> {
+pub(super) fn check_version(version_byte: u8, expected: Version) -> SyncResult<()> {
     let got = match version_byte {
-        VERSION_ERR => anyhow::bail!("Recieved version error byte"),
+        VERSION_ERR => return Err(SyncError::Version),
         v => Version::try_from(v)?,
     };
 
     if got != expected {
-        anyhow::bail!(SyncError::Version)
+        return Err(SyncError::Version);
     }
 
     Ok(())
