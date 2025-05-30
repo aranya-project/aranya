@@ -102,7 +102,7 @@ impl ClientCtx {
     "uds_api_path": "{}",
     "pid_file": "{}",
     "sync_addr": "127.0.0.1:0",
-    "quic_sync": { "service_name": "Aranya-QUIC-sync-rust-example" },
+    "quic_sync": {{ "service_name": "Aranya-QUIC-sync-rust-example" }},
 }}"#,
                 work_dir.as_os_str().to_str().context("should be UTF-8")?,
                 uds_api_path
@@ -210,11 +210,14 @@ async fn main() -> Result<()> {
     // Create a team.
     info!("creating team");
     let cfg = TeamConfig::builder().build()?;
-    let (team_id, psk) = owner
+    let (team_id, Some(psk)) = owner
         .client
         .create_team(cfg)
         .await
-        .context("expected to create team")?;
+        .context("expected to create team")?
+    else {
+        bail!("Expected a valid QUIC sync config")
+    };
     info!(%team_id);
 
     // get sync addresses.
@@ -235,7 +238,9 @@ async fn main() -> Result<()> {
     let mut memberb_team = memberb.client.team(team_id);
 
     // add team to each non-owner device's local store
-    let cfg_with_psk = TeamConfig::builder().psk(psk.idenitity(), psk.raw_secret_bytes()).build()?;
+    let cfg_with_psk = TeamConfig::builder()
+        .psk(psk.idenitity(), psk.raw_secret_bytes())
+        .build()?;
     for member in [&admin_team, &operator_team, &membera_team, &memberb_team] {
         member.add_team(cfg_with_psk.clone()).await?;
     }
