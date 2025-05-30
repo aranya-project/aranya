@@ -26,7 +26,7 @@ async fn test_sync_now() -> Result<()> {
     let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
 
     // Create the initial team, and get our TeamId and PSK.
-    let (team_id, psk) = {
+    let (team_id, maybe_psk) = {
         let cfg = TeamConfig::builder().build()?;
         team.owner
             .client
@@ -36,16 +36,18 @@ async fn test_sync_now() -> Result<()> {
     };
     info!(?team_id);
 
-    let cfg = {
-        let idenitity = psk.idenitity();
-        let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(idenitity, secret).build()?
-    };
+    if let Some(psk) = maybe_psk {
+        let cfg = {
+            let idenitity = psk.idenitity();
+            let secret = psk.raw_secret_bytes();
+            TeamConfig::builder().psk(idenitity, secret).build()?
+        };
 
-    team.admin.client.add_team(team_id, cfg.clone()).await?;
-    team.operator.client.add_team(team_id, cfg.clone()).await?;
-    team.membera.client.add_team(team_id, cfg.clone()).await?;
-    team.memberb.client.add_team(team_id, cfg).await?;
+        team.admin.client.add_team(team_id, cfg.clone()).await?;
+        team.operator.client.add_team(team_id, cfg.clone()).await?;
+        team.membera.client.add_team(team_id, cfg.clone()).await?;
+        team.memberb.client.add_team(team_id, cfg).await?;
+    }
 
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
@@ -90,7 +92,7 @@ async fn test_query_functions() -> Result<()> {
     let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
 
     // Create the initial team, and get our TeamId and PSK.
-    let (team_id, psk) = {
+    let (team_id, maybe_psk) = {
         let cfg = TeamConfig::builder().build()?;
         team.owner
             .client
@@ -100,16 +102,18 @@ async fn test_query_functions() -> Result<()> {
     };
     info!(?team_id);
 
-    let cfg = {
-        let idenitity = psk.idenitity();
-        let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(idenitity, secret).build()?
-    };
+    if let Some(psk) = maybe_psk {
+        let cfg = {
+            let idenitity = psk.idenitity();
+            let secret = psk.raw_secret_bytes();
+            TeamConfig::builder().psk(idenitity, secret).build()?
+        };
 
-    team.admin.client.add_team(team_id, cfg.clone()).await?;
-    team.operator.client.add_team(team_id, cfg.clone()).await?;
-    team.membera.client.add_team(team_id, cfg.clone()).await?;
-    team.memberb.client.add_team(team_id, cfg).await?;
+        team.admin.client.add_team(team_id, cfg.clone()).await?;
+        team.operator.client.add_team(team_id, cfg.clone()).await?;
+        team.membera.client.add_team(team_id, cfg.clone()).await?;
+        team.memberb.client.add_team(team_id, cfg).await?;
+    }
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -148,7 +152,7 @@ async fn test_add_team() -> Result<()> {
     let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
 
     // Create the initial team, and get our TeamId and PSK.
-    let (team_id, psk) = {
+    let (team_id, maybe_psk) = {
         let cfg = TeamConfig::builder().build()?;
         team.owner
             .client
@@ -158,51 +162,55 @@ async fn test_add_team() -> Result<()> {
     };
     info!(?team_id);
 
-    let cfg = {
-        let idenitity = psk.idenitity();
-        let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(idenitity, secret).build()?
-    };
+    if let Some(psk) = maybe_psk {
+        let cfg = {
+            let idenitity = psk.idenitity();
+            let secret = psk.raw_secret_bytes();
+            TeamConfig::builder().psk(idenitity, secret).build()?
+        };
 
-    // Grab the shorthand for our address.
-    let owner_addr = team.owner.aranya_local_addr().await?;
+        // Grab the shorthand for our address.
+        let owner_addr = team.owner.aranya_local_addr().await?;
 
-    // Grab the shorthand for the teams we need to operate on.
-    let mut owner = team.owner.client.team(team_id);
-    let mut admin = team.admin.client.team(team_id);
+        // Grab the shorthand for the teams we need to operate on.
+        let mut owner = team.owner.client.team(team_id);
+        let mut admin = team.admin.client.team(team_id);
 
-    // Add the admin as a new device.
-    info!("adding admin to team");
-    owner.add_device_to_team(team.admin.pk.clone()).await?;
+        // Add the admin as a new device.
+        info!("adding admin to team");
+        owner.add_device_to_team(team.admin.pk.clone()).await?;
 
-    // Add the operator as a new device.
-    info!("adding operator to team");
-    owner.add_device_to_team(team.operator.pk.clone()).await?;
+        // Add the operator as a new device.
+        info!("adding operator to team");
+        owner.add_device_to_team(team.operator.pk.clone()).await?;
 
-    // Give the admin its role.
-    owner.assign_role(team.admin.id, Role::Admin).await?;
+        // Give the admin its role.
+        owner.assign_role(team.admin.id, Role::Admin).await?;
 
-    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
-    admin.sync_now(owner_addr.into(), None).await?;
-    sleep(SLEEP_INTERVAL).await;
+        // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+        admin.sync_now(owner_addr.into(), None).await?;
+        sleep(SLEEP_INTERVAL).await;
 
-    // Now, we try to assign a role using the admin, which is expected to fail.
-    match admin.assign_role(team.operator.id, Role::Operator).await {
-        Ok(_) => bail!("Expected role assignment to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(_) => bail!("Unexpected error"),
+        // Now, we try to assign a role using the admin, which is expected to fail.
+        match admin.assign_role(team.operator.id, Role::Operator).await {
+            Ok(_) => bail!("Expected role assignment to fail"),
+            Err(aranya_client::Error::Aranya(_)) => {}
+            Err(_) => bail!("Unexpected error"),
+        }
+
+        admin.add_team(cfg.clone()).await?;
+        sleep(SLEEP_INTERVAL).await;
+        admin.sync_now(owner_addr.into(), None).await?;
+        sleep(SLEEP_INTERVAL).await;
+
+        // Now we should be able to successfully assign a role.
+        admin
+            .assign_role(team.operator.id, Role::Operator)
+            .await
+            .context("Assigning a role should not fail here!")?;
+
+        return Ok(());
     }
 
-    admin.add_team(cfg.clone()).await?;
-    sleep(SLEEP_INTERVAL).await;
-    admin.sync_now(owner_addr.into(), None).await?;
-    sleep(SLEEP_INTERVAL).await;
-
-    // Now we should be able to successfully assign a role.
-    admin
-        .assign_role(team.operator.id, Role::Operator)
-        .await
-        .context("Assigning a role should not fail here!")?;
-
-    Ok(())
+    panic!("Handle other syncer types")
 }

@@ -16,5 +16,5 @@
     // Aranya sync server address.
     "sync_addr": "0.0.0.0:4321",
 
-    "service_name": "Aranya-QUIC-sync",
+    "quic_sync": { "service_name": "Aranya-QUIC-sync" },
 }

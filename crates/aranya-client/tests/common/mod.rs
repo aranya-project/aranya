@@ -9,7 +9,10 @@ use std::{
 use anyhow::{Context, Result};
 use aranya_client::{client::Client, SyncPeerConfig};
 use aranya_crypto::{csprng::rand::RngCore, Rng};
-use aranya_daemon::{config::Config, Daemon};
+use aranya_daemon::{
+    config::{Config, QSConfig},
+    Daemon,
+};
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
@@ -236,6 +239,8 @@ impl DeviceCtx {
         let combined_name = format!("{team_name}-{name}");
         let service_name = Self::gen_service_name(&combined_name, &mut Rng);
 
+        let quic_sync = Some(QSConfig { service_name });
+
         let cfg = Config {
             name: "daemon".into(),
             work_dir: work_dir.clone(),
@@ -244,7 +249,7 @@ impl DeviceCtx {
             sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
             afc: None,
             aqc: None,
-            service_name: service_name.try_into()?,
+            quic_sync,
         };
 
         // Load daemon from config.

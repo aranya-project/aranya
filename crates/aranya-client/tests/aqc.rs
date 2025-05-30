@@ -26,12 +26,15 @@ async fn test_aqc_chans() -> Result<()> {
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
-    let (team_id, psk) = team
+    let (team_id, Some(psk)) = team
         .owner
         .client
         .create_team(cfg)
         .await
-        .expect("expected to create team");
+        .expect("expected to create team")
+    else {
+        panic!("Not configured with the QUIC syncer")
+    };
     info!(?team_id);
 
     // Add graph to devices

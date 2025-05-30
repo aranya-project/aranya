@@ -651,7 +651,7 @@ pub trait DaemonApi {
     async fn remove_team(team: TeamId) -> Result<()>;
 
     /// Create a new graph/team with the current device as the owner.
-    async fn create_team(cfg: TeamConfig) -> Result<(TeamId, QuicSyncPSK)>;
+    async fn create_team(cfg: TeamConfig) -> Result<(TeamId, Option<QuicSyncPSK>)>;
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 

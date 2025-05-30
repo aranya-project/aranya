@@ -19,6 +19,7 @@ use aranya_runtime::GraphId;
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
+pub(crate) use quic_sync::Data as QSData;
 use rustls::crypto::{hash::HashAlgorithm, PresharedKey};
 use tarpc::{
     context,
@@ -26,7 +27,7 @@ use tarpc::{
 };
 use tokio::{
     net::UnixListener,
-    sync::{broadcast, mpsc, Mutex},
+    sync::{mpsc, Mutex},
     task::JoinSet,
 };
 use tracing::{debug, error, info, instrument, trace, warn};
@@ -43,6 +44,8 @@ use crate::{
     Client, EF,
 };
 
+mod quic_sync;
+
 /// returns first effect matching a particular type.
 /// returns None if there are no matching effects.
 #[macro_export]
@@ -53,7 +56,6 @@ macro_rules! find_effect {
 }
 
 type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
-type PSKSender = broadcast::Sender<Msg>;
 
 /// Daemon API Server.
 #[derive(Debug)]
@@ -74,13 +76,7 @@ pub(crate) struct DaemonApiServer {
 
     /// Channel for receiving effects from the syncer.
     recv_effects: EffectReceiver,
-
-    /// Channel for sending PSK updates
-    // Should this be optional since there will be other syncer types in the future?
-    psk_send: broadcast::Sender<Msg>,
-
-    /// See [`crate::config::Config::service_name`]
-    service_name: String,
+    quic: Option<quic_sync::Data>,
 }
 
 impl DaemonApiServer {
@@ -96,8 +92,7 @@ impl DaemonApiServer {
         peers: SyncPeers,
         recv_effects: EffectReceiver,
         aqc: Aqc<CE, KS>,
-        psk_send: PSKSender,
-        service_name: String,
+        quic: Option<quic_sync::Data>,
     ) -> Result<Self> {
         Ok(Self {
             uds_path,
@@ -108,8 +103,7 @@ impl DaemonApiServer {
             pk,
             peers,
             aqc,
-            psk_send,
-            service_name,
+            quic,
         })
     }
 
@@ -142,8 +136,7 @@ impl DaemonApiServer {
             handler: EffectHandler {
                 aqc: Arc::clone(&aqc),
             },
-            psk_send: self.psk_send,
-            service_name: self.service_name,
+            quic: self.quic,
         }));
 
         let server = {
@@ -267,8 +260,7 @@ struct ApiInner {
     peers: Mutex<SyncPeers>,
     handler: EffectHandler,
     aqc: Arc<Aqc<CE, KS>>,
-    psk_send: broadcast::Sender<Msg>,
-    service_name: String,
+    quic: Option<quic_sync::Data>,
 }
 
 impl ApiInner {
@@ -374,29 +366,34 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::TeamConfig,
     ) -> api::Result<()> {
-        let (Some(identity), Some(secret)) = (cfg.psk_idenitity, cfg.psk_secret) else {
-            return Err(anyhow::anyhow!("Invalid Team Config for `add_team`. Expected `psk_idenitity` and `psk_secret` fields to be set").into());
-        };
-        let psk = PresharedKey::external(&identity, secret.raw_secret_bytes())
-            .context("unable to create PSK")?
-            .with_hash_alg(HashAlgorithm::SHA384)
-            .expect("Valid hash algorithm");
-        self.psk_send.send(Msg::Insert((team, Arc::new(psk))))?;
-        // TODO(Steve): What else is left?
-        insert_psk(
-            &self.service_name,
-            &team,
-            &identity,
-            secret.raw_secret_bytes(),
-        )?;
+        if let Some(data) = &self.quic {
+            let quic_sync::Data {
+                service_name,
+                psk_send,
+            } = data;
 
-        Ok(())
+            let (Some(identity), Some(secret)) = (cfg.psk_idenitity, cfg.psk_secret) else {
+                return Err(anyhow::anyhow!("Invalid Team Config for `add_team`. Expected `psk_idenitity` and `psk_secret` fields to be set").into());
+            };
+            let psk = PresharedKey::external(&identity, secret.raw_secret_bytes())
+                .context("unable to create PSK")?
+                .with_hash_alg(HashAlgorithm::SHA384)
+                .expect("Valid hash algorithm");
+            psk_send.send(Msg::Insert((team, Arc::new(psk))))?;
+            insert_psk(service_name, &team, &identity, secret.raw_secret_bytes())?;
+
+            Ok(())
+        } else {
+            todo!("Only implemented when using the QUIC syncer. Implement for other syncer types")
+        }
     }
 
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        self.psk_send.send(Msg::Remove(team))?;
-        delete_psk(&self.service_name, &team)?;
+        if let Some(data) = &self.quic {
+            data.psk_send.send(Msg::Remove(team))?;
+            delete_psk(&data.service_name, &team)?;
+        }
         todo!("Should remove graph data from storage provider");
     }
 
@@ -405,7 +402,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         cfg: api::TeamConfig,
-    ) -> api::Result<(api::TeamId, QuicSyncPSK)> {
+    ) -> api::Result<(api::TeamId, Option<QuicSyncPSK>)> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
@@ -417,19 +414,25 @@ impl DaemonApi for Api {
             .context("unable to create team")?;
         debug!(?graph_id);
 
-        let psk = QuicSyncPSK::new(&mut Rng);
+        let psk = match &self.quic {
+            Some(data) => {
+                let psk = QuicSyncPSK::new(&mut Rng);
+                // Send PSK update to the key stores
+                {
+                    let psk_ref = Arc::new(
+                        PresharedKey::external(psk.idenitity(), psk.raw_secret_bytes())
+                            .context("unable to create PSK")?
+                            .with_hash_alg(HashAlgorithm::SHA384)
+                            .expect("Valid hash algorithm"),
+                    );
+                    let team_id = api::TeamId::from(*graph_id.as_array());
+                    data.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
+                }
 
-        // Send PSK update to the key stores
-        {
-            let psk_ref = Arc::new(
-                PresharedKey::external(psk.idenitity(), psk.raw_secret_bytes())
-                    .context("unable to create PSK")?
-                    .with_hash_alg(HashAlgorithm::SHA384)
-                    .expect("Valid hash algorithm"),
-            );
-            let team_id = api::TeamId::from(*graph_id.as_array());
-            self.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
-        }
+                Some(psk)
+            }
+            None => None,
+        };
 
         Ok((graph_id.into_id().into(), psk))
     }

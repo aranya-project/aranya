@@ -245,7 +245,7 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<(TeamId, QuicSyncPSK)> {
+    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<(TeamId, Option<QuicSyncPSK>)> {
         self.daemon
             .create_team(context::current(), cfg.into())
             .await

@@ -14,5 +14,8 @@
 	"pid_file": "./out/daemon.pid",
 
 	// The network address of the Aranya sync server.
-	"sync_addr": "0.0.0.0:4321"
+	"sync_addr": "0.0.0.0:4321",
+
+	// QUIC syncer config
+	"quic_sync": { "service_name": "Aranya-QUIC-sync" },
 }

@@ -34,7 +34,7 @@ use tracing::{error, info, info_span, Instrument as _};
 use crate::sync::task::quic::delete_psk;
 use crate::{
     actions::Actions,
-    api::{ApiKey, DaemonApiServer, PublicApiKey},
+    api::{ApiKey, DaemonApiServer, PublicApiKey, QSData},
     aqc::Aqc,
     aranya,
     config::Config,
@@ -171,7 +171,13 @@ impl Daemon {
         };
 
         // Declare here because self is moved into the closure below
-        let service_name = self.cfg.service_name.clone();
+        // TODO: Don't panic. Update when other syncer types are supported
+        let service_name = self
+            .cfg
+            .quic_sync
+            .clone()
+            .expect("Provided a quic sync config")
+            .service_name;
         let uds_path = self.cfg.uds_api_path.clone();
 
         #[cfg(feature = "testing")]
@@ -200,6 +206,10 @@ impl Daemon {
             });
         }
 
+        let data = QSData {
+            psk_send,
+            service_name,
+        };
         let api = DaemonApiServer::new(
             client,
             local_addr,
@@ -209,8 +219,7 @@ impl Daemon {
             peers,
             recv_effects,
             aqc,
-            psk_send,
-            service_name,
+            Some(data),
         )?;
         api.serve().await?;
 
@@ -254,7 +263,18 @@ impl Daemon {
         )));
 
         let client = Client::new(Arc::clone(&aranya));
-        let initial_keys = get_existing_psks(client.clone(), &self.cfg.service_name).await?;
+
+        // TODO: Fix this when other syncer types are supported
+        let initial_keys = get_existing_psks(
+            client.clone(),
+            &self
+                .cfg
+                .quic_sync
+                .as_ref()
+                .expect("QUIC sync configured")
+                .service_name,
+        )
+        .await?;
 
         info!(addr = %external_sync_addr, "starting QUIC sync server");
         let server = SyncServer::new(
@@ -376,8 +396,12 @@ impl Drop for Daemon {
         let _ = std::fs::remove_file(&self.cfg.uds_api_path);
 
         #[cfg(feature = "testing")]
-        for id in &self.delete_bucket {
-            let _ = delete_psk(&self.cfg.service_name, id);
+        {
+            if let Some(cfg) = self.cfg.quic_sync.as_ref() {
+                for id in &self.delete_bucket {
+                    let _ = delete_psk(&cfg.service_name, id);
+                }
+            }
         }
     }
 }
@@ -440,7 +464,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::AfcConfig;
+    use crate::config::{AfcConfig, QSConfig};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -464,7 +488,7 @@ mod tests {
             uds_api_path: work_dir.join("api"),
             pid_file: work_dir.join("pid"),
             sync_addr: any,
-            service_name,
+            quic_sync: Some(QSConfig { service_name }),
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,
