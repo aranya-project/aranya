@@ -99,7 +99,7 @@ impl AqcClient {
         addr: SocketAddr,
         label_id: LabelId,
         psks: AqcUniPsks,
-    ) -> Result<channels::AqcSenderChannel, AqcError> {
+    ) -> Result<channels::AqcSendChannel, AqcError> {
         let channel_id = UniChannelId::from(*psks.channel_id());
         self.client_keys.load_psks(AqcPsks::Uni(psks));
         let mut conn = self
@@ -107,7 +107,7 @@ impl AqcClient {
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
             .await?;
         conn.keep_alive(true)?;
-        Ok(channels::AqcSenderChannel::new(
+        Ok(channels::AqcSendChannel::new(
             label_id,
             channel_id,
             conn.handle(),
@@ -299,7 +299,7 @@ impl AqcClient {
             Err(e) => {
                 error!("Failed to deserialize AqcCtrlMessage: {}", e);
                 let ack_msg =
-                    AqcAckMessage::Failure(format!("Failed to deserialize AqcCtrlMessage: {}", e));
+                    AqcAckMessage::Failure(format!("Failed to deserialize AqcCtrlMessage: {e}"));
                 let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
                 let _ = stream.send(Bytes::from(ack_bytes)).await;
                 let _ = stream.close().await;
