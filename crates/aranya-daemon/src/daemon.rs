@@ -170,14 +170,12 @@ impl Daemon {
             Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
         };
 
+        // TODO: Fix this when other syncer types are supported
+        let Some(qs_config) = &self.cfg.quic_sync else {
+            anyhow::bail!("Supply a valid QUIC sync config")
+        };
         // Declare here because self is moved into the closure below
-        // TODO: Don't panic. Update when other syncer types are supported
-        let service_name = self
-            .cfg
-            .quic_sync
-            .clone()
-            .expect("Provided a quic sync config")
-            .service_name;
+        let service_name = qs_config.service_name.clone();
         let uds_path = self.cfg.uds_api_path.clone();
 
         #[cfg(feature = "testing")]
@@ -265,16 +263,10 @@ impl Daemon {
         let client = Client::new(Arc::clone(&aranya));
 
         // TODO: Fix this when other syncer types are supported
-        let initial_keys = get_existing_psks(
-            client.clone(),
-            &self
-                .cfg
-                .quic_sync
-                .as_ref()
-                .expect("QUIC sync configured")
-                .service_name,
-        )
-        .await?;
+        let Some(qs_config) = &self.cfg.quic_sync else {
+            anyhow::bail!("Supply a valid QUIC sync config")
+        };
+        let initial_keys = get_existing_psks(client.clone(), &qs_config.service_name).await?;
 
         info!(addr = %external_sync_addr, "starting QUIC sync server");
         let server = SyncServer::new(
