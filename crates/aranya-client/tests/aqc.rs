@@ -280,13 +280,28 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
+    let (team_id, Some(psk)) = team
         .owner
         .client
         .create_team(cfg)
         .await
-        .expect("expected to create team");
+        .expect("expected to create team")
+    else {
+        panic!("Not configured with the QUIC syncer")
+    };
     info!(?team_id);
+
+    // Add graph to devices
+    let cfg = {
+        let idenitity = psk.idenitity();
+        let secret = psk.raw_secret_bytes();
+        TeamConfig::builder().psk(idenitity, secret).build()?
+    };
+    let [_owner, rest @ ..] = team.devices();
+
+    for device in rest {
+        device.client.add_team(team_id, cfg.clone()).await?;
+    }
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -373,13 +388,28 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
+    let (team_id, Some(psk)) = team
         .owner
         .client
         .create_team(cfg)
         .await
-        .expect("expected to create team");
+        .expect("expected to create team")
+    else {
+        panic!("Not configured with the QUIC syncer")
+    };
     info!(?team_id);
+
+    // Add graph to devices
+    let cfg = {
+        let idenitity = psk.idenitity();
+        let secret = psk.raw_secret_bytes();
+        TeamConfig::builder().psk(idenitity, secret).build()?
+    };
+    let [_owner, rest @ ..] = team.devices();
+
+    for device in rest {
+        device.client.add_team(team_id, cfg.clone()).await?;
+    }
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -466,13 +496,28 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
+    let (team_id, Some(psk)) = team
         .owner
         .client
         .create_team(cfg)
         .await
-        .expect("expected to create team");
+        .expect("expected to create team")
+    else {
+        panic!("Not configured with the QUIC syncer")
+    };
     info!(?team_id);
+
+    // Add graph to devices
+    let cfg = {
+        let idenitity = psk.idenitity();
+        let secret = psk.raw_secret_bytes();
+        TeamConfig::builder().psk(idenitity, secret).build()?
+    };
+    let [_owner, rest @ ..] = team.devices();
+
+    for device in rest {
+        device.client.add_team(team_id, cfg.clone()).await?;
+    }
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -612,13 +657,28 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
+    let (team_id, Some(psk)) = team
         .owner
         .client
         .create_team(cfg)
         .await
-        .expect("expected to create team");
+        .expect("expected to create team")
+    else {
+        panic!("Not configured with the QUIC syncer")
+    };
     info!(?team_id);
+
+    // Add graph to devices
+    let cfg = {
+        let idenitity = psk.idenitity();
+        let secret = psk.raw_secret_bytes();
+        TeamConfig::builder().psk(idenitity, secret).build()?
+    };
+    let [_owner, rest @ ..] = team.devices();
+
+    for device in rest {
+        device.client.add_team(team_id, cfg.clone()).await?;
+    }
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;

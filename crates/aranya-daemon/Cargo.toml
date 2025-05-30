@@ -48,7 +48,6 @@ futures-util = { workspace = true }
 hex = { version = "0.4" }
 keyring = { workspace = true }
 postcard = { workspace = true }
-rustls = { workspace = true }
 s2n-quic = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }

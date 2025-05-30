@@ -20,7 +20,7 @@ use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::{StreamExt, TryStreamExt};
 pub(crate) use quic_sync::Data as QSData;
-use rustls::crypto::{hash::HashAlgorithm, PresharedKey};
+use s2n_quic::provider::tls::rustls::rustls::crypto::{hash::HashAlgorithm, PresharedKey};
 use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},

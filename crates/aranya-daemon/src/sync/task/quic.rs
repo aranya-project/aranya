@@ -13,7 +13,6 @@ use std::{
     sync::Arc,
 };
 
-use ::rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig};
 use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_runtime::{
@@ -23,7 +22,10 @@ use aranya_runtime::{
 use aranya_util::Addr;
 use buggy::{bug, BugExt as _};
 use bytes::Bytes;
-use rustls::crypto::CryptoProvider;
+#[allow(deprecated)]
+use s2n_quic::provider::tls::rustls::rustls::{
+    self, crypto::CryptoProvider, server::PresharedKeySelection, ClientConfig, ServerConfig,
+};
 use s2n_quic::{
     client::Connect,
     connection::Error as ConnErr,

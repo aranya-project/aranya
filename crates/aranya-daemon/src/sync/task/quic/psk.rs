@@ -5,12 +5,14 @@ use std::{
     sync::{Arc, Mutex as SyncMutex},
 };
 
-use ::rustls::{client::PresharedKeyStore, crypto::PresharedKey, server::SelectsPresharedKeys};
 use anyhow::{bail, Result};
 use aranya_daemon_api::TeamId;
 use aranya_runtime::StorageProvider;
 use buggy::BugExt as _;
-use s2n_quic::provider::tls::rustls::rustls::pki_types::ServerName;
+use s2n_quic::provider::tls::rustls::rustls::{
+    client::PresharedKeyStore, crypto::PresharedKey, pki_types::ServerName,
+    server::SelectsPresharedKeys,
+};
 use tokio::sync::mpsc;
 use tracing::{debug, error};
 

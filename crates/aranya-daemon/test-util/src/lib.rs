@@ -34,7 +34,7 @@ use aranya_runtime::{
     ClientState, GraphId,
 };
 use aranya_util::Addr;
-use rustls::crypto::{hash::HashAlgorithm, PresharedKey};
+use s2n_quic::provider::tls::rustls::rustls::crypto::{hash::HashAlgorithm, PresharedKey};
 use tempfile::{tempdir, TempDir};
 use tokio::{
     sync::{

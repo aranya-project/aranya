@@ -19,6 +19,6 @@ aranya-daemon-api = { workspace = true }
 aranya-keygen = { workspace = true }
 
 anyhow = { workspace = true }
-rustls = { workspace = true }
+s2n-quic = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
