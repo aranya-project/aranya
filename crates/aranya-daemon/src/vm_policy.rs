@@ -43,7 +43,7 @@ impl FromStr for ChanOp {
 /// Display implementation for [`ChanOp`]
 impl fmt::Display for ChanOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ChanOp::{:?}", self)
+        write!(f, "ChanOp::{self:?}")
     }
 }
 
