@@ -5,6 +5,7 @@
 pub const PROTOCOL_ERR: u8 = 0;
 
 #[repr(u8)]
+#[non_exhaustive]
 /// Protocols supported by the syncer.
 pub enum SyncProtocol {
     /// Version 1.
