@@ -50,7 +50,7 @@
             break;                                                             \
         }                                                                      \
         switch (err) {                                                         \
-        case ARANYA_ERROR_EMPTY:                                               \
+        case ARANYA_ERROR_WOULD_BLOCK:                                         \
             usleep(100000);                                                    \
             continue;                                                          \
         default:                                                               \
@@ -476,7 +476,7 @@ AranyaError run(Team *t) {
 
     Client *owner = &t->clients.owner;
     Client *admin = &t->clients.admin;
-    Client *operator = &t->clients.operator;
+    Client *operator= & t->clients.operator;
     Client *membera = &t->clients.membera;
     Client *memberb = &t->clients.memberb;
 
@@ -931,7 +931,7 @@ AranyaError run_aqc_example(Team *t) {
     AranyaLabelId *labels = NULL;
 
     Client *admin = &t->clients.admin;
-    Client *operator = &t->clients.operator;
+    Client *operator= & t->clients.operator;
     Client *membera = &t->clients.membera;
     Client *memberb = &t->clients.memberb;
 

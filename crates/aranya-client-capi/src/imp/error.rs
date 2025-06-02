@@ -24,7 +24,7 @@ pub enum Error {
     BufferTooSmall,
 
     #[error("haven't received any data yet")]
-    Empty,
+    WouldBlock,
 
     #[error("connection was unexpectedly closed")]
     Closed,
@@ -58,7 +58,7 @@ impl From<TryReceiveError<AqcError>> for Error {
     fn from(value: TryReceiveError<AqcError>) -> Self {
         match value {
             TryReceiveError::Closed => Self::Closed,
-            TryReceiveError::Empty => Self::Empty,
+            TryReceiveError::Empty => Self::WouldBlock,
             TryReceiveError::Error(e) => Self::Client(aranya_client::Error::Aqc(e)),
         }
     }
@@ -68,7 +68,7 @@ impl From<TryReceiveError<aranya_client::Error>> for Error {
     fn from(value: TryReceiveError<aranya_client::Error>) -> Self {
         match value {
             TryReceiveError::Closed => Self::Closed,
-            TryReceiveError::Empty => Self::Empty,
+            TryReceiveError::Empty => Self::WouldBlock,
             TryReceiveError::Error(e) => Self::Client(e),
         }
     }

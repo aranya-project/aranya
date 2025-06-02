@@ -63,7 +63,7 @@ pub enum Error {
 
     /// Tried to poll an endpoint but nothing received yet.
     #[capi(msg = "no response ready yet")]
-    Empty,
+    WouldBlock,
 
     /// A connection got unexpectedly closed.
     #[capi(msg = "connection got closed")]
@@ -104,7 +104,7 @@ impl From<&imp::Error> for Error {
                     Self::Bug
                 }
             },
-            imp::Error::Empty => Self::Empty,
+            imp::Error::WouldBlock => Self::WouldBlock,
             imp::Error::Closed => Self::Closed,
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
@@ -1518,7 +1518,7 @@ pub fn aqc_delete_uni_channel(
 
 /// Tries to poll AQC to see if any channels have been received.
 ///
-/// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
+/// This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any
 /// channels received yet which is considered a non-fatal error.
 ///
 /// Note that the [`AqcPeerChannel`] must be converted before it can be used:
@@ -1658,7 +1658,7 @@ pub fn aqc_bidi_stream_send(
 
 /// Receive some data from an [`AqcBidiStream`].
 ///
-/// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+/// This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
 /// received yet which is considered a non-fatal error.
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcBidiStream`].
@@ -1672,10 +1672,8 @@ pub fn aqc_bidi_stream_try_recv(
     mut buffer: &mut [MaybeUninit<u8>],
 ) -> Result<usize, imp::Error> {
     let mut written = 0;
-    while {
+    while !buffer.is_empty() {
         written += consume_bytes(&mut buffer, &mut stream.data);
-        !buffer.is_empty()
-    } {
         match stream.inner.try_receive() {
             Ok(data) => stream.data = data,
             Err(_) if written > 0 => break,
@@ -1708,7 +1706,7 @@ pub fn aqc_bidi_create_uni_stream(
 
 /// Tries to receive the receive (and potentially send) ends of a stream.
 ///
-/// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
+/// This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any
 /// streams received yet which is considered a non-fatal error.
 ///
 /// Note that the recipient will not be able to receive the stream until data is
@@ -1770,7 +1768,7 @@ pub fn aqc_send_create_uni_stream(
 /// Note that the recipient will not be able to receive the stream until data is
 /// sent over the stream.
 ///
-/// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+/// This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
 /// received yet which is considered a non-fatal error.
 ///
 /// @param[in]  channel the AQC channel object [`AqcReceiveChannel`].
@@ -1806,7 +1804,7 @@ pub fn aqc_send_stream_send(
 
 /// Receive some data from an [`AqcReceiveStream`].
 ///
-/// This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+/// This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
 /// received yet which is considered a non-fatal error.
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcReceiveStream`].
@@ -1820,10 +1818,8 @@ pub fn aqc_recv_stream_try_recv(
     mut buffer: &mut [MaybeUninit<u8>],
 ) -> Result<usize, imp::Error> {
     let mut written = 0;
-    while {
+    while !buffer.is_empty() {
         written += consume_bytes(&mut buffer, &mut stream.data);
-        !buffer.is_empty()
-    } {
         match stream.inner.try_receive() {
             Ok(data) => stream.data = data,
             Err(_) if written > 0 => break,

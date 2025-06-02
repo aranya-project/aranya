@@ -191,7 +191,7 @@ enum AranyaError
     /**
      * Tried to poll an endpoint but nothing received yet.
      */
-    ARANYA_ERROR_EMPTY,
+    ARANYA_ERROR_WOULD_BLOCK,
     /**
      * A connection got unexpectedly closed.
      */
@@ -2253,7 +2253,7 @@ AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaClient *client,
 /**
  * Tries to poll AQC to see if any channels have been received.
  *
- * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
+ * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any
  * channels received yet which is considered a non-fatal error.
  *
  * Note that the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) must be converted before it can be used:
@@ -2287,7 +2287,7 @@ AranyaError aranya_aqc_try_receive_channel(struct AranyaClient *client,
 /**
  * Tries to poll AQC to see if any channels have been received.
  *
- * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
+ * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any
  * channels received yet which is considered a non-fatal error.
  *
  * Note that the [`AranyaAqcPeerChannel`](@ref AranyaAqcPeerChannel) must be converted before it can be used:
@@ -2448,7 +2448,7 @@ AranyaError aranya_aqc_bidi_stream_send_ext(struct AranyaClient *client,
 /**
  * Receive some data from an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
  *
- * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+ * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
  * received yet which is considered a non-fatal error.
  *
  * @param[in]  stream the receiving side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
@@ -2466,7 +2466,7 @@ AranyaError aranya_aqc_bidi_stream_try_recv(struct AranyaAqcBidiStream *stream,
 /**
  * Receive some data from an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
  *
- * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+ * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
  * received yet which is considered a non-fatal error.
  *
  * @param[in]  stream the receiving side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
@@ -2518,7 +2518,7 @@ AranyaError aranya_aqc_bidi_create_uni_stream_ext(struct AranyaClient *client,
 /**
  * Tries to receive the receive (and potentially send) ends of a stream.
  *
- * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
+ * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any
  * streams received yet which is considered a non-fatal error.
  *
  * Note that the recipient will not be able to receive the stream until data is
@@ -2541,7 +2541,7 @@ AranyaError aranya_aqc_bidi_try_receive_stream(struct AranyaAqcBidiChannel *chan
 /**
  * Tries to receive the receive (and potentially send) ends of a stream.
  *
- * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any
+ * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any
  * streams received yet which is considered a non-fatal error.
  *
  * Note that the recipient will not be able to receive the stream until data is
@@ -2601,7 +2601,7 @@ AranyaError aranya_aqc_send_create_uni_stream_ext(struct AranyaClient *client,
  * Note that the recipient will not be able to receive the stream until data is
  * sent over the stream.
  *
- * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+ * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
  * received yet which is considered a non-fatal error.
  *
  * @param[in]  channel the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
@@ -2618,7 +2618,7 @@ AranyaError aranya_aqc_recv_try_receive_uni_stream(struct AranyaAqcReceiveChanne
  * Note that the recipient will not be able to receive the stream until data is
  * sent over the stream.
  *
- * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+ * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
  * received yet which is considered a non-fatal error.
  *
  * @param[in]  channel the AQC channel object [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
@@ -2664,7 +2664,7 @@ AranyaError aranya_aqc_send_stream_send_ext(struct AranyaClient *client,
 /**
  * Receive some data from an [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
  *
- * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+ * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
  * received yet which is considered a non-fatal error.
  *
  * @param[in]  stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
@@ -2682,7 +2682,7 @@ AranyaError aranya_aqc_recv_stream_try_recv(struct AranyaAqcReceiveStream *strea
 /**
  * Receive some data from an [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
  *
- * This can return `ARANYA_ERROR_EMPTY` to signal that there aren't any streams
+ * This can return `ARANYA_ERROR_WOULD_BLOCK` to signal that there aren't any streams
  * received yet which is considered a non-fatal error.
  *
  * @param[in]  stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
