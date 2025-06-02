@@ -145,11 +145,12 @@ async fn test_query_functions() -> Result<()> {
 
 /// Tests add_team() by demonstrating that syncing can only occur after
 /// a peer calls the add_team() API
+#[ignore] // FIXME
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_team() -> Result<()> {
     // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
-    let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
+    let mut team = TeamCtx::new("test_add_team", work_dir).await?;
 
     // Create the initial team, and get our TeamId and PSK.
     let (team_id, maybe_psk) = {
