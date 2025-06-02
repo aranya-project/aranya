@@ -58,10 +58,10 @@ use crate::{
     },
 };
 
+const SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
+
 /// ALPN protocol identifier for Aranya QUIC sync.
 const ALPN_QUIC_SYNC: &[u8] = const {
-    use crate::daemon::SYNC_PROTOCOL;
-
     match SYNC_PROTOCOL {
         SyncProtocol::V1 => b"quic_sync_v1",
     }
@@ -88,7 +88,7 @@ pub enum Error {
     QuicStreamError(#[from] s2n_quic::stream::Error),
 }
 
-/// Data used for sending sync requests and processing sync responses
+/// QUIC syncer state used for sending sync requests and processing sync responses
 pub struct State {
     /// QUIC client to make sync requests and handle sync responses.
     client: QuicClient,
@@ -99,6 +99,7 @@ pub struct State {
 
 impl SyncState for State {
     #[allow(clippy::manual_async_fn)]
+    #[instrument(skip(syncer, sink))]
     /// Syncs with the peer.
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
     fn sync_impl<S>(
@@ -122,12 +123,14 @@ impl SyncState for State {
             // send sync request.
             syncer
                 .send_sync_request(&mut send, &mut sync_requester, peer)
-                .await?;
+                .await
+                .map_err(|e| SyncError::SendSyncRequest(Box::new(e)))?;
 
             // receive sync response.
             syncer
                 .receive_sync_response(&mut recv, &mut sync_requester, &id, sink, peer)
-                .await?;
+                .await
+                .map_err(|e| SyncError::ReceiveSyncResponse(Box::new(e)))?;
 
             Ok(())
         }
@@ -184,6 +187,7 @@ impl State {
 }
 
 impl Syncer<State> {
+    #[instrument(skip(self))]
     async fn connect(&mut self, peer: &Addr) -> SyncResult<BidirectionalStream> {
         info!(?peer, "client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
@@ -192,11 +196,11 @@ impl Syncer<State> {
         let client = &self.state.client;
 
         let conn = match conns.entry(*peer) {
-            Entry::Occupied(e) => {
+            Entry::Occupied(entry) => {
                 info!("Client is able to re-use existing QUIC connection");
-                e.into_mut()
+                entry.into_mut()
             }
-            Entry::Vacant(e) => {
+            Entry::Vacant(entry) => {
                 info!(?peer, "existing QUIC connection not found");
 
                 let addr = tokio::net::lookup_host(peer.to_socket_addrs())
@@ -212,7 +216,7 @@ impl Syncer<State> {
                     .map_err(Error::from)?;
                 conn.keep_alive(true).map_err(Error::from)?;
                 debug!(?peer, "created new quic connection");
-                e.insert(conn)
+                entry.insert(conn)
             }
         };
 
@@ -242,6 +246,7 @@ impl Syncer<State> {
         Ok(stream)
     }
 
+    #[instrument(skip(self, syncer))]
     async fn send_sync_request<A>(
         &self,
         send: &mut SendStream,
@@ -277,6 +282,7 @@ impl Syncer<State> {
         Ok(())
     }
 
+    #[instrument(skip(self, syncer, sink))]
     async fn receive_sync_response<S, A>(
         &self,
         recv: &mut ReceiveStream,

@@ -25,6 +25,10 @@ mod error {
         QuicSyncError(#[from] QSError),
         #[error(transparent)]
         Runtime(#[from] aranya_runtime::SyncError),
+        #[error("Could not send sync request: {0}")]
+        SendSyncRequest(Box<SyncError>),
+        #[error("Could not receive sync response: {0}")]
+        ReceiveSyncResponse(Box<SyncError>),
         #[error(transparent)]
         Bug(#[from] buggy::Bug),
         #[error(transparent)]

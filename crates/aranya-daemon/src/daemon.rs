@@ -40,12 +40,9 @@ use crate::{
     config::Config,
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::{
-        prot::SyncProtocol,
-        task::{
-            quic::{get_existing_psks, Msg, State as QuicSyncState, TeamIdPSKPair},
-            Syncer,
-        },
+    sync::task::{
+        quic::{get_existing_psks, Msg, State as QuicSyncState, TeamIdPSKPair},
+        Syncer,
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
@@ -64,7 +61,6 @@ pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
-pub(crate) const SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
 
 /// The daemon itself.
 pub struct Daemon {

@@ -11,10 +11,3 @@ pub enum SyncProtocol {
     /// Version 1.
     V1 = 1,
 }
-
-// Always default to latest version?
-impl Default for SyncProtocol {
-    fn default() -> Self {
-        Self::V1
-    }
-}
