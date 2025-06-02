@@ -130,7 +130,8 @@ pub(crate) fn consume_bytes(buffer: &mut &mut [MaybeUninit<u8>], bytes: &mut Byt
     let len = core::cmp::min(bytes.len(), buffer.len());
 
     // SAFETY: &[T] and &[MaybeUninit<T>] have the same layout.
-    let src = unsafe { &*(ptr::from_ref::<[u8]>(bytes.as_ref()) as *const [MaybeUninit<u8>]) };
+    let src =
+        unsafe { &*(ptr::from_ref::<[u8]>(&bytes.as_ref()[..len]) as *const [MaybeUninit<u8>]) };
     let dst = &mut (*buffer)[..len];
     dst.copy_from_slice(src);
 
