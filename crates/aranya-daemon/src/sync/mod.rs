@@ -10,6 +10,8 @@ pub type Result<T> = core::result::Result<T, SyncError>;
 mod error {
     use thiserror::Error;
 
+    use super::task::quic::Error as QSError;
+
     #[derive(Error, Debug)]
     #[non_exhaustive]
     pub enum SyncError {
@@ -19,10 +21,8 @@ mod error {
         Version,
         #[error("Unknown Version")]
         UnknownVersion,
-        #[error("QUIC connection error: {0}")]
-        QuicConnectionError(#[from] s2n_quic::connection::Error),
-        #[error("QUIC stream error: {0}")]
-        QuicStreamError(#[from] s2n_quic::stream::Error),
+        #[error(transparent)]
+        QuicSyncError(#[from] QSError),
         #[error(transparent)]
         Runtime(#[from] aranya_runtime::SyncError),
         #[error(transparent)]

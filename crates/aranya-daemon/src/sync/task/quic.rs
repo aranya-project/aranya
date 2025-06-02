@@ -77,6 +77,17 @@ pub(crate) use psk::{delete_psk, get_existing_psks, insert_psk, TeamIdPSKPair};
 pub use psk::{ClientPresharedKeys, Msg, ServerPresharedKeys};
 pub use version::Version;
 
+/// Errors specific to the QUIC syncer
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    /// QUIC Connection error
+    #[error("QUIC connection error: {0}")]
+    QuicConnectionError(#[from] s2n_quic::connection::Error),
+    /// QUIC Stream error
+    #[error("QUIC stream error: {0}")]
+    QuicStreamError(#[from] s2n_quic::stream::Error),
+}
+
 /// Data used for sending sync requests and processing sync responses
 pub struct State {
     /// QUIC client to make sync requests and handle sync responses.
@@ -197,8 +208,9 @@ impl Syncer<State> {
                 debug!(?peer, "attempting to create new quic connection");
                 let mut conn = client
                     .connect(Connect::new(addr).with_server_name("127.0.0.1"))
-                    .await?;
-                conn.keep_alive(true)?;
+                    .await
+                    .map_err(Error::from)?;
+                conn.keep_alive(true).map_err(Error::from)?;
                 debug!(?peer, "created new quic connection");
                 e.insert(conn)
             }
@@ -217,12 +229,12 @@ impl Syncer<State> {
             Err(e @ ConnErr::StatelessReset { .. })
             | Err(e @ ConnErr::StreamIdExhausted { .. })
             | Err(e @ ConnErr::MaxHandshakeDurationExceeded { .. }) => {
-                return Err(SyncError::QuicConnectionError(e));
+                return Err(SyncError::QuicSyncError(e.into()));
             }
             // Other errors means the stream has closed
             Err(e) => {
                 conns.remove(peer);
-                return Err(SyncError::QuicConnectionError(e));
+                return Err(SyncError::QuicSyncError(e.into()));
             }
         };
 
@@ -254,9 +266,12 @@ impl Syncer<State> {
 
         // TODO: `send_all`?
         send.send(Bytes::from_owner([QUIC_SYNC_VERSION as u8]))
-            .await?;
-        send.send(Bytes::from_owner(send_buf)).await?;
-        send.close().await?;
+            .await
+            .map_err(Error::from)?;
+        send.send(Bytes::from_owner(send_buf))
+            .await
+            .map_err(Error::from)?;
+        send.close().await.map_err(Error::from)?;
         debug!(?peer, "sent sync request");
 
         Ok(())
@@ -484,8 +499,10 @@ where
         let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
             Err(SyncError::Version) => {
-                send.send(Bytes::from_owner([VERSION_ERR])).await?;
-                send.close().await?;
+                send.send(Bytes::from_owner([VERSION_ERR]))
+                    .await
+                    .map_err(Error::from)?;
+                send.close().await.map_err(Error::from)?;
                 return Ok(());
             }
             Err(err) => SyncResponse::Err(format!("{err:?}")),
@@ -502,7 +519,7 @@ where
         send.send(Bytes::from_owner(data))
             .await
             .context("Could not send sync response")?;
-        send.close().await?;
+        send.close().await.map_err(Error::from)?;
         debug!(?peer, n = data_len, "server sent sync response");
 
         Ok(())
