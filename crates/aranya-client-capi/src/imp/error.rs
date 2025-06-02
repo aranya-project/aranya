@@ -4,6 +4,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     write_c_str, ExtendedError, InvalidArg, WriteCStrError,
 };
+use aranya_client::{aqc::TryReceiveError, error::AqcError};
 use buggy::Bug;
 use tracing::warn;
 
@@ -22,6 +23,12 @@ pub enum Error {
     #[error("buffer too small")]
     BufferTooSmall,
 
+    #[error("haven't received any data yet")]
+    WouldBlock,
+
+    #[error("connection was unexpectedly closed")]
+    Closed,
+
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),
 
@@ -39,6 +46,32 @@ pub enum Error {
 
     #[error("{0}")]
     Other(#[from] anyhow::Error),
+}
+
+impl From<AqcError> for Error {
+    fn from(value: AqcError) -> Self {
+        Self::Client(aranya_client::Error::Aqc(value))
+    }
+}
+
+impl From<TryReceiveError<AqcError>> for Error {
+    fn from(value: TryReceiveError<AqcError>) -> Self {
+        match value {
+            TryReceiveError::Closed => Self::Closed,
+            TryReceiveError::Empty => Self::WouldBlock,
+            TryReceiveError::Error(e) => Self::Client(aranya_client::Error::Aqc(e)),
+        }
+    }
+}
+
+impl From<TryReceiveError<aranya_client::Error>> for Error {
+    fn from(value: TryReceiveError<aranya_client::Error>) -> Self {
+        match value {
+            TryReceiveError::Closed => Self::Closed,
+            TryReceiveError::Empty => Self::WouldBlock,
+            TryReceiveError::Error(e) => Self::Client(e),
+        }
+    }
 }
 
 impl From<WriteCStrError> for Error {

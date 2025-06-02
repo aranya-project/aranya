@@ -12,13 +12,13 @@ use serde::{Deserialize, Serialize};
 ///
 /// A KeyBundle contains identifiers for three types of keys:
 /// - Device identity key: Used to identify a device in an Aranya team. A device's ID
-///     is derived from the public portion of the device identity key. The device key is
-///     used for digital signatures allowing others to verify signatures created with this key.
+///   is derived from the public portion of the device identity key. The device key is
+///   used for digital signatures allowing others to verify signatures created with this key.
 /// - Encryption key: Used for secure data encryption and decryption. This key is used
-///     for the encapsulation and decapsulation of KEM shared secrets.
+///   for the encapsulation and decapsulation of KEM shared secrets.
 /// - Signing key: Used for creating and verifying cryptographic signatures. Whenever
-///     this device publishes a command, it is signed using the secret portion of this key.
-///     Other devices can use the public portion of this key to verify those signatures.
+///   this device publishes a command, it is signed using the secret portion of this key.
+///   Other devices can use the public portion of this key to verify those signatures.
 ///
 /// The actual key material is stored in the provided `KeyStore`, and this
 /// structure only contains references to those keys.

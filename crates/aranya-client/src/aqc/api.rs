@@ -25,7 +25,7 @@ use super::{
         ClientPresharedKeys, NoCertResolver, ServerPresharedKeys, SkipServerVerification, CTRL_PSK,
     },
     net::{AqcClient, TryReceiveError},
-    AqcBidiChannel, AqcPeerChannel, AqcSenderChannel,
+    AqcBidiChannel, AqcPeerChannel, AqcSendChannel,
 };
 use crate::{
     error::{aranya_error, no_addr, AqcError, IpcError},
@@ -139,7 +139,7 @@ impl AqcChannelsImpl {
         peer_addr: SocketAddr,
         label_id: LabelId,
         psks: AqcUniPsks,
-    ) -> Result<AqcSenderChannel, AqcError> {
+    ) -> Result<AqcSendChannel, AqcError> {
         self.client
             .create_uni_channel(peer_addr, label_id, psks)
             .await
@@ -239,7 +239,7 @@ impl<'a> AqcChannels<'a> {
         team_id: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> crate::Result<AqcSenderChannel> {
+    ) -> crate::Result<AqcSendChannel> {
         debug!("creating aqc uni channel");
 
         let (aqc_ctrl, psks) = self
@@ -287,7 +287,7 @@ impl<'a> AqcChannels<'a> {
 
     /// Deletes an AQC uni channel.
     #[instrument(skip_all, fields(?chan))]
-    pub async fn delete_uni_channel(&mut self, mut chan: AqcSenderChannel) -> crate::Result<()> {
+    pub async fn delete_uni_channel(&mut self, mut chan: AqcSendChannel) -> crate::Result<()> {
         // let _ctrl = self
         //     .client
         //     .daemon
