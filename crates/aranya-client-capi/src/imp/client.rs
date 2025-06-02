@@ -2,6 +2,7 @@ use std::mem::MaybeUninit;
 
 use aranya_capi_core::safe::{TypeId, Typed};
 
+/// An instance of an Aranya Client, along with an async runtime.
 pub struct Client {
     pub(crate) inner: aranya_client::Client,
     pub(crate) rt: tokio::runtime::Runtime,
@@ -15,7 +16,7 @@ impl Client {
 }
 
 impl Typed for Client {
-    const TYPE_ID: TypeId = TypeId::new(0xbbafb41c);
+    const TYPE_ID: TypeId = TypeId::new(0xBBAFB41C);
 }
 
 /// Serializes a [`KeyBundle`] into the output buffer.
