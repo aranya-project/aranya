@@ -239,7 +239,7 @@ async fn main() -> Result<()> {
 
     // add team to each non-owner device's local store
     let cfg_with_psk = TeamConfig::builder()
-        .psk(psk.idenitity(), psk.raw_secret_bytes())
+        .psk(psk.identity(), psk.raw_secret_bytes())
         .build()?;
     for member in [&admin_team, &operator_team, &membera_team, &memberb_team] {
         member.add_team(cfg_with_psk.clone()).await?;

@@ -85,7 +85,7 @@ impl Default for SyncPeerConfigBuilder {
 #[derive(Clone)]
 /// Configuration info for adding and creating teams.
 pub struct TeamConfig {
-    psk_idenitity: Option<Box<[u8]>>,
+    psk_identity: Option<Box<[u8]>>,
     psk_secret: Option<Secret>,
 }
 
@@ -99,7 +99,7 @@ impl TeamConfig {
 impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
     fn from(value: TeamConfig) -> Self {
         Self {
-            psk_idenitity: value.psk_idenitity,
+            psk_identity: value.psk_identity,
             psk_secret: value.psk_secret,
         }
     }
@@ -108,7 +108,7 @@ impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
 /// Builder for a [`TeamConfig`]
 #[derive(Clone, Debug, Default)]
 pub struct TeamConfigBuilder {
-    psk_idenitity: Option<Box<[u8]>>,
+    psk_identity: Option<Box<[u8]>>,
     psk_secret: Option<Secret>,
 }
 
@@ -119,8 +119,8 @@ impl TeamConfigBuilder {
     }
 
     /// Configures the psk fields.
-    pub fn psk<I: Into<Box<[u8]>>, S: Into<Secret>>(mut self, idenitity: I, secret: S) -> Self {
-        self.psk_idenitity = Some(idenitity.into());
+    pub fn psk<I: Into<Box<[u8]>>, S: Into<Secret>>(mut self, identity: I, secret: S) -> Self {
+        self.psk_identity = Some(identity.into());
         self.psk_secret = Some(secret.into());
 
         self
@@ -129,7 +129,7 @@ impl TeamConfigBuilder {
     /// Attempts to build a [`TeamConfig`] using the provided parameters.
     pub fn build(self) -> Result<TeamConfig> {
         Ok(TeamConfig {
-            psk_idenitity: self.psk_idenitity,
+            psk_identity: self.psk_identity,
             psk_secret: self.psk_secret,
         })
     }

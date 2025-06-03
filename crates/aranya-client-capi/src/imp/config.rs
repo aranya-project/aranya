@@ -245,15 +245,15 @@ impl Default for SyncPeerConfigBuilder {
 /// Configuration info when creating or adding a team in Aranya
 #[derive(Clone, Debug)]
 pub struct TeamConfig {
-    psk_idenitity: Option<Box<[u8]>>,
+    psk_identity: Option<Box<[u8]>>,
     psk_secret: Option<Secret>,
 }
 
 impl From<TeamConfig> for aranya_client::TeamConfig {
     fn from(value: TeamConfig) -> Self {
         let mut builder = Self::builder();
-        if let (Some(idenitity), Some(secret)) = (value.psk_idenitity, value.psk_secret) {
-            builder = builder.psk(idenitity, secret);
+        if let (Some(identity), Some(secret)) = (value.psk_identity, value.psk_secret) {
+            builder = builder.psk(identity, secret);
         }
 
         builder.build().expect("All fields set")
@@ -273,7 +273,7 @@ impl Typed for TeamConfig {
 /// Builder for a [`TeamConfig`]
 #[derive(Clone, Debug, Default)]
 pub struct TeamConfigBuilder {
-    psk_idenitity: Option<Box<[u8]>>,
+    psk_identity: Option<Box<[u8]>>,
     psk_secret: Option<Secret>,
 }
 
@@ -292,7 +292,7 @@ impl Builder for TeamConfigBuilder {
         Self::Output::init(
             out,
             TeamConfig {
-                psk_idenitity: self.psk_idenitity,
+                psk_identity: self.psk_identity,
                 psk_secret: self.psk_secret,
             },
         );

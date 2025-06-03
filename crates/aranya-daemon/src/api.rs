@@ -372,8 +372,8 @@ impl DaemonApi for Api {
                 psk_send,
             } = data;
 
-            let (Some(identity), Some(secret)) = (cfg.psk_idenitity, cfg.psk_secret) else {
-                return Err(anyhow::anyhow!("Invalid Team Config for `add_team`. Expected `psk_idenitity` and `psk_secret` fields to be set").into());
+            let (Some(identity), Some(secret)) = (cfg.psk_identity, cfg.psk_secret) else {
+                return Err(anyhow::anyhow!("Invalid Team Config for `add_team`. Expected `psk_identity` and `psk_secret` fields to be set").into());
             };
             let psk = PresharedKey::external(&identity, secret.raw_secret_bytes())
                 .context("unable to create PSK")?
@@ -420,7 +420,7 @@ impl DaemonApi for Api {
                 // Send PSK update to the key stores
                 {
                     let psk_ref = Arc::new(
-                        PresharedKey::external(psk.idenitity(), psk.raw_secret_bytes())
+                        PresharedKey::external(psk.identity(), psk.raw_secret_bytes())
                             .context("unable to create PSK")?
                             .with_hash_alg(HashAlgorithm::SHA384)
                             .expect("Valid hash algorithm"),

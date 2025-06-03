@@ -139,7 +139,7 @@ pub enum Role {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TeamConfig {
     // TODO(nikki): any fields added to this should be public
-    pub psk_idenitity: Option<Box<[u8]>>,
+    pub psk_identity: Option<Box<[u8]>>,
     pub psk_secret: Option<Secret>,
 }
 
@@ -238,7 +238,7 @@ impl QuicSyncPSK {
 
     /// Return the id bytes.
     #[inline]
-    pub fn idenitity(&self) -> &[u8] {
+    pub fn identity(&self) -> &[u8] {
         self.id.as_bytes()
     }
 

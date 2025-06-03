@@ -43,9 +43,9 @@ async fn test_aqc_chans() -> Result<()> {
 
     // Add graph to devices
     let cfg = {
-        let idenitity = psk.idenitity();
+        let identity = psk.identity();
         let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(idenitity, secret).build()?
+        TeamConfig::builder().psk(identity, secret).build()?
     };
     let [_owner, rest @ ..] = team.devices();
 
@@ -293,9 +293,9 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
 
     // Add graph to devices
     let cfg = {
-        let idenitity = psk.idenitity();
+        let identity = psk.identity();
         let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(idenitity, secret).build()?
+        TeamConfig::builder().psk(identity, secret).build()?
     };
     let [_owner, rest @ ..] = team.devices();
 
@@ -401,9 +401,9 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     // Add graph to devices
     let cfg = {
-        let idenitity = psk.idenitity();
+        let identity = psk.identity();
         let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(idenitity, secret).build()?
+        TeamConfig::builder().psk(identity, secret).build()?
     };
     let [_owner, rest @ ..] = team.devices();
 
@@ -509,9 +509,9 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     // Add graph to devices
     let cfg = {
-        let idenitity = psk.idenitity();
+        let identity = psk.identity();
         let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(idenitity, secret).build()?
+        TeamConfig::builder().psk(identity, secret).build()?
     };
     let [_owner, rest @ ..] = team.devices();
 
@@ -670,9 +670,9 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     // Add graph to devices
     let cfg = {
-        let idenitity = psk.idenitity();
+        let identity = psk.identity();
         let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(idenitity, secret).build()?
+        TeamConfig::builder().psk(identity, secret).build()?
     };
     let [_owner, rest @ ..] = team.devices();
 

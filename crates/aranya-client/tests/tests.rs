@@ -38,9 +38,9 @@ async fn test_sync_now() -> Result<()> {
 
     if let Some(psk) = maybe_psk {
         let cfg = {
-            let idenitity = psk.idenitity();
+            let identity = psk.identity();
             let secret = psk.raw_secret_bytes();
-            TeamConfig::builder().psk(idenitity, secret).build()?
+            TeamConfig::builder().psk(identity, secret).build()?
         };
 
         team.admin.client.add_team(team_id, cfg.clone()).await?;
@@ -104,9 +104,9 @@ async fn test_query_functions() -> Result<()> {
 
     if let Some(psk) = maybe_psk {
         let cfg = {
-            let idenitity = psk.idenitity();
+            let identity = psk.identity();
             let secret = psk.raw_secret_bytes();
-            TeamConfig::builder().psk(idenitity, secret).build()?
+            TeamConfig::builder().psk(identity, secret).build()?
         };
 
         team.admin.client.add_team(team_id, cfg.clone()).await?;
@@ -165,9 +165,9 @@ async fn test_add_team() -> Result<()> {
 
     if let Some(psk) = maybe_psk {
         let cfg = {
-            let idenitity = psk.idenitity();
+            let identity = psk.identity();
             let secret = psk.raw_secret_bytes();
-            TeamConfig::builder().psk(idenitity, secret).build()?
+            TeamConfig::builder().psk(identity, secret).build()?
         };
 
         // Grab the shorthand for our address.
