@@ -35,6 +35,7 @@
 //! # }
 //! ```
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![warn(clippy::wildcard_imports, missing_docs)]
 
 mod keygen;
