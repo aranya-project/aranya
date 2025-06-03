@@ -14,8 +14,9 @@ use aranya_crypto::{
 };
 use aranya_daemon::{
     aranya::{self, Actions},
-    policy::{Effect, KeyBundle as UserKeyBundle, Role},
+    policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
+    AranyaStore,
 };
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
@@ -166,7 +167,7 @@ impl TestCtx {
             let mut store = {
                 let path = root.join("keystore");
                 fs::create_dir_all(&path)?;
-                Store::open(path)?
+                Store::open(path).map(AranyaStore::new)?
             };
             let (mut eng, _) = DefaultEngine::<Rng>::from_entropy(Rng);
             let bundle = KeyBundle::generate(&mut eng, &mut store)
@@ -189,7 +190,7 @@ impl TestCtx {
                     TEST_POLICY_1,
                     eng,
                     store.try_clone().context("unable to clone keystore")?,
-                    bundle.user_id,
+                    bundle.device_id,
                 )?,
                 LinearStorageProvider::new(FileManager::new(&storage_dir)?),
             );
@@ -224,7 +225,7 @@ impl TestCtx {
                 let nonce = &mut [0u8; 16];
                 Rng.fill_bytes(nonce);
                 (client.graph_id, _) = client
-                    .create_team(UserKeyBundle::try_from(&client.pk)?, Some(nonce))
+                    .create_team(DeviceKeyBundle::try_from(&client.pk)?, Some(nonce))
                     .await?;
             }
             clients.push(client)
@@ -248,7 +249,7 @@ impl TestCtx {
         // team setup
         owner
             .actions()
-            .add_member(UserKeyBundle::try_from(&admin.pk)?)
+            .add_member(DeviceKeyBundle::try_from(&admin.pk)?)
             .await
             .context("unable to add admin member")?;
         owner
@@ -259,7 +260,7 @@ impl TestCtx {
         admin.sync(owner).await?;
         owner
             .actions()
-            .add_member(UserKeyBundle::try_from(&operator.pk)?)
+            .add_member(DeviceKeyBundle::try_from(&operator.pk)?)
             .await
             .context("unable to add operator member")?;
         owner
@@ -270,13 +271,13 @@ impl TestCtx {
         operator.sync(owner).await?;
         operator
             .actions()
-            .add_member(UserKeyBundle::try_from(&membera.pk)?)
+            .add_member(DeviceKeyBundle::try_from(&membera.pk)?)
             .await
             .context("unable to add membera member")?;
         membera.sync(admin).await?;
         operator
             .actions()
-            .add_member(UserKeyBundle::try_from(&memberb.pk)?)
+            .add_member(DeviceKeyBundle::try_from(&memberb.pk)?)
             .await
             .context("unable to add memberb member")?;
         memberb.sync(admin).await?;

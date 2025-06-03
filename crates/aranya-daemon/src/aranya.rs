@@ -1,18 +1,22 @@
 //! Aranya.
 
-use std::{borrow::Cow, future::Future, marker::PhantomData, net::SocketAddr, sync::Arc};
+use core::{fmt, future::Future, marker::PhantomData, net::SocketAddr};
+use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{bail, Context, Result};
-use aranya_crypto::{Csprng, Rng, UserId};
-use aranya_fast_channels::Label;
+use aranya_aqc_util::LabelId;
+use aranya_crypto::{Csprng, DeviceId, Rng};
+use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_vm::Value;
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, PeerCache, Policy, Session, Sink,
-    StorageProvider, SyncRequester, SyncResponder, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
+    StorageProvider, SyncRequester, SyncResponder, SyncType, VmPolicy, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::Addr;
+use buggy::bug;
+use futures_util::TryFutureExt as _;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
@@ -39,7 +43,7 @@ pub enum SyncResponse {
 /// Aranya client.
 pub struct Client<EN, SP, CE> {
     /// Thread-safe Aranya client reference.
-    aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    pub(crate) aranya: Arc<Mutex<ClientState<EN, SP>>>,
     _eng: PhantomData<CE>,
 }
 
@@ -67,7 +71,10 @@ where
         S: Sink<<EN as Engine>::Effect>,
     {
         // send the sync request.
-        let mut syncer = SyncRequester::new(id, &mut Rng);
+
+        // TODO: Real server address.
+        let server_addr = ();
+        let mut syncer = SyncRequester::new(id, &mut Rng, server_addr);
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let (len, _) = {
@@ -115,9 +122,15 @@ where
                 let mut trx = client.transaction(id);
                 // TODO: save PeerCache somewhere.
                 client
-                    .add_commands(&mut trx, sink, &cmds, &mut PeerCache::new())
+                    .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
                 client.commit(&mut trx, sink).context("commit failed")?;
+                // TODO: Update heads
+                // client.update_heads(
+                //     id,
+                //     cmds.iter().filter_map(|cmd| cmd.address().ok()),
+                //     heads,
+                // )?;
                 debug!("committed");
             }
         }
@@ -182,6 +195,12 @@ where
         let mut sink = VecSink::new();
         session.receive(&client, &mut sink, command)?;
         Ok(sink.collect()?)
+    }
+}
+
+impl<EN, SP, CE> fmt::Debug for Client<EN, SP, CE> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Client").finish_non_exhaustive()
     }
 }
 
@@ -267,7 +286,7 @@ impl<EN, SP> Server<EN, SP> {
 
 impl<EN, SP> Server<EN, SP>
 where
-    EN: Engine + Send + Sync + 'static,
+    EN: Engine + Send + 'static,
     SP: StorageProvider + Send + Sync + 'static,
 {
     /// Begins accepting incoming requests.
@@ -336,8 +355,20 @@ where
         client: Arc<Mutex<ClientState<EN, SP>>>,
         request: &[u8],
     ) -> Result<Box<[u8]>> {
-        let mut resp = SyncResponder::new();
+        // TODO: Use real server address
+        let server_address = ();
+        let mut resp = SyncResponder::new(server_address);
+
+        let SyncType::Poll {
+            request,
+            address: (),
+        } = postcard::from_bytes(request)?
+        else {
+            bug!("Other sync types are not implemented");
+        };
+
         resp.receive(request).context("sync recv failed")?;
+
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
         // TODO: save PeerCache somewhere.
         let len = resp
@@ -395,10 +426,13 @@ where
     }
 
     /// Remove a Member instance from the team.
-    #[instrument(skip(self), fields(user_id = %user_id))]
-    fn remove_member(&self, user_id: UserId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    #[instrument(skip(self), fields(device_id = %device_id))]
+    fn remove_member(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.remove_member(user_id.into())?;
+            actor.remove_member(device_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -408,11 +442,11 @@ where
     #[instrument(skip_all)]
     fn assign_role(
         &self,
-        user_id: UserId,
+        device_id: DeviceId,
         role: Role,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_role(user_id.into(), role)?;
+            actor.assign_role(device_id.into(), role)?;
             Ok(())
         })
         .in_current_span()
@@ -422,158 +456,279 @@ where
     #[instrument(skip_all)]
     fn revoke_role(
         &self,
-        user_id: UserId,
+        device_id: DeviceId,
         role: Role,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.revoke_role(user_id.into(), role)?;
+            actor.revoke_role(device_id.into(), role)?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Defines an AFC label.
-    #[instrument(skip(self), fields(label = %label))]
-    fn define_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    /// Create a label.
+    #[instrument(skip(self), fields(name = %name))]
+    fn create_label(&self, name: String) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.define_label(i64::from(label.to_u32()))?;
+            actor.create_label(name)?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Undefines an AFC label.
-    #[instrument(skip(self), fields(label = %label))]
-    fn undefine_label(&self, label: Label) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    /// Delete a label.
+    #[instrument(skip(self), fields(label_id = %label_id))]
+    fn delete_label(&self, label_id: LabelId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.undefine_label(i64::from(label.to_u32()))?;
+            actor.delete_label(label_id.into())?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Grants an app permission to use an AFC label.
-    #[instrument(skip(self), fields(user_id = %user_id, label = %label, op = %op))]
+    /// Assigns a label to a device.
+    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id, op = %op))]
     fn assign_label(
         &self,
-        user_id: UserId,
-        label: Label,
+        device_id: DeviceId,
+        label_id: LabelId,
         op: ChanOp,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_label(user_id.into(), i64::from(label.to_u32()), op)?;
+            actor.assign_label(device_id.into(), label_id.into(), op)?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Revokes an AFC label.
-    #[instrument(skip(self), fields(user_id = %user_id, label = %label))]
+    /// Revokes a label.
+    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id))]
     fn revoke_label(
         &self,
-        user_id: UserId,
-        label: Label,
+        device_id: DeviceId,
+        label_id: LabelId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%user_id, %label, "revoking AFC label");
+        info!(%device_id, %label_id, "revoking AQC label");
         self.with_actor(move |actor| {
-            actor.revoke_label(user_id.into(), i64::from(label.to_u32()))?;
+            actor.revoke_label(device_id.into(), label_id.into())?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Sets a network name.
-    #[instrument(skip(self), fields(user_id = %user_id, net_identifier = %net_identifier))]
-    fn set_network_name(
+    /// Sets an AQC network name.
+    #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
+    fn set_aqc_network_name(
         &self,
-        user_id: UserId,
+        device_id: DeviceId,
         net_identifier: String,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%user_id, %net_identifier, "setting network name");
+        info!(%device_id, %net_identifier, "setting AQC network name");
         self.with_actor(move |actor| {
-            actor.set_network_name(user_id.into(), net_identifier)?;
+            actor.set_aqc_network_name(device_id.into(), net_identifier)?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Sets a network name.
-    #[instrument(skip(self), fields(user_id = %user_id))]
-    fn unset_network_name(
+    /// Unsets an AQC network name.
+    #[instrument(skip(self), fields(device_id = %device_id))]
+    fn unset_aqc_network_name(
         &self,
-        user_id: UserId,
+        device_id: DeviceId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%user_id, "unsetting network name");
+        info!(%device_id, "unsetting AQC network name");
         self.with_actor(move |actor| {
-            actor.unset_network_name(user_id.into())?;
+            actor.unset_aqc_network_name(device_id.into())?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Creates a bidirectional AFC channel.
-    #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
-    fn create_bidi_channel(
+    /// Queries all AQC network names off-graph.
+    #[instrument(skip(self))]
+    fn query_aqc_network_names_off_graph(
         &self,
-        peer_id: UserId,
-        label: Label,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.create_bidi_channel(peer_id.into(), i64::from(label.to_u32()))?;
-            Ok(())
+    ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_aqc_network_names",
+            args: Cow::Owned(vec![]),
+        })
+        .and_then(|(_, effects)| {
+            std::future::ready(
+                effects
+                    .into_iter()
+                    .map(|eff| {
+                        let Effect::QueryAqcNetworkNamesOutput(eff) = eff else {
+                            anyhow::bail!("bad effect in query_network_names");
+                        };
+                        Ok((
+                            NetIdentifier(eff.net_identifier),
+                            DeviceId::from(eff.device_id),
+                        ))
+                    })
+                    .collect(),
+            )
         })
         .in_current_span()
     }
 
-    /// Creates a bidirectional AFC channel off graph.
+    /// Creates a bidirectional AQC channel off graph.
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(peer_id = %peer_id, label = %label))]
-    fn create_bidi_channel_off_graph(
+    #[instrument(skip(self), fields(peer_id = %peer_id, label = %label_id))]
+    fn create_aqc_bidi_channel_off_graph(
         &self,
-        peer_id: UserId,
-        label: Label,
+        peer_id: DeviceId,
+        label_id: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "create_bidi_channel",
-            args: Cow::Owned(vec![
-                Value::from(peer_id),
-                Value::from(i64::from(label.to_u32())),
-            ]),
+            name: "create_aqc_bidi_channel",
+            args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
         })
         .in_current_span()
     }
 
-    /// Creates a unidirectional AFC channel.
-    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
-    fn create_uni_channel(
+    /// Creates a unidirectional AQC channel.
+    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
+    fn create_aqc_uni_channel(
         &self,
-        seal_id: UserId,
-        open_id: UserId,
-        label: Label,
+        seal_id: DeviceId,
+        open_id: DeviceId,
+        label_id: LabelId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_uni_channel(seal_id.into(), open_id.into(), i64::from(label.to_u32()))?;
+            actor.create_aqc_uni_channel(seal_id.into(), open_id.into(), label_id.into())?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Creates a unidirectional AFC channel.
+    /// Creates a unidirectional AQC channel.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
-    fn create_uni_channel_off_graph(
+    fn create_aqc_uni_channel_off_graph(
         &self,
-        seal_id: UserId,
-        open_id: UserId,
-        label: Label,
+        seal_id: DeviceId,
+        open_id: DeviceId,
+        label: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "create_uni_channel",
+            name: "create_aqc_uni_channel",
             args: Cow::Owned(vec![
                 Value::from(seal_id),
                 Value::from(open_id),
-                Value::from(i64::from(label.to_u32())),
+                Value::from(label),
             ]),
+        })
+        .in_current_span()
+    }
+
+    /// Creates a bidirectional AQC channel.
+    #[instrument(skip(self), fields(peer_id = %peer_id, label_id = %label_id))]
+    fn create_aqc_bidi_channel(
+        &self,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.create_aqc_bidi_channel(peer_id.into(), label_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Query devices on team off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_devices_on_team_off_graph(
+        &self,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_devices_on_team",
+            args: Cow::Owned(vec![]),
+        })
+        .in_current_span()
+    }
+
+    /// Query device role off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_device_role_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_device_role",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query device keybundle off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_device_keybundle_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_device_keybundle",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query device label assignments off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_label_assignments_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_label_assignments",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query AQC net identifier off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_aqc_net_identifier_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_aqc_net_identifier",
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query label exists off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_label_exists_off_graph(
+        &self,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_label_exists",
+            args: Cow::Owned(vec![Value::from(label_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query labels off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_labels_off_graph(
+        &self,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: "query_labels",
+            args: Cow::Owned(vec![]),
         })
         .in_current_span()
     }

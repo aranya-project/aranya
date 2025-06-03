@@ -18,7 +18,7 @@ script = "cargo make --quiet --list-all-steps --hide-uninteresting"
 
 
 # Build
-[tasks.build-code]
+[tasks.build]
 category = "build"
 description = "Build Code"
 command = "cargo"
@@ -85,11 +85,11 @@ tar -cvzf aranya-client-lib.tar.gz -C "${capi}" .
 
 [tasks.install-cbindgen]
 private = true
-install_crate = { crate_name = "cbindgen", version = "0.27.0", binary = "cbindgen", test_arg = "-V" }
+install_crate = { crate_name = "cbindgen", version = "0.29.0", binary = "cbindgen", test_arg = "-V" }
 
 
 # Test
-[tasks.unit-tests]
+[tasks.test]
 category = "test"
 description = "Run Unit Tests"
 workspace = true
@@ -110,13 +110,13 @@ run_task = { name = [
 
 [tasks.cargo-audit]
 category = "security"
-install_crate = { crate_name = "cargo-audit", version = "0.21.0", binary = "cargo-audit", test_arg = "-V" }
+install_crate = { crate_name = "cargo-audit", version = "0.21.2", binary = "cargo-audit", test_arg = "-V" }
 command = "cargo"
 args = ["audit"]
 
 [tasks.cargo-deny]
 category = "security"
-install_crate = { crate_name = "cargo-deny", version = "0.16.3", binary = "cargo-deny", test_arg = "-V" }
+install_crate = { crate_name = "cargo-deny", version = "0.18.2", binary = "cargo-deny", test_arg = "-V" }
 command = "cargo"
 args = ["deny", "check"]
 
@@ -175,7 +175,7 @@ dependencies = ["install-taplo"]
 
 [tasks.install-taplo]
 private = true
-install_crate = { crate_name = "taplo-cli", version = "0.9.0", binary = "taplo", test_arg = ["-V"] }
+install_crate = { crate_name = "taplo-cli", version = "0.9.3", binary = "taplo", test_arg = ["-V"] }
 
 [tasks.check-features]
 category = "correctness"
@@ -200,7 +200,7 @@ install_crate = { rustup_component_name = "clippy" }
 [tasks.machete]
 command = "cargo"
 args = ["machete"]
-install_crate = { crate_name = "cargo-machete", version = "0.6.2", binary = "cargo-machete", test_arg = "--version" }
+install_crate = { crate_name = "cargo-machete", version = "0.8.0", binary = "cargo-machete", test_arg = "--version" }
 
 
 # Docs
@@ -250,3 +250,10 @@ description = "Run C example application"
 cwd = "examples/c"
 script = "./run.bash"
 dependencies = ["build-capi-header", "build-capi-lib"]
+
+# Rust Example
+[tasks.run-rust-example]
+category = "examples"
+description = "Run Rust example application"
+cwd = "examples/rust"
+script = "./run.bash"

@@ -9,13 +9,14 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use anyhow::{Context, Result};
-use aranya_buggy::BugExt;
+use aranya_daemon_api::SyncPeerConfig;
 use aranya_runtime::storage::GraphId;
 use aranya_util::Addr;
+use buggy::BugExt;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
-use tracing::{error, info, instrument};
+use tracing::{error, instrument, trace};
 
 use crate::{
     daemon::{Client, EF},
@@ -25,7 +26,8 @@ use crate::{
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
 enum Msg {
-    AddPeer { peer: SyncPeer, interval: Duration },
+    SyncNow { peer: SyncPeer },
+    AddPeer { peer: SyncPeer, cfg: SyncPeerConfig },
     RemovePeer { peer: SyncPeer },
 }
 
@@ -40,33 +42,49 @@ struct SyncPeer {
 }
 
 /// Handles adding and removing sync peers.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SyncPeers {
     /// Send messages to add/remove peers.
     send: mpsc::Sender<Msg>,
+    /// Configuration values for syncing
+    cfgs: HashMap<(Addr, GraphId), SyncPeerConfig>,
 }
 
 impl SyncPeers {
     /// Create a new peer manager.
     fn new(send: mpsc::Sender<Msg>) -> Self {
-        Self { send }
+        Self {
+            send,
+            cfgs: HashMap::new(),
+        }
     }
 
     /// Add peer to [`Syncer`].
-    pub async fn add_peer(&self, addr: Addr, interval: Duration, graph_id: GraphId) -> Result<()> {
+    pub async fn add_peer(
+        &mut self,
+        addr: Addr,
+        graph_id: GraphId,
+        cfg: SyncPeerConfig,
+    ) -> Result<()> {
         let peer = Msg::AddPeer {
             peer: SyncPeer { addr, graph_id },
-            interval,
+            cfg: cfg.clone(),
         };
         if let Err(e) = self.send.send(peer).await.context("unable to add peer") {
             error!(?e, "error adding peer to syncer");
             return Err(e);
         }
+        if cfg.sync_now {
+            self.sync_now(addr, graph_id, Some(cfg.clone())).await?
+        }
+
+        self.cfgs.insert((addr, graph_id), cfg);
+
         Ok(())
     }
 
     /// Remove peer from [`Syncer`].
-    pub async fn remove_peer(&self, addr: Addr, graph_id: GraphId) -> Result<()> {
+    pub async fn remove_peer(&mut self, addr: Addr, graph_id: GraphId) -> Result<()> {
         if let Err(e) = self
             .send
             .send(Msg::RemovePeer {
@@ -78,9 +96,36 @@ impl SyncPeers {
             error!(?e, "error removing peer from syncer");
             return Err(e);
         }
+
+        self.cfgs.remove(&(addr, graph_id));
+
+        Ok(())
+    }
+
+    /// Sync with a peer immediately.
+    pub async fn sync_now(
+        &self,
+        addr: Addr,
+        graph_id: GraphId,
+        _cfg: Option<SyncPeerConfig>,
+    ) -> Result<()> {
+        let peer = Msg::SyncNow {
+            peer: SyncPeer { addr, graph_id },
+        };
+        if let Err(e) = self
+            .send
+            .send(peer)
+            .await
+            .context("unable to add sync now peer")
+        {
+            error!(?e, "error adding sync now peer to syncer");
+            return Err(e);
+        }
         Ok(())
     }
 }
+
+type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
@@ -95,7 +140,7 @@ pub struct Syncer {
     /// Delay queue for getting the next peer to sync with.
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
-    send_effects: mpsc::Sender<Vec<EF>>,
+    send_effects: EffectSender,
 }
 
 struct PeerInfo {
@@ -107,7 +152,7 @@ struct PeerInfo {
 
 impl Syncer {
     /// Creates a new `Syncer`.
-    pub fn new(client: Arc<Client>, send_effects: mpsc::Sender<Vec<EF>>) -> (Self, SyncPeers) {
+    pub fn new(client: Arc<Client>, send_effects: EffectSender) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -131,10 +176,13 @@ impl Syncer {
             // receive added/removed peers.
             Some(msg) = self.recv.recv() => {
                 match msg {
-                    Msg::AddPeer { peer, interval } => self.add_peer(peer, interval),
+                    Msg::SyncNow{ peer } => {
+                        // sync with peer right now.
+                        self.sync(&peer.graph_id, &peer.addr).await?;
+                    },
+                    Msg::AddPeer { peer, cfg } => self.add_peer(peer, &cfg),
                     Msg::RemovePeer { peer } => self.remove_peer(peer),
                 }
-
             }
             // get next peer from delay queue.
             Some(expired) = self.queue.next() => {
@@ -149,16 +197,19 @@ impl Syncer {
     }
 
     /// Add a peer to the delay queue, overwriting an existing one.
-    fn add_peer(&mut self, peer: SyncPeer, interval: Duration) {
-        let key = self.queue.insert(peer.clone(), interval);
+    fn add_peer(&mut self, peer: SyncPeer, cfg: &SyncPeerConfig) {
+        let key = self.queue.insert(peer.clone(), cfg.interval);
         self.peers
             .entry(peer)
             .and_modify(|info| {
                 self.queue.remove(&info.key);
-                info.interval = interval;
+                info.interval = cfg.interval;
                 info.key = key;
             })
-            .or_insert(PeerInfo { interval, key });
+            .or_insert(PeerInfo {
+                interval: cfg.interval,
+                key,
+            });
     }
 
     /// Remove a peer from the delay queue.
@@ -168,10 +219,10 @@ impl Syncer {
         }
     }
 
+    /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
     async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
-        info!("syncing with peer");
-
+        trace!("syncing with peer");
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
             self.client
@@ -183,10 +234,10 @@ impl Syncer {
         };
         let n = effects.len();
         self.send_effects
-            .send(effects)
+            .send((*id, effects))
             .await
             .context("unable to send effects")?;
-        info!(?n, "completed sync");
+        trace!(?n, "completed sync");
         Ok(())
     }
 }

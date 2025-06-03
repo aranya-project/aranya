@@ -1,12 +1,12 @@
 use core::{ffi::c_char, mem::MaybeUninit};
 
-use aranya_buggy::Bug;
 use aranya_capi_core::{
     safe::{TypeId, Typed},
     write_c_str, ExtendedError, InvalidArg, WriteCStrError,
 };
+use aranya_client::{aqc::TryReceiveError, error::AqcError};
+use buggy::Bug;
 use tracing::warn;
-use tracing_subscriber::util::TryInitError;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -16,15 +16,18 @@ pub enum Error {
     #[error(transparent)]
     Timeout(#[from] tokio::time::error::Elapsed),
 
-    #[error("could not initialize logging: {0}")]
-    LogInit(#[from] TryInitError),
-
     /// An invalid argument was provided.
     #[error(transparent)]
     InvalidArg(#[from] InvalidArg<'static>),
 
     #[error("buffer too small")]
     BufferTooSmall,
+
+    #[error("haven't received any data yet")]
+    WouldBlock,
+
+    #[error("connection was unexpectedly closed")]
+    Closed,
 
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),
@@ -35,8 +38,40 @@ pub enum Error {
     #[error("client error: {0}")]
     Client(#[from] aranya_client::Error),
 
-    #[error("tokio runtime error: {0}")]
-    Runtime(#[source] std::io::Error),
+    #[error("config error: {0}")]
+    Config(#[from] aranya_client::ConfigError),
+
+    #[error("serialization errors: {0}")]
+    Serialization(#[from] postcard::Error),
+
+    #[error("{0}")]
+    Other(#[from] anyhow::Error),
+}
+
+impl From<AqcError> for Error {
+    fn from(value: AqcError) -> Self {
+        Self::Client(aranya_client::Error::Aqc(value))
+    }
+}
+
+impl From<TryReceiveError<AqcError>> for Error {
+    fn from(value: TryReceiveError<AqcError>) -> Self {
+        match value {
+            TryReceiveError::Closed => Self::Closed,
+            TryReceiveError::Empty => Self::WouldBlock,
+            TryReceiveError::Error(e) => Self::Client(aranya_client::Error::Aqc(e)),
+        }
+    }
+}
+
+impl From<TryReceiveError<aranya_client::Error>> for Error {
+    fn from(value: TryReceiveError<aranya_client::Error>) -> Self {
+        match value {
+            TryReceiveError::Closed => Self::Closed,
+            TryReceiveError::Empty => Self::WouldBlock,
+            TryReceiveError::Error(e) => Self::Client(e),
+        }
+    }
 }
 
 impl From<WriteCStrError> for Error {

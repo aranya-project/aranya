@@ -34,7 +34,7 @@ jobs:
         uses: ./.github/actions/setup
 
       - name: Unit Tests
-        run: cargo make unit-tests
+        run: cargo make test
 
 
   c-example-application:
@@ -54,3 +54,20 @@ jobs:
         run: |
           export CC=clang
           cargo make run-capi-example
+
+  rust-example-application:
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-latest
+          - ubuntu2404-arm64-4core
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+
+      - name: Rust Example Application
+        run: |
+          cargo make run-rust-example

@@ -17,16 +17,22 @@ workspace = true
 crate-type = ["rlib", "cdylib"]
 
 
+[features]
+default = []
+
+
 [dependencies]
 aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 
-aranya-buggy = { workspace = true }
-aranya-capi-core = "0.1.0"
-aranya-fast-channels = { workspace = true }
+aranya-capi-core = { workspace = true }
+aranya-crypto = { workspace = true }
+buggy = { workspace = true }
 
-libc = { workspace = true, features = ["extra_traits"] }
+anyhow = { workspace = true }
+bytes = { workspace = true }
+postcard = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
@@ -34,7 +40,7 @@ tracing-subscriber = { workspace = true }
 
 
 [build-dependencies]
-aranya-capi-codegen = "0.1.0"
+aranya-capi-codegen = { workspace = true }
 
 anyhow = { workspace = true }
 quote = "1"

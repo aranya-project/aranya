@@ -14,30 +14,5 @@
 	"pid_file": "out/owner/hub.pid",
 
 	// Aranya sync server address.
-	"sync_addr": "127.0.0.1:10001"
-
-	// AFC configuration.
-	"afc": {
-		// Shared memory path.
-		"shm_path": "/owner",
-
-		// Unlink `shm_path` before creating the shared memory?
-		//
-		// Ignored if `afc.create` is false.
-		"unlink_on_startup": true,
-
-		// Unlink `shm_path` when the daemon exits?
-		//
-		// If false, the shared memory will persist across daemon
-		// restarts.
-		"unlink_at_exit": true,
-
-		// Create the shared memory?
-		//
-		// If true, the shared memory must not already exist.
-		"create": true,
-
-		// Maximum number of channels AFC should support.
-		"max_chans": 256,
-	}
+	"sync_addr": "127.0.0.1:10001",
 }

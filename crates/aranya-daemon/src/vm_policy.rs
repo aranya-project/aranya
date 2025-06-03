@@ -3,8 +3,8 @@
 use std::{fmt, marker::PhantomData, str::FromStr};
 
 use anyhow::{anyhow, Context, Result};
-use aranya_afc_util::Ffi as AfcFfi;
-use aranya_crypto::{keystore::fs_keystore::Store, UserId};
+use aranya_aqc_util::Ffi as AqcFfi;
+use aranya_crypto::{keystore::fs_keystore::Store, DeviceId};
 use aranya_crypto_ffi::Ffi as CryptoFfi;
 use aranya_device_ffi::FfiDevice as DeviceFfi;
 use aranya_envelope_ffi::Ffi as EnvelopeFfi;
@@ -19,8 +19,10 @@ use aranya_runtime::{
 };
 use tracing::instrument;
 
-use super::policy::ChanOp;
-use crate::policy::Role;
+use crate::{
+    keystore::AranyaStore,
+    policy::{ChanOp, Role},
+};
 
 /// Policy loaded from policy.md file.
 pub const TEST_POLICY_1: &str = include_str!("./policy.md");
@@ -30,9 +32,9 @@ impl FromStr for ChanOp {
     type Err = anyhow::Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "ChanOp::ReadOnly" => Ok(Self::ReadOnly),
-            "ChanOp::WriteOnly" => Ok(Self::WriteOnly),
-            "ChanOp::ReadWrite" => Ok(Self::ReadWrite),
+            "ChanOp::RecvOnly" => Ok(Self::RecvOnly),
+            "ChanOp::SendOnly" => Ok(Self::SendOnly),
+            "ChanOp::SendRecv" => Ok(Self::SendRecv),
             _ => Err(anyhow!("unknown `ChanOp`: {s}")),
         }
     }
@@ -41,7 +43,7 @@ impl FromStr for ChanOp {
 /// Display implementation for [`ChanOp`]
 impl fmt::Display for ChanOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ChanOp::{:?}", self)
+        write!(f, "ChanOp::{self:?}")
     }
 }
 
@@ -58,12 +60,17 @@ where
     E: aranya_crypto::Engine,
 {
     /// Creates a `PolicyEngine` from a policy document.
-    pub fn new(policy_doc: &str, eng: E, store: Store, user_id: UserId) -> Result<Self> {
+    pub fn new(
+        policy_doc: &str,
+        eng: E,
+        store: AranyaStore<Store>,
+        device_id: DeviceId,
+    ) -> Result<Self> {
         // compile the policy.
         let ast = parse_policy_document(policy_doc).context("unable to parse policy document")?;
         let module = Compiler::new(&ast)
             .ffi_modules(&[
-                AfcFfi::<Store>::SCHEMA,
+                AqcFfi::<Store>::SCHEMA,
                 CryptoFfi::<Store>::SCHEMA,
                 DeviceFfi::SCHEMA,
                 EnvelopeFfi::SCHEMA,
@@ -76,9 +83,9 @@ where
 
         // select which FFI moddules to use.
         let ffis: Vec<Box<dyn FfiCallable<E> + Send + 'static>> = vec![
-            Box::from(AfcFfi::new(store.try_clone()?)),
+            Box::from(AqcFfi::new(store.try_clone()?)),
             Box::from(CryptoFfi::new(store.try_clone()?)),
-            Box::from(DeviceFfi::new(user_id)),
+            Box::from(DeviceFfi::new(device_id)),
             Box::from(EnvelopeFfi),
             Box::from(IdamFfi::new(store)),
             Box::from(PerspectiveFfi),
@@ -110,6 +117,16 @@ where
 
     fn get_policy(&self, _id: PolicyId) -> Result<&Self::Policy, EngineError> {
         Ok(&self.policy)
+    }
+}
+
+impl<E, KS> fmt::Debug for PolicyEngine<E, KS>
+where
+    E: fmt::Debug,
+    KS: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PolicyEngine").finish_non_exhaustive()
     }
 }
 

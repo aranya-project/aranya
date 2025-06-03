@@ -1,43 +1,18 @@
 {
-	// The daemon's name.
-	"name": "name",
-	
-	// The daemon's working directory.
-	//
-	// Must already exist.
-	"work_dir": "/var/lib/work_dir",
+    // The daemon's name.
+    "name": "name",
 
-	// Used to receive API requests from the user library client.
-	"uds_api_path": "/var/run/uds.sock",
+    // The daemon's working directory.
+    //
+    // Must already exist.
+    "work_dir": "/var/lib/work_dir",
 
-	// The path where the daemon should write its PID file.
-	"pid_file": "/var/run/hub.pid",
+    // Used to receive API requests from the user library client.
+    "uds_api_path": "/var/run/uds.sock",
 
-	// Aranya sync server address.
-	"sync_addr": "0.0.0.0:4321",
+    // The path where the daemon should write its PID file.
+    "pid_file": "/var/run/hub.pid",
 
-	// AFC configuration.
-	"afc": {
-		// Shared memory path.
-		"shm_path": "/hub",
-
-		// Unlink `shm_path` before creating the shared memory?
-		//
-		// Ignored if `afc.create` is false.
-		"unlink_on_startup": false,
-
-		// Unlink `shm_path` when the daemon exits?
-		//
-		// If false, the shared memory will persist across daemon
-		// restarts.
-		"unlink_at_exit": false,
-
-		// Create the shared memory?
-		//
-		// If true, the shared memory must not already exist.
-		"create": true,
-
-		// Maximum number of channels AFC should support.
-		"max_chans": 100,
-	}
+    // Aranya sync server address.
+    "sync_addr": "0.0.0.0:4321",
 }

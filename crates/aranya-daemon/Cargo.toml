@@ -13,12 +13,15 @@ rust-version.workspace = true
 workspace = true
 
 
+[features]
+default = []
+
+
 [dependencies]
 aranya-daemon-api = { workspace = true }
 aranya-keygen = { workspace = true }
 
-aranya-afc-util = { workspace = true }
-aranya-buggy = { workspace = true }
+aranya-aqc-util = { workspace = true }
 aranya-crypto = { workspace = true }
 aranya-crypto-ffi = { workspace = true }
 aranya-device-ffi = { workspace = true }
@@ -31,8 +34,8 @@ aranya-policy-lang = { workspace = true }
 aranya-policy-vm = { workspace = true }
 aranya-runtime = { workspace = true }
 aranya-util = { workspace = true }
+buggy = { workspace = true }
 
-aranya-fast-channels = { workspace = true }
 
 anyhow = { workspace = true }
 bimap = "0.6"
@@ -40,6 +43,7 @@ ciborium = { workspace = true }
 clap = { workspace = true }
 deser-hjson = { version = "2" }
 futures-util = { workspace = true }
+hex = { version = "0.4" }
 postcard = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }

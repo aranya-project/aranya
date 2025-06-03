@@ -30,7 +30,7 @@ runs:
     - name: Install sccache
       uses: aranya-project/sccache-action@main
       with:
-        version: "v0.8.2"
+        version: "v0.10.0"
 
     - name: Configure sccache
       run: |

@@ -29,11 +29,14 @@ pub struct Config {
     pub sync_addr: Addr,
 
     /// AFC configuration.
-    pub afc: AfcConfig,
+    #[serde(default)]
+    pub afc: Option<AfcConfig>,
+
+    /// AQC configuration.
+    #[serde(default)]
+    pub aqc: Option<AqcConfig>,
 }
 
-// TODO: remove allow dead_code once all methods are used.
-#[allow(dead_code)]
 impl Config {
     /// Reads the configuration from `path`.
     pub fn load<P>(path: P) -> Result<Self>
@@ -46,11 +49,6 @@ impl Config {
         Ok(cfg)
     }
 
-    /// Path to `State`.
-    pub(crate) fn state_path(&self) -> PathBuf {
-        self.work_dir.join("app_state.cbor")
-    }
-
     /// Path to the [`DefaultEngine`]'s key wrapping key.
     pub(crate) fn key_wrap_key_path(&self) -> PathBuf {
         self.work_dir.join("key_wrap_key")
@@ -61,9 +59,29 @@ impl Config {
         self.work_dir.join("key_bundle")
     }
 
-    /// Path to `Store`.
+    /// Path to the daemon's public API key.
+    pub fn daemon_api_pk_path(&self) -> PathBuf {
+        self.work_dir.join("daemon_api_pk")
+    }
+
+    /// The directory where keystore files are written.
     pub(crate) fn keystore_path(&self) -> PathBuf {
         self.work_dir.join("keystore")
+    }
+
+    /// The directory where the root keystore exists.
+    ///
+    /// The Aranaya keystore contains Aranya's key material.
+    pub(crate) fn aranya_keystore_path(&self) -> PathBuf {
+        self.keystore_path().join("aranya")
+    }
+
+    /// The directory where the local keystore exists.
+    ///
+    /// The local keystore contains key material for the daemon.
+    /// E.g., its API key.
+    pub(crate) fn local_keystore_path(&self) -> PathBuf {
+        self.keystore_path().join("local")
     }
 
     /// Path to the runtime's storage.
@@ -103,6 +121,11 @@ pub struct AfcConfig {
     pub max_chans: usize,
 }
 
+/// AQC configuration.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AqcConfig {}
+
 #[cfg(test)]
 mod tests {
     use std::net::Ipv4Addr;
@@ -122,13 +145,8 @@ mod tests {
             uds_api_path: "/var/run/uds.sock".parse()?,
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
-            afc: AfcConfig {
-                shm_path: "/hub".to_owned(),
-                unlink_on_startup: false,
-                unlink_at_exit: false,
-                create: true,
-                max_chans: 100,
-            },
+            afc: None,
+            aqc: None,
         };
         assert_eq!(got, want);
         Ok(())
