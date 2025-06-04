@@ -52,7 +52,7 @@ async fn test_remove_members() -> Result<()> {
         .context("unable to remove membera")?;
     if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.membera.pk.ident_pk.id().expect("id").into())
     {
-        panic!("expected MemberRemoved effect: {:?}", effects)
+        panic!("expected MemberRemoved effect: {effects:?}")
     }
     let effects = team
         .operator
@@ -62,7 +62,7 @@ async fn test_remove_members() -> Result<()> {
         .context("unable to remove memberb")?;
     if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.memberb.pk.ident_pk.id().expect("id").into())
     {
-        panic!("expected MemberRemoved effect: {:?}", effects)
+        panic!("expected MemberRemoved effect: {effects:?}")
     }
     team.admin.sync(team.operator).await?;
     team.owner
@@ -77,7 +77,7 @@ async fn test_remove_members() -> Result<()> {
         .context("unable to remove operator")?;
     if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.operator.pk.ident_pk.id().expect("id").into())
     {
-        panic!("expected OperatorRemoved effect: {:?}", effects)
+        panic!("expected OperatorRemoved effect: {effects:?}")
     }
     team.owner
         .actions()
@@ -91,7 +91,7 @@ async fn test_remove_members() -> Result<()> {
         .context("unable to remove admin")?;
     if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.admin.pk.ident_pk.id().expect("id").into())
     {
-        panic!("expected AdminRemoved effect: {:?}", effects)
+        panic!("expected AdminRemoved effect: {effects:?}")
     }
     // TODO: should an owner be able to remove itself?
     Ok(())
