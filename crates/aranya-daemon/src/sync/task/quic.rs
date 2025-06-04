@@ -11,6 +11,7 @@ use std::{
     collections::{btree_map::Entry, BTreeMap},
     future::Future,
     sync::Arc,
+    time::Duration,
 };
 
 use anyhow::Context;
@@ -44,6 +45,7 @@ use tokio::{
         mpsc,
     },
     task::JoinSet,
+    time,
 };
 use tracing::{debug, error, info, instrument};
 use version::{check_version, VERSION_ERR};
@@ -112,7 +114,10 @@ impl SyncState for State {
         S: Sink<<crate::EN as Engine>::Effect> + Send,
     {
         async move {
-            let stream = syncer.connect(peer).await?;
+            let stream = syncer
+                .connect(peer)
+                .await
+                .inspect_err(|e| error!("Could not create connection: {e}"))?;
             // TODO: spawn a task for send/recv?
             let (mut recv, mut send) = stream.split();
 
@@ -210,10 +215,13 @@ impl Syncer<State> {
                     .assume("invalid peer address")?;
                 // Note: cert is not used but server name must be set to connect.
                 debug!(?peer, "attempting to create new quic connection");
-                let mut conn = client
-                    .connect(Connect::new(addr).with_server_name("127.0.0.1"))
+
+                let conn_attempt = client.connect(Connect::new(addr).with_server_name("127.0.0.1"));
+                let mut conn = time::timeout(Duration::from_millis(250), conn_attempt)
                     .await
+                    .context("Connection attempt timed out")?
                     .map_err(Error::from)?;
+
                 conn.keep_alive(true).map_err(Error::from)?;
                 debug!(?peer, "created new quic connection");
                 entry.insert(conn)

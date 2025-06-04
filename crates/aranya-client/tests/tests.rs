@@ -145,7 +145,6 @@ async fn test_query_functions() -> Result<()> {
 
 /// Tests add_team() by demonstrating that syncing can only occur after
 /// a peer calls the add_team() API
-#[ignore] // FIXME
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_team() -> Result<()> {
     // Set up our team context so we can run the test.
