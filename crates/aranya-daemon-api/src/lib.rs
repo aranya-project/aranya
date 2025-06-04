@@ -5,6 +5,8 @@
 //! permanently unstable and does NOT promise backward
 //! compatibility.
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 pub mod crypto;
 mod service;
 
