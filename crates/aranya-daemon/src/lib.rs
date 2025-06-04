@@ -4,6 +4,7 @@
 //! `aranya-daemon` executable. It is permanently unstable and
 //! does NOT promise backward compatibility.
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(unstable_name_collisions)]
 #![warn(
     clippy::alloc_instead_of_core,
