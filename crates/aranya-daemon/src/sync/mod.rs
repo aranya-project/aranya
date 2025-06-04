@@ -10,7 +10,7 @@ pub type Result<T> = core::result::Result<T, SyncError>;
 mod error {
     use thiserror::Error;
 
-    use super::task::quic::Error as QSErr;
+    use super::task::quic::Error as QSError;
 
     #[derive(Error, Debug)]
     #[non_exhaustive]
@@ -22,7 +22,7 @@ mod error {
         #[error("Unknown Version")]
         UnknownVersion,
         #[error(transparent)]
-        QuicSyncError(#[from] QSErr),
+        QuicSync(#[from] QSError),
         #[error(transparent)]
         Runtime(#[from] aranya_runtime::SyncError),
         #[error("Could not send sync request: {0}")]

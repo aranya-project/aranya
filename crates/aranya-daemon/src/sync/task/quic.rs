@@ -241,12 +241,12 @@ impl Syncer<State> {
             Err(e @ ConnErr::StatelessReset { .. })
             | Err(e @ ConnErr::StreamIdExhausted { .. })
             | Err(e @ ConnErr::MaxHandshakeDurationExceeded { .. }) => {
-                return Err(SyncError::QuicSyncError(e.into()));
+                return Err(SyncError::QuicSync(e.into()));
             }
             // Other errors means the stream has closed
             Err(e) => {
                 conns.remove(peer);
-                return Err(SyncError::QuicSyncError(e.into()));
+                return Err(SyncError::QuicSync(e.into()));
             }
         };
 

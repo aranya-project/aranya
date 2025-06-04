@@ -224,7 +224,7 @@ impl<ST> Syncer<ST> {
 impl<ST: SyncState> Syncer<ST> {
     /// Syncs with the next peer in the list.
     #[instrument(skip_all)]
-    pub async fn next(&mut self) -> Result<()> {
+    pub async fn next(&mut self) -> SyncResult<()> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
@@ -253,7 +253,7 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
-    pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
+    pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> SyncResult<()> {
         trace!("syncing with peer");
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
@@ -261,7 +261,7 @@ impl<ST: SyncState> Syncer<ST> {
                 .await
                 .context("sync_peer error")
                 .inspect_err(|err| error!("{err:?}"))?;
-            sink.collect()?
+            sink.collect().context("could not collect effcects")?
         };
         let n = effects.len();
         self.send_effects
