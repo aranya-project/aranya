@@ -6,14 +6,15 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, future::Future, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::storage::GraphId;
+use aranya_runtime::{storage::GraphId, Engine, Sink};
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::StreamExt;
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, instrument, trace};
@@ -48,6 +49,15 @@ pub struct SyncPeers {
     send: mpsc::Sender<Msg>,
     /// Configuration values for syncing
     cfgs: HashMap<(Addr, GraphId), SyncPeerConfig>,
+}
+
+/// A response to a sync request.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum SyncResponse {
+    /// Success.
+    Ok(Box<[u8]>),
+    /// Failure.
+    Err(String),
 }
 
 impl SyncPeers {
@@ -130,9 +140,9 @@ type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
-pub struct Syncer {
+pub struct Syncer<ST> {
     /// Aranya client to allow syncing the Aranya graph with another peer.
-    client: Arc<Client>,
+    pub client: Client,
     /// Keeps track of peer info.
     peers: HashMap<SyncPeer, PeerInfo>,
     /// Receives added/removed peers.
@@ -141,6 +151,8 @@ pub struct Syncer {
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
+    /// Additional state used by the syncer
+    _state: ST,
 }
 
 struct PeerInfo {
@@ -150,9 +162,23 @@ struct PeerInfo {
     key: Key,
 }
 
-impl Syncer {
+/// Types that contain additional data that are part of a [`Syncer`]
+/// object.
+pub trait SyncState: Sized {
+    /// Syncs with the peer.
+    fn sync_impl<S>(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        sink: &mut S,
+        peer: &Addr,
+    ) -> impl Future<Output = Result<()>> + Send
+    where
+        S: Sink<<crate::EN as Engine>::Effect> + Send;
+}
+
+impl<ST> Syncer<ST> {
     /// Creates a new `Syncer`.
-    pub fn new(client: Arc<Client>, send_effects: EffectSender) -> (Self, SyncPeers) {
+    pub fn new(client: Client, send_effects: EffectSender, _state: ST) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -162,11 +188,37 @@ impl Syncer {
                 recv,
                 queue: DelayQueue::new(),
                 send_effects,
+                _state,
             },
             peers,
         )
     }
 
+    /// Add a peer to the delay queue, overwriting an existing one.
+    fn add_peer(&mut self, peer: SyncPeer, cfg: &SyncPeerConfig) {
+        let key = self.queue.insert(peer.clone(), cfg.interval);
+        self.peers
+            .entry(peer)
+            .and_modify(|info| {
+                self.queue.remove(&info.key);
+                info.interval = cfg.interval;
+                info.key = key;
+            })
+            .or_insert(PeerInfo {
+                interval: cfg.interval,
+                key,
+            });
+    }
+
+    /// Remove a peer from the delay queue.
+    fn remove_peer(&mut self, peer: SyncPeer) {
+        if let Some(info) = self.peers.remove(&peer) {
+            self.queue.remove(&info.key);
+        }
+    }
+}
+
+impl<ST: SyncState> Syncer<ST> {
     /// Syncs with the next peer in the list.
     #[instrument(skip_all)]
     pub async fn next(&mut self) -> Result<()> {
@@ -196,37 +248,13 @@ impl Syncer {
         Ok(())
     }
 
-    /// Add a peer to the delay queue, overwriting an existing one.
-    fn add_peer(&mut self, peer: SyncPeer, cfg: &SyncPeerConfig) {
-        let key = self.queue.insert(peer.clone(), cfg.interval);
-        self.peers
-            .entry(peer)
-            .and_modify(|info| {
-                self.queue.remove(&info.key);
-                info.interval = cfg.interval;
-                info.key = key;
-            })
-            .or_insert(PeerInfo {
-                interval: cfg.interval,
-                key,
-            });
-    }
-
-    /// Remove a peer from the delay queue.
-    fn remove_peer(&mut self, peer: SyncPeer) {
-        if let Some(info) = self.peers.remove(&peer) {
-            self.queue.remove(&info.key);
-        }
-    }
-
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
-    async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
+    pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
         trace!("syncing with peer");
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
-            self.client
-                .sync_peer(*id, &mut sink, peer)
+            <ST as SyncState>::sync_impl(self, *id, &mut sink, peer)
                 .await
                 .context("sync_peer error")
                 .inspect_err(|err| error!("{err:?}"))?;

@@ -6,16 +6,18 @@ use std::{
     sync::Arc,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
     Csprng, Rng,
 };
 use aranya_daemon::{
-    aranya::{self, Actions},
+    actions::Actions,
+    aranya,
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
-    vm_policy::{PolicyEngine, VecSink, TEST_POLICY_1},
+    sync,
+    vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore,
 };
 use aranya_keygen::{KeyBundle, PublicKeys};
@@ -27,17 +29,24 @@ use aranya_util::Addr;
 use tempfile::{tempdir, TempDir};
 use tokio::{
     net::TcpListener,
-    sync::Mutex,
+    sync::{
+        mpsc::{self, Receiver},
+        Mutex,
+    },
     task::{self, AbortHandle},
 };
 
-pub type TestClient = aranya::Client<
-    PolicyEngine<DefaultEngine, Store>,
-    LinearStorageProvider<FileManager>,
-    DefaultEngine,
->;
+// Aranya graph client for testing.
+pub type TestClient =
+    aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
+
+type TestState = sync::tcp::State;
+// Aranya sync client for testing.
+pub type TestSyncer = sync::task::Syncer<TestState>;
+
+// Aranya sync server for testing.
 pub type TestServer =
-    aranya::Server<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
+    sync::tcp::Server<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
 // checks if effects vector contains a particular type of effect.
 #[macro_export]
@@ -48,7 +57,8 @@ macro_rules! contains_effect {
 }
 
 pub struct TestDevice {
-    aranya: TestClient,
+    /// Aranya sync client.
+    pub syncer: TestSyncer,
     /// The Aranya graph ID.
     pub graph_id: GraphId,
     /// The address that the server is listening on.
@@ -57,6 +67,7 @@ pub struct TestDevice {
     handle: AbortHandle,
     /// Public keys
     pub pk: PublicKeys<DefaultCipherSuite>,
+    effect_recv: Receiver<(GraphId, Vec<Effect>)>,
 }
 
 impl TestDevice {
@@ -68,23 +79,33 @@ impl TestDevice {
         graph_id: GraphId,
     ) -> Result<Self> {
         let handle = task::spawn(async { server.serve().await }).abort_handle();
+        let (send_effects, effect_recv) = mpsc::channel(1);
+        let (syncer, _sync_peers) = TestSyncer::new(client, send_effects, TestState {});
         Ok(Self {
-            aranya: client,
+            syncer,
             graph_id,
             local_addr,
             handle,
             pk,
+            effect_recv,
         })
     }
 }
 
 impl TestDevice {
-    pub async fn sync(&self, device: &TestDevice) -> Result<Vec<Effect>> {
-        let mut sink = VecSink::new();
-        self.sync_peer(self.graph_id, &mut sink, &device.local_addr)
+    pub async fn sync(&mut self, device: &TestDevice) -> Result<Vec<Effect>> {
+        self.syncer
+            .sync(&self.graph_id, &device.local_addr)
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.local_addr))?;
-        Ok(sink.collect()?)
+
+        while let Some((graph_id, effects)) = self.effect_recv.recv().await {
+            if graph_id == self.graph_id {
+                return Ok(effects);
+            }
+        }
+
+        bail!("Channel closed or nothing to receive")
     }
 
     pub fn actions(
@@ -94,7 +115,7 @@ impl TestDevice {
         LinearStorageProvider<FileManager>,
         DefaultEngine<Rng>,
     > {
-        self.aranya.actions(&self.graph_id)
+        self.syncer.client.actions(&self.graph_id)
     }
 }
 
@@ -108,33 +129,37 @@ impl Deref for TestDevice {
     type Target = TestClient;
 
     fn deref(&self) -> &Self::Target {
-        &self.aranya
+        &self.syncer.client
     }
 }
 
 impl DerefMut for TestDevice {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.aranya
+        &mut self.syncer.client
     }
 }
 
 pub struct TestTeam<'a> {
-    pub owner: &'a TestDevice,
-    pub admin: &'a TestDevice,
-    pub operator: &'a TestDevice,
-    pub membera: &'a TestDevice,
-    pub memberb: &'a TestDevice,
+    pub owner: &'a mut TestDevice,
+    pub admin: &'a mut TestDevice,
+    pub operator: &'a mut TestDevice,
+    pub membera: &'a mut TestDevice,
+    pub memberb: &'a mut TestDevice,
 }
 
 impl<'a> TestTeam<'a> {
-    pub fn new(clients: &'a [TestDevice]) -> Self {
+    pub fn new(clients: &'a mut [TestDevice]) -> Self {
         assert!(clients.len() >= 5);
+        let [owner, admin, operator, membera, memberb, ..] = clients else {
+            panic!("need at least 5 clients");
+        };
+
         TestTeam {
-            owner: &clients[0],
-            admin: &clients[1],
-            operator: &clients[2],
-            membera: &clients[3],
-            memberb: &clients[4],
+            owner,
+            admin,
+            operator,
+            membera,
+            memberb,
         }
     }
 }
@@ -197,7 +222,10 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let server = TestServer::new(Arc::clone(&aranya), listener);
+            let server: sync::tcp::Server<
+                PolicyEngine<DefaultEngine, Store>,
+                LinearStorageProvider<FileManager>,
+            > = TestServer::new(client.clone(), listener);
             (client, server, local_addr, pk)
         };
 
@@ -235,11 +263,11 @@ impl TestCtx {
 
     /// Creates default team.
     pub async fn new_team(&mut self) -> Result<Vec<TestDevice>> {
-        let clients = self
+        let mut clients = self
             .new_group(5)
             .await
             .context("unable to create clients")?;
-        let team = TestTeam::new(&clients);
+        let team = TestTeam::new(&mut clients);
         let owner = team.owner;
         let admin = team.admin;
         let operator = team.operator;
