@@ -29,6 +29,7 @@ Before attempting to use this API, verify that you are using a matching version 
 
 Objects for creating an Aranya client and Aranya team:
 - `AranyaClient`
+- `AranyaClientConfig`
 - `AranyaTeamConfig`
 - `AranyaTeamConfigBuilder`
 
