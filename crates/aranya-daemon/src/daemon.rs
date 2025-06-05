@@ -23,13 +23,14 @@ use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
+    actions::Actions,
     api::{ApiKey, DaemonApiServer, PublicApiKey},
     aqc::Aqc,
-    aranya::{self, Actions},
+    aranya,
     config::Config,
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::Syncer,
+    sync::{task::Syncer, tcp::State as TCPSyncState},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
@@ -45,8 +46,8 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 /// EF = Policy Effect
 pub(crate) type EF = policy::Effect;
 
-pub(crate) type Client = aranya::Client<EN, SP, CE>;
-type Server = aranya::Server<EN, SP>;
+pub(crate) type Client = aranya::Client<EN, SP>;
+type TcpSyncServer = crate::sync::tcp::Server<EN, SP>;
 
 /// The daemon itself.
 pub struct Daemon {
@@ -86,7 +87,7 @@ impl Daemon {
         let mut local_store = self.load_local_keystore().await?;
         let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
 
-        // Initialize Aranya client.
+        // Initialize Aranya syncer client.
         let (client, local_addr) = {
             let (client, server) = self
                 .setup_aranya(
@@ -99,7 +100,6 @@ impl Daemon {
                 )
                 .await?;
             let local_addr = server.local_addr()?;
-            let client = Arc::new(client);
             set.spawn(async move { server.serve().await });
 
             (client, local_addr)
@@ -107,7 +107,7 @@ impl Daemon {
 
         // Sync in the background at some specified interval.
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-        let (mut syncer, peers) = Syncer::new(Arc::clone(&client), send_effects);
+        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects, TCPSyncState);
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {
@@ -181,7 +181,7 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-    ) -> Result<(Client, Server)> {
+    ) -> Result<(Client, TcpSyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -199,7 +199,7 @@ impl Daemon {
             let listener = TcpListener::bind(external_sync_addr.to_socket_addrs())
                 .await
                 .context("unable to bind TCP listener")?;
-            Server::new(Arc::clone(&aranya), listener)
+            TcpSyncServer::new(client.clone(), listener)
         };
 
         info!(device_id = %device_id, "set up Aranya");

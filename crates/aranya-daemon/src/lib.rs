@@ -4,6 +4,7 @@
 //! `aranya-daemon` executable. It is permanently unstable and
 //! does NOT promise backward compatibility.
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
 #![allow(unstable_name_collisions)]
 #![warn(
     clippy::alloc_instead_of_core,
@@ -29,17 +30,18 @@
     unused_qualifications
 )]
 
+pub mod actions;
 pub mod aranya;
 pub mod config;
 #[rustfmt::skip]
 pub mod policy;
+pub mod sync;
 pub mod vm_policy;
 
 mod api;
 mod aqc;
 mod daemon;
 mod keystore;
-mod sync;
 
 pub use daemon::*;
 pub use keystore::AranyaStore;
