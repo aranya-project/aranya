@@ -10,6 +10,8 @@
 //!
 //! This crate makes no promises on backwards compatibility.
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 pub mod addr;
 pub mod util;
 
