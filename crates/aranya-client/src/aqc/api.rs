@@ -1,160 +1,16 @@
 //! AQC support.
 
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
-use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
-use aranya_daemon_api::{
-    AqcBidiPsks, AqcUniPsks, DaemonApiClient, DeviceId, LabelId, NetIdentifier, TeamId,
-};
-use buggy::{Bug, BugExt as _};
-use s2n_quic::{
-    provider::{
-        congestion_controller::Bbr,
-        tls::rustls::{
-            self as rustls_provider,
-            rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig},
-        },
-    },
-    Server,
-};
+use aranya_daemon_api::{LabelId, NetIdentifier, TeamId};
 use tarpc::context;
 use tracing::{debug, instrument};
 
-use super::{
-    crypto::{
-        ClientPresharedKeys, NoCertResolver, ServerPresharedKeys, SkipServerVerification, CTRL_PSK,
-    },
-    net::{AqcClient, TryReceiveError},
-    AqcBidiChannel, AqcPeerChannel, AqcSendChannel,
-};
+use super::{AqcBidiChannel, AqcPeerChannel, AqcSendChannel, TryReceiveError};
 use crate::{
     error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
 };
-
-/// ALPN protocol identifier for Aranya QUIC Channels
-const ALPN_AQC: &[u8] = b"aqc-v1";
-
-/// An AQC Channel ID.
-#[derive(Copy, Clone, Debug)]
-pub(crate) enum AqcChannelId {
-    Bidi(BidiChannelId),
-    Uni(UniChannelId),
-}
-
-/// Sends and receives AQC messages.
-#[derive(Debug)]
-pub(crate) struct AqcChannelsImpl {
-    client: AqcClient,
-}
-
-impl AqcChannelsImpl {
-    /// Creates a new [`AqcChannelsImpl`] listening for connections on `server_addr`.
-    pub(crate) async fn new(
-        device_id: DeviceId,
-        server_addr: SocketAddr,
-        daemon: DaemonApiClient,
-    ) -> Result<Self, AqcError> {
-        debug!("device ID: {:?}", device_id);
-
-        // --- Start Rustls Setup ---
-        let client_keys = Arc::new(ClientPresharedKeys::new(CTRL_PSK.clone()));
-
-        // Create Client Config (INSECURE: Skips server cert verification)
-        let mut client_config = ClientConfig::builder()
-            .dangerous()
-            .with_custom_certificate_verifier(SkipServerVerification::new())
-            .with_no_client_auth();
-        client_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
-        client_config.preshared_keys = client_keys.clone(); // Pass the Arc<ClientPresharedKeys>
-
-        // TODO(jdygert): enable after rustls upstream fix.
-        // client_config.psk_kex_modes = vec![PskKexMode::PskOnly];
-
-        let (server_keys, identity_rx) = ServerPresharedKeys::new();
-        server_keys.insert(CTRL_PSK.clone());
-        let server_keys = Arc::new(server_keys);
-
-        // Create Server Config
-        let mut server_config = ServerConfig::builder()
-            .with_no_client_auth()
-            .with_cert_resolver(Arc::new(NoCertResolver::default()));
-        server_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
-        server_config.preshared_keys =
-            PresharedKeySelection::Required(Arc::clone(&server_keys) as _);
-
-        #[allow(deprecated)]
-        let tls_client_provider = rustls_provider::Client::new(client_config);
-        #[allow(deprecated)]
-        let tls_server_provider = rustls_provider::Server::new(server_config);
-        // --- End Rustls Setup ---
-
-        // Use the rustls client provider
-        // Pass client_keys Arc to AqcClient::new
-
-        // Use the rustls server provider
-        let server = Server::builder()
-            .with_tls(tls_server_provider)? // Use the wrapped server config
-            .with_io(server_addr)
-            .assume("can set aqc server addr")?
-            .with_congestion_controller(Bbr::default())?
-            .start()
-            .map_err(AqcError::ServerStart)?;
-        let client = AqcClient::new(
-            tls_client_provider,
-            client_keys,
-            server_keys,
-            identity_rx,
-            server,
-            daemon,
-        )?;
-        Ok(Self { client })
-    }
-
-    /// Returns the local address that the AQC client is bound to.
-    pub fn client_addr(&self) -> Result<SocketAddr, Bug> {
-        self.client.client_addr()
-    }
-
-    /// Returns the local address that the AQC server is bound to.
-    pub fn server_addr(&self) -> Result<SocketAddr, Bug> {
-        self.client.server_addr()
-    }
-
-    /// Creates a bidirectional AQC channel with a peer.
-    pub async fn create_bidirectional_channel(
-        &mut self,
-        peer_addr: SocketAddr,
-        label_id: LabelId,
-        psks: AqcBidiPsks,
-    ) -> Result<AqcBidiChannel, AqcError> {
-        self.client
-            .create_bidi_channel(peer_addr, label_id, psks)
-            .await
-    }
-
-    /// Creates a unidirectional AQC channel with a peer.
-    pub async fn create_unidirectional_channel(
-        &mut self,
-        peer_addr: SocketAddr,
-        label_id: LabelId,
-        psks: AqcUniPsks,
-    ) -> Result<AqcSendChannel, AqcError> {
-        self.client
-            .create_uni_channel(peer_addr, label_id, psks)
-            .await
-    }
-
-    /// Receives a channel.
-    pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
-        self.client.receive_channel().await
-    }
-
-    /// Attempts to receive a channel.
-    pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
-        self.client.try_receive_channel()
-    }
-}
 
 /// Aranya QUIC Channels client for managing channels which allow sending and
 /// receiving data with peers.
@@ -214,13 +70,12 @@ impl<'a> AqcChannels<'a> {
 
         self.client
             .aqc
-            .client
             .send_ctrl(peer_addr, aqc_ctrl, team_id)
             .await?;
         let channel = self
             .client
             .aqc
-            .create_bidirectional_channel(peer_addr, label_id, psks)
+            .create_bidi_channel(peer_addr, label_id, psks)
             .await?;
         Ok(channel)
     }
@@ -259,14 +114,13 @@ impl<'a> AqcChannels<'a> {
 
         self.client
             .aqc
-            .client
             .send_ctrl(peer_addr, aqc_ctrl, team_id)
             .await?;
 
         let channel = self
             .client
             .aqc
-            .create_unidirectional_channel(peer_addr, label_id, psks)
+            .create_uni_channel(peer_addr, label_id, psks)
             .await?;
         Ok(channel)
     }
