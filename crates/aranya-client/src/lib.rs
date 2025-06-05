@@ -11,6 +11,8 @@
 //! [README]: https://github.com/aranya-project/aranya/tree/main/crates/aranya-client/README.md
 //! [walkthrough]: https://github.com/aranya-project/aranya/tree/main/docs/walkthrough.md
 
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 pub mod aqc;
 pub mod client;
 pub mod config;

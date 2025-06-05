@@ -208,7 +208,7 @@ install_crate = { crate_name = "cargo-machete", version = "0.8.0", binary = "car
 category = "docs"
 description = "Generate docs with rust nightly"
 toolchain = "${NIGHTLY}"
-env = { RUSTDOCFLAGS = "--cfg docs ${RUSTDOCFLAGS}" }
+env = { RUSTDOCFLAGS = "--cfg docsrs ${RUSTDOCFLAGS}" }
 command = "cargo"
 args = ["doc", "--all-features"]
 dependencies = ["install-nightly"]
