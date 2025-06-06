@@ -88,6 +88,12 @@ pub enum Error {
     /// QUIC Stream error
     #[error("QUIC stream error: {0}")]
     QuicStreamError(#[from] s2n_quic::stream::Error),
+    /// QUIC client config error
+    #[error("QUIC client config error: {0}")]
+    ClientConfig(anyhow::Error),
+    /// QUIC server config error
+    #[error("QUIC server config error: {0}")]
+    ServerConfig(anyhow::Error),
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
@@ -164,11 +170,14 @@ impl State {
 
         let client = QuicClient::builder()
             .with_tls(provider)
-            .context("QUIC client tls config")?
+            .context("QUIC client tls config")
+            .map_err(Error::ClientConfig)?
             .with_io("0.0.0.0:0")
-            .context("QUIC client io config")?
+            .context("QUIC client io config")
+            .map_err(Error::ClientConfig)?
             .start()
-            .context("Could not start quic client")?;
+            .context("Could not start quic client")
+            .map_err(Error::ClientConfig)?;
 
         tokio::spawn(async move {
             loop {
@@ -411,11 +420,14 @@ where
         // Use the rustls server provider
         let server = QuicServer::builder()
             .with_tls(tls_server_provider)
-            .context("QUIC server tls config")? // Use the wrapped server config
+            .context("QUIC server tls config")
+            .map_err(Error::ServerConfig)? // Use the wrapped server config
             .with_io(addr)
-            .context("QUIC server io config")?
+            .context("QUIC server io config")
+            .map_err(Error::ServerConfig)?
             .with_congestion_controller(Bbr::default())
-            .context("QUIC server congestion controller config")?
+            .context("QUIC server congestion controller config")
+            .map_err(Error::ServerConfig)?
             .start()
             .context("Could not start QUIC server")?;
 
