@@ -271,6 +271,7 @@ impl AqcClient {
                 AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
             }
         }
+        while stream.receive().await?.is_some() {}
         Ok(())
     }
 
