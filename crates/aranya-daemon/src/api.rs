@@ -12,7 +12,7 @@ pub(crate) use aranya_daemon_api::crypto::{ApiKey, PublicApiKey};
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, QuicSyncPSK, CE, CS,
+    CreateTeamResponse, DaemonApi, QuicSyncPSK, CE, CS,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -400,7 +400,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         cfg: api::TeamConfig,
-    ) -> api::Result<(api::TeamId, Option<QuicSyncPSK>)> {
+    ) -> api::Result<CreateTeamResponse> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
@@ -432,7 +432,10 @@ impl DaemonApi for Api {
             None => None,
         };
 
-        Ok((graph_id.into_id().into(), psk))
+        Ok(CreateTeamResponse {
+            team_id: graph_id.into_id().into(),
+            psk,
+        })
     }
 
     #[instrument(skip(self))]

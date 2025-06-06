@@ -4,7 +4,7 @@ use std::time::Duration;
 
 mod common;
 use anyhow::Result;
-use aranya_client::{aqc::AqcPeerChannel, config::QuicSyncConfig, TeamConfig};
+use aranya_client::aqc::AqcPeerChannel;
 use aranya_crypto::csprng::rand;
 use aranya_daemon_api::{ChanOp, NetIdentifier};
 use buggy::BugExt;
@@ -12,7 +12,6 @@ use bytes::{Bytes, BytesMut};
 use common::{sleep, TeamCtx};
 use futures_util::future::try_join;
 use tempfile::tempdir;
-use tracing::info;
 
 /// Demonstrate nominal usage of AQC channels.
 /// 1. Create bidirectional and unidirectional AQC channels.
@@ -28,29 +27,8 @@ async fn test_aqc_chans() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let (team_id, Some(psk)) = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team")
-    else {
-        panic!("Not configured with the QUIC syncer")
-    };
-    info!(?team_id);
-
-    // Add graph to devices
-    let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
-    };
-    let [_owner, rest @ ..] = team.devices();
-
-    for device in rest {
-        device.client.add_team(team_id, cfg.clone()).await?;
-    }
+    let team_id = team.create_and_add_team().await?;
 
     sleep(sleep_interval).await;
 
@@ -276,30 +254,8 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     let work_dir = tmp.path().to_path_buf();
 
     let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_sender", work_dir).await?;
-
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let (team_id, Some(psk)) = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team")
-    else {
-        panic!("Not configured with the QUIC syncer")
-    };
-    info!(?team_id);
-
-    // Add graph to devices
-    let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
-    };
-    let [_owner, rest @ ..] = team.devices();
-
-    for device in rest {
-        device.client.add_team(team_id, cfg.clone()).await?;
-    }
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -384,29 +340,8 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_recvr", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let (team_id, Some(psk)) = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team")
-    else {
-        panic!("Not configured with the QUIC syncer")
-    };
-    info!(?team_id);
-
-    // Add graph to devices
-    let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
-    };
-    let [_owner, rest @ ..] = team.devices();
-
-    for device in rest {
-        device.client.add_team(team_id, cfg.clone()).await?;
-    }
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -491,29 +426,8 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans_close_sender_stream", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let (team_id, Some(psk)) = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team")
-    else {
-        panic!("Not configured with the QUIC syncer")
-    };
-    info!(?team_id);
-
-    // Add graph to devices
-    let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
-    };
-    let [_owner, rest @ ..] = team.devices();
-
-    for device in rest {
-        device.client.add_team(team_id, cfg.clone()).await?;
-    }
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -651,29 +565,8 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans_delete_chan_send", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let (team_id, Some(psk)) = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team")
-    else {
-        panic!("Not configured with the QUIC syncer")
-    };
-    info!(?team_id);
-
-    // Add graph to devices
-    let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
-    };
-    let [_owner, rest @ ..] = team.devices();
-
-    for device in rest {
-        device.client.add_team(team_id, cfg.clone()).await?;
-    }
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;

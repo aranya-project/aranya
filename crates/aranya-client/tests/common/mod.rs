@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use aranya_client::{client::Client, SyncPeerConfig};
+use aranya_client::{client::Client, QuicSyncConfig, SyncPeerConfig, TeamConfig};
 use aranya_crypto::{csprng::rand::RngCore, Rng};
 use aranya_daemon::{
     config::{Config, QSConfig},
@@ -215,6 +215,50 @@ impl TeamCtx {
         sleep(SLEEP_INTERVAL).await;
 
         Ok(())
+    }
+
+    pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
+        // Create the initial team, and get our TeamId and PSK.
+        let cfg = TeamConfig::builder().build()?;
+        let response = {
+            self.owner
+                .client
+                .create_team(cfg.clone())
+                .await
+                .expect("expected to create team")
+        };
+        info!(?response.team_id);
+
+        let cfg = match response.psk {
+            Some(psk) => {
+                let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+                TeamConfig::builder().quic_sync(qs_cfg).build()?
+            }
+            None => cfg,
+        };
+
+        self.admin
+            .client
+            .team(response.team_id)
+            .add_team(cfg.clone())
+            .await?;
+        self.operator
+            .client
+            .team(response.team_id)
+            .add_team(cfg.clone())
+            .await?;
+        self.membera
+            .client
+            .team(response.team_id)
+            .add_team(cfg.clone())
+            .await?;
+        self.memberb
+            .client
+            .team(response.team_id)
+            .add_team(cfg)
+            .await?;
+
+        Ok(response.team_id)
     }
 }
 

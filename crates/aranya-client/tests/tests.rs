@@ -11,7 +11,7 @@
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{QuicSyncConfig, TeamConfig};
-use aranya_daemon_api::Role;
+use aranya_daemon_api::{CreateTeamResponse, Role};
 use test_log::test;
 use tracing::{debug, info};
 
@@ -26,27 +26,7 @@ async fn test_sync_now() -> Result<()> {
     let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
 
     // Create the initial team, and get our TeamId and PSK.
-    let (team_id, maybe_psk) = {
-        let cfg = TeamConfig::builder().build()?;
-        team.owner
-            .client
-            .create_team(cfg)
-            .await
-            .expect("expected to create team")
-    };
-    info!(?team_id);
-
-    if let Some(psk) = maybe_psk {
-        let cfg = {
-            let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
-            TeamConfig::builder().quic_sync(qs_cfg).build()?
-        };
-
-        team.admin.client.add_team(team_id, cfg.clone()).await?;
-        team.operator.client.add_team(team_id, cfg.clone()).await?;
-        team.membera.client.add_team(team_id, cfg.clone()).await?;
-        team.memberb.client.add_team(team_id, cfg).await?;
-    }
+    let team_id = team.create_and_add_team().await?;
 
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
@@ -91,27 +71,7 @@ async fn test_query_functions() -> Result<()> {
     let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
 
     // Create the initial team, and get our TeamId and PSK.
-    let (team_id, maybe_psk) = {
-        let cfg = TeamConfig::builder().build()?;
-        team.owner
-            .client
-            .create_team(cfg)
-            .await
-            .expect("expected to create team")
-    };
-    info!(?team_id);
-
-    if let Some(psk) = maybe_psk {
-        let cfg = {
-            let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
-            TeamConfig::builder().quic_sync(qs_cfg).build()?
-        };
-
-        team.admin.client.add_team(team_id, cfg.clone()).await?;
-        team.operator.client.add_team(team_id, cfg.clone()).await?;
-        team.membera.client.add_team(team_id, cfg.clone()).await?;
-        team.memberb.client.add_team(team_id, cfg).await?;
-    }
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -150,7 +110,7 @@ async fn test_add_team() -> Result<()> {
     let mut team = TeamCtx::new("test_add_team", work_dir).await?;
 
     // Create the initial team, and get our TeamId and PSK.
-    let (team_id, maybe_psk) = {
+    let CreateTeamResponse { team_id, psk } = {
         let cfg = TeamConfig::builder().build()?;
         team.owner
             .client
@@ -160,7 +120,7 @@ async fn test_add_team() -> Result<()> {
     };
     info!(?team_id);
 
-    if let Some(psk) = maybe_psk {
+    if let Some(psk) = psk {
         let cfg = {
             let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
             TeamConfig::builder().quic_sync(qs_cfg).build()?

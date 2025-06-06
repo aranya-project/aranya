@@ -9,7 +9,7 @@ use anyhow::{bail, Context as _, Result};
 use aranya_client::{
     aqc::AqcPeerChannel, client::Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
 };
-use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_daemon_api::{ChanOp, CreateTeamResponse, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -212,7 +212,7 @@ async fn main() -> Result<()> {
     // Create a team.
     info!("creating team");
     let cfg = TeamConfig::builder().build()?;
-    let (team_id, Some(psk)) = owner
+    let CreateTeamResponse { team_id, psk: Some(psk) } = owner
         .client
         .create_team(cfg)
         .await

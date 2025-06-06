@@ -9,6 +9,7 @@ use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_crypto::hex;
+use aranya_daemon_api::CreateTeamResponse;
 use bytes::Bytes;
 use tracing::error;
 
@@ -942,8 +943,9 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
     // FIXME(Steve): Return id and psk with out params
-    let (id, _psk) = client.rt.block_on(client.inner.create_team(cfg.into()))?;
-    Ok(id.into())
+    let CreateTeamResponse { team_id, .. } =
+        client.rt.block_on(client.inner.create_team(cfg.into()))?;
+    Ok(team_id.into())
 }
 
 /// Add a team to the local device store.
@@ -962,7 +964,7 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
     let cfg: &imp::TeamConfig = cfg.deref();
     client
         .rt
-        .block_on(client.inner.add_team(team.into(), cfg.into()))?;
+        .block_on(client.inner.team(team.into()).add_team(cfg.into()))?;
     Ok(())
 }
 
