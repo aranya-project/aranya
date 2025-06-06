@@ -351,6 +351,11 @@ impl AqcClient {
                     AqcAckMessage::Failure(format!("Failed to deserialize AqcCtrlMessage: {e}"));
                 let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
                 stream.send(Bytes::from(ack_bytes)).await.ok();
+                if let Err(err) = stream.close().await {
+                    if !is_close_error(err) {
+                        error!(%err, "error closing stream after ctrl failure");
+                    }
+                }
                 return Err(AqcError::Serde(e).into());
             }
         }
@@ -442,6 +447,11 @@ enum AqcAckMessage {
     Failure(String),
 }
 
+/// Read all of a stream until it has finished.
+///
+/// A bit more efficient than going through the `AsyncRead`-based impl,
+/// especially if there was only one chunk of data. Also avoids needing to
+/// convert/handle an `io::Error`.
 async fn read_to_end(stream: &mut BidirectionalStream) -> Result<Bytes, s2n_quic::stream::Error> {
     let Some(first) = stream.receive().await? else {
         return Ok(Bytes::new());
@@ -461,6 +471,7 @@ async fn read_to_end(stream: &mut BidirectionalStream) -> Result<Bytes, s2n_quic
     Ok(buf.freeze())
 }
 
+/// Indicates whether the stream error is "connection closed without error".
 fn is_close_error(err: s2n_quic::stream::Error) -> bool {
     matches!(
         err,
