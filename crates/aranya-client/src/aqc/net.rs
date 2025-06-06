@@ -16,18 +16,32 @@ use aranya_daemon_api::{
 use buggy::{Bug, BugExt as _};
 use bytes::Bytes;
 use channels::AqcPeerChannel;
-use s2n_quic::{self, client::Connect, provider, Client, Connection, Server};
+use s2n_quic::{
+    self,
+    client::Connect,
+    provider::{
+        congestion_controller::Bbr,
+        tls::rustls::{
+            self as rustls_provider,
+            rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig},
+        },
+    },
+    Client, Connection, Server,
+};
 use tarpc::context;
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
-use super::{
-    api::AqcChannelId,
-    crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL},
+use super::crypto::{
+    ClientPresharedKeys, NoCertResolver, ServerPresharedKeys, SkipServerVerification, CTRL_PSK,
+    PSK_IDENTITY_CTRL,
 };
 use crate::error::{aranya_error, AqcError, IpcError};
 
 pub mod channels;
+
+/// ALPN protocol identifier for Aranya QUIC Channels
+const ALPN_AQC: &[u8] = b"aqc-v1";
 
 /// An AQC client. Used to create and receive channels.
 #[derive(Debug)]
@@ -58,20 +72,51 @@ pub(crate) struct AqcClient {
 type PskIdentity = Vec<u8>;
 
 impl AqcClient {
-    /// Create an Aqc client with the given certificate chain.
-    pub fn new<T: provider::tls::Provider>(
-        provider: T,
-        client_keys: Arc<ClientPresharedKeys>,
-        server_keys: Arc<ServerPresharedKeys>,
-        identity_rx: mpsc::Receiver<Vec<u8>>,
-        server: Server,
-        daemon: DaemonApiClient,
-    ) -> Result<AqcClient, AqcError> {
+    pub async fn new(server_addr: SocketAddr, daemon: DaemonApiClient) -> Result<Self, AqcError> {
+        let client_keys = Arc::new(ClientPresharedKeys::new(CTRL_PSK.clone()));
+
+        // Create Client Config (INSECURE: Skips server cert verification)
+        let mut client_config = ClientConfig::builder()
+            .dangerous()
+            .with_custom_certificate_verifier(SkipServerVerification::new())
+            .with_no_client_auth();
+        client_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
+        client_config.preshared_keys = client_keys.clone(); // Pass the Arc<ClientPresharedKeys>
+
+        // TODO(jdygert): enable after rustls upstream fix.
+        // client_config.psk_kex_modes = vec![PskKexMode::PskOnly];
+
+        let (server_keys, identity_rx) = ServerPresharedKeys::new();
+        server_keys.insert(CTRL_PSK.clone());
+        let server_keys = Arc::new(server_keys);
+
+        // Create Server Config
+        let mut server_config = ServerConfig::builder()
+            .with_no_client_auth()
+            .with_cert_resolver(Arc::new(NoCertResolver::default()));
+        server_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
+        server_config.preshared_keys =
+            PresharedKeySelection::Required(Arc::clone(&server_keys) as _);
+
+        #[allow(deprecated)]
+        let tls_client_provider = rustls_provider::Client::new(client_config);
+        #[allow(deprecated)]
+        let tls_server_provider = rustls_provider::Server::new(server_config);
+
+        // Use the rustls server provider
+        let server = Server::builder()
+            .with_tls(tls_server_provider)? // Use the wrapped server config
+            .with_io(server_addr)
+            .assume("can set aqc server addr")?
+            .with_congestion_controller(Bbr::default())?
+            .start()?;
+
         let quic_client = Client::builder()
-            .with_tls(provider)?
+            .with_tls(tls_client_provider)?
             .with_io((Ipv4Addr::UNSPECIFIED, 0))
             .assume("can set aqc client addr")?
             .start()?;
+
         Ok(AqcClient {
             quic_client,
             client_keys,
@@ -369,13 +414,20 @@ struct AqcChannelInfo {
     channel_id: AqcChannelId,
 }
 
+/// An AQC Channel ID.
+#[derive(Copy, Clone, Debug)]
+enum AqcChannelId {
+    Bidi(BidiChannelId),
+    Uni(UniChannelId),
+}
+
 /// An AQC control message.
 #[derive(serde::Serialize, serde::Deserialize)]
 struct AqcCtrlMessage {
     /// The team id.
-    pub team_id: TeamId,
+    team_id: TeamId,
     /// The control message.
-    pub ctrl: AqcCtrl,
+    ctrl: AqcCtrl,
 }
 
 /// An AQC control message.
