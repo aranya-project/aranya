@@ -33,8 +33,46 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup
 
+      # TODO: revert this change
       - name: Unit Tests
-        run: cargo make test
+        run: |
+          cargo make test
+
+      - name: Unit Tests
+        run: |
+          cargo make test
+
+      - name: Unit Tests
+        run: |
+          cargo make test
+
+      - name: Unit Tests
+        run: |
+          cargo make test
+
+      - name: Unit Tests
+        run: |
+          cargo make test
+
+      - name: Unit Tests
+        run: |
+          cargo make test
+
+      - name: Unit Tests
+        run: |
+          cargo make test
+
+      - name: Unit Tests
+        run: |
+          cargo make test
+
+      - name: Unit Tests
+        run: |
+          cargo make test
+
+      - name: Unit Tests
+        run: |
+          cargo make test
 
 
   c-example-application:
