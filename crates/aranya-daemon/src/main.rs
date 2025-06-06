@@ -42,12 +42,14 @@ fn main() -> Result<()> {
         info!("loaded Aranya daemon");
 
         if flags.print_api_pk {
-            let pk = daemon.public_api_key().await?.encode()?;
+            let pk = daemon.public_api_key().encode()?;
             print!("{}", hex::encode(pk));
             return Ok(());
         }
 
-        daemon.run().await
+        daemon.spawn().join().await?;
+
+        Ok(())
     })
     .inspect_err(|err| error!(?err))
 }

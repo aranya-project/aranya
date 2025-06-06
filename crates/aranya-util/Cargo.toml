@@ -18,6 +18,7 @@ aranya-fast-channels = { workspace = true }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }
+futures-util = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = [
     "rt-multi-thread",
@@ -25,4 +26,9 @@ tokio = { workspace = true, features = [
     "fs",
     "net",
 ] }
+tokio-util = { workspace = true, features = ["rt"] }
 tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["time"] }
+tokio-util = { workspace = true, features = ["time"] }

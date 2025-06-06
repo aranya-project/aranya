@@ -20,3 +20,4 @@ aranya-keygen = { workspace = true }
 anyhow = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true }
+tracing = { workspace = true }

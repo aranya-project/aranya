@@ -35,6 +35,7 @@ use tokio::{
     },
     task::{self, AbortHandle},
 };
+use tracing::Instrument;
 
 // Aranya graph client for testing.
 pub type TestClient =
@@ -78,7 +79,7 @@ impl TestDevice {
         pk: PublicKeys<DefaultCipherSuite>,
         graph_id: GraphId,
     ) -> Result<Self> {
-        let handle = task::spawn(async { server.serve().await }).abort_handle();
+        let handle = task::spawn(server.serve().in_current_span()).abort_handle();
         let (send_effects, effect_recv) = mpsc::channel(1);
         let (syncer, _sync_peers) = TestSyncer::new(client, send_effects, TestState {});
         Ok(Self {

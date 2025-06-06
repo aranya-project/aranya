@@ -233,8 +233,10 @@ dependencies = [
  "anyhow",
  "aranya-fast-channels",
  "buggy",
+ "futures-util",
  "serde",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 
@@ -2336,6 +2338,8 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
+ "hashbrown",
  "pin-project-lite",
  "slab",
  "tokio",

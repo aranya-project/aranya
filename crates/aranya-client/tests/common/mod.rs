@@ -1,107 +1,26 @@
-#![allow(dead_code)]
-use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    path::PathBuf,
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 use aranya_client::{client::Client, SyncPeerConfig};
-use aranya_daemon::{config::Config, Daemon};
+use aranya_daemon::{config::Config, Daemon, DaemonHandle};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
-use tokio::{
-    fs,
-    task::{self, AbortHandle},
-    time::{self, Sleep},
-};
-use tracing::{debug, info, instrument};
+use tokio::{fs, time};
+use tracing::{info, instrument, trace};
 
 const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
-#[instrument(skip_all, fields(%duration = FmtDuration(d)))]
-pub fn sleep(d: Duration) -> Sleep {
-    debug!("sleeping");
-
-    time::sleep(d)
-}
-
-/// Formats a [`Duration`], using the same syntax as Go's `time.Duration`.
-struct FmtDuration(Duration);
-
-impl fmt::Display for FmtDuration {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.0 < Duration::ZERO {
-            write!(f, "-")?;
-        }
-
-        let mut d = self.0.abs_diff(Duration::ZERO);
-
-        // Small number, format it with small units.
-        if d < Duration::from_secs(1) {
-            if d.is_zero() {
-                return write!(f, "0s");
-            }
-
-            const MICROSECOND: u128 = 1000;
-            const MILLISECOND: u128 = 1000 * MICROSECOND;
-
-            // NB: the unwrap and error cases should never happen since `d` is less than one second.
-            let ns = d.as_nanos();
-            if ns < MICROSECOND {
-                return write!(f, "{ns}ns");
-            }
-
-            let (v, width, fmt) = if ns < MILLISECOND {
-                (MICROSECOND, 3, "µs")
-            } else {
-                (MILLISECOND, 6, "ms")
-            };
-
-            let quo = ns / v;
-            let rem = ns % v;
-            write!(f, "{quo}")?;
-            if rem > 0 {
-                let (rem, width) = trim(rem, width);
-                write!(f, ".{rem:0width$}")?;
-            }
-            return write!(f, "{fmt}");
-        }
-
-        let hours = d.as_secs() / 3600;
-        if hours > 0 {
-            write!(f, "{hours}h")?;
-            d -= Duration::from_secs(hours * 3600);
-        }
-
-        let mins = d.as_secs() / 60;
-        if mins > 0 {
-            write!(f, "{mins}m")?;
-            d -= Duration::from_secs(mins * 60);
-        }
-
-        let secs = d.as_secs();
-        write!(f, "{secs}")?;
-        d -= Duration::from_secs(secs);
-
-        if !d.is_zero() {
-            // NB: the unwrap and error cases should never happen since `d` is less than one second.
-            let (ns, width) = trim(d.as_nanos(), 9);
-            write!(f, ".{ns:0width$}")?;
-        }
-        write!(f, "s")
-    }
-}
-
-/// Trim up to `width` trailing zeros from `d`.
-fn trim(mut d: u128, mut width: usize) -> (u128, usize) {
-    while width > 0 {
-        if d % 10 != 0 {
-            break;
-        }
-        d /= 10;
-        width -= 1;
-    }
-    (d, width)
+#[instrument(skip_all)]
+pub async fn sleep(duration: Duration) {
+    trace!(?duration, "sleeping");
+    time::sleep(duration).await;
 }
 
 pub struct TeamCtx {
@@ -114,11 +33,11 @@ pub struct TeamCtx {
 
 impl TeamCtx {
     pub async fn new(name: &str, work_dir: PathBuf) -> Result<Self> {
-        let owner = DeviceCtx::new(name, "owner", work_dir.join("owner"), 0).await?;
-        let admin = DeviceCtx::new(name, "admin", work_dir.join("admin"), 0).await?;
-        let operator = DeviceCtx::new(name, "operator", work_dir.join("operator"), 0).await?;
-        let membera = DeviceCtx::new(name, "membera", work_dir.join("membera"), 0).await?;
-        let memberb = DeviceCtx::new(name, "memberb", work_dir.join("memberb"), 0).await?;
+        let owner = DeviceCtx::new(name, "owner", work_dir.join("owner")).await?;
+        let admin = DeviceCtx::new(name, "admin", work_dir.join("admin")).await?;
+        let operator = DeviceCtx::new(name, "operator", work_dir.join("operator")).await?;
+        let membera = DeviceCtx::new(name, "membera", work_dir.join("membera")).await?;
+        let memberb = DeviceCtx::new(name, "memberb", work_dir.join("memberb")).await?;
 
         Ok(Self {
             owner,
@@ -213,22 +132,23 @@ pub struct DeviceCtx {
     pub client: Client,
     pub pk: KeyBundle,
     pub id: DeviceId,
-    pub daemon: AbortHandle,
+    #[expect(unused, reason = "manages tasks")]
+    pub daemon: DaemonHandle,
 }
 
 impl DeviceCtx {
-    async fn new(_team_name: &str, _name: &str, work_dir: PathBuf, port: u16) -> Result<Self> {
-        let aqc_addr = Addr::new("127.0.0.1", port).expect("unable to init AQC address");
+    async fn new(_team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
+        let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
         fs::create_dir_all(work_dir.clone()).await?;
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
         let cfg = Config {
-            name: "daemon".into(),
+            name: name.into(),
             work_dir: work_dir.clone(),
             uds_api_path: uds_api_path.clone(),
             pid_file: work_dir.join("pid"),
-            sync_addr: Addr::new("localhost", 0)?,
+            sync_addr: addr_any,
             afc: None,
             aqc: None,
         };
@@ -237,15 +157,9 @@ impl DeviceCtx {
         let daemon = Daemon::load(cfg.clone())
             .await
             .context("unable to init daemon")?;
-        let pk = daemon.public_api_key().await?;
+        let pk = daemon.public_api_key();
         let pk_bytes = pk.encode()?;
-        let handle = task::spawn(async move {
-            daemon
-                .run()
-                .await
-                .expect("expected no errors running daemon")
-        })
-        .abort_handle();
+        let handle = daemon.spawn();
 
         // give daemon time to setup UDS API.
         sleep(SLEEP_INTERVAL).await;
@@ -255,7 +169,7 @@ impl DeviceCtx {
             Client::builder()
                 .with_daemon_uds_path(&uds_api_path)
                 .with_daemon_api_pk(&pk_bytes)
-                .with_daemon_aqc_addr(&aqc_addr)
+                .with_daemon_aqc_addr(&addr_any)
                 .connect()
         })
         .retry(ExponentialBuilder::default())
@@ -276,15 +190,5 @@ impl DeviceCtx {
 
     pub async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.local_addr().await?)
-    }
-
-    pub async fn aqc_client_addr(&self) -> Result<SocketAddr> {
-        Ok(self.client.aqc_client_addr().await?)
-    }
-}
-
-impl Drop for DeviceCtx {
-    fn drop(&mut self) {
-        self.daemon.abort();
     }
 }

@@ -367,6 +367,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "2.4.0 -> 2.5.0"
 
+[[audits.tokio-util]]
+who = "Jonathan Dygert <jdygert@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.7.13 -> 0.7.15"
+
 [[audits.typenum]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
