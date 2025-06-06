@@ -4,8 +4,8 @@ use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::LabelId;
 use bytes::Bytes;
 
-use super::TryReceiveError;
-use crate::{aqc::api::AqcChannelId, error::AqcError};
+use super::{AqcChannelId, TryReceiveError};
+use crate::error::AqcError;
 
 mod s2n {
     pub use s2n_quic::{
@@ -25,7 +25,7 @@ pub enum AqcPeerChannel {
 }
 
 impl AqcPeerChannel {
-    pub(crate) fn new(label_id: LabelId, channel_id: AqcChannelId, conn: s2n::Connection) -> Self {
+    pub(super) fn new(label_id: LabelId, channel_id: AqcChannelId, conn: s2n::Connection) -> Self {
         match channel_id {
             AqcChannelId::Bidi(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
@@ -57,7 +57,7 @@ impl AqcSendChannel {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub(crate) fn new(label_id: LabelId, id: UniChannelId, handle: s2n::Handle) -> Self {
+    pub(super) fn new(label_id: LabelId, id: UniChannelId, handle: s2n::Handle) -> Self {
         Self {
             label_id,
             id,
@@ -108,7 +108,7 @@ impl AqcReceiveChannel {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub(crate) fn new(label_id: LabelId, aqc_id: UniChannelId, conn: s2n::Connection) -> Self {
+    pub(super) fn new(label_id: LabelId, aqc_id: UniChannelId, conn: s2n::Connection) -> Self {
         Self {
             label_id,
             aqc_id,
@@ -160,7 +160,7 @@ pub struct AqcBidiChannel {
 
 impl AqcBidiChannel {
     /// Create a new bidirectional channel with the given id and conection handle.
-    pub(crate) fn new(label_id: LabelId, aqc_id: BidiChannelId, conn: s2n::Connection) -> Self {
+    pub(super) fn new(label_id: LabelId, aqc_id: BidiChannelId, conn: s2n::Connection) -> Self {
         Self {
             label_id,
             aqc_id,
@@ -227,7 +227,7 @@ impl AqcBidiChannel {
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
     pub fn close(&mut self) {
-        pub(crate) const ERROR_CODE: u32 = 0;
+        const ERROR_CODE: u32 = 0;
         self.conn.close(ERROR_CODE.into());
     }
 }
