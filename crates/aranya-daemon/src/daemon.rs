@@ -207,6 +207,15 @@ impl Daemon {
         }
         info!("created directories");
 
+        if let Err(err) = fs::remove_file(&cfg.uds_api_path).await {
+            if err.kind() != io::ErrorKind::NotFound {
+                return Err(err).context(format!(
+                    "unable to remove api socket {:?}",
+                    cfg.uds_api_path,
+                ));
+            }
+        }
+
         info!("set up environment");
         Ok(())
     }
@@ -342,13 +351,6 @@ impl Daemon {
         }
     }
 }
-
-// TODO(jdygert): Is this needed? Probably never gets run currently.
-// impl Drop for Daemon {
-//     fn drop(&mut self) {
-//         let _ = std::fs::remove_file(&self.cfg.uds_api_path);
-//     }
-// }
 
 /// Tries to read CBOR from `path`.
 async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<Option<T>> {
