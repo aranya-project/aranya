@@ -14,7 +14,7 @@ use aranya_daemon_api::{
     AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
 };
 use buggy::{Bug, BugExt as _};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use channels::AqcPeerChannel;
 use s2n_quic::{
     self,
@@ -26,6 +26,7 @@ use s2n_quic::{
             rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig},
         },
     },
+    stream::BidirectionalStream,
     Client, Connection, Server,
 };
 use tarpc::context;
@@ -304,18 +305,20 @@ impl AqcClient {
             .quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
             .await?;
-        conn.keep_alive(true)?;
         let mut stream = conn.open_bidirectional_stream().await?;
+
         let msg = AqcCtrlMessage { team_id, ctrl };
         let msg_bytes = postcard::to_stdvec(&msg).assume("can serialize")?;
-        stream.send(Bytes::from_owner(msg_bytes)).await?;
-        if let Some(msg_bytes) = stream.receive().await? {
-            let msg = postcard::from_bytes::<AqcAckMessage>(&msg_bytes).map_err(AqcError::Serde)?;
-            match msg {
-                AqcAckMessage::Success => (),
-                AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
-            }
+        stream.send(Bytes::from(msg_bytes)).await?;
+        stream.finish()?;
+
+        let ack_bytes = read_to_end(&mut stream).await?;
+        let ack = postcard::from_bytes::<AqcAckMessage>(&ack_bytes).map_err(AqcError::Serde)?;
+        match ack {
+            AqcAckMessage::Success => (),
+            AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
         }
+
         Ok(())
     }
 
@@ -325,10 +328,7 @@ impl AqcClient {
             .await
             .map_err(AqcError::ConnectionError)?
             .ok_or(AqcError::ConnectionClosed)?;
-        let Ok(Some(ctrl_bytes)) = stream.receive().await else {
-            error!("Failed to receive control message or stream closed");
-            return Err(AqcError::ConnectionClosed.into());
-        };
+        let ctrl_bytes = read_to_end(&mut stream).await.map_err(AqcError::from)?;
         match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
             Ok(ctrl) => {
                 self.process_ctrl_message(ctrl.team_id, ctrl.ctrl).await?;
@@ -339,15 +339,23 @@ impl AqcClient {
                     .send(Bytes::from(ack_bytes))
                     .await
                     .map_err(AqcError::from)?;
-                stream.close().await.map_err(AqcError::from)?;
+                if let Err(err) = stream.close().await {
+                    if !is_close_error(err) {
+                        return Err(AqcError::from(err).into());
+                    }
+                }
             }
             Err(e) => {
                 error!("Failed to deserialize AqcCtrlMessage: {}", e);
                 let ack_msg =
                     AqcAckMessage::Failure(format!("Failed to deserialize AqcCtrlMessage: {e}"));
                 let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
-                let _ = stream.send(Bytes::from(ack_bytes)).await;
-                let _ = stream.close().await;
+                stream.send(Bytes::from(ack_bytes)).await.ok();
+                if let Err(err) = stream.close().await {
+                    if !is_close_error(err) {
+                        error!(%err, "error closing stream after ctrl failure");
+                    }
+                }
                 return Err(AqcError::Serde(e).into());
             }
         }
@@ -437,4 +445,39 @@ enum AqcAckMessage {
     Success,
     /// The failure message.
     Failure(String),
+}
+
+/// Read all of a stream until it has finished.
+///
+/// A bit more efficient than going through the `AsyncRead`-based impl,
+/// especially if there was only one chunk of data. Also avoids needing to
+/// convert/handle an `io::Error`.
+async fn read_to_end(stream: &mut BidirectionalStream) -> Result<Bytes, s2n_quic::stream::Error> {
+    let Some(first) = stream.receive().await? else {
+        return Ok(Bytes::new());
+    };
+    let Some(mut more) = stream.receive().await? else {
+        return Ok(first);
+    };
+    let mut buf = BytesMut::from(first);
+    loop {
+        buf.extend_from_slice(&more);
+        if let Some(even_more) = stream.receive().await? {
+            more = even_more;
+        } else {
+            break;
+        }
+    }
+    Ok(buf.freeze())
+}
+
+/// Indicates whether the stream error is "connection closed without error".
+fn is_close_error(err: s2n_quic::stream::Error) -> bool {
+    matches!(
+        err,
+        s2n_quic::stream::Error::ConnectionError {
+            error: s2n_quic::connection::Error::Closed { .. },
+            ..
+        },
+    )
 }
