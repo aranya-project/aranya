@@ -96,19 +96,12 @@ impl ClientCtx {
 
             let buf = format!(
                 r#"
-{{
-    "name": "daemon",
-    "work_dir": "{}",
-    "uds_api_path": "{}",
-    "pid_file": "{}",
-    "sync_addr": "localhost:0"
-}}"#,
-                work_dir.as_os_str().to_str().context("should be UTF-8")?,
-                uds_api_path
-                    .as_os_str()
-                    .to_str()
-                    .context("should be UTF-8")?,
-                pid_file.as_os_str().to_str().context("should be UTF-8")?,
+                name: "daemon"
+                work_dir: {work_dir:?}
+                uds_api_path: {uds_api_path:?}
+                pid_file: {pid_file:?}
+                sync_addr: "localhost:0"
+                "#
             );
             fs::write(&cfg_path, buf).await?;
 
@@ -200,11 +193,11 @@ async fn main() -> Result<()> {
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
     let team_name = "rust_example";
-    let mut owner = ClientCtx::new(&team_name, "owner", &daemon_path).await?;
-    let mut admin = ClientCtx::new(&team_name, "admin", &daemon_path).await?;
-    let mut operator = ClientCtx::new(&team_name, "operator", &daemon_path).await?;
-    let mut membera = ClientCtx::new(&team_name, "member_a", &daemon_path).await?;
-    let mut memberb = ClientCtx::new(&team_name, "member_b", &daemon_path).await?;
+    let mut owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
+    let mut admin = ClientCtx::new(team_name, "admin", &daemon_path).await?;
+    let mut operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
+    let mut membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
+    let mut memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
 
     // Create a team.
     info!("creating team");
@@ -392,12 +385,10 @@ async fn main() -> Result<()> {
 
     // memberb receives a bidirectional channel.
     info!("memberb receiving acq bidi channel");
-    let mut received_aqc_chan = loop {
-        let chan = memberb.client.aqc().receive_channel().await?;
-        match chan {
-            AqcPeerChannel::Bidi(channel) => break channel,
-            _ => bail!("expected a bidirectional channel"),
-        }
+    let AqcPeerChannel::Bidi(mut received_aqc_chan) =
+        memberb.client.aqc().receive_channel().await?
+    else {
+        bail!("expected a bidirectional channel");
     };
 
     // Now await the completion of membera's channel creation
