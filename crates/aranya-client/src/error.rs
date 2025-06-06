@@ -131,6 +131,10 @@ pub enum AqcError {
     #[error("stream error: {0}")]
     StreamError(#[from] s2n_quic::stream::Error),
 
+    /// Async I/O read error.
+    #[error("failed async read: {0}")]
+    AsyncReadError(#[from] io::Error),
+
     /// Failed to resolve address.
     #[error("failed to resolve address: {0}")]
     AddrResolution(io::Error),

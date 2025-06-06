@@ -29,7 +29,7 @@ use s2n_quic::{
     Client, Connection, Server,
 };
 use tarpc::context;
-use tokio::sync::mpsc;
+use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::{debug, error, warn};
 
 use super::crypto::{
@@ -308,15 +308,16 @@ impl AqcClient {
         let msg = AqcCtrlMessage { team_id, ctrl };
         let msg_bytes = postcard::to_stdvec(&msg).assume("can serialize")?;
         stream.send(Bytes::from_owner(msg_bytes)).await?;
-        let _ = stream.close().await;
-        if let Some(msg_bytes) = stream.receive().await? {
-            let msg = postcard::from_bytes::<AqcAckMessage>(&msg_bytes).map_err(AqcError::Serde)?;
-            match msg {
-                AqcAckMessage::Success => (),
-                AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
-            }
+        if let Err(e) = stream.close().await {
+            warn!(?e);
         }
-        while stream.receive().await?.is_some() {}
+        let mut ack_bytes = Vec::new();
+        stream.read_to_end(&mut ack_bytes).await?;
+        let ack = postcard::from_bytes::<AqcAckMessage>(&ack_bytes).map_err(AqcError::Serde)?;
+        match ack {
+            AqcAckMessage::Success => (),
+            AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
+        }
         Ok(())
     }
 
@@ -326,10 +327,11 @@ impl AqcClient {
             .await
             .map_err(AqcError::ConnectionError)?
             .ok_or(AqcError::ConnectionClosed)?;
-        let Ok(Some(ctrl_bytes)) = stream.receive().await else {
-            error!("Failed to receive control message or stream closed");
-            return Err(AqcError::ConnectionClosed.into());
-        };
+        let mut ctrl_bytes = Vec::new();
+        stream
+            .read_to_end(&mut ctrl_bytes)
+            .await
+            .map_err(AqcError::AsyncReadError)?;
         match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
             Ok(ctrl) => {
                 self.process_ctrl_message(ctrl.team_id, ctrl.ctrl).await?;
@@ -340,7 +342,9 @@ impl AqcClient {
                     .send(Bytes::from(ack_bytes))
                     .await
                     .map_err(AqcError::from)?;
-                let _ = stream.close().await;
+                if let Err(e) = stream.close().await {
+                    warn!(?e);
+                }
             }
             Err(e) => {
                 error!("Failed to deserialize AqcCtrlMessage: {}", e);
@@ -348,7 +352,9 @@ impl AqcClient {
                     AqcAckMessage::Failure(format!("Failed to deserialize AqcCtrlMessage: {e}"));
                 let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
                 let _ = stream.send(Bytes::from(ack_bytes)).await;
-                let _ = stream.close().await;
+                if let Err(e) = stream.close().await {
+                    warn!(?e);
+                }
                 return Err(AqcError::Serde(e).into());
             }
         }
