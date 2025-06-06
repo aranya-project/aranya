@@ -62,13 +62,13 @@ PROJECT_BRIEF          = "a software development tool for governing access to da
 # pixels and the maximum width should not exceed 200 pixels. Doxygen will copy
 # the logo to the output directory.
 
-PROJECT_LOGO           = "images/spideroak-icon.png"
+PROJECT_LOGO           = "images/aranya-icon.png"
 
 # With the PROJECT_ICON tag one can specify an icon that is included in the tabs
 # when the HTML document is shown. Doxygen will copy the logo to the output
 # directory.
 
-PROJECT_ICON           = "images/spideroak-icon.png"
+PROJECT_ICON           = "images/aranya-icon.png"
 
 # The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute) path
 # into which the generated documentation will be written. If a relative path is
