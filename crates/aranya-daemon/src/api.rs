@@ -3,8 +3,8 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-use core::{future, net::SocketAddr, ops::Deref};
-use std::{path::PathBuf, pin::pin, sync::Arc};
+use core::{future, net::SocketAddr, ops::Deref, pin::pin};
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
 use aranya_crypto::{Csprng, Rng};
@@ -16,8 +16,7 @@ use aranya_daemon_api::{
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
-use aranya_util::Addr;
-use buggy::BugExt;
+use aranya_util::{task::scope, Addr};
 use futures_util::{StreamExt, TryStreamExt};
 use tarpc::{
     context,
@@ -26,9 +25,8 @@ use tarpc::{
 use tokio::{
     net::UnixListener,
     sync::{mpsc, Mutex},
-    task::JoinSet,
 };
-use tracing::{debug, error, info, instrument, trace, warn};
+use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 
 use crate::{
     actions::Actions,
@@ -57,18 +55,14 @@ pub(crate) struct DaemonApiServer {
     sk: ApiKey<CS>,
     /// The UDS path we serve the API on.
     uds_path: PathBuf,
-    /// The Aranya client.
-    client: Client,
-    /// The local network address for the `Client`'s sync server.
-    local_addr: SocketAddr,
-    /// Public keys of current device.
-    pk: PublicKeys<CS>,
-    /// Aranya sync peers,
-    peers: SyncPeers,
-    aqc: Aqc<CE, KS>,
+    /// Socket bound to `uds_path`.
+    listener: UnixListener,
 
     /// Channel for receiving effects from the syncer.
     recv_effects: EffectReceiver,
+
+    /// Api Handler.
+    api: Api,
 }
 
 impl DaemonApiServer {
@@ -85,94 +79,78 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
         aqc: Aqc<CE, KS>,
     ) -> Result<Self> {
+        let listener = UnixListener::bind(&uds_path)?;
+        let aqc = Arc::new(aqc);
+        let effect_handler = EffectHandler {
+            aqc: Arc::clone(&aqc),
+        };
+        let api = Api(Arc::new(ApiInner {
+            client,
+            local_addr,
+            pk,
+            peers: Mutex::new(peers),
+            effect_handler,
+            aqc,
+        }));
         Ok(Self {
             uds_path,
             sk,
             recv_effects,
-            client,
-            local_addr,
-            pk,
-            peers,
-            aqc,
+            listener,
+            api,
         })
     }
 
     /// Runs the server.
-    #[instrument(skip_all)]
-    #[allow(clippy::disallowed_macros)]
-    pub async fn serve(mut self) -> Result<()> {
-        let aqc = Arc::new(self.aqc);
-
-        let _handler = {
-            let handler = EffectHandler {
-                aqc: Arc::clone(&aqc),
-            };
-            tokio::spawn(async move {
-                while let Some((graph, effects)) = self.recv_effects.recv().await {
-                    if let Err(err) = handler.handle_effects(graph, &effects).await {
-                        error!(?err, "error handling effects");
+    pub async fn serve(mut self) {
+        scope(async |s| {
+            s.spawn({
+                let effect_handler = self.api.effect_handler.clone();
+                async move {
+                    while let Some((graph, effects)) = self.recv_effects.recv().await {
+                        if let Err(err) = effect_handler.handle_effects(graph, &effects).await {
+                            error!(?err, "error handling effects");
+                        }
                     }
+                    info!("effect handler exiting");
                 }
-                info!("effect handler exiting");
-            })
-        };
-
-        let api = Api(Arc::new(ApiInner {
-            client: self.client,
-            local_addr: self.local_addr,
-            pk: self.pk,
-            peers: Mutex::new(self.peers),
-            aqc: Arc::clone(&aqc),
-            handler: EffectHandler {
-                aqc: Arc::clone(&aqc),
-            },
-        }));
-
-        let server = {
-            let listener = UnixListener::bind(&self.uds_path)?;
-            info!(
-                addr = ?listener
-                    .local_addr()
-                    .assume("should be able to retrieve local addr")?
-                    .as_pathname()
-                    .assume("addr should be a pathname")?,
-                "listening"
-            );
-
-            let info = self.uds_path.as_os_str().as_encoded_bytes();
-            let codec = LengthDelimitedCodec::builder()
-                .max_frame_length(usize::MAX)
-                .new_codec();
-            let listener = txp::unix::UnixListenerStream::from(listener);
-            txp::server(listener, codec, self.sk, info)
-        };
-
-        let mut chans = JoinSet::new();
-        let mut incoming = server
-            .inspect_err(|err| warn!(?err, "accept error"))
-            .filter_map(|r| future::ready(r.ok()))
-            .map(BaseChannel::with_defaults)
-            .max_concurrent_requests_per_channel(10);
-        while let Some(ch) = incoming.next().await {
-            let api = api.clone();
-            chans.spawn(async move {
-                let mut reqs = JoinSet::new();
-                let requests = ch
-                    .requests()
-                    .inspect_err(|err| warn!(?err, "channel failure"))
-                    .take_while(|r| future::ready(r.is_ok()))
-                    .filter_map(|r| async { r.ok() });
-                let mut requests = pin!(requests);
-                while let Some(req) = requests.next().await {
-                    reqs.spawn(req.execute(api.clone().serve()));
-                }
-                reqs.join_all().await
+                .in_current_span()
             });
-        }
-        let _ = chans.join_all().await;
+
+            let server = {
+                info!(addr = ?self.uds_path, "listening");
+
+                let info = self.uds_path.as_os_str().as_encoded_bytes();
+                let codec = LengthDelimitedCodec::builder()
+                    .max_frame_length(usize::MAX)
+                    .new_codec();
+                let listener = txp::unix::UnixListenerStream::from(self.listener);
+                txp::server(listener, codec, self.sk, info)
+            };
+
+            let mut incoming = server
+                .inspect_err(|err| warn!(?err, "accept error"))
+                .filter_map(|r| future::ready(r.ok()))
+                .map(BaseChannel::with_defaults)
+                .max_concurrent_requests_per_channel(10);
+            while let Some(ch) = incoming.next().await {
+                let api = self.api.clone();
+                s.spawn(scope(async move |reqs| {
+                    let requests = ch
+                        .requests()
+                        .inspect_err(|err| warn!(?err, "channel failure"))
+                        .take_while(|r| future::ready(r.is_ok()))
+                        .filter_map(|r| async { r.ok() });
+                    let mut requests = pin!(requests);
+                    while let Some(req) = requests.next().await {
+                        reqs.spawn(req.execute(api.clone().serve()));
+                    }
+                }));
+            }
+        })
+        .await;
 
         info!("server exiting");
-        Ok(())
     }
 }
 
@@ -247,7 +225,7 @@ struct ApiInner {
     pk: PublicKeys<CS>,
     /// Aranya sync peers,
     peers: Mutex<SyncPeers>,
-    handler: EffectHandler,
+    effect_handler: EffectHandler,
     aqc: Arc<Aqc<CE, KS>>,
 }
 
@@ -462,7 +440,7 @@ impl DaemonApi for Api {
             .set_aqc_network_name(device.into_id().into(), name.0)
             .await
             .context("unable to assign aqc network identifier")?;
-        self.handler
+        self.effect_handler
             .handle_effects(GraphId::from(team.into_id()), &effects)
             .await?;
         Ok(())
@@ -515,7 +493,7 @@ impl DaemonApi for Api {
             return Err(anyhow!("unable to find `AqcBidiChannelCreated` effect").into());
         };
 
-        self.handler.handle_effects(graph, &effects).await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         let psks = self.aqc.bidi_channel_created(e).await?;
         info!(num = psks.len(), "bidi channel created");
@@ -554,7 +532,7 @@ impl DaemonApi for Api {
             return Err(anyhow!("unable to find AqcUniChannelCreated effect").into());
         };
 
-        self.handler.handle_effects(graph, &effects).await?;
+        self.effect_handler.handle_effects(graph, &effects).await?;
 
         let psks = self.aqc.uni_channel_created(e).await?;
         info!(num = psks.len(), "uni channel created");
@@ -595,7 +573,7 @@ impl DaemonApi for Api {
             let our_device_id = self.pk.ident_pk.id()?;
 
             let effects = self.client.session_receive(&mut session, &cmd).await?;
-            self.handler.handle_effects(graph, &effects).await?;
+            self.effect_handler.handle_effects(graph, &effects).await?;
 
             let effect = effects.iter().find(|e| match e {
                 Effect::AqcBidiChannelReceived(e) => e.peer_id == our_device_id.into(),

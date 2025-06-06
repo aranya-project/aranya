@@ -16,7 +16,7 @@ use aranya_runtime::{
 };
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
-use buggy::BugExt;
+use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
@@ -49,120 +49,157 @@ pub(crate) type EF = policy::Effect;
 pub(crate) type Client = aranya::Client<EN, SP>;
 type TcpSyncServer = crate::sync::tcp::Server<EN, SP>;
 
+/// Handle for the spawned daemon.
+///
+/// Dropping this will abort the daemon's tasks.
+#[clippy::has_significant_drop]
+pub struct DaemonHandle {
+    set: JoinSet<()>,
+}
+
+impl DaemonHandle {
+    /// Wait for the daemon to finish.
+    ///
+    /// Panics if the daemon's tasks panic.
+    pub async fn join(mut self) -> Result<(), Bug> {
+        match self.set.join_next().await.assume("set not empty")? {
+            Ok(()) => {}
+            Err(err) if err.is_panic() => std::panic::resume_unwind(err.into_panic()),
+            Err(err) => {
+                error!(%err, "tasks cancelled");
+                bug!("tasks cancelled");
+            }
+        }
+        self.set.abort_all();
+        Ok(())
+    }
+}
+
 /// The daemon itself.
 pub struct Daemon {
-    cfg: Config,
+    public_api_key: PublicApiKey<CS>,
+    sync_server: TcpSyncServer,
+    syncer: Syncer<TCPSyncState>,
+    api: DaemonApiServer,
+    span: tracing::Span,
 }
 
 impl Daemon {
     /// Loads a `Daemon` using its config.
     pub async fn load(cfg: Config) -> Result<Self> {
-        Ok(Self { cfg })
+        let name = (!cfg.name.is_empty()).then_some(cfg.name.as_str());
+        let span = info_span!("daemon", name);
+        let span_id = span.id();
+
+        async move {
+            Self::setup_env(&cfg).await?;
+            let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
+            let mut eng = Self::load_crypto_engine(&cfg).await?;
+            let pk = Self::load_or_gen_public_keys(&cfg, &mut eng, &mut aranya_store).await?;
+            let mut local_store = Self::load_local_keystore(&cfg).await?;
+
+            let api_sk = Self::load_or_gen_api_sk(&cfg, &mut eng, &mut local_store).await?;
+            let public_api_key = api_sk.public()?;
+
+            // Initialize Aranya client.
+            let (client, sync_server) = Self::setup_aranya(
+                &cfg,
+                eng.clone(),
+                aranya_store
+                    .try_clone()
+                    .context("unable to clone keystore")?,
+                &pk,
+                cfg.sync_addr,
+            )
+            .await?;
+            let local_addr = sync_server.local_addr()?;
+
+            // Sync in the background at some specified interval.
+            let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
+            let (syncer, peers) = Syncer::new(client.clone(), send_effects, TCPSyncState);
+
+            let graph_ids = client
+                .aranya
+                .lock()
+                .await
+                .provider()
+                .list_graph_ids()?
+                .flatten()
+                .collect::<Vec<_>>();
+
+            let aqc = {
+                let peers = {
+                    let mut peers = BTreeMap::new();
+                    for graph_id in &graph_ids {
+                        let graph_peers = BiBTreeMap::from_iter(
+                            client
+                                .actions(graph_id)
+                                .query_aqc_network_names_off_graph()
+                                .await?,
+                        );
+                        peers.insert(*graph_id, graph_peers);
+                    }
+                    peers
+                };
+                Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
+            };
+
+            let api = DaemonApiServer::new(
+                client,
+                local_addr,
+                cfg.uds_api_path.clone(),
+                api_sk,
+                pk,
+                peers,
+                recv_effects,
+                aqc,
+            )?;
+            Ok(Self {
+                public_api_key,
+                sync_server,
+                syncer,
+                api,
+                span,
+            })
+        }
+        .instrument(info_span!(parent: span_id, "load"))
+        .await
     }
 
     /// Returns the daemon's public API key.
-    pub async fn public_api_key(&self) -> Result<PublicApiKey<CS>> {
-        self.setup_env().await?;
-
-        let mut eng = self.load_crypto_engine().await?;
-        let mut store = self.load_local_keystore().await?;
-        let sk = self.load_or_gen_api_sk(&mut eng, &mut store).await?;
-        sk.public().map_err(Into::into)
+    pub fn public_api_key(&self) -> &PublicApiKey<CS> {
+        &self.public_api_key
     }
 
     /// The daemon's entrypoint.
-    pub async fn run(self) -> Result<()> {
-        // Setup environment for daemon's working directory.
-        // E.g. creating subdirectories.
-        self.setup_env().await?;
-
+    pub fn spawn(mut self) -> DaemonHandle {
+        let _guard = self.span.enter();
         let mut set = JoinSet::new();
-
-        let mut aranya_store = self.load_aranya_keystore().await?;
-        let mut eng = self.load_crypto_engine().await?;
-        let pk = self
-            .load_or_gen_public_keys(&mut eng, &mut aranya_store)
-            .await?;
-
-        let mut local_store = self.load_local_keystore().await?;
-        let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
-
-        // Initialize Aranya syncer client.
-        let (client, local_addr) = {
-            let (client, server) = self
-                .setup_aranya(
-                    eng.clone(),
-                    aranya_store
-                        .try_clone()
-                        .context("unable to clone keystore")?,
-                    &pk,
-                    self.cfg.sync_addr,
-                )
-                .await?;
-            let local_addr = server.local_addr()?;
-            set.spawn(async move { server.serve().await });
-
-            (client, local_addr)
-        };
-
-        // Sync in the background at some specified interval.
-        let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects, TCPSyncState);
-        set.spawn(async move {
-            loop {
-                if let Err(err) = syncer.next().await {
-                    error!(err = ?err, "unable to sync with peer");
+        set.spawn(
+            self.sync_server
+                .serve()
+                .instrument(info_span!("sync-server")),
+        );
+        set.spawn(
+            async move {
+                loop {
+                    if let Err(err) = self.syncer.next().await {
+                        error!(?err, "unable to sync with peer");
+                    }
                 }
             }
-        });
-
-        let graph_ids = client
-            .aranya
-            .lock()
-            .await
-            .provider()
-            .list_graph_ids()?
-            .flatten()
-            .collect::<Vec<_>>();
-
-        let aqc = {
-            let peers = {
-                let mut peers = BTreeMap::new();
-                for graph_id in &graph_ids {
-                    let graph_peers = BiBTreeMap::from_iter(
-                        client
-                            .actions(graph_id)
-                            .query_aqc_network_names_off_graph()
-                            .await?,
-                    );
-                    peers.insert(*graph_id, graph_peers);
-                }
-                peers
-            };
-            Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
-        };
-
-        let api = DaemonApiServer::new(
-            client,
-            local_addr,
-            self.cfg.uds_api_path.clone(),
-            api_sk,
-            pk,
-            peers,
-            recv_effects,
-            aqc,
-        )?;
-        api.serve().await?;
-
-        Ok(())
+            .instrument(info_span!("syncer")),
+        );
+        set.spawn(self.api.serve().instrument(info_span!("api-server")));
+        DaemonHandle { set }
     }
 
     /// Initializes the environment (creates directories, etc.).
-    async fn setup_env(&self) -> Result<()> {
+    async fn setup_env(cfg: &Config) -> Result<()> {
         // These directories aren't created for us.
         for (name, path) in [
-            ("keystore", self.cfg.keystore_path()),
-            ("storage", self.cfg.storage_path()),
+            ("keystore", cfg.keystore_path()),
+            ("storage", cfg.storage_path()),
         ] {
             aranya_util::create_dir_all(&path)
                 .await
@@ -176,7 +213,7 @@ impl Daemon {
 
     /// Creates the Aranya client and server.
     async fn setup_aranya(
-        &self,
+        cfg: &Config,
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
@@ -187,8 +224,7 @@ impl Daemon {
         let aranya = Arc::new(Mutex::new(ClientState::new(
             EN::new(TEST_POLICY_1, eng, store, device_id)?,
             SP::new(
-                FileManager::new(self.cfg.storage_path())
-                    .context("unable to create `FileManager`")?,
+                FileManager::new(cfg.storage_path()).context("unable to create `FileManager`")?,
             ),
         )));
 
@@ -208,16 +244,16 @@ impl Daemon {
     }
 
     /// Loads the crypto engine.
-    async fn load_crypto_engine(&self) -> Result<CE> {
-        let key = load_or_gen_key(self.cfg.key_wrap_key_path()).await?;
+    async fn load_crypto_engine(cfg: &Config) -> Result<CE> {
+        let key = load_or_gen_key(cfg.key_wrap_key_path()).await?;
         Ok(CE::new(&key, Rng))
     }
 
     /// Loads the Aranya keystore.
     ///
     /// The Aranaya keystore contains Aranya's key material.
-    async fn load_aranya_keystore(&self) -> Result<AranyaStore<KS>> {
-        let dir = self.cfg.aranya_keystore_path();
+    async fn load_aranya_keystore(cfg: &Config) -> Result<AranyaStore<KS>> {
+        let dir = cfg.aranya_keystore_path();
         aranya_util::create_dir_all(&dir).await?;
         KS::open(&dir)
             .context("unable to open Aranya keystore")
@@ -228,8 +264,8 @@ impl Daemon {
     ///
     /// The local keystore contains key material for the daemon.
     /// E.g., its API key.
-    async fn load_local_keystore(&self) -> Result<LocalStore<KS>> {
-        let dir = self.cfg.local_keystore_path();
+    async fn load_local_keystore(cfg: &Config) -> Result<LocalStore<KS>> {
+        let dir = cfg.local_keystore_path();
         aranya_util::create_dir_all(&dir).await?;
         KS::open(&dir)
             .context("unable to open local keystore")
@@ -238,7 +274,7 @@ impl Daemon {
 
     /// Loads the daemon's [`PublicKeys`].
     async fn load_or_gen_public_keys<E, S>(
-        &self,
+        cfg: &Config,
         eng: &mut E,
         store: &mut AranyaStore<S>,
     ) -> Result<PublicKeys<E::CS>>
@@ -246,7 +282,7 @@ impl Daemon {
         E: Engine,
         S: KeyStore,
     {
-        let path = self.cfg.key_bundle_path();
+        let path = cfg.key_bundle_path();
         let bundle = match try_read_cbor(&path).await? {
             Some(bundle) => bundle,
             None => {
@@ -274,7 +310,7 @@ impl Daemon {
 
     /// Loads or generates the [`ApiKey`].
     async fn load_or_gen_api_sk<E, S>(
-        &self,
+        cfg: &Config,
         eng: &mut E,
         store: &mut LocalStore<S>,
     ) -> Result<ApiKey<E::CS>>
@@ -282,7 +318,7 @@ impl Daemon {
         E: Engine,
         S: KeyStore,
     {
-        let path = self.cfg.daemon_api_pk_path();
+        let path = cfg.daemon_api_pk_path();
         match try_read_cbor::<PublicApiKey<E::CS>>(&path).await? {
             Some(pk) => {
                 let id = pk.id()?;
@@ -307,11 +343,12 @@ impl Daemon {
     }
 }
 
-impl Drop for Daemon {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.cfg.uds_api_path);
-    }
-}
+// TODO(jdygert): Is this needed? Probably never gets run currently.
+// impl Drop for Daemon {
+//     fn drop(&mut self) {
+//         let _ = std::fs::remove_file(&self.cfg.uds_api_path);
+//     }
+// }
 
 /// Tries to read CBOR from `path`.
 async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<Option<T>> {
@@ -400,7 +437,7 @@ mod tests {
             .await
             .expect("should be able to load `Daemon`");
 
-        time::timeout(Duration::from_secs(1), daemon.run())
+        time::timeout(Duration::from_secs(1), daemon.spawn().join())
             .await
             .expect_err("`Timeout` should return Elapsed");
     }

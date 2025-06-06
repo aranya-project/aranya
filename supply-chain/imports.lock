@@ -2,74 +2,74 @@
 # cargo-vet imports lock
 
 [[publisher.aranya-aqc-util]]
-version = "0.3.0"
-when = "2025-05-19"
+version = "0.4.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-codegen]]
-version = "0.3.0"
-when = "2025-05-19"
+version = "0.3.1"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-core]]
-version = "0.4.0"
-when = "2025-05-19"
+version = "0.4.1"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-macro]]
-version = "0.3.0"
-when = "2025-05-19"
+version = "0.3.1"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto]]
-version = "0.6.0"
-when = "2025-05-19"
+version = "0.6.1"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto-ffi]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.9.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-device-ffi]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.9.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-envelope-ffi]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.9.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-fast-channels]]
-version = "0.7.0"
-when = "2025-05-19"
+version = "0.8.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-idam-ffi]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.9.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-libc]]
-version = "0.2.0"
-when = "2025-04-21"
+version = "0.3.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-perspective-ffi]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.9.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -80,26 +80,26 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-compiler]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.9.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-derive]]
-version = "0.5.1"
-when = "2025-05-19"
+version = "0.5.2"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.9.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-build]]
-version = "0.4.0"
-when = "2025-04-21"
+version = "0.4.2"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -110,26 +110,26 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-lang]]
-version = "0.4.1"
-when = "2025-05-19"
+version = "0.4.2"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-module]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.9.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-vm]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.9.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-runtime]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.9.0"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -207,7 +207,7 @@ who = "Alex Crichton <alex@alexcrichton.com>"
 criteria = "safe-to-deploy"
 user-id = 73222 # wasmtime-publish
 start = "2023-01-01"
-end = "2025-05-08"
+end = "2026-06-03"
 notes = """
 The Bytecode Alliance uses the `wasmtime-publish` crates.io account to automate
 publication of this crate from CI. This repository requires all PRs are reviewed
@@ -982,6 +982,24 @@ For more detailed unsafe review notes please see https://crrev.com/c/6362797
 """
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
+[[audits.google.audits.rand_chacha]]
+who = "Lukasz Anforowicz <lukasza@chromium.org>"
+criteria = "safe-to-deploy"
+version = "0.3.1"
+notes = """
+For more detailed unsafe review notes please see https://crrev.com/c/6362797
+"""
+aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
+
+[[audits.google.audits.rand_core]]
+who = "Lukasz Anforowicz <lukasza@chromium.org>"
+criteria = "safe-to-deploy"
+version = "0.6.4"
+notes = """
+For more detailed unsafe review notes please see https://crrev.com/c/6362797
+"""
+aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
+
 [[audits.google.audits.regex-syntax]]
 who = "Manish Goregaokar <manishearth@google.com>"
 criteria = "safe-to-deploy"
@@ -1517,10 +1535,20 @@ who = "David Cook <dcook@divviup.org>"
 criteria = "safe-to-deploy"
 version = "0.3.1"
 
+[[audits.isrg.audits.rand_chacha]]
+who = "David Cook <dcook@divviup.org>"
+criteria = "safe-to-deploy"
+delta = "0.3.1 -> 0.9.0"
+
 [[audits.isrg.audits.rand_core]]
 who = "David Cook <dcook@divviup.org>"
 criteria = "safe-to-deploy"
 version = "0.6.3"
+
+[[audits.isrg.audits.rand_core]]
+who = "David Cook <dcook@divviup.org>"
+criteria = "safe-to-deploy"
+delta = "0.6.4 -> 0.9.3"
 
 [[audits.isrg.audits.sha2]]
 who = "David Cook <dcook@divviup.org>"

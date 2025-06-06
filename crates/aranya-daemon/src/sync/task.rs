@@ -220,7 +220,6 @@ impl<ST> Syncer<ST> {
 
 impl<ST: SyncState> Syncer<ST> {
     /// Syncs with the next peer in the list.
-    #[instrument(skip_all)]
     pub async fn next(&mut self) -> Result<()> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
