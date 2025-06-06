@@ -259,11 +259,11 @@ impl AqcClient {
             .quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
             .await?;
-        conn.keep_alive(true)?;
         let mut stream = conn.open_bidirectional_stream().await?;
         let msg = AqcCtrlMessage { team_id, ctrl };
         let msg_bytes = postcard::to_stdvec(&msg).assume("can serialize")?;
         stream.send(Bytes::from_owner(msg_bytes)).await?;
+        let _ = stream.close().await;
         if let Some(msg_bytes) = stream.receive().await? {
             let msg = postcard::from_bytes::<AqcAckMessage>(&msg_bytes).map_err(AqcError::Serde)?;
             match msg {
@@ -271,7 +271,6 @@ impl AqcClient {
                 AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
             }
         }
-        stream.close().await?;
         Ok(())
     }
 
@@ -295,7 +294,7 @@ impl AqcClient {
                     .send(Bytes::from(ack_bytes))
                     .await
                     .map_err(AqcError::from)?;
-                //stream.close().await.map_err(AqcError::from)?;
+                let _ = stream.close().await;
             }
             Err(e) => {
                 error!("Failed to deserialize AqcCtrlMessage: {}", e);
