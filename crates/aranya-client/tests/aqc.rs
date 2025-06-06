@@ -4,7 +4,7 @@ use std::time::Duration;
 
 mod common;
 use anyhow::Result;
-use aranya_client::{aqc::AqcPeerChannel, TeamConfig};
+use aranya_client::{aqc::AqcPeerChannel, config::QuicSyncConfig, TeamConfig};
 use aranya_crypto::csprng::rand;
 use aranya_daemon_api::{ChanOp, NetIdentifier};
 use buggy::BugExt;
@@ -43,9 +43,8 @@ async fn test_aqc_chans() -> Result<()> {
 
     // Add graph to devices
     let cfg = {
-        let identity = psk.identity();
-        let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(identity, secret).build()?
+        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
     };
     let [_owner, rest @ ..] = team.devices();
 
@@ -293,9 +292,8 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
 
     // Add graph to devices
     let cfg = {
-        let identity = psk.identity();
-        let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(identity, secret).build()?
+        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
     };
     let [_owner, rest @ ..] = team.devices();
 
@@ -401,9 +399,8 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     // Add graph to devices
     let cfg = {
-        let identity = psk.identity();
-        let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(identity, secret).build()?
+        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
     };
     let [_owner, rest @ ..] = team.devices();
 
@@ -509,9 +506,8 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     // Add graph to devices
     let cfg = {
-        let identity = psk.identity();
-        let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(identity, secret).build()?
+        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
     };
     let [_owner, rest @ ..] = team.devices();
 
@@ -670,9 +666,8 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     // Add graph to devices
     let cfg = {
-        let identity = psk.identity();
-        let secret = psk.raw_secret_bytes();
-        TeamConfig::builder().psk(identity, secret).build()?
+        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
     };
     let [_owner, rest @ ..] = team.devices();
 

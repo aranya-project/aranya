@@ -366,26 +366,24 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::TeamConfig,
     ) -> api::Result<()> {
-        if let Some(data) = &self.quic {
-            let quic_sync::Data {
-                service_name,
-                psk_send,
-            } = data;
+        if let Some(cfg) = cfg.quic_sync {
+            let quic_data = self.quic.as_ref().context("quic syncing is not enabled")?;
 
-            let (Some(identity), Some(secret)) = (cfg.psk_identity, cfg.psk_secret) else {
-                return Err(anyhow::anyhow!("Invalid Team Config for `add_team`. Expected `psk_identity` and `psk_secret` fields to be set").into());
-            };
-            let psk = PresharedKey::external(&identity, secret.raw_secret_bytes())
+            let identity = cfg.psk().identity();
+            let secret = cfg.psk().raw_secret_bytes();
+            let psk = PresharedKey::external(identity, secret)
                 .context("unable to create PSK")?
                 .with_hash_alg(HashAlgorithm::SHA384)
                 .expect("Valid hash algorithm");
-            psk_send.send(Msg::Insert((team, Arc::new(psk))))?;
-            insert_psk(service_name, &team, &identity, secret.raw_secret_bytes())?;
 
-            Ok(())
-        } else {
-            todo!("Only implemented when using the QUIC syncer. Implement for other syncer types")
+            quic_data
+                .psk_send
+                .send(Msg::Insert((team, Arc::new(psk))))?;
+            insert_psk(&quic_data.service_name, &team, identity, secret)?;
         }
+
+        // TODO: Implement for other syncer types
+        Ok(())
     }
 
     #[instrument(skip(self))]

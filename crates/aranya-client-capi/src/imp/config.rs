@@ -4,7 +4,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::Secret;
+use aranya_daemon_api::QuicSyncPSK;
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -242,18 +242,84 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct QuicSyncConfig {
+    psk: QuicSyncPSK,
+}
+
+impl QuicSyncConfig {
+    pub fn builder() -> QuicSyncConfigBuilder {
+        QuicSyncConfigBuilder::default()
+    }
+}
+
+impl Typed for QuicSyncConfig {
+    const TYPE_ID: TypeId = TypeId::new(0xADF0F970);
+}
+
+impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
+    fn from(value: QuicSyncConfig) -> Self {
+        Self::builder()
+            .psk(value.psk)
+            .build()
+            .expect("All fields are set")
+    }
+}
+
+#[derive(Default)]
+pub struct QuicSyncConfigBuilder {
+    psk: Option<QuicSyncPSK>,
+}
+
+impl QuicSyncConfigBuilder {
+    /// Sets the psk.
+    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
+        self.psk = Some(psk);
+        self
+    }
+
+    /// Sets the psk.
+    pub fn build(self) -> Result<QuicSyncConfig, Error> {
+        let Some(psk) = self.psk else {
+            return Err(InvalidArg::new("psk", "`psk` field not set").into());
+        };
+
+        Ok(QuicSyncConfig { psk })
+    }
+}
+
+impl Typed for QuicSyncConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0xEEC2FA47);
+}
+
+impl Builder for QuicSyncConfigBuilder {
+    type Output = defs::QuicSyncConfig;
+    type Error = Error;
+
+    /// # Safety
+    ///
+    /// No special considerations.
+    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
+        let Some(psk) = self.psk else {
+            return Err(InvalidArg::new("psk", "`psk` field not set").into());
+        };
+
+        Self::Output::init(out, QuicSyncConfig { psk });
+        Ok(())
+    }
+}
+
 /// Configuration info when creating or adding a team in Aranya
 #[derive(Clone, Debug)]
 pub struct TeamConfig {
-    psk_identity: Option<Box<[u8]>>,
-    psk_secret: Option<Secret>,
+    quic_sync: Option<QuicSyncConfig>,
 }
 
 impl From<TeamConfig> for aranya_client::TeamConfig {
     fn from(value: TeamConfig) -> Self {
         let mut builder = Self::builder();
-        if let (Some(identity), Some(secret)) = (value.psk_identity, value.psk_secret) {
-            builder = builder.psk(identity, secret);
+        if let Some(cfg) = value.quic_sync {
+            builder = builder.quic_sync(cfg.into());
         }
 
         builder.build().expect("All fields set")
@@ -273,8 +339,7 @@ impl Typed for TeamConfig {
 /// Builder for a [`TeamConfig`]
 #[derive(Clone, Debug, Default)]
 pub struct TeamConfigBuilder {
-    psk_identity: Option<Box<[u8]>>,
-    psk_secret: Option<Secret>,
+    quic_sync: Option<QuicSyncConfig>,
 }
 
 impl Typed for TeamConfigBuilder {
@@ -292,8 +357,7 @@ impl Builder for TeamConfigBuilder {
         Self::Output::init(
             out,
             TeamConfig {
-                psk_identity: self.psk_identity,
-                psk_secret: self.psk_secret,
+                quic_sync: self.quic_sync,
             },
         );
         Ok(())

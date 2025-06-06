@@ -10,7 +10,7 @@
 )]
 
 use anyhow::{bail, Context, Result};
-use aranya_client::TeamConfig;
+use aranya_client::{QuicSyncConfig, TeamConfig};
 use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
@@ -38,9 +38,8 @@ async fn test_sync_now() -> Result<()> {
 
     if let Some(psk) = maybe_psk {
         let cfg = {
-            let identity = psk.identity();
-            let secret = psk.raw_secret_bytes();
-            TeamConfig::builder().psk(identity, secret).build()?
+            let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+            TeamConfig::builder().quic_sync(qs_cfg).build()?
         };
 
         team.admin.client.add_team(team_id, cfg.clone()).await?;
@@ -104,9 +103,8 @@ async fn test_query_functions() -> Result<()> {
 
     if let Some(psk) = maybe_psk {
         let cfg = {
-            let identity = psk.identity();
-            let secret = psk.raw_secret_bytes();
-            TeamConfig::builder().psk(identity, secret).build()?
+            let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+            TeamConfig::builder().quic_sync(qs_cfg).build()?
         };
 
         team.admin.client.add_team(team_id, cfg.clone()).await?;
@@ -164,9 +162,8 @@ async fn test_add_team() -> Result<()> {
 
     if let Some(psk) = maybe_psk {
         let cfg = {
-            let identity = psk.identity();
-            let secret = psk.raw_secret_bytes();
-            TeamConfig::builder().psk(identity, secret).build()?
+            let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+            TeamConfig::builder().quic_sync(qs_cfg).build()?
         };
 
         // Grab the shorthand for our address.

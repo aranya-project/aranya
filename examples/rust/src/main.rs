@@ -6,7 +6,9 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{aqc::AqcPeerChannel, client::Client, Error, SyncPeerConfig, TeamConfig};
+use aranya_client::{
+    aqc::AqcPeerChannel, client::Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
+};
 use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -238,11 +240,12 @@ async fn main() -> Result<()> {
     let mut memberb_team = memberb.client.team(team_id);
 
     // add team to each non-owner device's local store
-    let cfg_with_psk = TeamConfig::builder()
-        .psk(psk.identity(), psk.raw_secret_bytes())
-        .build()?;
+    let cfg_with_qs = {
+        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
+    };
     for member in [&admin_team, &operator_team, &membera_team, &memberb_team] {
-        member.add_team(cfg_with_psk.clone()).await?;
+        member.add_team(cfg_with_qs.clone()).await?;
     }
 
     info!("adding admin to team");

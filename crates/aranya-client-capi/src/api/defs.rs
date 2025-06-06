@@ -671,11 +671,36 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
     cfg.aqc((**aqc_config).clone());
 }
 
-#[aranya_capi_core::opaque(size = 48, align = 8)]
+#[aranya_capi_core::opaque(size = 64, align = 8)]
+pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
+
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 64, align = 8)]
+pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
+
+/// Attempts to construct a [`TeamConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param cfg a pointer to the team config builder
+/// @param out a pointer to write the team config to
+pub fn quic_sync_config_build(
+    cfg: OwnedPtr<QuicSyncConfigBuilder>,
+    out: &mut MaybeUninit<QuicSyncConfig>,
+) -> Result<(), imp::Error> {
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
+    Ok(())
+}
+
+// Stop
+
+#[aranya_capi_core::opaque(size = 64, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 48, align = 8)]
+#[aranya_capi_core::opaque(size = 64, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 
 /// Attempts to construct a [`TeamConfig`].

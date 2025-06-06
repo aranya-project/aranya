@@ -10,7 +10,7 @@ use core::{
 };
 use std::collections::hash_map::{self, HashMap};
 
-use anyhow::bail;
+use anyhow::{bail, Context as _};
 pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
@@ -135,12 +135,52 @@ pub enum Role {
     Member,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct QsPSK {
+    psk_identity: Box<[u8]>,
+    psk_secret: Secret,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct QuicSyncConfig {
+    psk: QuicSyncPSK,
+}
+
+impl QuicSyncConfig {
+    pub fn builder() -> QuicSyncConfigBuilder {
+        QuicSyncConfigBuilder::default()
+    }
+
+    pub fn psk(&self) -> &QuicSyncPSK {
+        &self.psk
+    }
+}
+
+#[derive(Default)]
+pub struct QuicSyncConfigBuilder {
+    psk: Option<QuicSyncPSK>,
+}
+
+impl QuicSyncConfigBuilder {
+    /// Configures the psk fields.
+    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
+        self.psk = Some(psk);
+
+        self
+    }
+
+    pub fn build(self) -> anyhow::Result<QuicSyncConfig> {
+        Ok(QuicSyncConfig {
+            psk: self.psk.context("Missing PSK field")?,
+        })
+    }
+}
+
 /// A configuration for creating or adding a team to a daemon.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TeamConfig {
     // TODO(nikki): any fields added to this should be public
-    pub psk_identity: Option<Box<[u8]>>,
-    pub psk_secret: Option<Secret>,
+    pub quic_sync: Option<QuicSyncConfig>,
 }
 
 /// A device's network identifier.

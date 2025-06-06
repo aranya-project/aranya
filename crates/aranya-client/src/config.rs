@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use aranya_daemon_api::Secret;
+use aranya_daemon_api::QuicSyncPSK;
 
 use crate::{error::InvalidArg, ConfigError, Result};
 
@@ -83,10 +83,46 @@ impl Default for SyncPeerConfigBuilder {
 }
 
 #[derive(Clone)]
+pub struct QuicSyncConfig {
+    psk: QuicSyncPSK,
+}
+
+impl QuicSyncConfig {
+    pub fn builder() -> QuicSyncConfigBuilder {
+        QuicSyncConfigBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct QuicSyncConfigBuilder {
+    psk: Option<QuicSyncPSK>,
+}
+
+impl QuicSyncConfigBuilder {
+    /// Sets the psk.
+    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
+        self.psk = Some(psk);
+        self
+    }
+
+    /// Sets the psk.
+    pub fn build(self) -> Result<QuicSyncConfig> {
+        let Some(psk) = self.psk else {
+            return Err(ConfigError::InvalidArg(InvalidArg::new(
+                "psk",
+                "must call `QuicSyncConfigBuilder::psk`",
+            ))
+            .into());
+        };
+
+        Ok(QuicSyncConfig { psk })
+    }
+}
+
+#[derive(Clone)]
 /// Configuration info for adding and creating teams.
 pub struct TeamConfig {
-    psk_identity: Option<Box<[u8]>>,
-    psk_secret: Option<Secret>,
+    quic_sync: Option<QuicSyncConfig>,
 }
 
 impl TeamConfig {
@@ -96,20 +132,27 @@ impl TeamConfig {
     }
 }
 
+impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
+    fn from(value: QuicSyncConfig) -> Self {
+        Self::builder()
+            .psk(value.psk)
+            .build()
+            .expect("All fields are set")
+    }
+}
+
 impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
     fn from(value: TeamConfig) -> Self {
         Self {
-            psk_identity: value.psk_identity,
-            psk_secret: value.psk_secret,
+            quic_sync: value.quic_sync.map(Into::into),
         }
     }
 }
 
 /// Builder for a [`TeamConfig`]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct TeamConfigBuilder {
-    psk_identity: Option<Box<[u8]>>,
-    psk_secret: Option<Secret>,
+    quic_sync: Option<QuicSyncConfig>,
 }
 
 impl TeamConfigBuilder {
@@ -118,10 +161,9 @@ impl TeamConfigBuilder {
         Self::default()
     }
 
-    /// Configures the psk fields.
-    pub fn psk<I: Into<Box<[u8]>>, S: Into<Secret>>(mut self, identity: I, secret: S) -> Self {
-        self.psk_identity = Some(identity.into());
-        self.psk_secret = Some(secret.into());
+    /// Configures the quic_sync config.
+    pub fn quic_sync(mut self, cfg: QuicSyncConfig) -> Self {
+        self.quic_sync = Some(cfg);
 
         self
     }
@@ -129,8 +171,7 @@ impl TeamConfigBuilder {
     /// Attempts to build a [`TeamConfig`] using the provided parameters.
     pub fn build(self) -> Result<TeamConfig> {
         Ok(TeamConfig {
-            psk_identity: self.psk_identity,
-            psk_secret: self.psk_secret,
+            quic_sync: self.quic_sync,
         })
     }
 }
