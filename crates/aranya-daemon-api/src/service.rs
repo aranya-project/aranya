@@ -10,7 +10,7 @@ use core::{
 };
 use std::collections::hash_map::{self, HashMap};
 
-use anyhow::bail;
+use anyhow::{bail, Context as _};
 pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
@@ -18,7 +18,7 @@ use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    Id,
+    Csprng, Id, Random,
 };
 use aranya_util::Addr;
 use buggy::Bug;
@@ -35,6 +35,13 @@ pub type CS = DefaultCipherSuite;
 // TODO: enum?
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Error(String);
+
+impl Error {
+    pub fn from_err<E: error::Error>(err: E) -> Self {
+        error!(?err);
+        Self(format!("{err:?}"))
+    }
+}
 
 impl From<Bug> for Error {
     fn from(err: Bug) -> Self {
@@ -59,6 +66,13 @@ impl From<semver::Error> for Error {
 
 impl From<aranya_crypto::id::IdError> for Error {
     fn from(err: aranya_crypto::id::IdError) -> Self {
+        error!(%err);
+        Self(err.to_string())
+    }
+}
+
+impl<T> From<tokio::sync::broadcast::error::SendError<T>> for Error {
+    fn from(err: tokio::sync::broadcast::error::SendError<T>) -> Self {
         error!(%err);
         Self(err.to_string())
     }
@@ -99,6 +113,11 @@ custom_id! {
     pub struct AqcUniChannelId;
 }
 
+custom_id! {
+    /// A PSK ID.
+    pub struct PskId;
+}
+
 /// A device's public key bundle.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KeyBundle {
@@ -116,10 +135,52 @@ pub enum Role {
     Member,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct QsPSK {
+    psk_identity: Box<[u8]>,
+    psk_secret: Secret,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct QuicSyncConfig {
+    psk: QuicSyncPSK,
+}
+
+impl QuicSyncConfig {
+    pub fn builder() -> QuicSyncConfigBuilder {
+        QuicSyncConfigBuilder::default()
+    }
+
+    pub fn psk(&self) -> &QuicSyncPSK {
+        &self.psk
+    }
+}
+
+#[derive(Default)]
+pub struct QuicSyncConfigBuilder {
+    psk: Option<QuicSyncPSK>,
+}
+
+impl QuicSyncConfigBuilder {
+    /// Configures the psk fields.
+    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
+        self.psk = Some(psk);
+
+        self
+    }
+
+    pub fn build(self) -> anyhow::Result<QuicSyncConfig> {
+        Ok(QuicSyncConfig {
+            psk: self.psk.context("Missing PSK field")?,
+        })
+    }
+}
+
 /// A configuration for creating or adding a team to a daemon.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TeamConfig {
     // TODO(nikki): any fields added to this should be public
+    pub quic_sync: Option<QuicSyncConfig>,
 }
 
 /// A device's network identifier.
@@ -193,6 +254,38 @@ impl ZeroizeOnDrop for Secret {}
 impl Drop for Secret {
     fn drop(&mut self) {
         self.0.zeroize()
+    }
+}
+
+/// A secret key.
+// TODO(Steve): Replace?
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QuicSyncPSK {
+    id: PskId,
+    secret: Secret,
+}
+
+impl QuicSyncPSK {
+    /// Creates a new instance.
+    pub fn new<R: Csprng>(rng: &mut R) -> Self {
+        let random_bytes = <[u8; 32] as Random>::random(rng);
+
+        Self {
+            id: PskId::random(rng),
+            secret: Secret::from(random_bytes),
+        }
+    }
+
+    /// Return the id bytes.
+    #[inline]
+    pub fn identity(&self) -> &[u8] {
+        self.id.as_bytes()
+    }
+
+    /// Return the secret bytes.
+    #[inline]
+    pub fn raw_secret_bytes(&self) -> &[u8] {
+        self.secret.raw_secret_bytes()
     }
 }
 
@@ -568,6 +661,12 @@ pub struct Label {
     pub name: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateTeamResponse {
+    pub team_id: TeamId,
+    pub psk: Option<QuicSyncPSK>,
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
     /// Returns the daemon's version.
@@ -598,7 +697,7 @@ pub trait DaemonApi {
     async fn remove_team(team: TeamId) -> Result<()>;
 
     /// Create a new graph/team with the current device as the owner.
-    async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
+    async fn create_team(cfg: TeamConfig) -> Result<CreateTeamResponse>;
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 

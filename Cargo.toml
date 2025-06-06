@@ -60,12 +60,13 @@ aranya-keygen = { version = "0.6.0", path = "crates/aranya-keygen" }
 aranya-util = { version = "0.6.0", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
-bytes = { version = "1.0" }
 backon = { version = "1.2.0" }
+bytes = { version = "1.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 futures-lite = { version = "2.6.0" }
 futures-util = { version = "0.3.30" }
+keyring = { version = "3.6", features = ["apple-native", "linux-native"] }
 heapless = { version = "0.8", default-features = false }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }

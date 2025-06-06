@@ -1,5 +1,7 @@
 use core::time::Duration;
 
+use aranya_daemon_api::QuicSyncPSK;
+
 use crate::{error::InvalidArg, ConfigError, Result};
 
 /// Configuration info for syncing with a peer.
@@ -80,9 +82,47 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
+#[derive(Clone)]
+pub struct QuicSyncConfig {
+    psk: QuicSyncPSK,
+}
+
+impl QuicSyncConfig {
+    pub fn builder() -> QuicSyncConfigBuilder {
+        QuicSyncConfigBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct QuicSyncConfigBuilder {
+    psk: Option<QuicSyncPSK>,
+}
+
+impl QuicSyncConfigBuilder {
+    /// Sets the psk.
+    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
+        self.psk = Some(psk);
+        self
+    }
+
+    /// Sets the psk.
+    pub fn build(self) -> Result<QuicSyncConfig> {
+        let Some(psk) = self.psk else {
+            return Err(ConfigError::InvalidArg(InvalidArg::new(
+                "psk",
+                "must call `QuicSyncConfigBuilder::psk`",
+            ))
+            .into());
+        };
+
+        Ok(QuicSyncConfig { psk })
+    }
+}
+
+#[derive(Clone)]
 /// Configuration info for adding and creating teams.
 pub struct TeamConfig {
-    _priv: (),
+    quic_sync: Option<QuicSyncConfig>,
 }
 
 impl TeamConfig {
@@ -92,16 +132,27 @@ impl TeamConfig {
     }
 }
 
+impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
+    fn from(value: QuicSyncConfig) -> Self {
+        Self::builder()
+            .psk(value.psk)
+            .build()
+            .expect("All fields are set")
+    }
+}
+
 impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
-    fn from(_value: TeamConfig) -> Self {
-        Self {}
+    fn from(value: TeamConfig) -> Self {
+        Self {
+            quic_sync: value.quic_sync.map(Into::into),
+        }
     }
 }
 
 /// Builder for a [`TeamConfig`]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Default)]
 pub struct TeamConfigBuilder {
-    _priv: (),
+    quic_sync: Option<QuicSyncConfig>,
 }
 
 impl TeamConfigBuilder {
@@ -110,8 +161,17 @@ impl TeamConfigBuilder {
         Self::default()
     }
 
+    /// Configures the quic_sync config.
+    pub fn quic_sync(mut self, cfg: QuicSyncConfig) -> Self {
+        self.quic_sync = Some(cfg);
+
+        self
+    }
+
     /// Attempts to build a [`TeamConfig`] using the provided parameters.
     pub fn build(self) -> Result<TeamConfig> {
-        Ok(TeamConfig { _priv: () })
+        Ok(TeamConfig {
+            quic_sync: self.quic_sync,
+        })
     }
 }

@@ -35,6 +35,9 @@ pub struct Config {
     /// AQC configuration.
     #[serde(default)]
     pub aqc: Option<AqcConfig>,
+
+    /// QUIC syncer config
+    pub quic_sync: Option<QSConfig>,
 }
 
 impl Config {
@@ -126,6 +129,18 @@ pub struct AfcConfig {
 #[serde(deny_unknown_fields)]
 pub struct AqcConfig {}
 
+/// QUIC syncer configuration.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QSConfig {
+    /// The service name used by Keyring's [`keyring::Entry`] API
+    /// See the documentation for each Platform's credential store
+    /// to see what the service name maps to.
+    ///
+    /// This value should not be blank.
+    pub service_name: String,
+}
+
 #[cfg(test)]
 mod tests {
     use std::net::Ipv4Addr;
@@ -145,10 +160,14 @@ mod tests {
             uds_api_path: "/var/run/uds.sock".parse()?,
             pid_file: "/var/run/hub.pid".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
+            quic_sync: Some(QSConfig {
+                service_name: "Aranya-QUIC-sync".into(),
+            }),
             afc: None,
             aqc: None,
         };
         assert_eq!(got, want);
+
         Ok(())
     }
 }

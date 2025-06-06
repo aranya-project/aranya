@@ -1,9 +1,18 @@
 #![allow(dead_code)]
-use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    fmt,
+    net::{Ipv4Addr, SocketAddr},
+    path::PathBuf,
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
-use aranya_client::{client::Client, SyncPeerConfig};
-use aranya_daemon::{config::Config, Daemon};
+use aranya_client::{client::Client, QuicSyncConfig, SyncPeerConfig, TeamConfig};
+use aranya_crypto::{csprng::rand::RngCore, Rng};
+use aranya_daemon::{
+    config::{Config, QSConfig},
+    Daemon,
+};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
@@ -129,7 +138,7 @@ impl TeamCtx {
         })
     }
 
-    fn devices(&mut self) -> [&mut DeviceCtx; 5] {
+    pub(super) fn devices(&mut self) -> [&mut DeviceCtx; 5] {
         [
             &mut self.owner,
             &mut self.admin,
@@ -207,6 +216,50 @@ impl TeamCtx {
 
         Ok(())
     }
+
+    pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
+        // Create the initial team, and get our TeamId and PSK.
+        let cfg = TeamConfig::builder().build()?;
+        let response = {
+            self.owner
+                .client
+                .create_team(cfg.clone())
+                .await
+                .expect("expected to create team")
+        };
+        info!(?response.team_id);
+
+        let cfg = match response.psk {
+            Some(psk) => {
+                let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+                TeamConfig::builder().quic_sync(qs_cfg).build()?
+            }
+            None => cfg,
+        };
+
+        self.admin
+            .client
+            .team(response.team_id)
+            .add_team(cfg.clone())
+            .await?;
+        self.operator
+            .client
+            .team(response.team_id)
+            .add_team(cfg.clone())
+            .await?;
+        self.membera
+            .client
+            .team(response.team_id)
+            .add_team(cfg.clone())
+            .await?;
+        self.memberb
+            .client
+            .team(response.team_id)
+            .add_team(cfg)
+            .await?;
+
+        Ok(response.team_id)
+    }
 }
 
 pub struct DeviceCtx {
@@ -217,20 +270,28 @@ pub struct DeviceCtx {
 }
 
 impl DeviceCtx {
-    async fn new(_team_name: &str, _name: &str, work_dir: PathBuf, port: u16) -> Result<Self> {
+    async fn new(team_name: &str, name: &str, work_dir: PathBuf, port: u16) -> Result<Self> {
         let aqc_addr = Addr::new("127.0.0.1", port).expect("unable to init AQC address");
         fs::create_dir_all(work_dir.clone()).await?;
 
         // Setup daemon config.
         let uds_api_path = work_dir.join("uds.sock");
+
+        // Reduce chance of having a collision in the storage
+        let combined_name = format!("{team_name}-{name}");
+        let service_name = Self::gen_service_name(&combined_name, &mut Rng);
+
+        let quic_sync = Some(QSConfig { service_name });
+
         let cfg = Config {
             name: "daemon".into(),
             work_dir: work_dir.clone(),
             uds_api_path: uds_api_path.clone(),
             pid_file: work_dir.join("pid"),
-            sync_addr: Addr::new("localhost", 0)?,
+            sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
             afc: None,
             aqc: None,
+            quic_sync,
         };
 
         // Load daemon from config.
@@ -280,6 +341,17 @@ impl DeviceCtx {
 
     pub async fn aqc_client_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.aqc_client_addr().await?)
+    }
+
+    fn gen_service_name(name: &str, rng: &mut Rng) -> String {
+        let exe_name = std::env::current_exe()
+            .ok()
+            .map(PathBuf::into_os_string)
+            .and_then(|s| s.into_string().ok())
+            .unwrap_or_else(|| String::from("test-device"));
+        let pid = std::process::id();
+        let rand_int = rng.next_u32();
+        format!("{exe_name}-{name}-daemon-{pid}-{rand_int}")
     }
 }
 

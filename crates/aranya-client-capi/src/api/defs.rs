@@ -3,12 +3,13 @@ use core::{
     ffi::{c_char, CStr},
     ptr,
 };
-use std::{ffi::OsStr, os::unix::ffi::OsStrExt, str::FromStr};
+use std::{ffi::OsStr, ops::Deref, os::unix::ffi::OsStrExt, str::FromStr};
 
 use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_crypto::hex;
+use aranya_daemon_api::CreateTeamResponse;
 use bytes::Bytes;
 use tracing::error;
 
@@ -671,11 +672,36 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
     cfg.aqc((**aqc_config).clone());
 }
 
-#[aranya_capi_core::opaque(size = 24, align = 8)]
+#[aranya_capi_core::opaque(size = 64, align = 8)]
+pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
+
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 64, align = 8)]
+pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
+
+/// Attempts to construct a [`TeamConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param cfg a pointer to the team config builder
+/// @param out a pointer to write the team config to
+pub fn quic_sync_config_build(
+    cfg: OwnedPtr<QuicSyncConfigBuilder>,
+    out: &mut MaybeUninit<QuicSyncConfig>,
+) -> Result<(), imp::Error> {
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
+    Ok(())
+}
+
+// Stop
+
+#[aranya_capi_core::opaque(size = 64, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 16, align = 8)]
+#[aranya_capi_core::opaque(size = 64, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 
 /// Attempts to construct a [`TeamConfig`].
@@ -915,9 +941,11 @@ pub fn revoke_label(
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.imp();
-    let cfg = aranya_client::TeamConfig::builder().build()?;
-    let id = client.rt.block_on(client.inner.create_team(cfg))?;
-    Ok(id.into())
+    let cfg: &imp::TeamConfig = cfg.deref();
+    // FIXME(Steve): Return id and psk with out params
+    let CreateTeamResponse { team_id, .. } =
+        client.rt.block_on(client.inner.create_team(cfg.into()))?;
+    Ok(team_id.into())
 }
 
 /// Add a team to the local device store.
@@ -932,10 +960,11 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.imp();
-    let cfg = aranya_client::TeamConfig::builder().build()?;
+
+    let cfg: &imp::TeamConfig = cfg.deref();
     client
         .rt
-        .block_on(client.inner.add_team(team.into(), cfg))?;
+        .block_on(client.inner.team(team.into()).add_team(cfg.into()))?;
     Ok(())
 }
 
