@@ -271,6 +271,7 @@ impl AqcClient {
                 AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
             }
         }
+        stream.close().await?;
         Ok(())
     }
 
@@ -294,7 +295,7 @@ impl AqcClient {
                     .send(Bytes::from(ack_bytes))
                     .await
                     .map_err(AqcError::from)?;
-                stream.close().await.map_err(AqcError::from)?;
+                //stream.close().await.map_err(AqcError::from)?;
             }
             Err(e) => {
                 error!("Failed to deserialize AqcCtrlMessage: {}", e);
