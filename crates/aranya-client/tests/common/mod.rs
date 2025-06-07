@@ -246,12 +246,10 @@ impl DeviceCtx {
         }
         let uds_path = cfg.uds_api_sock();
 
-        // Load daemon from config.
+        // Load and start daemon from config.
         let daemon = Daemon::load(cfg.clone())
             .await
             .context("unable to init daemon")?;
-        let pk = daemon.public_api_key().await?;
-        let pk_bytes = pk.encode()?;
         let handle = task::spawn(async move {
             daemon
                 .run()
@@ -260,14 +258,13 @@ impl DeviceCtx {
         })
         .abort_handle();
 
-        // give daemon time to setup UDS API.
+        // give daemon time to setup UDS API and write the public key.
         sleep(SLEEP_INTERVAL).await;
 
-        // Initialize the user library.
+        // Initialize the user library - the client will automatically load the daemon's public key.
         let mut client = (|| {
             Client::builder()
                 .with_daemon_uds_path(&uds_path)
-                .with_daemon_api_pk(&pk_bytes)
                 .with_daemon_aqc_addr(&aqc_addr)
                 .connect()
         })

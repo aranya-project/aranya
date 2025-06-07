@@ -25,6 +25,7 @@ anyhow = { workspace = true }
 aranya-crypto = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
+ciborium = { workspace = true }
 futures-lite = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }

@@ -13,8 +13,10 @@ use aranya_daemon_api::{
     Version, CS,
 };
 use aranya_util::Addr;
+use ciborium as cbor;
+use serde::de::DeserializeOwned;
 use tarpc::context;
-use tokio::net::UnixStream;
+use tokio::{fs, net::UnixStream};
 use tracing::{debug, info, instrument};
 
 use crate::{
@@ -60,8 +62,6 @@ pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]
     uds_path: Option<&'a Path>,
-    // The daemon's public key.
-    pk: Option<&'a [u8]>,
     // AQC address.
     aqc_addr: Option<&'a Addr>,
 }
@@ -70,7 +70,6 @@ impl ClientBuilder<'_> {
     pub fn new() -> Self {
         Self {
             uds_path: None,
-            pk: None,
             aqc_addr: None,
         }
     }
@@ -84,13 +83,28 @@ impl ClientBuilder<'_> {
             ))
             .into());
         };
-        let Some(pk) = &self.pk else {
-            return Err(IpcError::new(InvalidArg::new(
-                "with_daemon_api_pk",
-                "must specify the daemon's public key",
-            ))
-            .into());
+
+        // Load the public key from the UDS directory
+        let uds_dir = sock
+            .parent()
+            .context("UDS path must have a parent directory")
+            .map_err(IpcError::new)?;
+        let api_pk_path = uds_dir.join("api.pk");
+
+        let pk_bytes = match try_read_cbor::<PublicApiKey<CS>>(&api_pk_path).await {
+            Ok(Some(pk)) => pk.encode().map_err(IpcError::new)?,
+            Ok(None) => {
+                return Err(IpcError::new(InvalidArg::new(
+                    "public key",
+                    "daemon's public API key not found. Ensure the daemon has written its public key to the UDS directory",
+                ))
+                .into());
+            }
+            Err(err) => {
+                return Err(IpcError::new(err).into());
+            }
         };
+
         let Some(aqc_addr) = &self.aqc_addr else {
             return Err(IpcError::new(InvalidArg::new(
                 "with_daemon_aqc_addr",
@@ -98,7 +112,7 @@ impl ClientBuilder<'_> {
             ))
             .into());
         };
-        Client::connect(sock, pk, aqc_addr).await
+        Client::connect(sock, &pk_bytes, aqc_addr).await
     }
 }
 
@@ -114,12 +128,6 @@ impl<'a> ClientBuilder<'a> {
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn with_daemon_uds_path(mut self, sock: &'a Path) -> Self {
         self.uds_path = Some(sock);
-        self
-    }
-
-    /// Specifies the daemon's public API key.
-    pub fn with_daemon_api_pk(mut self, pk: &'a [u8]) -> Self {
-        self.pk = Some(pk);
         self
     }
 
@@ -533,5 +541,14 @@ impl Queries<'_> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         Ok(Labels { data })
+    }
+}
+
+/// Tries to read CBOR from `path`.
+async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> anyhow::Result<Option<T>> {
+    match fs::read(path.as_ref()).await {
+        Ok(buf) => Ok(cbor::from_reader(&buf[..])?),
+        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(err) => Err(err.into()),
     }
 }
