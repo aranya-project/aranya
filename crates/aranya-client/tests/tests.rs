@@ -9,6 +9,8 @@
     rust_2018_idioms
 )]
 
+use std::time::Duration;
+
 use anyhow::{bail, Context, Result};
 use aranya_client::{QuicSyncConfig, TeamConfig};
 use aranya_daemon_api::{CreateTeamResponse, Role};
@@ -105,6 +107,8 @@ async fn test_query_functions() -> Result<()> {
 /// a peer calls the add_team() API
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_team() -> Result<()> {
+    const TLS_HANDSHAKE_DURATION: Duration = Duration::from_secs(10);
+
     // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_add_team", work_dir).await?;
@@ -146,7 +150,7 @@ async fn test_add_team() -> Result<()> {
 
         // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
         admin.sync_now(owner_addr.into(), None).await?;
-        sleep(SLEEP_INTERVAL).await;
+        sleep(TLS_HANDSHAKE_DURATION).await;
 
         // Now, we try to assign a role using the admin, which is expected to fail.
         match admin.assign_role(team.operator.id, Role::Operator).await {
@@ -158,7 +162,7 @@ async fn test_add_team() -> Result<()> {
         admin.add_team(cfg.clone()).await?;
         sleep(SLEEP_INTERVAL).await;
         admin.sync_now(owner_addr.into(), None).await?;
-        sleep(SLEEP_INTERVAL).await;
+        sleep(TLS_HANDSHAKE_DURATION).await;
 
         // Now we should be able to successfully assign a role.
         admin
