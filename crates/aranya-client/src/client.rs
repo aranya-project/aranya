@@ -18,7 +18,7 @@ use tokio::net::UnixStream;
 use tracing::{debug, info, instrument};
 
 use crate::{
-    aqc::{AqcChannels, AqcChannelsImpl},
+    aqc::{AqcChannels, AqcClient},
     config::{SyncPeerConfig, TeamConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
 };
@@ -142,7 +142,7 @@ pub struct Client {
     /// RPC connection to the daemon
     pub(crate) daemon: DaemonApiClient,
     /// Support for AQC
-    pub(crate) aqc: AqcChannelsImpl,
+    pub(crate) aqc: AqcClient,
 }
 
 impl Client {
@@ -192,13 +192,6 @@ impl Client {
         }
         debug!(client = ?want, daemon = ?got, "versions");
 
-        let device_id = daemon
-            .get_device_id(context::current())
-            .await
-            .map_err(IpcError::new)?
-            .context("unable to retrieve device id")
-            .map_err(error::other)?;
-        debug!(?device_id);
         let aqc_server_addr = aqc_addr
             .lookup()
             .await
@@ -206,7 +199,7 @@ impl Client {
             .map_err(error::other)?
             .next()
             .expect("expected AQC server address");
-        let aqc = AqcChannelsImpl::new(device_id, aqc_server_addr, daemon.clone()).await?;
+        let aqc = AqcClient::new(aqc_server_addr, daemon.clone()).await?;
         let client = Self { daemon, aqc };
 
         Ok(client)

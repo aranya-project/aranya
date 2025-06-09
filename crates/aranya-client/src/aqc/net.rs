@@ -13,21 +13,34 @@ use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{
     AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
 };
+use aranya_util::tls::{NoCertResolver, SkipServerVerification};
 use buggy::{Bug, BugExt as _};
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use channels::AqcPeerChannel;
-use s2n_quic::{self, client::Connect, provider, Client, Connection, Server};
+use s2n_quic::{
+    self,
+    client::Connect,
+    provider::{
+        congestion_controller::Bbr,
+        tls::rustls::{
+            self as rustls_provider,
+            rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig},
+        },
+    },
+    stream::BidirectionalStream,
+    Client, Connection, Server,
+};
 use tarpc::context;
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
-use super::{
-    api::AqcChannelId,
-    crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL},
-};
+use super::crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL};
 use crate::error::{aranya_error, AqcError, IpcError};
 
 pub mod channels;
+
+/// ALPN protocol identifier for Aranya QUIC Channels
+const ALPN_AQC: &[u8] = b"aqc-v1";
 
 /// An AQC client. Used to create and receive channels.
 #[derive(Debug)]
@@ -58,20 +71,51 @@ pub(crate) struct AqcClient {
 type PskIdentity = Vec<u8>;
 
 impl AqcClient {
-    /// Create an Aqc client with the given certificate chain.
-    pub fn new<T: provider::tls::Provider>(
-        provider: T,
-        client_keys: Arc<ClientPresharedKeys>,
-        server_keys: Arc<ServerPresharedKeys>,
-        identity_rx: mpsc::Receiver<Vec<u8>>,
-        server: Server,
-        daemon: DaemonApiClient,
-    ) -> Result<AqcClient, AqcError> {
+    pub async fn new(server_addr: SocketAddr, daemon: DaemonApiClient) -> Result<Self, AqcError> {
+        let client_keys = Arc::new(ClientPresharedKeys::new(CTRL_PSK.clone()));
+
+        // Create Client Config (INSECURE: Skips server cert verification)
+        let mut client_config = ClientConfig::builder()
+            .dangerous()
+            .with_custom_certificate_verifier(SkipServerVerification::new())
+            .with_no_client_auth();
+        client_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
+        client_config.preshared_keys = client_keys.clone(); // Pass the Arc<ClientPresharedKeys>
+
+        // TODO(jdygert): enable after rustls upstream fix.
+        // client_config.psk_kex_modes = vec![PskKexMode::PskOnly];
+
+        let (server_keys, identity_rx) = ServerPresharedKeys::new();
+        server_keys.insert(CTRL_PSK.clone());
+        let server_keys = Arc::new(server_keys);
+
+        // Create Server Config
+        let mut server_config = ServerConfig::builder()
+            .with_no_client_auth()
+            .with_cert_resolver(Arc::new(NoCertResolver::default()));
+        server_config.alpn_protocols = vec![ALPN_AQC.to_vec()]; // Set field directly
+        server_config.preshared_keys =
+            PresharedKeySelection::Required(Arc::clone(&server_keys) as _);
+
+        #[allow(deprecated)]
+        let tls_client_provider = rustls_provider::Client::new(client_config);
+        #[allow(deprecated)]
+        let tls_server_provider = rustls_provider::Server::new(server_config);
+
+        // Use the rustls server provider
+        let server = Server::builder()
+            .with_tls(tls_server_provider)? // Use the wrapped server config
+            .with_io(server_addr)
+            .assume("can set aqc server addr")?
+            .with_congestion_controller(Bbr::default())?
+            .start()?;
+
         let quic_client = Client::builder()
-            .with_tls(provider)?
+            .with_tls(tls_client_provider)?
             .with_io((Ipv4Addr::UNSPECIFIED, 0))
             .assume("can set aqc client addr")?
             .start()?;
+
         Ok(AqcClient {
             quic_client,
             client_keys,
@@ -259,18 +303,20 @@ impl AqcClient {
             .quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
             .await?;
-        conn.keep_alive(true)?;
         let mut stream = conn.open_bidirectional_stream().await?;
+
         let msg = AqcCtrlMessage { team_id, ctrl };
         let msg_bytes = postcard::to_stdvec(&msg).assume("can serialize")?;
-        stream.send(Bytes::from_owner(msg_bytes)).await?;
-        if let Some(msg_bytes) = stream.receive().await? {
-            let msg = postcard::from_bytes::<AqcAckMessage>(&msg_bytes).map_err(AqcError::Serde)?;
-            match msg {
-                AqcAckMessage::Success => (),
-                AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
-            }
+        stream.send(Bytes::from(msg_bytes)).await?;
+        stream.finish()?;
+
+        let ack_bytes = read_to_end(&mut stream).await?;
+        let ack = postcard::from_bytes::<AqcAckMessage>(&ack_bytes).map_err(AqcError::Serde)?;
+        match ack {
+            AqcAckMessage::Success => (),
+            AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
         }
+
         Ok(())
     }
 
@@ -280,10 +326,7 @@ impl AqcClient {
             .await
             .map_err(AqcError::ConnectionError)?
             .ok_or(AqcError::ConnectionClosed)?;
-        let Ok(Some(ctrl_bytes)) = stream.receive().await else {
-            error!("Failed to receive control message or stream closed");
-            return Err(AqcError::ConnectionClosed.into());
-        };
+        let ctrl_bytes = read_to_end(&mut stream).await.map_err(AqcError::from)?;
         match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
             Ok(ctrl) => {
                 self.process_ctrl_message(ctrl.team_id, ctrl.ctrl).await?;
@@ -294,15 +337,23 @@ impl AqcClient {
                     .send(Bytes::from(ack_bytes))
                     .await
                     .map_err(AqcError::from)?;
-                stream.close().await.map_err(AqcError::from)?;
+                if let Err(err) = stream.close().await {
+                    if !is_close_error(err) {
+                        return Err(AqcError::from(err).into());
+                    }
+                }
             }
             Err(e) => {
                 error!("Failed to deserialize AqcCtrlMessage: {}", e);
                 let ack_msg =
                     AqcAckMessage::Failure(format!("Failed to deserialize AqcCtrlMessage: {e}"));
                 let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
-                let _ = stream.send(Bytes::from(ack_bytes)).await;
-                let _ = stream.close().await;
+                stream.send(Bytes::from(ack_bytes)).await.ok();
+                if let Err(err) = stream.close().await {
+                    if !is_close_error(err) {
+                        error!(%err, "error closing stream after ctrl failure");
+                    }
+                }
                 return Err(AqcError::Serde(e).into());
             }
         }
@@ -369,13 +420,20 @@ struct AqcChannelInfo {
     channel_id: AqcChannelId,
 }
 
+/// An AQC Channel ID.
+#[derive(Copy, Clone, Debug)]
+enum AqcChannelId {
+    Bidi(BidiChannelId),
+    Uni(UniChannelId),
+}
+
 /// An AQC control message.
 #[derive(serde::Serialize, serde::Deserialize)]
 struct AqcCtrlMessage {
     /// The team id.
-    pub team_id: TeamId,
+    team_id: TeamId,
     /// The control message.
-    pub ctrl: AqcCtrl,
+    ctrl: AqcCtrl,
 }
 
 /// An AQC control message.
@@ -385,4 +443,39 @@ enum AqcAckMessage {
     Success,
     /// The failure message.
     Failure(String),
+}
+
+/// Read all of a stream until it has finished.
+///
+/// A bit more efficient than going through the `AsyncRead`-based impl,
+/// especially if there was only one chunk of data. Also avoids needing to
+/// convert/handle an `io::Error`.
+async fn read_to_end(stream: &mut BidirectionalStream) -> Result<Bytes, s2n_quic::stream::Error> {
+    let Some(first) = stream.receive().await? else {
+        return Ok(Bytes::new());
+    };
+    let Some(mut more) = stream.receive().await? else {
+        return Ok(first);
+    };
+    let mut buf = BytesMut::from(first);
+    loop {
+        buf.extend_from_slice(&more);
+        if let Some(even_more) = stream.receive().await? {
+            more = even_more;
+        } else {
+            break;
+        }
+    }
+    Ok(buf.freeze())
+}
+
+/// Indicates whether the stream error is "connection closed without error".
+fn is_close_error(err: s2n_quic::stream::Error) -> bool {
+    matches!(
+        err,
+        s2n_quic::stream::Error::ConnectionError {
+            error: s2n_quic::connection::Error::Closed { .. },
+            ..
+        },
+    )
 }
