@@ -147,7 +147,7 @@ impl Daemon {
             let api = DaemonApiServer::new(
                 client,
                 local_addr,
-                cfg.uds_api_path.clone(),
+                cfg.uds_api_sock(),
                 api_sk,
                 pk,
                 peers,
@@ -196,6 +196,22 @@ impl Daemon {
 
     /// Initializes the environment (creates directories, etc.).
     async fn setup_env(cfg: &Config) -> Result<()> {
+        // These directories need to already exist.
+        for dir in &[
+            &cfg.runtime_dir,
+            &cfg.state_dir,
+            &cfg.cache_dir,
+            &cfg.logs_dir,
+            &cfg.config_dir,
+        ] {
+            if !dir.try_exists()? {
+                return Err(anyhow::anyhow!(
+                    "directory does not exist: {}",
+                    dir.display()
+                ));
+            }
+        }
+
         // These directories aren't created for us.
         for (name, path) in [
             ("keystore", cfg.keystore_path()),
@@ -209,12 +225,10 @@ impl Daemon {
 
         // Remove unix socket so we can re-bind after e.g. the process is killed.
         // (We could remove it at exit but can't guarantee that will happen.)
-        if let Err(err) = fs::remove_file(&cfg.uds_api_path).await {
+        let uds_api_sock = cfg.uds_api_sock();
+        if let Err(err) = fs::remove_file(&uds_api_sock).await {
             if err.kind() != io::ErrorKind::NotFound {
-                return Err(err).context(format!(
-                    "unable to remove api socket {:?}",
-                    cfg.uds_api_path,
-                ));
+                return Err(err).context(format!("unable to remove api socket {uds_api_sock:?}"));
             }
         }
 
@@ -423,9 +437,11 @@ mod tests {
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
             name: "name".to_string(),
-            work_dir: work_dir.clone(),
-            uds_api_path: work_dir.join("api"),
-            pid_file: work_dir.join("pid"),
+            runtime_dir: work_dir.join("run"),
+            state_dir: work_dir.join("state"),
+            cache_dir: work_dir.join("cache"),
+            logs_dir: work_dir.join("logs"),
+            config_dir: work_dir.join("config"),
             sync_addr: any,
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
@@ -436,6 +452,17 @@ mod tests {
             }),
             aqc: None,
         };
+        for dir in [
+            &cfg.runtime_dir,
+            &cfg.state_dir,
+            &cfg.cache_dir,
+            &cfg.logs_dir,
+            &cfg.config_dir,
+        ] {
+            aranya_util::create_dir_all(dir)
+                .await
+                .expect("should be able to create directory");
+        }
 
         let daemon = Daemon::load(cfg)
             .await

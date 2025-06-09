@@ -139,19 +139,32 @@ pub struct DeviceCtx {
 impl DeviceCtx {
     async fn new(_team_name: &str, name: &str, work_dir: PathBuf) -> Result<Self> {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
-        fs::create_dir_all(work_dir.clone()).await?;
 
         // Setup daemon config.
-        let uds_api_path = work_dir.join("uds.sock");
         let cfg = Config {
             name: name.into(),
-            work_dir: work_dir.clone(),
-            uds_api_path: uds_api_path.clone(),
-            pid_file: work_dir.join("pid"),
+            runtime_dir: work_dir.join("run"),
+            state_dir: work_dir.join("state"),
+            cache_dir: work_dir.join("cache"),
+            logs_dir: work_dir.join("log"),
+            config_dir: work_dir.join("config"),
             sync_addr: addr_any,
             afc: None,
             aqc: None,
         };
+
+        for dir in [
+            &cfg.runtime_dir,
+            &cfg.state_dir,
+            &cfg.cache_dir,
+            &cfg.logs_dir,
+            &cfg.config_dir,
+        ] {
+            fs::create_dir_all(dir)
+                .await
+                .with_context(|| format!("unable to create directory: {}", dir.display()))?;
+        }
+        let uds_path = cfg.uds_api_sock();
 
         // Load daemon from config.
         let daemon = Daemon::load(cfg.clone())
@@ -167,7 +180,7 @@ impl DeviceCtx {
         // Initialize the user library.
         let mut client = (|| {
             Client::builder()
-                .with_daemon_uds_path(&uds_api_path)
+                .with_daemon_uds_path(&uds_path)
                 .with_daemon_api_pk(&pk_bytes)
                 .with_daemon_aqc_addr(&addr_any)
                 .connect()

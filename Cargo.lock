@@ -300,6 +300,7 @@ dependencies = [
  "postcard",
  "pretty_assertions",
  "serde",
+ "serde_json",
  "serial_test",
  "tarpc",
  "tempfile",
