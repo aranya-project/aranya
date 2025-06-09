@@ -398,11 +398,11 @@ mod tests {
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
             name: "name".to_string(),
-            runtime_dir: work_dir.clone(),
-            state_dir: work_dir.clone(),
-            cache_dir: work_dir.clone(),
-            logs_dir: work_dir.clone(),
-            config_dir: work_dir.clone(),
+            runtime_dir: work_dir.join("run"),
+            state_dir: work_dir.join("state"),
+            cache_dir: work_dir.join("cache"),
+            logs_dir: work_dir.join("logs"),
+            config_dir: work_dir.join("config"),
             sync_addr: any,
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
@@ -413,6 +413,17 @@ mod tests {
             }),
             aqc: None,
         };
+        for dir in [
+            &cfg.runtime_dir,
+            &cfg.state_dir,
+            &cfg.cache_dir,
+            &cfg.logs_dir,
+            &cfg.config_dir,
+        ] {
+            aranya_util::create_dir_all(dir)
+                .await
+                .expect("should be able to create directory");
+        }
 
         let daemon = Daemon::load(cfg)
             .await

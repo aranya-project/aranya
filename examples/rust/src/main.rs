@@ -84,31 +84,42 @@ impl ClientCtx {
 
         let work_dir = TempDir::with_prefix(user_name)?;
 
-        // The path that the daemon will listen on.
-        let uds_api_path = work_dir.path().join("uds.sock");
-
         let (daemon, pk) = {
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
             let cfg_path = work_dir.join("config.json");
-            let pid_file = work_dir.join("pid");
+
+            let runtime_dir = work_dir.join("run");
+            let state_dir = work_dir.join("state");
+            let cache_dir = work_dir.join("cache");
+            let logs_dir = work_dir.join("logs");
+            let config_dir = work_dir.join("config");
+            for dir in &[&runtime_dir, &state_dir, &cache_dir, &logs_dir, &config_dir] {
+                fs::create_dir_all(dir)
+                    .await
+                    .with_context(|| format!("unable to create directory: {}", dir.display()))?;
+            }
 
             let buf = format!(
                 r#"
 {{
     "name": "daemon",
-    "work_dir": "{}",
-    "uds_api_path": "{}",
-    "pid_file": "{}",
+    "runtime_dir": "{}",
+    "state_dir": "{}",
+    "cache_dir": "{}",
+    "logs_dir": "{}",
+    "config_dir": "{}",
     "sync_addr": "localhost:0"
 }}"#,
-                work_dir.as_os_str().to_str().context("should be UTF-8")?,
-                uds_api_path
+                runtime_dir
                     .as_os_str()
                     .to_str()
                     .context("should be UTF-8")?,
-                pid_file.as_os_str().to_str().context("should be UTF-8")?,
+                state_dir.as_os_str().to_str().context("should be UTF-8")?,
+                cache_dir.as_os_str().to_str().context("should be UTF-8")?,
+                logs_dir.as_os_str().to_str().context("should be UTF-8")?,
+                config_dir.as_os_str().to_str().context("should be UTF-8")?,
             );
             fs::write(&cfg_path, buf).await?;
 
@@ -116,6 +127,9 @@ impl ClientCtx {
             let daemon = Daemon::spawn(daemon_path, &work_dir, &cfg_path).await?;
             (daemon, pk)
         };
+
+        // The path that the daemon will listen on.
+        let uds_sock = work_dir.path().join("run").join("uds.sock");
 
         // Give the daemon time to start up.
         sleep(Duration::from_millis(100)).await;
@@ -125,7 +139,7 @@ impl ClientCtx {
         let mut client = (|| {
             Client::builder()
                 .with_daemon_api_pk(&pk)
-                .with_daemon_uds_path(&uds_api_path)
+                .with_daemon_uds_path(&uds_sock)
                 .with_daemon_aqc_addr(&any_addr)
                 .connect()
         })
