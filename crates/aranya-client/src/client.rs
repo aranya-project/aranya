@@ -15,7 +15,7 @@ use aranya_daemon_api::{
 use aranya_util::Addr;
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
-use tracing::{debug, info, instrument};
+use tracing::{debug, error, info, instrument};
 
 use crate::{
     aqc::{AqcChannels, AqcClient},
@@ -89,7 +89,9 @@ impl ClientBuilder<'_> {
             ))
             .into());
         };
-        Client::connect(sock, aqc_addr).await
+        Client::connect(sock, aqc_addr)
+            .await
+            .inspect_err(|err| error!(?err, "unable to connect to daemon"))
     }
 }
 
@@ -139,12 +141,11 @@ impl Client {
     /// Creates a client connection to the daemon.
     #[instrument(skip_all, fields(?uds_path))]
     async fn connect(uds_path: &Path, aqc_addr: &Addr) -> Result<Self> {
-        info!("starting Aranya client");
+        info!("connecting to daemon");
 
         let daemon = {
             let pk = {
-                // The public key is located alongside the
-                // socket.
+                // The public key is located next to the socket.
                 let api_pk_path = uds_path.parent().unwrap_or(uds_path).join("api.pk");
                 let bytes = fs::read(&api_pk_path)
                     .await

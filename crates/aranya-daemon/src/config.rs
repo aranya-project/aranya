@@ -174,7 +174,7 @@ impl Config {
 
     /// Path to the daemon's API public key.
     pub fn api_pk_path(&self) -> PathBuf {
-        self.state_dir.join("api.pk")
+        self.runtime_dir.join("api.pk")
     }
 }
 
