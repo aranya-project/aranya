@@ -118,8 +118,6 @@ impl DaemonApiServer {
             });
 
             let server = {
-                info!(addr = ?self.uds_path, "listening");
-
                 let info = self.uds_path.as_os_str().as_encoded_bytes();
                 let codec = LengthDelimitedCodec::builder()
                     .max_frame_length(usize::MAX)
@@ -127,6 +125,7 @@ impl DaemonApiServer {
                 let listener = txp::unix::UnixListenerStream::from(self.listener);
                 txp::server(listener, codec, self.sk, info)
             };
+            info!(addr = ?self.uds_path, "listening");
 
             let mut incoming = server
                 .inspect_err(|err| warn!(?err, "accept error"))

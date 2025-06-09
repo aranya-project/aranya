@@ -207,6 +207,8 @@ impl Daemon {
         }
         info!("created directories");
 
+        // Remove unix socket so we can re-bind after e.g. the process is killed.
+        // (We could remove it at exit but can't guarantee that will happen.)
         if let Err(err) = fs::remove_file(&cfg.uds_api_path).await {
             if err.kind() != io::ErrorKind::NotFound {
                 return Err(err).context(format!(
