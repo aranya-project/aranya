@@ -44,7 +44,7 @@ use tokio::{
     io::AsyncReadExt,
     sync::{
         broadcast::{error::RecvError, Receiver},
-        mpsc,
+        mpsc, Mutex,
     },
     task::JoinSet,
 };
@@ -104,6 +104,9 @@ pub struct State {
     /// Address -> Connection map used for re-using connections
     /// when making outgoing sync requests
     conns: BTreeMap<Addr, Connection>,
+    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
+    /// Lock must be acquired after [`Self::client`]
+    caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
 }
 
 impl SyncState for State {
@@ -197,6 +200,7 @@ impl State {
         Ok(Self {
             client,
             conns: BTreeMap::new(),
+            caches: Arc::new(Mutex::new(BTreeMap::new())),
         })
     }
 }
@@ -278,9 +282,10 @@ impl Syncer<State> {
 
         let (len, _) = {
             let mut client = self.client.lock().await;
-            // TODO: save PeerCache somewhere.
+            let mut caches = self.state.caches.lock().await;
+            let cache = caches.entry(*peer).or_default();
             syncer
-                .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
+                .poll(&mut send_buf, client.provider(), cache)
                 .context("sync poll failed")?
         };
         debug!(?len, "sync poll finished");
@@ -373,6 +378,9 @@ pub struct Server<EN, SP> {
     set: JoinSet<()>,
     /// Identity Receiver.
     _identity_rx: mpsc::Receiver<Vec<u8>>,
+    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
+    /// Lock must be acquired after [`Self::aranya`]
+    caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
 }
 
 impl<EN, SP> Server<EN, SP> {
@@ -446,12 +454,14 @@ where
 
             info!("PSK broadcast channel closed");
         });
+        let caches = Arc::new(Mutex::new(BTreeMap::new()));
 
         Ok(Self {
             aranya,
             server,
             set,
             _identity_rx,
+            caches,
         })
     }
 
@@ -471,13 +481,17 @@ where
                 continue;
             };
             let client = self.aranya.clone();
+            let caches = self.caches.clone();
             self.set.spawn(async move {
                 loop {
                     // Accept incoming streams.
                     match conn.accept_bidirectional_stream().await {
                         Ok(Some(stream)) => {
                             debug!(?peer, "received incoming QUIC stream");
-                            if let Err(e) = Self::sync(client.clone(), peer, stream).await {
+                            if let Err(e) =
+                                Self::sync(client.clone(), caches.clone(), peer.into(), stream)
+                                    .await
+                            {
                                 error!(?e, ?peer, "server unable to sync with peer");
                                 break;
                             }
@@ -505,7 +519,8 @@ where
     #[instrument(skip_all, fields(peer = %peer))]
     pub async fn sync(
         client: AranyaClient<EN, SP>,
-        peer: SocketAddr,
+        caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+        peer: Addr,
         stream: BidirectionalStream,
     ) -> SyncResult<()> {
         info!(?peer, "server received a sync request");
@@ -518,7 +533,7 @@ where
         debug!(?peer, n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let sync_response_res = Self::sync_respond(client, &recv_buf)
+        let sync_response_res = Self::sync_respond(client, caches, peer, &recv_buf)
             .await
             .inspect_err(|e| error!(?e, "error responding to sync request"));
 
@@ -555,6 +570,8 @@ where
     #[instrument(skip_all)]
     async fn sync_respond(
         client: AranyaClient<EN, SP>,
+        caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+        addr: Addr,
         request_data: &[u8],
     ) -> SyncResult<Box<[u8]>> {
         info!("server responding to sync request");
@@ -581,13 +598,10 @@ where
         resp.receive(request_msg).context("sync recv failed")?;
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
-        // TODO: save PeerCache somewhere.
+        let mut caches = caches.lock().await;
+        let cache = caches.entry(addr).or_default();
         let len = resp
-            .poll(
-                &mut buf,
-                client.lock().await.provider(),
-                &mut PeerCache::new(),
-            )
+            .poll(&mut buf, client.lock().await.provider(), cache)
             .context("sync resp poll failed")?;
         debug!(len = len, "sync poll finished");
         buf.truncate(len);
