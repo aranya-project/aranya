@@ -850,43 +850,6 @@ AranyaError aranya_client_config_builder_set_daemon_uds_path_ext(struct AranyaCl
                                                                  struct AranyaExtError *__ext_err);
 
 /**
- * Sets the daemon's public API key.
- *
- * `pk` must not be encoded; it must be the raw key bytes.
- *
- * The daemon's public API key can be retrieved by invoking the
- * daemon with the `--print-api-pk` flag. The output will be
- * hexadecimal encoded and must be decoded before being passed
- * to this function. You can use [`aranya_decode_hex`](@ref aranya_decode_hex) for this
- * purpose.
- *
- * @param cfg a pointer to the client config builder
- * @param pk the daemon's raw (not encoded) public API key bytes
- */
-AranyaError aranya_client_config_builder_set_daemon_api_pk(struct AranyaClientConfigBuilder *cfg,
-                                                           const uint8_t *pk,
-                                                           size_t pk_len);
-
-/**
- * Sets the daemon's public API key.
- *
- * `pk` must not be encoded; it must be the raw key bytes.
- *
- * The daemon's public API key can be retrieved by invoking the
- * daemon with the `--print-api-pk` flag. The output will be
- * hexadecimal encoded and must be decoded before being passed
- * to this function. You can use [`aranya_decode_hex`](@ref aranya_decode_hex) for this
- * purpose.
- *
- * @param cfg a pointer to the client config builder
- * @param pk the daemon's raw (not encoded) public API key bytes
- */
-AranyaError aranya_client_config_builder_set_daemon_api_pk_ext(struct AranyaClientConfigBuilder *cfg,
-                                                               const uint8_t *pk,
-                                                               size_t pk_len,
-                                                               struct AranyaExtError *__ext_err);
-
-/**
  * Initializes `AranyaAqcConfigBuilder`.
  *
  * When no longer needed, `out`'s resources must be released

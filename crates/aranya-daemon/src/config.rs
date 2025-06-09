@@ -171,6 +171,11 @@ impl Config {
     pub fn uds_api_sock(&self) -> PathBuf {
         self.runtime_dir.join("uds.sock")
     }
+
+    /// Path to the daemon's API public key.
+    pub fn api_pk_path(&self) -> PathBuf {
+        self.state_dir.join("api.pk")
+    }
 }
 
 /// Reads JSON from `path`.

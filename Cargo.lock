@@ -199,7 +199,6 @@ dependencies = [
  "backon",
  "buggy",
  "bytes",
- "ciborium",
  "futures-lite",
  "futures-util",
  "postcard",

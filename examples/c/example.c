@@ -184,7 +184,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 
     err = aranya_client_config_builder_set_aqc_config(&cli_builder, &aqc_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to set daemon API public key\n");
+        fprintf(stderr, "unable to set AQC config\n");
         aranya_client_config_builder_cleanup(&cli_builder);
         return err;
     }

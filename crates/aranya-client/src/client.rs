@@ -2,7 +2,7 @@
 
 use std::{io, net::SocketAddr, path::Path};
 
-use anyhow::Context;
+use anyhow::Context as _;
 use aranya_crypto::Rng;
 use aranya_daemon_api::{
     crypto::{
@@ -13,8 +13,6 @@ use aranya_daemon_api::{
     Version, CS,
 };
 use aranya_util::Addr;
-use ciborium as cbor;
-use serde::de::DeserializeOwned;
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, info, instrument};
@@ -84,27 +82,6 @@ impl ClientBuilder<'_> {
             .into());
         };
 
-        // Load the public key from the UDS directory
-        let uds_dir = sock
-            .parent()
-            .context("UDS path must have a parent directory")
-            .map_err(IpcError::new)?;
-        let api_pk_path = uds_dir.join("api.pk");
-
-        let pk_bytes = match try_read_cbor::<PublicApiKey<CS>>(&api_pk_path).await {
-            Ok(Some(pk)) => pk.encode().map_err(IpcError::new)?,
-            Ok(None) => {
-                return Err(IpcError::new(InvalidArg::new(
-                    "public key",
-                    "daemon's public API key not found. Ensure the daemon has written its public key to the UDS directory",
-                ))
-                .into());
-            }
-            Err(err) => {
-                return Err(IpcError::new(err).into());
-            }
-        };
-
         let Some(aqc_addr) = &self.aqc_addr else {
             return Err(IpcError::new(InvalidArg::new(
                 "with_daemon_aqc_addr",
@@ -112,7 +89,7 @@ impl ClientBuilder<'_> {
             ))
             .into());
         };
-        Client::connect(sock, &pk_bytes, aqc_addr).await
+        Client::connect(sock, aqc_addr).await
     }
 }
 
@@ -160,19 +137,29 @@ impl Client {
     }
 
     /// Creates a client connection to the daemon.
-    #[instrument(skip_all, fields(?path))]
-    async fn connect(path: &Path, pk: &[u8], aqc_addr: &Addr) -> Result<Self> {
+    #[instrument(skip_all, fields(?uds_path))]
+    async fn connect(uds_path: &Path, aqc_addr: &Addr) -> Result<Self> {
         info!("starting Aranya client");
 
         let daemon = {
-            let sock = UnixStream::connect(path)
+            let pk = {
+                // The public key is located alongside the
+                // socket.
+                let api_pk_path = uds_path.parent().unwrap_or(uds_path).join("api.pk");
+                let bytes = fs::read(&api_pk_path)
+                    .await
+                    .with_context(|| "unable to read daemon API public key")
+                    .map_err(IpcError::new)?;
+                PublicApiKey::<CS>::decode(&bytes)
+                    .context("unable to decode public API key")
+                    .map_err(IpcError::new)?
+            };
+
+            let sock = UnixStream::connect(uds_path)
                 .await
                 .context("unable to connect to UDS path")
                 .map_err(IpcError::new)?;
-            let pk = PublicApiKey::<CS>::decode(pk)
-                .context("unable to decode public API key")
-                .map_err(IpcError::new)?;
-            let info = path.as_os_str().as_encoded_bytes();
+            let info = uds_path.as_os_str().as_encoded_bytes();
             let codec = LengthDelimitedCodec::builder()
                 .max_frame_length(usize::MAX)
                 .new_codec();
@@ -541,14 +528,5 @@ impl Queries<'_> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         Ok(Labels { data })
-    }
-}
-
-/// Tries to read CBOR from `path`.
-async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> anyhow::Result<Option<T>> {
-    match fs::read(path.as_ref()).await {
-        Ok(buf) => Ok(cbor::from_reader(&buf[..])?),
-        Err(err) if err.kind() == io::ErrorKind::NotFound => Ok(None),
-        Err(err) => Err(err.into()),
     }
 }

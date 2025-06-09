@@ -80,15 +80,12 @@ impl Daemon {
 
         let mut aranya_store = self.load_aranya_keystore().await?;
         let mut eng = self.load_crypto_engine().await?;
-        let pk = self
+        let pks = self
             .load_or_gen_public_keys(&mut eng, &mut aranya_store)
             .await?;
 
         let mut local_store = self.load_local_keystore().await?;
         let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
-
-        // Write the daemon's public API key to the UDS directory before creating the socket
-        self.write_api_key_to_uds_dir(&api_sk).await?;
 
         // Initialize Aranya syncer client.
         let (client, local_addr) = {
@@ -98,7 +95,7 @@ impl Daemon {
                     aranya_store
                         .try_clone()
                         .context("unable to clone keystore")?,
-                    &pk,
+                    &pks,
                     self.cfg.sync_addr,
                 )
                 .await?;
@@ -142,15 +139,16 @@ impl Daemon {
                 }
                 peers
             };
-            Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
+            Aqc::new(eng, pks.ident_pk.id()?, aranya_store, peers)
         };
 
         let api = DaemonApiServer::new(
             client,
             local_addr,
             self.cfg.uds_api_sock(),
+            self.cfg.api_pk_path(),
             api_sk,
-            pk,
+            pks,
             peers,
             recv_effects,
             aqc,
@@ -324,37 +322,14 @@ impl Daemon {
             }
         }
     }
-
-    /// Writes the daemon's public API key to the UDS directory before creating the socket
-    async fn write_api_key_to_uds_dir(&self, api_sk: &ApiKey<CS>) -> Result<()> {
-        // Get the directory containing the UDS path
-        let uds_dir = self
-            .cfg
-            .uds_api_path
-            .parent()
-            .context("UDS path must have a parent directory")?;
-
-        // Create the public key file path in the same directory as the UDS
-        let api_pk_path = uds_dir.join("api.pk");
-
-        // Ensure the directory exists
-        aranya_util::create_dir_all(&uds_dir)
-            .await
-            .context("unable to create UDS directory")?;
-
-        // Write the public key
-        write_cbor(&api_pk_path, &api_sk.public()?)
-            .await
-            .context("unable to write `PublicApiKey` to UDS directory")?;
-
-        info!(?api_pk_path, "wrote daemon public API key");
-        Ok(())
-    }
 }
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(self.cfg.uds_api_sock());
+        use std::fs;
+
+        let _ = fs::remove_file(self.cfg.api_pk_path());
+        let _ = fs::remove_file(self.cfg.uds_api_sock());
     }
 }
 
