@@ -2,7 +2,7 @@
 
 use std::{io, net::SocketAddr, path::Path};
 
-use anyhow::Context;
+use anyhow::Context as _;
 use aranya_crypto::Rng;
 use aranya_daemon_api::{
     crypto::{
@@ -14,8 +14,8 @@ use aranya_daemon_api::{
 };
 use aranya_util::Addr;
 use tarpc::context;
-use tokio::net::UnixStream;
-use tracing::{debug, info, instrument};
+use tokio::{fs, net::UnixStream};
+use tracing::{debug, error, info, instrument};
 
 use crate::{
     aqc::{AqcChannels, AqcClient},
@@ -60,8 +60,6 @@ pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]
     uds_path: Option<&'a Path>,
-    // The daemon's public key.
-    pk: Option<&'a [u8]>,
     // AQC address.
     aqc_addr: Option<&'a Addr>,
 }
@@ -70,7 +68,6 @@ impl ClientBuilder<'_> {
     pub fn new() -> Self {
         Self {
             uds_path: None,
-            pk: None,
             aqc_addr: None,
         }
     }
@@ -84,13 +81,7 @@ impl ClientBuilder<'_> {
             ))
             .into());
         };
-        let Some(pk) = &self.pk else {
-            return Err(IpcError::new(InvalidArg::new(
-                "with_daemon_api_pk",
-                "must specify the daemon's public key",
-            ))
-            .into());
-        };
+
         let Some(aqc_addr) = &self.aqc_addr else {
             return Err(IpcError::new(InvalidArg::new(
                 "with_daemon_aqc_addr",
@@ -98,7 +89,9 @@ impl ClientBuilder<'_> {
             ))
             .into());
         };
-        Client::connect(sock, pk, aqc_addr).await
+        Client::connect(sock, aqc_addr)
+            .await
+            .inspect_err(|err| error!(?err, "unable to connect to daemon"))
     }
 }
 
@@ -114,12 +107,6 @@ impl<'a> ClientBuilder<'a> {
     #[cfg_attr(docsrs, doc(cfg(unix)))]
     pub fn with_daemon_uds_path(mut self, sock: &'a Path) -> Self {
         self.uds_path = Some(sock);
-        self
-    }
-
-    /// Specifies the daemon's public API key.
-    pub fn with_daemon_api_pk(mut self, pk: &'a [u8]) -> Self {
-        self.pk = Some(pk);
         self
     }
 
@@ -152,19 +139,28 @@ impl Client {
     }
 
     /// Creates a client connection to the daemon.
-    #[instrument(skip_all, fields(?path))]
-    async fn connect(path: &Path, pk: &[u8], aqc_addr: &Addr) -> Result<Self> {
-        info!("starting Aranya client");
+    #[instrument(skip_all, fields(?uds_path))]
+    async fn connect(uds_path: &Path, aqc_addr: &Addr) -> Result<Self> {
+        info!("connecting to daemon");
 
         let daemon = {
-            let sock = UnixStream::connect(path)
+            let pk = {
+                // The public key is located next to the socket.
+                let api_pk_path = uds_path.parent().unwrap_or(uds_path).join("api.pk");
+                let bytes = fs::read(&api_pk_path)
+                    .await
+                    .with_context(|| "unable to read daemon API public key")
+                    .map_err(IpcError::new)?;
+                PublicApiKey::<CS>::decode(&bytes)
+                    .context("unable to decode public API key")
+                    .map_err(IpcError::new)?
+            };
+
+            let sock = UnixStream::connect(uds_path)
                 .await
                 .context("unable to connect to UDS path")
                 .map_err(IpcError::new)?;
-            let pk = PublicApiKey::<CS>::decode(pk)
-                .context("unable to decode public API key")
-                .map_err(IpcError::new)?;
-            let info = path.as_os_str().as_encoded_bytes();
+            let info = uds_path.as_os_str().as_encoded_bytes();
             let codec = LengthDelimitedCodec::builder()
                 .max_frame_length(usize::MAX)
                 .new_codec();

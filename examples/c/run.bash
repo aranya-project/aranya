@@ -84,13 +84,6 @@ for device in "${devices[@]}"; do
 
     # Note: set ARANYA_DAEMON=debug to debug daemons.
     cfg_path="${example}/configs/${device}-config.json"
-    api_pk="${out}/${device}/api_pk"
-    rm -I "${api_pk}" || true
-
-    ARANYA_DAEMON=trace \
-        "${release}/aranya-daemon" \
-        --config "${cfg_path}" \
-        --print-api-pk | tee "${api_pk}"
 
     ARANYA_DAEMON="aranya_daemon::aqc=trace,aranya_daemon::api=debug" \
         "${release}/aranya-daemon" \

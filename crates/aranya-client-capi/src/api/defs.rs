@@ -217,7 +217,6 @@ pub unsafe fn client_init(
     let inner = rt.block_on({
         aranya_client::Client::builder()
             .with_daemon_uds_path(daemon_socket)
-            .with_daemon_api_pk(config.daemon_api_pk())
             .with_daemon_aqc_addr(&aqc_addr)
             .connect()
     })?;
@@ -611,22 +610,6 @@ pub fn client_config_builder_set_daemon_uds_path(
     address: *const c_char,
 ) {
     cfg.daemon_addr(address);
-}
-
-/// Sets the daemon's public API key.
-///
-/// `pk` must not be encoded; it must be the raw key bytes.
-///
-/// The daemon's public API key can be retrieved by invoking the
-/// daemon with the `--print-api-pk` flag. The output will be
-/// hexadecimal encoded and must be decoded before being passed
-/// to this function. You can use [`decode_hex`] for this
-/// purpose.
-///
-/// @param cfg a pointer to the client config builder
-/// @param pk the daemon's raw (not encoded) public API key bytes
-pub fn client_config_builder_set_daemon_api_pk(cfg: &mut ClientConfigBuilder, pk: &[u8]) {
-    cfg.daemon_pk(pk);
 }
 
 /// Configuration info for Aranya QUIC Channels.

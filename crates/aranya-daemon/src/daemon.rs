@@ -80,7 +80,7 @@ impl Daemon {
 
         let mut aranya_store = self.load_aranya_keystore().await?;
         let mut eng = self.load_crypto_engine().await?;
-        let pk = self
+        let pks = self
             .load_or_gen_public_keys(&mut eng, &mut aranya_store)
             .await?;
 
@@ -95,7 +95,7 @@ impl Daemon {
                     aranya_store
                         .try_clone()
                         .context("unable to clone keystore")?,
-                    &pk,
+                    &pks,
                     self.cfg.sync_addr,
                 )
                 .await?;
@@ -139,15 +139,16 @@ impl Daemon {
                 }
                 peers
             };
-            Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
+            Aqc::new(eng, pks.ident_pk.id()?, aranya_store, peers)
         };
 
         let api = DaemonApiServer::new(
             client,
             local_addr,
             self.cfg.uds_api_sock(),
+            self.cfg.api_pk_path(),
             api_sk,
-            pk,
+            pks,
             peers,
             recv_effects,
             aqc,
@@ -325,7 +326,10 @@ impl Daemon {
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(self.cfg.uds_api_sock());
+        use std::fs;
+
+        let _ = fs::remove_file(self.cfg.api_pk_path());
+        let _ = fs::remove_file(self.cfg.uds_api_sock());
     }
 }
 
