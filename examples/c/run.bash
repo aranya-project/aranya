@@ -26,6 +26,22 @@ fi
 
 declare -a devices=("owner" "admin" "operator" "membera" "memberb")
 
+port=10001
+for device in "${devices[@]}"; do
+    cat <<EOF >"${example}/configs/${device}-config.json"
+{
+    "name": "${device}",
+    "runtime_dir": "${out}/${device}/run",
+    "state_dir": "${out}/${device}/state",
+    "cache_dir": "${out}/${device}/cache",
+    "logs_dir": "${out}/${device}/log",
+    "config_dir": "${out}/${device}/config",
+    "sync_addr": "127.0.0.1:${port}",
+}
+EOF
+    port=$((port + 1))
+done
+
 proj="$(cargo locate-project --workspace --message-format plain)"
 proj="$(dirname "${proj}")"
 release="${proj}/target/release"
@@ -62,7 +78,6 @@ cmake --build build
 # start the daemons
 for device in "${devices[@]}"; do
     mkdir -p "${out}/${device}"
-    # TODO: autogenerate these config files
     # Note: set ARANYA_DAEMON=debug to debug daemons.
     cfg_path="${example}/configs/${device}-config.json"
     api_pk="${out}/${device}/api_pk"

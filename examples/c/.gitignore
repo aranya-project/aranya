@@ -2,3 +2,5 @@ out/
 build/
 lib/*
 include/
+configs/*
+!configs/.gitkeep

@@ -145,7 +145,7 @@ impl Daemon {
         let api = DaemonApiServer::new(
             client,
             local_addr,
-            self.cfg.uds_api_path.clone(),
+            self.cfg.uds_api_sock(),
             api_sk,
             pk,
             peers,
@@ -309,7 +309,7 @@ impl Daemon {
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.cfg.uds_api_path);
+        let _ = std::fs::remove_file(&self.cfg.uds_api_sock());
     }
 }
 
@@ -382,9 +382,11 @@ mod tests {
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
             name: "name".to_string(),
-            work_dir: work_dir.clone(),
-            uds_api_path: work_dir.join("api"),
-            pid_file: work_dir.join("pid"),
+            runtime_dir: work_dir.clone(),
+            state_dir: work_dir.clone(),
+            cache_dir: work_dir.clone(),
+            logs_dir: work_dir.clone(),
+            config_dir: work_dir.clone(),
             sync_addr: any,
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),

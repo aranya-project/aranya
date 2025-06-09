@@ -63,11 +63,11 @@ tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = { workspace = true }
+serde_json = { version = "1" }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
 test-util = { path = "./test-util" }
-
 
 [build-dependencies]
 aranya-policy-ifgen-build = { workspace = true }
