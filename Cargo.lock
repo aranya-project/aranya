@@ -626,6 +626,7 @@ version = "0.6.0"
 dependencies = [
  "anyhow",
  "aranya-fast-channels",
+ "aranya-internal-s2n-quic",
  "buggy",
  "serde",
  "tokio",

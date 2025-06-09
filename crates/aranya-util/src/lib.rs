@@ -13,6 +13,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 pub mod addr;
+pub mod tls;
 pub mod util;
 
 pub use addr::*;

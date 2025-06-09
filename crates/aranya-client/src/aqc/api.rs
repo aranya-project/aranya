@@ -6,6 +6,7 @@ use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{
     AqcBidiPsks, AqcUniPsks, DaemonApiClient, DeviceId, LabelId, NetIdentifier, TeamId,
 };
+use aranya_util::tls::{NoCertResolver, SkipServerVerification};
 use buggy::{Bug, BugExt as _};
 use s2n_quic::{
     provider::{
@@ -21,9 +22,7 @@ use tarpc::context;
 use tracing::{debug, instrument};
 
 use super::{
-    crypto::{
-        ClientPresharedKeys, NoCertResolver, ServerPresharedKeys, SkipServerVerification, CTRL_PSK,
-    },
+    crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK},
     net::{AqcClient, TryReceiveError},
     AqcBidiChannel, AqcPeerChannel, AqcSendChannel,
 };
