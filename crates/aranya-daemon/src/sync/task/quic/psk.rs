@@ -20,6 +20,9 @@ use super::AranyaClient;
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
+/// PSK Identity bytes.
+type PskId = Vec<u8>;
+
 #[derive(Debug, Clone)]
 /// Insertion and Removal updates.
 /// Used by [`ClientPresharedKeys`] and [`ServerPresharedKeys`].
@@ -34,9 +37,10 @@ pub enum Msg {
 /// Contains thread-safe references to [PresharedKey]s.
 /// Used by [`super::Server`]
 pub struct ServerPresharedKeys {
-    keys: SyncMutex<HashMap<Vec<u8>, TeamIdPSKPair>>,
+    keys: SyncMutex<HashMap<PskId, TeamIdPSKPair>>,
+    ids: SyncMutex<HashMap<TeamId, PskId>>,
     // Optional sender to report the selected identity
-    identity_sender: mpsc::Sender<Vec<u8>>,
+    identity_sender: mpsc::Sender<PskId>,
 }
 
 impl ServerPresharedKeys {
@@ -47,6 +51,7 @@ impl ServerPresharedKeys {
         (
             Self {
                 keys: SyncMutex::new(HashMap::new()),
+                ids: SyncMutex::new(HashMap::new()),
                 identity_sender: identity_tx,
             },
             identity_rx,
@@ -56,8 +61,30 @@ impl ServerPresharedKeys {
     fn insert(&self, id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
         match self.keys.lock() {
             Ok(ref mut map) => {
-                map.insert(psk.identity().to_vec(), (id, psk));
+                map.insert(psk.clone().identity().to_vec(), (id, psk.clone()));
+                match self.ids.lock() {
+                    Ok(ref mut map) => {
+                        map.insert(id, psk.identity().to_vec());
+                    }
+                    Err(e) => bail!(e.to_string()),
+                }
             }
+            Err(e) => bail!(e.to_string()),
+        }
+
+        Ok(())
+    }
+
+    fn remove(&self, id: TeamId) -> Result<()> {
+        match self.keys.lock() {
+            Ok(ref mut keys) => match self.ids.lock() {
+                Ok(ref mut ids) => {
+                    if let Some(id) = ids.remove(&id) {
+                        keys.remove(&id);
+                    }
+                }
+                Err(e) => bail!(e.to_string()),
+            },
             Err(e) => bail!(e.to_string()),
         }
 
@@ -86,8 +113,10 @@ impl ServerPresharedKeys {
                     .insert(team_id, psk)
                     .inspect_err(|err| error!(err = ?err, "unable to insert PSK"));
             }
-            Msg::Remove(_team_id) => {
-                todo!("Add remove method to `ServerPreSharedKeys`")
+            Msg::Remove(team_id) => {
+                let _ = self
+                    .remove(team_id)
+                    .inspect_err(|err| error!(err = ?err, "unable to remove PSK"));
             }
         }
     }
