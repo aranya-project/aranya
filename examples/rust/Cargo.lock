@@ -84,7 +84,6 @@ dependencies = [
  "aranya-util",
  "buggy",
  "bytes",
- "ciborium",
  "futures-lite",
  "futures-util",
  "postcard",
