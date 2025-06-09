@@ -159,6 +159,22 @@ impl Daemon {
 
     /// Initializes the environment (creates directories, etc.).
     async fn setup_env(&self) -> Result<()> {
+        // These directories need to already exist.
+        for dir in &[
+            &self.cfg.runtime_dir,
+            &self.cfg.state_dir,
+            &self.cfg.cache_dir,
+            &self.cfg.logs_dir,
+            &self.cfg.config_dir,
+        ] {
+            if !dir.try_exists()? {
+                return Err(anyhow::anyhow!(
+                    "directory does not exist: {}",
+                    dir.display()
+                ));
+            }
+        }
+
         // These directories aren't created for us.
         for (name, path) in [
             ("keystore", self.cfg.keystore_path()),

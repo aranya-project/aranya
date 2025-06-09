@@ -26,6 +26,21 @@ fi
 
 declare -a devices=("owner" "admin" "operator" "membera" "memberb")
 
+proj="$(cargo locate-project --workspace --message-format plain)"
+proj="$(dirname "${proj}")"
+release="${proj}/target/release"
+capi="${proj}/crates/aranya-client-capi"
+example="${proj}/examples/c"
+out="${example}/out"
+
+cleanup() {
+    jobs -p | xargs -I{} kill {} || true
+}
+trap 'cleanup' EXIT
+trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
+
+rm -rf "${out}"
+
 port=10001
 for device in "${devices[@]}"; do
     cat <<EOF >"${example}/configs/${device}-config.json"
@@ -41,21 +56,6 @@ for device in "${devices[@]}"; do
 EOF
     port=$((port + 1))
 done
-
-proj="$(cargo locate-project --workspace --message-format plain)"
-proj="$(dirname "${proj}")"
-release="${proj}/target/release"
-capi="${proj}/crates/aranya-client-capi"
-example="${proj}/examples/c"
-out="${example}/out"
-
-cleanup() {
-    jobs -p | xargs -I{} kill {} || true
-}
-trap 'cleanup' EXIT
-trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
-
-rm -rf "${out}"
 
 # build the daemon.
 cargo build --bin aranya-daemon --release
@@ -78,6 +78,10 @@ cmake --build build
 # start the daemons
 for device in "${devices[@]}"; do
     mkdir -p "${out}/${device}"
+    for dir in run state cache log config; do
+        mkdir -p "${out}/${device}/${dir}"
+    done
+
     # Note: set ARANYA_DAEMON=debug to debug daemons.
     cfg_path="${example}/configs/${device}-config.json"
     api_pk="${out}/${device}/api_pk"

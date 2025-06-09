@@ -168,12 +168,8 @@ impl Config {
     }
 
     /// Path to the daemon's UDS API socket.
-    // TODO(eric): This is exported for our integration tests,
-    // but it is an implementation detail and should not be part
-    // of the public API.
-    #[doc(hidden)]
     pub fn uds_api_sock(&self) -> PathBuf {
-        self.runtime_dir.join("api.sock")
+        self.runtime_dir.join("uds.sock")
     }
 }
 
