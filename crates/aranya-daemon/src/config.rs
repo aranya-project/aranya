@@ -7,23 +7,97 @@ use std::{
 
 use anyhow::{Context, Result};
 use aranya_util::Addr;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{
+    de::{self, DeserializeOwned},
+    Deserialize, Serialize,
+};
 
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    /// Human-readable name for the daemon for tracing.
+    /// The name of the daemon, used for logging and debugging
+    /// purposes.
     pub name: String,
 
-    /// The daemon's working directory.
-    pub work_dir: PathBuf,
-
-    /// Used to receive API requests from the frontend client.
-    pub uds_api_path: PathBuf,
-
-    /// Path where the daemon should write its PID file.
-    pub pid_file: PathBuf,
+    /// The directory where the daemon stores non-essential
+    /// runtime files and other file objects (sockets, etc.).
+    ///
+    /// # Multiple Daemon Support
+    ///
+    /// This directory should be unique for each instance of the
+    /// daemon.
+    ///
+    /// # Example
+    ///
+    /// For example, this could be `/var/run/aranya`.
+    ///
+    /// See also: systemd `RuntimeDirectory=` and
+    /// `$XDG_RUNTIME_DIR`.
+    #[serde(deserialize_with = "non_empty_path")]
+    pub runtime_dir: PathBuf,
+    /// The directory where the daemon stores non-portable data
+    /// that should persist between application restarts.
+    ///
+    /// # Multiple Daemon Support
+    ///
+    /// This directory should be unique for each instance of the
+    /// daemon.
+    ///
+    /// # Example
+    ///
+    /// For example, this could be `/var/lib/aranya`.
+    ///
+    /// See also: systemd `StateDirectory=` and
+    /// `$XDG_STATE_HOME`.
+    #[serde(deserialize_with = "non_empty_path")]
+    pub state_dir: PathBuf,
+    /// The directory where the daemon stores non-essential data
+    /// files.
+    ///
+    /// # Multiple Daemon Support
+    ///
+    /// This directory should be unique for each instance of the
+    /// daemon.
+    ///
+    /// # Example
+    ///
+    /// For example, this could be `/var/cache/aranya`.
+    ///
+    /// See also: systemd `CacheDirectory=` and
+    /// `$XDG_CACHE_HOME`.
+    #[serde(deserialize_with = "non_empty_path")]
+    pub cache_dir: PathBuf,
+    /// The directory where the daemon writes log files.
+    ///
+    /// # Multiple Daemon Support
+    ///
+    /// This directory should be unique for each instance of the
+    /// daemon.
+    ///
+    /// # Example
+    ///
+    /// For example, this could be `/var/log/aranya`.
+    ///
+    /// See also: systemd `LogsDirectory=`.
+    #[serde(deserialize_with = "non_empty_path")]
+    pub logs_dir: PathBuf,
+    /// The directory where the daemon can find additional
+    /// configuration files.
+    ///
+    /// # Multiple Daemon Support
+    ///
+    /// This directory should be unique for each instance of the
+    /// daemon.
+    ///
+    /// # Example
+    ///
+    /// For example, this could be `/etc/aranya`.
+    ///
+    /// See also: systemd `ConfigDirectory=` and
+    /// `$XDG_CONFIG_HOME`.
+    #[serde(deserialize_with = "non_empty_path")]
+    pub config_dir: PathBuf,
 
     /// Network address of Aranya sync server.
     pub sync_addr: Addr,
@@ -44,29 +118,33 @@ impl Config {
         P: AsRef<Path>,
     {
         let cfg: Self = read_json(path.as_ref())
-            .context(format!("unable to parse config: {:?}", path.as_ref()))?;
-
+            .with_context(|| format!("unable to parse config: {}", path.as_ref().display()))?;
         Ok(cfg)
+    }
+
+    /// Path to the PID file.
+    pub fn pid_path(&self) -> PathBuf {
+        self.runtime_dir.join("daemon.pid")
     }
 
     /// Path to the [`DefaultEngine`]'s key wrapping key.
     pub(crate) fn key_wrap_key_path(&self) -> PathBuf {
-        self.work_dir.join("key_wrap_key")
+        self.state_dir.join("key_wrap_key")
     }
 
     /// Path to the [`KeyBundle`].
     pub(crate) fn key_bundle_path(&self) -> PathBuf {
-        self.work_dir.join("key_bundle")
+        self.state_dir.join("key_bundle")
     }
 
     /// Path to the daemon's public API key.
     pub fn daemon_api_pk_path(&self) -> PathBuf {
-        self.work_dir.join("daemon_api_pk")
+        self.state_dir.join("daemon_api_pk")
     }
 
     /// The directory where keystore files are written.
     pub(crate) fn keystore_path(&self) -> PathBuf {
-        self.work_dir.join("keystore")
+        self.state_dir.join("keystore")
     }
 
     /// The directory where the root keystore exists.
@@ -86,7 +164,12 @@ impl Config {
 
     /// Path to the runtime's storage.
     pub(crate) fn storage_path(&self) -> PathBuf {
-        self.work_dir.join("storage")
+        self.state_dir.join("storage")
+    }
+
+    /// Path to the daemon's UDS API socket.
+    pub fn uds_api_sock(&self) -> PathBuf {
+        self.runtime_dir.join("uds.sock")
     }
 }
 
@@ -126,29 +209,71 @@ pub struct AfcConfig {
 #[serde(deny_unknown_fields)]
 pub struct AqcConfig {}
 
+fn non_empty_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let path = PathBuf::deserialize(deserializer)?;
+    if path.components().next().is_none() {
+        Err(de::Error::custom("path cannot be empty"))
+    } else {
+        Ok(path)
+    }
+}
+
 #[cfg(test)]
+#[allow(clippy::expect_used)]
 mod tests {
     use std::net::Ipv4Addr;
 
     use pretty_assertions::assert_eq;
+    use serde_json::json;
 
     use super::*;
 
     #[test]
-    fn test_config() -> Result<()> {
+    fn test_example_config() -> Result<()> {
         const DIR: &str = env!("CARGO_MANIFEST_DIR");
         let path = Path::new(DIR).join("example.json");
         let got = Config::load(path)?;
         let want = Config {
             name: "name".to_string(),
-            work_dir: "/var/lib/work_dir".parse()?,
-            uds_api_path: "/var/run/uds.sock".parse()?,
-            pid_file: "/var/run/hub.pid".parse()?,
+            runtime_dir: "/var/run/aranya".parse()?,
+            state_dir: "/var/lib/aranya".parse()?,
+            cache_dir: "/var/cache/aranya".parse()?,
+            logs_dir: "/var/log/aranya".parse()?,
+            config_dir: "/etc/aranya".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
             afc: None,
             aqc: None,
         };
         assert_eq!(got, want);
         Ok(())
+    }
+
+    #[test]
+    fn test_config() {
+        // Missing a required field.
+        let data = json!({
+            "name": "aranya",
+            "runtime_dir": "/var/run/aranya",
+            "state_dir": "/var/lib/aranya",
+            "logs_dir": "/var/log/aranya",
+            "config_dir": "/etc/aranya",
+            "sync_addr": "127.0.0.1:4321",
+        });
+        serde_json::from_value::<Config>(data).expect_err("missing `cache_dir` should be rejected");
+
+        // A required field is empty.
+        let data = json!({
+            "name": "aranya",
+            "runtime_dir": "/var/run/aranya",
+            "state_dir": "/var/lib/aranya",
+            "cache_dir": "",
+            "logs_dir": "/var/log/aranya",
+            "config_dir": "/etc/aranya",
+            "sync_addr": "127.0.0.1:4321",
+        });
+        serde_json::from_value::<Config>(data).expect_err("empty `cache_dir` should be rejected");
     }
 }

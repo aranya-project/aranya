@@ -41,6 +41,22 @@ trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
 
 rm -rf "${out}"
 
+port=10001
+for device in "${devices[@]}"; do
+    cat <<EOF >"${example}/configs/${device}-config.json"
+{
+    "name": "${device}",
+    "runtime_dir": "${out}/${device}/run",
+    "state_dir": "${out}/${device}/state",
+    "cache_dir": "${out}/${device}/cache",
+    "logs_dir": "${out}/${device}/log",
+    "config_dir": "${out}/${device}/config",
+    "sync_addr": "127.0.0.1:${port}",
+}
+EOF
+    port=$((port + 1))
+done
+
 # build the daemon.
 cargo build --bin aranya-daemon --release
 
@@ -62,7 +78,10 @@ cmake --build build
 # start the daemons
 for device in "${devices[@]}"; do
     mkdir -p "${out}/${device}"
-    # TODO: autogenerate these config files
+    for dir in run state cache log config; do
+        mkdir -p "${out}/${device}/${dir}"
+    done
+
     # Note: set ARANYA_DAEMON=debug to debug daemons.
     cfg_path="${example}/configs/${device}-config.json"
     api_pk="${out}/${device}/api_pk"
