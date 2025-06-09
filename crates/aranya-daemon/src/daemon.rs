@@ -325,7 +325,7 @@ impl Daemon {
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.cfg.uds_api_sock());
+        let _ = std::fs::remove_file(self.cfg.uds_api_sock());
     }
 }
 
