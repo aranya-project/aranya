@@ -129,7 +129,7 @@ impl ClientCtx {
         };
 
         // The path that the daemon will listen on.
-        let uds_sock = work_dir.path().join("run").join("uds.sock");
+        let uds_sock = work_dir.path().join("daemon").join("run").join("uds.sock");
 
         // Give the daemon time to start up.
         sleep(Duration::from_millis(100)).await;
