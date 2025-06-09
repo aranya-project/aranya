@@ -60,7 +60,7 @@ pub struct DaemonHandle {
 impl DaemonHandle {
     /// Wait for the daemon to finish.
     ///
-    /// Panics if the daemon's tasks panic.
+    /// Panics if any of the daemon's tasks panic.
     pub async fn join(mut self) -> Result<(), Bug> {
         match self.set.join_next().await.assume("set not empty")? {
             Ok(()) => {}
