@@ -1,5 +1,10 @@
 #![allow(dead_code)]
-use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{
+    fmt,
+    net::{Ipv4Addr, SocketAddr},
+    path::PathBuf,
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 use aranya_client::{client::Client, QuicSyncConfig, SyncPeerConfig, TeamConfig};
@@ -282,7 +287,7 @@ impl DeviceCtx {
             cache_dir: work_dir.join("cache"),
             logs_dir: work_dir.join("log"),
             config_dir: work_dir.join("config"),
-            sync_addr: Addr::new("localhost", 0)?,
+            sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
             afc: None,
             aqc: None,
             quic_sync,
