@@ -172,7 +172,8 @@ impl Daemon {
         };
         // Declare here because self is moved into the closure below
         let service_name = qs_config.service_name.clone();
-        let uds_path = self.cfg.uds_api_path.clone();
+        let uds_sock = self.cfg.uds_api_sock().clone();
+        let pk_path = self.cfg.api_pk_path();
 
         #[cfg(feature = "testing")]
         {
@@ -207,8 +208,8 @@ impl Daemon {
         let api = DaemonApiServer::new(
             client,
             local_addr,
-            self.cfg.uds_api_sock(),
-            self.cfg.api_pk_path(),
+            uds_sock,
+            pk_path,
             api_sk,
             pks,
             peers,
