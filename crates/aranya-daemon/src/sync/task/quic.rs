@@ -337,7 +337,6 @@ impl Syncer<State> {
             if !cmds.is_empty() {
                 let mut client = self.client.lock().await;
                 let mut trx = client.transaction(*id);
-                // TODO: save PeerCache somewhere.
                 client
                     .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
