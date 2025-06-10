@@ -238,6 +238,7 @@ impl EffectHandler {
                 QueriedLabelAssignment(_) => {}
                 QueryLabelExistsResult(_) => {}
                 QueryAqcNetworkNamesOutput(_) => {}
+                RoleCreated(_) => {}
             }
         }
         Ok(())

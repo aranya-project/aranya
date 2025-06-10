@@ -74,16 +74,6 @@ use perspective
 ### Enums & Structs
 
 ```policy
-
-// Defines the roles a team member may have.
-// TODO: implement custom ID-based roles.
-enum Role {
-    Owner,
-    Admin,
-    Operator,
-    Member,
-}
-
 // Valid channel operations for a label assignment.
 enum ChanOp {
     // The device can only receive data in channels with this
@@ -111,6 +101,36 @@ struct KeyIds {
     sign_key_id id,
     enc_key_id id,
 }
+
+// A device.
+struct DeviceInfo {
+    // ID of the device.
+    device_id id,
+    // Signing key id.
+    sign_key_id id,
+    // Encryption key id.
+    enc_key_id id,
+}
+
+// An AQC/AFC label.
+struct LabelInfo {
+    // ID of the label.
+    label_id id,
+    // Name of the label.
+    name string,
+    // ID of device that created the label.
+    author_id id,
+}
+
+// A role.
+struct RoleInfo {
+    // ID of the role.
+    role_id id,
+    // Name of the role.
+    name string,
+    // ID of device that created the role.
+    author_id id,
+}
 ```
 
 ### Facts
@@ -127,6 +147,17 @@ fact DeviceSignKey[device_id id]=>{key_id id, key bytes}
 
 // A device's public EncryptionKey.
 fact DeviceEncKey[device_id id]=>{key_id id, key bytes}
+
+// An RBAC role.
+fact Role[role_id id]=>{name string, author_id id}
+
+// Records that a device has been assigned a role.
+fact AssignedRole[role_id id, device_id id]=>{}
+
+// Records that a device must possess a certain role in order to
+// perform the operation.
+// TODO: use enum permission key.
+fact OpRequiresRole[op string]=>{role_id id}
 
 // Indicates that the team has been terminated.
 fact TeamEnd[]=>{}
@@ -159,10 +190,13 @@ function find_existing_device(device_id id) optional struct Device {
     return device
 }
 
-// Returns whether the team exists.
-// Returns true if the team exists, returns false otherwise.
-// This should always be the first thing that is checked before executing a command on a team.
-// The only command that doesn't run this check first is `CreateTeam`.
+// Reports whether the team exists.
+//
+// This should always be the first thing that is checked before
+// executing a command on a team.
+//
+// The only command that doesn't run this check first is
+// `CreateTeam`.
 function team_exists() bool {
     // Check to see if team is active.
     return !exists TeamEnd[]=> {}
@@ -187,26 +221,6 @@ function derive_device_key_ids(device_keys struct KeyBundle) struct KeyIds {
         sign_key_id: sign_key_id,
         enc_key_id: enc_key_id,
     }
-}
-
-// Verify team member has `Role::Owner`
-function is_owner(role enum Role) bool {
-    return role == Role::Owner
-}
-
-// Verify team member has `Role::Admin`
-function is_admin(role enum Role) bool {
-    return role == Role::Admin
-}
-
-// Verify team member has `Role::Operator`
-function is_operator(role enum Role) bool {
-    return role == Role::Operator
-}
-
-// Verify team member has `Role::Member`
-function is_member(role enum Role) bool {
-    return role == Role::Member
 }
 
 // Seals a serialized basic command into an envelope, using the stored SigningKey for this device.
@@ -240,6 +254,54 @@ function open_envelope(sealed_envelope struct Envelope) bytes {
         envelope::signature(sealed_envelope),
     )
     return verified_command
+}
+```
+
+#### Role Operation RBAC Functions
+
+Used to determine if a role has permission to publish a certain command.
+A command may only have 1 role with permission to publish it.
+A role may be assigned to multiple devices.
+A device may be assigned multiple roles.
+
+```policy
+// Returns a unique ID for a role created by a command.
+//
+// NB: This function is deterministic and injective for the
+// current policy. Calling it multiple times for the same
+// envelope will always return the same ID.
+function derive_role_id(evp struct Envelope) id {
+    // The role ID is the ID of the command that created it.
+    return envelope::command_id(evp)
+}
+
+// Returns the `Device` corresponding with the author of the
+// envelope iff the author is authorized to perform the operation.
+//
+// Otherwise, it raises a check error.
+function get_authorized_device(evp struct Envelope, op string) struct Device {
+    let device = get_valid_device(envelope::author_id(evp))
+    check can_perform_op(device.device_id, op)
+    return device
+}
+
+// Reports whether a device has permission to perform an
+// operation.
+function can_perform_op(device_id id, op string) bool {
+    let role_op_opt = query OpRequiresRole[op: op]
+    if role_op_opt is None {
+        return false
+    }
+    let role_id = (unwrap role_op_opt).role_id
+    if !exists Role[role_id: role_id] {
+        return false
+    }
+    return exists AssignedRole[role_id: role_id, device_id: device_id]
+}
+
+// Reports whether the device has been assigned the role.
+function has_role(device_id id, role_id id) bool {
+    return check exists AssignedRole[role_id: role_id, device_id: device_id]
 }
 ```
 
@@ -393,16 +455,32 @@ command CreateTeam {
     }
 
     policy {
-        // Get author of command
+        check !team_exists()
+
         let author_id = envelope::author_id(envelope)
-        // Derive the key ids from the device_keys
+
         let owner_key_ids = derive_device_key_ids(this.owner_keys)
 
-        // Check that author_id matches the device_id being created
+        // The author must have signed the command with the same
+        // device keys.
         check author_id == owner_key_ids.device_id
+
+        // The ID of the 'owner' role.
+        let role_id = new_role_id(envelope)
 
         finish {
             add_new_device(this.owner_keys, owner_key_ids, Role::Owner)
+
+            // Assign all the default operations to the owner
+            // role.
+            create OpRequiresRole[op: "AddMember"]=>{role_id: role_id}
+            create OpRequiresRole[op: "RemoveMember"]=>{role_id: role_id}
+
+            create OpRequiresRole[op: "AssignRole"]=>{role_id: role_id}
+            create OpRequiresRole[op: "RevokeRole"]=>{role_id: role_id}
+            create OpRequiresRole[op: "SetupDefaultRole"]=>{role_id: role_id}
+
+            create OpRequiresRole[op: "TerminateTeam"]=>{role_id: role_id}
 
             emit TeamCreated {
                 owner_id: author_id,
@@ -434,7 +512,6 @@ finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyId
 **Invariants:**
 
 - This is the initial command in the graph.
-- Only an Owner will create this event.
 
 ## TerminateTeam
 
@@ -443,10 +520,10 @@ The `TerminateTeam` terminates a Team. It can only be done by the Owner.
 ```policy
 // Terminates a Team.
 action terminate_team() {
-    publish TerminateTeam{}
+    publish TerminateTeam {}
 }
 
-effect TeamTerminated{
+effect TeamTerminated {
     owner_id id,
 }
 
@@ -459,15 +536,12 @@ command TerminateTeam {
     policy {
         check team_exists()
 
-        // Check that the team is active and return the author's info if they exist in the team.
-        let author = get_valid_device(envelope::author_id(envelope))
-        // Only the Owner can close the Team
-        check is_owner(author.role)
+        let author = get_authorized_device(envelope, "TerminateTeam")
 
         finish {
             create TeamEnd[]=>{}
 
-            emit TeamTerminated{
+            emit TeamTerminated {
                 owner_id: author.device_id,
             }
         }
@@ -478,8 +552,95 @@ command TerminateTeam {
 **Invariants:**
 
 - This is the final command in the graph.
-- Only an Owner can create this event.
 - Once terminated, no further communication will occur over the team graph.
+
+## SetupDefaultRoles
+
+The `SetupDefaultRoles` command sets up default roles on the team.
+Operation can only be invoked by the team owner role.
+
+```policy
+// Setup default roles on a team.
+action setup_default_roles() {
+    publish SetupDefaultRole {
+        name: "admin",
+    }
+    publish SetupDefaultRole {
+        name: "operator",
+    }
+    publish SetupDefaultRole {
+        name: "member",
+    }
+}
+
+command SetupDefaultRole {
+    fields {
+        name string
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_authorized_device(envelope, "SetupDefaultRole")
+        let role_id = new_role_id(envelope)
+
+        match this.name {
+            "admin" => {
+                finish {
+                    create Role[role_id: role_id]=>{name: this.name, author_id: author.device_id}
+
+                    create OpRequiresRole[op: "AssignAdmin"]=>{role_id: role.role_id}
+                    create OpRequiresRole[op: "RevokeAdmin"]=>{role_id: role.role_id}
+
+                    emit RoleCreated {
+                        role_id: role_id,
+                        name: this.name,
+                        author_id: author.device_id,
+                    }
+                }
+            }
+            "operator" => {
+                create Role[role_id: role_id]=>{name: this.name, author_id: author.device_id}
+
+                emit RoleCreated {
+                    role_id: role_id,
+                    name: this.name,
+                    author_id: author.device_id,
+                }
+            }
+            "member" => {
+                create Role[role_id: role_id]=>{name: this.name, author_id: author.device_id}
+
+                emit RoleCreated {
+                    role_id: role_id,
+                    name: this.name,
+                    author_id: author.device_id,
+                }
+            }
+            // Invalid role name.
+            _ => { check false }
+        }
+    }
+}
+
+// Emittedd when a role is created.
+effect RoleCreated {
+    // ID of the role.
+    role_id id,
+    // Name of the role.
+    name string,
+    // ID of device that created the role.
+    author_id id,
+}
+```
+
+**Invariants:**
+
+- This is the initial command in the graph.
+- Only an Owner will create this event.
 
 
 ## AddMember
@@ -488,6 +649,7 @@ Add a member to a team.
 
 ```policy
 // Adds a Member to the Team.
+// TODO(eric): rename this to "add_device"?
 action add_member(device_keys struct KeyBundle){
     publish AddMember {
         device_keys: device_keys,
@@ -514,12 +676,11 @@ command AddMember {
     policy {
         check team_exists()
 
-        let author = get_valid_device(envelope::author_id(envelope))
+        let author = get_authorized_device(envelope, "AddMember")
+
         // Derive the key IDs from the provided KeyBundle.
         let device_key_ids = derive_device_key_ids(this.device_keys)
 
-        // Only Operator and Owner can add a Member.
-        check is_operator(author.role) || is_owner(author.role)
         // Check that the Member doesn't already exist.
         check find_existing_device(device_key_ids.device_id) is None
 
@@ -537,8 +698,8 @@ command AddMember {
 
 **Invariants**:
 
-- Members can only be added by Operators and Owners.
-- Non-Member roles must first be added as a Member and can then get assigned to a higher role.
+- Non-Member roles must first be added as a Member and can then
+  get assigned to a higher role.
 
 
 ## RemoveMember
@@ -558,9 +719,9 @@ effect MemberRemoved {
     device_id id,
 }
 
-command RemoveMember{
+command RemoveMember {
     fields {
-        // The removed device's ID.
+        // The ID of the device being removed from the team.
         device_id id,
     }
 
@@ -570,13 +731,11 @@ command RemoveMember{
     policy {
         check team_exists()
 
-        let author = get_valid_device(envelope::author_id(envelope))
-        let device = get_valid_device(this.device_id)
+        let author = get_authorized_device(envelope, "RemoveMember")
 
-        // Only Operators and Owners can remove a Member
-        check is_operator(author.role) || is_owner(author.role)
-        // Check that the device is a Member
-        check is_member(device.role)
+        let target = get_valid_device(this.device_id)
+
+        // TODO: author dominates target?
 
         finish {
             remove_device(this.device_id)
@@ -599,9 +758,7 @@ finish function remove_device(device_id id) {
 
 **Invariants**:
 
-- Members can only be removed by Operators and Owners.
-- Removing non-Members requires revoking their higher role so the device is made into a Member first.
-
+TODO
 
 ## AssignRole
 
@@ -609,44 +766,24 @@ Assign a role to a device.
 
 ```policy
 // Assigns the specified role to the device.
-action assign_role(device_id id, role enum Role){
-    match role {
-        Role::Owner => {
-            // Assigns the Owner role.
-            publish AssignOwner {
-                device_id: device_id,
-            }
-        }
-        Role::Admin => {
-            // Assigns the Admin role.
-            publish AssignAdmin {
-                device_id: device_id,
-            }
-        }
-        Role::Operator => {
-            // Assigns the Operator role.
-            publish AssignOperator {
-                device_id: device_id,
-            }
-        }
-        _ => { check false }
+action assign_role(device_id id, role_id id) {
+    publish AssignRole {
+        device_id: device_id,
+        role_id: role_id,
     }
 }
-```
 
-### AssignOwner
-
-Assign the `Owner` role to a device.
-
-```policy
-// A device was assigned with the Owner role.
-effect OwnerAssigned {
+// Emitted when a device is assigned a role.
+effect RoleAssigned {
+    // The ID of the device that was assigned a role.
     device_id id,
+    // The ID of the role that was assigned.
+    role_id id,
 }
 
-command AssignOwner{
+command AssignRole {
     fields {
-        // The assigned device's ID.
+        // The ID of the device being assigned the role.
         device_id id,
     }
 
@@ -656,35 +793,20 @@ command AssignOwner{
     policy {
         check team_exists()
 
-        let author = get_valid_device(envelope::author_id(envelope))
-        let device = get_valid_device(this.device_id)
+        let author = get_authorized_device(envelope, "AssignRole")
+        let target = get_valid_device(this.device_id)
 
-        // Only an Owner can assign the Owner role.
-        check is_owner(author.role)
-        // The device must not already have the Owner role.
-        check device.role != Role::Owner
+        let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
-            assign_role(device, Role::Owner)
+            create AssignedRole[role_id: role.role_id, device_id: target.device_id]=>{}
 
-            emit OwnerAssigned {
-                device_id: this.device_id,
+            emit RoleAssigned {
+                device_id: target.device_id,
+                role_id: role.role_id,
             }
         }
     }
-}
-
-// Assigns the device to the specified role.
-finish function assign_role(device struct Device, role enum Role) {
-    update Device[device_id: device.device_id]=>{
-        role: device.role,
-        sign_key_id: device.sign_key_id,
-        enc_key_id: device.enc_key_id,
-        } to {
-            role: role,
-            sign_key_id: device.sign_key_id,
-            enc_key_id: device.enc_key_id,
-        }
 }
 ```
 
@@ -1484,13 +1606,22 @@ Establishes a whitelist of labels that can be assigned to Members.
 ```policy
 // Records a label.
 //
-// `name` is a short description of the label. E.g., "TELEMETRY".
+// - `name` is a short description of the label, like
+//   "TELEMETRY".
+// - `author_id` is the ID of the device that created the label.
 fact Label[label_id id]=>{name string, author_id id}
 
 // Creates a label.
-action create_label(name string) {
+//
+// - `name` is a short description of the label, like
+//   "TELEMETRY".
+// - `managing_role_id` specifies the ID of the role required to
+//    grant other devices permission to use the label. Devices
+//    are never allowed to assign labels to themselves.
+action create_label(name string, managing_role_id id) {
     publish CreateLabel {
         label_name: name,
+        managing_role_id: managing_role_id,
     }
 }
 
@@ -1498,6 +1629,9 @@ command CreateLabel {
     fields {
         // The label name.
         label_name string,
+        // The ID of the role required to grant *other* devices
+        // permission to use the label.
+        managing_role_id id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -1511,8 +1645,7 @@ command CreateLabel {
         // A label's ID is the ID of the command that created it.
         let label_id = envelope::command_id(envelope)
 
-        // Owners, Admins and Operators can create labels.
-        check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
+        let role = check_unwrap query Role[role_id: this.managing_role_id]
 
         // Verify that the label does not already exist.
         //
@@ -1523,11 +1656,13 @@ command CreateLabel {
 
         finish {
             create Label[label_id: label_id]=>{name: this.label_name, author_id: author.device_id}
+            create CanAssignLabel[label_id: label_id]=>{managing_role_id: role.role_id}
 
             emit LabelCreated {
                 label_id: label_id,
                 label_name: this.label_name,
                 label_author_id: author.device_id,
+                managing_role_id: role.role_id,
             }
         }
     }
@@ -1542,6 +1677,9 @@ effect LabelCreated {
     label_name string,
     // The ID of the device that created the label.
     label_author_id id,
+    // The ID of the role required to grant *other* devices
+    // permission to use the label.
+    managing_role_id id,
 }
 
 action delete_label(label_id id) {
@@ -1559,7 +1697,8 @@ action delete_label(label_id id) {
 
 ##### DeleteLabel
 
-Removes a label from the whitelist. This operation will result in the label revocation across all Members that were assigned to it.
+Deletes a label. This operation revokes access from all devices
+who have been granted permission to use it.
 
 ```policy
 command DeleteLabel {
@@ -1620,6 +1759,78 @@ effect LabelDeleted {
 
 - Only Owners and Admins are allowed to delete labels.
 
+##### Update Label Managing Role
+
+```policy
+// Records that a particular role is required in order to grant
+// *other* devices permission to use the label.
+//
+// Devices with the role are allowed to grant any *other* device
+// permission to use the label. Devices cannot grant themselves
+// permission to use the label, even if they have the requisite
+// role.
+fact CanAssignLabel[label_id id]=>{managing_role_id id}
+// Changes the role required to grant *other* devices permission
+// to use the label.
+//
+// Devices with the role are allowed to grant any *other* device
+// permission to use the label. Devices cannot grant themselves
+// permission to use the label, even if they have the requisite
+// role.
+action change_label_managing_role(label_id id, managing_role_id id) {
+    publish ChangeLabelManagingRole {
+        label_id: label_id,
+        managing_role_id: managing_role_id,
+    }
+}
+command ChangeLabelManagingRole {
+    fields {
+        // The label to update.
+        label_id id,
+        // The ID of the role required to grant *other* devices
+        // permission to use the label.
+        managing_role_id id,
+    }
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+    policy {
+        let author = get_valid_device(envelope::author_id(envelope))
+        check device_can_execute_op(author.device_id, "ChangeLabelManagingRole")
+        let label = check_unwrap query Label[label_id: this.label_id]
+        // Only the author of the label is allowed to change the
+        // managing role.
+        check author.device_id == label.author_id
+        let ctx = check_unwrap query CanAssignLabel[label_id: label.label_id]
+        let old_managing_role_id = ctx.managing_role_id
+        // Make sure the role exists.
+        let role = check_unwrap query Role[role_id: this.managing_role_id]
+        let new_managing_role_id = this.managing_role_id
+        finish {
+            update CanAssignLabel[label_id: label.label_id]=>{managing_role_id: old_managing_role_id} to {managing_role_id: new_managing_role_id}
+            emit LabelUpdated {
+                label_id: label.label_id,
+                label_name: label.name,
+                label_author_id: label.author_id,
+                managing_role_id: new_managing_role_id,
+            }
+        }
+    }
+}
+// The effect emitted when the `ChangeLabelManagingRole` command
+// is successfully processed.
+effect LabelUpdated {
+    // Uniquely identifies the label.
+    label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
+    // The ID of the role required to grant *other* devices
+    // permission to use the label.
+    managing_role_id id,
+}
+```
+
 ##### Assign Label
 
 Assigns a label to a Member.
@@ -1631,6 +1842,10 @@ fact AssignedLabel[label_id id, device_id id]=>{op enum ChanOp}
 
 // Grants the device permission to use the label.
 //
+// - It is an error if the author does not have the role required
+//   to assign this label.
+// - It is an error if `device_id` refers to the author (devices
+//   are never allowed to assign roles to themselves).
 // - It is an error if the device does not exist.
 // - It is an error if the label does not exist.
 // - It is an error if the device has already been granted
@@ -1663,11 +1878,23 @@ command AssignLabel {
         let author = get_valid_device(envelope::author_id(envelope))
         let target = get_valid_device(this.device_id)
 
+        // Devices are never allowed to assign labels to
+        // themselves.
+        //
+        // Perform this check before we make more fact database
+        // queries.
+        check target.device_id != author.device_id
+
         // Only Owners and Operators can assign labels to Members.
         check is_owner(author.role) || is_operator(author.role)
 
         // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
+
+        // The author must have been granted permission to manage
+        // this label.
+        let ctx = check_unwrap query CanAssignLabel[label_id: label.label_id]
+        let role = check_unwrap query AssignedRole[role_id: ctx.managing_role_id, device_id: author.device_id]
 
         // Verify that the device has not already been granted
         // permission to use the label.
@@ -1752,7 +1979,13 @@ command RevokeLabel {
         check is_owner(author.role) || is_admin(author.role) || is_operator(author.role)
         check is_member(target.role)
 
+        // The label must exist.
         let label = check_unwrap query Label[label_id: this.label_id]
+
+        // The author must have been granted permission to manage
+        // this label.
+        let ctx = check_unwrap query CanAssignLabel[label_id: label.label_id]
+        let role = check_unwrap query AssignedRole[role_id: ctx.managing_role_id, device_id: author.device_id]
 
         // Verify that the device has been granted permission to
         // use the label.

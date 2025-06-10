@@ -37,6 +37,7 @@ pub enum ChanOp {
 pub enum Effect {
     TeamCreated(TeamCreated),
     TeamTerminated(TeamTerminated),
+    RoleCreated(RoleCreated),
     MemberAdded(MemberAdded),
     MemberRemoved(MemberRemoved),
     OwnerAssigned(OwnerAssigned),
@@ -73,6 +74,13 @@ pub struct TeamCreated {
 #[effect]
 pub struct TeamTerminated {
     pub owner_id: Id,
+}
+/// RoleCreated policy effect.
+#[effect]
+pub struct RoleCreated {
+    pub role_id: Id,
+    pub name: String,
+    pub author_id: Id,
 }
 /// MemberAdded policy effect.
 #[effect]
@@ -268,6 +276,7 @@ pub trait ActorExt {
         nonce: Vec<u8>,
     ) -> Result<(), ClientError>;
     fn terminate_team(&mut self) -> Result<(), ClientError>;
+    fn setup_default_roles(&mut self) -> Result<(), ClientError>;
     fn add_member(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
     fn remove_member(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: Id, role: Role) -> Result<(), ClientError>;
