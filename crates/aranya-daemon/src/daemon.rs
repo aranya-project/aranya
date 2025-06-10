@@ -123,7 +123,8 @@ impl Daemon {
         let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
         let state = QuicSyncState::new(initial_keys, psk_recv)?;
-        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects, state);
+        let (mut syncer, peers) =
+            Syncer::new(client.clone(), send_effects, state, local_addr.into());
         set.spawn(async move {
             loop {
                 if let Err(err) = syncer.next().await {

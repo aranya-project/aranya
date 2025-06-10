@@ -98,12 +98,13 @@ impl TestDevice {
         psk_send: Sender<Msg>,  // Quic Syncer specific
         psk_rx: BReceiver<Msg>, // Quic Syncer specific
     ) -> Result<Self> {
+        let server_addr = server.local_addr()?.into();
         let handle = task::spawn(async { server.serve().await }).abort_handle();
 
         let state = TestState::new([], psk_rx.resubscribe())?;
 
         let (send, effect_recv) = mpsc::channel(1);
-        let (syncer, _sync_peers) = TestSyncer::new(client, send, state);
+        let (syncer, _sync_peers) = TestSyncer::new(client, send, state, server_addr);
         Ok(Self {
             syncer,
             graph_id,

@@ -131,6 +131,7 @@ impl SyncState for State {
         syncer: &mut Syncer<Self>,
         id: GraphId,
         sink: &mut S,
+        server_addr: Addr,
         peer: &Addr,
     ) -> impl Future<Output = SyncResult<()>> + Send
     where
@@ -144,8 +145,6 @@ impl SyncState for State {
             // TODO: spawn a task for send/recv?
             let (mut recv, mut send) = stream.split();
 
-            // TODO: Real server address.
-            let server_addr = ();
             let mut sync_requester = SyncRequester::new(id, &mut Rng, server_addr);
 
             // send sync request.
@@ -482,9 +481,10 @@ where
     /// Begins accepting incoming requests.
     #[instrument(skip_all)]
     pub async fn serve(mut self) -> SyncResult<()> {
+        let addr = self.local_addr().map_err(SyncError::Other)?;
         info!(
             "QUIC sync server listening for incoming connections: {}",
-            self.local_addr().map_err(SyncError::Other)?
+            addr
         );
 
         // Accept incoming QUIC connections
@@ -502,9 +502,14 @@ where
                     match conn.accept_bidirectional_stream().await {
                         Ok(Some(stream)) => {
                             debug!(?peer, "received incoming QUIC stream");
-                            if let Err(e) =
-                                Self::sync(client.clone(), caches.clone(), peer.into(), stream)
-                                    .await
+                            if let Err(e) = Self::sync(
+                                client.clone(),
+                                caches.clone(),
+                                addr.into(),
+                                peer.into(),
+                                stream,
+                            )
+                            .await
                             {
                                 error!(?e, ?peer, "server unable to sync with peer");
                                 break;
@@ -534,6 +539,7 @@ where
     pub async fn sync(
         client: AranyaClient<EN, SP>,
         caches: Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>,
+        addr: Addr,
         peer: Addr,
         stream: BidirectionalStream,
     ) -> SyncResult<()> {
@@ -547,7 +553,7 @@ where
         debug!(?peer, n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let sync_response_res = Self::sync_respond(client, caches, peer, &recv_buf)
+        let sync_response_res = Self::sync_respond(client, caches, addr, &recv_buf)
             .await
             .inspect_err(|e| error!(?e, "error responding to sync request"));
 
@@ -597,14 +603,13 @@ where
         };
         check_version(*version_byte, QUIC_SYNC_VERSION)?;
 
-        // TODO: Use real server address
-        let server_address = ();
+        let server_address = addr;
         let mut resp = SyncResponder::new(server_address);
 
         let SyncType::Poll {
             request: request_msg,
-            address: (),
-        } = postcard::from_bytes(sync_request).map_err(|e| anyhow::anyhow!(e))?
+            address: peer_server_addr,
+        }: SyncType<Addr> = postcard::from_bytes(sync_request).map_err(|e| anyhow::anyhow!(e))?
         else {
             bug!("Other sync types are not implemented");
         };
@@ -617,7 +622,7 @@ where
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
         let mut caches = caches.lock().await;
-        let key = PeerCacheKey::new(addr, storage_id);
+        let key = PeerCacheKey::new(peer_server_addr, storage_id);
         let cache = caches.entry(key).or_default();
         let len = resp
             .poll(&mut buf, client.lock().await.provider(), cache)
