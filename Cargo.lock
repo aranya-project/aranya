@@ -126,15 +126,14 @@ checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 [[package]]
 name = "aranya-aqc-util"
 version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a51bb0711855c476f302459f790625f8802162ca07a3dfa429d8d094bc21991"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
  "buggy",
  "postcard",
  "serde",
- "spin",
+ "spin 0.10.0",
  "thiserror 2.0.12",
  "tracing",
 ]
@@ -164,7 +163,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5bc02d9d37676f9a3567dc47e42e2b906f1faf6bf86fa184cd57e44c5f00830"
 dependencies = [
  "aranya-capi-macro",
- "aranya-libc",
+ "aranya-libc 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "buggy",
  "cfg-if",
  "const_format",
@@ -238,18 +237,17 @@ dependencies = [
 [[package]]
 name = "aranya-crypto"
 version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59e9997517909beeb58ca64c5a2942de0898d7f2ab8721c3739e2028e6feb5ac"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "buggy",
  "byteorder",
  "cfg-if",
  "ciborium",
  "ciborium-io",
- "postcard",
  "proptest",
  "rustix",
  "serde",
+ "sha3-utils",
  "siphasher",
  "spideroak-base58",
  "spideroak-crypto",
@@ -260,8 +258,7 @@ dependencies = [
 [[package]]
 name = "aranya-crypto-ffi"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99188351fbddae72d0ea9d266e8f9427436944625e07563af6f572be828a4710"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -344,8 +341,7 @@ dependencies = [
 [[package]]
 name = "aranya-device-ffi"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31cdd1e4d5dc2e251b5edb0b8eac47d65850c6b80af9fc4a79fcb79947937eb7"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -354,8 +350,7 @@ dependencies = [
 [[package]]
 name = "aranya-envelope-ffi"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2916a954d99e2084d147335a00e0d2cf639f73ff053811b50f8c07e0f5713a0e"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -366,8 +361,7 @@ dependencies = [
 [[package]]
 name = "aranya-fast-channels"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "329bfcc5dbc2cabefa0217c6517257a010535c5e03672a89c09470f38d1c48d4"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-crypto",
  "buggy",
@@ -375,7 +369,7 @@ dependencies = [
  "cfg-if",
  "const_format",
  "errno",
- "heapless 0.7.17",
+ "heapless 0.8.0",
  "libc",
  "serde",
  "thiserror 2.0.12",
@@ -384,8 +378,7 @@ dependencies = [
 [[package]]
 name = "aranya-idam-ffi"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5dbfbb475042cb043a8f9f3d9990c835e3d5ab885b7da5527ba09a787bc37911"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -470,10 +463,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "aranya-libc"
+version = "0.3.0"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
+dependencies = [
+ "cfg-if",
+ "errno",
+ "libc",
+ "memchr",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "aranya-perspective-ffi"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cc9eafcd4e5af02c47876d71d954de743549c97c8fbd6f34e5aaf488d031100"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-vm",
@@ -482,8 +486,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-ast"
 version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b4c33e8ab519a5ae145a642f92851c811aa8411622540a32056796a652676ba"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "serde",
  "thiserror 2.0.12",
@@ -492,8 +495,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-compiler"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc9b470656b3853dc2859d4784d51cc5b8e588b77ab39f334b298118e6769dc6"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-policy-ast",
  "aranya-policy-lang",
@@ -507,8 +509,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-derive"
 version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b82c7ba7e4f3fccd00b059d4ab25e169b16b8ab8fa07eab2d44080382f0ab56d"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-policy-lang",
  "prettyplease",
@@ -533,8 +534,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-ifgen-build"
 version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69a043f4e4861eff87d8d7a3314fdaccd09fdeca77aee95082c982228552a8f4"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "anyhow",
  "aranya-policy-ast",
@@ -559,8 +559,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-lang"
 version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0a21a1adfca1f7e9492cffcfcce717d892d21267652eec8936f9150f5ac5d8b"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "anyhow",
  "aranya-policy-ast",
@@ -576,8 +575,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-module"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f4065a0e288506cad81e86696c8bca71f963e4c1fb4e86f3a5e3d6d5031ebcfa"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-ast",
@@ -588,8 +586,7 @@ dependencies = [
 [[package]]
 name = "aranya-policy-vm"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "75aa58c76eb57e80424743956b312a0154952b146d2d617d127fd78ecbd6aa8f"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-crypto",
  "aranya-policy-ast",
@@ -604,17 +601,16 @@ dependencies = [
 [[package]]
 name = "aranya-runtime"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5e36def6afb5aa23503bbd229120d913a4dff417fdbb4a8f9e5e923ff959725"
+source = "git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id#827c51cb269acc5669d15cdefb5d5fe2f95549af"
 dependencies = [
  "aranya-crypto",
- "aranya-libc",
+ "aranya-libc 0.3.0 (git+https://github.com/aranya-project/aranya-core.git?branch=267-runtime-delete-graph-from-storage-based-on-graph-id)",
  "aranya-policy-vm",
  "buggy",
  "heapless 0.8.0",
  "postcard",
  "serde",
- "spin",
+ "spin 0.10.0",
  "thiserror 2.0.12",
  "tracing",
  "vec1",
@@ -1573,7 +1569,7 @@ dependencies = [
  "hash32 0.2.1",
  "rustc_version",
  "serde",
- "spin",
+ "spin 0.9.8",
  "stable_deref_trait",
 ]
 
@@ -2742,11 +2738,11 @@ dependencies = [
 
 [[package]]
 name = "sha3-utils"
-version = "0.3.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e19df53912f231b1348a1af81c59202ca43d9a1b8d7455ece97c2e17a597f491"
+checksum = "08e0bf98cc082cbe077f06a707c94ca15796d046cc4cd2593167b5730a6727be"
 dependencies = [
- "typenum",
+ "zerocopy 0.8.24",
 ]
 
 [[package]]
@@ -2817,9 +2813,9 @@ dependencies = [
 
 [[package]]
 name = "spideroak-crypto"
-version = "0.2.1"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71b5091ebcf7bc8fc98c07cc571cb1c22e7034d7decd5adb48a86c48f3890ec7"
+checksum = "cb9104419294271e35d214416fce160cd27aaae6284f4fc721abd2e968ef5a90"
 dependencies = [
  "aes-gcm",
  "buggy",
@@ -2833,7 +2829,6 @@ dependencies = [
  "getrandom 0.2.15",
  "p256",
  "p384",
- "postcard",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
@@ -2842,19 +2837,20 @@ dependencies = [
  "sha2",
  "sha3-utils",
  "spideroak-crypto-derive",
- "spin",
+ "spin 0.10.0",
  "subtle",
+ "thiserror 2.0.12",
  "typenum",
+ "zerocopy 0.8.24",
  "zeroize",
 ]
 
 [[package]]
 name = "spideroak-crypto-derive"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c17eb41e55e0b7786ee1ab9c618babb79c4d643771c85be8f9dbceb623e1235c"
+checksum = "0f9a7eef355abf3ffa83d09840070d4cbd6a7daf2cb6ea0d401e317952c3dde1"
 dependencies = [
- "prettyplease",
  "proc-macro2",
  "quote",
  "syn 2.0.99",
@@ -2868,6 +2864,12 @@ checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 dependencies = [
  "lock_api",
 ]
+
+[[package]]
+name = "spin"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5fe4ccb98d9c292d56fec89a5e07da7fc4cf0dc11e156b41793132775d3e591"
 
 [[package]]
 name = "spki"

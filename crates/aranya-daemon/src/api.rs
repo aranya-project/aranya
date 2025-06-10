@@ -402,7 +402,9 @@ impl DaemonApi for Api {
             data.psk_send.send(Msg::Remove(team))?;
             delete_psk(&data.service_name, &team)?;
         }
-        todo!("Should remove graph data from storage provider");
+        self.client.aranya.lock().await.remove_graph(team.into())?;
+
+        Ok(())
     }
 
     #[instrument(skip(self))]
