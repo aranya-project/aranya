@@ -341,7 +341,7 @@ async fn write_cbor(path: impl AsRef<Path>, data: impl Serialize) -> Result<()> 
 
 /// Loads a key from a file or generates and writes a new one.
 async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
-    pub async fn load_or_gen_key_inner<K: SecretKey>(path: &Path) -> Result<K> {
+    async fn load_or_gen_key_inner<K: SecretKey>(path: &Path) -> Result<K> {
         match fs::read(&path).await {
             Ok(buf) => {
                 tracing::info!("loading key");

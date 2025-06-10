@@ -103,7 +103,7 @@ impl DaemonApiServer {
     }
 
     /// Runs the server.
-    pub async fn serve(mut self) {
+    pub(crate) async fn serve(mut self) {
         scope(async |s| {
             s.spawn({
                 let effect_handler = self.api.effect_handler.clone();

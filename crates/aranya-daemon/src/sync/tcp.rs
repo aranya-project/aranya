@@ -120,7 +120,7 @@ impl<EN, SP> Server<EN, SP> {
     }
 
     /// Returns the local address the sync server bound to.
-    pub fn local_addr(&self) -> Result<SocketAddr> {
+    pub(crate) fn local_addr(&self) -> Result<SocketAddr> {
         Ok(self.listener.local_addr()?)
     }
 }
