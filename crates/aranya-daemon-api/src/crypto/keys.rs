@@ -1,6 +1,6 @@
 use core::{borrow::Borrow, fmt, marker::PhantomData};
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use aranya_crypto::{
     aead::{Aead, AeadId},
     custom_id,
@@ -11,7 +11,6 @@ use aranya_crypto::{
     kdf::{Kdf, KdfId},
     kem::{DecapKey as _, Kem, KemId},
     keys::{PublicKey, SecretKey},
-    keystore::KeyStore,
     mac::{Mac, MacId},
     signer::{PkError, Signer, SignerId},
     CipherSuite, Engine,
@@ -52,20 +51,12 @@ impl<CS: CipherSuite> ApiKey<CS> {
         &self.0
     }
 
-    /// Generates a key, wraps it with `eng`, and and writes the
-    /// wrapped key to `store`.
-    pub fn generate<E, S>(eng: &mut E, store: &mut S) -> Result<Self>
+    /// Generates a random API key.
+    pub fn generate<E>(eng: &mut E) -> Self
     where
         E: Engine<CS = CS>,
-        S: KeyStore,
     {
-        let sk = Self::new(eng);
-        let id = sk.id()?;
-        let wrapped = eng.wrap(sk.clone()).context("unable to wrap `ApiKey`")?;
-        store
-            .try_insert(id.into(), wrapped)
-            .context("unable to insert wrapped `ApiKey`")?;
-        Ok(sk)
+        Self::new(eng)
     }
 }
 

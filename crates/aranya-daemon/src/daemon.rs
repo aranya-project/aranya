@@ -7,7 +7,7 @@ use aranya_crypto::{
     default::DefaultEngine,
     import::Import,
     keys::SecretKey,
-    keystore::{fs_keystore::Store, KeyStore, KeyStoreExt},
+    keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
 use aranya_daemon_api::CS;
@@ -18,7 +18,6 @@ use aranya_runtime::{
 };
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
-use buggy::BugExt;
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 #[cfg(feature = "testing")]
@@ -79,16 +78,6 @@ impl Daemon {
         })
     }
 
-    /// Returns the daemon's public API key.
-    pub async fn public_api_key(&self) -> Result<PublicApiKey<CS>> {
-        self.setup_env().await?;
-
-        let mut eng = self.load_crypto_engine().await?;
-        let mut store = self.load_local_keystore().await?;
-        let sk = self.load_or_gen_api_sk(&mut eng, &mut store).await?;
-        sk.public().map_err(Into::into)
-    }
-
     /// The daemon's entrypoint.
     pub async fn run(mut self) -> Result<()> {
         // Setup environment for daemon's working directory.
@@ -103,8 +92,11 @@ impl Daemon {
             .load_or_gen_public_keys(&mut eng, &mut aranya_store)
             .await?;
 
-        let mut local_store = self.load_local_keystore().await?;
-        let api_sk = self.load_or_gen_api_sk(&mut eng, &mut local_store).await?;
+        // Currently unused after #294.
+        let mut _local_store = self.load_local_keystore().await?;
+
+        // Generate a fresh API key at startup.
+        let api_sk = ApiKey::generate(&mut eng);
 
         let (psk_send, psk_recv) = tokio::sync::broadcast::channel(16);
 
@@ -360,40 +352,6 @@ impl Daemon {
             .await?
             .context("`PublicApiKey` not found")?;
         pk.encode()
-    }
-
-    /// Loads or generates the [`ApiKey`].
-    async fn load_or_gen_api_sk<E, S>(
-        &self,
-        eng: &mut E,
-        store: &mut LocalStore<S>,
-    ) -> Result<ApiKey<E::CS>>
-    where
-        E: Engine,
-        S: KeyStore,
-    {
-        let path = self.cfg.daemon_api_pk_path();
-        match try_read_cbor::<PublicApiKey<E::CS>>(&path).await? {
-            Some(pk) => {
-                let id = pk.id()?;
-                let sk = store
-                    .get_key::<E, ApiKey<E::CS>>(eng, id.into())?
-                    // If the public API key exists then the
-                    // secret half should exist the keystore. If
-                    // not, then something deleted it from the
-                    // keystore.
-                    .assume("`ApiKey` should exist")?;
-                Ok(sk)
-            }
-            None => {
-                let sk = ApiKey::generate(eng, store).context("unable to generate `ApiKey`")?;
-                info!("generated `ApiKey`");
-                write_cbor(&path, &sk.public()?)
-                    .await
-                    .context("unable to write `PublicApiKey` to disk")?;
-                Ok(sk)
-            }
-        }
     }
 }
 
