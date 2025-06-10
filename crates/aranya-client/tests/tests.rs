@@ -162,7 +162,7 @@ async fn test_add_team() -> Result<()> {
         admin.add_team(cfg.clone()).await?;
         sleep(SLEEP_INTERVAL).await;
         admin.sync_now(owner_addr.into(), None).await?;
-        sleep(TLS_HANDSHAKE_DURATION).await;
+        sleep(SLEEP_INTERVAL).await;
 
         // Now we should be able to successfully assign a role.
         admin
