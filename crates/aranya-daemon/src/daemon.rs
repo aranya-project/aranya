@@ -5,7 +5,7 @@ use aranya_crypto::{
     default::DefaultEngine,
     import::Import,
     keys::SecretKey,
-    keystore::{fs_keystore::Store, KeyStore, KeyStoreExt},
+    keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
 use aranya_daemon_api::CS;
@@ -77,7 +77,6 @@ impl DaemonHandle {
 
 /// The daemon itself.
 pub struct Daemon {
-    public_api_key: PublicApiKey<CS>,
     sync_server: TcpSyncServer,
     syncer: Syncer<TCPSyncState>,
     api: DaemonApiServer,
@@ -95,11 +94,17 @@ impl Daemon {
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
             let mut eng = Self::load_crypto_engine(&cfg).await?;
-            let pk = Self::load_or_gen_public_keys(&cfg, &mut eng, &mut aranya_store).await?;
-            let mut local_store = Self::load_local_keystore(&cfg).await?;
+            let pks = Self::load_or_gen_public_keys(&cfg, &mut eng, &mut aranya_store).await?;
 
-            let api_sk = Self::load_or_gen_api_sk(&cfg, &mut eng, &mut local_store).await?;
-            let public_api_key = api_sk.public()?;
+            // Currently unused after #294.
+            let mut _local_store = Self::load_local_keystore(&cfg).await?;
+
+            // Generate a fresh API key at startup.
+            let api_sk = ApiKey::generate(&mut eng);
+            aranya_util::write_file(cfg.api_pk_path(), &api_sk.public()?.encode()?)
+                .await
+                .context("unable to write API public key")?;
+            info!(path = %cfg.api_pk_path().display(), "wrote API public key");
 
             // Initialize Aranya client.
             let (client, sync_server) = Self::setup_aranya(
@@ -108,7 +113,7 @@ impl Daemon {
                 aranya_store
                     .try_clone()
                     .context("unable to clone keystore")?,
-                &pk,
+                &pks,
                 cfg.sync_addr,
             )
             .await?;
@@ -141,7 +146,7 @@ impl Daemon {
                     }
                     peers
                 };
-                Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
+                Aqc::new(eng, pks.ident_pk.id()?, aranya_store, peers)
             };
 
             let api = DaemonApiServer::new(
@@ -149,13 +154,12 @@ impl Daemon {
                 local_addr,
                 cfg.uds_api_sock(),
                 api_sk,
-                pk,
+                pks,
                 peers,
                 recv_effects,
                 aqc,
             )?;
             Ok(Self {
-                public_api_key,
                 sync_server,
                 syncer,
                 api,
@@ -164,11 +168,6 @@ impl Daemon {
         }
         .instrument(info_span!(parent: span_id, "load"))
         .await
-    }
-
-    /// Returns the daemon's public API key.
-    pub fn public_api_key(&self) -> &PublicApiKey<CS> {
-        &self.public_api_key
     }
 
     /// The daemon's entrypoint.
@@ -331,40 +330,6 @@ impl Daemon {
             .await?
             .context("`PublicApiKey` not found")?;
         pk.encode()
-    }
-
-    /// Loads or generates the [`ApiKey`].
-    async fn load_or_gen_api_sk<E, S>(
-        cfg: &Config,
-        eng: &mut E,
-        store: &mut LocalStore<S>,
-    ) -> Result<ApiKey<E::CS>>
-    where
-        E: Engine,
-        S: KeyStore,
-    {
-        let path = cfg.daemon_api_pk_path();
-        match try_read_cbor::<PublicApiKey<E::CS>>(&path).await? {
-            Some(pk) => {
-                let id = pk.id()?;
-                let sk = store
-                    .get_key::<E, ApiKey<E::CS>>(eng, id.into())?
-                    // If the public API key exists then the
-                    // secret half should exist the keystore. If
-                    // not, then something deleted it from the
-                    // keystore.
-                    .assume("`ApiKey` should exist")?;
-                Ok(sk)
-            }
-            None => {
-                let sk = ApiKey::generate(eng, store).context("unable to generate `ApiKey`")?;
-                info!("generated `ApiKey`");
-                write_cbor(&path, &sk.public()?)
-                    .await
-                    .context("unable to write `PublicApiKey` to disk")?;
-                Ok(sk)
-            }
-        }
     }
 }
 

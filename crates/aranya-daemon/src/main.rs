@@ -41,12 +41,6 @@ fn main() -> Result<()> {
         let daemon = Daemon::load(cfg).await.context("unable to load daemon")?;
         info!("loaded Aranya daemon");
 
-        if flags.print_api_pk {
-            let pk = daemon.public_api_key().encode()?;
-            print!("{}", hex::encode(pk));
-            return Ok(());
-        }
-
         daemon.spawn().join().await?;
 
         Ok(())
@@ -60,11 +54,6 @@ struct Args {
     /// Path to the configuration file.
     #[arg(long)]
     config: PathBuf,
-
-    /// Print the public API key in hexadecimal format, then
-    /// exit.
-    #[arg(long)]
-    print_api_pk: bool,
 }
 
 /// A PID file.

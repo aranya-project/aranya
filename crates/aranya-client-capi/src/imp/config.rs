@@ -12,18 +12,12 @@ use crate::api::defs::{self, Duration};
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
     daemon_addr: *const c_char,
-    // The daemon's public API key.
-    pk: Vec<u8>,
     aqc: AqcConfig,
 }
 
 impl ClientConfig {
     pub(crate) fn daemon_addr(&self) -> *const c_char {
         self.daemon_addr
-    }
-
-    pub(crate) fn daemon_api_pk(&self) -> &[u8] {
-        &self.pk
     }
 
     pub(crate) fn aqc_addr(&self) -> *const c_char {
@@ -39,7 +33,6 @@ impl Typed for ClientConfig {
 #[derive(Clone, Debug)]
 pub struct ClientConfigBuilder {
     daemon_addr: *const c_char,
-    pk: Option<Vec<u8>>,
     aqc: Option<AqcConfig>,
 }
 
@@ -47,11 +40,6 @@ impl ClientConfigBuilder {
     /// Set the address for the daemon
     pub fn daemon_addr(&mut self, addr: *const c_char) {
         self.daemon_addr = addr;
-    }
-
-    /// Sets the daemon's public API key.
-    pub fn daemon_pk(&mut self, pk: &[u8]) {
-        self.pk = Some(pk.to_vec());
     }
 
     /// Set the config to be used for AQC
@@ -76,17 +64,12 @@ impl Builder for ClientConfigBuilder {
             return Err(InvalidArg::new("daemon_addr", "field not set").into());
         }
 
-        let Some(pk) = self.pk else {
-            return Err(InvalidArg::new("pk", "field not set").into());
-        };
-
         let Some(aqc) = self.aqc else {
             return Err(InvalidArg::new("aqc", "field not set").into());
         };
 
         let cfg = ClientConfig {
             daemon_addr: self.daemon_addr,
-            pk: pk.clone(),
             aqc,
         };
         Self::Output::init(out, cfg);
@@ -98,7 +81,6 @@ impl Default for ClientConfigBuilder {
     fn default() -> Self {
         Self {
             daemon_addr: ptr::null(),
-            pk: None,
             aqc: None,
         }
     }

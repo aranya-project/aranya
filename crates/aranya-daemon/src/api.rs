@@ -67,6 +67,7 @@ pub(crate) struct DaemonApiServer {
 
 impl DaemonApiServer {
     /// Creates a `DaemonApiServer`.
+    // TODO(eric): Clean up the arguments.
     #[instrument(skip_all)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
