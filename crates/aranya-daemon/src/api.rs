@@ -8,7 +8,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
 use aranya_crypto::{Csprng, Rng};
-pub(crate) use aranya_daemon_api::crypto::{ApiKey, PublicApiKey};
+pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},

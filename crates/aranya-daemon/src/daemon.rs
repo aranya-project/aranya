@@ -24,7 +24,7 @@ use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
     actions::Actions,
-    api::{ApiKey, DaemonApiServer, PublicApiKey},
+    api::{ApiKey, DaemonApiServer},
     aqc::Aqc,
     aranya,
     config::Config,
@@ -320,16 +320,6 @@ impl Daemon {
             }
         };
         bundle.public_keys(eng, store)
-    }
-
-    /// Loads the daemmon's public API key.
-    ///
-    /// For testing purposes only.
-    pub async fn load_api_pk(path: &Path) -> Result<Vec<u8>> {
-        let pk = try_read_cbor::<PublicApiKey<CS>>(&path)
-            .await?
-            .context("`PublicApiKey` not found")?;
-        pk.encode()
     }
 }
 
