@@ -156,6 +156,8 @@ pub struct Syncer<ST> {
     send_effects: EffectSender,
     /// Additional state used by the syncer
     state: ST,
+    /// Sync server address.
+    server_addr: Addr,
 }
 
 struct PeerInfo {
@@ -173,6 +175,7 @@ pub trait SyncState: Sized {
         syncer: &mut Syncer<Self>,
         id: GraphId,
         sink: &mut S,
+        server_addr: Addr,
         peer: &Addr,
     ) -> impl Future<Output = SyncResult<()>> + Send
     where
@@ -181,7 +184,12 @@ pub trait SyncState: Sized {
 
 impl<ST> Syncer<ST> {
     /// Creates a new `Syncer`.
-    pub fn new(client: Client, send_effects: EffectSender, state: ST) -> (Self, SyncPeers) {
+    pub fn new(
+        client: Client,
+        send_effects: EffectSender,
+        state: ST,
+        server_addr: Addr,
+    ) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -192,6 +200,7 @@ impl<ST> Syncer<ST> {
                 queue: DelayQueue::new(),
                 send_effects,
                 state,
+                server_addr,
             },
             peers,
         )
@@ -254,9 +263,10 @@ impl<ST: SyncState> Syncer<ST> {
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
     pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> SyncResult<()> {
         trace!("syncing with peer");
+        let server_addr = self.server_addr;
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
-            <ST as SyncState>::sync_impl(self, *id, &mut sink, peer)
+            <ST as SyncState>::sync_impl(self, *id, &mut sink, server_addr, peer)
                 .await
                 .context("sync_peer error")
                 .inspect_err(|err| error!("{err:?}"))?;

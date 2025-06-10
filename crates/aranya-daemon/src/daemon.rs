@@ -140,7 +140,7 @@ impl Daemon {
             let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
             let state = QuicSyncState::new(psk_store.clone())?;
-            let (syncer, peers) = Syncer::new(client.clone(), send_effects, state);
+            let (syncer, peers) = Syncer::new(client.clone(), send_effects, state, cfg.sync_addr);
 
             let graph_ids = client
                 .aranya
