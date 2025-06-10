@@ -64,6 +64,8 @@ pub(crate) struct DaemonApiServer {
     sk: ApiKey<CS>,
     /// The UDS path we serve the API on.
     uds_path: PathBuf,
+    /// The path where we write the API public key.
+    api_pk_path: PathBuf,
     /// The Aranya client.
     client: Client,
     /// The local network address for the `Client`'s sync server.
@@ -81,12 +83,14 @@ pub(crate) struct DaemonApiServer {
 
 impl DaemonApiServer {
     /// Creates a `DaemonApiServer`.
+    // TODO(eric): Clean up the arguments.
     #[instrument(skip_all)]
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         client: Client,
         local_addr: SocketAddr,
         uds_path: PathBuf,
+        api_pk_path: PathBuf,
         sk: ApiKey<CS>,
         pk: PublicKeys<CS>,
         peers: SyncPeers,
@@ -96,6 +100,7 @@ impl DaemonApiServer {
     ) -> Result<Self> {
         Ok(Self {
             uds_path,
+            api_pk_path,
             sk,
             recv_effects,
             client,
@@ -138,6 +143,11 @@ impl DaemonApiServer {
             },
             quic: self.quic,
         }));
+
+        aranya_util::write_file(&self.api_pk_path, &self.sk.public()?.encode()?)
+            .await
+            .context("unable to write API public key")?;
+        info!(path = %self.api_pk_path.display(), "wrote API public key");
 
         let server = {
             let listener = UnixListener::bind(&self.uds_path)?;

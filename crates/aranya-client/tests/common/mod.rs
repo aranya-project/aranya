@@ -1,10 +1,5 @@
 #![allow(dead_code)]
-use std::{
-    fmt,
-    net::{Ipv4Addr, SocketAddr},
-    path::PathBuf,
-    time::Duration,
-};
+use std::{fmt, net::SocketAddr, path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_client::{client::Client, QuicSyncConfig, SyncPeerConfig, TeamConfig};
@@ -272,11 +267,8 @@ pub struct DeviceCtx {
 impl DeviceCtx {
     async fn new(team_name: &str, name: &str, work_dir: PathBuf, port: u16) -> Result<Self> {
         let aqc_addr = Addr::new("127.0.0.1", port).expect("unable to init AQC address");
-        fs::create_dir_all(work_dir.clone()).await?;
 
         // Setup daemon config.
-        let uds_api_path = work_dir.join("uds.sock");
-
         // Reduce chance of having a collision in the storage
         let combined_name = format!("{team_name}-{name}");
         let service_name = Self::gen_service_name(&combined_name, &mut Rng);
@@ -285,21 +277,34 @@ impl DeviceCtx {
 
         let cfg = Config {
             name: "daemon".into(),
-            work_dir: work_dir.clone(),
-            uds_api_path: uds_api_path.clone(),
-            pid_file: work_dir.join("pid"),
-            sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
+            runtime_dir: work_dir.join("run"),
+            state_dir: work_dir.join("state"),
+            cache_dir: work_dir.join("cache"),
+            logs_dir: work_dir.join("log"),
+            config_dir: work_dir.join("config"),
+            sync_addr: Addr::new("localhost", 0)?,
             afc: None,
             aqc: None,
             quic_sync,
         };
 
-        // Load daemon from config.
+        for dir in [
+            &cfg.runtime_dir,
+            &cfg.state_dir,
+            &cfg.cache_dir,
+            &cfg.logs_dir,
+            &cfg.config_dir,
+        ] {
+            fs::create_dir_all(dir)
+                .await
+                .with_context(|| format!("unable to create directory: {}", dir.display()))?;
+        }
+        let uds_path = cfg.uds_api_sock();
+
+        // Load and start daemon from config.
         let daemon = Daemon::load(cfg.clone())
             .await
             .context("unable to init daemon")?;
-        let pk = daemon.public_api_key().await?;
-        let pk_bytes = pk.encode()?;
         let handle = task::spawn(async move {
             daemon
                 .run()
@@ -308,14 +313,13 @@ impl DeviceCtx {
         })
         .abort_handle();
 
-        // give daemon time to setup UDS API.
+        // give daemon time to setup UDS API and write the public key.
         sleep(SLEEP_INTERVAL).await;
 
-        // Initialize the user library.
+        // Initialize the user library - the client will automatically load the daemon's public key.
         let mut client = (|| {
             Client::builder()
-                .with_daemon_uds_path(&uds_api_path)
-                .with_daemon_api_pk(&pk_bytes)
+                .with_daemon_uds_path(&uds_path)
                 .with_daemon_aqc_addr(&aqc_addr)
                 .connect()
         })
