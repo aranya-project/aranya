@@ -54,19 +54,6 @@ impl Daemon {
             _work_dir: work_dir.into(),
         })
     }
-
-    async fn get_api_pk(path: &DaemonPath, cfg_path: &Path) -> Result<Vec<u8>> {
-        let cfg_path = cfg_path.as_os_str().to_str().context("should be UTF-8")?;
-        let mut cmd = Command::new(&path.0);
-        cmd.kill_on_drop(true)
-            .args(["--config", cfg_path])
-            .arg("--print-api-pk");
-        debug!(?cmd, "running daemon");
-        let output = cmd.output().await.context("unable to run daemon")?;
-        let pk_hex = String::from_utf8(output.stdout)?;
-        let pk = hex::decode(pk_hex.trim())?;
-        Ok(pk)
-    }
 }
 
 /// An Aranya device.
@@ -86,49 +73,60 @@ impl ClientCtx {
 
         let work_dir = TempDir::with_prefix(user_name)?;
 
-        // The path that the daemon will listen on.
-        let uds_api_path = work_dir.path().join("uds.sock");
-
-        let (daemon, pk) = {
+        let daemon = {
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
             let cfg_path = work_dir.join("config.json");
-            let pid_file = work_dir.join("pid");
+
+            let runtime_dir = work_dir.join("run");
+            let state_dir = work_dir.join("state");
+            let cache_dir = work_dir.join("cache");
+            let logs_dir = work_dir.join("logs");
+            let config_dir = work_dir.join("config");
+            for dir in &[&runtime_dir, &state_dir, &cache_dir, &logs_dir, &config_dir] {
+                fs::create_dir_all(dir)
+                    .await
+                    .with_context(|| format!("unable to create directory: {}", dir.display()))?;
+            }
 
             let buf = format!(
                 r#"
 {{
     "name": "daemon",
-    "work_dir": "{}",
-    "uds_api_path": "{}",
-    "pid_file": "{}",
+    "runtime_dir": "{}",
+    "state_dir": "{}",
+    "cache_dir": "{}",
+    "logs_dir": "{}",
+    "config_dir": "{}",
     "sync_addr": "127.0.0.1:0",
     "quic_sync": {{ "service_name": "Aranya-QUIC-sync-rust-example" }},
 }}"#,
-                work_dir.as_os_str().to_str().context("should be UTF-8")?,
-                uds_api_path
+                runtime_dir
                     .as_os_str()
                     .to_str()
                     .context("should be UTF-8")?,
-                pid_file.as_os_str().to_str().context("should be UTF-8")?,
+                state_dir.as_os_str().to_str().context("should be UTF-8")?,
+                cache_dir.as_os_str().to_str().context("should be UTF-8")?,
+                logs_dir.as_os_str().to_str().context("should be UTF-8")?,
+                config_dir.as_os_str().to_str().context("should be UTF-8")?,
             );
             fs::write(&cfg_path, buf).await?;
 
-            let pk = Daemon::get_api_pk(daemon_path, &cfg_path).await?;
-            let daemon = Daemon::spawn(daemon_path, &work_dir, &cfg_path).await?;
-            (daemon, pk)
+            Daemon::spawn(daemon_path, &work_dir, &cfg_path).await?
         };
 
-        // Give the daemon time to start up.
+        // The path that the daemon will listen on.
+        let uds_sock = work_dir.path().join("daemon").join("run").join("uds.sock");
+
+        // Give the daemon time to start up and write its public key.
         sleep(Duration::from_millis(100)).await;
 
         let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         let mut client = (|| {
             Client::builder()
-                .with_daemon_api_pk(&pk)
-                .with_daemon_uds_path(&uds_api_path)
+                .with_daemon_uds_path(&uds_sock)
                 .with_daemon_aqc_addr(&any_addr)
                 .connect()
         })
