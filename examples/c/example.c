@@ -64,102 +64,6 @@
 // Number of clients on an Aranya team.
 #define NUM_CLIENTS 5
 
-static AranyaError read_api_pk(uint8_t **api_pk, size_t *api_pk_len,
-                               const char *name) {
-    AranyaError err = ARANYA_ERROR_OTHER;
-    FILE *f         = NULL;
-    char *path      = NULL;
-
-    if (api_pk == NULL || api_pk_len == NULL) {
-        abort();
-    }
-    *api_pk     = NULL;
-    *api_pk_len = 0;
-
-    int n = snprintf(NULL, 0, "out/%s/api_pk", name);
-    if (n < 0) {
-        perror("snprintf failed");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-    size_t path_len = n;
-    path            = calloc(path_len + 1, sizeof(char));
-    if (path == NULL) {
-        abort();
-    }
-    n = snprintf(path, path_len + 1, "out/%s/api_pk", name);
-    if (n < 0) {
-        perror("snprintf failed");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-    f = fopen(path, "rb");
-    if (f == NULL) {
-        perror("fopen failed");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-    if (fseek(f, 0, SEEK_END) < 0) {
-        perror("fseek(..., 0, SEEK_END) failed");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-    long api_pk_hex_len = ftell(f);
-    if (api_pk_hex_len < 0) {
-        perror("ftell failed");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-    if (fseek(f, 0, SEEK_SET) < 0) {
-        perror("fseek(..., 0, SEEK_SET) failed");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-    char *api_pk_hex = calloc(api_pk_hex_len + 1, sizeof(char));
-    if (api_pk_hex == NULL) {
-        abort();
-    }
-    if (fread(api_pk_hex, sizeof(char), api_pk_hex_len, f) < 1) {
-        perror("fread failed");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-
-    // Just in case: chop off any trailing whitespace.
-    while (api_pk_hex_len > 0 && isspace(api_pk_hex[api_pk_hex_len - 1])) {
-        api_pk_hex_len -= 1;
-    }
-    api_pk_hex[api_pk_hex_len] = 0;
-
-    *api_pk_len = api_pk_hex_len / 2;
-    *api_pk     = calloc(*api_pk_len, sizeof(uint8_t));
-    if (*api_pk == NULL) {
-        abort();
-    }
-    size_t nw = 0;
-    err = aranya_decode_hex(*api_pk, *api_pk_len, (const uint8_t *)api_pk_hex,
-                            (size_t)api_pk_hex_len, &nw);
-    EXPECT("unable to decode hex", err);
-
-    if (nw != *api_pk_len) {
-        fprintf(stderr, "bug in aranya_decode_hex: %zu != %zu\n", nw,
-                *api_pk_len);
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-
-exit:
-    free(path);
-    if (f != NULL) {
-        fclose(f);
-    }
-    if (err != ARANYA_ERROR_SUCCESS) {
-        free(*api_pk);
-        *api_pk_len = 0;
-    }
-    return ARANYA_ERROR_SUCCESS;
-}
-
 // Team members enum. Can index into team member arrays.
 typedef enum {
     OWNER,
@@ -227,7 +131,6 @@ typedef struct {
 
 // Forward Declarations
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
-                        const uint8_t *api_pk, size_t api_pk_len,
                         const char *aqc_addr);
 AranyaError init_team(Team *t);
 AranyaError add_sync_peers(Team *t, AranyaSyncPeerConfig *cfg);
@@ -237,7 +140,6 @@ AranyaError cleanup_team(Team *t);
 
 // Initialize an Aranya `Client` with the given parameters.
 AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
-                        const uint8_t *api_pk, size_t api_pk_len,
                         const char *aqc_addr) {
     AranyaError err;
     c->name = name;
@@ -279,17 +181,10 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
         aranya_client_config_builder_cleanup(&cli_builder);
         return err;
     }
-    err = aranya_client_config_builder_set_daemon_api_pk(&cli_builder, api_pk,
-                                                         api_pk_len);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to set daemon API public key\n");
-        aranya_client_config_builder_cleanup(&cli_builder);
-        return err;
-    }
 
     err = aranya_client_config_builder_set_aqc_config(&cli_builder, &aqc_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to set daemon API public key\n");
+        fprintf(stderr, "unable to set AQC config\n");
         aranya_client_config_builder_cleanup(&cli_builder);
         return err;
     }
@@ -354,25 +249,14 @@ AranyaError init_team(Team *t) {
     for (int i = 0; i < NUM_CLIENTS; i++) {
         printf("initializing client: %s\n", client_names[i]);
 
-        uint8_t *api_pk   = NULL;
-        size_t api_pk_len = 0;
-
-        err = read_api_pk(&api_pk, &api_pk_len, client_names[i]);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to read public API key\n");
-            return err;
-        }
-
         Client *client = &t->clients_arr[i];
-        err = init_client(client, client_names[i], daemon_socks[i], api_pk,
-                          api_pk_len, aqc_addrs[i]);
+        err =
+            init_client(client, client_names[i], daemon_socks[i], aqc_addrs[i]);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to initialize client %s: %s\n",
                     client->name, aranya_error_to_str(err));
-            free(api_pk);
             return err;
         }
-        free(api_pk);
     }
 
     AranyaTeamConfigBuilder build;

@@ -33,19 +33,13 @@ fn main() -> Result<()> {
 
     info!("starting Aranya daemon");
 
-    let pid = PidFile::create(&cfg.pid_file).context("unable to create PID file")?;
+    let pid = PidFile::create(cfg.pid_path()).context("unable to create PID file")?;
     info!(name = cfg.name, "wrote PID file to {pid}");
 
     let rt = Runtime::new()?;
     rt.block_on(async {
         let daemon = Daemon::load(cfg).await.context("unable to load daemon")?;
         info!("loaded Aranya daemon");
-
-        if flags.print_api_pk {
-            let pk = daemon.public_api_key().await?.encode()?;
-            print!("{}", hex::encode(pk));
-            return Ok(());
-        }
 
         daemon.run().await
     })
@@ -58,11 +52,6 @@ struct Args {
     /// Path to the configuration file.
     #[arg(long)]
     config: PathBuf,
-
-    /// Print the public API key in hexadecimal format, then
-    /// exit.
-    #[arg(long)]
-    print_api_pk: bool,
 }
 
 /// A PID file.

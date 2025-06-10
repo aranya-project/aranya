@@ -99,7 +99,7 @@ impl Daemon {
 
         let mut aranya_store = self.load_aranya_keystore().await?;
         let mut eng = self.load_crypto_engine().await?;
-        let pk = self
+        let pks = self
             .load_or_gen_public_keys(&mut eng, &mut aranya_store)
             .await?;
 
@@ -116,7 +116,7 @@ impl Daemon {
                     aranya_store
                         .try_clone()
                         .context("unable to clone keystore")?,
-                    &pk,
+                    &pks,
                     self.cfg.sync_addr,
                     psk_send.subscribe(),
                 )
@@ -163,7 +163,7 @@ impl Daemon {
                 }
                 peers
             };
-            Aqc::new(eng, pk.ident_pk.id()?, aranya_store, peers)
+            Aqc::new(eng, pks.ident_pk.id()?, aranya_store, peers)
         };
 
         // TODO: Fix this when other syncer types are supported
@@ -207,9 +207,10 @@ impl Daemon {
         let api = DaemonApiServer::new(
             client,
             local_addr,
-            uds_path,
+            self.cfg.uds_api_sock(),
+            self.cfg.api_pk_path(),
             api_sk,
-            pk,
+            pks,
             peers,
             recv_effects,
             aqc,
@@ -222,6 +223,22 @@ impl Daemon {
 
     /// Initializes the environment (creates directories, etc.).
     async fn setup_env(&self) -> Result<()> {
+        // These directories need to already exist.
+        for dir in &[
+            &self.cfg.runtime_dir,
+            &self.cfg.state_dir,
+            &self.cfg.cache_dir,
+            &self.cfg.logs_dir,
+            &self.cfg.config_dir,
+        ] {
+            if !dir.try_exists()? {
+                return Err(anyhow::anyhow!(
+                    "directory does not exist: {}",
+                    dir.display()
+                ));
+            }
+        }
+
         // These directories aren't created for us.
         for (name, path) in [
             ("keystore", self.cfg.keystore_path()),
@@ -381,7 +398,10 @@ impl Daemon {
 
 impl Drop for Daemon {
     fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.cfg.uds_api_path);
+        use std::fs;
+
+        let _ = fs::remove_file(self.cfg.api_pk_path());
+        let _ = fs::remove_file(self.cfg.uds_api_sock());
 
         #[cfg(feature = "testing")]
         {
@@ -472,9 +492,11 @@ mod tests {
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
             name: "name".to_string(),
-            work_dir: work_dir.clone(),
-            uds_api_path: work_dir.join("api"),
-            pid_file: work_dir.join("pid"),
+            runtime_dir: work_dir.join("run"),
+            state_dir: work_dir.join("state"),
+            cache_dir: work_dir.join("cache"),
+            logs_dir: work_dir.join("logs"),
+            config_dir: work_dir.join("config"),
             sync_addr: any,
             quic_sync: Some(QSConfig { service_name }),
             afc: Some(AfcConfig {
@@ -486,6 +508,17 @@ mod tests {
             }),
             aqc: None,
         };
+        for dir in [
+            &cfg.runtime_dir,
+            &cfg.state_dir,
+            &cfg.cache_dir,
+            &cfg.logs_dir,
+            &cfg.config_dir,
+        ] {
+            aranya_util::create_dir_all(dir)
+                .await
+                .expect("should be able to create directory");
+        }
 
         let daemon = Daemon::load(cfg)
             .await
