@@ -16,8 +16,8 @@ use std::{
 use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_runtime::{
-    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder, SyncType,
-    MAX_SYNC_MESSAGE_SIZE,
+    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequestMessage, SyncRequester,
+    SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     tls::{NoCertResolver, SkipServerVerification},
@@ -97,6 +97,19 @@ pub enum Error {
     ServerConfig(anyhow::Error),
 }
 
+/// Key for looking up syncer peer cache in map.
+#[derive(Ord, PartialOrd, Eq, PartialEq)]
+struct PeerCacheKey {
+    addr: Addr,
+    id: GraphId,
+}
+
+impl PeerCacheKey {
+    fn new(addr: Addr, id: GraphId) -> Self {
+        Self { addr, id }
+    }
+}
+
 /// QUIC syncer state used for sending sync requests and processing sync responses
 pub struct State {
     /// QUIC client to make sync requests and handle sync responses.
@@ -106,7 +119,7 @@ pub struct State {
     conns: BTreeMap<Addr, Connection>,
     /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
     /// Lock must be acquired after [`Self::client`]
-    caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+    caches: Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>,
 }
 
 impl SyncState for State {
@@ -137,7 +150,7 @@ impl SyncState for State {
 
             // send sync request.
             syncer
-                .send_sync_request(&mut send, &mut sync_requester, peer)
+                .send_sync_request(&mut send, &mut sync_requester, id, peer)
                 .await
                 .map_err(|e| SyncError::SendSyncRequest(Box::new(e)))?;
 
@@ -272,6 +285,7 @@ impl Syncer<State> {
         &self,
         send: &mut SendStream,
         syncer: &mut SyncRequester<'_, A>,
+        id: GraphId,
         peer: &Addr,
     ) -> SyncResult<()>
     where
@@ -283,7 +297,8 @@ impl Syncer<State> {
         let (len, _) = {
             let mut client = self.client.lock().await;
             let mut caches = self.state.caches.lock().await;
-            let cache = caches.entry(*peer).or_default();
+            let key = PeerCacheKey::new(*peer, id);
+            let cache = caches.entry(key).or_default();
             syncer
                 .poll(&mut send_buf, client.provider(), cache)
                 .context("sync poll failed")?
@@ -379,7 +394,7 @@ pub struct Server<EN, SP> {
     _identity_rx: mpsc::Receiver<Vec<u8>>,
     /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
     /// Lock must be acquired after [`Self::aranya`]
-    caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+    caches: Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>,
 }
 
 impl<EN, SP> Server<EN, SP> {
@@ -518,7 +533,7 @@ where
     #[instrument(skip_all, fields(peer = %peer))]
     pub async fn sync(
         client: AranyaClient<EN, SP>,
-        caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+        caches: Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>,
         peer: Addr,
         stream: BidirectionalStream,
     ) -> SyncResult<()> {
@@ -569,7 +584,7 @@ where
     #[instrument(skip_all)]
     async fn sync_respond(
         client: AranyaClient<EN, SP>,
-        caches: Arc<Mutex<BTreeMap<Addr, PeerCache>>>,
+        caches: Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>,
         addr: Addr,
         request_data: &[u8],
     ) -> SyncResult<Box<[u8]>> {
@@ -594,11 +609,16 @@ where
             bug!("Other sync types are not implemented");
         };
 
+        let SyncRequestMessage::SyncRequest { storage_id, .. } = request_msg else {
+            bug!("Other sync types are not implemented");
+        };
+
         resp.receive(request_msg).context("sync recv failed")?;
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
         let mut caches = caches.lock().await;
-        let cache = caches.entry(addr).or_default();
+        let key = PeerCacheKey::new(addr, storage_id);
+        let cache = caches.entry(key).or_default();
         let len = resp
             .poll(&mut buf, client.lock().await.provider(), cache)
             .context("sync resp poll failed")?;
