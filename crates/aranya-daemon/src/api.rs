@@ -378,9 +378,10 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         if let Some(cfg) = cfg.quic_sync {
             let quic_data = self.quic.as_ref().context("quic syncing is not enabled")?;
+            let psk = QuicSyncPSK::decode(cfg.psk())?;
 
-            let identity = cfg.psk().identity();
-            let secret = cfg.psk().raw_secret_bytes();
+            let identity = psk.identity();
+            let secret = psk.raw_secret_bytes();
             let psk = PresharedKey::external(identity, secret)
                 .context("unable to create PSK")?
                 .with_hash_alg(HashAlgorithm::SHA384)
@@ -437,7 +438,7 @@ impl DaemonApi for Api {
                     data.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
                 }
 
-                Some(psk)
+                Some(psk.encode()?.into_boxed_slice())
             }
             None => None,
         };

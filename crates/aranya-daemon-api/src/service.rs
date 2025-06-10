@@ -22,6 +22,7 @@ use aranya_crypto::{
 };
 use aranya_util::Addr;
 use buggy::Bug;
+use ciborium as cbor;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
 use tracing::error;
@@ -143,7 +144,7 @@ struct QsPSK {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {
-    psk: QuicSyncPSK,
+    pub psk: Box<[u8]>,
 }
 
 impl QuicSyncConfig {
@@ -151,19 +152,19 @@ impl QuicSyncConfig {
         QuicSyncConfigBuilder::default()
     }
 
-    pub fn psk(&self) -> &QuicSyncPSK {
+    pub fn psk(&self) -> &[u8] {
         &self.psk
     }
 }
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    psk: Option<QuicSyncPSK>,
+    psk: Option<Box<[u8]>>,
 }
 
 impl QuicSyncConfigBuilder {
     /// Configures the psk fields.
-    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
+    pub fn psk(mut self, psk: Box<[u8]>) -> Self {
         self.psk = Some(psk);
 
         self
@@ -286,6 +287,18 @@ impl QuicSyncPSK {
     #[inline]
     pub fn raw_secret_bytes(&self) -> &[u8] {
         self.secret.raw_secret_bytes()
+    }
+
+    /// Encodes the PSK as bytes.
+    pub fn encode(&self) -> Result<Vec<u8>> {
+        let mut buf = Vec::new();
+        cbor::into_writer(self, &mut buf).context("could not encode PSK.")?;
+        Ok(buf)
+    }
+
+    /// Decodes the PSK from bytes.
+    pub fn decode(data: &[u8]) -> Result<Self> {
+        Ok(cbor::from_reader(data).context("could not decode PSK.")?)
     }
 }
 
@@ -664,7 +677,7 @@ pub struct Label {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTeamResponse {
     pub team_id: TeamId,
-    pub psk: Option<QuicSyncPSK>,
+    pub psk: Option<Box<[u8]>>,
 }
 
 #[tarpc::service]

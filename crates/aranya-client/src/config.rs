@@ -1,7 +1,5 @@
 use core::time::Duration;
 
-use aranya_daemon_api::QuicSyncPSK;
-
 use crate::{error::InvalidArg, ConfigError, Result};
 
 /// Configuration info for syncing with a peer.
@@ -84,7 +82,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone)]
 pub struct QuicSyncConfig {
-    psk: QuicSyncPSK,
+    psk: Box<[u8]>,
 }
 
 impl QuicSyncConfig {
@@ -95,12 +93,12 @@ impl QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    psk: Option<QuicSyncPSK>,
+    psk: Option<Box<[u8]>>,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the psk.
-    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
+    pub fn psk(mut self, psk: Box<[u8]>) -> Self {
         self.psk = Some(psk);
         self
     }

@@ -4,7 +4,6 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::QuicSyncPSK;
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -226,7 +225,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
-    psk: QuicSyncPSK,
+    psk: Box<[u8]>,
 }
 
 impl QuicSyncConfig {
@@ -250,12 +249,12 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    psk: Option<QuicSyncPSK>,
+    psk: Option<Box<[u8]>>,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the psk.
-    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
+    pub fn psk(mut self, psk: Box<[u8]>) -> Self {
         self.psk = Some(psk);
         self
     }
