@@ -249,23 +249,23 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    psk: Option<Box<[u8]>>,
+    seed: Option<Box<[u8]>>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Sets the psk.
-    pub fn psk(mut self, psk: Box<[u8]>) -> Self {
-        self.psk = Some(psk);
+    /// Sets the seed.
+    pub fn psk(mut self, seed: Box<[u8]>) -> Self {
+        self.seed = Some(seed);
         self
     }
 
-    /// Sets the psk.
+    /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig, Error> {
-        let Some(psk) = self.psk else {
-            return Err(InvalidArg::new("psk", "`psk` field not set").into());
+        let Some(seed) = self.seed else {
+            return Err(InvalidArg::new("seed", "`seed` field not set").into());
         };
 
-        Ok(QuicSyncConfig { seed: psk })
+        Ok(QuicSyncConfig { seed })
     }
 }
 
@@ -281,7 +281,7 @@ impl Builder for QuicSyncConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        let Some(psk) = self.psk else {
+        let Some(psk) = self.seed else {
             return Err(InvalidArg::new("psk", "`psk` field not set").into());
         };
 

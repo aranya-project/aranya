@@ -311,7 +311,7 @@ pub struct QuicSyncSeed<CS> {
 }
 
 impl<CS> QuicSyncSeed<CS> {
-    /// Creates a new instance.
+    /// Creates a new randomized instance.
     pub fn new<R: Csprng>(rng: &mut R) -> Self {
         let seed = <[u8; 64] as Random>::random(rng);
 
@@ -321,12 +321,12 @@ impl<CS> QuicSyncSeed<CS> {
         }
     }
 
-    /// Encodes the PSK as bytes.
+    /// returns the seed as bytes.
     pub fn as_bytes(&self) -> &[u8] {
         &self.seed
     }
 
-    /// Decodes the PSK from bytes.
+    /// Creates the seed from a slice of bytes.
     pub fn from_bytes(data: &[u8]) -> Result<Self> {
         Ok(Self {
             seed: data
@@ -346,7 +346,7 @@ impl<CS: CipherSuite> QuicSyncSeed<CS> {
     pub fn id(&self) -> QuicSyncSeedId {
         // ID = HMAC(
         //     key=GroupKey,
-        //     message="QuicSyncKeyId-v1" || suite_id,
+        //     message="QuicSyncKeyId-v1",
         //     outputBytes=64,
         // )
         let mut h = Hmac::<CS::Hash>::new(&self.seed);
@@ -372,6 +372,13 @@ impl<CS: CipherSuite> QuicSyncSeed<CS> {
         };
 
         Ok(QuicSyncPSK::new(identity, key))
+    }
+}
+
+impl<CS> ZeroizeOnDrop for QuicSyncSeed<CS> {}
+impl<CS> Drop for QuicSyncSeed<CS> {
+    fn drop(&mut self) {
+        self.seed.zeroize()
     }
 }
 

@@ -103,7 +103,7 @@ impl QuicSyncConfigBuilder {
         self
     }
 
-    /// Sets the psk.
+    /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig> {
         let Some(psk) = self.seed else {
             return Err(ConfigError::InvalidArg(InvalidArg::new(
