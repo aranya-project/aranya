@@ -33,6 +33,8 @@ pub use semver::Version;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
+pub mod quic_sync;
+
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
 /// CS = Cipher Suite
@@ -145,12 +147,6 @@ pub enum Role {
     Admin,
     Operator,
     Member,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct QsPSK {
-    psk_identity: Box<[u8]>,
-    psk_secret: Secret,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
