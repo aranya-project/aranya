@@ -82,7 +82,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone)]
 pub struct QuicSyncConfig {
-    psk: Box<[u8]>,
+    seed: Box<[u8]>,
 }
 
 impl QuicSyncConfig {
@@ -93,19 +93,19 @@ impl QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    psk: Option<Box<[u8]>>,
+    seed: Option<Box<[u8]>>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Sets the psk.
-    pub fn psk(mut self, psk: Box<[u8]>) -> Self {
-        self.psk = Some(psk);
+    /// Sets the seed.
+    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
+        self.seed = Some(seed);
         self
     }
 
     /// Sets the psk.
     pub fn build(self) -> Result<QuicSyncConfig> {
-        let Some(psk) = self.psk else {
+        let Some(psk) = self.seed else {
             return Err(ConfigError::InvalidArg(InvalidArg::new(
                 "psk",
                 "must call `QuicSyncConfigBuilder::psk`",
@@ -113,7 +113,7 @@ impl QuicSyncConfigBuilder {
             .into());
         };
 
-        Ok(QuicSyncConfig { psk })
+        Ok(QuicSyncConfig { seed: psk })
     }
 }
 
@@ -133,7 +133,7 @@ impl TeamConfig {
 impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .psk(value.psk)
+            .psk(value.seed)
             .build()
             .expect("All fields are set")
     }

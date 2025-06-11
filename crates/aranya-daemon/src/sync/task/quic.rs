@@ -76,7 +76,7 @@ const QUIC_SYNC_VERSION: Version = Version::V1;
 mod psk;
 mod version;
 
-pub(crate) use psk::{delete_psk, get_existing_psks, insert_psk, TeamIdPSKPair};
+pub(crate) use psk::{delete_psk, get_existing_psks, TeamIdPSKPair};
 pub use psk::{ClientPresharedKeys, Msg, ServerPresharedKeys};
 pub use version::Version;
 

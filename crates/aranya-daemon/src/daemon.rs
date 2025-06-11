@@ -10,7 +10,6 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
-use aranya_daemon_api::CS;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -49,6 +48,8 @@ use crate::{
 // Use short names so that we can more easily add generics.
 /// CE = Crypto Engine
 pub(crate) type CE = DefaultEngine;
+/// CS = Crypto Suite
+pub(crate) type CS = <DefaultEngine as Engine>::CS;
 /// KS = Key Store
 pub(crate) type KS = Store;
 /// EN = Engine (Policy)
@@ -92,8 +93,7 @@ impl Daemon {
             .load_or_gen_public_keys(&mut eng, &mut aranya_store)
             .await?;
 
-        // Currently unused after #294.
-        let mut _local_store = self.load_local_keystore().await?;
+        let local_store = self.load_local_keystore().await?;
 
         // Generate a fresh API key at startup.
         let api_sk = ApiKey::generate(&mut eng);
@@ -155,7 +155,7 @@ impl Daemon {
                 }
                 peers
             };
-            Aqc::new(eng, pks.ident_pk.id()?, aranya_store, peers)
+            Aqc::new(eng.clone(), pks.ident_pk.id()?, aranya_store, peers)
         };
 
         // TODO: Fix this when other syncer types are supported
@@ -196,6 +196,8 @@ impl Daemon {
         let data = QSData {
             psk_send,
             service_name,
+            store: local_store,
+            engine: eng,
         };
         let api = DaemonApiServer::new(
             client,

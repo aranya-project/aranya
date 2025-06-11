@@ -210,7 +210,7 @@ async fn main() -> Result<()> {
     // Create a team.
     info!("creating team");
     let cfg = TeamConfig::builder().build()?;
-    let CreateTeamResponse { team_id, psk: Some(psk) } = owner
+    let CreateTeamResponse { team_id, seed: Some(seed) } = owner
         .client
         .create_team(cfg)
         .await
@@ -239,7 +239,7 @@ async fn main() -> Result<()> {
 
     // add team to each non-owner device's local store
     let cfg_with_qs = {
-        let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+        let qs_cfg = QuicSyncConfig::builder().seed(seed).build()?;
         TeamConfig::builder().quic_sync(qs_cfg).build()?
     };
     for member in [&admin_team, &operator_team, &membera_team, &memberb_team] {

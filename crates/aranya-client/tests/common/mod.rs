@@ -229,9 +229,9 @@ impl TeamCtx {
         };
         info!(?response.team_id);
 
-        let cfg = match response.psk {
-            Some(psk) => {
-                let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+        let cfg = match response.seed {
+            Some(seed) => {
+                let qs_cfg = QuicSyncConfig::builder().seed(seed).build()?;
                 TeamConfig::builder().quic_sync(qs_cfg).build()?
             }
             None => cfg,

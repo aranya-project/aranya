@@ -225,7 +225,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
-    psk: Box<[u8]>,
+    seed: Box<[u8]>,
 }
 
 impl QuicSyncConfig {
@@ -241,7 +241,7 @@ impl Typed for QuicSyncConfig {
 impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .psk(value.psk)
+            .seed(value.seed)
             .build()
             .expect("All fields are set")
     }
@@ -265,7 +265,7 @@ impl QuicSyncConfigBuilder {
             return Err(InvalidArg::new("psk", "`psk` field not set").into());
         };
 
-        Ok(QuicSyncConfig { psk })
+        Ok(QuicSyncConfig { seed: psk })
     }
 }
 
@@ -285,7 +285,7 @@ impl Builder for QuicSyncConfigBuilder {
             return Err(InvalidArg::new("psk", "`psk` field not set").into());
         };
 
-        Self::Output::init(out, QuicSyncConfig { psk });
+        Self::Output::init(out, QuicSyncConfig { seed: psk });
         Ok(())
     }
 }
