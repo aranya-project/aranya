@@ -107,8 +107,8 @@ impl QuicSyncConfigBuilder {
     pub fn build(self) -> Result<QuicSyncConfig> {
         let Some(psk) = self.seed else {
             return Err(ConfigError::InvalidArg(InvalidArg::new(
-                "psk",
-                "must call `QuicSyncConfigBuilder::psk`",
+                "seed",
+                "must call `QuicSyncConfigBuilder::seed`",
             ))
             .into());
         };

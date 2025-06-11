@@ -281,11 +281,11 @@ impl Builder for QuicSyncConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        let Some(psk) = self.seed else {
-            return Err(InvalidArg::new("psk", "`psk` field not set").into());
+        let Some(seed) = self.seed else {
+            return Err(InvalidArg::new("seed", "`seed` field not set").into());
         };
 
-        Self::Output::init(out, QuicSyncConfig { seed: psk });
+        Self::Output::init(out, QuicSyncConfig { seed });
         Ok(())
     }
 }
