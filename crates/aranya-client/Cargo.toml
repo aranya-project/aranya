@@ -39,7 +39,6 @@ tracing = { workspace = true }
 aranya-daemon = { path = "../aranya-daemon", features = ["testing"] }
 
 backon = { workspace = true }
-keyring = { workspace = true }
 serial_test = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }

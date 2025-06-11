@@ -100,7 +100,7 @@ impl ClientCtx {
     "logs_dir": "{}",
     "config_dir": "{}",
     "sync_addr": "127.0.0.1:0",
-    "quic_sync": {{ "service_name": "Aranya-QUIC-sync-rust-example" }},
+    "quic_sync": {{ }},
 }}"#,
                 runtime_dir
                     .as_os_str()

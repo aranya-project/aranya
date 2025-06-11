@@ -220,14 +220,7 @@ pub struct AqcConfig {}
 /// QUIC syncer configuration.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct QSConfig {
-    /// The service name used by Keyring's [`keyring::Entry`] API
-    /// See the documentation for each Platform's credential store
-    /// to see what the service name maps to.
-    ///
-    /// This value should not be blank.
-    pub service_name: String,
-}
+pub struct QSConfig {}
 
 fn non_empty_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
 where
@@ -264,9 +257,7 @@ mod tests {
             logs_dir: "/var/log/aranya".parse()?,
             config_dir: "/etc/aranya".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
-            quic_sync: Some(QSConfig {
-                service_name: "Aranya-QUIC-sync".into(),
-            }),
+            quic_sync: Some(QSConfig {}),
             afc: None,
             aqc: None,
         };
