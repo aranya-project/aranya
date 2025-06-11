@@ -47,7 +47,7 @@ async fn test_remove_members() -> Result<()> {
     let effects = team
         .operator
         .actions()
-        .remove_member(team.membera.pk.ident_pk.id()?)
+        .remove_device(team.membera.pk.ident_pk.id()?)
         .await
         .context("unable to remove membera")?;
     if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.membera.pk.ident_pk.id().expect("id").into())
@@ -57,7 +57,7 @@ async fn test_remove_members() -> Result<()> {
     let effects = team
         .operator
         .actions()
-        .remove_member(team.memberb.pk.ident_pk.id()?)
+        .remove_device(team.memberb.pk.ident_pk.id()?)
         .await
         .context("unable to remove memberb")?;
     if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.memberb.pk.ident_pk.id().expect("id").into())
@@ -72,7 +72,7 @@ async fn test_remove_members() -> Result<()> {
     let effects = team
         .owner
         .actions()
-        .remove_member(team.operator.pk.ident_pk.id()?)
+        .remove_device(team.operator.pk.ident_pk.id()?)
         .await
         .context("unable to remove operator")?;
     if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.operator.pk.ident_pk.id().expect("id").into())
@@ -86,7 +86,7 @@ async fn test_remove_members() -> Result<()> {
     let effects = team
         .owner
         .actions()
-        .remove_member(team.admin.pk.ident_pk.id()?)
+        .remove_device(team.admin.pk.ident_pk.id()?)
         .await
         .context("unable to remove admin")?;
     if !contains_effect!(&effects, Effect::MemberRemoved(e) if e.device_id ==  team.admin.pk.ident_pk.id().expect("id").into())

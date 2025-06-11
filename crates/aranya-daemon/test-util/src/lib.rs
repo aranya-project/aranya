@@ -277,7 +277,7 @@ impl TestCtx {
         // team setup
         owner
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&admin.pk)?)
+            .add_device(DeviceKeyBundle::try_from(&admin.pk)?)
             .await
             .context("unable to add admin member")?;
         owner
@@ -288,7 +288,7 @@ impl TestCtx {
         admin.sync(owner).await?;
         owner
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&operator.pk)?)
+            .add_device(DeviceKeyBundle::try_from(&operator.pk)?)
             .await
             .context("unable to add operator member")?;
         owner
@@ -299,13 +299,13 @@ impl TestCtx {
         operator.sync(owner).await?;
         operator
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&membera.pk)?)
+            .add_device(DeviceKeyBundle::try_from(&membera.pk)?)
             .await
             .context("unable to add membera member")?;
         membera.sync(admin).await?;
         operator
             .actions()
-            .add_member(DeviceKeyBundle::try_from(&memberb.pk)?)
+            .add_device(DeviceKeyBundle::try_from(&memberb.pk)?)
             .await
             .context("unable to add memberb member")?;
         memberb.sync(admin).await?;
