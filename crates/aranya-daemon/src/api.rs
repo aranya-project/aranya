@@ -378,7 +378,7 @@ impl DaemonApi for Api {
             let mut guard = self.quic.lock().await;
             let quic_data = guard.as_mut().context("quic syncing is not enabled")?;
 
-            let seed = QuicSyncSeed::<CS>::from_bytes(cfg.psk())?;
+            let seed = QuicSyncSeed::<CS>::from_bytes(cfg.seed())?;
             insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
                 .context("could not insert seed into keystore")?;
 

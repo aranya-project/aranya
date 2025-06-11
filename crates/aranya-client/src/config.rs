@@ -133,7 +133,7 @@ impl TeamConfig {
 impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .psk(value.seed)
+            .seed(value.seed)
             .build()
             .expect("All fields are set")
     }

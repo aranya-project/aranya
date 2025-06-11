@@ -155,7 +155,7 @@ struct QsPSK {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {
-    pub psk: Box<[u8]>,
+    pub seed: Box<[u8]>,
 }
 
 impl QuicSyncConfig {
@@ -163,27 +163,27 @@ impl QuicSyncConfig {
         QuicSyncConfigBuilder::default()
     }
 
-    pub fn psk(&self) -> &[u8] {
-        &self.psk
+    pub fn seed(&self) -> &[u8] {
+        &self.seed
     }
 }
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    psk: Option<Box<[u8]>>,
+    seed: Option<Box<[u8]>>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Configures the psk fields.
-    pub fn psk(mut self, psk: Box<[u8]>) -> Self {
-        self.psk = Some(psk);
+    /// Configures the seed.
+    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
+        self.seed = Some(seed);
 
         self
     }
 
     pub fn build(self) -> anyhow::Result<QuicSyncConfig> {
         Ok(QuicSyncConfig {
-            psk: self.psk.context("Missing PSK field")?,
+            seed: self.seed.context("Missing `seed` field")?,
         })
     }
 }
