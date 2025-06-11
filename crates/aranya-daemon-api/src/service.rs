@@ -8,17 +8,24 @@ use core::{
     ops::Deref,
     time::Duration,
 };
-use std::collections::hash_map::{self, HashMap};
+use std::{
+    collections::hash_map::{self, HashMap},
+    marker::PhantomData,
+};
 
 use anyhow::{bail, Context as _};
 pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
     custom_id,
-    default::{DefaultCipherSuite, DefaultEngine},
+    default::DefaultEngine,
+    engine::{AlgId, RawSecret, UnwrappedKey, UnwrappedSecret, WrongKeyType},
+    hmac::Hmac,
+    id::IdError,
+    kdf::Kdf,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    Csprng, Id, Random,
+    CipherSuite, Csprng, Engine, Id, Identified, Random,
 };
 use aranya_util::Addr;
 use buggy::Bug;
@@ -29,7 +36,7 @@ use tracing::error;
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
 /// CS = Cipher Suite
-pub type CS = DefaultCipherSuite;
+pub type CS = <DefaultEngine as Engine>::CS;
 
 /// An error returned by the API.
 // TODO: enum?
@@ -64,8 +71,8 @@ impl From<semver::Error> for Error {
     }
 }
 
-impl From<aranya_crypto::id::IdError> for Error {
-    fn from(err: aranya_crypto::id::IdError) -> Self {
+impl From<IdError> for Error {
+    fn from(err: IdError) -> Self {
         error!(%err);
         Self(err.to_string())
     }
@@ -114,6 +121,11 @@ custom_id! {
 }
 
 custom_id! {
+    /// A QUIC sync key ID.
+    pub struct QuicSyncSeedId;
+}
+
+custom_id! {
     /// A PSK ID.
     pub struct PskId;
 }
@@ -143,7 +155,7 @@ struct QsPSK {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {
-    psk: QuicSyncPSK,
+    pub seed: Box<[u8]>,
 }
 
 impl QuicSyncConfig {
@@ -151,27 +163,27 @@ impl QuicSyncConfig {
         QuicSyncConfigBuilder::default()
     }
 
-    pub fn psk(&self) -> &QuicSyncPSK {
-        &self.psk
+    pub fn seed(&self) -> &[u8] {
+        &self.seed
     }
 }
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    psk: Option<QuicSyncPSK>,
+    seed: Option<Box<[u8]>>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Configures the psk fields.
-    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
-        self.psk = Some(psk);
+    /// Configures the seed.
+    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
+        self.seed = Some(seed);
 
         self
     }
 
     pub fn build(self) -> anyhow::Result<QuicSyncConfig> {
         Ok(QuicSyncConfig {
-            psk: self.psk.context("Missing PSK field")?,
+            seed: self.seed.context("Missing `seed` field")?,
         })
     }
 }
@@ -257,35 +269,150 @@ impl Drop for Secret {
     }
 }
 
-/// A secret key.
-// TODO(Steve): Replace?
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QuicSyncPSK {
-    id: PskId,
-    secret: Secret,
+impl<CS: CipherSuite> Identified for QuicSyncSeed<CS> {
+    type Id = QuicSyncSeedId;
+
+    fn id(&self) -> std::result::Result<Self::Id, IdError> {
+        Ok(self.id())
+    }
 }
 
-impl QuicSyncPSK {
-    /// Creates a new instance.
-    pub fn new<R: Csprng>(rng: &mut R) -> Self {
-        let random_bytes = <[u8; 32] as Random>::random(rng);
+/// A PSK.
+#[derive(Debug, Clone)]
+pub struct QuicSyncPSK<CS> {
+    id: PskId,
+    secret: Secret,
+    _cs: PhantomData<CS>,
+}
 
+impl<CS> QuicSyncPSK<CS> {
+    fn new(identity: [u8; 32], secret: [u8; 64]) -> Self {
         Self {
-            id: PskId::random(rng),
-            secret: Secret::from(random_bytes),
+            id: identity.into(),
+            secret: Secret::from(secret),
+            _cs: PhantomData,
         }
     }
 
-    /// Return the id bytes.
-    #[inline]
     pub fn identity(&self) -> &[u8] {
         self.id.as_bytes()
     }
 
-    /// Return the secret bytes.
-    #[inline]
-    pub fn raw_secret_bytes(&self) -> &[u8] {
+    pub fn raw_secret(&self) -> &[u8] {
         self.secret.raw_secret_bytes()
+    }
+}
+
+/// A secret key.
+#[derive(Debug)]
+pub struct QuicSyncSeed<CS> {
+    seed: [u8; 64],
+    _cs: PhantomData<CS>,
+}
+
+impl<CS> QuicSyncSeed<CS> {
+    /// Creates a new randomized instance.
+    pub fn new<R: Csprng>(rng: &mut R) -> Self {
+        let seed = <[u8; 64] as Random>::random(rng);
+
+        Self {
+            seed,
+            _cs: PhantomData,
+        }
+    }
+
+    /// returns the seed as bytes.
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.seed
+    }
+
+    /// Creates the seed from a slice of bytes.
+    pub fn from_bytes(data: &[u8]) -> Result<Self> {
+        Ok(Self {
+            seed: data
+                .try_into()
+                .context("could not create seed from bytes")?,
+            _cs: PhantomData::<CS>,
+        })
+    }
+}
+
+impl<CS: CipherSuite> QuicSyncSeed<CS> {
+    pub fn key_id(&self) -> Id {
+        self.id().into()
+    }
+
+    #[inline]
+    pub fn id(&self) -> QuicSyncSeedId {
+        // ID = HMAC(
+        //     key=GroupKey,
+        //     message="QuicSyncKeyId-v1",
+        //     outputBytes=64,
+        // )
+        let mut h = Hmac::<CS::Hash>::new(&self.seed);
+        h.update(b"QuicSyncKeyId-v1");
+        QuicSyncSeedId(h.tag().into_array().into())
+    }
+
+    pub fn gen_psk(&self) -> Result<QuicSyncPSK<CS>> {
+        let prk = <CS::Kdf as Kdf>::extract(&self.seed, &[]);
+
+        let identity = {
+            let mut buf = [0; 32];
+            <CS::Kdf as Kdf>::expand(&mut buf, &prk, b"quic sync psk identity")
+                .context("could not create identity")?;
+            buf
+        };
+
+        let key = {
+            let mut buf = [0; 64];
+            <CS::Kdf as Kdf>::expand(&mut buf, &prk, b"quic sync psk secret")
+                .context("could not create identity")?;
+            buf
+        };
+
+        Ok(QuicSyncPSK::new(identity, key))
+    }
+}
+
+impl<CS> ZeroizeOnDrop for QuicSyncSeed<CS> {}
+impl<CS> Drop for QuicSyncSeed<CS> {
+    fn drop(&mut self) {
+        self.seed.zeroize()
+    }
+}
+
+impl<CS> Clone for QuicSyncSeed<CS> {
+    fn clone(&self) -> Self {
+        Self {
+            seed: self.seed,
+            _cs: PhantomData,
+        }
+    }
+}
+
+// TODO: use `aranya_crypto::unwrapped` instead once
+// `__unwrapped_inner` is exported.
+impl<CS: CipherSuite> UnwrappedKey<CS> for QuicSyncSeed<CS> {
+    const ID: AlgId = AlgId::Seed(());
+
+    #[inline]
+    fn into_secret(self) -> aranya_crypto::engine::Secret<CS> {
+        aranya_crypto::engine::Secret::new(RawSecret::Seed(self.seed))
+    }
+
+    #[inline]
+    fn try_from_secret(key: UnwrappedSecret<CS>) -> Result<Self, WrongKeyType> {
+        match key.into_raw() {
+            RawSecret::Seed(seed) => Ok(Self {
+                seed,
+                _cs: PhantomData::<CS>,
+            }),
+            got => Err(WrongKeyType {
+                got: got.name(),
+                expected: ::core::stringify!($name),
+            }),
+        }
     }
 }
 
@@ -664,7 +791,7 @@ pub struct Label {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTeamResponse {
     pub team_id: TeamId,
-    pub psk: Option<QuicSyncPSK>,
+    pub seed: Option<Box<[u8]>>,
 }
 
 #[tarpc::service]

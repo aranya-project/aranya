@@ -66,7 +66,6 @@ ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 futures-lite = { version = "2.6.0" }
 futures-util = { version = "0.3.30" }
-keyring = { version = "3.6", features = ["apple-native", "linux-native"] }
 heapless = { version = "0.8", default-features = false }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }

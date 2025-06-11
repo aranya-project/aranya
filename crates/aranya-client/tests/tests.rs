@@ -27,7 +27,7 @@ async fn test_sync_now() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
 
-    // Create the initial team, and get our TeamId and PSK.
+    // Create the initial team, and get our TeamId and seed.
     let team_id = team.create_and_add_team().await?;
 
     // Grab the shorthand for our address.
@@ -72,7 +72,7 @@ async fn test_query_functions() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
 
-    // Create the initial team, and get our TeamId and PSK.
+    // Create the initial team, and get our TeamId and seed.
     let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
@@ -113,8 +113,8 @@ async fn test_add_team() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_add_team", work_dir).await?;
 
-    // Create the initial team, and get our TeamId and PSK.
-    let CreateTeamResponse { team_id, psk } = {
+    // Create the initial team, and get our TeamId and seed.
+    let CreateTeamResponse { team_id, seed } = {
         let cfg = TeamConfig::builder().build()?;
         team.owner
             .client
@@ -124,9 +124,9 @@ async fn test_add_team() -> Result<()> {
     };
     info!(?team_id);
 
-    if let Some(psk) = psk {
+    if let Some(seed) = seed {
         let cfg = {
-            let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
+            let qs_cfg = QuicSyncConfig::builder().seed(seed).build()?;
             TeamConfig::builder().quic_sync(qs_cfg).build()?
         };
 
