@@ -36,6 +36,7 @@ use crate::{
         quic::{Msg, State as QuicSyncState, TeamIdPSKPair},
         Syncer,
     },
+    util::{load_team_psk_pairs, SeedFile},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
@@ -81,16 +82,23 @@ impl Daemon {
             .load_or_gen_public_keys(&mut eng, &mut aranya_store)
             .await?;
 
-        let local_store = self.load_local_keystore().await?;
+        let mut local_store = self.load_local_keystore().await?;
 
         // Generate a fresh API key at startup.
         let api_sk = ApiKey::generate(&mut eng);
 
         let (psk_send, psk_recv) = tokio::sync::broadcast::channel(16);
 
+        let initial_keys = load_team_psk_pairs(
+            &mut eng,
+            &mut local_store,
+            &mut SeedFile::new(self.cfg.seed_id_path()).await?,
+        )
+        .await?;
+
         // Initialize the Aranya client and sync server.
-        let (client, local_addr, initial_keys) = {
-            let (client, server, initial_keys) = self
+        let (client, local_addr) = {
+            let (client, server) = self
                 .setup_aranya(
                     eng.clone(),
                     aranya_store
@@ -99,12 +107,13 @@ impl Daemon {
                     &pks,
                     self.cfg.sync_addr,
                     psk_send.subscribe(),
+                    initial_keys.clone(),
                 )
                 .await?;
             let local_addr = server.local_addr()?;
             set.spawn(async move { server.serve().await });
 
-            (client, local_addr, initial_keys)
+            (client, local_addr)
         };
 
         // Sync in the background at some specified interval.
@@ -153,11 +162,13 @@ impl Daemon {
 
         let uds_sock = self.cfg.uds_api_sock().clone();
         let pk_path = self.cfg.api_pk_path();
+        let seed_id_path = self.cfg.seed_id_path();
 
         let data = QSData {
             psk_send,
             store: local_store,
             engine: eng,
+            seed_id_path,
         };
         let api = DaemonApiServer::new(
             client,
@@ -217,7 +228,8 @@ impl Daemon {
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
         recv: Receiver<Msg>,
-    ) -> Result<(Client, SyncServer, Vec<TeamIdPSKPair>)> {
+        initial_keys: Vec<TeamIdPSKPair>,
+    ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -234,22 +246,15 @@ impl Daemon {
         let Some(_qs_config) = &self.cfg.quic_sync else {
             anyhow::bail!("Supply a valid QUIC sync config")
         };
-        // let initial_keys = get_existing_psks(client.clone()).await?; Fix this function
-        let initial_keys = Vec::new();
 
         info!(addr = %external_sync_addr, "starting QUIC sync server");
-        let server = SyncServer::new(
-            client.clone(),
-            &external_sync_addr,
-            initial_keys.clone(),
-            recv,
-        )
-        .await
-        .context("unable to initialize QUIC sync server")?;
+        let server = SyncServer::new(client.clone(), &external_sync_addr, initial_keys, recv)
+            .await
+            .context("unable to initialize QUIC sync server")?;
 
         info!(device_id = %device_id, "set up Aranya");
 
-        Ok((client, server, initial_keys))
+        Ok((client, server))
     }
 
     /// Loads the crypto engine.

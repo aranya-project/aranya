@@ -12,7 +12,7 @@ pub(crate) use aranya_daemon_api::crypto::{ApiKey, PublicApiKey};
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    CreateTeamResponse, DaemonApi, QuicSyncSeed, CE, CS,
+    CreateTeamResponse, DaemonApi, QuicSyncSeed, QuicSyncSeedId, CE, CS,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -39,6 +39,7 @@ use crate::{
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::task::{quic::Msg, SyncPeers},
+    util::SeedFile,
     Client, EF,
 };
 
@@ -381,6 +382,9 @@ impl DaemonApi for Api {
             let seed = QuicSyncSeed::<CS>::from_bytes(cfg.seed())?;
             insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
                 .context("could not insert seed into keystore")?;
+            write_seed_id(&quic_data.seed_id_path, &team, &seed.id())
+                .await
+                .context("could not write seed id to file")?;
 
             let psk = seed.gen_psk()?;
 
@@ -957,6 +961,17 @@ impl DaemonApi for Api {
 
 fn insert_seed(eng: &mut CE, store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
     store.try_insert(seed.key_id(), eng.wrap(seed)?)?;
+    Ok(())
+}
+
+async fn write_seed_id(
+    path: &PathBuf,
+    team_id: &api::TeamId,
+    seed_id: &QuicSyncSeedId,
+) -> Result<()> {
+    let mut file = SeedFile::new(path).await?;
+    file.append(team_id, seed_id).await?;
+
     Ok(())
 }
 

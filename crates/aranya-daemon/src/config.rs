@@ -170,6 +170,11 @@ impl Config {
         self.state_dir.join("storage")
     }
 
+    /// Path to the seed ID file.
+    pub(crate) fn seed_id_path(&self) -> PathBuf {
+        self.state_dir.join("seeds")
+    }
+
     /// Path to the daemon's UDS API socket.
     pub fn uds_api_sock(&self) -> PathBuf {
         self.runtime_dir.join("uds.sock")

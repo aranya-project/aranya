@@ -7,7 +7,6 @@ use std::{
 
 use anyhow::{bail, Result};
 use aranya_daemon_api::TeamId;
-use aranya_runtime::StorageProvider;
 use buggy::BugExt as _;
 use s2n_quic::provider::tls::rustls::rustls::{
     client::PresharedKeyStore, crypto::PresharedKey, pki_types::ServerName,
@@ -15,8 +14,6 @@ use s2n_quic::provider::tls::rustls::rustls::{
 };
 use tokio::sync::mpsc;
 use tracing::error;
-
-use super::AranyaClient;
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
@@ -166,10 +163,4 @@ impl PresharedKeyStore for ClientPresharedKeys {
         let key_map = self.key_refs.lock().expect("Client PSK mutex poisoned");
         key_map.values().map(Arc::clone).collect()
     }
-}
-
-pub(crate) async fn _get_existing_psks<EN, SP: StorageProvider>(
-    _client: AranyaClient<EN, SP>,
-) -> Result<Vec<TeamIdPSKPair>> {
-    todo!()
 }
