@@ -352,10 +352,6 @@ criteria = "safe-to-deploy"
 version = "0.12.4"
 criteria = "safe-to-deploy"
 
-[[exemptions.home]]
-version = "0.5.11"
-criteria = "safe-to-deploy"
-
 [[exemptions.humantime]]
 version = "2.1.0"
 criteria = "safe-to-deploy"
@@ -480,10 +476,6 @@ criteria = "safe-to-deploy"
 version = "1.1.7"
 criteria = "safe-to-deploy"
 
-[[exemptions.pin-project-lite]]
-version = "0.2.15"
-criteria = "safe-to-deploy"
-
 [[exemptions.pkcs8]]
 version = "0.10.2"
 criteria = "safe-to-deploy"
@@ -532,16 +524,8 @@ criteria = "safe-to-deploy"
 version = "0.2.2"
 criteria = "safe-to-deploy"
 
-[[exemptions.rand_chacha]]
-version = "0.9.0"
-criteria = "safe-to-deploy"
-
 [[exemptions.rand_core]]
 version = "0.5.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.rand_core]]
-version = "0.9.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.rand_hc]]
@@ -754,10 +738,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.untrusted]]
 version = "0.9.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.utf8parse]]
-version = "0.2.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.vec1]]

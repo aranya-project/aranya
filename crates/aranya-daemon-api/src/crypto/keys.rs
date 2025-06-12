@@ -2,21 +2,17 @@ use core::{borrow::Borrow, fmt, marker::PhantomData};
 
 use anyhow::Result;
 use aranya_crypto::{
-    aead::{Aead, AeadId},
     custom_id,
-    engine::{AlgId, RawSecret, Secret, UnwrappedKey, UnwrappedSecret, WrongKeyType},
-    hash::{Hash, HashId},
+    dangerous::spideroak_crypto::{
+        import::ImportError,
+        kem::{DecapKey as _, Kem},
+        keys::PublicKey,
+        signer::PkError,
+    },
     id::{Id, IdError, Identified},
-    import::ImportError,
-    kdf::{Kdf, KdfId},
-    kem::{DecapKey as _, Kem, KemId},
-    keys::{PublicKey, SecretKey},
-    mac::{Mac, MacId},
-    signer::{PkError, Signer, SignerId},
-    CipherSuite, Engine,
+    unwrapped, CipherSuite, Engine, Oids, Random,
 };
 use ciborium as cbor;
-use postcard::experimental::max_size::MaxSize;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 custom_id! {
@@ -33,7 +29,7 @@ impl<CS: CipherSuite> ApiKey<CS> {
     where
         E: Engine<CS = CS>,
     {
-        Self(<<<CS as CipherSuite>::Kem as Kem>::DecapKey as SecretKey>::new(eng))
+        Self(Random::random(eng))
     }
 
     /// Returns the key's unique ID.
@@ -90,26 +86,11 @@ impl<CS: CipherSuite> Identified for ApiKey<CS> {
     }
 }
 
-// TODO(eric): use `aranya_crypto::unwrapped` instead once
-// `__unwrapped_inner` is exported. Oops.
-impl<CS: CipherSuite> UnwrappedKey<CS> for ApiKey<CS> {
-    const ID: AlgId = AlgId::Decap(<CS::Kem as Kem>::ID);
-
-    #[inline]
-    fn into_secret(self) -> Secret<CS> {
-        Secret::new(RawSecret::Decap(self.0))
-    }
-
-    #[inline]
-    fn try_from_secret(key: UnwrappedSecret<CS>) -> Result<Self, WrongKeyType> {
-        match key.into_raw() {
-            RawSecret::Decap(key) => Ok(Self(key)),
-            got => Err(WrongKeyType {
-                got: got.name(),
-                expected: ::core::stringify!($name),
-            }),
-        }
-    }
+unwrapped! {
+    name: ApiKey;
+    type: Decap;
+    into: |key: Self| { key.0 };
+    from: |key| { Self(key) };
 }
 
 /// The public half of [`ApiKey`].
@@ -187,7 +168,8 @@ impl<CS: CipherSuite> Serialize for PublicApiKey<CS> {
     where
         S: Serializer,
     {
-        ExportedData::from_key::<CS>(&self.0, ExportedDataType::PublicApiKey).serialize(serializer)
+        ExportedData::<CS, _>::from_key(&self.0, ExportedDataType::PublicApiKey)
+            .serialize(serializer)
     }
 }
 
@@ -196,8 +178,8 @@ impl<'de, CS: CipherSuite> Deserialize<'de> for PublicApiKey<CS> {
     where
         D: Deserializer<'de>,
     {
-        let data = ExportedData::<SerdeOwnedKey<_>>::deserialize(deserializer)?;
-        if !data.valid_context::<CS>(ExportedDataType::PublicApiKey) {
+        let data = ExportedData::<CS, SerdeOwnedKey<_>>::deserialize(deserializer)?;
+        if !data.is_type(ExportedDataType::PublicApiKey) {
             Err(de::Error::custom(ImportError::InvalidContext))
         } else {
             Ok(Self(data.data.0))
@@ -217,33 +199,43 @@ impl<CS: CipherSuite> Identified for PublicApiKey<CS> {
 // Allow repeated suffixes since different types will be added in
 // the future.
 #[allow(clippy::enum_variant_names)]
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, MaxSize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 enum ExportedDataType {
     PublicApiKey,
 }
 
 /// Non-secret exported from an `Engine`.
-#[derive(Serialize, Deserialize, MaxSize)]
+#[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct ExportedData<T> {
+struct ExportedData<CS, T>
+where
+    CS: CipherSuite,
+{
     /// Uniquely idenitifies the chosen algorithms.
-    suite_id: SuiteIds,
+    #[serde(bound = "CS: CipherSuite")]
+    oids: Oids<CS>,
     /// Uniquely idenitifes the type of data.
     name: ExportedDataType,
     /// The exported data.
     pub(crate) data: T,
 }
 
-impl<T> ExportedData<T> {
-    pub(crate) fn valid_context<CS: CipherSuite>(&self, name: ExportedDataType) -> bool {
-        self.suite_id == SuiteIds::from_suite::<CS>() && self.name == name
+impl<CS, T> ExportedData<CS, T>
+where
+    CS: CipherSuite,
+{
+    pub(crate) fn is_type(&self, name: ExportedDataType) -> bool {
+        self.name == name
     }
 }
 
-impl<'a, K: PublicKey> ExportedData<SerdeBorrowedKey<'a, K>> {
-    pub(crate) fn from_key<CS: CipherSuite>(pk: &'a K, name: ExportedDataType) -> Self {
+impl<'a, CS, K: PublicKey> ExportedData<CS, SerdeBorrowedKey<'a, K>>
+where
+    CS: CipherSuite,
+{
+    pub(crate) fn from_key(pk: &'a K, name: ExportedDataType) -> Self {
         Self {
-            suite_id: SuiteIds::from_suite::<CS>(),
+            oids: CS::OIDS,
             name,
             data: SerdeBorrowedKey(pk),
         }
@@ -295,31 +287,5 @@ impl<K: PublicKey> Serialize for SerdeBorrowedKey<'_, K> {
         S: Serializer,
     {
         serializer.serialize_bytes(self.0.export().borrow())
-    }
-}
-
-/// Identifies the algorithms used by a [`CipherSuite`].
-///
-/// Used for domain separation and contextual binding.
-#[derive(Copy, Clone, Eq, PartialEq, Serialize, Deserialize, MaxSize)]
-struct SuiteIds {
-    aead: AeadId,
-    hash: HashId,
-    kdf: KdfId,
-    kem: KemId,
-    mac: MacId,
-    signer: SignerId,
-}
-
-impl SuiteIds {
-    const fn from_suite<S: CipherSuite>() -> Self {
-        Self {
-            aead: S::Aead::ID,
-            hash: S::Hash::ID,
-            kdf: S::Kdf::ID,
-            kem: S::Kem::ID,
-            mac: S::Mac::ID,
-            signer: S::Signer::ID,
-        }
     }
 }
