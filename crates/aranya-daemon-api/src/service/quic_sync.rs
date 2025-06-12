@@ -70,7 +70,7 @@ impl<CS: CipherSuite> Identified for QuicSyncSeed<CS> {
     }
 }
 
-/// A PSK.
+/// A QUIC syncer PSK.
 #[derive(Debug, Clone)]
 pub struct QuicSyncPSK<CS> {
     id: QuicSyncPskId,
@@ -96,7 +96,7 @@ impl<CS> QuicSyncPSK<CS> {
     }
 }
 
-/// A secret key.
+/// A secret seed that a KDF can derive a PSK from..
 #[derive(Debug)]
 pub struct QuicSyncSeed<CS> {
     seed: [u8; 64],

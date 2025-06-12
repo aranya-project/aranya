@@ -678,8 +678,6 @@ pub fn quic_sync_config_build(
     Ok(())
 }
 
-// Stop
-
 #[aranya_capi_core::opaque(size = 64, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 

@@ -254,7 +254,7 @@ pub struct QuicSyncConfigBuilder {
 
 impl QuicSyncConfigBuilder {
     /// Sets the seed.
-    pub fn psk(mut self, seed: Box<[u8]>) -> Self {
+    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
         self.seed = Some(seed);
         self
     }
