@@ -78,6 +78,45 @@ async fn test_sync_now() -> Result<()> {
     Ok(())
 }
 
+/// Tests that devices can be removed from the team.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_remove_devices() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
+
+    // Create the initial team, and get our TeamId.
+    let cfg = TeamConfig::builder().build()?;
+    let team_id = team
+        .owner
+        .client
+        .create_team(cfg)
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    // Tell all peers to sync with one another, and assign their roles.
+    team.add_all_sync_peers(team_id).await?;
+    team.add_all_device_roles(team_id).await?;
+
+    // Grab the shorthand for the teams we need to operate on.
+    let mut owner = team.owner.client.team(team_id);
+
+    owner.remove_device_from_team(team.membera.id).await?;
+    owner.remove_device_from_team(team.memberb.id).await?;
+    owner.revoke_role(team.operator.id, Role::Operator).await?;
+    owner.remove_device_from_team(team.operator.id).await?;
+    owner.revoke_role(team.admin.id, Role::Admin).await?;
+    owner.remove_device_from_team(team.admin.id).await?;
+    owner.revoke_role(team.owner.id, Role::Owner).await?;
+    owner
+        .remove_device_from_team(team.owner.id)
+        .await
+        .expect_err("owner should not be able to remove itself from team");
+
+    Ok(())
+}
+
 /// Tests functionality to make sure that we can query the fact database for various things.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_query_functions() -> Result<()> {
