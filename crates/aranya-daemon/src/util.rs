@@ -3,68 +3,58 @@ use std::{path::Path, sync::Arc};
 use anyhow::{Context as _, Result};
 use aranya_crypto::{Engine, Id, KeyStore};
 use aranya_daemon_api::{QuicSyncSeed, QuicSyncSeedId, TeamId};
+use aranya_util::create_dir_all;
 use s2n_quic::provider::tls::rustls::rustls::crypto::{hash::HashAlgorithm, PresharedKey};
 use tokio::{
-    fs::File,
-    io::{AsyncReadExt as _, AsyncWriteExt},
+    fs::{read, read_dir, OpenOptions},
+    io::AsyncWriteExt,
 };
 
 use crate::{CE, CS, KS};
 
-pub(crate) struct SeedFile(File);
+pub(crate) struct SeedDir<'a>(&'a Path);
 
-const ID_SIZE: usize = const { size_of::<Id>() };
+impl<'a> SeedDir<'a> {
+    pub(crate) async fn new(p: &'a Path) -> Result<Self> {
+        create_dir_all(p).await?;
+        Ok(Self(p))
+    }
 
-impl SeedFile {
-    pub(crate) async fn new<P: AsRef<Path>>(p: P) -> Result<Self> {
-        let f = File::options()
-            .append(true)
+    pub(crate) async fn append(&self, team_id: &TeamId, seed_id: &QuicSyncSeedId) -> Result<()> {
+        let file_name = self.0.join(team_id.to_string());
+
+        // fail if a file with the same name already exists
+        let mut file = OpenOptions::new()
             .write(true)
-            .create(true)
-            .open(p)
+            .create_new(true)
+            .open(file_name)
             .await?;
-        Ok(Self(f))
+
+        file.write_all(seed_id.as_bytes()).await?;
+        file.flush().await?;
+
+        Ok(())
     }
 
-    pub(crate) async fn append(
-        &mut self,
-        team_id: &TeamId,
-        seed_id: &QuicSyncSeedId,
-    ) -> Result<()> {
-        let combined = [team_id.as_bytes(), seed_id.as_bytes()].concat(); // call write twice instead?
-        self.0
-            .write_all(&combined)
-            .await
-            .context("could not write seed ID to file")?;
-
-        self.0.flush().await.context("could not flush to seed file")
-    }
-
-    async fn list(&mut self) -> Result<Vec<(TeamId, QuicSyncSeedId)>> {
-        let mut buf = [0; ID_SIZE * 2];
+    pub(crate) async fn list(&self) -> Result<Vec<(TeamId, QuicSyncSeedId)>> {
+        let mut entries = read_dir(&self.0).await?;
         let mut out = Vec::new();
 
-        loop {
-            match self.0.read_exact(&mut buf).await {
-                Ok(read) => {
-                    tracing::debug!(read);
-                    debug_assert_eq!(read, ID_SIZE * 2);
+        while let Some(entry) = entries.next_entry().await? {
+            let file_name = entry.file_name().into_string().map_err(|s| {
+                anyhow::anyhow!("could not convert OsString: `{:?}` into String", s)
+            })?;
+            let team_id = Id::decode(file_name).map(Into::into)?;
 
-                    let team_id = {
-                        let arr: [u8; ID_SIZE] = buf[0..ID_SIZE].try_into()?;
-                        TeamId::from(arr)
-                    };
-                    let seed_id = {
-                        let arr: [u8; ID_SIZE] = buf[ID_SIZE..].try_into()?;
-                        QuicSyncSeedId::from(arr)
-                    };
-                    out.push((team_id, seed_id));
-                }
-                Err(e) => {
-                    tracing::debug!(%e);
-                    break;
-                }
-            }
+            let seed_id = {
+                let bytes = read(entry.path()).await?;
+                let arr: [u8; size_of::<Id>()] = bytes.try_into().map_err(|input| {
+                    anyhow::anyhow!("could not convert {:?} to an array", input)
+                })?;
+                arr.into()
+            };
+
+            out.push((team_id, seed_id));
         }
 
         Ok(out)
@@ -84,12 +74,12 @@ fn load_seed(
     Ok(Some(seed))
 }
 
-pub(crate) async fn load_team_psk_pairs(
+pub(crate) async fn load_team_psk_pairs<'a>(
     eng: &mut CE,
     store: &mut KS,
-    file: &mut SeedFile,
+    dir: &'a SeedDir<'a>,
 ) -> Result<Vec<(TeamId, Arc<PresharedKey>)>> {
-    let pairs = file.list().await?;
+    let pairs = dir.list().await?;
     let mut out = Vec::new();
 
     for (team_id, seed_id) in pairs {
@@ -113,6 +103,8 @@ pub(crate) async fn load_team_psk_pairs(
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use aranya_crypto::Rng;
     use tempfile::tempdir;
     use test_log::test;
@@ -120,20 +112,40 @@ mod tests {
     use super::*;
 
     #[test(tokio::test(flavor = "multi_thread"))]
-    #[ignore = "fix bad file descriptor"]
-    async fn test_append() -> Result<()> {
-        let dir = tempdir()?;
-        let path = dir.path().join("seeds");
+    async fn test_append_and_list() -> Result<()> {
+        let tmp_dir = tempdir()?;
+        let path = tmp_dir.path().join("seeds");
 
-        let mut seed_file = SeedFile::new(path).await?;
-        let team_id = Id::random(&mut Rng).into();
-        let seed_id = Id::random(&mut Rng).into();
+        let seed_dir = SeedDir::new(&path)
+            .await
+            .context("could not create seed dir")?;
 
-        seed_file.append(&team_id, &seed_id).await?;
+        let mut expected = Vec::new();
+        let mut seen = HashSet::new();
 
-        let out = seed_file.list().await?;
+        for _ in 0..100 {
+            let team_id = Id::random(&mut Rng).into();
+            let seed_id = Id::random(&mut Rng).into();
 
-        assert_eq!(out, vec![(team_id, seed_id)]);
+            // may see duplicates by random chance
+            if !seen.insert(team_id) {
+                continue;
+            }
+
+            seed_dir
+                .append(&team_id, &seed_id)
+                .await
+                .context("could not append")?;
+
+            expected.push((team_id, seed_id));
+        }
+
+        let mut out = seed_dir.list().await?;
+        out.sort_unstable();
+
+        expected.sort_unstable();
+
+        assert_eq!(out, expected);
 
         Ok(())
     }

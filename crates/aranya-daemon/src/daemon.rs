@@ -36,7 +36,7 @@ use crate::{
         quic::{Msg, State as QuicSyncState, TeamIdPSKPair},
         Syncer,
     },
-    util::{load_team_psk_pairs, SeedFile},
+    util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
@@ -92,7 +92,7 @@ impl Daemon {
         let initial_keys = load_team_psk_pairs(
             &mut eng,
             &mut local_store,
-            &mut SeedFile::new(self.cfg.seed_id_path()).await?,
+            &SeedDir::new(&self.cfg.seed_id_path()).await?,
         )
         .await?;
 
