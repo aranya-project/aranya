@@ -7,12 +7,12 @@ use core::{future, net::SocketAddr, ops::Deref};
 use std::{path::PathBuf, pin::pin, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
-use aranya_crypto::{Csprng, Rng};
+use aranya_crypto::{Csprng, Engine, KeyStore, Rng};
 pub(crate) use aranya_daemon_api::crypto::{ApiKey, PublicApiKey};
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    CreateTeamResponse, DaemonApi, QuicSyncPSK, CE, CS,
+    CreateTeamResponse, DaemonApi, QuicSyncSeed, QuicSyncSeedId, CE, CS,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -36,11 +36,10 @@ use crate::{
     actions::Actions,
     aqc::Aqc,
     daemon::KS,
+    keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::task::{
-        quic::{delete_psk, insert_psk, Msg},
-        SyncPeers,
-    },
+    sync::task::{quic::Msg, SyncPeers},
+    util::SeedFile,
     Client, EF,
 };
 
@@ -141,7 +140,7 @@ impl DaemonApiServer {
             handler: EffectHandler {
                 aqc: Arc::clone(&aqc),
             },
-            quic: self.quic,
+            quic: Mutex::new(self.quic),
         }));
 
         aranya_util::write_file(&self.api_pk_path, &self.sk.public()?.encode()?)
@@ -270,7 +269,7 @@ struct ApiInner {
     peers: Mutex<SyncPeers>,
     handler: EffectHandler,
     aqc: Arc<Aqc<CE, KS>>,
-    quic: Option<quic_sync::Data>,
+    quic: Mutex<Option<quic_sync::Data>>,
 }
 
 impl ApiInner {
@@ -377,10 +376,20 @@ impl DaemonApi for Api {
         cfg: api::TeamConfig,
     ) -> api::Result<()> {
         if let Some(cfg) = cfg.quic_sync {
-            let quic_data = self.quic.as_ref().context("quic syncing is not enabled")?;
+            let mut guard = self.quic.lock().await;
+            let quic_data = guard.as_mut().context("quic syncing is not enabled")?;
 
-            let identity = cfg.psk().identity();
-            let secret = cfg.psk().raw_secret_bytes();
+            let seed = QuicSyncSeed::<CS>::from_bytes(cfg.seed())?;
+            insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
+                .context("could not insert seed into keystore")?;
+            write_seed_id(&quic_data.seed_id_path, &team, &seed.id())
+                .await
+                .context("could not write seed id to file")?;
+
+            let psk = seed.gen_psk()?;
+
+            let identity = psk.identity();
+            let secret = psk.raw_secret();
             let psk = PresharedKey::external(identity, secret)
                 .context("unable to create PSK")?
                 .with_hash_alg(HashAlgorithm::SHA384)
@@ -389,7 +398,6 @@ impl DaemonApi for Api {
             quic_data
                 .psk_send
                 .send(Msg::Insert((team, Arc::new(psk))))?;
-            insert_psk(&quic_data.service_name, &team, identity, secret)?;
         }
 
         // TODO: Implement for other syncer types
@@ -398,9 +406,8 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        if let Some(data) = &self.quic {
+        if let Some(ref data) = *self.quic.lock().await {
             data.psk_send.send(Msg::Remove(team))?;
-            delete_psk(&data.service_name, &team)?;
         }
         self.client.aranya.lock().await.remove_graph(team.into())?;
 
@@ -424,29 +431,34 @@ impl DaemonApi for Api {
             .context("unable to create team")?;
         debug!(?graph_id);
 
-        let psk = match &self.quic {
-            Some(data) => {
-                let psk = QuicSyncPSK::new(&mut Rng);
+        let seed = match *self.quic.lock().await {
+            Some(ref mut quic_data) => {
+                let seed = QuicSyncSeed::<CS>::new(&mut Rng);
+
+                insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
+                    .context("could not insert seed into keystore")?;
+
+                let psk = seed.gen_psk()?;
                 // Send PSK update to the key stores
                 {
                     let psk_ref = Arc::new(
-                        PresharedKey::external(psk.identity(), psk.raw_secret_bytes())
+                        PresharedKey::external(psk.identity(), psk.raw_secret())
                             .context("unable to create PSK")?
                             .with_hash_alg(HashAlgorithm::SHA384)
                             .expect("Valid hash algorithm"),
                     );
                     let team_id = api::TeamId::from(*graph_id.as_array());
-                    data.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
+                    quic_data.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
                 }
 
-                Some(psk)
+                Some(Box::from(seed.as_bytes()))
             }
             None => None,
         };
 
         Ok(CreateTeamResponse {
             team_id: graph_id.into_id().into(),
-            psk,
+            seed,
         })
     }
 
@@ -947,6 +959,22 @@ impl DaemonApi for Api {
         }
         Ok(labels)
     }
+}
+
+fn insert_seed(eng: &mut CE, store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
+    store.try_insert(seed.key_id(), eng.wrap(seed)?)?;
+    Ok(())
+}
+
+async fn write_seed_id(
+    path: &PathBuf,
+    team_id: &api::TeamId,
+    seed_id: &QuicSyncSeedId,
+) -> Result<()> {
+    let mut file = SeedFile::new(path).await?;
+    file.append(team_id, seed_id).await?;
+
+    Ok(())
 }
 
 impl From<api::KeyBundle> for KeyBundle {

@@ -27,7 +27,7 @@ async fn test_sync_now() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
 
-    // Create the initial team, and get our TeamId and PSK.
+    // Create the initial team, and get our TeamId and seed.
     let team_id = team.create_and_add_team().await?;
 
     // Grab the shorthand for our address.
@@ -72,7 +72,7 @@ async fn test_query_functions() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
 
-    // Create the initial team, and get our TeamId and PSK.
+    // Create the initial team, and get our TeamId and seed.
     let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
@@ -113,65 +113,66 @@ async fn test_add_team() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_add_team", work_dir).await?;
 
-    // Create the initial team, and get our TeamId and PSK.
-    let CreateTeamResponse { team_id, psk } = {
-        let cfg = TeamConfig::builder().build()?;
-        team.owner
-            .client
-            .create_team(cfg)
-            .await
-            .expect("expected to create team")
+    // Create the initial team, and get our TeamId and seed.
+    let cfg = TeamConfig::builder().build()?;
+    let CreateTeamResponse {
+        team_id,
+        seed: Some(seed),
+    } = team
+        .owner
+        .client
+        .create_team(cfg)
+        .await
+        .expect("expected to create team")
+    else {
+        panic!("Only implemented when using the QUIC syncer. Handle other syncer types")
     };
     info!(?team_id);
 
-    if let Some(psk) = psk {
-        let cfg = {
-            let qs_cfg = QuicSyncConfig::builder().psk(psk).build()?;
-            TeamConfig::builder().quic_sync(qs_cfg).build()?
-        };
+    let cfg = {
+        let qs_cfg = QuicSyncConfig::builder().seed(seed).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
+    };
 
-        // Grab the shorthand for our address.
-        let owner_addr = team.owner.aranya_local_addr().await?;
+    // Grab the shorthand for our address.
+    let owner_addr = team.owner.aranya_local_addr().await?;
 
-        // Grab the shorthand for the teams we need to operate on.
-        let mut owner = team.owner.client.team(team_id);
-        let mut admin = team.admin.client.team(team_id);
+    // Grab the shorthand for the teams we need to operate on.
+    let mut owner = team.owner.client.team(team_id);
+    let mut admin = team.admin.client.team(team_id);
 
-        // Add the admin as a new device.
-        info!("adding admin to team");
-        owner.add_device_to_team(team.admin.pk.clone()).await?;
+    // Add the admin as a new device.
+    info!("adding admin to team");
+    owner.add_device_to_team(team.admin.pk.clone()).await?;
 
-        // Add the operator as a new device.
-        info!("adding operator to team");
-        owner.add_device_to_team(team.operator.pk.clone()).await?;
+    // Add the operator as a new device.
+    info!("adding operator to team");
+    owner.add_device_to_team(team.operator.pk.clone()).await?;
 
-        // Give the admin its role.
-        owner.assign_role(team.admin.id, Role::Admin).await?;
+    // Give the admin its role.
+    owner.assign_role(team.admin.id, Role::Admin).await?;
 
-        // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
-        admin.sync_now(owner_addr.into(), None).await?;
-        sleep(TLS_HANDSHAKE_DURATION).await;
+    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+    admin.sync_now(owner_addr.into(), None).await?;
+    sleep(TLS_HANDSHAKE_DURATION).await;
 
-        // Now, we try to assign a role using the admin, which is expected to fail.
-        match admin.assign_role(team.operator.id, Role::Operator).await {
-            Ok(_) => bail!("Expected role assignment to fail"),
-            Err(aranya_client::Error::Aranya(_)) => {}
-            Err(_) => bail!("Unexpected error"),
-        }
-
-        admin.add_team(cfg.clone()).await?;
-        sleep(SLEEP_INTERVAL).await;
-        admin.sync_now(owner_addr.into(), None).await?;
-        sleep(SLEEP_INTERVAL).await;
-
-        // Now we should be able to successfully assign a role.
-        admin
-            .assign_role(team.operator.id, Role::Operator)
-            .await
-            .context("Assigning a role should not fail here!")?;
-
-        return Ok(());
+    // Now, we try to assign a role using the admin, which is expected to fail.
+    match admin.assign_role(team.operator.id, Role::Operator).await {
+        Ok(_) => bail!("Expected role assignment to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(_) => bail!("Unexpected error"),
     }
 
-    panic!("Handle other syncer types")
+    admin.add_team(cfg.clone()).await?;
+    sleep(SLEEP_INTERVAL).await;
+    admin.sync_now(owner_addr.into(), None).await?;
+    sleep(SLEEP_INTERVAL).await;
+
+    // Now we should be able to successfully assign a role.
+    admin
+        .assign_role(team.operator.id, Role::Operator)
+        .await
+        .context("Assigning a role should not fail here!")?;
+
+    return Ok(());
 }

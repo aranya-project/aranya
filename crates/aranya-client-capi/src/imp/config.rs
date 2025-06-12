@@ -4,7 +4,6 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::QuicSyncPSK;
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -226,7 +225,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
-    psk: QuicSyncPSK,
+    seed: Box<[u8]>,
 }
 
 impl QuicSyncConfig {
@@ -242,7 +241,7 @@ impl Typed for QuicSyncConfig {
 impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .psk(value.psk)
+            .seed(value.seed)
             .build()
             .expect("All fields are set")
     }
@@ -250,23 +249,23 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    psk: Option<QuicSyncPSK>,
+    seed: Option<Box<[u8]>>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Sets the psk.
-    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
-        self.psk = Some(psk);
+    /// Sets the seed.
+    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
+        self.seed = Some(seed);
         self
     }
 
-    /// Sets the psk.
+    /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig, Error> {
-        let Some(psk) = self.psk else {
-            return Err(InvalidArg::new("psk", "`psk` field not set").into());
+        let Some(seed) = self.seed else {
+            return Err(InvalidArg::new("seed", "`seed` field not set").into());
         };
 
-        Ok(QuicSyncConfig { psk })
+        Ok(QuicSyncConfig { seed })
     }
 }
 
@@ -282,11 +281,11 @@ impl Builder for QuicSyncConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        let Some(psk) = self.psk else {
-            return Err(InvalidArg::new("psk", "`psk` field not set").into());
+        let Some(seed) = self.seed else {
+            return Err(InvalidArg::new("seed", "`seed` field not set").into());
         };
 
-        Self::Output::init(out, QuicSyncConfig { psk });
+        Self::Output::init(out, QuicSyncConfig { seed });
         Ok(())
     }
 }

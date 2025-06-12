@@ -15,7 +15,6 @@ workspace = true
 
 [features]
 default = []
-testing = []
 
 
 [dependencies]
@@ -45,8 +44,6 @@ ciborium = { workspace = true }
 clap = { workspace = true }
 deser-hjson = { version = "2" }
 futures-util = { workspace = true }
-hex = { version = "0.4" }
-keyring = { workspace = true }
 postcard = { workspace = true }
 s2n-quic = { workspace = true }
 serde = { workspace = true }

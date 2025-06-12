@@ -15,10 +15,11 @@ pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
     custom_id,
-    default::{DefaultCipherSuite, DefaultEngine},
+    default::DefaultEngine,
+    id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    Csprng, Id, Random,
+    Engine, Id,
 };
 use aranya_util::Addr;
 use buggy::Bug;
@@ -26,10 +27,13 @@ pub use semver::Version;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
+pub mod quic_sync;
+pub use quic_sync::*;
+
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
 /// CS = Cipher Suite
-pub type CS = DefaultCipherSuite;
+pub type CS = <DefaultEngine as Engine>::CS;
 
 /// An error returned by the API.
 // TODO: enum?
@@ -64,8 +68,8 @@ impl From<semver::Error> for Error {
     }
 }
 
-impl From<aranya_crypto::id::IdError> for Error {
-    fn from(err: aranya_crypto::id::IdError) -> Self {
+impl From<IdError> for Error {
+    fn from(err: IdError) -> Self {
         error!(%err);
         Self(err.to_string())
     }
@@ -113,11 +117,6 @@ custom_id! {
     pub struct AqcUniChannelId;
 }
 
-custom_id! {
-    /// A PSK ID.
-    pub struct PskId;
-}
-
 /// A device's public key bundle.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KeyBundle {
@@ -136,14 +135,8 @@ pub enum Role {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct QsPSK {
-    psk_identity: Box<[u8]>,
-    psk_secret: Secret,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {
-    psk: QuicSyncPSK,
+    pub seed: Box<[u8]>,
 }
 
 impl QuicSyncConfig {
@@ -151,35 +144,35 @@ impl QuicSyncConfig {
         QuicSyncConfigBuilder::default()
     }
 
-    pub fn psk(&self) -> &QuicSyncPSK {
-        &self.psk
+    pub fn seed(&self) -> &[u8] {
+        &self.seed
     }
 }
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    psk: Option<QuicSyncPSK>,
+    seed: Option<Box<[u8]>>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Configures the psk fields.
-    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
-        self.psk = Some(psk);
+    /// Configures the seed.
+    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
+        self.seed = Some(seed);
 
         self
     }
 
     pub fn build(self) -> anyhow::Result<QuicSyncConfig> {
         Ok(QuicSyncConfig {
-            psk: self.psk.context("Missing PSK field")?,
+            seed: self.seed.context("Missing `seed` field")?,
         })
     }
 }
 
+// Note: any fields added to this type should be public
 /// A configuration for creating or adding a team to a daemon.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TeamConfig {
-    // TODO(nikki): any fields added to this should be public
     pub quic_sync: Option<QuicSyncConfig>,
 }
 
@@ -254,38 +247,6 @@ impl ZeroizeOnDrop for Secret {}
 impl Drop for Secret {
     fn drop(&mut self) {
         self.0.zeroize()
-    }
-}
-
-/// A secret key.
-// TODO(Steve): Replace?
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QuicSyncPSK {
-    id: PskId,
-    secret: Secret,
-}
-
-impl QuicSyncPSK {
-    /// Creates a new instance.
-    pub fn new<R: Csprng>(rng: &mut R) -> Self {
-        let random_bytes = <[u8; 32] as Random>::random(rng);
-
-        Self {
-            id: PskId::random(rng),
-            secret: Secret::from(random_bytes),
-        }
-    }
-
-    /// Return the id bytes.
-    #[inline]
-    pub fn identity(&self) -> &[u8] {
-        self.id.as_bytes()
-    }
-
-    /// Return the secret bytes.
-    #[inline]
-    pub fn raw_secret_bytes(&self) -> &[u8] {
-        self.secret.raw_secret_bytes()
     }
 }
 
@@ -664,7 +625,7 @@ pub struct Label {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTeamResponse {
     pub team_id: TeamId,
-    pub psk: Option<QuicSyncPSK>,
+    pub seed: Option<Box<[u8]>>,
 }
 
 #[tarpc::service]

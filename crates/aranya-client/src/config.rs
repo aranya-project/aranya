@@ -1,7 +1,5 @@
 use core::time::Duration;
 
-use aranya_daemon_api::QuicSyncPSK;
-
 use crate::{error::InvalidArg, ConfigError, Result};
 
 /// Configuration info for syncing with a peer.
@@ -84,7 +82,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone)]
 pub struct QuicSyncConfig {
-    psk: QuicSyncPSK,
+    seed: Box<[u8]>,
 }
 
 impl QuicSyncConfig {
@@ -95,27 +93,27 @@ impl QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    psk: Option<QuicSyncPSK>,
+    seed: Option<Box<[u8]>>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Sets the psk.
-    pub fn psk(mut self, psk: QuicSyncPSK) -> Self {
-        self.psk = Some(psk);
+    /// Sets the seed.
+    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
+        self.seed = Some(seed);
         self
     }
 
-    /// Sets the psk.
+    /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig> {
-        let Some(psk) = self.psk else {
+        let Some(psk) = self.seed else {
             return Err(ConfigError::InvalidArg(InvalidArg::new(
-                "psk",
-                "must call `QuicSyncConfigBuilder::psk`",
+                "seed",
+                "must call `QuicSyncConfigBuilder::seed`",
             ))
             .into());
         };
 
-        Ok(QuicSyncConfig { psk })
+        Ok(QuicSyncConfig { seed: psk })
     }
 }
 
@@ -135,7 +133,7 @@ impl TeamConfig {
 impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .psk(value.psk)
+            .seed(value.seed)
             .build()
             .expect("All fields are set")
     }
