@@ -130,7 +130,7 @@ impl Roles {
     }
 
     #[doc(hidden)]
-    pub fn __into_data(self) -> Vec<Role> {
+    pub fn __into_data(self) -> Box<[Role]> {
         self.data
     }
 }
@@ -451,7 +451,10 @@ impl Client {
 
     /// Get an existing team.
     pub fn team(&mut self, id: TeamId) -> Team<'_> {
-        Team { client: self, id }
+        Team {
+            client: self,
+            id: id.into_api(),
+        }
     }
 
     /// Get access to Aranya QUIC Channels.
@@ -613,34 +616,52 @@ impl Team<'_> {
     }
 
     /// Disassociate an AQC network identifier from a device.
-    pub async fn remove_aqc_net_identifier(
+    pub async fn remove_aqc_net_identifier<'a, I>(
         &mut self,
         device: DeviceId,
-        net_identifier: NetIdentifier,
-    ) -> Result<()> {
+        net_identifier: I,
+    ) -> Result<()>
+    where
+        I: TryInto<NetIdentifier<'a>, Error = InvalidNetIdentifier>,
+    {
         self.client
             .daemon
-            .remove_aqc_net_identifier(context::current(), self.id, device, net_identifier)
+            .remove_aqc_net_identifier(
+                context::current(),
+                self.id,
+                device.into_api(),
+                net_identifier.try_into()?.into_api(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
     /// Create a label.
-    pub async fn create_label(&mut self, label_name: String) -> Result<LabelId> {
+    pub async fn create_label(
+        &mut self,
+        label_name: String,
+        managing_role_id: RoleId,
+    ) -> Result<LabelId> {
         self.client
             .daemon
-            .create_label(context::current(), self.id, label_name)
+            .create_label(
+                context::current(),
+                self.id,
+                label_name,
+                managing_role_id.into_api(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
+            .map(LabelId::from_api)
     }
 
     /// Delete a label.
     pub async fn delete_label(&mut self, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
-            .delete_label(context::current(), self.id, label_id)
+            .delete_label(context::current(), self.id, label_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -655,7 +676,13 @@ impl Team<'_> {
     ) -> Result<()> {
         self.client
             .daemon
-            .assign_label(context::current(), self.id, device, label_id, op)
+            .assign_label(
+                context::current(),
+                self.id,
+                device.into_api(),
+                label_id.into_api(),
+                op.to_api(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -665,7 +692,12 @@ impl Team<'_> {
     pub async fn revoke_label(&mut self, device: DeviceId, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
-            .revoke_label(context::current(), self.id, device, label_id)
+            .revoke_label(
+                context::current(),
+                self.id,
+                device.into_api(),
+                label_id.into_api(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -694,14 +726,18 @@ impl Queries<'_> {
     }
 
     /// Returns the role of the current device.
-    pub async fn device_role(&mut self, device: DeviceId) -> Result<Box<[Role]>> {
+    pub async fn device_role(&mut self, device: DeviceId) -> Result<Roles> {
         let data = self
             .client
             .daemon
-            .query_device_roles(context::current(), self.id, device)
+            .query_device_roles(context::current(), self.id, device.into_api())
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
+            .map_err(aranya_error)?
+            // This _should_ just be `into_iter`, but the
+            // compiler chooses the `&Box` impl. It's the same
+            // end result, though.
+            .into_vec()
             .into_iter()
             .map(Role::from_api)
             .collect();
@@ -734,20 +770,27 @@ impl Queries<'_> {
     }
 
     /// Returns the AQC network identifier assigned to the current device.
-    pub async fn aqc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
-        self.client
+    pub async fn aqc_net_identifier<'a>(
+        &mut self,
+        device: DeviceId,
+    ) -> Result<Option<NetIdentifier<'a>>> {
+        let id = self
+            .client
             .daemon
-            .query_aqc_net_identifier(context::current(), self.id, device)
+            .query_aqc_net_identifier(context::current(), self.id, device.into_api())
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
+            .map_err(aranya_error)?
+            .map(|id| NetIdentifier::try_from(id.0))
+            .transpose()?;
+        Ok(id)
     }
 
     /// Returns whether a label exists.
     pub async fn label_exists(&mut self, label_id: LabelId) -> Result<bool> {
         self.client
             .daemon
-            .query_label_exists(context::current(), self.id, label_id)
+            .query_label_exists(context::current(), self.id, label_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -761,7 +804,10 @@ impl Queries<'_> {
             .query_labels(context::current(), self.id)
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)?;
+            .map_err(aranya_error)?
+            .into_iter()
+            .map(Label::from_api)
+            .collect();
         Ok(Labels { data })
     }
 }
