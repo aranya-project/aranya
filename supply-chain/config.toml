@@ -650,7 +650,7 @@ criteria = "safe-to-deploy"
 
 [[exemptions.tempfile]]
 version = "3.14.0"
-criteria = "safe-to-deploy"
+criteria = "safe-to-run"
 
 [[exemptions.termcolor]]
 version = "1.4.1"
