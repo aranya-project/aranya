@@ -306,7 +306,6 @@ dependencies = [
  "tarpc",
  "tempfile",
  "test-log",
- "test-util",
  "thiserror 2.0.12",
  "tokio",
  "tokio-util",
@@ -2943,22 +2942,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.99",
-]
-
-[[package]]
-name = "test-util"
-version = "0.0.0"
-dependencies = [
- "anyhow",
- "aranya-crypto",
- "aranya-daemon",
- "aranya-daemon-api",
- "aranya-internal-s2n-quic",
- "aranya-keygen",
- "aranya-runtime",
- "aranya-util",
- "tempfile",
- "tokio",
 ]
 
 [[package]]
