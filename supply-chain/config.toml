@@ -92,18 +92,6 @@ criteria = "safe-to-deploy"
 version = "3.0.6"
 criteria = "safe-to-deploy"
 
-[[exemptions.aranya-internal-rustls]]
-version = "0.23.26-psk.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.aranya-internal-s2n-quic]]
-version = "1.58.0-psk.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.aranya-internal-s2n-quic-rustls]]
-version = "0.58.0-psk.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.async-trait]]
 version = "0.1.83"
 criteria = "safe-to-deploy"

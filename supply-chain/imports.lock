@@ -26,8 +26,8 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto]]
-version = "0.7.0"
-when = "2025-06-12"
+version = "0.7.1"
+when = "2025-06-13"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -52,6 +52,24 @@ user-login = "aranya-project-bot"
 [[publisher.aranya-idam-ffi]]
 version = "0.10.0"
 when = "2025-06-12"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-internal-rustls]]
+version = "0.23.26-psk.1"
+when = "2025-05-29"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-internal-s2n-quic]]
+version = "1.58.0-psk.1"
+when = "2025-05-29"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-internal-s2n-quic-rustls]]
+version = "0.58.0-psk.1"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -161,6 +179,24 @@ when = "2023-07-17"
 user-id = 2915
 user-login = "Amanieu"
 user-name = "Amanieu d'Antras"
+
+[[publisher.spideroak-base58]]
+version = "0.2.0"
+when = "2025-06-06"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.spideroak-crypto]]
+version = "0.5.3"
+when = "2025-06-10"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.spideroak-crypto-derive]]
+version = "0.2.0"
+when = "2025-05-27"
+user-id = 293722
+user-login = "aranya-project-bot"
 
 [[publisher.unicode-width]]
 version = "0.1.14"
