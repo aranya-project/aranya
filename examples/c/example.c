@@ -9,6 +9,7 @@
 // Note: this file is formatted with `clang-format`.
 
 #include <ctype.h>
+#include <errno.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -74,9 +75,10 @@ typedef enum {
 } Members;
 
 // List of Unix domain socket paths for the Aranya clients.
-const char *daemon_socks[] = {"out/owner/uds.sock", "out/admin/uds.sock",
-                              "out/operator/uds.sock", "out/membera/uds.sock",
-                              "out/memberb/uds.sock"};
+const char *daemon_socks[] = {
+    "out/owner/run/uds.sock", "out/admin/run/uds.sock",
+    "out/operator/run/uds.sock", "out/membera/run/uds.sock",
+    "out/memberb/run/uds.sock"};
 
 // List of names for the Aranya clients.
 const char *client_names[] = {"owner", "admin", "operator", "membera",
@@ -250,9 +252,16 @@ AranyaError init_team(Team *t) {
     for (int i = 0; i < NUM_CLIENTS; i++) {
         printf("initializing client: %s\n", client_names[i]);
 
+        char *sock_path = realpath(daemon_socks[i], NULL);
+        if (sock_path == NULL) {
+            fprintf(stderr, "`realpath(%s,...)` failed: %s\n", daemon_socks[i],
+                    strerror(errno));
+            return ARANYA_ERROR_OTHER;
+        }
+
         Client *client = &t->clients_arr[i];
-        err =
-            init_client(client, client_names[i], daemon_socks[i], aqc_addrs[i]);
+        err = init_client(client, client_names[i], sock_path, aqc_addrs[i]);
+        free(sock_path);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to initialize client %s: %s\n",
                     client->name, aranya_error_to_str(err));
@@ -511,7 +520,7 @@ AranyaError run(Team *t) {
         }
     }
 
-    uint8_t memberb_keybundle[256] = {0};
+    uint8_t memberb_keybundle[1024] = {0};
     size_t memberb_keybundle_len   = sizeof(memberb_keybundle);
     err = aranya_query_device_keybundle(&operator->client, &t->id, &memberb->id,
                                         memberb_keybundle,
@@ -569,7 +578,7 @@ AranyaError run(Team *t) {
 
 exit:
     free(devices);
-    return ARANYA_ERROR_SUCCESS;
+    return err;
 }
 
 // Thread-unique data.
@@ -973,7 +982,7 @@ exit:
 }
 
 int main(void) {
-    Team team;
+    Team team       = {0};
     AranyaError err = ARANYA_ERROR_OTHER;
     int retErr      = EXIT_SUCCESS;
 
