@@ -92,18 +92,6 @@ criteria = "safe-to-deploy"
 version = "3.0.6"
 criteria = "safe-to-deploy"
 
-[[exemptions.aranya-internal-rustls]]
-version = "0.23.26-psk.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.aranya-internal-s2n-quic]]
-version = "1.58.0-psk.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.aranya-internal-s2n-quic-rustls]]
-version = "0.58.0-psk.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.async-trait]]
 version = "0.1.83"
 criteria = "safe-to-deploy"
@@ -352,10 +340,6 @@ criteria = "safe-to-deploy"
 version = "0.12.4"
 criteria = "safe-to-deploy"
 
-[[exemptions.home]]
-version = "0.5.11"
-criteria = "safe-to-deploy"
-
 [[exemptions.humantime]]
 version = "2.1.0"
 criteria = "safe-to-deploy"
@@ -478,10 +462,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.pin-project-internal]]
 version = "1.1.7"
-criteria = "safe-to-deploy"
-
-[[exemptions.pin-project-lite]]
-version = "0.2.15"
 criteria = "safe-to-deploy"
 
 [[exemptions.pkcs8]]
@@ -670,7 +650,7 @@ criteria = "safe-to-deploy"
 
 [[exemptions.tempfile]]
 version = "3.14.0"
-criteria = "safe-to-deploy"
+criteria = "safe-to-run"
 
 [[exemptions.termcolor]]
 version = "1.4.1"
@@ -746,10 +726,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.untrusted]]
 version = "0.9.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.utf8parse]]
-version = "0.2.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.vec1]]
