@@ -385,7 +385,14 @@ impl DaemonApi for Api {
         if let Some(ref data) = *self.quic.lock().await {
             data.psk_send.send(Msg::Remove(team))?;
         }
-        todo!("Should remove graph data from storage provider");
+        self.client
+            .aranya
+            .lock()
+            .await
+            .remove_graph(team.into_id().into())
+            .context("unable to remove graph from storage")?;
+
+        Ok(())
     }
 
     #[instrument(skip(self))]
