@@ -339,6 +339,10 @@ typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
     uint8_t __for_size_only[64];
 } AranyaQuicSyncConfigBuilder;
 
+typedef struct AranyaSeed {
+    uint8_t bytes[ARANYA_SEED_LEN];
+} AranyaSeed;
+
 typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
     /**
      * This field only exists for size purposes. It is
@@ -415,10 +419,6 @@ typedef const char *AranyaLabelName;
 typedef struct AranyaLabelId {
     struct AranyaId id;
 } AranyaLabelId;
-
-typedef struct AranyaSeed {
-    uint8_t bytes[ARANYA_SEED_LEN];
-} AranyaSeed;
 
 /**
  * A network socket address for an Aranya client.
@@ -1022,6 +1022,31 @@ AranyaError aranya_quic_sync_config_builder_cleanup_ext(struct AranyaQuicSyncCon
                                                         struct AranyaExtError *__ext_err);
 
 /**
+ * Attempts to set seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_quic_sync_config_seed(struct AranyaQuicSyncConfigBuilder *cfg,
+                                         const struct AranyaSeed *seed);
+
+/**
+ * Attempts to set seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_quic_sync_config_seed_ext(struct AranyaQuicSyncConfigBuilder *cfg,
+                                             const struct AranyaSeed *seed,
+                                             struct AranyaExtError *__ext_err);
+
+/**
  * Attempts to construct a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
  *
  * This function consumes and releases any resources associated
@@ -1085,6 +1110,33 @@ AranyaError aranya_team_config_builder_cleanup(struct AranyaTeamConfigBuilder *p
  */
 AranyaError aranya_team_config_builder_cleanup_ext(struct AranyaTeamConfigBuilder *ptr,
                                                    struct AranyaExtError *__ext_err);
+
+/**
+ * Configures QUIC syncer for [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder).
+ *
+ * By default, the QUIC syncer config is not set. It is an error to call
+ * [`aranya_team_config_build`](@ref aranya_team_config_build) before setting the interval with
+ * this function
+ *
+ * @param cfg a pointer to the builder for a team config
+ * @param quic Set the QUIC syncer config
+ */
+AranyaError aranya_team_config_builder_set_quic_syncer(struct AranyaTeamConfigBuilder *cfg,
+                                                       const struct AranyaQuicSyncConfig *quic);
+
+/**
+ * Configures QUIC syncer for [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder).
+ *
+ * By default, the QUIC syncer config is not set. It is an error to call
+ * [`aranya_team_config_build`](@ref aranya_team_config_build) before setting the interval with
+ * this function
+ *
+ * @param cfg a pointer to the builder for a team config
+ * @param quic Set the QUIC syncer config
+ */
+AranyaError aranya_team_config_builder_set_quic_syncer_ext(struct AranyaTeamConfigBuilder *cfg,
+                                                           const struct AranyaQuicSyncConfig *quic,
+                                                           struct AranyaExtError *__ext_err);
 
 /**
  * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig).

@@ -269,21 +269,8 @@ AranyaError init_team(Team *t) {
         }
     }
 
-    AranyaQuicSyncConfigBuilder quic_build;
-    err = aranya_quic_sync_config_builder_init(&quic_build);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
-        return err;
-    }
-    AranyaQuicSyncConfig quic_cfg;
-    err = aranya_quic_sync_config_build(&quic_build, &quic_cfg);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
-        return err;
-    }
-
-    AranyaTeamConfigBuilder build;
-    err = aranya_team_config_builder_init(&build);
+    AranyaTeamConfigBuilder owner_build;
+    err = aranya_team_config_builder_init(&owner_build);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
         return err;
@@ -291,17 +278,18 @@ AranyaError init_team(Team *t) {
 
     // NB: A builder's "_build" method consumes the builder, so
     // do _not_ call "_cleanup" afterward.
-    AranyaTeamConfig cfg;
-    err = aranya_team_config_build(&build, &cfg);
+    AranyaTeamConfig owner_cfg;
+    err = aranya_team_config_build(&owner_build, &owner_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
+        fprintf(stderr, "unable to init `AranyaTeamConfig`\n");
         return err;
     }
 
     // have owner create the team.
     // The `aranya_create_team` method is used to create a new graph for the
     // team to operate on.
-    err = aranya_create_team(&t->clients.owner.client, &cfg, &t->id, &t->seed);
+    err = aranya_create_team(&t->clients.owner.client, &owner_cfg, &t->id,
+                             &t->seed);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to create team\n");
         return err;
@@ -329,6 +317,63 @@ AranyaError init_team(Team *t) {
         return ARANYA_ERROR_OTHER;
     }
 
+    // Setup team config for non-owner devices.
+    // QUIC syncer PSK must be set.
+    AranyaQuicSyncConfigBuilder quic_build;
+    err = aranya_quic_sync_config_builder_init(&quic_build);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
+        return err;
+    }
+    err = aranya_quic_sync_config_seed(&quic_build, &t->seed);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to set `AranyaQuicSyncConfigBuilder` seed\n");
+        return err;
+    }
+    AranyaQuicSyncConfig quic_cfg;
+    err = aranya_quic_sync_config_build(&quic_build, &quic_cfg);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to init `AranyaQuicSyncConfig`\n");
+        return err;
+    }
+
+    AranyaTeamConfigBuilder build;
+    err = aranya_team_config_builder_init(&build);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
+        return err;
+    }
+
+    err = aranya_team_config_builder_set_quic_syncer(&build, &quic_cfg);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(
+            stderr,
+            "unable to set `QuicSyncConfig` for `AranyaTeamConfigBuilder`\n");
+        return err;
+    }
+
+    // NB: A builder's "_build" method consumes the builder, so
+    // do _not_ call "_cleanup" afterward.
+    AranyaTeamConfig cfg;
+    err = aranya_team_config_build(&build, &cfg);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to init `AranyaTeamConfig`\n");
+        return err;
+    }
+
+    // add_team() for each non-owner device
+    for (int i = 1; i < NUM_CLIENTS; i++) {
+        printf("add_team() client: %s\n", client_names[i]);
+
+        Client *client = &t->clients_arr[i];
+        err            = aranya_add_team(&client->client, &t->id, &cfg);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to add_team() for client: %s\n",
+                    client_names[i]);
+            return err;
+        }
+    }
+
     return ARANYA_ERROR_SUCCESS;
 }
 
@@ -338,6 +383,12 @@ AranyaError cleanup_team(Team *t) {
     AranyaError retErr = ARANYA_ERROR_SUCCESS;
 
     for (int i = 0; i < NUM_CLIENTS; i++) {
+        err = aranya_remove_team(&t->clients_arr[i].client, &t->id);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "error removing device from team %s: %s\n",
+                    t->clients_arr[i].name, aranya_error_to_str(err));
+            retErr = err;
+        }
         free(t->clients_arr[i].pk);
         err = aranya_client_cleanup(&t->clients_arr[i].client);
         if (err != ARANYA_ERROR_SUCCESS) {
@@ -521,7 +572,7 @@ AranyaError run(Team *t) {
     }
 
     uint8_t memberb_keybundle[1024] = {0};
-    size_t memberb_keybundle_len   = sizeof(memberb_keybundle);
+    size_t memberb_keybundle_len    = sizeof(memberb_keybundle);
     err = aranya_query_device_keybundle(&operator->client, &t->id, &memberb->id,
                                         memberb_keybundle,
                                         &memberb_keybundle_len);

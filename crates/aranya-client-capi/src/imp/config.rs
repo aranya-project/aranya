@@ -229,6 +229,11 @@ pub struct QuicSyncConfig {
 }
 
 impl QuicSyncConfig {
+    /// Useful for deref coercion.
+    pub(crate) fn imp(&self) -> &Self {
+        self
+    }
+
     pub fn builder() -> QuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }
@@ -254,9 +259,8 @@ pub struct QuicSyncConfigBuilder {
 
 impl QuicSyncConfigBuilder {
     /// Sets the seed.
-    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
+    pub fn seed(&mut self, seed: Box<[u8]>) {
         self.seed = Some(seed);
-        self
     }
 
     /// Builds the config.
@@ -325,6 +329,13 @@ pub struct TeamConfigBuilder {
 
 impl Typed for TeamConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0x112905E7);
+}
+
+impl TeamConfigBuilder {
+    /// Sets the QUIC syncer config.
+    pub fn quic(&mut self, quic: &QuicSyncConfig) {
+        self.quic_sync = Some(quic.clone());
+    }
 }
 
 impl Builder for TeamConfigBuilder {
