@@ -81,22 +81,9 @@ tokio-util = { version = "0.7.12" }
 tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
+#TODO: remove patches after aranya-core release
 [patch.crates-io]
-aranya-runtime = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-policy-vm = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-aqc-util = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-crypto-ffi = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-device-ffi = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-envelope-ffi = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-idam-ffi = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-perspective-ffi = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-crypto = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-policy-module = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-policy-ast = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-policy-lang = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-policy-ifgen-build = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-policy-compiler = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
-aranya-fast-channels = { git = 'https://github.com/aranya-project/aranya-core.git', branch = "issue/283" }
+aranya-crypto = { git = 'https://github.com/aranya-project/aranya-core.git', rev = "331c25a6ff3814aa3e7f9ac37cdee01f3f95db2c" }
 
 [profile.dev]
 opt-level = 1
