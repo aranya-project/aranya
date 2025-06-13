@@ -307,6 +307,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.3.1"
 
+[[audits.sha3-utils]]
+who = "Eric Lagergren <elagergren@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.3.1 -> 0.3.0"
+
 [[audits.spideroak-base58]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
