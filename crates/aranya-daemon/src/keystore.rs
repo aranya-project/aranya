@@ -37,8 +37,8 @@ macro_rules! impl_typed_keystore {
             ) -> Result<keystore::Entry<'_, Self, T>, Self::Error> {
                 use keystore::Entry;
                 self.0.entry(id).map(|entry| match entry {
-                    Entry::Vacant(entry) => Entry::Vacant(VacantEntry::new(entry)),
-                    Entry::Occupied(entry) => Entry::Occupied(OccupiedEntry::new(entry)),
+                    Entry::Vacant(entry) => Entry::Vacant(VacantEntry(entry)),
+                    Entry::Occupied(entry) => Entry::Occupied(OccupiedEntry(entry)),
                 })
             }
 
@@ -112,12 +112,6 @@ impl_typed_keystore! {
 #[derive(Debug)]
 pub struct VacantEntry<E>(E);
 
-impl<E> VacantEntry<E> {
-    pub(crate) fn new(entry: E) -> Self {
-        Self(entry)
-    }
-}
-
 impl<E, T> Vacant<T> for VacantEntry<E>
 where
     E: Vacant<T>,
@@ -133,12 +127,6 @@ where
 /// An occupied entry.
 #[derive(Debug)]
 pub struct OccupiedEntry<E>(E);
-
-impl<E> OccupiedEntry<E> {
-    pub(crate) fn new(entry: E) -> Self {
-        Self(entry)
-    }
-}
 
 impl<E, T> Occupied<T> for OccupiedEntry<E>
 where

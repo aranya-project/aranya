@@ -457,10 +457,10 @@ where
 
     /// Begins accepting incoming requests.
     #[instrument(skip_all)]
-    pub async fn serve(mut self) -> SyncResult<()> {
+    pub async fn serve(mut self) {
         info!(
-            "QUIC sync server listening for incoming connections: {}",
-            self.local_addr().map_err(SyncError::Other)?
+            "QUIC sync server listening for incoming connections: {:?}",
+            self.local_addr()
         );
 
         // Accept incoming QUIC connections
@@ -494,11 +494,8 @@ where
                 }
             });
         }
-        error!(
-            "server terminated: {}",
-            self.local_addr().map_err(SyncError::Other)?
-        );
-        Ok(())
+
+        error!("server terminated: {:?}", self.local_addr());
     }
 
     /// Responds to a sync.
