@@ -14,6 +14,7 @@ use aranya_daemon_api::{
 };
 // TODO(eric): Wrap these.
 pub use aranya_daemon_api::{KeyBundle, Op};
+use aranya_policy_text::Text;
 use aranya_util::Addr;
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
@@ -61,7 +62,7 @@ custom_id! {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Label {
     pub id: LabelId,
-    pub name: String,
+    pub name: Text,
     pub author_id: DeviceId,
 }
 

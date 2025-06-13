@@ -21,7 +21,7 @@ use aranya_crypto::{
     zeroize::{Zeroize, ZeroizeOnDrop},
     Id,
 };
-use aranya_policy_text::Text;
+use aranya_policy_text::{InvalidText, Text};
 use aranya_util::Addr;
 use buggy::Bug;
 pub use semver::Version;
@@ -47,6 +47,13 @@ impl From<Bug> for Error {
 
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
+        error!(?err);
+        Self(format!("{err:?}"))
+    }
+}
+
+impl From<InvalidText> for Error {
+    fn from(err: InvalidText) -> Self {
         error!(?err);
         Self(format!("{err:?}"))
     }
@@ -94,7 +101,7 @@ custom_id! {
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Role {
     pub id: RoleId,
-    pub name: String,
+    pub name: Text,
     pub author_id: DeviceId,
 }
 
@@ -114,7 +121,7 @@ pub struct TeamConfig {
 
 /// A device's network identifier.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-pub struct NetIdentifier(pub String);
+pub struct NetIdentifier(pub Text);
 
 impl Borrow<str> for NetIdentifier {
     #[inline]
@@ -153,7 +160,7 @@ impl fmt::Display for NetIdentifier {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Label {
     pub id: LabelId,
-    pub name: String,
+    pub name: Text,
     pub author_id: DeviceId,
 }
 
@@ -649,7 +656,7 @@ impl FromStr for Op {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Self::try_from_str(s).context("unknown operation")
+        Self::try_from_str(s).context("invalid operation")
     }
 }
 
@@ -724,7 +731,7 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     // Create a label.
-    async fn create_label(team: TeamId, name: String, managing_role_id: RoleId) -> Result<LabelId>;
+    async fn create_label(team: TeamId, name: Text, managing_role_id: RoleId) -> Result<LabelId>;
     // Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     // Assign a label to a device.

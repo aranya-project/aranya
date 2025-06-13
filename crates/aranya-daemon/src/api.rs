@@ -15,6 +15,7 @@ use aranya_daemon_api::{
     DaemonApi, CE, CS,
 };
 use aranya_keygen::PublicKeys;
+use aranya_policy_text::Text;
 use aranya_runtime::GraphId;
 use aranya_util::{task::scope, Addr};
 use futures_util::{StreamExt, TryStreamExt};
@@ -617,7 +618,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        label_name: String,
+        label_name: Text,
         managing_role_id: api::RoleId,
     ) -> api::Result<api::LabelId> {
         let effects = self
@@ -744,7 +745,7 @@ impl DaemonApi for Api {
             if let Effect::QueryDeviceRolesResult(e) = e {
                 roles.push(api::Role {
                     id: e.role_id.into(),
-                    name: e.name,
+                    name: e.name.try_into()?,
                     author_id: e.author_id.into(),
                 });
             }
@@ -794,7 +795,7 @@ impl DaemonApi for Api {
             if let Effect::QueriedLabelAssignment(e) = e {
                 labels.push(api::Label {
                     id: e.label_id.into(),
-                    name: e.label_name,
+                    name: e.label_name.try_into()?,
                     author_id: e.label_author_id.into(),
                 });
             }
@@ -819,7 +820,7 @@ impl DaemonApi for Api {
             if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
                 find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
             {
-                return Ok(Some(api::NetIdentifier(e.net_identifier)));
+                return Ok(Some(api::NetIdentifier(e.net_identifier.try_into()?)));
             }
         }
         Ok(None)
@@ -866,7 +867,7 @@ impl DaemonApi for Api {
             if let Effect::QueriedLabel(e) = e {
                 labels.push(api::Label {
                     id: e.label_id.into(),
-                    name: e.label_name,
+                    name: e.label_name.try_into()?,
                     author_id: e.label_author_id.into(),
                 });
             }

@@ -9,6 +9,7 @@ use aranya_crypto::{Csprng, DeviceId, Id, Rng};
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
+use aranya_policy_text::Text;
 use aranya_policy_vm::Value;
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
@@ -246,11 +247,11 @@ where
     #[instrument(skip(self), fields(%name, %managing_role_id))]
     fn create_label(
         &self,
-        name: String,
+        name: Text,
         managing_role_id: Id,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_label(name, managing_role_id)?;
+            actor.create_label(name.to_string(), managing_role_id)?;
             Ok(())
         })
         .in_current_span()
@@ -301,11 +302,11 @@ where
     fn set_aqc_network_name(
         &self,
         device_id: DeviceId,
-        net_identifier: String,
+        net_identifier: Text,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         info!(%device_id, %net_identifier, "setting AQC network name");
         self.with_actor(move |actor| {
-            actor.set_aqc_network_name(device_id.into(), net_identifier)?;
+            actor.set_aqc_network_name(device_id.into(), net_identifier.to_string())?;
             Ok(())
         })
         .in_current_span()
