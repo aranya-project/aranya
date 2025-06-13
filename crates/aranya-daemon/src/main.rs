@@ -41,7 +41,9 @@ fn main() -> Result<()> {
         let daemon = Daemon::load(cfg).await.context("unable to load daemon")?;
         info!("loaded Aranya daemon");
 
-        daemon.run().await
+        daemon.spawn().join().await?;
+
+        Ok(())
     })
     .inspect_err(|err| error!(?err))
 }
@@ -65,7 +67,7 @@ impl PidFile {
     /// Creates a new PID file at `path`.
     ///
     /// It's deleted when dropped.
-    pub fn create<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+    fn create<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         fs::write(path.as_ref(), process::id().to_string())?;
         Ok(Self {
             path: path.as_ref().to_owned(),

@@ -56,7 +56,7 @@ pub struct SyncPeers {
 
 /// A response to a sync request.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum SyncResponse {
+pub(crate) enum SyncResponse {
     /// Success.
     Ok(Box<[u8]>),
     /// Failure.
@@ -73,7 +73,7 @@ impl SyncPeers {
     }
 
     /// Add peer to [`Syncer`].
-    pub async fn add_peer(
+    pub(crate) async fn add_peer(
         &mut self,
         addr: Addr,
         graph_id: GraphId,
@@ -97,7 +97,7 @@ impl SyncPeers {
     }
 
     /// Remove peer from [`Syncer`].
-    pub async fn remove_peer(&mut self, addr: Addr, graph_id: GraphId) -> Result<()> {
+    pub(crate) async fn remove_peer(&mut self, addr: Addr, graph_id: GraphId) -> Result<()> {
         if let Err(e) = self
             .send
             .send(Msg::RemovePeer {
@@ -116,7 +116,7 @@ impl SyncPeers {
     }
 
     /// Sync with a peer immediately.
-    pub async fn sync_now(
+    pub(crate) async fn sync_now(
         &self,
         addr: Addr,
         graph_id: GraphId,
@@ -223,8 +223,7 @@ impl<ST> Syncer<ST> {
 
 impl<ST: SyncState> Syncer<ST> {
     /// Syncs with the next peer in the list.
-    #[instrument(skip_all)]
-    pub async fn next(&mut self) -> SyncResult<()> {
+    pub(crate) async fn next(&mut self) -> SyncResult<()> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
