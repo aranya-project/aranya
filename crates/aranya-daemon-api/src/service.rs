@@ -654,7 +654,7 @@ pub trait DaemonApi {
     /// add a team to the local device store that was created by someone else. Not an aranya action/command.
     async fn add_team(team: TeamId, cfg: TeamConfig) -> Result<()>;
 
-    /// remove a team from the local device store.
+    /// Remove a team from local device storage.
     async fn remove_team(team: TeamId) -> Result<()>;
 
     /// Create a new graph/team with the current device as the owner.

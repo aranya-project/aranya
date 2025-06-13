@@ -112,6 +112,7 @@ typedef struct {
 // team.
 typedef struct {
     AranyaTeamId id;
+    AranyaSeed seed;
     union {
         struct {
             // Team owner.
@@ -278,7 +279,7 @@ AranyaError init_team(Team *t) {
     // have owner create the team.
     // The `aranya_create_team` method is used to create a new graph for the
     // team to operate on.
-    err = aranya_create_team(&t->clients.owner.client, &cfg, &t->id);
+    err = aranya_create_team(&t->clients.owner.client, &cfg, &t->id, &t->seed);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to create team\n");
         return err;
