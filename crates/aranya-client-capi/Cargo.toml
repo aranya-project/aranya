@@ -23,7 +23,6 @@ default = []
 
 [dependencies]
 aranya-client = { workspace = true }
-aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 
 aranya-capi-core = { workspace = true }

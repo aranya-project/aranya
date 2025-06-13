@@ -16,6 +16,7 @@ workspace = true
 [dependencies]
 aranya-crypto = { workspace = true }
 aranya-util = { workspace = true }
+aranya-policy-text = { workspace = true }
 buggy = { workspace = true }
 
 anyhow = { workspace = true }
