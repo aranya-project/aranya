@@ -260,6 +260,19 @@ AranyaError init_team(Team *t) {
         }
     }
 
+    AranyaQuicSyncConfigBuilder quic_build;
+    err = aranya_quic_sync_config_builder_init(&quic_build);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
+        return err;
+    }
+    AranyaQuicSyncConfig quic_cfg;
+    err = aranya_quic_sync_config_build(&quic_build, &quic_cfg);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
+        return err;
+    }
+
     AranyaTeamConfigBuilder build;
     err = aranya_team_config_builder_init(&build);
     if (err != ARANYA_ERROR_SUCCESS) {

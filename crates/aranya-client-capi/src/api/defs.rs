@@ -670,7 +670,7 @@ pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
 #[aranya_capi_core::opaque(size = 64, align = 8)]
 pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
 
-/// Attempts to construct a [`TeamConfig`].
+/// Attempts to construct a [`QuicSyncConfig`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.

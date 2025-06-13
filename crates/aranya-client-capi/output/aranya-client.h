@@ -1022,7 +1022,7 @@ AranyaError aranya_quic_sync_config_builder_cleanup_ext(struct AranyaQuicSyncCon
                                                         struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * Attempts to construct a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
@@ -1034,7 +1034,7 @@ AranyaError aranya_quic_sync_config_build(struct AranyaQuicSyncConfigBuilder *cf
                                           struct AranyaQuicSyncConfig *out);
 
 /**
- * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * Attempts to construct a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
