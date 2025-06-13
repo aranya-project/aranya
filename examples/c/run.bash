@@ -93,5 +93,6 @@ done
 sleep 1
 
 # start the example app.
-ARANYA_CAPI=aranya=debug \
+ASAN_OPTIONS=detect_leaks=0 \
+    ARANYA_CAPI=aranya=debug \
     ./build/example
