@@ -103,7 +103,7 @@ impl DaemonApiServer {
     }
 
     /// Runs the server.
-    #[instrument(skip_all)]
+    #[instrument(skip_all, fields(uds_path = %self.uds_path.display()))]
     #[allow(clippy::disallowed_macros)]
     pub async fn serve(mut self) -> Result<()> {
         let aqc = Arc::new(self.aqc);
@@ -150,6 +150,7 @@ impl DaemonApiServer {
             );
 
             let info = self.uds_path.as_os_str().as_encoded_bytes();
+            debug!(?info, "info");
             let codec = LengthDelimitedCodec::builder()
                 .max_frame_length(usize::MAX)
                 .new_codec();
