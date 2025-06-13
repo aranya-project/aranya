@@ -506,7 +506,7 @@ AranyaError run(Team *t) {
         }
     }
 
-    uint8_t memberb_keybundle[256] = {0};
+    uint8_t memberb_keybundle[1024] = {0};
     size_t memberb_keybundle_len   = sizeof(memberb_keybundle);
     err = aranya_query_device_keybundle(&operator->client, &t->id, &memberb->id,
                                         memberb_keybundle,
