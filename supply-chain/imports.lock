@@ -2,104 +2,116 @@
 # cargo-vet imports lock
 
 [[publisher.aranya-aqc-util]]
-version = "0.3.0"
-when = "2025-05-19"
+version = "0.5.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-codegen]]
-version = "0.3.0"
-when = "2025-05-19"
+version = "0.3.2"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-core]]
-version = "0.4.0"
-when = "2025-05-19"
+version = "0.4.2"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-capi-macro]]
-version = "0.3.0"
-when = "2025-05-19"
+version = "0.3.2"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto]]
-version = "0.6.0"
-when = "2025-05-19"
+version = "0.7.1"
+when = "2025-06-13"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-crypto-ffi]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.10.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-device-ffi]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.10.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-envelope-ffi]]
-version = "0.8.0"
-when = "2025-05-19"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-fast-channels]]
-version = "0.7.0"
-when = "2025-05-19"
+version = "0.10.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-idam-ffi]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.10.0"
+when = "2025-06-12"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-internal-rustls]]
+version = "0.23.26-psk.1"
+when = "2025-05-29"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-internal-s2n-quic]]
+version = "1.58.0-psk.1"
+when = "2025-05-29"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-internal-s2n-quic-rustls]]
+version = "0.58.0-psk.1"
+when = "2025-05-29"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-libc]]
-version = "0.2.0"
-when = "2025-04-21"
+version = "0.3.1"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-perspective-ffi]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.10.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ast]]
-version = "0.4.1"
-when = "2025-05-19"
+version = "0.5.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-compiler]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.10.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-derive]]
-version = "0.5.1"
-when = "2025-05-19"
+version = "0.5.3"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.10.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-ifgen-build]]
-version = "0.4.0"
-when = "2025-04-21"
+version = "0.4.3"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -110,26 +122,26 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-lang]]
-version = "0.4.1"
-when = "2025-05-19"
+version = "0.5.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-module]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.10.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-policy-vm]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.10.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-runtime]]
-version = "0.8.0"
-when = "2025-05-19"
+version = "0.10.0"
+when = "2025-06-12"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -168,6 +180,24 @@ user-id = 2915
 user-login = "Amanieu"
 user-name = "Amanieu d'Antras"
 
+[[publisher.spideroak-base58]]
+version = "0.2.0"
+when = "2025-06-06"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.spideroak-crypto]]
+version = "0.5.3"
+when = "2025-06-10"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.spideroak-crypto-derive]]
+version = "0.2.0"
+when = "2025-05-27"
+user-id = 293722
+user-login = "aranya-project-bot"
+
 [[publisher.unicode-width]]
 version = "0.1.14"
 when = "2024-09-19"
@@ -195,6 +225,16 @@ who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.3.1"
 
+[[audits.aranya-core.audits.sha3-utils]]
+who = "Eric Lagergren <elagergren@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.3.0 -> 0.5.0"
+
+[[audits.aranya-core.audits.spin]]
+who = "Eric Lagergren <elagergren@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.9.8 -> 0.10.0"
+
 [[audits.bytecode-alliance.wildcard-audits.bumpalo]]
 who = "Nick Fitzgerald <fitzgen@gmail.com>"
 criteria = "safe-to-deploy"
@@ -207,7 +247,7 @@ who = "Alex Crichton <alex@alexcrichton.com>"
 criteria = "safe-to-deploy"
 user-id = 73222 # wasmtime-publish
 start = "2023-01-01"
-end = "2025-05-08"
+end = "2026-06-03"
 notes = """
 The Bytecode Alliance uses the `wasmtime-publish` crates.io account to automate
 publication of this crate from CI. This repository requires all PRs are reviewed
@@ -465,6 +505,12 @@ a few `unsafe` blocks related to utf-8 validation which are locally verifiable
 as correct and otherwise this crate is good to go.
 """
 
+[[audits.bytecode-alliance.audits.pin-project-lite]]
+who = "Alex Crichton <alex@alexcrichton.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.13 -> 0.2.14"
+notes = "No substantive changes in this update"
+
 [[audits.bytecode-alliance.audits.pin-utils]]
 who = "Pat Hickey <phickey@fastly.com>"
 criteria = "safe-to-deploy"
@@ -522,7 +568,34 @@ criteria = "safe-to-deploy"
 version = "1.1.4"
 notes = "uses unsafe to implement thread local storage of objects"
 
-[audits.cargo-vet.audits]
+[[audits.cargo-vet.audits.home]]
+who = "Nika Layzell <nika@thelayzells.com>"
+criteria = "safe-to-deploy"
+version = "0.5.3"
+notes = """
+Crate with straightforward code for determining the user's HOME directory. Only
+unsafe code is used to invoke the Windows SHGetFolderPathW API to get the
+profile directory when the USERPROFILE environment variable is unavailable.
+"""
+
+[[audits.cargo-vet.audits.home]]
+who = "Nika Layzell <nika@thelayzells.com>"
+criteria = "safe-to-deploy"
+delta = "0.5.3 -> 0.5.11"
+
+[[audits.cargo-vet.audits.pin-project-lite]]
+who = "Nika Layzell <nika@thelayzells.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.14 -> 0.2.16"
+notes = """
+Only functional change is to work around a bug in the negative_impls feature
+(https://github.com/taiki-e/pin-project/issues/340#issuecomment-2432146009)
+"""
+
+[[audits.cargo-vet.audits.utf8parse]]
+who = "Nika Layzell <nika@thelayzells.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.1 -> 0.2.2"
 
 [[audits.embark.audits.anyhow]]
 who = "Johan Andersson <opensource@embark-studios.com>"
@@ -540,6 +613,12 @@ who = "Johan Andersson <opensource@embark-studios.com>"
 criteria = "safe-to-deploy"
 version = "1.0.40"
 notes = "Found no unsafe or ambient capabilities used"
+
+[[audits.embark.audits.utf8parse]]
+who = "Johan Andersson <opensource@embark-studios.com>"
+criteria = "safe-to-deploy"
+version = "0.2.1"
+notes = "Single unsafe usage that looks sound, no ambient capabilities"
 
 [[audits.embark.audits.valuable]]
 who = "Johan Andersson <opensource@embark-studios.com>"
@@ -834,6 +913,20 @@ criteria = "safe-to-run"
 delta = "0.11.2 -> 0.12.1"
 aggregated-from = "https://chromium.googlesource.com/chromiumos/third_party/rust_crates/+/refs/heads/main/cargo-vet/audits.toml?format=TEXT"
 
+[[audits.google.audits.pin-project-lite]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = "safe-to-deploy"
+version = "0.2.9"
+notes = "Reviewed on https://fxrev.dev/824504"
+aggregated-from = "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/third_party/rust_crates/supply-chain/audits.toml?format=TEXT"
+
+[[audits.google.audits.pin-project-lite]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = "safe-to-deploy"
+delta = "0.2.9 -> 0.2.13"
+notes = "Audited at https://fxrev.dev/946396"
+aggregated-from = "https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/third_party/rust_crates/supply-chain/audits.toml?format=TEXT"
+
 [[audits.google.audits.proc-macro2]]
 who = "Lukasz Anforowicz <lukasza@chromium.org>"
 criteria = "safe-to-deploy"
@@ -977,6 +1070,24 @@ aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_p
 who = "Lukasz Anforowicz <lukasza@chromium.org>"
 criteria = "safe-to-deploy"
 version = "0.8.5"
+notes = """
+For more detailed unsafe review notes please see https://crrev.com/c/6362797
+"""
+aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
+
+[[audits.google.audits.rand_chacha]]
+who = "Lukasz Anforowicz <lukasza@chromium.org>"
+criteria = "safe-to-deploy"
+version = "0.3.1"
+notes = """
+For more detailed unsafe review notes please see https://crrev.com/c/6362797
+"""
+aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
+
+[[audits.google.audits.rand_core]]
+who = "Lukasz Anforowicz <lukasza@chromium.org>"
+criteria = "safe-to-deploy"
+version = "0.6.4"
 notes = """
 For more detailed unsafe review notes please see https://crrev.com/c/6362797
 """
@@ -1515,12 +1626,12 @@ version = "0.3.0"
 [[audits.isrg.audits.rand_chacha]]
 who = "David Cook <dcook@divviup.org>"
 criteria = "safe-to-deploy"
-version = "0.3.1"
+delta = "0.3.1 -> 0.9.0"
 
 [[audits.isrg.audits.rand_core]]
 who = "David Cook <dcook@divviup.org>"
 criteria = "safe-to-deploy"
-version = "0.6.3"
+delta = "0.6.4 -> 0.9.3"
 
 [[audits.isrg.audits.sha2]]
 who = "David Cook <dcook@divviup.org>"
@@ -1742,12 +1853,6 @@ delta = "0.30.0 -> 0.29.0"
 notes = "No unsafe code, mostly algorithms and parsing. Very unlikely to cause security issues."
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
-[[audits.mozilla.audits.hex]]
-who = "Simon Friedberger <simon@mozilla.com>"
-criteria = "safe-to-deploy"
-version = "0.4.3"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
 [[audits.mozilla.audits.itertools]]
 who = "Mike Hommey <mh+mozilla@glandium.org>"
 criteria = "safe-to-deploy"
@@ -1788,12 +1893,6 @@ aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-ch
 who = "Valentin Gosu <valentin.gosu@gmail.com>"
 criteria = "safe-to-deploy"
 delta = "2.3.0 -> 2.3.1"
-aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
-
-[[audits.mozilla.audits.rand_core]]
-who = "Mike Hommey <mh+mozilla@glandium.org>"
-criteria = "safe-to-deploy"
-delta = "0.6.3 -> 0.6.4"
 aggregated-from = "https://hg.mozilla.org/mozilla-central/raw-file/tip/supply-chain/audits.toml"
 
 [[audits.mozilla.audits.rmp]]

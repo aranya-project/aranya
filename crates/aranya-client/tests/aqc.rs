@@ -5,7 +5,7 @@ use std::time::Duration;
 mod common;
 use anyhow::Result;
 use aranya_client::aqc::AqcPeerChannel;
-use aranya_crypto::csprng::rand;
+use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
 use aranya_daemon_api::{ChanOp, NetIdentifier};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};

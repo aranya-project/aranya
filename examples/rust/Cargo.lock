@@ -96,19 +96,19 @@ dependencies = [
 
 [[package]]
 name = "aranya-crypto"
-version = "0.6.1"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59e9997517909beeb58ca64c5a2942de0898d7f2ab8721c3739e2028e6feb5ac"
+checksum = "803d5194111f4404a3180b293564334c0d8945da5efb901853d8a7e3f278ce7f"
 dependencies = [
  "buggy",
  "byteorder",
  "cfg-if",
  "ciborium",
  "ciborium-io",
- "postcard",
  "proptest",
  "rustix",
  "serde",
+ "sha3-utils",
  "siphasher",
  "spideroak-base58",
  "spideroak-crypto",
@@ -152,24 +152,6 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "aranya-fast-channels"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "329bfcc5dbc2cabefa0217c6517257a010535c5e03672a89c09470f38d1c48d4"
-dependencies = [
- "aranya-crypto",
- "buggy",
- "byteorder",
- "cfg-if",
- "const_format",
- "errno",
- "heapless",
- "libc",
- "serde",
- "thiserror 2.0.12",
 ]
 
 [[package]]
@@ -500,26 +482,6 @@ name = "const-oid"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
-
-[[package]]
-name = "const_format"
-version = "0.2.34"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "126f97965c8ad46d6d9163268ff28432e8f6a1196a55578867832e3049df63dd"
-dependencies = [
- "const_format_proc_macros",
-]
-
-[[package]]
-name = "const_format_proc_macros"
-version = "0.2.34"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d57c2eccfb16dbac1f4e61e206105db5820c9d26c3c472bc17c774259ef7744"
-dependencies = [
- "proc-macro2",
- "quote",
- "unicode-xid",
-]
 
 [[package]]
 name = "cpufeatures"
@@ -1059,7 +1021,7 @@ dependencies = [
  "hash32",
  "rustc_version",
  "serde",
- "spin",
+ "spin 0.9.8",
  "stable_deref_trait",
 ]
 
@@ -1991,11 +1953,11 @@ dependencies = [
 
 [[package]]
 name = "sha3-utils"
-version = "0.3.1"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e19df53912f231b1348a1af81c59202ca43d9a1b8d7455ece97c2e17a597f491"
+checksum = "08e0bf98cc082cbe077f06a707c94ca15796d046cc4cd2593167b5730a6727be"
 dependencies = [
- "typenum",
+ "zerocopy",
 ]
 
 [[package]]
@@ -2065,19 +2027,18 @@ dependencies = [
 
 [[package]]
 name = "spideroak-base58"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09b719743eccf9f6ef06ac55f6b315a9c825bf26500b7c703ad7978a92aedf9f"
+checksum = "80779d12410f1470dfc7197177c3a7a21c65bd15af1434c2094fbdf38047b325"
 dependencies = [
  "buggy",
- "byteorder",
 ]
 
 [[package]]
 name = "spideroak-crypto"
-version = "0.2.1"
+version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71b5091ebcf7bc8fc98c07cc571cb1c22e7034d7decd5adb48a86c48f3890ec7"
+checksum = "cb9104419294271e35d214416fce160cd27aaae6284f4fc721abd2e968ef5a90"
 dependencies = [
  "aes-gcm",
  "buggy",
@@ -2091,7 +2052,6 @@ dependencies = [
  "getrandom 0.2.16",
  "p256",
  "p384",
- "postcard",
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "rand_core 0.6.4",
@@ -2100,19 +2060,20 @@ dependencies = [
  "sha2",
  "sha3-utils",
  "spideroak-crypto-derive",
- "spin",
+ "spin 0.10.0",
  "subtle",
+ "thiserror 2.0.12",
  "typenum",
+ "zerocopy",
  "zeroize",
 ]
 
 [[package]]
 name = "spideroak-crypto-derive"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c17eb41e55e0b7786ee1ab9c618babb79c4d643771c85be8f9dbceb623e1235c"
+checksum = "0f9a7eef355abf3ffa83d09840070d4cbd6a7daf2cb6ea0d401e317952c3dde1"
 dependencies = [
- "prettyplease",
  "proc-macro2",
  "quote",
  "syn 2.0.101",
@@ -2126,6 +2087,12 @@ checksum = "6980e8d7511241f8acf4aebddbb1ff938df5eebe98691418c4468d0b72a96a67"
 dependencies = [
  "lock_api",
 ]
+
+[[package]]
+name = "spin"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5fe4ccb98d9c292d56fec89a5e07da7fc4cf0dc11e156b41793132775d3e591"
 
 [[package]]
 name = "spki"
@@ -2430,12 +2397,6 @@ name = "unicode-ident"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a5f39404a5da50712a4c1eecf25e90dd62b613502b7e925fd4e4d19b5c96512"
-
-[[package]]
-name = "unicode-xid"
-version = "0.2.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
 
 [[package]]
 name = "universal-hash"
