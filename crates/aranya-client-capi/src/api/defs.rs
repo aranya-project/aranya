@@ -8,7 +8,7 @@ use std::{ffi::OsStr, os::unix::ffi::OsStrExt, str::FromStr};
 use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::{self, AqcPeerStream};
-use aranya_crypto::hex;
+use aranya_crypto::dangerous::spideroak_crypto::hex;
 use bytes::Bytes;
 use tracing::error;
 

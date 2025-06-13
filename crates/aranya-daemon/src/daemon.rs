@@ -2,9 +2,8 @@ use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
+    dangerous::spideroak_crypto::{import::Import, keys::SecretKey},
     default::DefaultEngine,
-    import::Import,
-    keys::SecretKey,
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
@@ -319,6 +318,7 @@ async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
             }
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 tracing::info!("generating key");
+                // TODO: not compiling
                 let key = K::new(&mut Rng);
                 let bytes = key
                     .try_export_secret()
