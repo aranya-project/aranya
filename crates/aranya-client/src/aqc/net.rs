@@ -13,6 +13,7 @@ use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{
     AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
 };
+use aranya_util::rustls::{NoCertResolver, SkipServerVerification};
 use buggy::{Bug, BugExt as _};
 use bytes::{Bytes, BytesMut};
 use channels::AqcPeerChannel;
@@ -33,10 +34,7 @@ use tarpc::context;
 use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
-use super::crypto::{
-    ClientPresharedKeys, NoCertResolver, ServerPresharedKeys, SkipServerVerification, CTRL_PSK,
-    PSK_IDENTITY_CTRL,
-};
+use super::crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL};
 use crate::error::{aranya_error, AqcError, IpcError};
 
 pub mod channels;

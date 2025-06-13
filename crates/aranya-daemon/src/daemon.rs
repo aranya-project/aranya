@@ -7,7 +7,6 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
-use aranya_daemon_api::CS;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -18,24 +17,34 @@ use bimap::BiBTreeMap;
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
+use tokio::{
+    fs,
+    sync::{broadcast::Receiver, Mutex},
+    task::JoinSet,
+};
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
     actions::Actions,
-    api::{ApiKey, DaemonApiServer},
+    api::{ApiKey, DaemonApiServer, QSData},
     aqc::Aqc,
     aranya,
     config::Config,
     keystore::{AranyaStore, LocalStore},
     policy,
-    sync::{task::Syncer, tcp::State as TCPSyncState},
+    sync::task::{
+        quic::{Msg, State as QuicSyncState, TeamIdPSKPair},
+        Syncer,
+    },
+    util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
 // Use short names so that we can more easily add generics.
 /// CE = Crypto Engine
 pub(crate) type CE = DefaultEngine;
+/// CS = Crypto Suite
+pub(crate) type CS = <DefaultEngine as Engine>::CS;
 /// KS = Key Store
 pub(crate) type KS = Store;
 /// EN = Engine (Policy)
@@ -46,7 +55,7 @@ pub(crate) type SP = LinearStorageProvider<FileManager>;
 pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
-type TcpSyncServer = crate::sync::tcp::Server<EN, SP>;
+pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
 
 /// Handle for the spawned daemon.
 ///
@@ -76,8 +85,8 @@ impl DaemonHandle {
 
 /// The daemon itself.
 pub struct Daemon {
-    sync_server: TcpSyncServer,
-    syncer: Syncer<TCPSyncState>,
+    sync_server: SyncServer,
+    syncer: Syncer<QuicSyncState>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -95,8 +104,7 @@ impl Daemon {
             let mut eng = Self::load_crypto_engine(&cfg).await?;
             let pks = Self::load_or_gen_public_keys(&cfg, &mut eng, &mut aranya_store).await?;
 
-            // Currently unused after #294.
-            let mut _local_store = Self::load_local_keystore(&cfg).await?;
+            let mut local_store = Self::load_local_keystore(&cfg).await?;
 
             // Generate a fresh API key at startup.
             let api_sk = ApiKey::generate(&mut eng);
@@ -104,6 +112,15 @@ impl Daemon {
                 .await
                 .context("unable to write API public key")?;
             info!(path = %cfg.api_pk_path().display(), "wrote API public key");
+
+            let (psk_send, psk_recv) = tokio::sync::broadcast::channel(16);
+
+            let initial_keys = load_team_psk_pairs(
+                &mut eng,
+                &mut local_store,
+                &SeedDir::new(&cfg.seed_id_path()).await?,
+            )
+            .await?;
 
             // Initialize Aranya client.
             let (client, sync_server) = Self::setup_aranya(
@@ -114,13 +131,17 @@ impl Daemon {
                     .context("unable to clone keystore")?,
                 &pks,
                 cfg.sync_addr,
+                psk_send.subscribe(),
+                initial_keys.clone(),
             )
             .await?;
             let local_addr = sync_server.local_addr()?;
 
             // Sync in the background at some specified interval.
             let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-            let (syncer, peers) = Syncer::new(client.clone(), send_effects, TCPSyncState);
+
+            let state = QuicSyncState::new(initial_keys, psk_recv)?;
+            let (syncer, peers) = Syncer::new(client.clone(), send_effects, state);
 
             let graph_ids = client
                 .aranya
@@ -145,7 +166,19 @@ impl Daemon {
                     }
                     peers
                 };
-                Aqc::new(eng, pks.ident_pk.id()?, aranya_store, peers)
+                Aqc::new(eng.clone(), pks.ident_pk.id()?, aranya_store, peers)
+            };
+
+            // TODO: Fix this when other syncer types are supported
+            let Some(_qs_config) = &cfg.quic_sync else {
+                anyhow::bail!("Supply a valid QUIC sync config")
+            };
+
+            let data = QSData {
+                psk_send,
+                store: local_store,
+                engine: eng,
+                seed_id_path: cfg.seed_id_path(),
             };
 
             let api = DaemonApiServer::new(
@@ -157,6 +190,7 @@ impl Daemon {
                 peers,
                 recv_effects,
                 aqc,
+                Some(data),
             )?;
             Ok(Self {
                 sync_server,
@@ -234,14 +268,16 @@ impl Daemon {
         Ok(())
     }
 
-    /// Creates the Aranya client and server.
+    /// Creates the Aranya client and sync server.
     async fn setup_aranya(
         cfg: &Config,
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-    ) -> Result<(Client, TcpSyncServer)> {
+        recv: Receiver<Msg>,
+        initial_keys: Vec<TeamIdPSKPair>,
+    ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -253,13 +289,15 @@ impl Daemon {
 
         let client = Client::new(Arc::clone(&aranya));
 
-        let server = {
-            info!(addr = %external_sync_addr, "starting TCP server");
-            let listener = TcpListener::bind(external_sync_addr.to_socket_addrs())
-                .await
-                .context("unable to bind TCP listener")?;
-            TcpSyncServer::new(client.clone(), listener)
+        // TODO: Fix this when other syncer types are supported
+        let Some(_qs_config) = &cfg.quic_sync else {
+            anyhow::bail!("Supply a valid QUIC sync config")
         };
+
+        info!(addr = %external_sync_addr, "starting QUIC sync server");
+        let server = SyncServer::new(client.clone(), &external_sync_addr, initial_keys, recv)
+            .await
+            .context("unable to initialize QUIC sync server")?;
 
         info!(device_id = %device_id, "set up Aranya");
 
@@ -380,7 +418,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::AfcConfig;
+    use crate::config::{AfcConfig, QSConfig};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -397,6 +435,7 @@ mod tests {
             logs_dir: work_dir.join("logs"),
             config_dir: work_dir.join("config"),
             sync_addr: any,
+            quic_sync: Some(QSConfig {}),
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,

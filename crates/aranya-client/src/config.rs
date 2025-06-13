@@ -80,9 +80,47 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
+#[derive(Clone)]
+pub struct QuicSyncConfig {
+    seed: Box<[u8]>,
+}
+
+impl QuicSyncConfig {
+    pub fn builder() -> QuicSyncConfigBuilder {
+        QuicSyncConfigBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct QuicSyncConfigBuilder {
+    seed: Option<Box<[u8]>>,
+}
+
+impl QuicSyncConfigBuilder {
+    /// Sets the seed.
+    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
+    /// Builds the config.
+    pub fn build(self) -> Result<QuicSyncConfig> {
+        let Some(psk) = self.seed else {
+            return Err(ConfigError::InvalidArg(InvalidArg::new(
+                "seed",
+                "must call `QuicSyncConfigBuilder::seed`",
+            ))
+            .into());
+        };
+
+        Ok(QuicSyncConfig { seed: psk })
+    }
+}
+
+#[derive(Clone)]
 /// Configuration info for adding and creating teams.
 pub struct TeamConfig {
-    _priv: (),
+    quic_sync: Option<QuicSyncConfig>,
 }
 
 impl TeamConfig {
@@ -92,16 +130,27 @@ impl TeamConfig {
     }
 }
 
+impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
+    fn from(value: QuicSyncConfig) -> Self {
+        Self::builder()
+            .seed(value.seed)
+            .build()
+            .expect("All fields are set")
+    }
+}
+
 impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
-    fn from(_value: TeamConfig) -> Self {
-        Self {}
+    fn from(value: TeamConfig) -> Self {
+        Self {
+            quic_sync: value.quic_sync.map(Into::into),
+        }
     }
 }
 
 /// Builder for a [`TeamConfig`]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Default)]
 pub struct TeamConfigBuilder {
-    _priv: (),
+    quic_sync: Option<QuicSyncConfig>,
 }
 
 impl TeamConfigBuilder {
@@ -110,8 +159,17 @@ impl TeamConfigBuilder {
         Self::default()
     }
 
+    /// Configures the quic_sync config.
+    pub fn quic_sync(mut self, cfg: QuicSyncConfig) -> Self {
+        self.quic_sync = Some(cfg);
+
+        self
+    }
+
     /// Attempts to build a [`TeamConfig`] using the provided parameters.
     pub fn build(self) -> Result<TeamConfig> {
-        Ok(TeamConfig { _priv: () })
+        Ok(TeamConfig {
+            quic_sync: self.quic_sync,
+        })
     }
 }

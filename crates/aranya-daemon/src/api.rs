@@ -4,20 +4,25 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
-use std::{path::PathBuf, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use anyhow::{anyhow, Context as _, Result};
-use aranya_crypto::{Csprng, Rng};
+use aranya_crypto::{default::WrappedKey, Csprng, Engine, KeyStore, Rng};
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, CE, CS,
+    CreateTeamResponse, DaemonApi, QuicSyncSeed, QuicSyncSeedId, CE, CS,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::{task::scope, Addr};
 use futures_util::{StreamExt, TryStreamExt};
+pub(crate) use quic_sync::Data as QSData;
+use s2n_quic::provider::tls::rustls::rustls::crypto::{hash::HashAlgorithm, PresharedKey};
 use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
@@ -32,10 +37,14 @@ use crate::{
     actions::Actions,
     aqc::Aqc,
     daemon::KS,
+    keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::task::SyncPeers,
+    sync::task::{quic::Msg, SyncPeers},
+    util::SeedDir,
     Client, EF,
 };
+
+mod quic_sync;
 
 /// returns first effect matching a particular type.
 /// returns None if there are no matching effects.
@@ -79,6 +88,7 @@ impl DaemonApiServer {
         peers: SyncPeers,
         recv_effects: EffectReceiver,
         aqc: Aqc<CE, KS>,
+        quic: Option<quic_sync::Data>,
     ) -> Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
         let aqc = Arc::new(aqc);
@@ -92,6 +102,7 @@ impl DaemonApiServer {
             peers: Mutex::new(peers),
             effect_handler,
             aqc,
+            quic: Mutex::new(quic),
         }));
         Ok(Self {
             uds_path,
@@ -227,6 +238,7 @@ struct ApiInner {
     peers: Mutex<SyncPeers>,
     effect_handler: EffectHandler,
     aqc: Arc<Aqc<CE, KS>>,
+    quic: Mutex<Option<quic_sync::Data>>,
 }
 
 impl ApiInner {
@@ -332,12 +344,48 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::TeamConfig,
     ) -> api::Result<()> {
-        todo!()
+        if let Some(cfg) = cfg.quic_sync {
+            let mut guard = self.quic.lock().await;
+            let quic_data = guard.as_mut().context("quic syncing is not enabled")?;
+
+            let seed = QuicSyncSeed::<CS>::from_bytes(cfg.seed())?;
+            insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
+                .context("could not insert seed into keystore")?;
+
+            if let Err(e) = write_seed_id(&quic_data.seed_id_path, &team, &seed.id())
+                .await
+                .context("could not write seed id to file")
+            {
+                error!(%e);
+                remove_seed(&mut quic_data.store, seed.clone())
+                    .context("could not remove seed from keystore")?;
+                return Err(e.into());
+            };
+
+            let psk = seed.gen_psk()?;
+
+            let identity = psk.identity();
+            let secret = psk.raw_secret();
+            let psk = PresharedKey::external(identity, secret)
+                .context("unable to create PSK")?
+                .with_hash_alg(HashAlgorithm::SHA384)
+                .expect("Valid hash algorithm");
+
+            quic_data
+                .psk_send
+                .send(Msg::Insert((team, Arc::new(psk))))?;
+        }
+
+        // TODO: Implement for other syncer types
+        Ok(())
     }
 
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        todo!();
+        if let Some(ref data) = *self.quic.lock().await {
+            data.psk_send.send(Msg::Remove(team))?;
+        }
+        todo!("Should remove graph data from storage provider");
     }
 
     #[instrument(skip(self))]
@@ -345,7 +393,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         cfg: api::TeamConfig,
-    ) -> api::Result<api::TeamId> {
+    ) -> api::Result<CreateTeamResponse> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
@@ -356,7 +404,45 @@ impl DaemonApi for Api {
             .await
             .context("unable to create team")?;
         debug!(?graph_id);
-        Ok(graph_id.into_id().into())
+
+        let seed = match *self.quic.lock().await {
+            Some(ref mut quic_data) => {
+                let seed = QuicSyncSeed::<CS>::new(&mut Rng);
+                insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
+                    .context("could not insert seed into keystore")?;
+
+                let team_id = api::TeamId::from(*graph_id.as_array());
+                if let Err(e) = write_seed_id(&quic_data.seed_id_path, &team_id, &seed.id())
+                    .await
+                    .context("could not write seed id to file")
+                {
+                    error!(%e);
+                    remove_seed(&mut quic_data.store, seed.clone())
+                        .context("could not remove seed from keystore")?;
+                    return Err(e.into());
+                };
+
+                let psk = seed.gen_psk()?;
+                // Send PSK update to the key stores
+                {
+                    let psk_ref = Arc::new(
+                        PresharedKey::external(psk.identity(), psk.raw_secret())
+                            .context("unable to create PSK")?
+                            .with_hash_alg(HashAlgorithm::SHA384)
+                            .expect("Valid hash algorithm"),
+                    );
+                    quic_data.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
+                }
+
+                Some(Box::from(seed.as_bytes()))
+            }
+            None => None,
+        };
+
+        Ok(CreateTeamResponse {
+            team_id: graph_id.into_id().into(),
+            seed,
+        })
     }
 
     #[instrument(skip(self))]
@@ -856,6 +942,23 @@ impl DaemonApi for Api {
         }
         Ok(labels)
     }
+}
+
+fn insert_seed(eng: &mut CE, store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
+    store.try_insert(seed.key_id(), eng.wrap(seed)?)?;
+    Ok(())
+}
+
+fn remove_seed(store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
+    store.remove::<WrappedKey<CS>>(seed.key_id())?;
+    Ok(())
+}
+
+async fn write_seed_id(path: &Path, team_id: &api::TeamId, seed_id: &QuicSyncSeedId) -> Result<()> {
+    let dir = SeedDir::new(path).await?;
+    dir.append(team_id, seed_id).await?;
+
+    Ok(())
 }
 
 impl From<api::KeyBundle> for KeyBundle {

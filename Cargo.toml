@@ -59,8 +59,8 @@ aranya-keygen = { version = "0.6.1", path = "crates/aranya-keygen" }
 aranya-util = { version = "0.6.1", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
-bytes = { version = "1.0" }
 backon = { version = "1.2.0" }
+bytes = { version = "1.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 futures-lite = { version = "2.6.0" }

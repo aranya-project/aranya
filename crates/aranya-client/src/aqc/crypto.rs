@@ -8,7 +8,7 @@ use aranya_daemon_api::{AqcPsk, AqcPsks, CipherSuiteId};
 use s2n_quic::provider::tls::rustls::rustls::{
     self,
     client::PresharedKeyStore,
-    crypto::{hash::HashAlgorithm, CryptoProvider, PresharedKey},
+    crypto::{hash::HashAlgorithm, PresharedKey},
     server::SelectsPresharedKeys,
 };
 use tokio::sync::mpsc;
@@ -132,100 +132,4 @@ fn suite_hash(suite: CipherSuiteId) -> Option<HashAlgorithm> {
         CipherSuiteId::TlsAes128Ccm8Sha256 => HashAlgorithm::SHA256,
         _ => return None,
     })
-}
-
-// --- Start SkipServerVerification ---
-// INSECURE: Allows connecting to any server certificate.
-// Requires the `dangerous_configuration` feature on the `rustls` crate.
-// Use full paths for traits and types
-// TODO: remove this once we have a way to exclusively use PSKs.
-// Currently, we use this to allow the server to be set up to use PSKs
-// without having to rely on the server certificate.
-
-#[derive(Debug)]
-pub struct SkipServerVerification(&'static CryptoProvider);
-
-impl SkipServerVerification {
-    pub fn new() -> Arc<Self> {
-        let provider = CryptoProvider::get_default().expect("Default crypto provider not found");
-        Arc::new(Self(provider))
-    }
-}
-
-// Use full trait path
-impl rustls::client::danger::ServerCertVerifier for SkipServerVerification {
-    fn verify_server_cert(
-        &self,
-        _end_entity: &rustls::pki_types::CertificateDer<'_>,
-        _intermediates: &[rustls::pki_types::CertificateDer<'_>],
-        _server_name: &rustls::pki_types::ServerName<'_>,
-        _ocsp_response: &[u8],
-        _now: rustls::pki_types::UnixTime,
-    ) -> Result<rustls::client::danger::ServerCertVerified, rustls::Error> {
-        Ok(rustls::client::danger::ServerCertVerified::assertion())
-    }
-
-    fn verify_tls12_signature(
-        &self,
-        message: &[u8],
-        cert: &rustls::pki_types::CertificateDer<'_>,
-        dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-        // Use the selected provider's verification algorithms
-        rustls::crypto::verify_tls12_signature(
-            message,
-            cert,
-            dss,
-            &self.0.signature_verification_algorithms,
-        )
-    }
-
-    fn verify_tls13_signature(
-        &self,
-        message: &[u8],
-        cert: &rustls::pki_types::CertificateDer<'_>,
-        dss: &rustls::DigitallySignedStruct,
-    ) -> Result<rustls::client::danger::HandshakeSignatureValid, rustls::Error> {
-        // Use the selected provider's verification algorithms
-        rustls::crypto::verify_tls13_signature(
-            message,
-            cert,
-            dss,
-            &self.0.signature_verification_algorithms,
-        )
-    }
-
-    fn supported_verify_schemes(&self) -> Vec<rustls::SignatureScheme> {
-        self.0.signature_verification_algorithms.supported_schemes()
-    }
-}
-// --- End SkipServerVerification ---
-
-#[derive(Debug, Default)]
-pub struct NoCertResolver(Arc<NoSigningKey>);
-impl rustls::server::ResolvesServerCert for NoCertResolver {
-    fn resolve(
-        &self,
-        _client_hello: rustls::server::ClientHello<'_>,
-    ) -> Option<Arc<rustls::sign::CertifiedKey>> {
-        Some(Arc::new(rustls::sign::CertifiedKey::new(
-            vec![],
-            Arc::clone(&self.0) as _,
-        )))
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct NoSigningKey;
-impl rustls::sign::SigningKey for NoSigningKey {
-    fn choose_scheme(
-        &self,
-        _offered: &[rustls::SignatureScheme],
-    ) -> Option<Box<dyn rustls::sign::Signer>> {
-        None
-    }
-
-    fn algorithm(&self) -> rustls::SignatureAlgorithm {
-        rustls::SignatureAlgorithm::ECDSA
-    }
 }

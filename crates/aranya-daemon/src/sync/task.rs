@@ -19,10 +19,13 @@ use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, instrument, trace};
 
+use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
     vm_policy::VecSink,
 };
+
+pub mod quic;
 
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
@@ -152,7 +155,7 @@ pub struct Syncer<ST> {
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
     /// Additional state used by the syncer
-    _state: ST,
+    state: ST,
 }
 
 struct PeerInfo {
@@ -171,14 +174,14 @@ pub trait SyncState: Sized {
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> impl Future<Output = Result<()>> + Send
+    ) -> impl Future<Output = SyncResult<()>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
 }
 
 impl<ST> Syncer<ST> {
     /// Creates a new `Syncer`.
-    pub fn new(client: Client, send_effects: EffectSender, _state: ST) -> (Self, SyncPeers) {
+    pub fn new(client: Client, send_effects: EffectSender, state: ST) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -188,7 +191,7 @@ impl<ST> Syncer<ST> {
                 recv,
                 queue: DelayQueue::new(),
                 send_effects,
-                _state,
+                state,
             },
             peers,
         )
@@ -220,7 +223,7 @@ impl<ST> Syncer<ST> {
 
 impl<ST: SyncState> Syncer<ST> {
     /// Syncs with the next peer in the list.
-    pub(crate) async fn next(&mut self) -> Result<()> {
+    pub(crate) async fn next(&mut self) -> SyncResult<()> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
@@ -249,7 +252,7 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
-    pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
+    pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> SyncResult<()> {
         trace!("syncing with peer");
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
@@ -257,7 +260,7 @@ impl<ST: SyncState> Syncer<ST> {
                 .await
                 .context("sync_peer error")
                 .inspect_err(|err| error!("{err:?}"))?;
-            sink.collect()?
+            sink.collect().context("could not collect effcects")?
         };
         let n = effects.len();
         self.send_effects

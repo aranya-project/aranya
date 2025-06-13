@@ -42,6 +42,7 @@ mod api;
 mod aqc;
 mod daemon;
 mod keystore;
+mod util;
 
 pub use daemon::*;
 pub use keystore::AranyaStore;

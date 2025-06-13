@@ -223,9 +223,95 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct QuicSyncConfig {
+    seed: Box<[u8]>,
+}
+
+impl QuicSyncConfig {
+    pub fn builder() -> QuicSyncConfigBuilder {
+        QuicSyncConfigBuilder::default()
+    }
+}
+
+impl Typed for QuicSyncConfig {
+    const TYPE_ID: TypeId = TypeId::new(0xADF0F970);
+}
+
+impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
+    fn from(value: QuicSyncConfig) -> Self {
+        Self::builder()
+            .seed(value.seed)
+            .build()
+            .expect("All fields are set")
+    }
+}
+
+#[derive(Default)]
+pub struct QuicSyncConfigBuilder {
+    seed: Option<Box<[u8]>>,
+}
+
+impl QuicSyncConfigBuilder {
+    /// Sets the seed.
+    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
+        self.seed = Some(seed);
+        self
+    }
+
+    /// Builds the config.
+    pub fn build(self) -> Result<QuicSyncConfig, Error> {
+        let Some(seed) = self.seed else {
+            return Err(InvalidArg::new("seed", "`seed` field not set").into());
+        };
+
+        Ok(QuicSyncConfig { seed })
+    }
+}
+
+impl Typed for QuicSyncConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0xEEC2FA47);
+}
+
+impl Builder for QuicSyncConfigBuilder {
+    type Output = defs::QuicSyncConfig;
+    type Error = Error;
+
+    /// # Safety
+    ///
+    /// No special considerations.
+    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
+        let Some(seed) = self.seed else {
+            return Err(InvalidArg::new("seed", "`seed` field not set").into());
+        };
+
+        Self::Output::init(out, QuicSyncConfig { seed });
+        Ok(())
+    }
+}
+
 /// Configuration info when creating or adding a team in Aranya
 #[derive(Clone, Debug)]
-pub struct TeamConfig {}
+pub struct TeamConfig {
+    quic_sync: Option<QuicSyncConfig>,
+}
+
+impl From<TeamConfig> for aranya_client::TeamConfig {
+    fn from(value: TeamConfig) -> Self {
+        let mut builder = Self::builder();
+        if let Some(cfg) = value.quic_sync {
+            builder = builder.quic_sync(cfg.into());
+        }
+
+        builder.build().expect("All fields set")
+    }
+}
+
+impl From<&TeamConfig> for aranya_client::TeamConfig {
+    fn from(value: &TeamConfig) -> Self {
+        Self::from(value.to_owned())
+    }
+}
 
 impl Typed for TeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
@@ -233,7 +319,9 @@ impl Typed for TeamConfig {
 
 /// Builder for a [`TeamConfig`]
 #[derive(Clone, Debug, Default)]
-pub struct TeamConfigBuilder {}
+pub struct TeamConfigBuilder {
+    quic_sync: Option<QuicSyncConfig>,
+}
 
 impl Typed for TeamConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0x112905E7);
@@ -247,7 +335,12 @@ impl Builder for TeamConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Self::Output::init(out, TeamConfig {});
+        Self::Output::init(
+            out,
+            TeamConfig {
+                quic_sync: self.quic_sync,
+            },
+        );
         Ok(())
     }
 }
