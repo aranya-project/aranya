@@ -23,7 +23,7 @@ mod util;
 pub use crate::{
     client::{
         ChanOp, Client, DeviceId, InvalidNetIdentifier, KeyBundle, Label, LabelId, NetIdentifier,
-        Op, RoleId, Team, TeamId,
+        Op, Role, RoleId, Team, TeamId,
     },
     config::{SyncPeerConfig, SyncPeerConfigBuilder, TeamConfig, TeamConfigBuilder},
     error::{ConfigError, Error, Result},

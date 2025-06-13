@@ -191,7 +191,7 @@ where
         .in_current_span()
     }
 
-    /// Remove a Member instance from the team.
+    /// Remove a device from the team.
     #[instrument(skip(self), fields(device_id = %device_id))]
     fn remove_device(
         &self,
@@ -199,6 +199,16 @@ where
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
             actor.remove_device(device_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Sets up the default team roles.
+    #[instrument(skip(self))]
+    fn setup_default_roles(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.setup_default_roles()?;
             Ok(())
         })
         .in_current_span()

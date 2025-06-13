@@ -161,6 +161,13 @@ impl NetIdentifier<'_> {
     }
 }
 
+impl AsRef<str> for NetIdentifier<'_> {
+    #[inline]
+    fn as_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
 impl<'a> TryFrom<&'a str> for NetIdentifier<'a> {
     type Error = InvalidNetIdentifier;
 
@@ -554,6 +561,16 @@ impl Team<'_> {
         self.client
             .daemon
             .remove_device_from_team(context::current(), self.id, device.into_api())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Sets up the default team roles.
+    pub async fn setup_default_roles(&mut self) -> Result<()> {
+        self.client
+            .daemon
+            .setup_default_roles(context::current(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

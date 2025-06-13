@@ -2,15 +2,26 @@
 
 use std::net::SocketAddr;
 
-use aranya_daemon_api::{LabelId, NetIdentifier, TeamId};
 use tarpc::context;
 use tracing::{debug, instrument};
 
 use super::{AqcBidiChannel, AqcPeerChannel, AqcSendChannel, TryReceiveError};
 use crate::{
+    client::{InvalidNetIdentifier, LabelId, NetIdentifier, TeamId},
     error::{aranya_error, no_addr, AqcError, IpcError},
+    util::custom_id,
     Client,
 };
+
+custom_id! {
+    /// Uniquely identifies a bidirectional AQC channel.
+    pub struct AqcBidiChannelId;
+}
+
+custom_id! {
+    /// Uniquely identifies a unidirectional AQC channel.
+    pub struct AqcUniChannelId;
+}
 
 /// Aranya QUIC Channels client for managing channels which allow sending and
 /// receiving data with peers.
@@ -44,25 +55,35 @@ impl<'a> AqcChannels<'a> {
     /// # Cancellation Safety
     ///
     /// This method is NOT cancellation safe. Cancelling the resulting future might lose data.
-    #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
-    pub async fn create_bidi_channel(
+    #[instrument(skip_all, fields(%team_id, %label_id))]
+    pub async fn create_bidi_channel<'i, I>(
         &mut self,
         team_id: TeamId,
-        peer: NetIdentifier,
+        peer: I,
         label_id: LabelId,
-    ) -> crate::Result<AqcBidiChannel> {
+    ) -> crate::Result<AqcBidiChannel>
+    where
+        I: TryInto<NetIdentifier<'i>, Error = InvalidNetIdentifier>,
+    {
         debug!("creating bidi channel");
+
+        let peer: NetIdentifier<'i> = peer.try_into()?;
 
         let (aqc_ctrl, psks) = self
             .client
             .daemon
-            .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), label_id)
+            .create_aqc_bidi_channel(
+                context::current(),
+                team_id.into_api(),
+                peer.clone().into_api(),
+                label_id.into_api(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0)
+        let peer_addr = tokio::net::lookup_host(peer.as_ref())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
@@ -70,12 +91,12 @@ impl<'a> AqcChannels<'a> {
 
         self.client
             .aqc
-            .send_ctrl(peer_addr, aqc_ctrl, team_id)
+            .send_ctrl(peer_addr, aqc_ctrl, team_id.into_api())
             .await?;
         let channel = self
             .client
             .aqc
-            .create_bidi_channel(peer_addr, label_id, psks)
+            .create_bidi_channel(peer_addr, label_id.into_api(), psks)
             .await?;
         Ok(channel)
     }
@@ -88,25 +109,35 @@ impl<'a> AqcChannels<'a> {
     /// # Cancellation Safety
     ///
     /// This method is NOT cancellation safe. Cancelling the resulting future might lose data.
-    #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
-    pub async fn create_uni_channel(
+    #[instrument(skip_all, fields(%team_id, %label_id))]
+    pub async fn create_uni_channel<'i, I>(
         &mut self,
         team_id: TeamId,
-        peer: NetIdentifier,
+        peer: I,
         label_id: LabelId,
-    ) -> crate::Result<AqcSendChannel> {
+    ) -> crate::Result<AqcSendChannel>
+    where
+        I: TryInto<NetIdentifier<'i>, Error = InvalidNetIdentifier>,
+    {
         debug!("creating aqc uni channel");
+
+        let peer: NetIdentifier<'i> = peer.try_into()?;
 
         let (aqc_ctrl, psks) = self
             .client
             .daemon
-            .create_aqc_uni_channel(context::current(), team_id, peer.clone(), label_id)
+            .create_aqc_uni_channel(
+                context::current(),
+                team_id.into_api(),
+                peer.clone().into_api(),
+                label_id.into_api(),
+            )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created uni channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0)
+        let peer_addr = tokio::net::lookup_host(peer.as_ref())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
@@ -114,13 +145,13 @@ impl<'a> AqcChannels<'a> {
 
         self.client
             .aqc
-            .send_ctrl(peer_addr, aqc_ctrl, team_id)
+            .send_ctrl(peer_addr, aqc_ctrl, team_id.into_api())
             .await?;
 
         let channel = self
             .client
             .aqc
-            .create_uni_channel(peer_addr, label_id, psks)
+            .create_uni_channel(peer_addr, label_id.into_api(), psks)
             .await?;
         Ok(channel)
     }

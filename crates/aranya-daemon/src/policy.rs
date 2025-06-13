@@ -265,7 +265,7 @@ pub struct QueryAqcNetIdentifierResult {
 #[actions]
 pub trait ActorExt {
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
-    fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_device_roles(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn update_operation(&mut self, op: String, role_id: Id) -> Result<(), ClientError>;
     fn setup_default_roles(&mut self) -> Result<(), ClientError>;

@@ -427,6 +427,16 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self))]
+    async fn setup_default_roles(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        self.client
+            .actions(&team.into_id().into())
+            .setup_default_roles()
+            .await
+            .context("unable to setup default roles")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
     async fn assign_role(
         self,
         _: context::Context,
@@ -746,6 +756,7 @@ impl DaemonApi for Api {
         }
         return Ok(devices);
     }
+
     /// Query device role.
     #[instrument(skip(self))]
     async fn query_device_roles(
@@ -760,14 +771,19 @@ impl DaemonApi for Api {
             .query_device_role_off_graph(device.into_id().into())
             .await
             .context("unable to query device role")?;
-        if let Some(Effect::QueryDeviceRolesResult(_)) =
-            find_effect!(&effects, Effect::QueryDeviceRolesResult(_e))
-        {
-            Ok(todo!())
-        } else {
-            Err(anyhow!("unable to query device role").into())
+        let mut roles: Vec<api::Role> = Vec::new();
+        for e in effects {
+            if let Effect::QueryDeviceRolesResult(e) = e {
+                roles.push(api::Role {
+                    id: e.role_id.into(),
+                    name: e.name,
+                    author_id: e.author_id.into(),
+                });
+            }
         }
+        Ok(roles.into_boxed_slice())
     }
+
     /// Query device keybundle.
     #[instrument(skip(self))]
     async fn query_device_keybundle(

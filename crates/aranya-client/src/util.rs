@@ -14,6 +14,7 @@ macro_rules! custom_id {
         pub struct $name(aranya_daemon_api::$api);
 
         impl $name {
+            #[allow(dead_code, reason = "Depends on the type.")]
             pub(crate) fn into_api(self) -> aranya_daemon_api::$api {
                 self.0.into_id().into()
             }

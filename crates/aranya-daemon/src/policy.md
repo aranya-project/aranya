@@ -265,22 +265,31 @@ command QueryDevicesOnTeam {
 
 #### Query Device Roles
 
-Queries a device's roles.
+Queries the roles assigned to a device.
 
 ```policy
-action query_device_role(device_id id) {
-    // TODO
+action query_device_roles(device_id id) {
+    map AssignedRole[device_id: id, role_id: ?] as f {
+        publish QueryDeviceRoles {
+            device_id: f.device_id,
+            role_id: f.role_id,
+        }
+    }
 }
 
 effect QueryDeviceRolesResult {
+    // The role's ID.
     role_id id,
+    // The role's name.
     name string,
+    // The ID of the device that created the role.
     author_id id,
 }
 
 command QueryDeviceRoles {
     fields {
         device_id id,
+        role_id id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -290,9 +299,14 @@ command QueryDeviceRoles {
         check team_exists()
 
         let author = must_find_device(this.device_id)
+        let role = check_unwrap query Role[role_id: this.role_id]
 
         finish {
-            // TODO
+            emit QueryDeviceRolesResult {
+                role_id: role.role_id,
+                name: role.name,
+                author_id: author.device_id,
+            }
         }
     }
 }

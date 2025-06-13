@@ -712,6 +712,8 @@ pub trait DaemonApi {
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
 
+    /// Configures the team with default roles from policy.
+    async fn setup_default_roles(team: TeamId) -> Result<()>;
     /// Assign a role to a device.
     async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
