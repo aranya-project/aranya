@@ -14,6 +14,7 @@
 
 pub mod addr;
 pub mod rustls;
+pub mod task;
 pub mod util;
 
 pub use addr::*;

@@ -14,6 +14,7 @@ use aranya_runtime::{
 };
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
+use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{
@@ -25,7 +26,7 @@ use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
     actions::Actions,
-    api::{ApiKey, DaemonApiServer, PublicApiKey, QSData},
+    api::{ApiKey, DaemonApiServer, QSData},
     aqc::Aqc,
     aranya,
     config::Config,
@@ -56,145 +57,184 @@ pub(crate) type EF = policy::Effect;
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
 
+/// Handle for the spawned daemon.
+///
+/// Dropping this will abort the daemon's tasks.
+#[clippy::has_significant_drop]
+pub struct DaemonHandle {
+    set: JoinSet<()>,
+}
+
+impl DaemonHandle {
+    /// Wait for the daemon to finish.
+    ///
+    /// Panics if any of the daemon's tasks panic.
+    pub async fn join(mut self) -> Result<(), Bug> {
+        match self.set.join_next().await.assume("set not empty")? {
+            Ok(()) => {}
+            Err(err) if err.is_panic() => std::panic::resume_unwind(err.into_panic()),
+            Err(err) => {
+                error!(%err, "tasks cancelled");
+                bug!("tasks cancelled");
+            }
+        }
+        self.set.abort_all();
+        Ok(())
+    }
+}
+
 /// The daemon itself.
 pub struct Daemon {
-    cfg: Config,
+    sync_server: SyncServer,
+    syncer: Syncer<QuicSyncState>,
+    api: DaemonApiServer,
+    span: tracing::Span,
 }
 
 impl Daemon {
     /// Loads a `Daemon` using its config.
     pub async fn load(cfg: Config) -> Result<Self> {
-        Ok(Self { cfg })
+        let name = (!cfg.name.is_empty()).then_some(cfg.name.as_str());
+        let span = info_span!("daemon", name);
+        let span_id = span.id();
+
+        async move {
+            Self::setup_env(&cfg).await?;
+            let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
+            let mut eng = Self::load_crypto_engine(&cfg).await?;
+            let pks = Self::load_or_gen_public_keys(&cfg, &mut eng, &mut aranya_store).await?;
+
+            let mut local_store = Self::load_local_keystore(&cfg).await?;
+
+            // Generate a fresh API key at startup.
+            let api_sk = ApiKey::generate(&mut eng);
+            aranya_util::write_file(cfg.api_pk_path(), &api_sk.public()?.encode()?)
+                .await
+                .context("unable to write API public key")?;
+            info!(path = %cfg.api_pk_path().display(), "wrote API public key");
+
+            let (psk_send, psk_recv) = tokio::sync::broadcast::channel(16);
+
+            let initial_keys = load_team_psk_pairs(
+                &mut eng,
+                &mut local_store,
+                &SeedDir::new(&cfg.seed_id_path()).await?,
+            )
+            .await?;
+
+            // Initialize Aranya client.
+            let (client, sync_server) = Self::setup_aranya(
+                &cfg,
+                eng.clone(),
+                aranya_store
+                    .try_clone()
+                    .context("unable to clone keystore")?,
+                &pks,
+                cfg.sync_addr,
+                psk_send.subscribe(),
+                initial_keys.clone(),
+            )
+            .await?;
+            let local_addr = sync_server.local_addr()?;
+
+            // Sync in the background at some specified interval.
+            let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
+
+            let state = QuicSyncState::new(initial_keys, psk_recv)?;
+            let (syncer, peers) = Syncer::new(client.clone(), send_effects, state);
+
+            let graph_ids = client
+                .aranya
+                .lock()
+                .await
+                .provider()
+                .list_graph_ids()?
+                .flatten()
+                .collect::<Vec<_>>();
+
+            let aqc = {
+                let peers = {
+                    let mut peers = BTreeMap::new();
+                    for graph_id in &graph_ids {
+                        let graph_peers = BiBTreeMap::from_iter(
+                            client
+                                .actions(graph_id)
+                                .query_aqc_network_names_off_graph()
+                                .await?,
+                        );
+                        peers.insert(*graph_id, graph_peers);
+                    }
+                    peers
+                };
+                Aqc::new(eng.clone(), pks.ident_pk.id()?, aranya_store, peers)
+            };
+
+            // TODO: Fix this when other syncer types are supported
+            let Some(_qs_config) = &cfg.quic_sync else {
+                anyhow::bail!("Supply a valid QUIC sync config")
+            };
+
+            let data = QSData {
+                psk_send,
+                store: local_store,
+                engine: eng,
+                seed_id_path: cfg.seed_id_path(),
+            };
+
+            let api = DaemonApiServer::new(
+                client,
+                local_addr,
+                cfg.uds_api_sock(),
+                api_sk,
+                pks,
+                peers,
+                recv_effects,
+                aqc,
+                Some(data),
+            )?;
+            Ok(Self {
+                sync_server,
+                syncer,
+                api,
+                span,
+            })
+        }
+        .instrument(info_span!(parent: span_id, "load"))
+        .await
     }
 
     /// The daemon's entrypoint.
-    pub async fn run(self) -> Result<()> {
-        // Setup environment for daemon's working directory.
-        // E.g. creating subdirectories.
-        self.setup_env().await?;
-
+    pub fn spawn(mut self) -> DaemonHandle {
+        let _guard = self.span.enter();
         let mut set = JoinSet::new();
-
-        let mut aranya_store = self.load_aranya_keystore().await?;
-        let mut eng = self.load_crypto_engine().await?;
-        let pks = self
-            .load_or_gen_public_keys(&mut eng, &mut aranya_store)
-            .await?;
-
-        let mut local_store = self.load_local_keystore().await?;
-
-        // Generate a fresh API key at startup.
-        let api_sk = ApiKey::generate(&mut eng);
-
-        let (psk_send, psk_recv) = tokio::sync::broadcast::channel(16);
-
-        let initial_keys = load_team_psk_pairs(
-            &mut eng,
-            &mut local_store,
-            &SeedDir::new(&self.cfg.seed_id_path()).await?,
-        )
-        .await?;
-
-        // Initialize the Aranya client and sync server.
-        let (client, local_addr) = {
-            let (client, server) = self
-                .setup_aranya(
-                    eng.clone(),
-                    aranya_store
-                        .try_clone()
-                        .context("unable to clone keystore")?,
-                    &pks,
-                    self.cfg.sync_addr,
-                    psk_send.subscribe(),
-                    initial_keys.clone(),
-                )
-                .await?;
-            let local_addr = server.local_addr()?;
-            set.spawn(async move { server.serve().await });
-
-            (client, local_addr)
-        };
-
-        // Sync in the background at some specified interval.
-        let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-
-        let state = QuicSyncState::new(initial_keys, psk_recv)?;
-        let (mut syncer, peers) = Syncer::new(client.clone(), send_effects, state);
-        set.spawn(async move {
-            loop {
-                if let Err(err) = syncer.next().await {
-                    error!(err = ?err, "client unable to sync with peer");
+        set.spawn(
+            self.sync_server
+                .serve()
+                .instrument(info_span!("sync-server")),
+        );
+        set.spawn(
+            async move {
+                loop {
+                    if let Err(err) = self.syncer.next().await {
+                        error!(?err, "unable to sync with peer");
+                    }
                 }
             }
-        });
-
-        let graph_ids = client
-            .aranya
-            .lock()
-            .await
-            .provider()
-            .list_graph_ids()?
-            .flatten()
-            .collect::<Vec<_>>();
-
-        let aqc = {
-            let peers = {
-                let mut peers = BTreeMap::new();
-                for graph_id in &graph_ids {
-                    let graph_peers = BiBTreeMap::from_iter(
-                        client
-                            .actions(graph_id)
-                            .query_aqc_network_names_off_graph()
-                            .await?,
-                    );
-                    peers.insert(*graph_id, graph_peers);
-                }
-                peers
-            };
-            Aqc::new(eng.clone(), pks.ident_pk.id()?, aranya_store, peers)
-        };
-
-        // TODO: Fix this when other syncer types are supported
-        let Some(_qs_config) = &self.cfg.quic_sync else {
-            anyhow::bail!("Supply a valid QUIC sync config")
-        };
-
-        let uds_sock = self.cfg.uds_api_sock().clone();
-        let pk_path = self.cfg.api_pk_path();
-        let seed_id_path = self.cfg.seed_id_path();
-
-        let data = QSData {
-            psk_send,
-            store: local_store,
-            engine: eng,
-            seed_id_path,
-        };
-        let api = DaemonApiServer::new(
-            client,
-            local_addr,
-            uds_sock,
-            pk_path,
-            api_sk,
-            pks,
-            peers,
-            recv_effects,
-            aqc,
-            Some(data),
-        )?;
-        api.serve().await?;
-
-        Ok(())
+            .instrument(info_span!("syncer")),
+        );
+        set.spawn(self.api.serve().instrument(info_span!("api-server")));
+        DaemonHandle { set }
     }
 
     /// Initializes the environment (creates directories, etc.).
-    async fn setup_env(&self) -> Result<()> {
+    async fn setup_env(cfg: &Config) -> Result<()> {
         // These directories need to already exist.
         for dir in &[
-            &self.cfg.runtime_dir,
-            &self.cfg.state_dir,
-            &self.cfg.cache_dir,
-            &self.cfg.logs_dir,
-            &self.cfg.config_dir,
+            &cfg.runtime_dir,
+            &cfg.state_dir,
+            &cfg.cache_dir,
+            &cfg.logs_dir,
+            &cfg.config_dir,
         ] {
             if !dir.try_exists()? {
                 return Err(anyhow::anyhow!(
@@ -206,8 +246,8 @@ impl Daemon {
 
         // These directories aren't created for us.
         for (name, path) in [
-            ("keystore", self.cfg.keystore_path()),
-            ("storage", self.cfg.storage_path()),
+            ("keystore", cfg.keystore_path()),
+            ("storage", cfg.storage_path()),
         ] {
             aranya_util::create_dir_all(&path)
                 .await
@@ -215,13 +255,22 @@ impl Daemon {
         }
         info!("created directories");
 
+        // Remove unix socket so we can re-bind after e.g. the process is killed.
+        // (We could remove it at exit but can't guarantee that will happen.)
+        let uds_api_sock = cfg.uds_api_sock();
+        if let Err(err) = fs::remove_file(&uds_api_sock).await {
+            if err.kind() != io::ErrorKind::NotFound {
+                return Err(err).context(format!("unable to remove api socket {uds_api_sock:?}"));
+            }
+        }
+
         info!("set up environment");
         Ok(())
     }
 
     /// Creates the Aranya client and sync server.
     async fn setup_aranya(
-        &self,
+        cfg: &Config,
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
@@ -234,15 +283,14 @@ impl Daemon {
         let aranya = Arc::new(Mutex::new(ClientState::new(
             EN::new(TEST_POLICY_1, eng, store, device_id)?,
             SP::new(
-                FileManager::new(self.cfg.storage_path())
-                    .context("unable to create `FileManager`")?,
+                FileManager::new(cfg.storage_path()).context("unable to create `FileManager`")?,
             ),
         )));
 
         let client = Client::new(Arc::clone(&aranya));
 
         // TODO: Fix this when other syncer types are supported
-        let Some(_qs_config) = &self.cfg.quic_sync else {
+        let Some(_qs_config) = &cfg.quic_sync else {
             anyhow::bail!("Supply a valid QUIC sync config")
         };
 
@@ -257,16 +305,16 @@ impl Daemon {
     }
 
     /// Loads the crypto engine.
-    async fn load_crypto_engine(&self) -> Result<CE> {
-        let key = load_or_gen_key(self.cfg.key_wrap_key_path()).await?;
+    async fn load_crypto_engine(cfg: &Config) -> Result<CE> {
+        let key = load_or_gen_key(cfg.key_wrap_key_path()).await?;
         Ok(CE::new(&key, Rng))
     }
 
     /// Loads the Aranya keystore.
     ///
     /// The Aranaya keystore contains Aranya's key material.
-    async fn load_aranya_keystore(&self) -> Result<AranyaStore<KS>> {
-        let dir = self.cfg.aranya_keystore_path();
+    async fn load_aranya_keystore(cfg: &Config) -> Result<AranyaStore<KS>> {
+        let dir = cfg.aranya_keystore_path();
         aranya_util::create_dir_all(&dir).await?;
         KS::open(&dir)
             .context("unable to open Aranya keystore")
@@ -277,8 +325,8 @@ impl Daemon {
     ///
     /// The local keystore contains key material for the daemon.
     /// E.g., its API key.
-    async fn load_local_keystore(&self) -> Result<LocalStore<KS>> {
-        let dir = self.cfg.local_keystore_path();
+    async fn load_local_keystore(cfg: &Config) -> Result<LocalStore<KS>> {
+        let dir = cfg.local_keystore_path();
         aranya_util::create_dir_all(&dir).await?;
         KS::open(&dir)
             .context("unable to open local keystore")
@@ -287,7 +335,7 @@ impl Daemon {
 
     /// Loads the daemon's [`PublicKeys`].
     async fn load_or_gen_public_keys<E, S>(
-        &self,
+        cfg: &Config,
         eng: &mut E,
         store: &mut AranyaStore<S>,
     ) -> Result<PublicKeys<E::CS>>
@@ -295,7 +343,7 @@ impl Daemon {
         E: Engine,
         S: KeyStore,
     {
-        let path = self.cfg.key_bundle_path();
+        let path = cfg.key_bundle_path();
         let bundle = match try_read_cbor(&path).await? {
             Some(bundle) => bundle,
             None => {
@@ -309,25 +357,6 @@ impl Daemon {
             }
         };
         bundle.public_keys(eng, store)
-    }
-
-    /// Loads the daemmon's public API key.
-    ///
-    /// For testing purposes only.
-    pub async fn load_api_pk(path: &Path) -> Result<Vec<u8>> {
-        let pk = try_read_cbor::<PublicApiKey<CS>>(&path)
-            .await?
-            .context("`PublicApiKey` not found")?;
-        pk.encode()
-    }
-}
-
-impl Drop for Daemon {
-    fn drop(&mut self) {
-        use std::fs;
-
-        let _ = fs::remove_file(self.cfg.api_pk_path());
-        let _ = fs::remove_file(self.cfg.uds_api_sock());
     }
 }
 
@@ -349,7 +378,7 @@ async fn write_cbor(path: impl AsRef<Path>, data: impl Serialize) -> Result<()> 
 
 /// Loads a key from a file or generates and writes a new one.
 async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
-    pub async fn load_or_gen_key_inner<K: SecretKey>(path: &Path) -> Result<K> {
+    async fn load_or_gen_key_inner<K: SecretKey>(path: &Path) -> Result<K> {
         match fs::read(&path).await {
             Ok(buf) => {
                 tracing::info!("loading key");
@@ -432,7 +461,7 @@ mod tests {
             .await
             .expect("should be able to load `Daemon`");
 
-        time::timeout(Duration::from_secs(1), daemon.run())
+        time::timeout(Duration::from_secs(1), daemon.spawn().join())
             .await
             .expect_err("`Timeout` should return Elapsed");
     }
