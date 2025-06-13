@@ -242,7 +242,7 @@ impl Client {
             .map_err(aranya_error)
     }
 
-    /// Remove a team from the local device store.
+    /// Remove a team from local device storage.
     pub async fn remove_team(&mut self, team: TeamId) -> Result<()> {
         self.daemon
             .remove_team(context::current(), team)
