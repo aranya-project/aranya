@@ -496,7 +496,9 @@ pub fn init_logging() -> Result<(), imp::Error> {
 /// @param dst the output buffer
 /// @param src the input hexadecimal string
 pub fn decode_hex(dst: &mut [u8], src: &[u8]) -> Result<usize, imp::Error> {
-    hex::ct_decode(dst, src).map_err(|err| match err {
+    hex::ct_decode(dst, src).map_err(|err| 
+    // TODO: hex::Error no longer defined
+    match err {
         hex::Error::InvalidLength => imp::Error::BufferTooSmall,
         hex::Error::InvalidEncoding => {
             imp::Error::InvalidArg(InvalidArg::new("src", "not a valid hexadecimal string"))
