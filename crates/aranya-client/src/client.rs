@@ -139,9 +139,9 @@ impl Client {
     }
 
     /// Creates a client connection to the daemon.
-    #[instrument(skip_all, fields(?uds_path))]
+    #[instrument(skip_all)]
     async fn connect(uds_path: &Path, aqc_addr: &Addr) -> Result<Self> {
-        info!("connecting to daemon");
+        info!(path = ?uds_path, "connecting to daemon");
 
         let daemon = {
             let pk = {
@@ -161,7 +161,6 @@ impl Client {
                 .context("unable to connect to UDS path")
                 .map_err(IpcError::new)?;
             let info = uds_path.as_os_str().as_encoded_bytes();
-            debug!(?info, "info");
             let codec = LengthDelimitedCodec::builder()
                 .max_frame_length(usize::MAX)
                 .new_codec();

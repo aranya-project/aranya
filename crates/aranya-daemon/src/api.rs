@@ -103,7 +103,7 @@ impl DaemonApiServer {
     }
 
     /// Runs the server.
-    #[instrument(skip_all, fields(uds_path = %self.uds_path.display()))]
+    #[instrument(skip_all)]
     #[allow(clippy::disallowed_macros)]
     pub async fn serve(mut self) -> Result<()> {
         let aqc = Arc::new(self.aqc);
@@ -141,7 +141,7 @@ impl DaemonApiServer {
         let server = {
             let listener = UnixListener::bind(&self.uds_path)?;
             info!(
-                addr = ?listener
+                path = ?listener
                     .local_addr()
                     .assume("should be able to retrieve local addr")?
                     .as_pathname()
@@ -150,7 +150,6 @@ impl DaemonApiServer {
             );
 
             let info = self.uds_path.as_os_str().as_encoded_bytes();
-            debug!(?info, "info");
             let codec = LengthDelimitedCodec::builder()
                 .max_frame_length(usize::MAX)
                 .new_codec();
