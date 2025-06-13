@@ -13,7 +13,7 @@ use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{
     AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
 };
-use aranya_util::tls::{NoCertResolver, SkipServerVerification};
+use aranya_util::rustls::{NoCertResolver, SkipServerVerification};
 use buggy::{Bug, BugExt as _};
 use bytes::{Bytes, BytesMut};
 use channels::AqcPeerChannel;

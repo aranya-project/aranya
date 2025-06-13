@@ -170,7 +170,7 @@ impl Config {
         self.state_dir.join("storage")
     }
 
-    /// Path to the seed ID file.
+    /// Path to file containing the seed IDs.
     pub(crate) fn seed_id_path(&self) -> PathBuf {
         self.state_dir.join("seeds")
     }
