@@ -12,12 +12,13 @@ use core::{
 use std::sync::Arc;
 
 use aranya_crypto::{
-    aead::{Aead, Tag},
-    csprng::Csprng,
-    hpke::{Hpke, HpkeError, Mode, OpenCtx, SealCtx, Seq},
-    import::Import,
-    kem::Kem,
-    CipherSuite,
+    dangerous::spideroak_crypto::{
+        aead::{Aead, Tag},
+        hpke::{Hpke, HpkeError, Mode, OpenCtx, SealCtx, Seq},
+        import::Import,
+        kem::Kem,
+    },
+    CipherSuite, Csprng,
 };
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
