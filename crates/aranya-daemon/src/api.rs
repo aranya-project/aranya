@@ -137,7 +137,7 @@ impl DaemonApiServer {
                 let listener = txp::unix::UnixListenerStream::from(self.listener);
                 txp::server(listener, codec, self.sk, info)
             };
-            info!(addr = ?self.uds_path, "listening");
+            info!(path = ?self.uds_path, "listening");
 
             let mut incoming = server
                 .inspect_err(|err| warn!(?err, "accept error"))
