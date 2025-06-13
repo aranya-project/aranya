@@ -12,7 +12,7 @@ use aranya_daemon::{
     config::{Config, QSConfig},
     Daemon,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
+use aranya_daemon_api::{CreateTeamResponse, DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use tokio::{
@@ -219,16 +219,16 @@ impl TeamCtx {
     pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId and PSK.
         let cfg = TeamConfig::builder().build()?;
-        let response = {
+        let CreateTeamResponse { team_id, seed } = {
             self.owner
                 .client
                 .create_team(cfg.clone())
                 .await
                 .expect("expected to create team")
         };
-        info!(?response.team_id);
+        info!(?team_id);
 
-        let cfg = match response.seed {
+        let cfg = match seed {
             Some(seed) => {
                 let qs_cfg = QuicSyncConfig::builder().seed(seed).build()?;
                 TeamConfig::builder().quic_sync(qs_cfg).build()?
@@ -238,26 +238,22 @@ impl TeamCtx {
 
         self.admin
             .client
-            .team(response.team_id)
+            .team(team_id)
             .add_team(cfg.clone())
             .await?;
         self.operator
             .client
-            .team(response.team_id)
+            .team(team_id)
             .add_team(cfg.clone())
             .await?;
         self.membera
             .client
-            .team(response.team_id)
+            .team(team_id)
             .add_team(cfg.clone())
             .await?;
-        self.memberb
-            .client
-            .team(response.team_id)
-            .add_team(cfg)
-            .await?;
+        self.memberb.client.team(team_id).add_team(cfg).await?;
 
-        Ok(response.team_id)
+        Ok(team_id)
     }
 }
 

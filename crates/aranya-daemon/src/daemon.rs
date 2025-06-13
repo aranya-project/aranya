@@ -2,9 +2,8 @@ use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
+    dangerous::spideroak_crypto::{import::Import, keys::SecretKey},
     default::DefaultEngine,
-    import::Import,
-    keys::SecretKey,
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
@@ -36,7 +35,7 @@ use crate::{
         quic::{Msg, State as QuicSyncState, TeamIdPSKPair},
         Syncer,
     },
-    util::{load_team_psk_pairs, SeedFile},
+    util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
 };
 
@@ -92,7 +91,7 @@ impl Daemon {
         let initial_keys = load_team_psk_pairs(
             &mut eng,
             &mut local_store,
-            &mut SeedFile::new(self.cfg.seed_id_path()).await?,
+            &SeedDir::new(&self.cfg.seed_id_path()).await?,
         )
         .await?;
 
@@ -360,7 +359,7 @@ async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
             }
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 tracing::info!("generating key");
-                let key = K::new(&mut Rng);
+                let key = K::random(&mut Rng);
                 let bytes = key
                     .try_export_secret()
                     .context("unable to export new key")?;

@@ -1,4 +1,5 @@
 //! This module provides TLS configuration components that **deliberately bypass security checks**.
+//! Useful for server configurations that rely on PSKs to secure connections.
 
 // --- Start SkipServerVerification ---
 // INSECURE: Allows connecting to any server certificate.

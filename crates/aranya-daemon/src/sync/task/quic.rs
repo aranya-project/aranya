@@ -20,7 +20,7 @@ use aranya_runtime::{
     MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
-    tls::{NoCertResolver, SkipServerVerification},
+    rustls::{NoCertResolver, SkipServerVerification},
     Addr,
 };
 use buggy::{bug, BugExt as _};

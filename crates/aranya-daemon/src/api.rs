@@ -4,10 +4,14 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref};
-use std::{path::PathBuf, pin::pin, sync::Arc};
+use std::{
+    path::{Path, PathBuf},
+    pin::pin,
+    sync::Arc,
+};
 
 use anyhow::{anyhow, Context as _, Result};
-use aranya_crypto::{Csprng, Engine, KeyStore, Rng};
+use aranya_crypto::{default::WrappedKey, Csprng, Engine, KeyStore, Rng};
 pub(crate) use aranya_daemon_api::crypto::{ApiKey, PublicApiKey};
 use aranya_daemon_api::{
     self as api,
@@ -39,7 +43,7 @@ use crate::{
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::task::{quic::Msg, SyncPeers},
-    util::SeedFile,
+    util::SeedDir,
     Client, EF,
 };
 
@@ -382,9 +386,16 @@ impl DaemonApi for Api {
             let seed = QuicSyncSeed::<CS>::from_bytes(cfg.seed())?;
             insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
                 .context("could not insert seed into keystore")?;
-            write_seed_id(&quic_data.seed_id_path, &team, &seed.id())
+
+            if let Err(e) = write_seed_id(&quic_data.seed_id_path, &team, &seed.id())
                 .await
-                .context("could not write seed id to file")?;
+                .context("could not write seed id to file")
+            {
+                error!(%e);
+                remove_seed(&mut quic_data.store, seed.clone())
+                    .context("could not remove seed from keystore")?;
+                return Err(e.into());
+            };
 
             let psk = seed.gen_psk()?;
 
@@ -409,7 +420,12 @@ impl DaemonApi for Api {
         if let Some(ref data) = *self.quic.lock().await {
             data.psk_send.send(Msg::Remove(team))?;
         }
-        self.client.aranya.lock().await.remove_graph(team.into())?;
+        self.client
+            .aranya
+            .lock()
+            .await
+            .remove_graph(team.into_id().into())
+            .context("unable to remove graph")?;
 
         Ok(())
     }
@@ -434,9 +450,19 @@ impl DaemonApi for Api {
         let seed = match *self.quic.lock().await {
             Some(ref mut quic_data) => {
                 let seed = QuicSyncSeed::<CS>::new(&mut Rng);
-
                 insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
                     .context("could not insert seed into keystore")?;
+
+                let team_id = api::TeamId::from(*graph_id.as_array());
+                if let Err(e) = write_seed_id(&quic_data.seed_id_path, &team_id, &seed.id())
+                    .await
+                    .context("could not write seed id to file")
+                {
+                    error!(%e);
+                    remove_seed(&mut quic_data.store, seed.clone())
+                        .context("could not remove seed from keystore")?;
+                    return Err(e.into());
+                };
 
                 let psk = seed.gen_psk()?;
                 // Send PSK update to the key stores
@@ -447,7 +473,6 @@ impl DaemonApi for Api {
                             .with_hash_alg(HashAlgorithm::SHA384)
                             .expect("Valid hash algorithm"),
                     );
-                    let team_id = api::TeamId::from(*graph_id.as_array());
                     quic_data.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
                 }
 
@@ -966,13 +991,14 @@ fn insert_seed(eng: &mut CE, store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>)
     Ok(())
 }
 
-async fn write_seed_id(
-    path: &PathBuf,
-    team_id: &api::TeamId,
-    seed_id: &QuicSyncSeedId,
-) -> Result<()> {
-    let mut file = SeedFile::new(path).await?;
-    file.append(team_id, seed_id).await?;
+fn remove_seed(store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
+    store.remove::<WrappedKey<CS>>(seed.key_id())?;
+    Ok(())
+}
+
+async fn write_seed_id(path: &Path, team_id: &api::TeamId, seed_id: &QuicSyncSeedId) -> Result<()> {
+    let dir = SeedDir::new(path).await?;
+    dir.append(team_id, seed_id).await?;
 
     Ok(())
 }
