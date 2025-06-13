@@ -8,7 +8,7 @@ use std::{ffi::OsStr, os::unix::ffi::OsStrExt, str::FromStr};
 use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::{self, AqcPeerStream};
-use aranya_crypto::hex;
+use aranya_crypto::dangerous::spideroak_crypto::hex;
 use bytes::Bytes;
 use tracing::error;
 
@@ -496,12 +496,8 @@ pub fn init_logging() -> Result<(), imp::Error> {
 /// @param dst the output buffer
 /// @param src the input hexadecimal string
 pub fn decode_hex(dst: &mut [u8], src: &[u8]) -> Result<usize, imp::Error> {
-    hex::ct_decode(dst, src).map_err(|err| match err {
-        hex::Error::InvalidLength => imp::Error::BufferTooSmall,
-        hex::Error::InvalidEncoding => {
-            imp::Error::InvalidArg(InvalidArg::new("src", "not a valid hexadecimal string"))
-        }
-        hex::Error::Bug(err) => imp::Error::Bug(err),
+    hex::ct_decode(dst, src).map_err(|_| {
+        imp::Error::InvalidArg(InvalidArg::new("src", "not a valid hexadecimal string"))
     })
 }
 
