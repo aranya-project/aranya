@@ -8,12 +8,11 @@ use aranya_runtime::{
     Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder, SyncType,
     MAX_SYNC_MESSAGE_SIZE,
 };
-use aranya_util::Addr;
+use aranya_util::{task::scope, Addr};
 use buggy::bug;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::{TcpListener, TcpStream},
-    task::JoinSet,
 };
 use tracing::{debug, error, info_span, instrument, Instrument};
 
@@ -111,23 +110,17 @@ pub struct Server<EN, SP> {
     aranya: AranyaClient<EN, SP>,
     /// Used to receive sync requests and send responses.
     listener: TcpListener,
-    /// Tracks running tasks.
-    set: JoinSet<()>,
 }
 
 impl<EN, SP> Server<EN, SP> {
     /// Creates a new `Server`.
     #[inline]
     pub fn new(aranya: AranyaClient<EN, SP>, listener: TcpListener) -> Self {
-        Self {
-            aranya,
-            listener,
-            set: JoinSet::new(),
-        }
+        Self { aranya, listener }
     }
 
     /// Returns the local address the sync server bound to.
-    pub fn local_addr(&self) -> Result<SocketAddr> {
+    pub(crate) fn local_addr(&self) -> Result<SocketAddr> {
         Ok(self.listener.local_addr()?)
     }
 }
@@ -139,29 +132,32 @@ where
 {
     /// Begins accepting incoming requests.
     #[instrument(skip_all)]
-    pub async fn serve(mut self) -> Result<()> {
-        // accept incoming connections to the server
-        loop {
-            let incoming = self.listener.accept().await;
-            let (mut stream, addr) = match incoming {
-                Ok(incoming) => incoming,
-                Err(err) => {
-                    error!(err = %err, "stream failure");
-                    continue;
-                }
-            };
-            debug!(?addr, "received sync request");
-
-            let client = self.aranya.clone();
-            self.set.spawn(
-                async move {
-                    if let Err(err) = Self::sync(client, &mut stream, addr).await {
-                        error!(%err, "request failure");
+    pub async fn serve(self) {
+        scope(async move |s| {
+            // accept incoming connections to the server
+            loop {
+                let incoming = self.listener.accept().await;
+                let (mut stream, addr) = match incoming {
+                    Ok(incoming) => incoming,
+                    Err(err) => {
+                        error!(err = %err, "stream failure");
+                        continue;
                     }
-                }
-                .instrument(info_span!("sync", %addr)),
-            );
-        }
+                };
+                debug!(?addr, "received sync request");
+
+                let client = self.aranya.clone();
+                s.spawn(
+                    async move {
+                        if let Err(err) = Self::sync(client, &mut stream, addr).await {
+                            error!(%err, "request failure");
+                        }
+                    }
+                    .instrument(info_span!("sync", %addr)),
+                );
+            }
+        })
+        .await;
     }
 
     /// Responds to a sync.

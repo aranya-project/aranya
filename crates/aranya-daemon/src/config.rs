@@ -137,11 +137,6 @@ impl Config {
         self.state_dir.join("key_bundle")
     }
 
-    /// Path to the daemon's public API key.
-    pub fn daemon_api_pk_path(&self) -> PathBuf {
-        self.state_dir.join("daemon_api_pk")
-    }
-
     /// The directory where keystore files are written.
     pub(crate) fn keystore_path(&self) -> PathBuf {
         self.state_dir.join("keystore")

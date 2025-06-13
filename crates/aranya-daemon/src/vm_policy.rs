@@ -47,7 +47,7 @@ impl fmt::Display for ChanOp {
 /// Engine using policy from [`policy.md`].
 pub struct PolicyEngine<E, KS> {
     /// The underlying policy.
-    pub policy: VmPolicy<E>,
+    pub(crate) policy: VmPolicy<E>,
     _eng: PhantomData<E>,
     _ks: PhantomData<KS>,
 }
@@ -136,14 +136,14 @@ pub struct VecSink<E> {
 
 impl<E> VecSink<E> {
     /// Creates a new `VecSink`.
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self {
             effects: Vec::new(),
         }
     }
 
     /// Returns the collected effects.
-    pub fn collect<T>(self) -> Result<Vec<T>, <T as TryFrom<E>>::Error>
+    pub(crate) fn collect<T>(self) -> Result<Vec<T>, <T as TryFrom<E>>::Error>
     where
         T: TryFrom<E>,
     {
@@ -170,18 +170,18 @@ impl<E> Sink<E> for VecSink<E> {
 /// Sink for graph commands.
 /// Collects serialized graph commands into a `Vec` after processing an action.
 #[derive(Default)]
-pub struct MsgSink {
+pub(crate) struct MsgSink {
     cmds: Vec<Box<[u8]>>,
 }
 
 impl MsgSink {
     /// Creates a `MsgSink`.
-    pub const fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         Self { cmds: Vec::new() }
     }
 
     /// Returns the collected commands.
-    pub fn into_cmds(self) -> Vec<Box<[u8]>> {
+    pub(crate) fn into_cmds(self) -> Vec<Box<[u8]>> {
         self.cmds
     }
 }

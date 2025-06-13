@@ -71,7 +71,7 @@ where
     /// Create new ephemeral Session.
     /// Once the Session has been created, call `session_receive` to add an ephemeral command to the Session.
     #[instrument(skip_all, fields(id = %id))]
-    pub async fn session_new(&self, id: &GraphId) -> Result<Session<SP, EN>> {
+    pub(crate) async fn session_new(&self, id: &GraphId) -> Result<Session<SP, EN>> {
         let session = self.aranya.lock().await.session(*id)?;
         Ok(session)
     }
@@ -79,7 +79,7 @@ where
     /// Receives an ephemeral command from another ephemeral Session.
     /// Assumes an ephemeral Session has already been created before adding an ephemeral command to the Session.
     #[instrument(skip_all)]
-    pub async fn session_receive(
+    pub(crate) async fn session_receive(
         &self,
         session: &mut Session<SP, EN>,
         command: &[u8],
@@ -92,13 +92,13 @@ where
 }
 
 /// Implements [`Actions`] for a particular storage.
-pub struct ActionsImpl<EN, SP, CE> {
+struct ActionsImpl<EN, SP, CE> {
     /// Aranya client graph state.
-    pub aranya: Arc<Mutex<ClientState<EN, SP>>>,
+    aranya: Arc<Mutex<ClientState<EN, SP>>>,
     /// Aranya graph ID.
-    pub graph_id: GraphId,
+    graph_id: GraphId,
     /// Crypto engine.
-    pub _eng: PhantomData<CE>,
+    _eng: PhantomData<CE>,
 }
 
 impl<EN, SP, CE> Actions<EN, SP, CE> for ActionsImpl<EN, SP, CE>
@@ -531,11 +531,7 @@ where
     S: Sink<<EN as Engine>::Effect>,
 {
     /// Creates an [`ActorImpl`].
-    pub fn new(
-        client: &'a mut ClientState<EN, SP>,
-        sink: &'a mut S,
-        graph_id: &'a GraphId,
-    ) -> Self {
+    fn new(client: &'a mut ClientState<EN, SP>, sink: &'a mut S, graph_id: &'a GraphId) -> Self {
         ActorImpl {
             client,
             sink,
