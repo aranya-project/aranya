@@ -425,7 +425,7 @@ impl DaemonApi for Api {
             .lock()
             .await
             .remove_graph(team.into_id().into())
-            .context("unable to remove graph")?;
+            .context("unable to remove graph from storage")?;
 
         Ok(())
     }
