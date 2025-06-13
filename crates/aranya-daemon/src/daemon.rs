@@ -319,7 +319,7 @@ async fn load_or_gen_key<K: SecretKey>(path: impl AsRef<Path>) -> Result<K> {
             Err(err) if err.kind() == io::ErrorKind::NotFound => {
                 tracing::info!("generating key");
                 // TODO: not compiling
-                let key = K::new(&mut Rng);
+                let key = K::random(&mut Rng);
                 let bytes = key
                     .try_export_secret()
                     .context("unable to export new key")?;

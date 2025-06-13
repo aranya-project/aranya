@@ -8,7 +8,6 @@ use std::{ffi::OsStr, os::unix::ffi::OsStrExt, str::FromStr};
 use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::{self, AqcPeerStream};
-use aranya_crypto::dangerous::spideroak_crypto::hex;
 use bytes::Bytes;
 use tracing::error;
 
@@ -484,27 +483,6 @@ pub fn init_logging() -> Result<(), imp::Error> {
         .try_init()
         .context("unable to initialize logging")?;
     Ok(())
-}
-
-/// Decodes the hexadecimal string `src` into `dst` and returns
-/// the number of bytes written to `dst`.
-///
-/// If `src` is a valid hexadecimal string, the number of bytes
-/// written to `dst` will be exactly half the length of `src`.
-/// Therefore, `dst` must be at least half as long as `src`.
-///
-/// @param dst the output buffer
-/// @param src the input hexadecimal string
-pub fn decode_hex(dst: &mut [u8], src: &[u8]) -> Result<usize, imp::Error> {
-    hex::ct_decode(dst, src).map_err(|err| 
-    // TODO: hex::Error no longer defined
-    match err {
-        hex::Error::InvalidLength => imp::Error::BufferTooSmall,
-        hex::Error::InvalidEncoding => {
-            imp::Error::InvalidArg(InvalidArg::new("src", "not a valid hexadecimal string"))
-        }
-        hex::Error::Bug(err) => imp::Error::Bug(err),
-    })
 }
 
 /// Gets the public key bundle for this device.
