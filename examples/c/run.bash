@@ -93,6 +93,5 @@ done
 sleep 1
 
 # start the example app.
-# TODO: rm ASAN_OPTIONS when memory leaks are resolved.
 ARANYA_CAPI=aranya=debug \
     ./build/example
