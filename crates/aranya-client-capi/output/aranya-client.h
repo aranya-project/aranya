@@ -339,8 +339,13 @@ typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
     uint8_t __for_size_only[64];
 } AranyaQuicSyncConfigBuilder;
 
-typedef struct AranyaSeed {
-    uint8_t bytes[ARANYA_SEED_LEN];
+typedef struct ARANYA_ALIGNED(8) AranyaSeed {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[56];
 } AranyaSeed;
 
 typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
