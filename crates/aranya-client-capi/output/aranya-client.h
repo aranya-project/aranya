@@ -91,6 +91,11 @@
 #define ARANYA_ID_LEN 32
 
 /**
+ * The size in bytes of an ID
+ */
+#define ARANYA_SEED_LEN 64
+
+/**
  * The size in bytes of an ID converted to a human-readable base58 string.
  */
 #define ARANYA_ID_STR_LEN (((ARANYA_ID_LEN * 1375) / 1000) + 1)
@@ -325,13 +330,40 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
     uint8_t __for_size_only[40];
 } AranyaAqcConfig;
 
+typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[64];
+} AranyaQuicSyncConfigBuilder;
+
+typedef struct ARANYA_ALIGNED(8) AranyaSeed {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[56];
+} AranyaSeed;
+
+typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[64];
+} AranyaQuicSyncConfig;
+
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[16];
+    uint8_t __for_size_only[64];
 } AranyaTeamConfigBuilder;
 
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
@@ -340,7 +372,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[24];
+    uint8_t __for_size_only[64];
 } AranyaTeamConfig;
 
 /**
@@ -955,6 +987,96 @@ AranyaError aranya_client_config_builder_set_aqc_config_ext(struct AranyaClientC
                                                             struct AranyaExtError *__ext_err);
 
 /**
+ * Initializes `AranyaQuicSyncConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaQuicSyncConfigBuilder
+ */
+AranyaError aranya_quic_sync_config_builder_init(struct AranyaQuicSyncConfigBuilder *out);
+
+/**
+ * Initializes `AranyaQuicSyncConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaQuicSyncConfigBuilder
+ */
+AranyaError aranya_quic_sync_config_builder_init_ext(struct AranyaQuicSyncConfigBuilder *out,
+                                                     struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_quic_sync_config_builder_init`.
+ *
+ * @relates AranyaQuicSyncConfigBuilder
+ */
+AranyaError aranya_quic_sync_config_builder_cleanup(struct AranyaQuicSyncConfigBuilder *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_quic_sync_config_builder_init`.
+ *
+ * @relates AranyaQuicSyncConfigBuilder
+ */
+AranyaError aranya_quic_sync_config_builder_cleanup_ext(struct AranyaQuicSyncConfigBuilder *ptr,
+                                                        struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to set seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_quic_sync_config_seed(struct AranyaQuicSyncConfigBuilder *cfg,
+                                         const struct AranyaSeed *seed);
+
+/**
+ * Attempts to set seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_quic_sync_config_seed_ext(struct AranyaQuicSyncConfigBuilder *cfg,
+                                             const struct AranyaSeed *seed,
+                                             struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to construct a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_quic_sync_config_build(struct AranyaQuicSyncConfigBuilder *cfg,
+                                          struct AranyaQuicSyncConfig *out);
+
+/**
+ * Attempts to construct a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the team config builder
+ * @param out a pointer to write the team config to
+ */
+AranyaError aranya_quic_sync_config_build_ext(struct AranyaQuicSyncConfigBuilder *cfg,
+                                              struct AranyaQuicSyncConfig *out,
+                                              struct AranyaExtError *__ext_err);
+
+/**
  * Initializes `AranyaTeamConfigBuilder`.
  *
  * When no longer needed, `out`'s resources must be released
@@ -993,6 +1115,33 @@ AranyaError aranya_team_config_builder_cleanup(struct AranyaTeamConfigBuilder *p
  */
 AranyaError aranya_team_config_builder_cleanup_ext(struct AranyaTeamConfigBuilder *ptr,
                                                    struct AranyaExtError *__ext_err);
+
+/**
+ * Configures QUIC syncer for [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder).
+ *
+ * By default, the QUIC syncer config is not set. It is an error to call
+ * [`aranya_team_config_build`](@ref aranya_team_config_build) before setting the interval with
+ * this function
+ *
+ * @param cfg a pointer to the builder for a team config
+ * @param quic Set the QUIC syncer config
+ */
+AranyaError aranya_team_config_builder_set_quic_syncer(struct AranyaTeamConfigBuilder *cfg,
+                                                       const struct AranyaQuicSyncConfig *quic);
+
+/**
+ * Configures QUIC syncer for [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder).
+ *
+ * By default, the QUIC syncer config is not set. It is an error to call
+ * [`aranya_team_config_build`](@ref aranya_team_config_build) before setting the interval with
+ * this function
+ *
+ * @param cfg a pointer to the builder for a team config
+ * @param quic Set the QUIC syncer config
+ */
+AranyaError aranya_team_config_builder_set_quic_syncer_ext(struct AranyaTeamConfigBuilder *cfg,
+                                                           const struct AranyaQuicSyncConfig *quic,
+                                                           struct AranyaExtError *__ext_err);
 
 /**
  * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
@@ -1374,7 +1523,8 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
  */
 AranyaError aranya_create_team(struct AranyaClient *client,
                                const struct AranyaTeamConfig *cfg,
-                               struct AranyaTeamId *__output);
+                               struct AranyaTeamId *team_id,
+                               struct AranyaSeed *seed);
 
 /**
  * Create a new graph/team with the current device as the owner.
@@ -1387,7 +1537,8 @@ AranyaError aranya_create_team(struct AranyaClient *client,
  */
 AranyaError aranya_create_team_ext(struct AranyaClient *client,
                                    const struct AranyaTeamConfig *cfg,
-                                   struct AranyaTeamId *__output,
+                                   struct AranyaTeamId *team_id,
+                                   struct AranyaSeed *seed,
                                    struct AranyaExtError *__ext_err);
 
 /**

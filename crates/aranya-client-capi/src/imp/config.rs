@@ -8,6 +8,30 @@ use aranya_capi_core::{
 use super::Error;
 use crate::api::defs::{self, Duration};
 
+/// A QUIC syncer PSK seed.
+#[derive(Clone, Debug)]
+pub struct Seed {
+    pub(crate) inner: Box<[u8]>,
+}
+
+impl Typed for Seed {
+    const TYPE_ID: TypeId = TypeId::new(0x7B426A10);
+}
+
+impl Seed {
+    pub fn new(seed: Box<[u8]>) -> Self {
+        Self { inner: seed }
+    }
+
+    pub fn get_seed(&self) -> Self {
+        self.clone()
+    }
+
+    pub fn get_boxed(&self) -> Box<[u8]> {
+        self.inner.clone()
+    }
+}
+
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
 pub struct ClientConfig {
@@ -225,10 +249,15 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
-    seed: Box<[u8]>,
+    seed: Seed,
 }
 
 impl QuicSyncConfig {
+    /// Useful for deref coercion.
+    pub(crate) fn imp(&self) -> &Self {
+        self
+    }
+
     pub fn builder() -> QuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }
@@ -241,7 +270,7 @@ impl Typed for QuicSyncConfig {
 impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .seed(value.seed)
+            .seed(value.seed.get_boxed())
             .build()
             .expect("All fields are set")
     }
@@ -249,14 +278,13 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    seed: Option<Box<[u8]>>,
+    seed: Option<Seed>,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the seed.
-    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
+    pub fn seed(&mut self, seed: Seed) {
         self.seed = Some(seed);
-        self
     }
 
     /// Builds the config.
@@ -325,6 +353,13 @@ pub struct TeamConfigBuilder {
 
 impl Typed for TeamConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0x112905E7);
+}
+
+impl TeamConfigBuilder {
+    /// Sets the QUIC syncer config.
+    pub fn quic(&mut self, quic: &QuicSyncConfig) {
+        self.quic_sync = Some(quic.clone());
+    }
 }
 
 impl Builder for TeamConfigBuilder {

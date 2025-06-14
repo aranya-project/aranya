@@ -260,6 +260,15 @@ impl From<aranya_crypto::Id> for Id {
     }
 }
 
+/// The size in bytes of an ID
+pub const ARANYA_SEED_LEN: usize = 64;
+
+// TODO: compile time check for seed size
+
+// PSK Seed
+#[aranya_capi_core::opaque(size = 56, align = 8)]
+pub type Seed = Safe<imp::Seed>;
+
 /// Team ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -658,7 +667,22 @@ pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
 #[aranya_capi_core::opaque(size = 64, align = 8)]
 pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
 
-/// Attempts to construct a [`TeamConfig`].
+/// Attempts to set seed value on [`QuicSyncConfigBuilder`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param cfg a pointer to the team config builder
+/// @param out a pointer to write the team config to
+pub fn quic_sync_config_seed(
+    cfg: &mut QuicSyncConfigBuilder,
+    seed: &Seed,
+) -> Result<(), imp::Error> {
+    cfg.seed(seed.get_seed());
+    Ok(())
+}
+
+/// Attempts to construct a [`QuicSyncConfig`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
@@ -680,6 +704,18 @@ pub type TeamConfig = Safe<imp::TeamConfig>;
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 64, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
+
+/// Configures QUIC syncer for [`TeamConfigBuilder`].
+///
+/// By default, the QUIC syncer config is not set. It is an error to call
+/// [`team_config_build`] before setting the interval with
+/// this function
+///
+/// @param cfg a pointer to the builder for a team config
+/// @param quic Set the QUIC syncer config
+pub fn team_config_builder_set_quic_syncer(cfg: &mut TeamConfigBuilder, quic: &QuicSyncConfig) {
+    cfg.quic(quic.imp());
+}
 
 /// Attempts to construct a [`TeamConfig`].
 ///
@@ -916,13 +952,24 @@ pub fn revoke_label(
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
+pub fn create_team(
+    client: &mut Client,
+    cfg: &TeamConfig,
+    team_id: &mut MaybeUninit<TeamId>,
+    seed: &mut MaybeUninit<Seed>,
+) -> Result<(), imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
-    // FIXME(Steve): Return id and psk with out params
-    let CreateTeamResponse { team_id, .. } =
-        client.rt.block_on(client.inner.create_team(cfg.into()))?;
-    Ok(team_id.into())
+    let CreateTeamResponse {
+        team_id: id,
+        seed: s,
+    } = client.rt.block_on(client.inner.create_team(cfg.into()))?;
+
+    if let Some(s) = s {
+        Seed::init(seed, imp::Seed::new(s));
+    }
+    team_id.write(id.into());
+    Ok(())
 }
 
 /// Add a team to the local device store.
