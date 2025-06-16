@@ -386,7 +386,14 @@ impl DaemonApi for Api {
                 .remove(team)
                 .inspect_err(|err| error!(err = ?err, "unable to remove PSK"))?
         }
-        todo!("Should remove graph data from storage provider");
+        self.client
+            .aranya
+            .lock()
+            .await
+            .remove_graph(team.into_id().into())
+            .context("unable to remove graph from storage")?;
+
+        Ok(())
     }
 
     #[instrument(skip(self))]
