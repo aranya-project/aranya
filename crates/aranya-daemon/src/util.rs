@@ -17,7 +17,6 @@ pub(crate) struct SeedDir(PathBuf);
 
 impl SeedDir {
     pub(crate) async fn new(p: PathBuf) -> Result<Self> {
-        let p = p.into();
         create_dir_all(&p).await?;
         Ok(Self(p))
     }
