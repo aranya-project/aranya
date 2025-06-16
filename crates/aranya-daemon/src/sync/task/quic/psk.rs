@@ -17,40 +17,35 @@ use tracing::error;
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
-#[derive(Debug, Clone)]
-/// Insertion and Removal updates.
-/// Used by [`ClientPresharedKeys`] and [`ServerPresharedKeys`].
-pub enum Msg {
-    /// Insertion update
-    Insert(TeamIdPSKPair),
-    /// Removal update
-    Remove(TeamId),
-}
-
+/// PSK store that's shared between [`super::Syncer`]
+/// and [`super::Server`]
 #[derive(Debug)]
-/// Contains thread-safe references to [PresharedKey]s.
-/// Used by [`super::Server`]
-pub struct ServerPresharedKeys {
+pub struct PskStore {
     keys: SyncMutex<HashMap<Vec<u8>, TeamIdPSKPair>>,
     // Optional sender to report the selected identity
-    identity_sender: mpsc::Sender<Vec<u8>>,
+    identity_tx: mpsc::Sender<Vec<u8>>,
 }
 
-impl ServerPresharedKeys {
-    pub(super) fn new() -> (Self, mpsc::Receiver<Vec<u8>>) {
-        // Create the mpsc channel for PSK identities
+impl PskStore {
+    pub(crate) fn new<I>(initial_keys: I) -> (Self, mpsc::Receiver<Vec<u8>>)
+    where
+        I: IntoIterator<Item = TeamIdPSKPair>,
+    {
+        let keys = initial_keys
+            .into_iter()
+            .map(|(team_id, psk)| (psk.identity().into(), (team_id, psk)))
+            .collect();
         let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(10);
-
         (
             Self {
-                keys: SyncMutex::new(HashMap::new()),
-                identity_sender: identity_tx,
+                keys: SyncMutex::new(keys),
+                identity_tx,
             },
             identity_rx,
         )
     }
 
-    fn insert(&self, id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
+    pub(crate) fn insert(&self, id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
         match self.keys.lock() {
             Ok(ref mut map) => {
                 map.insert(psk.identity().to_vec(), (id, psk));
@@ -61,36 +56,25 @@ impl ServerPresharedKeys {
         Ok(())
     }
 
-    pub(super) fn extend(&self, psks: impl IntoIterator<Item = TeamIdPSKPair>) -> Result<()> {
-        match self.keys.lock() {
-            Ok(ref mut keys) => {
-                keys.extend(
-                    psks.into_iter()
-                        .map(|(id, psk)| (psk.identity().to_vec(), (id, psk))),
-                );
-            }
-            Err(e) => bail!(e.to_string()),
-        }
-
-        Ok(())
-    }
-
-    /// Handle PSK insertion and removal updates.
-    pub fn handle_msg(&self, msg: Msg) {
-        match msg {
-            Msg::Insert((team_id, psk)) => {
-                let _ = self
-                    .insert(team_id, psk)
-                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"));
-            }
-            Msg::Remove(_team_id) => {
-                todo!("Add remove method to `ServerPreSharedKeys`")
-            }
-        }
+    pub(crate) fn remove(&self, _id: TeamId) -> Result<()> {
+        todo!("Implement this method. https://github.com/aranya-project/aranya/pull/302")
     }
 }
 
-impl SelectsPresharedKeys for ServerPresharedKeys {
+impl PresharedKeyStore for PskStore {
+    #![allow(clippy::expect_used)]
+    fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
+        // TODO: don't panic here
+        let key_map = self.keys.lock().expect("Client PSK mutex poisoned");
+        key_map
+            .values()
+            .map(|(_, key)| key)
+            .map(Arc::clone)
+            .collect()
+    }
+}
+
+impl SelectsPresharedKeys for PskStore {
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
         let id_key = self
             .keys
@@ -104,63 +88,10 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
 
         // Use try_send for non-blocking behavior. Ignore error if receiver dropped.
         let _ = self
-            .identity_sender
+            .identity_tx
             .try_send(identity.to_vec())
             .assume("Failed to send identity");
 
         id_key.map(|(_, key)| key)
-    }
-}
-
-#[derive(Debug)]
-/// Contains thread-safe references to [PresharedKey]s.
-/// Used by [`super::Syncer`]
-pub struct ClientPresharedKeys {
-    key_refs: SyncMutex<HashMap<TeamId, Arc<PresharedKey>>>,
-}
-
-impl ClientPresharedKeys {
-    pub(super) fn new<I>(initial_keys: I) -> Self
-    where
-        I: IntoIterator<Item = TeamIdPSKPair>,
-    {
-        let key_refs = initial_keys.into_iter().collect();
-        Self {
-            key_refs: SyncMutex::new(key_refs),
-        }
-    }
-
-    fn insert(&self, id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
-        match self.key_refs.lock() {
-            Ok(ref mut map) => {
-                map.insert(id, psk);
-            }
-            Err(e) => bail!(e.to_string()),
-        }
-
-        Ok(())
-    }
-
-    /// Handle PSK insertion and removal updates.
-    pub fn handle_msg(&self, msg: Msg) {
-        match msg {
-            Msg::Insert((team_id, psk)) => {
-                let _ = self
-                    .insert(team_id, psk)
-                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"));
-            }
-            Msg::Remove(_team_id) => {
-                todo!("Add remove method to `ClientPresharedKeys`")
-            }
-        }
-    }
-}
-
-impl PresharedKeyStore for ClientPresharedKeys {
-    #![allow(clippy::expect_used)]
-    fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
-        // TODO: don't panic here
-        let key_map = self.key_refs.lock().expect("Client PSK mutex poisoned");
-        key_map.values().map(Arc::clone).collect()
     }
 }

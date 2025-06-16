@@ -1,14 +1,10 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Arc};
 
-use tokio::sync::broadcast;
-
-use super::Msg;
-use crate::{keystore::LocalStore, CE, KS};
+use crate::{keystore::LocalStore, sync::task::quic::PskStore, CE, KS};
 
 /// Held by [`super::DaemonApiServer`] when the QUIC syncer is used
 pub(crate) struct Data {
-    /// Channel for sending PSK updates
-    pub(crate) psk_send: broadcast::Sender<Msg>,
+    pub(crate) psk_store: Arc<PskStore>,
     pub(crate) store: LocalStore<KS>,
     pub(crate) engine: CE,
     pub(crate) seed_id_path: PathBuf,

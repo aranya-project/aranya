@@ -39,7 +39,7 @@ use crate::{
     daemon::KS,
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::task::{quic::Msg, SyncPeers},
+    sync::task::SyncPeers,
     util::SeedDir,
     Client, EF,
 };
@@ -372,8 +372,9 @@ impl DaemonApi for Api {
                 .expect("Valid hash algorithm");
 
             quic_data
-                .psk_send
-                .send(Msg::Insert((team, Arc::new(psk))))?;
+                .psk_store
+                .insert(team, Arc::new(psk))
+                .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
         }
 
         // TODO: Implement for other syncer types
@@ -383,7 +384,9 @@ impl DaemonApi for Api {
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
         if let Some(ref data) = *self.quic.lock().await {
-            data.psk_send.send(Msg::Remove(team))?;
+            data.psk_store
+                .remove(team)
+                .inspect_err(|err| error!(err = ?err, "unable to remove PSK"))?
         }
         todo!("Should remove graph data from storage provider");
     }
@@ -423,7 +426,7 @@ impl DaemonApi for Api {
                 };
 
                 let psk = seed.gen_psk()?;
-                // Send PSK update to the key stores
+                // Insert PSK into the store
                 {
                     let psk_ref = Arc::new(
                         PresharedKey::external(psk.identity(), psk.raw_secret())
@@ -431,7 +434,10 @@ impl DaemonApi for Api {
                             .with_hash_alg(HashAlgorithm::SHA384)
                             .expect("Valid hash algorithm"),
                     );
-                    quic_data.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
+                    quic_data
+                        .psk_store
+                        .insert(team_id, psk_ref)
+                        .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
                 }
 
                 Some(Box::from(seed.as_bytes()))
@@ -944,11 +950,13 @@ impl DaemonApi for Api {
     }
 }
 
+/// Inserts a seed into the daemon's local keystore
 fn insert_seed(eng: &mut CE, store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
     store.try_insert(seed.key_id(), eng.wrap(seed)?)?;
     Ok(())
 }
 
+/// Removes a seed from the daemon's local keystore
 fn remove_seed(store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
     store.remove::<WrappedKey<CS>>(seed.key_id())?;
     Ok(())
