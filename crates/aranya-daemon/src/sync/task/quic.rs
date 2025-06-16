@@ -34,10 +34,7 @@ use s2n_quic::{
     connection::Error as ConnErr,
     provider::{
         congestion_controller::Bbr,
-        tls::rustls::{
-            self as rustls_provider,
-            rustls::{client::PresharedKeyStore, server::SelectsPresharedKeys},
-        },
+        tls::rustls::{self as rustls_provider, rustls::server::SelectsPresharedKeys},
     },
     stream::{BidirectionalStream, ReceiveStream, SendStream},
     Client as QuicClient, Connection, Server as QuicServer,
@@ -99,6 +96,8 @@ pub struct State {
     /// Address -> Connection map used for re-using connections
     /// when making outgoing sync requests
     conns: BTreeMap<Addr, Connection>,
+    /// Shared PSK store
+    store: Arc<PskStore>,
 }
 
 impl SyncState for State {
@@ -116,6 +115,9 @@ impl SyncState for State {
         S: Sink<<crate::EN as Engine>::Effect> + Send,
     {
         async move {
+            // Sets the active team before starting a QUIC connection
+            syncer.state.store.set_team(id.into_id().into());
+
             let stream = syncer
                 .connect(peer)
                 .await
@@ -146,7 +148,7 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub fn new(client_keys: Arc<dyn PresharedKeyStore>) -> SyncResult<Self>
+    pub fn new(psk_store: Arc<PskStore>) -> SyncResult<Self>
 where {
         // Create Client Config (INSECURE: Skips server cert verification)
         let mut client_config = ClientConfig::builder()
@@ -154,7 +156,7 @@ where {
             .with_custom_certificate_verifier(SkipServerVerification::new())
             .with_no_client_auth();
         client_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
-        client_config.preshared_keys = client_keys; // Pass the Arc<ClientPresharedKeys>
+        client_config.preshared_keys = psk_store.clone(); // Pass the Arc<ClientPresharedKeys>
 
         // Client builder doesn't support adding preshared keys
         #[allow(deprecated)]
@@ -174,6 +176,7 @@ where {
         Ok(Self {
             client,
             conns: BTreeMap::new(),
+            store: psk_store,
         })
     }
 }
