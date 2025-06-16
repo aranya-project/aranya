@@ -288,8 +288,7 @@ AranyaError init_team(Team *t) {
     // have owner create the team.
     // The `aranya_create_team` method is used to create a new graph for the
     // team to operate on.
-    err = aranya_create_team(&t->clients.owner.client, &owner_cfg, &t->id,
-                             &t->seed);
+    err = aranya_create_team(&t->clients.owner.client, &owner_cfg, &t->id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to create team\n");
         return err;
@@ -325,7 +324,10 @@ AranyaError init_team(Team *t) {
         fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
         return err;
     }
-    err = aranya_quic_sync_config_seed(&quic_build, &t->seed);
+    // TODO: get a PSK seed encrypted for each device that calls `add_team()`
+    AranyaSeed seed = {0};
+    t->seed         = seed;
+    err             = aranya_quic_sync_config_seed(&quic_build, &t->seed);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to set `AranyaQuicSyncConfigBuilder` seed\n");
         return err;

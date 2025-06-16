@@ -1523,8 +1523,7 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
  */
 AranyaError aranya_create_team(struct AranyaClient *client,
                                const struct AranyaTeamConfig *cfg,
-                               struct AranyaTeamId *team_id,
-                               struct AranyaSeed *seed);
+                               struct AranyaTeamId *team_id);
 
 /**
  * Create a new graph/team with the current device as the owner.
@@ -1538,8 +1537,30 @@ AranyaError aranya_create_team(struct AranyaClient *client,
 AranyaError aranya_create_team_ext(struct AranyaClient *client,
                                    const struct AranyaTeamConfig *cfg,
                                    struct AranyaTeamId *team_id,
-                                   struct AranyaSeed *seed,
                                    struct AranyaExtError *__ext_err);
+
+/**
+ * Return PSK seed encrypted for another device on the team.
+ * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
+ *
+ */
+AranyaError aranya_get_psk_seed_encrypted(struct AranyaClient *_client,
+                                          const struct AranyaTeamId *_team_id,
+                                          const struct AranyaDeviceId *_device,
+                                          const uint8_t *_seed,
+                                          size_t _seed_len);
+
+/**
+ * Return PSK seed encrypted for another device on the team.
+ * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
+ *
+ */
+AranyaError aranya_get_psk_seed_encrypted_ext(struct AranyaClient *_client,
+                                              const struct AranyaTeamId *_team_id,
+                                              const struct AranyaDeviceId *_device,
+                                              const uint8_t *_seed,
+                                              size_t _seed_len,
+                                              struct AranyaExtError *__ext_err);
 
 /**
  * Add a team to the local device store.

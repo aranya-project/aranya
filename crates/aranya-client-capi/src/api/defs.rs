@@ -956,20 +956,27 @@ pub fn create_team(
     client: &mut Client,
     cfg: &TeamConfig,
     team_id: &mut MaybeUninit<TeamId>,
-    seed: &mut MaybeUninit<Seed>,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
-    let CreateTeamResponse {
-        team_id: id,
-        seed: s,
-    } = client.rt.block_on(client.inner.create_team(cfg.into()))?;
+    let CreateTeamResponse { team_id: id, .. } =
+        client.rt.block_on(client.inner.create_team(cfg.into()))?;
 
-    if let Some(s) = s {
-        Seed::init(seed, imp::Seed::new(s));
-    }
     team_id.write(id.into());
     Ok(())
+}
+
+/// Return PSK seed encrypted for another device on the team.
+/// The PSK seed will be encrypted using the public encryption key of the specified device on the team.
+///
+pub fn get_psk_seed_encrypted(
+    _client: &mut Client,
+    _team_id: &TeamId,
+    _device: &DeviceId,
+    _seed: &[u8],
+) -> Result<(), imp::Error> {
+    // TODO: get encrypted PSK seed from daemon.
+    todo!();
 }
 
 /// Add a team to the local device store.
@@ -984,7 +991,6 @@ pub fn create_team(
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.imp();
-
     let cfg: &imp::TeamConfig = cfg.deref();
     client
         .rt
