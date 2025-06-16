@@ -10,8 +10,7 @@ use aranya_daemon_api::TeamId;
 use buggy::BugExt as _;
 use bytes::Bytes;
 use s2n_quic::provider::tls::rustls::rustls::{
-    client::PresharedKeyStore, crypto::PresharedKey, pki_types::ServerName,
-    server::SelectsPresharedKeys,
+    client, crypto::PresharedKey, pki_types::ServerName, server,
 };
 use tokio::sync::mpsc;
 use tracing::error;
@@ -85,7 +84,7 @@ impl PskStore {
     }
 }
 
-impl PresharedKeyStore for PskStore {
+impl client::PresharedKeyStore for PskStore {
     #[allow(clippy::expect_used)]
     fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
         let inner = self.inner.lock().expect("poisoned mutex");
@@ -107,7 +106,7 @@ impl PresharedKeyStore for PskStore {
     }
 }
 
-impl SelectsPresharedKeys for PskStore {
+impl server::SelectsPresharedKeys for PskStore {
     #[allow(clippy::expect_used)]
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
         let inner = self
