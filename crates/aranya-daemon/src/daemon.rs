@@ -114,12 +114,9 @@ impl Daemon {
             info!(path = %cfg.api_pk_path().display(), "wrote API public key");
 
             // Initialize the PSK store used by the syncer and sync server
-            let initial_keys = load_team_psk_pairs(
-                &mut eng,
-                &mut local_store,
-                &SeedDir::new(&cfg.seed_id_path()).await?,
-            )
-            .await?;
+            let seed_id_dir = SeedDir::new(cfg.seed_id_path().to_path_buf()).await?;
+            let initial_keys =
+                load_team_psk_pairs(&mut eng, &mut local_store, &seed_id_dir).await?;
             let (psk_store, identity_rx) = PskStore::new(initial_keys);
             let psk_store = Arc::new(psk_store);
 
@@ -179,7 +176,7 @@ impl Daemon {
                 psk_store,
                 store: local_store,
                 engine: eng,
-                seed_id_path: cfg.seed_id_path(),
+                seed_id_dir,
             };
 
             let api = DaemonApiServer::new(
