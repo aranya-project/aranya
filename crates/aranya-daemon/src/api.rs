@@ -4,10 +4,7 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
-use std::{
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
 use aranya_crypto::{default::WrappedKey, Csprng, Engine, KeyStore, Rng};
@@ -15,7 +12,7 @@ pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    CreateTeamResponse, DaemonApi, QuicSyncSeed, QuicSyncSeedId, CE, CS,
+    CreateTeamResponse, DaemonApi, QuicSyncSeed, CE, CS,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -39,8 +36,7 @@ use crate::{
     daemon::KS,
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::task::{quic::Msg, SyncPeers},
-    util::SeedDir,
+    sync::task::SyncPeers,
     Client, EF,
 };
 
@@ -352,7 +348,9 @@ impl DaemonApi for Api {
             insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
                 .context("could not insert seed into keystore")?;
 
-            if let Err(e) = write_seed_id(&quic_data.seed_id_path, &team, &seed.id())
+            if let Err(e) = quic_data
+                .seed_id_dir
+                .append(&team, &seed.id())
                 .await
                 .context("could not write seed id to file")
             {
@@ -372,8 +370,9 @@ impl DaemonApi for Api {
                 .expect("Valid hash algorithm");
 
             quic_data
-                .psk_send
-                .send(Msg::Insert((team, Arc::new(psk))))?;
+                .psk_store
+                .insert(team, Arc::new(psk))
+                .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
         }
 
         // TODO: Implement for other syncer types
@@ -383,7 +382,9 @@ impl DaemonApi for Api {
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
         if let Some(ref data) = *self.quic.lock().await {
-            data.psk_send.send(Msg::Remove(team))?;
+            data.psk_store
+                .remove(team)
+                .inspect_err(|err| error!(err = ?err, "unable to remove PSK"))?
         }
         self.client
             .aranya
@@ -419,7 +420,9 @@ impl DaemonApi for Api {
                     .context("could not insert seed into keystore")?;
 
                 let team_id = api::TeamId::from(*graph_id.as_array());
-                if let Err(e) = write_seed_id(&quic_data.seed_id_path, &team_id, &seed.id())
+                if let Err(e) = quic_data
+                    .seed_id_dir
+                    .append(&team_id, &seed.id())
                     .await
                     .context("could not write seed id to file")
                 {
@@ -430,7 +433,7 @@ impl DaemonApi for Api {
                 };
 
                 let psk = seed.gen_psk()?;
-                // Send PSK update to the key stores
+                // Insert PSK into the store
                 {
                     let psk_ref = Arc::new(
                         PresharedKey::external(psk.identity(), psk.raw_secret())
@@ -438,7 +441,10 @@ impl DaemonApi for Api {
                             .with_hash_alg(HashAlgorithm::SHA384)
                             .expect("Valid hash algorithm"),
                     );
-                    quic_data.psk_send.send(Msg::Insert((team_id, psk_ref)))?;
+                    quic_data
+                        .psk_store
+                        .insert(team_id, psk_ref)
+                        .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
                 }
 
                 Some(Box::from(seed.as_bytes()))
@@ -951,20 +957,15 @@ impl DaemonApi for Api {
     }
 }
 
+/// Inserts a seed into the daemon's local keystore
 fn insert_seed(eng: &mut CE, store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
     store.try_insert(seed.key_id(), eng.wrap(seed)?)?;
     Ok(())
 }
 
+/// Removes a seed from the daemon's local keystore
 fn remove_seed(store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
     store.remove::<WrappedKey<CS>>(seed.key_id())?;
-    Ok(())
-}
-
-async fn write_seed_id(path: &Path, team_id: &api::TeamId, seed_id: &QuicSyncSeedId) -> Result<()> {
-    let dir = SeedDir::new(path).await?;
-    dir.append(team_id, seed_id).await?;
-
     Ok(())
 }
 

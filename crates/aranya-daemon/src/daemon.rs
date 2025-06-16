@@ -19,7 +19,7 @@ use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{
     fs,
-    sync::{broadcast::Receiver, Mutex},
+    sync::{mpsc::Receiver, Mutex},
     task::JoinSet,
 };
 use tracing::{error, info, info_span, Instrument as _};
@@ -33,7 +33,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{Msg, State as QuicSyncState, TeamIdPSKPair},
+        quic::{PskStore, State as QuicSyncState},
         Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -113,14 +113,12 @@ impl Daemon {
                 .context("unable to write API public key")?;
             info!(path = %cfg.api_pk_path().display(), "wrote API public key");
 
-            let (psk_send, psk_recv) = tokio::sync::broadcast::channel(16);
-
-            let initial_keys = load_team_psk_pairs(
-                &mut eng,
-                &mut local_store,
-                &SeedDir::new(&cfg.seed_id_path()).await?,
-            )
-            .await?;
+            // Initialize the PSK store used by the syncer and sync server
+            let seed_id_dir = SeedDir::new(cfg.seed_id_path().to_path_buf()).await?;
+            let initial_keys =
+                load_team_psk_pairs(&mut eng, &mut local_store, &seed_id_dir).await?;
+            let (psk_store, identity_rx) = PskStore::new(initial_keys);
+            let psk_store = Arc::new(psk_store);
 
             // Initialize Aranya client.
             let (client, sync_server) = Self::setup_aranya(
@@ -131,8 +129,8 @@ impl Daemon {
                     .context("unable to clone keystore")?,
                 &pks,
                 cfg.sync_addr,
-                psk_send.subscribe(),
-                initial_keys.clone(),
+                Arc::clone(&psk_store),
+                identity_rx,
             )
             .await?;
             let local_addr = sync_server.local_addr()?;
@@ -140,7 +138,7 @@ impl Daemon {
             // Sync in the background at some specified interval.
             let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
-            let state = QuicSyncState::new(initial_keys, psk_recv)?;
+            let state = QuicSyncState::new(psk_store.clone())?;
             let (syncer, peers) = Syncer::new(client.clone(), send_effects, state);
 
             let graph_ids = client
@@ -175,10 +173,10 @@ impl Daemon {
             };
 
             let data = QSData {
-                psk_send,
+                psk_store,
                 store: local_store,
                 engine: eng,
-                seed_id_path: cfg.seed_id_path(),
+                seed_id_dir,
             };
 
             let api = DaemonApiServer::new(
@@ -275,8 +273,8 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-        recv: Receiver<Msg>,
-        initial_keys: Vec<TeamIdPSKPair>,
+        psk_store: Arc<PskStore>,
+        identity_rx: Receiver<Vec<u8>>,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
@@ -295,7 +293,7 @@ impl Daemon {
         };
 
         info!(addr = %external_sync_addr, "starting QUIC sync server");
-        let server = SyncServer::new(client.clone(), &external_sync_addr, initial_keys, recv)
+        let server = SyncServer::new(client.clone(), &external_sync_addr, psk_store, identity_rx)
             .await
             .context("unable to initialize QUIC sync server")?;
 
