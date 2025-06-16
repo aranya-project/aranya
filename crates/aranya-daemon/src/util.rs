@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context as _, Result};
-use aranya_crypto::{Engine, Id, KeyStore};
+use aranya_crypto::{Engine, Id, KeyStore, KeyStoreExt};
 use aranya_daemon_api::{QuicSyncSeed, QuicSyncSeedId, TeamId};
 use aranya_util::create_dir_all;
 use s2n_quic::provider::tls::rustls::rustls::crypto::{hash::HashAlgorithm, PresharedKey};
@@ -45,7 +45,7 @@ impl SeedDir {
             let file_name = entry.file_name().into_string().map_err(|s| {
                 anyhow::anyhow!("could not convert OsString: `{:?}` into String", s)
             })?;
-            let team_id = Id::decode(file_name).map(Into::into)?;
+            let team_id = TeamId::decode(file_name)?;
 
             let seed_id = {
                 const ID_SIZE: usize = size_of::<Id>();
@@ -66,17 +66,13 @@ impl SeedDir {
     }
 }
 
+#[inline]
 fn load_seed(
     eng: &mut CE,
     store: &mut KS,
     id: &QuicSyncSeedId,
 ) -> Result<Option<QuicSyncSeed<CS>>> {
-    let Some(wrapped) = store.get(id.into_id())? else {
-        return Ok(None);
-    };
-    let seed = eng.unwrap(&wrapped)?;
-
-    Ok(Some(seed))
+    store.get_key(eng, id.into_id()).map_err(Into::into)
 }
 
 pub(crate) async fn load_team_psk_pairs(
