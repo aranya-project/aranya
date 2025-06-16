@@ -75,13 +75,6 @@ impl From<IdError> for Error {
     }
 }
 
-impl<T> From<tokio::sync::broadcast::error::SendError<T>> for Error {
-    fn from(err: tokio::sync::broadcast::error::SendError<T>) -> Self {
-        error!(%err);
-        Self(err.to_string())
-    }
-}
-
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
