@@ -34,7 +34,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{PskStore, State as QuicSyncState},
+        quic::{PeerCacheMap, PskStore, State as QuicSyncState},
         Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -100,6 +100,9 @@ impl Daemon {
         let span_id = span.id();
 
         async move {
+            // Create a shared PeerCacheMap
+            let caches = Arc::new(Mutex::new(BTreeMap::new()));
+
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
             let mut eng = Self::load_crypto_engine(&cfg).await?;
@@ -132,6 +135,7 @@ impl Daemon {
                 cfg.sync_addr,
                 Arc::clone(&psk_store),
                 active_team_rx,
+                caches.clone(),
             )
             .await?;
             let local_addr = sync_server.local_addr()?;
@@ -139,7 +143,7 @@ impl Daemon {
             // Sync in the background at some specified interval.
             let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
-            let state = QuicSyncState::new(psk_store.clone())?;
+            let state = QuicSyncState::new(psk_store.clone(), caches.clone())?;
             let (syncer, peers) = Syncer::new(client.clone(), send_effects, state, cfg.sync_addr);
 
             let graph_ids = client
@@ -276,6 +280,7 @@ impl Daemon {
         external_sync_addr: Addr,
         psk_store: Arc<PskStore>,
         active_team_rx: Receiver<TeamId>,
+        caches: PeerCacheMap,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
@@ -299,6 +304,7 @@ impl Daemon {
             &external_sync_addr,
             psk_store,
             active_team_rx,
+            caches,
         )
         .await
         .context("unable to initialize QUIC sync server")?;

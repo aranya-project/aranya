@@ -100,9 +100,11 @@ pub enum Error {
 
 /// Key for looking up syncer peer cache in map.
 #[derive(Ord, PartialOrd, Eq, PartialEq)]
-struct PeerCacheKey {
-    addr: Addr,
-    id: GraphId,
+pub struct PeerCacheKey {
+    /// The peer address.
+    pub addr: Addr,
+    /// The Aranya graph ID.
+    pub id: GraphId,
 }
 
 impl PeerCacheKey {
@@ -110,6 +112,11 @@ impl PeerCacheKey {
         Self { addr, id }
     }
 }
+
+/// Thread-safe map of peer caches
+/// For a given peer, there's should only be one cache. If separate caches are used
+/// for the server and state it will reduce the efficiency of the syncer.
+pub type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
 pub struct State {
@@ -122,7 +129,7 @@ pub struct State {
     store: Arc<PskStore>,
     /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
     /// Lock must be acquired after [`Self::client`]
-    caches: Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>,
+    caches: PeerCacheMap,
 }
 
 impl SyncState for State {
@@ -136,7 +143,7 @@ impl SyncState for State {
         sink: &mut S,
         server_addr: Addr,
         peer: &Addr,
-    ) -> impl Future<Output = SyncResult<()>> + Send
+    ) -> impl Future<Output = SyncResult<usize>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send,
     {
@@ -160,20 +167,19 @@ impl SyncState for State {
                 .map_err(|e| SyncError::SendSyncRequest(Box::new(e)))?;
 
             // receive sync response.
-            syncer
+            let cmd_count = syncer
                 .receive_sync_response(&mut recv, &mut sync_requester, &id, sink, peer)
                 .await
                 .map_err(|e| SyncError::ReceiveSyncResponse(Box::new(e)))?;
 
-            Ok(())
+            Ok(cmd_count)
         }
     }
 }
 
 impl State {
     /// Creates a new instance
-    pub fn new(psk_store: Arc<PskStore>) -> SyncResult<Self>
-where {
+    pub fn new(psk_store: Arc<PskStore>, caches: PeerCacheMap) -> SyncResult<Self> {
         // Create Client Config (INSECURE: Skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
@@ -201,7 +207,7 @@ where {
             client,
             conns: BTreeMap::new(),
             store: psk_store,
-            caches: Arc::new(Mutex::new(BTreeMap::new())),
+            caches,
         })
     }
 }
@@ -308,6 +314,9 @@ impl Syncer<State> {
     }
 
     #[instrument(skip(self, syncer, sink))]
+    /// Receives and processes a sync response from the server.
+    ///
+    /// Returns the number of commands that were received and successfully processed.
     async fn receive_sync_response<S, A>(
         &self,
         recv: &mut ReceiveStream,
@@ -315,7 +324,7 @@ impl Syncer<State> {
         id: &GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> SyncResult<()>
+    ) -> SyncResult<usize>
     where
         S: Sink<<crate::EN as Engine>::Effect>,
         A: Serialize + DeserializeOwned + Clone,
@@ -344,7 +353,7 @@ impl Syncer<State> {
         };
         if data.is_empty() {
             debug!("nothing to sync");
-            return Ok(());
+            return Ok(0);
         }
         if let Some(cmds) = syncer.receive(&data)? {
             debug!(num = cmds.len(), "received commands");
@@ -362,10 +371,11 @@ impl Syncer<State> {
                 //     heads,
                 // )?;
                 debug!("committed");
+                return Ok(cmds.len());
             }
         }
 
-        Ok(())
+        Ok(0)
     }
 }
 
@@ -381,7 +391,7 @@ pub struct Server<EN, SP> {
     active_team: Arc<SyncMutex<Option<TeamId>>>,
     /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
     /// Lock must be acquired after [`Self::aranya`]
-    caches: Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>,
+    caches: PeerCacheMap,
 }
 
 impl<EN, SP> Server<EN, SP> {
@@ -404,6 +414,7 @@ where
         addr: &Addr,
         server_keys: Arc<dyn SelectsPresharedKeys>,
         mut active_team_rx: mpsc::Receiver<TeamId>,
+        caches: PeerCacheMap,
     ) -> SyncResult<Self> {
         // Create Server Config
         let mut server_config = ServerConfig::builder()
@@ -448,7 +459,6 @@ where
                 }
             });
         }
-        let caches = Arc::new(Mutex::new(BTreeMap::new()));
 
         Ok(Self {
             aranya,
@@ -522,7 +532,7 @@ where
     #[instrument(skip_all, fields(peer = %peer))]
     pub async fn sync(
         client: AranyaClient<EN, SP>,
-        caches: Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>,
+        caches: PeerCacheMap,
         peer: Addr,
         stream: BidirectionalStream,
         active_team: &TeamId,
@@ -574,7 +584,7 @@ where
     #[instrument(skip_all)]
     async fn sync_respond(
         client: AranyaClient<EN, SP>,
-        caches: Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>,
+        caches: PeerCacheMap,
         addr: Addr,
         request_data: &[u8],
         active_team: &TeamId,

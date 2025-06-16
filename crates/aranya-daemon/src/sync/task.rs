@@ -171,13 +171,15 @@ struct PeerInfo {
 /// object.
 pub trait SyncState: Sized {
     /// Syncs with the peer.
+    ///
+    /// Returns the number of commands that were received and successfully processed.
     fn sync_impl<S>(
         syncer: &mut Syncer<Self>,
         id: GraphId,
         sink: &mut S,
         server_addr: Addr,
         peer: &Addr,
-    ) -> impl Future<Output = SyncResult<()>> + Send
+    ) -> impl Future<Output = SyncResult<usize>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
 }
@@ -241,7 +243,7 @@ impl<ST: SyncState> Syncer<ST> {
                 match msg {
                     Msg::SyncNow{ peer } => {
                         // sync with peer right now.
-                        self.sync(&peer.graph_id, &peer.addr).await?;
+                        let _ = self.sync(&peer.graph_id, &peer.addr).await?;
                     },
                     Msg::AddPeer { peer, cfg } => self.add_peer(peer, &cfg),
                     Msg::RemovePeer { peer } => self.remove_peer(peer),
@@ -253,31 +255,32 @@ impl<ST: SyncState> Syncer<ST> {
                 let info = self.peers.get_mut(&peer).assume("peer must exist")?;
                 info.key = self.queue.insert(peer.clone(), info.interval);
                 // sync with peer.
-                self.sync(&peer.graph_id, &peer.addr).await?;
+                let _ = self.sync(&peer.graph_id, &peer.addr).await?;
             }
         }
         Ok(())
     }
 
     /// Sync with a peer.
+    ///
+    /// Returns the number of commands that were received and successfully processed.
     #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
-    pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> SyncResult<()> {
+    pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> SyncResult<usize> {
         trace!("syncing with peer");
         let server_addr = self.server_addr;
-        let effects: Vec<EF> = {
-            let mut sink = VecSink::new();
-            <ST as SyncState>::sync_impl(self, *id, &mut sink, server_addr, peer)
-                .await
-                .context("sync_peer error")
-                .inspect_err(|err| error!("{err:?}"))?;
-            sink.collect().context("could not collect effcects")?
-        };
+        let mut sink = VecSink::new();
+        let cmd_count = <ST as SyncState>::sync_impl(self, *id, &mut sink, server_addr, peer)
+            .await
+            .context("sync_peer error")
+            .inspect_err(|err| error!("{err:?}"))?;
+        trace!(commands_received = cmd_count, "received commands from peer");
+        let effects: Vec<EF> = sink.collect().context("could not collect effcects")?;
         let n = effects.len();
         self.send_effects
             .send((*id, effects))
             .await
             .context("unable to send effects")?;
         trace!(?n, "completed sync");
-        Ok(())
+        Ok(cmd_count)
     }
 }
