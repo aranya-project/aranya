@@ -98,7 +98,7 @@ impl ClientCtx {
                 cache_dir: {cache_dir:?}
                 logs_dir: {logs_dir:?}
                 config_dir: {config_dir:?}
-                sync_addr: "localhost:0"
+                sync_addr: "127.0.0.1:0"
                 quic_sync: {{ }}
                 "#
             );
