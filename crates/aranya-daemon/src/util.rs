@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context as _, Result};
-use aranya_crypto::{Engine, Id, KeyStore, KeyStoreExt};
+use aranya_crypto::{Id, KeyStoreExt};
 use aranya_daemon_api::{QuicSyncSeed, QuicSyncSeedId, TeamId};
 use aranya_util::create_dir_all;
 use s2n_quic::provider::tls::rustls::rustls::crypto::{hash::HashAlgorithm, PresharedKey};
