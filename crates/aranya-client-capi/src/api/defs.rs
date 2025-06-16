@@ -998,7 +998,7 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
     Ok(())
 }
 
-/// Remove a team from the local device store.
+/// Remove a team from local device storage.
 ///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
