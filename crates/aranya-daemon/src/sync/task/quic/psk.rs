@@ -25,12 +25,12 @@ pub struct PskStore {
     team_identities: SyncMutex<HashMap<TeamId, Vec<Bytes>>>,
     identity_psk: SyncMutex<HashMap<Bytes, Arc<PresharedKey>>>,
     active_team: SyncMutex<Option<TeamId>>,
-    // Optional sender to report the selected identity
-    identity_tx: mpsc::Sender<Vec<u8>>,
+    // Optional sender to report the selected team
+    active_team_tx: mpsc::Sender<TeamId>,
 }
 
 impl PskStore {
-    pub(crate) fn new<I>(initial_keys: I) -> (Self, mpsc::Receiver<Vec<u8>>)
+    pub(crate) fn new<I>(initial_keys: I) -> (Self, mpsc::Receiver<TeamId>)
     where
         I: IntoIterator<Item = TeamIdPSKPair>,
     {
@@ -45,15 +45,15 @@ impl PskStore {
             identity_psk.insert(identity, psk);
         }
 
-        let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(10);
+        let (active_team_tx, active_team_rx) = mpsc::channel::<TeamId>(10);
         (
             Self {
                 active_team: SyncMutex::new(None),
                 team_identities: SyncMutex::new(team_identities),
                 identity_psk: SyncMutex::new(identity_psk),
-                identity_tx,
+                active_team_tx,
             },
-            identity_rx,
+            active_team_rx,
         )
     }
 
@@ -89,7 +89,7 @@ impl PskStore {
 }
 
 impl PresharedKeyStore for PskStore {
-    #![allow(clippy::expect_used)]
+    #[allow(clippy::expect_used)]
     fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
         let guard = self.active_team.lock().expect("poisoned active_team mutex");
         let Some(active_team) = guard.as_ref() else {
@@ -118,7 +118,7 @@ impl PresharedKeyStore for PskStore {
 }
 
 impl SelectsPresharedKeys for PskStore {
-    #![allow(clippy::expect_used)]
+    #[allow(clippy::expect_used)]
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
         self.identity_psk
             .lock()
@@ -130,11 +130,21 @@ impl SelectsPresharedKeys for PskStore {
             .cloned()
     }
 
+    #[allow(clippy::expect_used)]
     fn chosen(&self, identity: &[u8]) {
-        // Use try_send for non-blocking behavior. Ignore error if receiver dropped.
-        let _ = self
-            .identity_tx
-            .try_send(identity.to_vec())
-            .assume("Failed to send identity");
+        let team_identities = self.team_identities.lock().expect("mutex poisoned");
+
+        // TODO(Steve): More efficient approach
+        for (team_id, identities) in team_identities.iter() {
+            if identities.iter().any(|id| id == identity) {
+                // Use try_send for non-blocking behavior. Ignore error if receiver dropped.
+                let _ = self
+                    .active_team_tx
+                    .try_send(*team_id)
+                    .assume("Failed to send identity");
+
+                break;
+            }
+        }
     }
 }

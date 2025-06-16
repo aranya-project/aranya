@@ -10,14 +10,15 @@ use core::net::SocketAddr;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     future::Future,
-    sync::Arc,
+    sync::{Arc, Mutex as SyncMutex},
 };
 
 use anyhow::Context;
 use aranya_crypto::Rng;
+use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder, SyncType,
-    MAX_SYNC_MESSAGE_SIZE,
+    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequestMessage, SyncRequester,
+    SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     rustls::{NoCertResolver, SkipServerVerification},
@@ -84,6 +85,10 @@ pub enum Error {
     /// QUIC client config error
     #[error("QUIC client config error: {0}")]
     ClientConfig(anyhow::Error),
+    // TODO: Improve message
+    /// Invalid PSK used for syncing
+    #[error("Invalid PSK used when attempting to sync")]
+    InvalidPSK,
     /// QUIC server config error
     #[error("QUIC server config error: {0}")]
     ServerConfig(anyhow::Error),
@@ -351,8 +356,7 @@ pub struct Server<EN, SP> {
     server: QuicServer,
     /// Tracks running tasks.
     set: JoinSet<()>,
-    /// Identity Receiver.
-    _identity_rx: mpsc::Receiver<Vec<u8>>,
+    active_team: Arc<SyncMutex<Option<TeamId>>>,
 }
 
 impl<EN, SP> Server<EN, SP> {
@@ -374,7 +378,7 @@ where
         aranya: AranyaClient<EN, SP>,
         addr: &Addr,
         server_keys: Arc<dyn SelectsPresharedKeys>,
-        _identity_rx: mpsc::Receiver<Vec<u8>>,
+        mut active_team_rx: mpsc::Receiver<TeamId>,
     ) -> SyncResult<Self> {
         // Create Server Config
         let mut server_config = ServerConfig::builder()
@@ -404,12 +408,27 @@ where
             .start()
             .context("Could not start QUIC server")?;
 
-        let set = JoinSet::new();
+        let active_team = Arc::new(SyncMutex::new(None));
+        let mut set = JoinSet::new();
+        {
+            let active_team = Arc::clone(&active_team);
+            set.spawn(async move {
+                while let Some(team_id) = active_team_rx.recv().await {
+                    match active_team.lock() {
+                        Ok(ref mut guard) => {
+                            guard.replace(team_id);
+                        }
+                        Err(e) => error!(%e),
+                    }
+                }
+            });
+        }
+
         Ok(Self {
             aranya,
             server,
             set,
-            _identity_rx,
+            active_team,
         })
     }
 
@@ -429,13 +448,22 @@ where
                 continue;
             };
             let client = self.aranya.clone();
+            let active_team = {
+                let Ok(guard) = self.active_team.lock().inspect_err(|e| error!(%e)) else {
+                    continue;
+                };
+                let Some(active_team) = *guard else { continue };
+                active_team
+            };
             self.set.spawn(async move {
                 loop {
                     // Accept incoming streams.
                     match conn.accept_bidirectional_stream().await {
                         Ok(Some(stream)) => {
                             debug!(?peer, "received incoming QUIC stream");
-                            if let Err(e) = Self::sync(client.clone(), peer, stream).await {
+                            if let Err(e) =
+                                Self::sync(client.clone(), peer, stream, &active_team).await
+                            {
                                 error!(?e, ?peer, "server unable to sync with peer");
                                 break;
                             }
@@ -462,6 +490,7 @@ where
         client: AranyaClient<EN, SP>,
         peer: SocketAddr,
         stream: BidirectionalStream,
+        active_team: &TeamId,
     ) -> SyncResult<()> {
         info!(?peer, "server received a sync request");
 
@@ -473,7 +502,7 @@ where
         debug!(?peer, n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let sync_response_res = Self::sync_respond(client, &recv_buf)
+        let sync_response_res = Self::sync_respond(client, &recv_buf, active_team)
             .await
             .inspect_err(|e| error!(?e, "error responding to sync request"));
 
@@ -511,6 +540,7 @@ where
     async fn sync_respond(
         client: AranyaClient<EN, SP>,
         request_data: &[u8],
+        active_team: &TeamId,
     ) -> SyncResult<Box<[u8]>> {
         info!("server responding to sync request");
 
@@ -533,6 +563,8 @@ where
             bug!("Other sync types are not implemented");
         };
 
+        check_request(active_team, &request_msg)?;
+
         resp.receive(request_msg).context("sync recv failed")?;
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
@@ -548,4 +580,15 @@ where
         buf.truncate(len);
         Ok(buf.into())
     }
+}
+
+fn check_request(team_id: &TeamId, request: &SyncRequestMessage) -> SyncResult<()> {
+    let SyncRequestMessage::SyncRequest { storage_id, .. } = request else {
+        bug!("Should be a SyncRequest")
+    };
+    if team_id.as_bytes() != storage_id.as_bytes() {
+        return Err(SyncError::QuicSync(Error::InvalidPSK));
+    }
+
+    Ok(())
 }
