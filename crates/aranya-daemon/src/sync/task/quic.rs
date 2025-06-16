@@ -34,20 +34,16 @@ use s2n_quic::{
     connection::Error as ConnErr,
     provider::{
         congestion_controller::Bbr,
-        tls::rustls::{self as rustls_provider},
+        tls::rustls::{
+            self as rustls_provider,
+            rustls::{client::PresharedKeyStore, server::SelectsPresharedKeys},
+        },
     },
     stream::{BidirectionalStream, ReceiveStream, SendStream},
     Client as QuicClient, Connection, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{
-    io::AsyncReadExt,
-    sync::{
-        broadcast::{error::RecvError, Receiver},
-        mpsc,
-    },
-    task::JoinSet,
-};
+use tokio::{io::AsyncReadExt, sync::mpsc, task::JoinSet};
 use tracing::{debug, error, info, instrument};
 use version::{check_version, VERSION_ERR};
 
@@ -76,8 +72,7 @@ const QUIC_SYNC_VERSION: Version = Version::V1;
 mod psk;
 mod version;
 
-pub(crate) use psk::TeamIdPSKPair;
-pub use psk::{ClientPresharedKeys, Msg, ServerPresharedKeys};
+pub use psk::PskStore;
 pub use version::Version;
 
 /// Errors specific to the QUIC syncer
@@ -151,19 +146,15 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub fn new<I>(initial_keys: I, mut recv: Receiver<Msg>) -> SyncResult<Self>
-    where
-        I: IntoIterator<Item = TeamIdPSKPair>,
-    {
-        let client_keys = Arc::new(ClientPresharedKeys::new(initial_keys));
-
+    pub fn new(client_keys: Arc<dyn PresharedKeyStore>) -> SyncResult<Self>
+where {
         // Create Client Config (INSECURE: Skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
             .with_custom_certificate_verifier(SkipServerVerification::new())
             .with_no_client_auth();
         client_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
-        client_config.preshared_keys = client_keys.clone(); // Pass the Arc<ClientPresharedKeys>
+        client_config.preshared_keys = client_keys; // Pass the Arc<ClientPresharedKeys>
 
         // Client builder doesn't support adding preshared keys
         #[allow(deprecated)]
@@ -179,20 +170,6 @@ impl State {
             .start()
             .context("Could not start quic client")
             .map_err(Error::ClientConfig)?;
-
-        tokio::spawn(async move {
-            loop {
-                match recv.recv().await {
-                    Ok(msg) => client_keys.handle_msg(msg),
-                    Err(RecvError::Closed) => break,
-                    Err(err) => {
-                        error!(err = ?err, "unable to receive psk on broadcast channel")
-                    }
-                }
-            }
-
-            info!("PSK broadcast channel closed");
-        });
 
         Ok(Self {
             client,
@@ -390,25 +367,18 @@ where
     /// Creates a new `Server`.
     #[inline]
     #[allow(deprecated)]
-    pub async fn new<I>(
+    pub async fn new(
         aranya: AranyaClient<EN, SP>,
         addr: &Addr,
-        initial_psks: I,
-        mut recv: Receiver<Msg>,
-    ) -> SyncResult<Self>
-    where
-        I: IntoIterator<Item = TeamIdPSKPair>,
-    {
-        let (server_keys, _identity_rx) = ServerPresharedKeys::new();
-        let server_keys = Arc::new(server_keys);
-        server_keys.extend(initial_psks)?;
-
+        server_keys: Arc<dyn SelectsPresharedKeys>,
+        _identity_rx: mpsc::Receiver<Vec<u8>>,
+    ) -> SyncResult<Self> {
         // Create Server Config
         let mut server_config = ServerConfig::builder()
             .with_no_client_auth()
             .with_cert_resolver(Arc::new(NoCertResolver::default()));
         server_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
-        server_config.preshared_keys = PresharedKeySelection::Required(server_keys.clone());
+        server_config.preshared_keys = PresharedKeySelection::Required(server_keys);
 
         let tls_server_provider = rustls_provider::Server::new(server_config);
 
@@ -431,22 +401,7 @@ where
             .start()
             .context("Could not start QUIC server")?;
 
-        let mut set = JoinSet::new();
-
-        set.spawn(async move {
-            loop {
-                match recv.recv().await {
-                    Ok(msg) => server_keys.handle_msg(msg),
-                    Err(RecvError::Closed) => break,
-                    Err(err) => {
-                        error!(err = ?err, "unable to receive psk on broadcast channel")
-                    }
-                }
-            }
-
-            info!("PSK broadcast channel closed");
-        });
-
+        let set = JoinSet::new();
         Ok(Self {
             aranya,
             server,

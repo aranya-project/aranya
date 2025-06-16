@@ -1,4 +1,4 @@
-use std::{path::Path, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context as _, Result};
 use aranya_crypto::{Engine, Id, KeyStore};
@@ -12,11 +12,13 @@ use tokio::{
 
 use crate::{CE, CS, KS};
 
-pub(crate) struct SeedDir<'a>(&'a Path);
+#[derive(Debug)]
+pub(crate) struct SeedDir(PathBuf);
 
-impl<'a> SeedDir<'a> {
-    pub(crate) async fn new(p: &'a Path) -> Result<Self> {
-        create_dir_all(p).await?;
+impl SeedDir {
+    pub(crate) async fn new(p: PathBuf) -> Result<Self> {
+        let p = p.into();
+        create_dir_all(&p).await?;
         Ok(Self(p))
     }
 
@@ -47,9 +49,13 @@ impl<'a> SeedDir<'a> {
             let team_id = Id::decode(file_name).map(Into::into)?;
 
             let seed_id = {
+                const ID_SIZE: usize = size_of::<Id>();
                 let bytes = read(entry.path()).await?;
-                let arr: [u8; size_of::<Id>()] = bytes.try_into().map_err(|input| {
-                    anyhow::anyhow!("could not convert {:?} to an array", input)
+                let arr: [u8; ID_SIZE] = bytes.try_into().map_err(|input| {
+                    anyhow::anyhow!(
+                        "could not convert {:?} to an array of {ID_SIZE} bytes",
+                        input
+                    )
                 })?;
                 arr.into()
             };
@@ -74,10 +80,10 @@ fn load_seed(
     Ok(Some(seed))
 }
 
-pub(crate) async fn load_team_psk_pairs<'a>(
+pub(crate) async fn load_team_psk_pairs(
     eng: &mut CE,
     store: &mut KS,
-    dir: &'a SeedDir<'a>,
+    dir: &SeedDir,
 ) -> Result<Vec<(TeamId, Arc<PresharedKey>)>> {
     let pairs = dir.list().await?;
     let mut out = Vec::new();
@@ -116,7 +122,7 @@ mod tests {
         let tmp_dir = tempdir()?;
         let path = tmp_dir.path().join("seeds");
 
-        let seed_dir = SeedDir::new(&path)
+        let seed_dir = SeedDir::new(path)
             .await
             .context("could not create seed dir")?;
 
