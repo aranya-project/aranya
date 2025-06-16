@@ -7,6 +7,7 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
+use aranya_daemon_api::TeamId;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -117,7 +118,7 @@ impl Daemon {
             let seed_id_dir = SeedDir::new(cfg.seed_id_path().to_path_buf()).await?;
             let initial_keys =
                 load_team_psk_pairs(&mut eng, &mut local_store, &seed_id_dir).await?;
-            let (psk_store, identity_rx) = PskStore::new(initial_keys);
+            let (psk_store, active_team_rx) = PskStore::new(initial_keys);
             let psk_store = Arc::new(psk_store);
 
             // Initialize Aranya client.
@@ -130,7 +131,7 @@ impl Daemon {
                 &pks,
                 cfg.sync_addr,
                 Arc::clone(&psk_store),
-                identity_rx,
+                active_team_rx,
             )
             .await?;
             let local_addr = sync_server.local_addr()?;
@@ -274,7 +275,7 @@ impl Daemon {
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
         psk_store: Arc<PskStore>,
-        identity_rx: Receiver<Vec<u8>>,
+        active_team_rx: Receiver<TeamId>,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
@@ -293,9 +294,14 @@ impl Daemon {
         };
 
         info!(addr = %external_sync_addr, "starting QUIC sync server");
-        let server = SyncServer::new(client.clone(), &external_sync_addr, psk_store, identity_rx)
-            .await
-            .context("unable to initialize QUIC sync server")?;
+        let server = SyncServer::new(
+            client.clone(),
+            &external_sync_addr,
+            psk_store,
+            active_team_rx,
+        )
+        .await
+        .context("unable to initialize QUIC sync server")?;
 
         info!(device_id = %device_id, "set up Aranya");
 
