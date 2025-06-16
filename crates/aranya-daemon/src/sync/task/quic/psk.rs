@@ -8,12 +8,11 @@ use std::{
 use anyhow::{bail, Result};
 use aranya_daemon_api::TeamId;
 use buggy::BugExt as _;
-use bytes::Bytes;
 use s2n_quic::provider::tls::rustls::rustls::{
     client, crypto::PresharedKey, pki_types::ServerName, server,
 };
 use tokio::sync::mpsc;
-use tracing::error;
+use tracing::{error, warn};
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
@@ -31,15 +30,15 @@ impl PskStore {
     where
         I: IntoIterator<Item = TeamIdPSKPair>,
     {
-        let mut team_identities = HashMap::new();
+        let mut team_identities = HashMap::<TeamId, Vec<Arc<PresharedKey>>>::new();
         let mut identity_psk = HashMap::new();
 
         for (team_id, psk) in initial_keys {
-            let identity = Bytes::copy_from_slice(psk.identity());
-            let identities: &mut Vec<Bytes> = team_identities.entry(team_id).or_default();
-            identities.push(identity.clone());
-
-            identity_psk.insert(identity, psk);
+            team_identities
+                .entry(team_id)
+                .or_default()
+                .push(Arc::clone(&psk));
+            identity_psk.insert(PskIdAsKey(psk), team_id);
         }
 
         let (active_team_tx, active_team_rx) = mpsc::channel::<TeamId>(10);
@@ -59,14 +58,12 @@ impl PskStore {
     pub(crate) fn insert(&self, team_id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
         match self.inner.lock() {
             Ok(ref mut inner) => {
-                let identity = Bytes::copy_from_slice(psk.identity());
-
-                {
-                    let identities = inner.team_identities.entry(team_id).or_default();
-                    identities.push(identity.clone());
-                }
-
-                inner.identity_psk.insert(identity, psk);
+                inner
+                    .team_identities
+                    .entry(team_id)
+                    .or_default()
+                    .push(Arc::clone(&psk));
+                inner.identity_psk.insert(PskIdAsKey(psk), team_id);
                 Ok(())
             }
             Err(e) => bail!(e.to_string()),
@@ -95,14 +92,7 @@ impl client::PresharedKeyStore for PskStore {
         let Some(active_identities) = inner.team_identities.get(active_team) else {
             return Vec::new();
         };
-
-        let mut psks = Vec::new();
-        for identity in active_identities {
-            if let Some(psk) = inner.identity_psk.get(identity) {
-                psks.push(Arc::clone(psk));
-            }
-        }
-        psks
+        active_identities.clone()
     }
 }
 
@@ -115,31 +105,46 @@ impl server::SelectsPresharedKeys for PskStore {
             .inspect_err(|e| error!("mutex poisoned: {e}"))
             .ok()?;
 
-        inner.identity_psk.get(identity).cloned()
+        let (k, _) = inner.identity_psk.get_key_value(identity)?;
+        Some(k.0.clone())
     }
 
     #[allow(clippy::expect_used)]
     fn chosen(&self, identity: &[u8]) {
         let inner = self.inner.lock().expect("poisoned mutex");
-
-        // TODO(Steve): More efficient approach
-        for (team_id, identities) in inner.team_identities.iter() {
-            if identities.iter().any(|id| id == identity) {
-                // Use try_send for non-blocking behavior. Ignore error if receiver dropped.
-                let _ = self
-                    .active_team_tx
-                    .try_send(*team_id)
-                    .assume("Failed to send identity");
-
-                break;
-            }
-        }
+        let Some(team_id) = inner.identity_psk.get(identity) else {
+            warn!("identity removed?");
+            return;
+        };
+        self.active_team_tx
+            .try_send(*team_id)
+            .assume("Failed to send identity")
+            .ok();
     }
 }
 
 #[derive(Debug)]
 struct PskStoreInner {
-    team_identities: HashMap<TeamId, Vec<Bytes>>,
-    identity_psk: HashMap<Bytes, Arc<PresharedKey>>,
+    team_identities: HashMap<TeamId, Vec<Arc<PresharedKey>>>,
+    identity_psk: HashMap<PskIdAsKey, TeamId>,
     active_team: Option<TeamId>,
+}
+
+#[derive(Debug)]
+struct PskIdAsKey(Arc<PresharedKey>);
+impl core::hash::Hash for PskIdAsKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.identity().hash(state);
+    }
+}
+impl core::borrow::Borrow<[u8]> for PskIdAsKey {
+    fn borrow(&self) -> &[u8] {
+        self.0.identity()
+    }
+}
+impl Eq for PskIdAsKey {}
+impl PartialEq for PskIdAsKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.identity() == other.0.identity()
+    }
 }
