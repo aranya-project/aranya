@@ -27,7 +27,6 @@ postcard = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
-thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-serde = { version = "0.9", features = ["messagepack"] }
 tracing = { workspace = true }
