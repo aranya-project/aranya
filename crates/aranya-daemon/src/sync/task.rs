@@ -52,7 +52,7 @@ impl fmt::Display for SyncPeer {
 
 /// Handles adding and removing sync peers.
 #[derive(Clone, Debug)]
-pub struct SyncPeers {
+pub(crate) struct SyncPeers {
     /// Send messages to add/remove peers.
     send: mpsc::Sender<Msg>,
     /// Configuration values for syncing
@@ -152,7 +152,7 @@ type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
-pub struct Syncer<ST> {
+pub(crate) struct Syncer<ST> {
     /// Aranya client to allow syncing the Aranya graph with another peer.
     pub client: Client,
     /// Keeps track of peer info.
@@ -179,7 +179,7 @@ struct PeerInfo {
 
 /// Types that contain additional data that are part of a [`Syncer`]
 /// object.
-pub trait SyncState: Sized {
+pub(crate) trait SyncState: Sized {
     /// Syncs with the peer.
     fn sync_impl<S>(
         syncer: &mut Syncer<Self>,
@@ -193,7 +193,7 @@ pub trait SyncState: Sized {
 
 impl<ST> Syncer<ST> {
     /// Creates a new `Syncer`.
-    pub fn new(
+    pub(crate) fn new(
         client: Client,
         send_effects: EffectSender,
         invalid: InvalidGraphs,
@@ -270,7 +270,7 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer))]
-    pub async fn sync(&mut self, peer: &SyncPeer) -> anyhow::Result<()> {
+    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> anyhow::Result<()> {
         trace!("syncing with peer");
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
@@ -282,7 +282,7 @@ impl<ST: SyncState> Syncer<ST> {
                 if let SyncerError::ClientError(ClientError::ParallelFinalize) = e {
                     // Remove sync peers for graph that had finalization error.
                     self.peers.retain(|p, _| p.graph_id != peer.graph_id);
-                    self.invalid.blocking_write().insert(peer.graph_id);
+                    self.invalid.insert(peer.graph_id);
                 }
                 return Err(e.into());
             }

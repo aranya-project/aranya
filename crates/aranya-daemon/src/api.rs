@@ -6,7 +6,7 @@
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{anyhow, Context as _};
 use aranya_crypto::{Csprng, Rng};
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
@@ -80,7 +80,7 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
         invalid: InvalidGraphs,
         aqc: Aqc<CE, KS>,
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
         let aqc = Arc::new(aqc);
         let effect_handler = EffectHandler {
@@ -165,7 +165,7 @@ struct EffectHandler {
 impl EffectHandler {
     /// Handles effects resulting from invoking an Aranya action.
     #[instrument(skip_all, fields(%graph, effects = effects.len()))]
-    async fn handle_effects(&self, graph: GraphId, effects: &[Effect]) -> Result<()> {
+    async fn handle_effects(&self, graph: GraphId, effects: &[Effect]) -> anyhow::Result<()> {
         trace!("handling effects");
 
         use Effect::*;
@@ -255,14 +255,10 @@ impl Deref for Api {
 impl Api {
     /// Checks wither a team's graph is valid.
     /// If the graph is not valid, return an error to prevent operations on the invalid graph.
-    async fn check_team_valid(&self, team: api::TeamId) -> api::Result<()> {
-        if self.invalid.read().await.contains(&team.into_id().into()) {
+    async fn check_team_valid(&self, team: api::TeamId) -> anyhow::Result<()> {
+        if self.invalid.contains(team.into_id().into()) {
             // TODO: return custom daemon error type
-            return Err(anyhow!(format!(
-                "team invalid due to graph finalization error: {:}",
-                team.into_id()
-            ))
-            .into());
+            anyhow::bail!("team {team} invalid due to graph finalization error")
         }
         Ok(())
     }

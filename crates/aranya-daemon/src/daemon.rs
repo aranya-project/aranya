@@ -1,9 +1,4 @@
-use std::{
-    collections::{BTreeMap, HashSet},
-    io,
-    path::Path,
-    sync::Arc,
-};
+use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -16,19 +11,14 @@ use aranya_daemon_api::CS;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
-    ClientState, GraphId, StorageProvider,
+    ClientState, StorageProvider,
 };
 use aranya_util::Addr;
 use bimap::BiBTreeMap;
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{
-    fs,
-    net::TcpListener,
-    sync::{Mutex, RwLock},
-    task::JoinSet,
-};
+use tokio::{fs, net::TcpListener, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
@@ -58,11 +48,39 @@ pub(crate) type EF = policy::Effect;
 pub(crate) type Client = aranya::Client<EN, SP>;
 type TcpSyncServer = crate::sync::tcp::Server<EN, SP>;
 
-/// Keeps track of which graphs have had a finalization error.
-/// Once a finalization error has occurred for a graph,
-/// the graph error is permanent.
-/// The API will prevent subsequent operations on the invalid graph.
-pub(crate) type InvalidGraphs = Arc<RwLock<HashSet<GraphId>>>;
+mod invalid_graphs {
+    use std::{
+        collections::HashSet,
+        sync::{Arc, RwLock},
+    };
+
+    use aranya_runtime::GraphId;
+
+    /// Keeps track of which graphs have had a finalization error.
+    ///
+    /// Once a finalization error has occurred for a graph,
+    /// the graph error is permanent.
+    /// The API will prevent subsequent operations on the invalid graph.
+    #[derive(Clone, Debug, Default)]
+    pub(crate) struct InvalidGraphs {
+        // NB: Since the locking is short and not held over await points,
+        // we use a standard rwlock instead of tokio's.
+        map: Arc<RwLock<HashSet<GraphId>>>,
+    }
+
+    impl InvalidGraphs {
+        pub fn insert(&self, graph_id: GraphId) {
+            #[allow(clippy::expect_used)]
+            self.map.write().expect("poisoned").insert(graph_id);
+        }
+
+        pub fn contains(&self, graph_id: GraphId) -> bool {
+            #[allow(clippy::expect_used)]
+            self.map.read().expect("poisoned").contains(&graph_id)
+        }
+    }
+}
+pub(crate) use invalid_graphs::InvalidGraphs;
 
 /// Handle for the spawned daemon.
 ///
@@ -136,7 +154,7 @@ impl Daemon {
 
             // Sync in the background at some specified interval.
             let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-            let invalid_graphs = Arc::new(RwLock::new(HashSet::<GraphId>::new()));
+            let invalid_graphs = InvalidGraphs::default();
             let (syncer, peers) = Syncer::new(
                 client.clone(),
                 send_effects,
