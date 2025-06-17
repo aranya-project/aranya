@@ -147,6 +147,7 @@ impl SyncPeers {
 }
 
 type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
+type FinalizationSender = mpsc::Sender<GraphId>;
 
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
@@ -162,6 +163,8 @@ pub struct Syncer<ST> {
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
+    /// Used to notify the API if a finalization error has occurred for a graph.
+    send_fin: FinalizationSender,
     /// Additional state used by the syncer
     _state: ST,
 }
@@ -190,7 +193,12 @@ pub trait SyncState: Sized {
 
 impl<ST> Syncer<ST> {
     /// Creates a new `Syncer`.
-    pub fn new(client: Client, send_effects: EffectSender, _state: ST) -> (Self, SyncPeers) {
+    pub fn new(
+        client: Client,
+        send_effects: EffectSender,
+        send_fin: FinalizationSender,
+        _state: ST,
+    ) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -200,6 +208,7 @@ impl<ST> Syncer<ST> {
                 recv,
                 queue: DelayQueue::new(),
                 send_effects,
+                send_fin,
                 _state,
             },
             peers,
@@ -280,6 +289,10 @@ impl<ST: SyncState> Syncer<ST> {
                     for p in v {
                         self.peers.remove(&p);
                     }
+                    self.send_fin
+                        .send(peer.graph_id)
+                        .await
+                        .context("unable to notify API of finalization error")?;
                 }
                 return Err(e.into());
             }

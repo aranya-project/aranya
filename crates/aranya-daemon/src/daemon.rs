@@ -120,7 +120,8 @@ impl Daemon {
 
             // Sync in the background at some specified interval.
             let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-            let (syncer, peers) = Syncer::new(client.clone(), send_effects, TCPSyncState);
+            let (send_fin, recv_fin) = tokio::sync::mpsc::channel(256);
+            let (syncer, peers) = Syncer::new(client.clone(), send_effects, send_fin, TCPSyncState);
 
             let graph_ids = client
                 .aranya
@@ -156,6 +157,7 @@ impl Daemon {
                 pks,
                 peers,
                 recv_effects,
+                recv_fin,
                 aqc,
             )?;
             Ok(Self {
