@@ -45,7 +45,7 @@ struct SyncPeer {
 
 /// Handles adding and removing sync peers.
 #[derive(Clone, Debug)]
-pub(crate) struct SyncPeers {
+pub struct SyncPeers {
     /// Send messages to add/remove peers.
     send: mpsc::Sender<Msg>,
     /// Configuration values for syncing
@@ -141,7 +141,7 @@ type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
-pub(crate) struct Syncer<ST> {
+pub struct Syncer<ST> {
     /// Aranya client to allow syncing the Aranya graph with another peer.
     pub client: Client,
     /// Keeps track of peer info.
@@ -167,7 +167,7 @@ struct PeerInfo {
 
 /// Types that contain additional data that are part of a [`Syncer`]
 /// object.
-pub(crate) trait SyncState: Sized {
+pub trait SyncState: Sized {
     /// Syncs with the peer.
     fn sync_impl<S>(
         syncer: &mut Syncer<Self>,
