@@ -271,7 +271,13 @@ impl<ST: SyncState> Syncer<ST> {
                     .is_some_and(|err| matches!(err, ClientError::ParallelFinalize))
                 {
                     // Remove sync peers for graph that had finalization error.
-                    self.peers.retain(|p, _| p.graph_id != peer.graph_id);
+                    self.peers.retain(|p, info| {
+                        let keep = p.graph_id != peer.graph_id;
+                        if !keep {
+                            self.queue.remove(&info.key);
+                        }
+                        keep
+                    });
                     self.invalid.insert(peer.graph_id);
                 }
                 return Err(e);
