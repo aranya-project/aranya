@@ -1,13 +1,12 @@
 //! Aranya TCP client and server for syncing Aranya graph commands.
 
 use core::net::SocketAddr;
-use std::io;
 
-use anyhow::Context;
+use anyhow::{bail, Context, Result};
 use aranya_crypto::Rng;
 use aranya_runtime::{
-    ClientError, Engine, GraphId, PeerCache, Sink, StorageProvider, SyncError, SyncRequester,
-    SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
+    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequester, SyncResponder, SyncType,
+    MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{task::scope, Addr};
 use buggy::bug;
@@ -20,35 +19,6 @@ use tracing::{debug, error, info_span, instrument, Instrument};
 use super::task::{SyncResponse, SyncState};
 use crate::aranya::Client as AranyaClient;
 
-/// Possible errors that could happen when using Aranya QUIC Channels.
-#[derive(Debug, thiserror::Error)]
-#[non_exhaustive]
-pub enum SyncerError {
-    /// Sync response error.
-    #[error("sync response error")]
-    SyncResponse,
-
-    /// Sync poll error.
-    #[error("sync poll error: {0}")]
-    SyncPoll(#[from] SyncError),
-
-    /// Aranya runtime client error.
-    #[error("client error error: {0}")]
-    ClientError(#[from] ClientError),
-
-    /// IO error.
-    #[error("IO error: {0}")]
-    IO(#[from] io::Error),
-
-    /// An internal bug was discovered.
-    #[error("internal bug: {0}")]
-    Bug(#[from] buggy::Bug),
-
-    /// Other uncategorized error.
-    #[error("other: {0}")]
-    Other(#[from] anyhow::Error),
-}
-
 /// Data used for sending sync requests and processing sync responses
 pub struct State;
 
@@ -60,7 +30,7 @@ impl SyncState for State {
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> Result<(), SyncerError>
+    ) -> Result<()>
     where
         S: Sink<<crate::EN as Engine>::Effect>,
     {
@@ -76,7 +46,7 @@ impl SyncState for State {
             // TODO: save PeerCache somewhere.
             sync_requester
                 .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
-                .with_context(|| "sync poll failed")?
+                .context("sync poll failed")?
         };
         debug!(?len, "sync poll finished");
         send_buf.truncate(len);
@@ -86,7 +56,7 @@ impl SyncState for State {
         stream
             .write_all(&send_buf)
             .await
-            .with_context(|| "failed to write sync request")?;
+            .context("failed to write sync request")?;
         stream.shutdown().await?;
         debug!(?addr, "sent sync request");
 
@@ -95,7 +65,7 @@ impl SyncState for State {
         stream
             .read_to_end(&mut recv)
             .await
-            .with_context(|| "faile to read sync response")?;
+            .context("failed to read sync response")?;
         debug!(?addr, n = recv.len(), "received sync response");
 
         // process the sync response.
@@ -103,9 +73,7 @@ impl SyncState for State {
             postcard::from_bytes(&recv).context("postcard unable to deserialize sync response")?;
         let data = match resp {
             SyncResponse::Ok(data) => data,
-            SyncResponse::Err(msg) => {
-                return Err(SyncerError::SyncResponse).with_context(|| msg)?;
-            }
+            SyncResponse::Err(msg) => bail!("sync error: {msg}"),
         };
         if data.is_empty() {
             debug!("nothing to sync");
@@ -120,10 +88,7 @@ impl SyncState for State {
                 client
                     .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
-                client
-                    .commit(&mut trx, sink)
-                    .with_context(|| "commit failed")?;
-
+                client.commit(&mut trx, sink).context("commit failed")?;
                 // TODO: Update heads
                 // client.update_heads(
                 //     id,
@@ -155,7 +120,7 @@ impl<EN, SP> Server<EN, SP> {
     }
 
     /// Returns the local address the sync server bound to.
-    pub(crate) fn local_addr(&self) -> Result<SocketAddr, anyhow::Error> {
+    pub(crate) fn local_addr(&self) -> Result<SocketAddr> {
         Ok(self.listener.local_addr()?)
     }
 }
@@ -201,7 +166,7 @@ where
         client: AranyaClient<EN, SP>,
         stream: &mut TcpStream,
         addr: SocketAddr,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let mut recv = Vec::new();
         stream
             .read_to_end(&mut recv)
@@ -230,10 +195,7 @@ where
 
     /// Generates a sync response for a sync request.
     #[instrument(skip_all)]
-    async fn sync_respond(
-        client: AranyaClient<EN, SP>,
-        request: &[u8],
-    ) -> anyhow::Result<Box<[u8]>> {
+    async fn sync_respond(client: AranyaClient<EN, SP>, request: &[u8]) -> Result<Box<[u8]>> {
         // TODO: Use real server address
         let server_address = ();
         let mut resp = SyncResponder::new(server_address);

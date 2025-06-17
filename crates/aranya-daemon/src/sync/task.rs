@@ -6,9 +6,9 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, fmt, future::Future, time::Duration};
+use std::{collections::HashMap, future::Future, time::Duration};
 
-use anyhow::Context;
+use anyhow::{Context, Result};
 use aranya_daemon_api::SyncPeerConfig;
 use aranya_runtime::{storage::GraphId, ClientError, Engine, Sink};
 use aranya_util::Addr;
@@ -21,7 +21,6 @@ use tracing::{error, instrument, trace};
 
 use crate::{
     daemon::{Client, EF},
-    sync::tcp::SyncerError,
     vm_policy::VecSink,
     InvalidGraphs,
 };
@@ -42,12 +41,6 @@ enum Msg {
 struct SyncPeer {
     addr: Addr,
     graph_id: GraphId,
-}
-
-impl fmt::Display for SyncPeer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", &self)
-    }
 }
 
 /// Handles adding and removing sync peers.
@@ -83,7 +76,7 @@ impl SyncPeers {
         addr: Addr,
         graph_id: GraphId,
         cfg: SyncPeerConfig,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let peer = Msg::AddPeer {
             peer: SyncPeer { addr, graph_id },
             cfg: cfg.clone(),
@@ -102,11 +95,7 @@ impl SyncPeers {
     }
 
     /// Remove peer from [`Syncer`].
-    pub(crate) async fn remove_peer(
-        &mut self,
-        addr: Addr,
-        graph_id: GraphId,
-    ) -> anyhow::Result<()> {
+    pub(crate) async fn remove_peer(&mut self, addr: Addr, graph_id: GraphId) -> Result<()> {
         if let Err(e) = self
             .send
             .send(Msg::RemovePeer {
@@ -130,7 +119,7 @@ impl SyncPeers {
         addr: Addr,
         graph_id: GraphId,
         _cfg: Option<SyncPeerConfig>,
-    ) -> anyhow::Result<()> {
+    ) -> Result<()> {
         let peer = Msg::SyncNow {
             peer: SyncPeer { addr, graph_id },
         };
@@ -169,7 +158,6 @@ pub(crate) struct Syncer<ST> {
     _state: ST,
 }
 
-#[derive(Debug, Clone)]
 struct PeerInfo {
     /// Sync interval.
     interval: Duration,
@@ -186,7 +174,7 @@ pub(crate) trait SyncState: Sized {
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> impl Future<Output = Result<(), SyncerError>> + Send
+    ) -> impl Future<Output = Result<()>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
 }
@@ -241,7 +229,7 @@ impl<ST> Syncer<ST> {
 
 impl<ST: SyncState> Syncer<ST> {
     /// Syncs with the next peer in the list.
-    pub(crate) async fn next(&mut self) -> anyhow::Result<()> {
+    pub(crate) async fn next(&mut self) -> Result<()> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
@@ -269,8 +257,8 @@ impl<ST: SyncState> Syncer<ST> {
     }
 
     /// Sync with a peer.
-    #[instrument(skip_all, fields(peer = %peer))]
-    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> anyhow::Result<()> {
+    #[instrument(skip_all, fields(peer = ?peer))]
+    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> Result<()> {
         trace!("syncing with peer");
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
@@ -279,12 +267,14 @@ impl<ST: SyncState> Syncer<ST> {
                 .inspect_err(|err| error!("{err:?}"))
             {
                 // If a finalization error has occurred, remove all sync peers for that team.
-                if let SyncerError::ClientError(ClientError::ParallelFinalize) = e {
+                if e.downcast_ref::<ClientError>()
+                    .is_some_and(|err| matches!(err, ClientError::ParallelFinalize))
+                {
                     // Remove sync peers for graph that had finalization error.
                     self.peers.retain(|p, _| p.graph_id != peer.graph_id);
                     self.invalid.insert(peer.graph_id);
                 }
-                return Err(e.into());
+                return Err(e);
             }
             sink.collect()?
         };

@@ -46,7 +46,6 @@ futures-util = { workspace = true }
 postcard = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
-thiserror = { workspace = true }
 tokio = { workspace = true, features = [
     "rt-multi-thread",
     "io-util",
