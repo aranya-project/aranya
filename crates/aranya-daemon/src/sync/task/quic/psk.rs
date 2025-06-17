@@ -8,13 +8,11 @@ use std::{
 use anyhow::{bail, Result};
 use aranya_daemon_api::TeamId;
 use buggy::BugExt as _;
-use bytes::Bytes;
 use s2n_quic::provider::tls::rustls::rustls::{
-    client::PresharedKeyStore, crypto::PresharedKey, pki_types::ServerName,
-    server::SelectsPresharedKeys,
+    client, crypto::PresharedKey, pki_types::ServerName, server,
 };
 use tokio::sync::mpsc;
-use tracing::error;
+use tracing::{error, warn};
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
@@ -22,9 +20,7 @@ pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 /// and [`super::Server`]
 #[derive(Debug)]
 pub struct PskStore {
-    team_identities: SyncMutex<HashMap<TeamId, Vec<Bytes>>>,
-    identity_psk: SyncMutex<HashMap<Bytes, Arc<PresharedKey>>>,
-    active_team: SyncMutex<Option<TeamId>>,
+    inner: SyncMutex<PskStoreInner>,
     // Optional sender to report the selected team
     active_team_tx: mpsc::Sender<TeamId>,
 }
@@ -34,23 +30,25 @@ impl PskStore {
     where
         I: IntoIterator<Item = TeamIdPSKPair>,
     {
-        let mut team_identities = HashMap::new();
+        let mut team_identities = HashMap::<TeamId, Vec<Arc<PresharedKey>>>::new();
         let mut identity_psk = HashMap::new();
 
         for (team_id, psk) in initial_keys {
-            let identity = Bytes::copy_from_slice(psk.identity());
-            let identities: &mut Vec<Bytes> = team_identities.entry(team_id).or_default();
-            identities.push(identity.clone());
-
-            identity_psk.insert(identity, psk);
+            team_identities
+                .entry(team_id)
+                .or_default()
+                .push(Arc::clone(&psk));
+            identity_psk.insert(PskIdAsKey(psk), team_id);
         }
 
         let (active_team_tx, active_team_rx) = mpsc::channel::<TeamId>(10);
         (
             Self {
-                active_team: SyncMutex::new(None),
-                team_identities: SyncMutex::new(team_identities),
-                identity_psk: SyncMutex::new(identity_psk),
+                inner: SyncMutex::new(PskStoreInner {
+                    active_team: None,
+                    team_identities,
+                    identity_psk,
+                }),
                 active_team_tx,
             },
             active_team_rx,
@@ -58,20 +56,18 @@ impl PskStore {
     }
 
     pub(crate) fn insert(&self, team_id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
-        match (self.team_identities.lock(), self.identity_psk.lock()) {
-            // Use a single mutex for both maps?
-            (Ok(ref mut id_team), Ok(ref mut id_psk)) => {
-                let identity = Bytes::copy_from_slice(psk.identity());
-                let identities = id_team.entry(team_id).or_default();
-                identities.push(identity.clone());
-                id_psk.insert(identity, psk);
+        match self.inner.lock() {
+            Ok(ref mut inner) => {
+                inner
+                    .team_identities
+                    .entry(team_id)
+                    .or_default()
+                    .push(Arc::clone(&psk));
+                inner.identity_psk.insert(PskIdAsKey(psk), team_id);
+                Ok(())
             }
-            (Err(e1), Err(e2)) => bail!("err1: {e1}, err2: {e2}"),
-            (Err(e), _) => bail!(e.to_string()),
-            (_, Err(e)) => bail!(e.to_string()),
+            Err(e) => bail!(e.to_string()),
         }
-
-        Ok(())
     }
 
     pub(crate) fn remove(&self, _id: TeamId) -> Result<()> {
@@ -80,71 +76,75 @@ impl PskStore {
 
     #[allow(clippy::expect_used)]
     pub(crate) fn set_team(&self, team_id: TeamId) {
-        let _ = self
-            .active_team
-            .lock()
-            .expect("poisoned active team mutex")
-            .replace(team_id);
+        let mut inner = self.inner.lock().expect("poisoned mutex");
+        let _ = inner.active_team.replace(team_id);
     }
 }
 
-impl PresharedKeyStore for PskStore {
+impl client::PresharedKeyStore for PskStore {
     #[allow(clippy::expect_used)]
     fn psks(&self, _server_name: &ServerName<'_>) -> Vec<Arc<PresharedKey>> {
-        let guard = self.active_team.lock().expect("poisoned active_team mutex");
-        let Some(active_team) = guard.as_ref() else {
+        let inner = self.inner.lock().expect("poisoned mutex");
+
+        let Some(active_team) = inner.active_team.as_ref() else {
             return Vec::new();
         };
-
-        // TODO: don't panic here.
-        let team_ids = self
-            .team_identities
-            .lock()
-            .expect("Client PSK mutex poisoned");
-
-        let Some(active_identities) = team_ids.get(active_team) else {
+        let Some(active_identities) = inner.team_identities.get(active_team) else {
             return Vec::new();
         };
-        let id_psks = self.identity_psk.lock().expect("Client PSK mutex poisoned");
-        let mut psks = Vec::new();
-
-        for identity in active_identities {
-            if let Some(psk) = id_psks.get(identity) {
-                psks.push(Arc::clone(psk));
-            }
-        }
-        psks
+        active_identities.clone()
     }
 }
 
-impl SelectsPresharedKeys for PskStore {
+impl server::SelectsPresharedKeys for PskStore {
     #[allow(clippy::expect_used)]
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
-        self.identity_psk
+        let inner = self
+            .inner
             .lock()
-            .inspect_err(|e| {
-                error!("Server mutex poisoned: {e}");
-            })
-            .ok()?
-            .get(identity)
-            .cloned()
+            .inspect_err(|e| error!("mutex poisoned: {e}"))
+            .ok()?;
+
+        let (k, _) = inner.identity_psk.get_key_value(identity)?;
+        Some(k.0.clone())
     }
 
     #[allow(clippy::expect_used)]
     fn chosen(&self, identity: &[u8]) {
-        let team_identities = self.team_identities.lock().expect("mutex poisoned");
+        let inner = self.inner.lock().expect("poisoned mutex");
+        let Some(team_id) = inner.identity_psk.get(identity) else {
+            warn!("identity removed?");
+            return;
+        };
+        self.active_team_tx
+            .try_send(*team_id)
+            .assume("Failed to send identity")
+            .ok();
+    }
+}
 
-        // TODO(Steve): More efficient approach
-        for (team_id, identities) in team_identities.iter() {
-            if identities.iter().any(|id| id == identity) {
-                // Use try_send for non-blocking behavior. Ignore error if receiver dropped.
-                let _ = self
-                    .active_team_tx
-                    .try_send(*team_id)
-                    .assume("Failed to send identity");
+#[derive(Debug)]
+struct PskStoreInner {
+    team_identities: HashMap<TeamId, Vec<Arc<PresharedKey>>>,
+    identity_psk: HashMap<PskIdAsKey, TeamId>,
+    active_team: Option<TeamId>,
+}
 
-                break;
-            }
-        }
+#[derive(Debug)]
+struct PskIdAsKey(Arc<PresharedKey>);
+impl core::hash::Hash for PskIdAsKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.identity().hash(state);
+    }
+}
+impl core::borrow::Borrow<[u8]> for PskIdAsKey {
+    fn borrow(&self) -> &[u8] {
+        self.0.identity()
+    }
+}
+impl Eq for PskIdAsKey {}
+impl PartialEq for PskIdAsKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.identity() == other.0.identity()
     }
 }
