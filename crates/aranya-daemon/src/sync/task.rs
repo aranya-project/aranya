@@ -274,7 +274,7 @@ impl<ST: SyncState> Syncer<ST> {
             .context("sync_peer error")
             .inspect_err(|err| error!("{err:?}"))?;
         trace!(commands_received = cmd_count, "received commands from peer");
-        let effects: Vec<EF> = sink.collect().context("could not collect effcects")?;
+        let effects: Vec<EF> = sink.collect().context("could not collect effects")?;
         let n = effects.len();
         self.send_effects
             .send((*id, effects))
