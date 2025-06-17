@@ -48,6 +48,11 @@ macro_rules! find_effect {
 
 type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
 
+/// Notifies this API that a finalization error has occurred in a graph.
+/// After receiving a finalization error for a graph, the graph should be removed from storage.
+/// All team operations in this API should return a finalization error for the graph.
+type FinalizationReceiver = mpsc::Receiver<GraphId>;
+
 /// Daemon API Server.
 #[derive(Debug)]
 pub(crate) struct DaemonApiServer {
@@ -60,6 +65,8 @@ pub(crate) struct DaemonApiServer {
 
     /// Channel for receiving effects from the syncer.
     recv_effects: EffectReceiver,
+    /// Channel for receiving finalization error notification.
+    recv_fin: FinalizationReceiver,
 
     /// Api Handler.
     api: Api,
@@ -78,6 +85,7 @@ impl DaemonApiServer {
         pk: PublicKeys<CS>,
         peers: SyncPeers,
         recv_effects: EffectReceiver,
+        recv_fin: FinalizationReceiver,
         aqc: Aqc<CE, KS>,
     ) -> Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
@@ -85,18 +93,21 @@ impl DaemonApiServer {
         let effect_handler = EffectHandler {
             aqc: Arc::clone(&aqc),
         };
+        let finalization_handler = FinalizationHandler::new();
         let api = Api(Arc::new(ApiInner {
             client,
             local_addr,
             pk,
             peers: Mutex::new(peers),
             effect_handler,
+            finalization_handler,
             aqc,
         }));
         Ok(Self {
             uds_path,
             sk,
             recv_effects,
+            recv_fin,
             listener,
             api,
         })
@@ -114,6 +125,18 @@ impl DaemonApiServer {
                         }
                     }
                     info!("effect handler exiting");
+                }
+                .in_current_span()
+            });
+            s.spawn({
+                let finalization_handler = self.api.finalization_handler.clone();
+                async move {
+                    while let Some(graph) = self.recv_fin.recv().await {
+                        if let Err(err) = finalization_handler.handle_finalization(graph).await {
+                            error!(?err, "error handling finalization");
+                        }
+                    }
+                    info!("finalization handler exiting");
                 }
                 .in_current_span()
             });
@@ -151,6 +174,31 @@ impl DaemonApiServer {
         .await;
 
         info!("server exiting");
+    }
+}
+
+/// Handles finalization errors from Aranya syncer.
+#[derive(Clone, Debug)]
+struct FinalizationHandler {}
+
+impl FinalizationHandler {
+    fn new() -> Self {
+        // TODO: load graphs with finalization errors from disk
+        Self {}
+    }
+
+    /// Handles finalization error.
+    #[instrument(skip_all, fields(%graph))]
+    async fn handle_finalization(&self, graph: GraphId) -> Result<()> {
+        trace!("handling finalization");
+
+        // TODO: remove graph from storage
+
+        // TODO: keep track of graphs with finalization errors in map
+
+        // TODO: keep track of graphs with finalization errors on disk
+
+        Ok(())
     }
 }
 
@@ -226,6 +274,7 @@ struct ApiInner {
     /// Aranya sync peers,
     peers: Mutex<SyncPeers>,
     effect_handler: EffectHandler,
+    finalization_handler: FinalizationHandler,
     aqc: Arc<Aqc<CE, KS>>,
 }
 
@@ -285,6 +334,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::SyncPeerConfig,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         self.peers
             .lock()
             .await
@@ -301,6 +352,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: Option<api::SyncPeerConfig>,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         self.peers
             .lock()
             .await
@@ -316,6 +369,8 @@ impl DaemonApi for Api {
         peer: Addr,
         team: api::TeamId,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         self.peers
             .lock()
             .await
@@ -332,11 +387,15 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::TeamConfig,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         todo!()
     }
 
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        // TODO: return finalization error
+
         todo!();
     }
 
@@ -347,6 +406,9 @@ impl DaemonApi for Api {
         cfg: api::TeamConfig,
     ) -> api::Result<api::TeamId> {
         info!("create_team");
+
+        // TODO: return finalization error
+
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
         let pk = self.get_pk()?;
@@ -361,6 +423,8 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self))]
     async fn close_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        // TODO: return finalization error
+
         todo!();
     }
 
@@ -371,6 +435,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         keys: api::KeyBundle,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         self.client
             .actions(&team.into_id().into())
             .add_member(keys.into())
@@ -386,6 +452,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         self.client
             .actions(&team.into_id().into())
             .remove_member(device.into_id().into())
@@ -402,6 +470,8 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         role: api::Role,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         self.client
             .actions(&team.into_id().into())
             .assign_role(device.into_id().into(), role.into())
@@ -418,6 +488,8 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         role: api::Role,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         self.client
             .actions(&team.into_id().into())
             .revoke_role(device.into_id().into(), role.into())
@@ -434,6 +506,8 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         name: api::NetIdentifier,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -454,6 +528,8 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         name: api::NetIdentifier,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         self.client
             .actions(&team.into_id().into())
             .unset_aqc_network_name(device.into_id().into())
@@ -471,6 +547,8 @@ impl DaemonApi for Api {
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsks)> {
         info!("creating bidi channel");
+
+        // TODO: return finalization error
 
         let graph = GraphId::from(team.into_id());
 
@@ -510,6 +588,8 @@ impl DaemonApi for Api {
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcUniPsks)> {
         info!("creating uni channel");
+
+        // TODO: return finalization error
 
         let graph = GraphId::from(team.into_id());
 
@@ -567,6 +647,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         ctrl: api::AqcCtrl,
     ) -> api::Result<(api::LabelId, api::AqcPsks)> {
+        // TODO: return finalization error
+
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
@@ -609,6 +691,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_name: String,
     ) -> api::Result<api::LabelId> {
+        // TODO: return finalization error
+
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -630,6 +714,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_id: api::LabelId,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -653,6 +739,8 @@ impl DaemonApi for Api {
         label_id: api::LabelId,
         op: api::ChanOp,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -679,6 +767,8 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         label_id: api::LabelId,
     ) -> api::Result<()> {
+        // TODO: return finalization error
+
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -699,6 +789,8 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
     ) -> api::Result<Vec<api::DeviceId>> {
+        // TODO: return finalization error
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -721,6 +813,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<api::Role> {
+        // TODO: return finalization error
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -743,6 +837,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<api::KeyBundle> {
+        // TODO: return finalization error
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -766,6 +862,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<Vec<api::Label>> {
+        // TODO: return finalization error
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -793,6 +891,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<Option<api::NetIdentifier>> {
+        // TODO: return finalization error
+
         if let Ok((_ctrl, effects)) = self
             .client
             .actions(&team.into_id().into())
@@ -816,6 +916,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_id: api::LabelId,
     ) -> api::Result<bool> {
+        // TODO: return finalization error
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -838,6 +940,8 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
     ) -> api::Result<Vec<api::Label>> {
+        // TODO: return finalization error
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())

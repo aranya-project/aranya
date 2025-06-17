@@ -6,11 +6,11 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, future::Future, time::Duration};
+use std::{collections::HashMap, fmt, future::Future, time::Duration};
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{storage::GraphId, Engine, Sink};
+use aranya_runtime::{storage::GraphId, ClientError, Engine, Sink};
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::StreamExt;
@@ -21,6 +21,7 @@ use tracing::{error, instrument, trace};
 
 use crate::{
     daemon::{Client, EF},
+    sync::tcp::SyncerError,
     vm_policy::VecSink,
 };
 
@@ -36,10 +37,16 @@ enum Msg {
 /// Contains the information needed to sync with a single peer:
 /// - network address
 /// - Aranya graph id
-#[derive(Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
+#[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
 struct SyncPeer {
     addr: Addr,
     graph_id: GraphId,
+}
+
+impl fmt::Display for SyncPeer {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", &self)
+    }
 }
 
 /// Handles adding and removing sync peers.
@@ -75,7 +82,7 @@ impl SyncPeers {
         addr: Addr,
         graph_id: GraphId,
         cfg: SyncPeerConfig,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let peer = Msg::AddPeer {
             peer: SyncPeer { addr, graph_id },
             cfg: cfg.clone(),
@@ -94,7 +101,11 @@ impl SyncPeers {
     }
 
     /// Remove peer from [`Syncer`].
-    pub(crate) async fn remove_peer(&mut self, addr: Addr, graph_id: GraphId) -> Result<()> {
+    pub(crate) async fn remove_peer(
+        &mut self,
+        addr: Addr,
+        graph_id: GraphId,
+    ) -> anyhow::Result<()> {
         if let Err(e) = self
             .send
             .send(Msg::RemovePeer {
@@ -118,7 +129,7 @@ impl SyncPeers {
         addr: Addr,
         graph_id: GraphId,
         _cfg: Option<SyncPeerConfig>,
-    ) -> Result<()> {
+    ) -> anyhow::Result<()> {
         let peer = Msg::SyncNow {
             peer: SyncPeer { addr, graph_id },
         };
@@ -155,6 +166,7 @@ pub struct Syncer<ST> {
     _state: ST,
 }
 
+#[derive(Debug, Clone)]
 struct PeerInfo {
     /// Sync interval.
     interval: Duration,
@@ -171,7 +183,7 @@ pub trait SyncState: Sized {
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> impl Future<Output = Result<()>> + Send
+    ) -> impl Future<Output = Result<(), SyncerError>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
 }
@@ -220,7 +232,7 @@ impl<ST> Syncer<ST> {
 
 impl<ST: SyncState> Syncer<ST> {
     /// Syncs with the next peer in the list.
-    pub(crate) async fn next(&mut self) -> Result<()> {
+    pub(crate) async fn next(&mut self) -> anyhow::Result<()> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
@@ -229,7 +241,7 @@ impl<ST: SyncState> Syncer<ST> {
                 match msg {
                     Msg::SyncNow{ peer } => {
                         // sync with peer right now.
-                        self.sync(&peer.graph_id, &peer.addr).await?;
+                        self.sync(&peer).await?;
                     },
                     Msg::AddPeer { peer, cfg } => self.add_peer(peer, &cfg),
                     Msg::RemovePeer { peer } => self.remove_peer(peer),
@@ -241,27 +253,41 @@ impl<ST: SyncState> Syncer<ST> {
                 let info = self.peers.get_mut(&peer).assume("peer must exist")?;
                 info.key = self.queue.insert(peer.clone(), info.interval);
                 // sync with peer.
-                self.sync(&peer.graph_id, &peer.addr).await?;
+                self.sync(&peer).await?;
             }
         }
         Ok(())
     }
 
     /// Sync with a peer.
-    #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
-    pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> Result<()> {
+    #[instrument(skip_all, fields(peer = %peer))]
+    pub async fn sync(&mut self, peer: &SyncPeer) -> anyhow::Result<()> {
         trace!("syncing with peer");
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
-            <ST as SyncState>::sync_impl(self, *id, &mut sink, peer)
+            if let Err(e) = <ST as SyncState>::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
                 .await
-                .context("sync_peer error")
-                .inspect_err(|err| error!("{err:?}"))?;
+                .inspect_err(|err| error!("{err:?}"))
+            {
+                // If a finalization error has occurred, remove all sync peers for that team.
+                if let SyncerError::ClientError(ClientError::ParallelFinalize) = e {
+                    let mut v = Vec::new();
+                    for (p, _) in self.peers.clone() {
+                        if p.graph_id == peer.graph_id {
+                            v.push(p);
+                        }
+                    }
+                    for p in v {
+                        self.peers.remove(&p);
+                    }
+                }
+                return Err(e.into());
+            }
             sink.collect()?
         };
         let n = effects.len();
         self.send_effects
-            .send((*id, effects))
+            .send((peer.graph_id, effects))
             .await
             .context("unable to send effects")?;
         trace!(?n, "completed sync");
