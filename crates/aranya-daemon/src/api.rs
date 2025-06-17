@@ -387,7 +387,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::SyncPeerConfig,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         self.peers
             .lock()
