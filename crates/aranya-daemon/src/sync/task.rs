@@ -22,6 +22,7 @@ use tracing::{error, instrument, trace};
 use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
+    sync::task::quic::PeerCacheMap,
     vm_policy::VecSink,
 };
 
@@ -158,6 +159,9 @@ pub struct Syncer<ST> {
     state: ST,
     /// Sync server address.
     server_addr: Addr,
+    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
+    /// Lock must be acquired after [`Self::client`]
+    caches: PeerCacheMap,
 }
 
 struct PeerInfo {
@@ -191,6 +195,7 @@ impl<ST> Syncer<ST> {
         send_effects: EffectSender,
         state: ST,
         server_addr: Addr,
+        caches: PeerCacheMap,
     ) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
@@ -203,6 +208,7 @@ impl<ST> Syncer<ST> {
                 send_effects,
                 state,
                 server_addr,
+                caches,
             },
             peers,
         )

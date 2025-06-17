@@ -58,6 +58,13 @@ pub(crate) type EF = policy::Effect;
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
 
+/// Sync configuration for setting up Aranya.
+struct SyncParams {
+    psk_store: Arc<PskStore>,
+    active_team_rx: Receiver<TeamId>,
+    caches: PeerCacheMap,
+}
+
 /// Handle for the spawned daemon.
 ///
 /// Dropping this will abort the daemon's tasks.
@@ -133,9 +140,11 @@ impl Daemon {
                     .context("unable to clone keystore")?,
                 &pks,
                 cfg.sync_addr,
-                Arc::clone(&psk_store),
-                active_team_rx,
-                caches.clone(),
+                SyncParams {
+                    psk_store: Arc::clone(&psk_store),
+                    active_team_rx,
+                    caches: caches.clone(),
+                },
             )
             .await?;
             let local_addr = sync_server.local_addr()?;
@@ -143,8 +152,14 @@ impl Daemon {
             // Sync in the background at some specified interval.
             let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
-            let state = QuicSyncState::new(psk_store.clone(), caches.clone())?;
-            let (syncer, peers) = Syncer::new(client.clone(), send_effects, state, cfg.sync_addr);
+            let state = QuicSyncState::new(psk_store.clone())?;
+            let (syncer, peers) = Syncer::new(
+                client.clone(),
+                send_effects,
+                state,
+                cfg.sync_addr,
+                caches.clone(),
+            );
 
             let graph_ids = client
                 .aranya
@@ -278,9 +293,7 @@ impl Daemon {
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
-        psk_store: Arc<PskStore>,
-        active_team_rx: Receiver<TeamId>,
-        caches: PeerCacheMap,
+        sync_params: SyncParams,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
@@ -302,9 +315,9 @@ impl Daemon {
         let server = SyncServer::new(
             client.clone(),
             &external_sync_addr,
-            psk_store,
-            active_team_rx,
-            caches,
+            sync_params.psk_store,
+            sync_params.active_team_rx,
+            sync_params.caches,
         )
         .await
         .context("unable to initialize QUIC sync server")?;

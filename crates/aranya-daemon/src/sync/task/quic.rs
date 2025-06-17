@@ -127,9 +127,6 @@ pub struct State {
     conns: BTreeMap<Addr, Connection>,
     /// Shared PSK store
     store: Arc<PskStore>,
-    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
-    /// Lock must be acquired after [`Self::client`]
-    caches: PeerCacheMap,
 }
 
 impl SyncState for State {
@@ -179,7 +176,7 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub fn new(psk_store: Arc<PskStore>, caches: PeerCacheMap) -> SyncResult<Self> {
+    pub fn new(psk_store: Arc<PskStore>) -> SyncResult<Self> {
         // Create Client Config (INSECURE: Skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
@@ -207,7 +204,6 @@ impl State {
             client,
             conns: BTreeMap::new(),
             store: psk_store,
-            caches,
         })
     }
 }
@@ -290,7 +286,7 @@ impl Syncer<State> {
 
         let (len, _) = {
             let mut client = self.client.lock().await;
-            let mut caches = self.state.caches.lock().await;
+            let mut caches = self.caches.lock().await;
             let key = PeerCacheKey::new(*peer, id);
             let cache = caches.entry(key).or_default();
             syncer
