@@ -23,6 +23,7 @@ use crate::{
     daemon::{Client, EF},
     sync::tcp::SyncerError,
     vm_policy::VecSink,
+    InvalidGraphs,
 };
 
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
@@ -147,7 +148,6 @@ impl SyncPeers {
 }
 
 type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
-type FinalizationSender = mpsc::Sender<GraphId>;
 
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
@@ -163,8 +163,8 @@ pub struct Syncer<ST> {
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
-    /// Used to notify the API if a finalization error has occurred for a graph.
-    send_fin: FinalizationSender,
+    /// Keeps track of invalid graphs due to finalization errors.
+    invalid: InvalidGraphs,
     /// Additional state used by the syncer
     _state: ST,
 }
@@ -196,7 +196,7 @@ impl<ST> Syncer<ST> {
     pub fn new(
         client: Client,
         send_effects: EffectSender,
-        send_fin: FinalizationSender,
+        invalid: InvalidGraphs,
         _state: ST,
     ) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
@@ -208,7 +208,7 @@ impl<ST> Syncer<ST> {
                 recv,
                 queue: DelayQueue::new(),
                 send_effects,
-                send_fin,
+                invalid,
                 _state,
             },
             peers,
@@ -282,10 +282,7 @@ impl<ST: SyncState> Syncer<ST> {
                 if let SyncerError::ClientError(ClientError::ParallelFinalize) = e {
                     // Remove sync peers for graph that had finalization error.
                     self.peers.retain(|p, _| p.graph_id != peer.graph_id);
-                    self.send_fin
-                        .send(peer.graph_id)
-                        .await
-                        .context("unable to notify API of finalization error")?;
+                    self.invalid.blocking_write().insert(peer.graph_id);
                 }
                 return Err(e.into());
             }

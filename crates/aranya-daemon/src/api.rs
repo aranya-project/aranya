@@ -4,7 +4,7 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
 use aranya_crypto::{Csprng, Rng};
@@ -34,7 +34,7 @@ use crate::{
     daemon::KS,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::task::SyncPeers,
-    Client, EF,
+    Client, InvalidGraphs, EF,
 };
 
 /// returns first effect matching a particular type.
@@ -48,10 +48,6 @@ macro_rules! find_effect {
 
 type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
 
-/// Notifies this API that a finalization error has occurred in a graph.
-/// After receiving a finalization error for a graph, all team operations in this API should return a finalization error for the graph.
-type FinalizationErrorReceiver = mpsc::Receiver<GraphId>;
-
 /// Daemon API Server.
 #[derive(Debug)]
 pub(crate) struct DaemonApiServer {
@@ -64,9 +60,6 @@ pub(crate) struct DaemonApiServer {
 
     /// Channel for receiving effects from the syncer.
     recv_effects: EffectReceiver,
-
-    /// Channel for receiving finalization error notification.
-    recv_fin: FinalizationErrorReceiver,
 
     /// Api Handler.
     api: Api,
@@ -85,7 +78,7 @@ impl DaemonApiServer {
         pk: PublicKeys<CS>,
         peers: SyncPeers,
         recv_effects: EffectReceiver,
-        recv_fin: FinalizationErrorReceiver,
+        invalid: InvalidGraphs,
         aqc: Aqc<CE, KS>,
     ) -> Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
@@ -93,15 +86,12 @@ impl DaemonApiServer {
         let effect_handler = EffectHandler {
             aqc: Arc::clone(&aqc),
         };
-        let invalid = Arc::new(Mutex::new(InvalidGraphs::new()));
-        let finalization_handler = FinalizationErrorHandler::new(invalid.clone());
         let api = Api(Arc::new(ApiInner {
             client,
             local_addr,
             pk,
             peers: Mutex::new(peers),
             effect_handler,
-            finalization_handler,
             invalid,
             aqc,
         }));
@@ -109,7 +99,6 @@ impl DaemonApiServer {
             uds_path,
             sk,
             recv_effects,
-            recv_fin,
             listener,
             api,
         })
@@ -127,18 +116,6 @@ impl DaemonApiServer {
                         }
                     }
                     info!("effect handler exiting");
-                }
-                .in_current_span()
-            });
-            s.spawn({
-                let finalization_handler = self.api.finalization_handler.clone();
-                async move {
-                    while let Some(graph) = self.recv_fin.recv().await {
-                        if let Err(err) = finalization_handler.handle_finalization(graph).await {
-                            error!(?err, "error handling finalization");
-                        }
-                    }
-                    info!("finalization handler exiting");
                 }
                 .in_current_span()
             });
@@ -176,62 +153,6 @@ impl DaemonApiServer {
         .await;
 
         info!("server exiting");
-    }
-}
-
-/// Keeps track of which graphs have had a finalization error.
-/// Once a finalization error has occurred for a graph,
-/// the graph error is permanent.
-/// The API will prevent subsequent operations on the invalid graph.
-#[derive(Debug, Clone)]
-struct InvalidGraphs {
-    /// HashSet for graph IDs of graphs with finalization errors.
-    graphs: HashSet<GraphId>,
-}
-
-impl InvalidGraphs {
-    /// Allocates [`InvalidGraphs`] for keeping track of graphs with finalization errors.
-    fn new() -> Self {
-        // TODO: load graphs with finalization errors from disk
-        Self {
-            graphs: HashSet::new(),
-        }
-    }
-
-    /// Checks whether a graph is invalid due to a finalization error.
-    fn is_invalid(&self, graph_id: GraphId) -> bool {
-        self.graphs.contains(&graph_id)
-    }
-
-    /// Stores whether a graph has had a finalization error.
-    fn set_invalid(&mut self, graph_id: GraphId) -> bool {
-        self.graphs.insert(graph_id)
-    }
-}
-
-/// Handles finalization errors from Aranya syncer.
-#[derive(Clone, Debug)]
-struct FinalizationErrorHandler {
-    graphs: Arc<Mutex<InvalidGraphs>>,
-}
-
-impl FinalizationErrorHandler {
-    fn new(graphs: Arc<Mutex<InvalidGraphs>>) -> Self {
-        Self { graphs }
-    }
-
-    /// Handles finalization error.
-    #[instrument(skip_all, fields(%graph))]
-    async fn handle_finalization(&self, graph: GraphId) -> Result<()> {
-        trace!("handling finalization");
-
-        self.graphs.lock().await.set_invalid(graph);
-
-        // TODO: remove graph from storage
-
-        // TODO: keep track of graphs with finalization errors on disk
-
-        Ok(())
     }
 }
 
@@ -308,10 +229,8 @@ struct ApiInner {
     peers: Mutex<SyncPeers>,
     /// Handles graph effects from the syncer.
     effect_handler: EffectHandler,
-    /// Handles graph finalization errors.
-    finalization_handler: FinalizationErrorHandler,
     /// Keeps track of which graphs are invalid due to a finalization error.
-    invalid: Arc<Mutex<InvalidGraphs>>,
+    invalid: InvalidGraphs,
     aqc: Arc<Aqc<CE, KS>>,
 }
 
@@ -337,7 +256,7 @@ impl Api {
     /// Checks wither a team's graph is valid.
     /// If the graph is not valid, return an error to prevent operations on the invalid graph.
     async fn check_team_valid(&self, team: api::TeamId) -> api::Result<()> {
-        if self.invalid.lock().await.is_invalid(team.into_id().into()) {
+        if self.invalid.read().await.contains(&team.into_id().into()) {
             // TODO: return custom daemon error type
             return Err(anyhow!(format!(
                 "team invalid due to graph finalization error: {:}",
