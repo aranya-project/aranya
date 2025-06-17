@@ -280,15 +280,8 @@ impl<ST: SyncState> Syncer<ST> {
             {
                 // If a finalization error has occurred, remove all sync peers for that team.
                 if let SyncerError::ClientError(ClientError::ParallelFinalize) = e {
-                    let mut v = Vec::new();
-                    for (p, _) in self.peers.clone() {
-                        if p.graph_id == peer.graph_id {
-                            v.push(p);
-                        }
-                    }
-                    for p in v {
-                        self.peers.remove(&p);
-                    }
+                    // Remove sync peers for graph that had finalization error.
+                    self.peers.retain(|p, _| p.graph_id != peer.graph_id);
                     self.send_fin
                         .send(peer.graph_id)
                         .await

@@ -4,7 +4,7 @@
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
-use std::{path::PathBuf, sync::Arc};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _, Result};
 use aranya_crypto::{Csprng, Rng};
@@ -49,8 +49,7 @@ macro_rules! find_effect {
 type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
 
 /// Notifies this API that a finalization error has occurred in a graph.
-/// After receiving a finalization error for a graph, the graph should be removed from storage.
-/// All team operations in this API should return a finalization error for the graph.
+/// After receiving a finalization error for a graph, all team operations in this API should return a finalization error for the graph.
 type FinalizationReceiver = mpsc::Receiver<GraphId>;
 
 /// Daemon API Server.
@@ -65,6 +64,7 @@ pub(crate) struct DaemonApiServer {
 
     /// Channel for receiving effects from the syncer.
     recv_effects: EffectReceiver,
+
     /// Channel for receiving finalization error notification.
     recv_fin: FinalizationReceiver,
 
@@ -93,7 +93,8 @@ impl DaemonApiServer {
         let effect_handler = EffectHandler {
             aqc: Arc::clone(&aqc),
         };
-        let finalization_handler = FinalizationHandler::new();
+        let invalid = Arc::new(Mutex::new(InvalidGraphs::new()));
+        let finalization_handler = FinalizationHandler::new(invalid.clone());
         let api = Api(Arc::new(ApiInner {
             client,
             local_addr,
@@ -101,6 +102,7 @@ impl DaemonApiServer {
             peers: Mutex::new(peers),
             effect_handler,
             finalization_handler,
+            invalid,
             aqc,
         }));
         Ok(Self {
@@ -177,14 +179,45 @@ impl DaemonApiServer {
     }
 }
 
+/// Keeps track of which graphs have had a finalization error.
+/// Once a finalization error has occurred for a graph,
+/// the graph error is permanent.
+/// The API will prevent subsequent operations on the invalid graph.
+#[derive(Debug, Clone)]
+struct InvalidGraphs {
+    /// HashSet for graph IDs of graphs with finalization errors.
+    graphs: HashSet<GraphId>,
+}
+
+impl InvalidGraphs {
+    /// Allocates [`InvalidGraphs`] for keeping track of graphs with finalization errors.
+    fn new() -> Self {
+        Self {
+            graphs: HashSet::new(),
+        }
+    }
+
+    /// Checks whether a graph is invalid due to a finalization error.
+    fn is_invalid(&self, graph_id: GraphId) -> bool {
+        self.graphs.contains(&graph_id)
+    }
+
+    /// Stores whether a graph has had a finalization error.
+    fn set_invalid(&mut self, graph_id: GraphId) -> bool {
+        self.graphs.insert(graph_id)
+    }
+}
+
 /// Handles finalization errors from Aranya syncer.
 #[derive(Clone, Debug)]
-struct FinalizationHandler {}
+struct FinalizationHandler {
+    graphs: Arc<Mutex<InvalidGraphs>>,
+}
 
 impl FinalizationHandler {
-    fn new() -> Self {
+    fn new(graphs: Arc<Mutex<InvalidGraphs>>) -> Self {
         // TODO: load graphs with finalization errors from disk
-        Self {}
+        Self { graphs }
     }
 
     /// Handles finalization error.
@@ -192,9 +225,9 @@ impl FinalizationHandler {
     async fn handle_finalization(&self, graph: GraphId) -> Result<()> {
         trace!("handling finalization");
 
-        // TODO: remove graph from storage
+        self.graphs.lock().await.set_invalid(graph);
 
-        // TODO: keep track of graphs with finalization errors in map
+        // TODO: remove graph from storage
 
         // TODO: keep track of graphs with finalization errors on disk
 
@@ -273,8 +306,12 @@ struct ApiInner {
     pk: PublicKeys<CS>,
     /// Aranya sync peers,
     peers: Mutex<SyncPeers>,
+    /// Handles graph effects from the syncer.
     effect_handler: EffectHandler,
+    /// Handles graph finalization errors.
     finalization_handler: FinalizationHandler,
+    /// Keeps track of which graphs have had a finalization error.
+    invalid: Arc<Mutex<InvalidGraphs>>,
     aqc: Arc<Aqc<CE, KS>>,
 }
 
@@ -293,6 +330,22 @@ impl Deref for Api {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Api {
+    /// Checks wither a team's graph is valid.
+    /// If the graph is not valid, return an error to prevent operations on the invalid graph.
+    async fn check_team_valid(&self, team: api::TeamId) -> api::Result<()> {
+        if self.invalid.lock().await.is_invalid(team.into_id().into()) {
+            // TODO: return custom daemon error type
+            return Err(anyhow!(format!(
+                "team invalid due to graph finalization error: {:}",
+                team.into_id()
+            ))
+            .into());
+        }
+        Ok(())
     }
 }
 
@@ -352,7 +405,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: Option<api::SyncPeerConfig>,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         self.peers
             .lock()
@@ -369,7 +422,7 @@ impl DaemonApi for Api {
         peer: Addr,
         team: api::TeamId,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         self.peers
             .lock()
@@ -387,14 +440,14 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::TeamConfig,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         todo!()
     }
 
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         todo!();
     }
@@ -406,8 +459,6 @@ impl DaemonApi for Api {
         cfg: api::TeamConfig,
     ) -> api::Result<api::TeamId> {
         info!("create_team");
-
-        // TODO: return finalization error
 
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
@@ -423,7 +474,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self))]
     async fn close_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         todo!();
     }
@@ -435,7 +486,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         keys: api::KeyBundle,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         self.client
             .actions(&team.into_id().into())
@@ -452,7 +503,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         self.client
             .actions(&team.into_id().into())
@@ -470,7 +521,7 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         role: api::Role,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         self.client
             .actions(&team.into_id().into())
@@ -488,7 +539,7 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         role: api::Role,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         self.client
             .actions(&team.into_id().into())
@@ -506,7 +557,7 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         name: api::NetIdentifier,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let effects = self
             .client
@@ -528,7 +579,7 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         name: api::NetIdentifier,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         self.client
             .actions(&team.into_id().into())
@@ -546,9 +597,9 @@ impl DaemonApi for Api {
         peer: api::NetIdentifier,
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsks)> {
-        info!("creating bidi channel");
+        self.check_team_valid(team).await?;
 
-        // TODO: return finalization error
+        info!("creating bidi channel");
 
         let graph = GraphId::from(team.into_id());
 
@@ -587,9 +638,9 @@ impl DaemonApi for Api {
         peer: api::NetIdentifier,
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcUniPsks)> {
-        info!("creating uni channel");
+        self.check_team_valid(team).await?;
 
-        // TODO: return finalization error
+        info!("creating uni channel");
 
         let graph = GraphId::from(team.into_id());
 
@@ -647,7 +698,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         ctrl: api::AqcCtrl,
     ) -> api::Result<(api::LabelId, api::AqcPsks)> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
@@ -691,7 +742,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_name: String,
     ) -> api::Result<api::LabelId> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let effects = self
             .client
@@ -714,7 +765,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_id: api::LabelId,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let effects = self
             .client
@@ -739,7 +790,7 @@ impl DaemonApi for Api {
         label_id: api::LabelId,
         op: api::ChanOp,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let effects = self
             .client
@@ -767,7 +818,7 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         label_id: api::LabelId,
     ) -> api::Result<()> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let effects = self
             .client
@@ -789,7 +840,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
     ) -> api::Result<Vec<api::DeviceId>> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let (_ctrl, effects) = self
             .client
@@ -813,7 +864,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<api::Role> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let (_ctrl, effects) = self
             .client
@@ -837,7 +888,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<api::KeyBundle> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let (_ctrl, effects) = self
             .client
@@ -862,7 +913,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<Vec<api::Label>> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let (_ctrl, effects) = self
             .client
@@ -891,7 +942,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<Option<api::NetIdentifier>> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         if let Ok((_ctrl, effects)) = self
             .client
@@ -916,7 +967,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_id: api::LabelId,
     ) -> api::Result<bool> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let (_ctrl, effects) = self
             .client
@@ -940,7 +991,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
     ) -> api::Result<Vec<api::Label>> {
-        // TODO: return finalization error
+        self.check_team_valid(team).await?;
 
         let (_ctrl, effects) = self
             .client
