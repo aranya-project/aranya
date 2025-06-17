@@ -50,7 +50,7 @@ type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
 
 /// Notifies this API that a finalization error has occurred in a graph.
 /// After receiving a finalization error for a graph, all team operations in this API should return a finalization error for the graph.
-type FinalizationReceiver = mpsc::Receiver<GraphId>;
+type FinalizationErrorReceiver = mpsc::Receiver<GraphId>;
 
 /// Daemon API Server.
 #[derive(Debug)]
@@ -66,7 +66,7 @@ pub(crate) struct DaemonApiServer {
     recv_effects: EffectReceiver,
 
     /// Channel for receiving finalization error notification.
-    recv_fin: FinalizationReceiver,
+    recv_fin: FinalizationErrorReceiver,
 
     /// Api Handler.
     api: Api,
@@ -85,7 +85,7 @@ impl DaemonApiServer {
         pk: PublicKeys<CS>,
         peers: SyncPeers,
         recv_effects: EffectReceiver,
-        recv_fin: FinalizationReceiver,
+        recv_fin: FinalizationErrorReceiver,
         aqc: Aqc<CE, KS>,
     ) -> Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
@@ -94,7 +94,7 @@ impl DaemonApiServer {
             aqc: Arc::clone(&aqc),
         };
         let invalid = Arc::new(Mutex::new(InvalidGraphs::new()));
-        let finalization_handler = FinalizationHandler::new(invalid.clone());
+        let finalization_handler = FinalizationErrorHandler::new(invalid.clone());
         let api = Api(Arc::new(ApiInner {
             client,
             local_addr,
@@ -192,6 +192,7 @@ struct InvalidGraphs {
 impl InvalidGraphs {
     /// Allocates [`InvalidGraphs`] for keeping track of graphs with finalization errors.
     fn new() -> Self {
+        // TODO: load graphs with finalization errors from disk
         Self {
             graphs: HashSet::new(),
         }
@@ -210,13 +211,12 @@ impl InvalidGraphs {
 
 /// Handles finalization errors from Aranya syncer.
 #[derive(Clone, Debug)]
-struct FinalizationHandler {
+struct FinalizationErrorHandler {
     graphs: Arc<Mutex<InvalidGraphs>>,
 }
 
-impl FinalizationHandler {
+impl FinalizationErrorHandler {
     fn new(graphs: Arc<Mutex<InvalidGraphs>>) -> Self {
-        // TODO: load graphs with finalization errors from disk
         Self { graphs }
     }
 
@@ -309,8 +309,8 @@ struct ApiInner {
     /// Handles graph effects from the syncer.
     effect_handler: EffectHandler,
     /// Handles graph finalization errors.
-    finalization_handler: FinalizationHandler,
-    /// Keeps track of which graphs have had a finalization error.
+    finalization_handler: FinalizationErrorHandler,
+    /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: Arc<Mutex<InvalidGraphs>>,
     aqc: Arc<Aqc<CE, KS>>,
 }
