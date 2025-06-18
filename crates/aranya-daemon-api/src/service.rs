@@ -15,10 +15,11 @@ pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
     custom_id,
-    default::{DefaultCipherSuite, DefaultEngine},
+    default::DefaultEngine,
+    id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    Id,
+    Engine, Id,
 };
 use aranya_util::Addr;
 use buggy::Bug;
@@ -26,15 +27,25 @@ pub use semver::Version;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
+pub mod quic_sync;
+pub use quic_sync::*;
+
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
 /// CS = Cipher Suite
-pub type CS = DefaultCipherSuite;
+pub type CS = <DefaultEngine as Engine>::CS;
 
 /// An error returned by the API.
 // TODO: enum?
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Error(String);
+
+impl Error {
+    pub fn from_err<E: error::Error>(err: E) -> Self {
+        error!(?err);
+        Self(format!("{err:?}"))
+    }
+}
 
 impl From<Bug> for Error {
     fn from(err: Bug) -> Self {
@@ -57,8 +68,8 @@ impl From<semver::Error> for Error {
     }
 }
 
-impl From<aranya_crypto::id::IdError> for Error {
-    fn from(err: aranya_crypto::id::IdError) -> Self {
+impl From<IdError> for Error {
+    fn from(err: IdError) -> Self {
         error!(%err);
         Self(err.to_string())
     }
@@ -116,10 +127,11 @@ pub enum Role {
     Member,
 }
 
+// Note: any fields added to this type should be public
 /// A configuration for creating or adding a team to a daemon.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct TeamConfig {
-    // TODO(nikki): any fields added to this should be public
+    pub quic_sync: Option<QuicSyncConfig>,
 }
 
 /// A device's network identifier.

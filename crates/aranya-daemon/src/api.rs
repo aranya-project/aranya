@@ -7,17 +7,22 @@ use core::{future, net::SocketAddr, ops::Deref, pin::pin};
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
-use aranya_crypto::{Csprng, Rng};
+use aranya_crypto::{
+    tls::{CipherSuiteId, PskSeed},
+    Csprng, Identified as _, PolicyId, Rng,
+};
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, CE, CS,
+    DaemonApi, GenSeedMode,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::{task::scope, Addr};
 use futures_util::{StreamExt, TryStreamExt};
+pub(crate) use quic_sync::Data as QSData;
+use s2n_quic::provider::tls::rustls::rustls::crypto::{hash::HashAlgorithm, PresharedKey};
 use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
@@ -31,11 +36,15 @@ use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 use crate::{
     actions::Actions,
     aqc::Aqc,
-    daemon::KS,
+    daemon::{CE, CS, KS},
+    keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::task::SyncPeers,
+    sync::task::{quic::QUIC_SYNC_PSK_CONTEXT, SyncPeers},
+    util::{insert_seed, remove_seed, SeedDir},
     Client, InvalidGraphs, EF,
 };
+
+mod quic_sync;
 
 /// returns first effect matching a particular type.
 /// returns None if there are no matching effects.
@@ -80,6 +89,10 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
         invalid: InvalidGraphs,
         aqc: Aqc<CE, KS>,
+        store: LocalStore<KS>,
+        engine: CE,
+        seed_id_dir: SeedDir,
+        quic: Option<quic_sync::Data>,
     ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
         let aqc = Arc::new(aqc);
@@ -94,6 +107,9 @@ impl DaemonApiServer {
             effect_handler,
             invalid,
             aqc,
+            store_engine: Mutex::new((store, engine)),
+            seed_id_dir,
+            quic: Mutex::new(quic),
         }));
         Ok(Self {
             uds_path,
@@ -218,7 +234,6 @@ impl EffectHandler {
 ///
 /// This is separated out so we only have to clone one [`Arc`]
 /// (inside [`Api`]).
-#[derive(Debug)]
 struct ApiInner {
     client: Client,
     /// Local socket address of the API.
@@ -232,11 +247,26 @@ struct ApiInner {
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,
     aqc: Arc<Aqc<CE, KS>>,
+    store_engine: Mutex<(LocalStore<KS>, CE)>,
+    seed_id_dir: SeedDir,
+    quic: Mutex<Option<quic_sync::Data>>,
 }
 
 impl ApiInner {
     fn get_pk(&self) -> api::Result<KeyBundle> {
         Ok(KeyBundle::try_from(&self.pk).context("bad key bundle")?)
+    }
+}
+
+impl std::fmt::Debug for ApiInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Inner API Data")
+            .field("seed_id_dir", &self.seed_id_dir)
+            .field("client", &self.client)
+            .field("local_addr", &self.local_addr)
+            .field("pk", &self.pk)
+            .field("aqc", &self.aqc)
+            .finish_non_exhaustive()
     }
 }
 
@@ -357,12 +387,75 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        todo!()
+        if let Some(cfg) = cfg.quic_sync {
+            let mut guard = self.quic.lock().await;
+            let quic_data = guard.as_mut().context("quic syncing is not enabled")?;
+
+            let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
+
+            let GenSeedMode::IKM(ref ikm) = cfg.seed_mode() else {
+                return Err(
+                    anyhow::anyhow!("Only passing in IKM for the seed is supported!").into(),
+                );
+            };
+
+            let seed = PskSeed::<CS>::import_from_ikm(ikm, &team.into_id().into());
+            insert_seed(engine, store, seed.clone())
+                .context("could not insert seed into keystore")?;
+
+            if let Err(e) = self
+                .seed_id_dir
+                .append(&team, &seed.id()?)
+                .await
+                .context("could not write seed id to file")
+            {
+                error!(%e);
+                remove_seed(store, seed.clone()).context("could not remove seed from keystore")?;
+                return Err(e.into());
+            };
+
+            // TODO: Use a real policy ID
+            // TODO: Iterate over all cipher suite IDs
+            for psk_res in seed.generate_psks(
+                QUIC_SYNC_PSK_CONTEXT,
+                team.into_id().into(),
+                PolicyId::default(),
+                [CipherSuiteId::TlsAes256GcmSha384].iter().copied(),
+            ) {
+                let psk = psk_res.context("unable to generate psk")?;
+                let identity = psk.identity().as_bytes();
+                let secret = psk.raw_secret_bytes();
+                let psk = PresharedKey::external(identity, secret)
+                    .context("unable to create PSK")?
+                    .with_hash_alg(HashAlgorithm::SHA384)
+                    .expect("Valid hash algorithm");
+
+                quic_data
+                    .psk_store
+                    .insert(team, Arc::new(psk))
+                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+            }
+        }
+
+        // TODO: Implement for other syncer types
+        Ok(())
     }
 
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        todo!();
+        if let Some(ref data) = *self.quic.lock().await {
+            data.psk_store
+                .remove(team)
+                .inspect_err(|err| error!(err = ?err, "unable to remove PSK"))?
+        }
+        self.client
+            .aranya
+            .lock()
+            .await
+            .remove_graph(team.into_id().into())
+            .context("unable to remove graph from storage")?;
+
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -382,7 +475,59 @@ impl DaemonApi for Api {
             .await
             .context("unable to create team")?;
         debug!(?graph_id);
-        Ok(graph_id.into_id().into())
+        let team_id: api::TeamId = graph_id.into_id().into();
+
+        if let (Some(ref mut quic_data), Some(ref qs_cfg)) =
+            (self.quic.lock().await.as_ref(), cfg.quic_sync)
+        {
+            let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
+
+            let GenSeedMode::IKM(ref ikm) = qs_cfg.seed_mode() else {
+                return Err(
+                    anyhow::anyhow!("Only passing in IKM for the seed is supported!").into(),
+                );
+            };
+
+            let seed = PskSeed::<CS>::import_from_ikm(ikm, &team_id.into_id().into());
+            insert_seed(engine, store, seed.clone())
+                .context("could not insert seed into keystore")?;
+
+            let team_id = api::TeamId::from(*graph_id.as_array());
+            if let Err(e) = self
+                .seed_id_dir
+                .append(&team_id, &seed.id()?)
+                .await
+                .context("could not write seed id to file")
+            {
+                error!(%e);
+                remove_seed(store, seed.clone()).context("could not remove seed from keystore")?;
+                return Err(e.into());
+            };
+
+            // TODO: Use a real policy ID
+            // TODO: Iterate over all cipher suite IDs
+            for psk_res in seed.generate_psks(
+                QUIC_SYNC_PSK_CONTEXT,
+                team_id.into_id().into(),
+                PolicyId::default(),
+                [CipherSuiteId::TlsAes256GcmSha384].iter().copied(),
+            ) {
+                let psk = psk_res.context("unable to generate psk")?;
+                let identity = psk.identity().as_bytes();
+                let secret = psk.raw_secret_bytes();
+                let psk = PresharedKey::external(identity, secret)
+                    .context("unable to create PSK")?
+                    .with_hash_alg(HashAlgorithm::SHA384)
+                    .expect("Valid hash algorithm");
+
+                quic_data
+                    .psk_store
+                    .insert(team_id, Arc::new(psk))
+                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+            }
+        }
+
+        Ok(team_id)
     }
 
     #[instrument(skip(self))]

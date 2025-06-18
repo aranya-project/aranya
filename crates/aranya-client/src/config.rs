@@ -1,5 +1,7 @@
 use core::time::Duration;
 
+use aranya_daemon_api::GenSeedMode;
+
 use crate::{error::InvalidArg, ConfigError, Result};
 
 /// Configuration info for syncing with a peer.
@@ -80,9 +82,65 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
+#[derive(Clone)]
+pub struct QuicSyncConfig {
+    seed_mode: GenSeedMode,
+}
+
+impl QuicSyncConfig {
+    pub fn builder() -> QuicSyncConfigBuilder {
+        QuicSyncConfigBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct QuicSyncConfigBuilder {
+    seed_mode: GenSeedMode,
+}
+
+impl QuicSyncConfigBuilder {
+    /// Sets the seed to be generated.
+    /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`]
+    pub fn gen_seed(mut self) -> Self {
+        self.seed_mode = GenSeedMode::Generate;
+        self
+    }
+
+    /// Sets the seed IKM.
+    /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
+    pub fn seed_ikm(mut self, ikm: [u8; 32]) -> Self {
+        self.seed_mode = GenSeedMode::IKM(ikm);
+        self
+    }
+
+    /// Sets the wrapped seed.
+    /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
+    pub fn wrapped_seed(
+        mut self,
+        sender_pk: Box<[u8]>,
+        encap_key: Box<[u8]>,
+        encrypted_seed: Box<[u8]>,
+    ) -> Self {
+        self.seed_mode = GenSeedMode::Wrapped {
+            sender_pk,
+            encap_key,
+            encrypted_seed,
+        };
+        self
+    }
+
+    /// Builds the config.
+    pub fn build(self) -> Result<QuicSyncConfig> {
+        Ok(QuicSyncConfig {
+            seed_mode: self.seed_mode,
+        })
+    }
+}
+
+#[derive(Clone)]
 /// Configuration info for adding and creating teams.
 pub struct TeamConfig {
-    _priv: (),
+    quic_sync: Option<QuicSyncConfig>,
 }
 
 impl TeamConfig {
@@ -92,16 +150,27 @@ impl TeamConfig {
     }
 }
 
+impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
+    fn from(value: QuicSyncConfig) -> Self {
+        Self::builder()
+            .seed(value.seed_mode)
+            .build()
+            .expect("All fields are set")
+    }
+}
+
 impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
-    fn from(_value: TeamConfig) -> Self {
-        Self {}
+    fn from(value: TeamConfig) -> Self {
+        Self {
+            quic_sync: value.quic_sync.map(Into::into),
+        }
     }
 }
 
 /// Builder for a [`TeamConfig`]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Default)]
 pub struct TeamConfigBuilder {
-    _priv: (),
+    quic_sync: Option<QuicSyncConfig>,
 }
 
 impl TeamConfigBuilder {
@@ -110,8 +179,17 @@ impl TeamConfigBuilder {
         Self::default()
     }
 
+    /// Configures the quic_sync config.
+    pub fn quic_sync(mut self, cfg: QuicSyncConfig) -> Self {
+        self.quic_sync = Some(cfg);
+
+        self
+    }
+
     /// Attempts to build a [`TeamConfig`] using the provided parameters.
     pub fn build(self) -> Result<TeamConfig> {
-        Ok(TeamConfig { _priv: () })
+        Ok(TeamConfig {
+            quic_sync: self.quic_sync,
+        })
     }
 }

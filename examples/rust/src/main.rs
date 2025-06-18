@@ -6,7 +6,9 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{aqc::AqcPeerChannel, client::Client, Error, SyncPeerConfig, TeamConfig};
+use aranya_client::{
+    aqc::AqcPeerChannel, client::Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
+};
 use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -96,7 +98,8 @@ impl ClientCtx {
                 cache_dir: {cache_dir:?}
                 logs_dir: {logs_dir:?}
                 config_dir: {config_dir:?}
-                sync_addr: "localhost:0"
+                sync_addr: "127.0.0.1:0"
+                quic_sync: {{ }}
                 "#
             );
             fs::write(&cfg_path, buf).await?;
@@ -195,12 +198,18 @@ async fn main() -> Result<()> {
     let mut membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
     let mut memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
 
+    // Create the team config
+    let seed_ikm = [0u8; 32]; // TODO: Randomize this
+    let cfg = {
+        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
+    };
+
     // Create a team.
     info!("creating team");
-    let cfg = TeamConfig::builder().build()?;
     let team_id = owner
         .client
-        .create_team(cfg)
+        .create_team(cfg.clone())
         .await
         .context("expected to create team")?;
     info!(%team_id);
@@ -221,6 +230,10 @@ async fn main() -> Result<()> {
     let mut operator_team = operator.client.team(team_id);
     let mut membera_team = membera.client.team(team_id);
     let mut memberb_team = memberb.client.team(team_id);
+
+    for member in [&admin_team, &operator_team, &membera_team, &memberb_team] {
+        member.add_team(cfg.clone()).await?;
+    }
 
     info!("adding admin to team");
     owner_team.add_device_to_team(admin.pk).await?;

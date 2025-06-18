@@ -37,7 +37,7 @@ wildcard_imports = "warn"
 aranya-aqc-util = { version = "0.5.0", features = ["alloc"] }
 aranya-capi-core = { version = "0.4.2" }
 aranya-capi-codegen = { version = "0.3.2" }
-aranya-crypto = { version = "0.7.1", features = ["alloc", "aqc", "fs-keystore", "clone-aead", "std"] }
+aranya-crypto = { version = "0.7.1", features = ["alloc", "aqc", "fs-keystore", "clone-aead", "std", "tls"] }
 aranya-crypto-ffi = { version = "0.10.0" }
 aranya-device-ffi = { version = "0.10.0" }
 aranya-envelope-ffi = { version = "0.10.0" }
@@ -59,8 +59,8 @@ aranya-keygen = { version = "0.6.1", path = "crates/aranya-keygen" }
 aranya-util = { version = "0.6.1", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
-bytes = { version = "1.0" }
 backon = { version = "1.2.0" }
+bytes = { version = "1.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 futures-lite = { version = "2.6.0" }
@@ -95,3 +95,7 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
+
+[patch.crates-io]
+# Patch using a specific branch
+aranya-crypto = { git = "https://github.com/aranya-project/aranya-core", branch = "issue/301" }

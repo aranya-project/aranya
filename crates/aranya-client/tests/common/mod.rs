@@ -5,8 +5,11 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use aranya_client::{client::Client, SyncPeerConfig};
-use aranya_daemon::{config::Config, Daemon, DaemonHandle};
+use aranya_client::{client::Client, QuicSyncConfig, SyncPeerConfig, TeamConfig};
+use aranya_daemon::{
+    config::{Config, QSConfig},
+    Daemon, DaemonHandle,
+};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
@@ -48,7 +51,7 @@ impl TeamCtx {
         })
     }
 
-    fn devices(&mut self) -> [&mut DeviceCtx; 5] {
+    pub(super) fn devices(&mut self) -> [&mut DeviceCtx; 5] {
         [
             &mut self.owner,
             &mut self.admin,
@@ -126,6 +129,43 @@ impl TeamCtx {
 
         Ok(())
     }
+
+    pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
+        // Create the initial team, and get our TeamId.
+        let seed_ikm = [0; 32]; // TODO: Randomize this
+        let cfg = {
+            let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+            TeamConfig::builder().quic_sync(qs_cfg).build()?
+        };
+
+        let team_id = {
+            self.owner
+                .client
+                .create_team(cfg.clone())
+                .await
+                .expect("expected to create team")
+        };
+        info!(?team_id);
+
+        self.admin
+            .client
+            .team(team_id)
+            .add_team(cfg.clone())
+            .await?;
+        self.operator
+            .client
+            .team(team_id)
+            .add_team(cfg.clone())
+            .await?;
+        self.membera
+            .client
+            .team(team_id)
+            .add_team(cfg.clone())
+            .await?;
+        self.memberb.client.team(team_id).add_team(cfg).await?;
+
+        Ok(team_id)
+    }
 }
 
 pub struct DeviceCtx {
@@ -141,6 +181,8 @@ impl DeviceCtx {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // Setup daemon config.
+        let quic_sync = Some(QSConfig {});
+
         let cfg = Config {
             name: name.into(),
             runtime_dir: work_dir.join("run"),
@@ -151,6 +193,7 @@ impl DeviceCtx {
             sync_addr: addr_any,
             afc: None,
             aqc: None,
+            quic_sync,
         };
 
         for dir in [
