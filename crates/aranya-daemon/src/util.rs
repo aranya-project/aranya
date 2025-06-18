@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context as _, Result};
-use aranya_crypto::{Id, KeyStoreExt};
+use aranya_crypto::{default::WrappedKey, Engine, Id, KeyStore, KeyStoreExt};
 use aranya_daemon_api::{QuicSyncSeed, QuicSyncSeedId, TeamId};
 use aranya_util::create_dir_all;
 use s2n_quic::provider::tls::rustls::rustls::crypto::{hash::HashAlgorithm, PresharedKey};
@@ -10,7 +10,7 @@ use tokio::{
     io::AsyncWriteExt,
 };
 
-use crate::{CE, CS, KS};
+use crate::{keystore::LocalStore, CE, CS, KS};
 
 #[derive(Debug)]
 pub(crate) struct SeedDir(PathBuf);
@@ -102,6 +102,22 @@ pub(crate) async fn load_team_psk_pairs(
     }
 
     Ok(out)
+}
+
+/// Inserts a seed into the daemon's local keystore
+pub(crate) fn insert_seed(
+    eng: &mut CE,
+    store: &mut LocalStore<KS>,
+    seed: QuicSyncSeed<CS>,
+) -> Result<()> {
+    store.try_insert(seed.key_id(), eng.wrap(seed)?)?;
+    Ok(())
+}
+
+/// Removes a seed from the daemon's local keystore
+pub(crate) fn remove_seed(store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
+    store.remove::<WrappedKey<CS>>(seed.key_id())?;
+    Ok(())
 }
 
 #[cfg(test)]

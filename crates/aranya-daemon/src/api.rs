@@ -7,7 +7,7 @@ use core::{future, net::SocketAddr, ops::Deref, pin::pin};
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
-use aranya_crypto::{default::WrappedKey, Csprng, Engine, KeyStore, Rng};
+use aranya_crypto::{Csprng, KeyStore, Rng};
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
@@ -37,7 +37,7 @@ use crate::{
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::task::SyncPeers,
-    util::SeedDir,
+    util::{insert_seed, remove_seed, SeedDir},
     Client, InvalidGraphs, EF,
 };
 
@@ -1052,22 +1052,6 @@ impl DaemonApi for Api {
         }
         Ok(labels)
     }
-}
-
-/// Inserts a seed into the daemon's local keystore
-fn insert_seed(
-    eng: &mut CE,
-    store: &mut LocalStore<KS>,
-    seed: QuicSyncSeed<CS>,
-) -> anyhow::Result<()> {
-    store.try_insert(seed.key_id(), eng.wrap(seed)?)?;
-    Ok(())
-}
-
-/// Removes a seed from the daemon's local keystore
-fn remove_seed(store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> anyhow::Result<()> {
-    store.remove::<WrappedKey<CS>>(seed.key_id())?;
-    Ok(())
 }
 
 impl From<api::KeyBundle> for KeyBundle {
