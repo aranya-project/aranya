@@ -3,10 +3,7 @@
 use core::hash::Hash;
 
 use anyhow::Context as _;
-use aranya_crypto::{
-    custom_id,
-    tls::{PskSeed, PskSeedId},
-};
+use aranya_crypto::custom_id;
 use serde::{Deserialize, Serialize};
 
 custom_id! {
@@ -47,9 +44,6 @@ impl QuicSyncConfigBuilder {
         })
     }
 }
-
-pub type QuicSyncSeed<CS> = PskSeed<CS>;
-pub type QuicSyncSeedId = PskSeedId;
 
 // TODO: Create analogous type in aranya-client
 #[derive(Clone, Debug, Serialize, Deserialize)]

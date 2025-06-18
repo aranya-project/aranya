@@ -7,12 +7,15 @@ use core::{future, net::SocketAddr, ops::Deref, pin::pin};
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
-use aranya_crypto::{tls::CipherSuiteId, Csprng, Identified as _, PolicyId, Rng};
+use aranya_crypto::{
+    tls::{CipherSuiteId, PskSeed},
+    Csprng, Identified as _, PolicyId, Rng,
+};
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, GenSeedMode, QuicSyncSeed,
+    DaemonApi, GenSeedMode,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -397,7 +400,7 @@ impl DaemonApi for Api {
             };
 
             let ikm: [u8; 32] = ikm.deref().try_into().context("ikm must be 32 bytes")?;
-            let seed = QuicSyncSeed::<CS>::import_from_ikm(&ikm, &team.into_id().into());
+            let seed = PskSeed::<CS>::import_from_ikm(&ikm, &team.into_id().into());
             insert_seed(engine, store, seed.clone())
                 .context("could not insert seed into keystore")?;
 
@@ -489,7 +492,7 @@ impl DaemonApi for Api {
             };
             let ikm: [u8; 32] = ikm.deref().try_into().context("ikm must be 32 bytes")?;
 
-            let seed = QuicSyncSeed::<CS>::import_from_ikm(&ikm, &team_id.into_id().into());
+            let seed = PskSeed::<CS>::import_from_ikm(&ikm, &team_id.into_id().into());
             insert_seed(engine, store, seed.clone())
                 .context("could not insert seed into keystore")?;
 

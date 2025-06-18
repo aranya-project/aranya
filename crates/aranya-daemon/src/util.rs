@@ -2,10 +2,11 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context as _, Result};
 use aranya_crypto::{
-    default::WrappedKey, tls::CipherSuiteId, Engine, Id, Identified as _, KeyStore, KeyStoreExt,
-    PolicyId,
+    default::WrappedKey,
+    tls::{CipherSuiteId, PskSeed, PskSeedId},
+    Engine, Id, Identified as _, KeyStore, KeyStoreExt, PolicyId,
 };
-use aranya_daemon_api::{QuicSyncSeed, QuicSyncSeedId, TeamId};
+use aranya_daemon_api::TeamId;
 use aranya_util::create_dir_all;
 use s2n_quic::provider::tls::rustls::rustls::crypto::{hash::HashAlgorithm, PresharedKey};
 use tokio::{
@@ -24,7 +25,7 @@ impl SeedDir {
         Ok(Self(p))
     }
 
-    pub(crate) async fn append(&self, team_id: &TeamId, seed_id: &QuicSyncSeedId) -> Result<()> {
+    pub(crate) async fn append(&self, team_id: &TeamId, seed_id: &PskSeedId) -> Result<()> {
         let file_name = self.0.join(team_id.to_string());
 
         // fail if a file with the same name already exists
@@ -40,7 +41,7 @@ impl SeedDir {
         Ok(())
     }
 
-    pub(crate) async fn list(&self) -> Result<Vec<(TeamId, QuicSyncSeedId)>> {
+    pub(crate) async fn list(&self) -> Result<Vec<(TeamId, PskSeedId)>> {
         let mut entries = read_dir(&self.0).await?;
         let mut out = Vec::new();
 
@@ -58,7 +59,7 @@ impl SeedDir {
         Ok(out)
     }
 
-    async fn read_id(path: PathBuf) -> Result<QuicSyncSeedId> {
+    async fn read_id(path: PathBuf) -> Result<PskSeedId> {
         const ID_SIZE: usize = size_of::<Id>();
         let bytes = read(path).await?;
         let arr: [u8; ID_SIZE] = bytes.try_into().map_err(|input| {
@@ -75,8 +76,8 @@ impl SeedDir {
 pub(crate) fn load_seed(
     eng: &mut CE,
     store: &mut KS,
-    id: &QuicSyncSeedId,
-) -> Result<Option<QuicSyncSeed<CS>>> {
+    id: &PskSeedId,
+) -> Result<Option<PskSeed<CS>>> {
     store.get_key(eng, id.into_id()).map_err(Into::into)
 }
 
@@ -122,14 +123,14 @@ pub(crate) async fn load_team_psk_pairs(
 pub(crate) fn insert_seed(
     eng: &mut CE,
     store: &mut LocalStore<KS>,
-    seed: QuicSyncSeed<CS>,
+    seed: PskSeed<CS>,
 ) -> Result<()> {
     store.try_insert(seed.id()?.into_id(), eng.wrap(seed)?)?;
     Ok(())
 }
 
 /// Removes a seed from the daemon's local keystore
-pub(crate) fn remove_seed(store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
+pub(crate) fn remove_seed(store: &mut LocalStore<KS>, seed: PskSeed<CS>) -> Result<()> {
     store.remove::<WrappedKey<CS>>(seed.id()?.into_id())?;
     Ok(())
 }
