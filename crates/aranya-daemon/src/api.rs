@@ -7,7 +7,7 @@ use core::{future, net::SocketAddr, ops::Deref, pin::pin};
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
-use aranya_crypto::{Csprng, Rng};
+use aranya_crypto::{tls::CipherSuiteId, Csprng, Identified as _, PolicyId, Rng};
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
@@ -36,7 +36,7 @@ use crate::{
     daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
-    sync::task::SyncPeers,
+    sync::task::{quic::QUIC_SYNC_PSK_CONTEXT, SyncPeers},
     util::{insert_seed, remove_seed, SeedDir},
     Client, InvalidGraphs, EF,
 };
@@ -396,14 +396,14 @@ impl DaemonApi for Api {
                 );
             };
 
-            let ikm: [u8; 64] = ikm.deref().try_into().context("ikm must be 64 bytes")?;
-            let seed = QuicSyncSeed::<CS>::from_ikm(ikm);
+            let ikm: [u8; 32] = ikm.deref().try_into().context("ikm must be 32 bytes")?;
+            let seed = QuicSyncSeed::<CS>::import_from_ikm(&ikm, &team.into_id().into());
             insert_seed(engine, store, seed.clone())
                 .context("could not insert seed into keystore")?;
 
             if let Err(e) = self
                 .seed_id_dir
-                .append(&team, &seed.id())
+                .append(&team, &seed.id()?)
                 .await
                 .context("could not write seed id to file")
             {
@@ -412,19 +412,29 @@ impl DaemonApi for Api {
                 return Err(e.into());
             };
 
-            let psk = seed.gen_psk()?;
+            // TODO: Use a real policy ID
+            // TODO: Iterate over all cipher suite IDs
+            let psk_res_iter = seed.generate_psks(
+                QUIC_SYNC_PSK_CONTEXT,
+                team.into_id().into(),
+                PolicyId::default(),
+                [CipherSuiteId::TlsAes256GcmSha384].iter().copied(),
+            );
+            for res in psk_res_iter {
+                if let Ok(psk) = res {
+                    let identity = psk.identity().as_bytes();
+                    let secret = psk.raw_secret_bytes();
+                    let psk = PresharedKey::external(identity, secret)
+                        .context("unable to create PSK")?
+                        .with_hash_alg(HashAlgorithm::SHA384)
+                        .expect("Valid hash algorithm");
 
-            let identity = psk.identity();
-            let secret = psk.raw_secret();
-            let psk = PresharedKey::external(identity, secret)
-                .context("unable to create PSK")?
-                .with_hash_alg(HashAlgorithm::SHA384)
-                .expect("Valid hash algorithm");
-
-            quic_data
-                .psk_store
-                .insert(team, Arc::new(psk))
-                .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+                    quic_data
+                        .psk_store
+                        .insert(team, Arc::new(psk))
+                        .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+                }
+            }
         }
 
         // TODO: Implement for other syncer types
@@ -465,6 +475,7 @@ impl DaemonApi for Api {
             .await
             .context("unable to create team")?;
         debug!(?graph_id);
+        let team_id: api::TeamId = graph_id.into_id().into();
 
         if let (Some(ref mut quic_data), Some(ref qs_cfg)) =
             (self.quic.lock().await.as_ref(), cfg.quic_sync)
@@ -476,16 +487,16 @@ impl DaemonApi for Api {
                     anyhow::anyhow!("Only passing in IKM for the seed is supported!").into(),
                 );
             };
-            let ikm: [u8; 64] = ikm.deref().try_into().context("ikm must be 64 bytes")?;
+            let ikm: [u8; 32] = ikm.deref().try_into().context("ikm must be 32 bytes")?;
 
-            let seed = QuicSyncSeed::<CS>::from_ikm(ikm);
+            let seed = QuicSyncSeed::<CS>::import_from_ikm(&ikm, &team_id.into_id().into());
             insert_seed(engine, store, seed.clone())
                 .context("could not insert seed into keystore")?;
 
             let team_id = api::TeamId::from(*graph_id.as_array());
             if let Err(e) = self
                 .seed_id_dir
-                .append(&team_id, &seed.id())
+                .append(&team_id, &seed.id()?)
                 .await
                 .context("could not write seed id to file")
             {
@@ -494,23 +505,32 @@ impl DaemonApi for Api {
                 return Err(e.into());
             };
 
-            let psk = seed.gen_psk()?;
-            // Insert PSK into the store
-            {
-                let psk_ref = Arc::new(
-                    PresharedKey::external(psk.identity(), psk.raw_secret())
+            // TODO: Use a real policy ID
+            // TODO: Iterate over all cipher suite IDs
+            let psk_res_iter = seed.generate_psks(
+                QUIC_SYNC_PSK_CONTEXT,
+                team_id.into_id().into(),
+                PolicyId::default(),
+                [CipherSuiteId::TlsAes256GcmSha384].iter().copied(),
+            );
+            for res in psk_res_iter {
+                if let Ok(psk) = res {
+                    let identity = psk.identity().as_bytes();
+                    let secret = psk.raw_secret_bytes();
+                    let psk = PresharedKey::external(identity, secret)
                         .context("unable to create PSK")?
                         .with_hash_alg(HashAlgorithm::SHA384)
-                        .expect("Valid hash algorithm"),
-                );
-                quic_data
-                    .psk_store
-                    .insert(team_id, psk_ref)
-                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+                        .expect("Valid hash algorithm");
+
+                    quic_data
+                        .psk_store
+                        .insert(team_id, Arc::new(psk))
+                        .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+                }
             }
         }
 
-        Ok(graph_id.into_id().into())
+        Ok(team_id)
     }
 
     #[instrument(skip(self))]

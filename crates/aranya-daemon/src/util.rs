@@ -1,7 +1,10 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{Context as _, Result};
-use aranya_crypto::{default::WrappedKey, Engine, Id, KeyStore, KeyStoreExt};
+use aranya_crypto::{
+    default::WrappedKey, tls::CipherSuiteId, Engine, Id, Identified as _, KeyStore, KeyStoreExt,
+    PolicyId,
+};
 use aranya_daemon_api::{QuicSyncSeed, QuicSyncSeedId, TeamId};
 use aranya_util::create_dir_all;
 use s2n_quic::provider::tls::rustls::rustls::crypto::{hash::HashAlgorithm, PresharedKey};
@@ -10,7 +13,7 @@ use tokio::{
     io::AsyncWriteExt,
 };
 
-use crate::{keystore::LocalStore, CE, CS, KS};
+use crate::{keystore::LocalStore, sync::task::quic::QUIC_SYNC_PSK_CONTEXT, CE, CS, KS};
 
 #[derive(Debug)]
 pub(crate) struct SeedDir(PathBuf);
@@ -89,16 +92,27 @@ pub(crate) async fn load_team_psk_pairs(
         let Some(seed) = load_seed(eng, store, &seed_id)? else {
             continue;
         };
-        let psk = seed.gen_psk()?;
 
-        let identity = psk.identity();
-        let secret = psk.raw_secret();
-        let psk = PresharedKey::external(identity, secret)
-            .context("unable to create PSK")?
-            .with_hash_alg(HashAlgorithm::SHA384)
-            .context("invalid hash algorithm")?;
+        // TODO: Iterate over all cipher suite IDs
+        // TODO: Use real value for policy ID
+        let psk_iter = seed
+            .generate_psks(
+                QUIC_SYNC_PSK_CONTEXT,
+                team_id.into_id().into(),
+                PolicyId::default(),
+                [CipherSuiteId::TlsAes256GcmSha384].iter().copied(),
+            )
+            .flatten();
+        for psk in psk_iter {
+            let identity = psk.identity().as_bytes();
+            let secret = psk.raw_secret_bytes();
+            let psk = PresharedKey::external(identity, secret)
+                .context("unable to create PSK")?
+                .with_hash_alg(HashAlgorithm::SHA384)
+                .expect("Valid hash algorithm");
 
-        out.push((team_id, Arc::new(psk)));
+            out.push((team_id, Arc::new(psk)));
+        }
     }
 
     Ok(out)
@@ -110,13 +124,13 @@ pub(crate) fn insert_seed(
     store: &mut LocalStore<KS>,
     seed: QuicSyncSeed<CS>,
 ) -> Result<()> {
-    store.try_insert(seed.key_id(), eng.wrap(seed)?)?;
+    store.try_insert(seed.id()?.into_id(), eng.wrap(seed)?)?;
     Ok(())
 }
 
 /// Removes a seed from the daemon's local keystore
 pub(crate) fn remove_seed(store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
-    store.remove::<WrappedKey<CS>>(seed.key_id())?;
+    store.remove::<WrappedKey<CS>>(seed.id()?.into_id())?;
     Ok(())
 }
 

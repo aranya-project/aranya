@@ -199,7 +199,7 @@ async fn main() -> Result<()> {
     let mut memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
 
     // Create the team config
-    let seed_ikm = Box::from([0u8; 64]);
+    let seed_ikm = Box::from([0u8; 32]); // TODO: Randomize this
     let cfg = {
         let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
         TeamConfig::builder().quic_sync(qs_cfg).build()?

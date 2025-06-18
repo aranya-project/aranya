@@ -99,4 +99,3 @@ tag-prefix = ""
 [patch.crates-io]
 # Patch using a specific branch
 aranya-crypto = { git = "https://github.com/aranya-project/aranya-core", branch = "issue/301" }
-

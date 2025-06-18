@@ -132,7 +132,7 @@ impl TeamCtx {
 
     pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
-        let seed_ikm = Box::from([0; 64]);
+        let seed_ikm = Box::from([0; 32]); // TODO: Randomize this
         let cfg = {
             let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
             TeamConfig::builder().quic_sync(qs_cfg).build()?
