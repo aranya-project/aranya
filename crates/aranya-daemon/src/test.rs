@@ -46,10 +46,13 @@ use crate::{
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
-        task::quic::{PeerCacheMap, PskStore},
+        task::{
+            quic::{PeerCacheMap, PskStore},
+            SyncPeer,
+        },
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
-    AranyaStore,
+    AranyaStore, InvalidGraphs,
 };
 
 // Aranya graph client for testing.
@@ -95,6 +98,7 @@ impl TestDevice {
         let (syncer, _sync_peers) = TestSyncer::new(
             client,
             send_effects,
+            InvalidGraphs::default(),
             TestState::new(psk_store)?,
             Addr::from((Ipv4Addr::LOCALHOST, 0)),
             caches,
@@ -121,7 +125,7 @@ impl TestDevice {
     ) -> Result<Vec<Effect>> {
         let cmd_count = self
             .syncer
-            .sync(&self.graph_id, &device.local_addr)
+            .sync(&SyncPeer::new(device.local_addr, self.graph_id))
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.local_addr))?;
         if let Some(must_receive) = must_receive {

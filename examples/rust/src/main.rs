@@ -9,7 +9,7 @@ use anyhow::{bail, Context as _, Result};
 use aranya_client::{
     aqc::AqcPeerChannel, client::Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
 };
-use aranya_daemon_api::{ChanOp, CreateTeamResponse, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, SeedType};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -201,18 +201,17 @@ async fn main() -> Result<()> {
     // Create a team.
     info!("creating team");
     let cfg = TeamConfig::builder().build()?;
-    let CreateTeamResponse {
-        team_id,
-        seed: Some(seed),
-    } = owner
+    let team_id = owner
         .client
         .create_team(cfg)
         .await
-        .context("expected to create team")?
-    else {
-        bail!("Expected a valid QUIC sync config")
-    };
+        .context("expected to create team")?;
     info!(%team_id);
+
+    // load the psk seed
+    let SeedType::Raw(seed) = owner.client.load_psk_seed(aranya_daemon_api::GenSeedMode::Raw, team_id).await? else {
+        bail!("Wrapped keys are not supported!") 
+    };
 
     // get sync addresses.
     let owner_addr = owner.aranya_local_addr().await?;
@@ -233,7 +232,7 @@ async fn main() -> Result<()> {
 
     // add team to each non-owner device's local store
     let cfg_with_qs = {
-        let qs_cfg = QuicSyncConfig::builder().seed(seed).build()?;
+        let qs_cfg = QuicSyncConfig::builder().raw_seed(seed).build()?;
         TeamConfig::builder().quic_sync(qs_cfg).build()?
     };
     for member in [&admin_team, &operator_team, &membera_team, &memberb_team] {

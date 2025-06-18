@@ -10,7 +10,7 @@ use core::{
 };
 use std::collections::hash_map::{self, HashMap};
 
-use anyhow::{bail, Context as _};
+use anyhow::bail;
 pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
@@ -125,41 +125,6 @@ pub enum Role {
     Admin,
     Operator,
     Member,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct QuicSyncConfig {
-    pub seed: Box<[u8]>,
-}
-
-impl QuicSyncConfig {
-    pub fn builder() -> QuicSyncConfigBuilder {
-        QuicSyncConfigBuilder::default()
-    }
-
-    pub fn seed(&self) -> &[u8] {
-        &self.seed
-    }
-}
-
-#[derive(Default)]
-pub struct QuicSyncConfigBuilder {
-    seed: Option<Box<[u8]>>,
-}
-
-impl QuicSyncConfigBuilder {
-    /// Configures the seed.
-    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
-        self.seed = Some(seed);
-
-        self
-    }
-
-    pub fn build(self) -> anyhow::Result<QuicSyncConfig> {
-        Ok(QuicSyncConfig {
-            seed: self.seed.context("Missing `seed` field")?,
-        })
-    }
 }
 
 // Note: any fields added to this type should be public
@@ -615,12 +580,6 @@ pub struct Label {
     pub name: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateTeamResponse {
-    pub team_id: TeamId,
-    pub seed: Option<Box<[u8]>>,
-}
-
 #[tarpc::service]
 pub trait DaemonApi {
     /// Returns the daemon's version.
@@ -651,7 +610,7 @@ pub trait DaemonApi {
     async fn remove_team(team: TeamId) -> Result<()>;
 
     /// Create a new graph/team with the current device as the owner.
-    async fn create_team(cfg: TeamConfig) -> Result<CreateTeamResponse>;
+    async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 
@@ -728,6 +687,7 @@ pub trait DaemonApi {
     async fn query_labels(team: TeamId) -> Result<Vec<Label>>;
     /// Query whether a label exists.
     async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
+    async fn load_psk_seed(mode: GenSeedMode, team: TeamId) -> Result<SeedType>;
 }
 
 #[cfg(test)]

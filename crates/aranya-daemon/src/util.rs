@@ -37,6 +37,11 @@ impl SeedDir {
         Ok(())
     }
 
+    pub(crate) async fn get(&self, team_id: &TeamId) -> Result<QuicSyncSeedId> {
+        let path = self.0.join(team_id.to_string());
+        Self::read_id(path).await
+    }
+
     pub(crate) async fn list(&self) -> Result<Vec<(TeamId, QuicSyncSeedId)>> {
         let mut entries = read_dir(&self.0).await?;
         let mut out = Vec::new();
@@ -47,27 +52,29 @@ impl SeedDir {
             })?;
             let team_id = TeamId::decode(file_name)?;
 
-            let seed_id = {
-                const ID_SIZE: usize = size_of::<Id>();
-                let bytes = read(entry.path()).await?;
-                let arr: [u8; ID_SIZE] = bytes.try_into().map_err(|input| {
-                    anyhow::anyhow!(
-                        "could not convert {:?} to an array of {ID_SIZE} bytes",
-                        input
-                    )
-                })?;
-                arr.into()
-            };
+            let seed_id = Self::read_id(entry.path()).await?;
 
             out.push((team_id, seed_id));
         }
 
         Ok(out)
     }
+
+    async fn read_id(path: PathBuf) -> Result<QuicSyncSeedId> {
+        const ID_SIZE: usize = size_of::<Id>();
+        let bytes = read(path).await?;
+        let arr: [u8; ID_SIZE] = bytes.try_into().map_err(|input| {
+            anyhow::anyhow!(
+                "could not convert {:?} to an array of {ID_SIZE} bytes",
+                input
+            )
+        })?;
+        Ok(arr.into())
+    }
 }
 
 #[inline]
-fn load_seed(
+pub(crate) fn load_seed(
     eng: &mut CE,
     store: &mut KS,
     id: &QuicSyncSeedId,

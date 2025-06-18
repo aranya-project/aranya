@@ -9,8 +9,8 @@ use aranya_daemon_api::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
-    ChanOp, CreateTeamResponse, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId,
-    NetIdentifier, Role, TeamId, Version, CS,
+    ChanOp, DaemonApiClient, DeviceId, GenSeedMode, KeyBundle, Label, LabelId, NetIdentifier, Role,
+    SeedType, TeamId, Version, CS,
 };
 use aranya_util::Addr;
 use tarpc::context;
@@ -234,7 +234,7 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<CreateTeamResponse> {
+    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
         self.daemon
             .create_team(context::current(), cfg.into())
             .await
@@ -246,6 +246,15 @@ impl Client {
     pub async fn remove_team(&mut self, team: TeamId) -> Result<()> {
         self.daemon
             .remove_team(context::current(), team)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Create a new graph/team with the current device as the owner.
+    pub async fn load_psk_seed(&mut self, mode: GenSeedMode, team: TeamId) -> Result<SeedType> {
+        self.daemon
+            .load_psk_seed(context::current(), mode, team)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

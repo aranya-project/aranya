@@ -6,13 +6,13 @@
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context as _, Result};
+use anyhow::{anyhow, Context as _};
 use aranya_crypto::{default::WrappedKey, Csprng, Engine, KeyStore, Rng};
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    CreateTeamResponse, DaemonApi, QuicSyncSeed, CE, CS,
+    DaemonApi, GenSeedMode, QuicSyncSeed, SeedType,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -33,11 +33,12 @@ use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 use crate::{
     actions::Actions,
     aqc::Aqc,
-    daemon::KS,
+    daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::task::SyncPeers,
-    Client, EF,
+    util::{load_seed, SeedDir},
+    Client, InvalidGraphs, EF,
 };
 
 mod quic_sync;
@@ -83,9 +84,13 @@ impl DaemonApiServer {
         pk: PublicKeys<CS>,
         peers: SyncPeers,
         recv_effects: EffectReceiver,
+        invalid: InvalidGraphs,
         aqc: Aqc<CE, KS>,
+        store: LocalStore<KS>,
+        engine: CE,
+        seed_id_dir: SeedDir,
         quic: Option<quic_sync::Data>,
-    ) -> Result<Self> {
+    ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
         let aqc = Arc::new(aqc);
         let effect_handler = EffectHandler {
@@ -97,7 +102,10 @@ impl DaemonApiServer {
             pk,
             peers: Mutex::new(peers),
             effect_handler,
+            invalid,
             aqc,
+            store_engine: Mutex::new((store, engine)),
+            seed_id_dir,
             quic: Mutex::new(quic),
         }));
         Ok(Self {
@@ -170,7 +178,7 @@ struct EffectHandler {
 impl EffectHandler {
     /// Handles effects resulting from invoking an Aranya action.
     #[instrument(skip_all, fields(%graph, effects = effects.len()))]
-    async fn handle_effects(&self, graph: GraphId, effects: &[Effect]) -> Result<()> {
+    async fn handle_effects(&self, graph: GraphId, effects: &[Effect]) -> anyhow::Result<()> {
         trace!("handling effects");
 
         use Effect::*;
@@ -223,7 +231,6 @@ impl EffectHandler {
 ///
 /// This is separated out so we only have to clone one [`Arc`]
 /// (inside [`Api`]).
-#[derive(Debug)]
 struct ApiInner {
     client: Client,
     /// Local socket address of the API.
@@ -232,14 +239,31 @@ struct ApiInner {
     pk: PublicKeys<CS>,
     /// Aranya sync peers,
     peers: Mutex<SyncPeers>,
+    /// Handles graph effects from the syncer.
     effect_handler: EffectHandler,
+    /// Keeps track of which graphs are invalid due to a finalization error.
+    invalid: InvalidGraphs,
     aqc: Arc<Aqc<CE, KS>>,
+    store_engine: Mutex<(LocalStore<KS>, CE)>,
+    seed_id_dir: SeedDir,
     quic: Mutex<Option<quic_sync::Data>>,
 }
 
 impl ApiInner {
     fn get_pk(&self) -> api::Result<KeyBundle> {
         Ok(KeyBundle::try_from(&self.pk).context("bad key bundle")?)
+    }
+}
+
+impl std::fmt::Debug for ApiInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Inner API Data")
+            .field("seed_id_dir", &self.seed_id_dir)
+            .field("client", &self.client)
+            .field("local_addr", &self.local_addr)
+            .field("pk", &self.pk)
+            .field("aqc", &self.aqc)
+            .finish_non_exhaustive()
     }
 }
 
@@ -252,6 +276,18 @@ impl Deref for Api {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Api {
+    /// Checks wither a team's graph is valid.
+    /// If the graph is not valid, return an error to prevent operations on the invalid graph.
+    async fn check_team_valid(&self, team: api::TeamId) -> anyhow::Result<()> {
+        if self.invalid.contains(team.into_id().into()) {
+            // TODO: return custom daemon error type
+            anyhow::bail!("team {team} invalid due to graph finalization error")
+        }
+        Ok(())
     }
 }
 
@@ -293,6 +329,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::SyncPeerConfig,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         self.peers
             .lock()
             .await
@@ -309,6 +347,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: Option<api::SyncPeerConfig>,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         self.peers
             .lock()
             .await
@@ -324,6 +364,8 @@ impl DaemonApi for Api {
         peer: Addr,
         team: api::TeamId,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         self.peers
             .lock()
             .await
@@ -340,23 +382,29 @@ impl DaemonApi for Api {
         team: api::TeamId,
         cfg: api::TeamConfig,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         if let Some(cfg) = cfg.quic_sync {
             let mut guard = self.quic.lock().await;
             let quic_data = guard.as_mut().context("quic syncing is not enabled")?;
 
-            let seed = QuicSyncSeed::<CS>::from_bytes(cfg.seed())?;
-            insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
+            let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
+
+            let SeedType::Raw(ref raw_seed_bytes) = cfg.seed() else {
+                return Err(anyhow::anyhow!("Wrapped keys are not supported!").into());
+            };
+            let seed = QuicSyncSeed::<CS>::from_bytes(raw_seed_bytes)?;
+            insert_seed(engine, store, seed.clone())
                 .context("could not insert seed into keystore")?;
 
-            if let Err(e) = quic_data
+            if let Err(e) = self
                 .seed_id_dir
                 .append(&team, &seed.id())
                 .await
                 .context("could not write seed id to file")
             {
                 error!(%e);
-                remove_seed(&mut quic_data.store, seed.clone())
-                    .context("could not remove seed from keystore")?;
+                remove_seed(store, seed.clone()).context("could not remove seed from keystore")?;
                 return Err(e.into());
             };
 
@@ -401,8 +449,9 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         cfg: api::TeamConfig,
-    ) -> api::Result<CreateTeamResponse> {
+    ) -> api::Result<api::TeamId> {
         info!("create_team");
+
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
         let pk = self.get_pk()?;
@@ -413,53 +462,48 @@ impl DaemonApi for Api {
             .context("unable to create team")?;
         debug!(?graph_id);
 
-        let seed = match *self.quic.lock().await {
-            Some(ref mut quic_data) => {
-                let seed = QuicSyncSeed::<CS>::new(&mut Rng);
-                insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
-                    .context("could not insert seed into keystore")?;
+        let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
 
-                let team_id = api::TeamId::from(*graph_id.as_array());
-                if let Err(e) = quic_data
-                    .seed_id_dir
-                    .append(&team_id, &seed.id())
-                    .await
-                    .context("could not write seed id to file")
-                {
-                    error!(%e);
-                    remove_seed(&mut quic_data.store, seed.clone())
-                        .context("could not remove seed from keystore")?;
-                    return Err(e.into());
-                };
+        // Always generate a seed when a team is created. Use the value in the team config?
+        let seed = QuicSyncSeed::<CS>::new(&mut Rng);
+        insert_seed(engine, store, seed.clone()).context("could not insert seed into keystore")?;
 
-                let psk = seed.gen_psk()?;
-                // Insert PSK into the store
-                {
-                    let psk_ref = Arc::new(
-                        PresharedKey::external(psk.identity(), psk.raw_secret())
-                            .context("unable to create PSK")?
-                            .with_hash_alg(HashAlgorithm::SHA384)
-                            .expect("Valid hash algorithm"),
-                    );
-                    quic_data
-                        .psk_store
-                        .insert(team_id, psk_ref)
-                        .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
-                }
-
-                Some(Box::from(seed.as_bytes()))
-            }
-            None => None,
+        let team_id = api::TeamId::from(*graph_id.as_array());
+        if let Err(e) = self
+            .seed_id_dir
+            .append(&team_id, &seed.id())
+            .await
+            .context("could not write seed id to file")
+        {
+            error!(%e);
+            remove_seed(store, seed.clone()).context("could not remove seed from keystore")?;
+            return Err(e.into());
         };
 
-        Ok(CreateTeamResponse {
-            team_id: graph_id.into_id().into(),
-            seed,
-        })
+        if let Some(ref mut quic_data) = *self.quic.lock().await {
+            let psk = seed.gen_psk()?;
+            // Insert PSK into the store
+            {
+                let psk_ref = Arc::new(
+                    PresharedKey::external(psk.identity(), psk.raw_secret())
+                        .context("unable to create PSK")?
+                        .with_hash_alg(HashAlgorithm::SHA384)
+                        .expect("Valid hash algorithm"),
+                );
+                quic_data
+                    .psk_store
+                    .insert(team_id, psk_ref)
+                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+            }
+        }
+
+        Ok(graph_id.into_id().into())
     }
 
     #[instrument(skip(self))]
     async fn close_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         todo!();
     }
 
@@ -470,6 +514,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         keys: api::KeyBundle,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         self.client
             .actions(&team.into_id().into())
             .add_member(keys.into())
@@ -485,6 +531,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         self.client
             .actions(&team.into_id().into())
             .remove_member(device.into_id().into())
@@ -501,6 +549,8 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         role: api::Role,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         self.client
             .actions(&team.into_id().into())
             .assign_role(device.into_id().into(), role.into())
@@ -517,6 +567,8 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         role: api::Role,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         self.client
             .actions(&team.into_id().into())
             .revoke_role(device.into_id().into(), role.into())
@@ -533,6 +585,8 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         name: api::NetIdentifier,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -553,6 +607,8 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         name: api::NetIdentifier,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         self.client
             .actions(&team.into_id().into())
             .unset_aqc_network_name(device.into_id().into())
@@ -569,6 +625,8 @@ impl DaemonApi for Api {
         peer: api::NetIdentifier,
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsks)> {
+        self.check_team_valid(team).await?;
+
         info!("creating bidi channel");
 
         let graph = GraphId::from(team.into_id());
@@ -608,6 +666,8 @@ impl DaemonApi for Api {
         peer: api::NetIdentifier,
         label: api::LabelId,
     ) -> api::Result<(api::AqcCtrl, api::AqcUniPsks)> {
+        self.check_team_valid(team).await?;
+
         info!("creating uni channel");
 
         let graph = GraphId::from(team.into_id());
@@ -666,6 +726,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         ctrl: api::AqcCtrl,
     ) -> api::Result<(api::LabelId, api::AqcPsks)> {
+        self.check_team_valid(team).await?;
+
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
@@ -708,6 +770,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_name: String,
     ) -> api::Result<api::LabelId> {
+        self.check_team_valid(team).await?;
+
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -729,6 +793,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_id: api::LabelId,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -752,6 +818,8 @@ impl DaemonApi for Api {
         label_id: api::LabelId,
         op: api::ChanOp,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -778,6 +846,8 @@ impl DaemonApi for Api {
         device: api::DeviceId,
         label_id: api::LabelId,
     ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
         let effects = self
             .client
             .actions(&team.into_id().into())
@@ -798,6 +868,8 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
     ) -> api::Result<Vec<api::DeviceId>> {
+        self.check_team_valid(team).await?;
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -820,6 +892,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<api::Role> {
+        self.check_team_valid(team).await?;
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -842,6 +916,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<api::KeyBundle> {
+        self.check_team_valid(team).await?;
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -865,6 +941,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<Vec<api::Label>> {
+        self.check_team_valid(team).await?;
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -892,6 +970,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         device: api::DeviceId,
     ) -> api::Result<Option<api::NetIdentifier>> {
+        self.check_team_valid(team).await?;
+
         if let Ok((_ctrl, effects)) = self
             .client
             .actions(&team.into_id().into())
@@ -915,6 +995,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         label_id: api::LabelId,
     ) -> api::Result<bool> {
+        self.check_team_valid(team).await?;
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -937,6 +1019,8 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
     ) -> api::Result<Vec<api::Label>> {
+        self.check_team_valid(team).await?;
+
         let (_ctrl, effects) = self
             .client
             .actions(&team.into_id().into())
@@ -955,16 +1039,39 @@ impl DaemonApi for Api {
         }
         Ok(labels)
     }
+
+    async fn load_psk_seed(
+        self,
+        _context: context::Context,
+        mode: GenSeedMode,
+        team_id: api::TeamId,
+    ) -> api::Result<SeedType> {
+        if !matches!(mode, GenSeedMode::Raw) {
+            return Err(anyhow::anyhow!("Wrapped keys are not supported!").into());
+        }
+
+        let seed_id = self.seed_id_dir.get(&team_id).await?;
+        let (ref mut store, ref mut eng) = *self.store_engine.lock().await;
+
+        let seed =
+            load_seed(eng, store, &seed_id)?.context("Missing seed entry in the keystore")?;
+
+        Ok(SeedType::Raw(Box::from(seed.as_bytes())))
+    }
 }
 
 /// Inserts a seed into the daemon's local keystore
-fn insert_seed(eng: &mut CE, store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
+fn insert_seed(
+    eng: &mut CE,
+    store: &mut LocalStore<KS>,
+    seed: QuicSyncSeed<CS>,
+) -> anyhow::Result<()> {
     store.try_insert(seed.key_id(), eng.wrap(seed)?)?;
     Ok(())
 }
 
 /// Removes a seed from the daemon's local keystore
-fn remove_seed(store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> Result<()> {
+fn remove_seed(store: &mut LocalStore<KS>, seed: QuicSyncSeed<CS>) -> anyhow::Result<()> {
     store.remove::<WrappedKey<CS>>(seed.key_id())?;
     Ok(())
 }
