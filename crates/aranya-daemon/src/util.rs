@@ -37,11 +37,6 @@ impl SeedDir {
         Ok(())
     }
 
-    pub(crate) async fn get(&self, team_id: &TeamId) -> Result<QuicSyncSeedId> {
-        let path = self.0.join(team_id.to_string());
-        Self::read_id(path).await
-    }
-
     pub(crate) async fn list(&self) -> Result<Vec<(TeamId, QuicSyncSeedId)>> {
         let mut entries = read_dir(&self.0).await?;
         let mut out = Vec::new();

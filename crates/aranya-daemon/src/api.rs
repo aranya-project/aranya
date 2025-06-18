@@ -12,7 +12,7 @@ pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, GenSeedMode, QuicSyncSeed, SeedType,
+    DaemonApi, GenSeedMode, QuicSyncSeed,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -37,7 +37,7 @@ use crate::{
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::task::SyncPeers,
-    util::{load_seed, SeedDir},
+    util::SeedDir,
     Client, InvalidGraphs, EF,
 };
 
@@ -390,10 +390,14 @@ impl DaemonApi for Api {
 
             let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
 
-            let SeedType::Raw(ref raw_seed_bytes) = cfg.seed() else {
-                return Err(anyhow::anyhow!("Wrapped keys are not supported!").into());
+            let GenSeedMode::IKM(ref ikm) = cfg.seed() else {
+                return Err(
+                    anyhow::anyhow!("Only passing in IKM for the seed is supported!").into(),
+                );
             };
-            let seed = QuicSyncSeed::<CS>::from_bytes(raw_seed_bytes)?;
+
+            let ikm: [u8; 64] = ikm.deref().try_into().context("ikm must be 64 bytes")?;
+            let seed = QuicSyncSeed::<CS>::from_ikm(ikm);
             insert_seed(engine, store, seed.clone())
                 .context("could not insert seed into keystore")?;
 
@@ -462,25 +466,34 @@ impl DaemonApi for Api {
             .context("unable to create team")?;
         debug!(?graph_id);
 
-        let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
-
-        // Always generate a seed when a team is created. Use the value in the team config?
-        let seed = QuicSyncSeed::<CS>::new(&mut Rng);
-        insert_seed(engine, store, seed.clone()).context("could not insert seed into keystore")?;
-
-        let team_id = api::TeamId::from(*graph_id.as_array());
-        if let Err(e) = self
-            .seed_id_dir
-            .append(&team_id, &seed.id())
-            .await
-            .context("could not write seed id to file")
+        if let (Some(ref mut quic_data), Some(ref qs_cfg)) =
+            (self.quic.lock().await.as_ref(), cfg.quic_sync)
         {
-            error!(%e);
-            remove_seed(store, seed.clone()).context("could not remove seed from keystore")?;
-            return Err(e.into());
-        };
+            let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
 
-        if let Some(ref mut quic_data) = *self.quic.lock().await {
+            let GenSeedMode::IKM(ref ikm) = qs_cfg.seed() else {
+                return Err(
+                    anyhow::anyhow!("Only passing in IKM for the seed is supported!").into(),
+                );
+            };
+            let ikm: [u8; 64] = ikm.deref().try_into().context("ikm must be 64 bytes")?;
+
+            let seed = QuicSyncSeed::<CS>::from_ikm(ikm);
+            insert_seed(engine, store, seed.clone())
+                .context("could not insert seed into keystore")?;
+
+            let team_id = api::TeamId::from(*graph_id.as_array());
+            if let Err(e) = self
+                .seed_id_dir
+                .append(&team_id, &seed.id())
+                .await
+                .context("could not write seed id to file")
+            {
+                error!(%e);
+                remove_seed(store, seed.clone()).context("could not remove seed from keystore")?;
+                return Err(e.into());
+            };
+
             let psk = seed.gen_psk()?;
             // Insert PSK into the store
             {
@@ -1038,25 +1051,6 @@ impl DaemonApi for Api {
             }
         }
         Ok(labels)
-    }
-
-    async fn load_psk_seed(
-        self,
-        _context: context::Context,
-        mode: GenSeedMode,
-        team_id: api::TeamId,
-    ) -> api::Result<SeedType> {
-        if !matches!(mode, GenSeedMode::Raw) {
-            return Err(anyhow::anyhow!("Wrapped keys are not supported!").into());
-        }
-
-        let seed_id = self.seed_id_dir.get(&team_id).await?;
-        let (ref mut store, ref mut eng) = *self.store_engine.lock().await;
-
-        let seed =
-            load_seed(eng, store, &seed_id)?.context("Missing seed entry in the keystore")?;
-
-        Ok(SeedType::Raw(Box::from(seed.as_bytes())))
     }
 }
 

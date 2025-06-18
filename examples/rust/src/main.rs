@@ -9,7 +9,7 @@ use anyhow::{bail, Context as _, Result};
 use aranya_client::{
     aqc::AqcPeerChannel, client::Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
 };
-use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, SeedType};
+use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -198,20 +198,21 @@ async fn main() -> Result<()> {
     let mut membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
     let mut memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
 
+    // Create the team config
+    let seed_ikm = Box::from([0u8; 64]);
+    let cfg = {
+        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
+    };
+
     // Create a team.
     info!("creating team");
-    let cfg = TeamConfig::builder().build()?;
     let team_id = owner
         .client
-        .create_team(cfg)
+        .create_team(cfg.clone())
         .await
         .context("expected to create team")?;
     info!(%team_id);
-
-    // load the psk seed
-    let SeedType::Raw(seed) = owner.client.load_psk_seed(aranya_daemon_api::GenSeedMode::Raw, team_id).await? else {
-        bail!("Wrapped keys are not supported!") 
-    };
 
     // get sync addresses.
     let owner_addr = owner.aranya_local_addr().await?;
@@ -230,13 +231,8 @@ async fn main() -> Result<()> {
     let mut membera_team = membera.client.team(team_id);
     let mut memberb_team = memberb.client.team(team_id);
 
-    // add team to each non-owner device's local store
-    let cfg_with_qs = {
-        let qs_cfg = QuicSyncConfig::builder().raw_seed(seed).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
-    };
     for member in [&admin_team, &operator_team, &membera_team, &memberb_team] {
-        member.add_team(cfg_with_qs.clone()).await?;
+        member.add_team(cfg.clone()).await?;
     }
 
     info!("adding admin to team");

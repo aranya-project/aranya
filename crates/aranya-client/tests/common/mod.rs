@@ -10,7 +10,7 @@ use aranya_daemon::{
     config::{Config, QSConfig},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::{DeviceId, GenSeedMode, KeyBundle, Role, SeedType, TeamId};
+use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use tokio::{fs, time};
@@ -131,8 +131,13 @@ impl TeamCtx {
     }
 
     pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
-        // Create the initial team, and get our TeamId and PSK.
-        let cfg = TeamConfig::builder().build()?;
+        // Create the initial team, and get our TeamId.
+        let seed_ikm = Box::from([0; 64]);
+        let cfg = {
+            let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+            TeamConfig::builder().quic_sync(qs_cfg).build()?
+        };
+
         let team_id = {
             self.owner
                 .client
@@ -141,21 +146,6 @@ impl TeamCtx {
                 .expect("expected to create team")
         };
         info!(?team_id);
-
-        let SeedType::Raw(seed) = self
-            .owner
-            .client
-            .load_psk_seed(GenSeedMode::Raw, team_id)
-            .await
-            .expect("able to load seed")
-        else {
-            panic!("Only raw seeds are supported");
-        };
-
-        let cfg = {
-            let qs_cfg = QuicSyncConfig::builder().raw_seed(seed).build()?;
-            TeamConfig::builder().quic_sync(qs_cfg).build()?
-        };
 
         self.admin
             .client

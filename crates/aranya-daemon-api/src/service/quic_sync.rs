@@ -7,10 +7,10 @@ use anyhow::Context as _;
 use aranya_crypto::{
     custom_id,
     dangerous::spideroak_crypto::kdf::Kdf,
-    engine::{AlgId, RawSecret, UnwrappedKey, UnwrappedSecret, WrongKeyType},
     id::IdError,
+    unwrapped,
     zeroize::{Zeroize, ZeroizeOnDrop},
-    CipherSuite, Csprng, Id, Identified, Random,
+    CipherSuite, Id, Identified,
 };
 use serde::{Deserialize, Serialize};
 
@@ -28,7 +28,7 @@ custom_id! {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {
-    seed: SeedType,
+    seed: GenSeedMode,
 }
 
 impl QuicSyncConfig {
@@ -36,19 +36,19 @@ impl QuicSyncConfig {
         QuicSyncConfigBuilder::default()
     }
 
-    pub fn seed(&self) -> &SeedType {
+    pub fn seed(&self) -> &GenSeedMode {
         &self.seed
     }
 }
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    seed: Option<SeedType>,
+    seed: Option<GenSeedMode>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Sets the seed.
-    pub fn seed(mut self, seed: SeedType) -> Self {
+    /// Sets the seed type.
+    pub fn seed(mut self, seed: GenSeedMode) -> Self {
         self.seed = Some(seed);
         self
     }
@@ -101,33 +101,6 @@ pub struct QuicSyncSeed<CS> {
     _cs: PhantomData<CS>,
 }
 
-impl<CS> QuicSyncSeed<CS> {
-    /// Creates a new randomized instance.
-    pub fn new<R: Csprng>(rng: &mut R) -> Self {
-        let seed = <[u8; 64] as Random>::random(rng);
-
-        Self {
-            seed,
-            _cs: PhantomData,
-        }
-    }
-
-    /// returns the seed as bytes.
-    pub fn as_bytes(&self) -> &[u8] {
-        &self.seed
-    }
-
-    /// Creates the seed from a slice of bytes.
-    pub fn from_bytes(data: &[u8]) -> Result<Self> {
-        Ok(Self {
-            seed: data
-                .try_into()
-                .context("could not create seed from bytes")?,
-            _cs: PhantomData::<CS>,
-        })
-    }
-}
-
 impl<CS: CipherSuite> QuicSyncSeed<CS> {
     pub fn key_id(&self) -> Id {
         self.id().into()
@@ -136,6 +109,21 @@ impl<CS: CipherSuite> QuicSyncSeed<CS> {
     #[inline]
     pub fn id(&self) -> QuicSyncSeedId {
         Id::new::<CS>(&self.seed, b"QuicSyncKeyId-v1").into()
+    }
+
+    pub fn from_ikm(ikm: [u8; 64]) -> Self {
+        let prk = <CS::Kdf as Kdf>::extract(&ikm, &[]);
+        let mut seed = [0; 64];
+        <CS::Kdf as Kdf>::expand(&mut seed, &prk, b"quic sync seed").expect("can create seed");
+
+        Self::from_seed(seed)
+    }
+
+    const fn from_seed(seed: [u8; 64]) -> Self {
+        Self {
+            seed,
+            _cs: PhantomData,
+        }
     }
 
     pub fn gen_psk(&self) -> Result<QuicSyncPSK<CS>> {
@@ -175,45 +163,46 @@ impl<CS> Clone for QuicSyncSeed<CS> {
     }
 }
 
-// TODO: use `aranya_crypto::unwrapped` instead once
-// `__unwrapped_inner` is exported.
-impl<CS: CipherSuite> UnwrappedKey<CS> for QuicSyncSeed<CS> {
-    const ID: AlgId = AlgId::Seed(());
+unwrapped! {
+    name: QuicSyncSeed;
+    type: Seed;
+    into: |key: Self| { key.seed };
+    from: |seed: [u8;64] | { Self::from_seed(seed) };
 
-    #[inline]
-    fn into_secret(self) -> aranya_crypto::engine::Secret<CS> {
-        aranya_crypto::engine::Secret::new(RawSecret::Seed(self.seed))
-    }
-
-    #[inline]
-    fn try_from_secret(key: UnwrappedSecret<CS>) -> Result<Self, WrongKeyType> {
-        match key.into_raw() {
-            RawSecret::Seed(seed) => Ok(Self {
-                seed,
-                _cs: PhantomData::<CS>,
-            }),
-            got => Err(WrongKeyType {
-                got: got.name(),
-                expected: ::core::stringify!($name),
-            }),
-        }
-    }
 }
 
 // TODO: Create analogous type in aranya-client
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum GenSeedMode {
-    Raw,
+    /// The default option. Used in the create_team API
+    Generate,
+    /// Used in the create_team and add_team APIs
+    IKM(Box<[u8]>),
+    /// Used in the add_team API
     Wrapped { recv_pk: Box<[u8]> },
 }
 
-// Manually implement debug because of Raw variant?
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum SeedType {
-    Raw(Box<[u8]>),
-    Wrapped {
-        encrypted_seed: Box<[u8]>,
-        encap_key: Box<[u8]>,
-        sender_pk: Box<[u8]>,
-    },
+impl Default for GenSeedMode {
+    fn default() -> Self {
+        Self::Generate
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use aranya_crypto::{Random, Rng};
+
+    use super::*;
+    use crate::CS;
+
+    #[test]
+    fn test_from_ikm() {
+        let ikm = <[u8; 64] as Random>::random(&mut Rng);
+        let expected = QuicSyncSeed::<CS>::from_ikm(ikm);
+
+        for _ in 0..100 {
+            let got = QuicSyncSeed::<CS>::from_ikm(ikm);
+            assert_eq!(got.seed, expected.seed);
+        }
+    }
 }

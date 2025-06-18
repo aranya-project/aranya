@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{QuicSyncConfig, TeamConfig};
-use aranya_daemon_api::{GenSeedMode, Role, SeedType};
+use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
 
@@ -182,30 +182,20 @@ async fn test_add_team() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_add_team", work_dir).await?;
 
-    // Create the initial team, and get our TeamId and seed.
-    let cfg = TeamConfig::builder().build()?;
+    // Create the initial team, and get our TeamId.
+    let seed_ikm = Box::from([0; 64]);
+    let cfg = {
+        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
+    };
+
     let team_id = team
         .owner
         .client
-        .create_team(cfg)
+        .create_team(cfg.clone())
         .await
         .expect("expected to create team");
     info!(?team_id);
-
-    let SeedType::Raw(seed) = team
-        .owner
-        .client
-        .load_psk_seed(GenSeedMode::Raw, team_id)
-        .await
-        .expect("able to load seed")
-    else {
-        panic!("Only raw seeds are supported");
-    };
-
-    let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().raw_seed(seed).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
-    };
 
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
