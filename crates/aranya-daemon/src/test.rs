@@ -10,6 +10,7 @@
 use std::{
     collections::BTreeMap,
     fs,
+    net::Ipv4Addr,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -95,7 +96,7 @@ impl TestDevice {
             client,
             send_effects,
             TestState::new(psk_store)?,
-            Addr::new("localhost", 0)?,
+            Addr::from((Ipv4Addr::LOCALHOST, 0)),
             caches,
         );
         Ok(Self {
@@ -110,19 +111,45 @@ impl TestDevice {
 }
 
 impl TestDevice {
-    pub async fn sync(&mut self, device: &TestDevice) -> Result<Vec<Effect>> {
-        self.syncer
+    /// Syncs with a device and expects a certain number of commands to be received.
+    ///
+    /// Returns the effects that were received.
+    pub async fn sync_expect(
+        &mut self,
+        device: &TestDevice,
+        must_receive: Option<usize>,
+    ) -> Result<Vec<Effect>> {
+        let cmd_count = self
+            .syncer
             .sync(&self.graph_id, &device.local_addr)
             .await
             .with_context(|| format!("unable to sync with peer at {}", device.local_addr))?;
+        if let Some(must_receive) = must_receive {
+            assert_eq!(cmd_count, must_receive);
+        }
 
         while let Some((graph_id, effects)) = self.effect_recv.recv().await {
             if graph_id == self.graph_id {
                 return Ok(effects);
             }
         }
-
         bail!("Channel closed or nothing to receive")
+    }
+
+    /// Syncs with a device twice.
+    ///
+    /// First sync should receive `must_receive` commands.
+    /// Second sync should receive 0 commands. This is to check if the cache is being updated.
+    ///
+    /// Returns the effects that were received.
+    pub async fn sync_check_cache(
+        &mut self,
+        device: &TestDevice,
+        must_receive: Option<usize>,
+    ) -> Result<Vec<Effect>> {
+        let effects = self.sync_expect(device, must_receive).await?;
+        self.sync_expect(device, Some(0)).await?;
+        Ok(effects)
     }
 
     pub fn actions(
@@ -234,7 +261,7 @@ impl TestCtx {
 
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
-            let local_addr = Addr::new("localhost", 0)?;
+            let local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
             let (psk_store, receiver) = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
             let caches = PeerCacheMap::new(Mutex::new(BTreeMap::new()));
@@ -330,7 +357,7 @@ impl TestCtx {
             .assign_role(admin.pk.ident_pk.id()?, Role::Admin)
             .await
             .context("unable to elevate admin role")?;
-        admin.sync(owner).await?;
+        admin.sync_check_cache(owner, Some(3)).await?;
         owner
             .actions()
             .add_member(DeviceKeyBundle::try_from(&operator.pk)?)
@@ -341,24 +368,24 @@ impl TestCtx {
             .assign_role(operator.pk.ident_pk.id()?, Role::Operator)
             .await
             .context("unable to elevate operator role")?;
-        operator.sync(owner).await?;
+        operator.sync_check_cache(owner, Some(5)).await?;
         operator
             .actions()
             .add_member(DeviceKeyBundle::try_from(&membera.pk)?)
             .await
             .context("unable to add membera member")?;
-        membera.sync(admin).await?;
+        membera.sync_check_cache(admin, Some(3)).await?;
         operator
             .actions()
             .add_member(DeviceKeyBundle::try_from(&memberb.pk)?)
             .await
             .context("unable to add memberb member")?;
-        memberb.sync(admin).await?;
+        memberb.sync_check_cache(admin, Some(3)).await?;
 
-        owner.sync(operator).await?;
-        admin.sync(operator).await?;
-        membera.sync(operator).await?;
-        memberb.sync(operator).await?;
+        owner.sync_check_cache(operator, Some(2)).await?;
+        admin.sync_check_cache(operator, Some(5)).await?;
+        membera.sync_check_cache(operator, Some(5)).await?;
+        memberb.sync_check_cache(operator, Some(5)).await?;
 
         Ok(clients)
     }
