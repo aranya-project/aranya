@@ -5,6 +5,7 @@ use std::{
     time::Duration,
 };
 
+use aranya_policy_text::text;
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{aqc::AqcPeerChannel, client::Client, Error, SyncPeerConfig, TeamConfig};
 use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
@@ -141,6 +142,10 @@ impl ClientCtx {
 
     async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.local_addr().await?)
+    }
+
+    fn aqc_net_id(&self) -> NetIdentifier {
+        NetIdentifier(self.aqc_addr.to_string().try_into().expect("addr is valid text"))
     }
 }
 
@@ -315,17 +320,17 @@ async fn main() -> Result<()> {
 
     // add memberb to team.
     info!("adding memberb to team");
-    operator_team.add_device_to_team(memberb.pk).await?;
+    operator_team.add_device_to_team(memberb.pk.clone()).await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
 
     info!("assigning aqc net identifiers");
     operator_team
-        .assign_aqc_net_identifier(membera.id, NetIdentifier(membera.aqc_addr.to_string()))
+        .assign_aqc_net_identifier(membera.id, membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(memberb.id, NetIdentifier(memberb.aqc_addr.to_string()))
+        .assign_aqc_net_identifier(memberb.id, memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
@@ -355,7 +360,7 @@ async fn main() -> Result<()> {
 
     info!("demo aqc functionality");
     info!("creating aqc label");
-    let label3 = operator_team.create_label("label3".to_string()).await?;
+    let label3 = operator_team.create_label(text!("label3")).await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
     operator_team.assign_label(membera.id, label3, op).await?;
@@ -368,7 +373,7 @@ async fn main() -> Result<()> {
     // membera creates a bidirectional channel.
     info!("membera creating acq bidi channel");
     // Prepare arguments that need to be captured by the async move block
-    let memberb_net_identifier = NetIdentifier(memberb.aqc_addr.to_string());
+    let memberb_net_identifier = memberb.aqc_net_id();
 
     let create_handle = tokio::spawn(async move {
         let channel_result = membera
