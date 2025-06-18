@@ -22,13 +22,13 @@ buggy = { workspace = true }
 anyhow = { workspace = true }
 backon = { workspace = true }
 bytes = { workspace = true }
-hex = { version = "0.4" }
 libc = { workspace = true }
 metrics = { workspace = true }
-metrics-util = { workspace = true }
 metrics-exporter-prometheus = { version = "0.17" }
+metrics-util = { workspace = true }
 sysinfo = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["process"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+url = { workspace = true }

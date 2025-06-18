@@ -75,3 +75,7 @@ aranya-policy-ifgen-build = { workspace = true }
 name = "aranya-daemon"
 path = "src/main.rs"
 test = false
+
+[[bench]]
+name = "metrics"
+harness = false

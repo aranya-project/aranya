@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     env, io, mem,
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
@@ -16,7 +15,7 @@ use bytes::Bytes;
 #[cfg(target_os = "macos")]
 use libc::{c_int, c_void, pid_t, proc_pidinfo, proc_taskinfo, PROC_PIDTASKINFO};
 use libc::{getrusage, rusage, RUSAGE_SELF};
-use metrics::{describe_counter, describe_gauge, describe_histogram, gauge, histogram};
+use metrics::{counter, describe_counter, describe_gauge, describe_histogram, gauge, histogram};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
@@ -32,6 +31,7 @@ use tracing_subscriber::{
     prelude::*,
     EnvFilter,
 };
+use url::Url;
 
 /// Configuration for metrics collection and exporting
 #[derive(Debug)]
@@ -48,11 +48,6 @@ struct MetricsConfig {
 
     /// HTTP address to listen to (if we're using a scrape endpoint)
     pub http_listen_addr: Option<SocketAddr>,
-
-    /// Whether to enable high-resolution metrics (may impact performance)
-    pub high_resolution: bool,
-    /// Additional key-value pairs to apply to all metrics
-    pub global_labels: HashMap<String, String>,
 }
 
 impl Default for MetricsConfig {
@@ -66,9 +61,6 @@ impl Default for MetricsConfig {
             job_name: "aranya_demo".to_string(),
 
             http_listen_addr: None,
-
-            high_resolution: true,
-            global_labels: HashMap::new(),
         }
     }
 }
@@ -83,7 +75,7 @@ struct ProcessMetricsCollector {
     /// All child process PIDs for tracking
     child_pids: Vec<u32>,
     /// Collection start time for rate calculations
-    start_time: Instant,
+    _start_time: Instant,
     /// Previous metrics for rate calculations
     previous_metrics: Option<AggregatedMetrics>,
 }
@@ -98,8 +90,8 @@ struct AggregatedMetrics {
     total_disk_read_bytes: u64,
     total_disk_write_bytes: u64,
     // TODO(nikki): hook the TCP/QUIC syncer with a metrics macro.
-    total_network_rx_bytes: u64,
-    total_network_tx_bytes: u64,
+    //total_network_rx_bytes: u64,
+    //total_network_tx_bytes: u64,
     process_count: usize,
 }
 
@@ -123,7 +115,7 @@ impl ProcessMetricsCollector {
             config,
             system,
             child_pids,
-            start_time: Instant::now(),
+            _start_time: Instant::now(),
             previous_metrics: None,
         }
     }
@@ -155,8 +147,8 @@ impl ProcessMetricsCollector {
             total_memory_bytes: 0,
             total_disk_read_bytes: 0,
             total_disk_write_bytes: 0,
-            total_network_rx_bytes: 0,
-            total_network_tx_bytes: 0,
+            //total_network_rx_bytes: 0,
+            //total_network_tx_bytes: 0,
             process_count: 0,
         };
 
@@ -188,6 +180,8 @@ impl ProcessMetricsCollector {
 
         // Always fallback to sysinfo for disk metrics.
         self.collect_sysinfo_disk_metrics(pid, &mut process_metrics)?;
+
+        println!("{:?}", process_metrics);
 
         // Aggregate this process's metrics towards the total.
         metrics.total_cpu_user_time_us += process_metrics.cpu_user_time_us;
@@ -349,11 +343,27 @@ impl ProcessMetricsCollector {
     }
 }
 
+fn format_push_gateway_url(base_url: &str, job_name: &str) -> String {
+    match Url::parse(base_url) {
+        Ok(mut url) => {
+            url.set_path(&format!("/metrics/job/{job_name}"));
+            url.set_query(None);
+            url.set_fragment(None);
+            url.to_string()
+        }
+        Err(_) => {
+            warn!("Failed to parse push gateway URL `{base_url}`");
+            format!("http://localhost:9091/metrics/job/{job_name}")
+        }
+    }
+}
+
 fn setup_prometheus_exporter(config: &MetricsConfig) -> Result<()> {
     let mut builder = PrometheusBuilder::new();
 
     match (&config.push_gateway_url, &config.http_listen_addr) {
-        (Some(push_url), _) => {
+        (Some(base_url), _) => {
+            let push_url = format_push_gateway_url(base_url, &config.job_name);
             info!("Setting up Prometheus push gateway node: {push_url}");
             builder =
                 builder.with_push_gateway(push_url, config.push_interval, None, None, false)?;
@@ -374,30 +384,67 @@ fn setup_prometheus_exporter(config: &MetricsConfig) -> Result<()> {
         .install()
         .context("Failed to install Prometheus exporter")?;
 
-    describe_gauge!("cpu_user_time_microseconds_total", "Total User CPU time consumed by all monitored processes in microseconds");
-    describe_gauge!("cpu_system_time_microseconds_total", "Total System CPU time consumed by all monitored processes in microseconds");
-    describe_gauge!("memory_total_bytes", "Total memory usage across all monitored processes");
-    describe_gauge!("disk_read_bytes_total", "Total bytes read from disk by all monitored processes");
-    describe_gauge!("disk_write_bytes_total", "Total bytes written to disk by all monitored processes");
+    describe_gauge!(
+        "cpu_user_time_microseconds_total",
+        "Total User CPU time consumed by all monitored processes in microseconds"
+    );
+    describe_gauge!(
+        "cpu_system_time_microseconds_total",
+        "Total System CPU time consumed by all monitored processes in microseconds"
+    );
+    describe_gauge!(
+        "memory_total_bytes",
+        "Total memory usage across all monitored processes"
+    );
+    describe_gauge!(
+        "disk_read_bytes_total",
+        "Total bytes read from disk by all monitored processes"
+    );
+    describe_gauge!(
+        "disk_write_bytes_total",
+        "Total bytes written to disk by all monitored processes"
+    );
     describe_gauge!("network_rx_bytes_total", "Total network bytes received");
     describe_gauge!("network_tx_bytes_total", "Total network bytes transmitted");
-    describe_gauge!("monitored_processes_count", "Number of processes being monitored");
+    describe_gauge!(
+        "monitored_processes_count",
+        "Number of processes being monitored"
+    );
 
-    describe_gauge!("cpu_user_utilization_rate", "User CPU utilization since last tick");
-    describe_gauge!("cpu_system_utilization_rate", "System CPU utilization since last tick");
-    describe_gauge!("cpu_total_utilization_rate", "Total CPU utilization since last tick");
-    describe_gauge!("disk_read_bytes_rate", "Number of bytes read since last tick");
-    describe_gauge!("disk_write_bytes_rate", "Number of bytes written since last tick");
+    describe_gauge!(
+        "cpu_user_utilization_rate",
+        "User CPU utilization since last tick"
+    );
+    describe_gauge!(
+        "cpu_system_utilization_rate",
+        "System CPU utilization since last tick"
+    );
+    describe_gauge!(
+        "cpu_total_utilization_rate",
+        "Total CPU utilization since last tick"
+    );
+    describe_gauge!(
+        "disk_read_bytes_rate",
+        "Number of bytes read since last tick"
+    );
+    describe_gauge!(
+        "disk_write_bytes_rate",
+        "Number of bytes written since last tick"
+    );
 
-    describe_histogram!("metrics_collection_duration_microseconds", "Time spent collecting metrics in microseconds");
-    describe_counter!("demo_operations_total", "Total number of demo operations completed");
+    describe_histogram!(
+        "metrics_collection_duration_microseconds",
+        "Time spent collecting metrics in microseconds"
+    );
+    describe_counter!(
+        "demo_operations_total",
+        "Total number of demo operations completed"
+    );
 
     info!("Prometheus exporter configured successfully!");
 
     Ok(())
 }
-
-// TODO(nikki): update below after rebase
 
 #[derive(Clone, Debug)]
 struct DaemonPath(PathBuf);
@@ -406,7 +453,7 @@ struct DaemonPath(PathBuf);
 #[clippy::has_significant_drop]
 struct Daemon {
     // NB: This has important drop side effects.
-    _proc: Child,
+    proc: Child,
     _work_dir: PathBuf,
 }
 
@@ -422,22 +469,13 @@ impl Daemon {
         debug!(?cmd, "spawning daemon");
         let proc = cmd.spawn().context("unable to spawn daemon")?;
         Ok(Daemon {
-            _proc: proc,
+            proc,
             _work_dir: work_dir.into(),
         })
     }
 
-    async fn get_api_pk(path: &DaemonPath, cfg_path: &Path) -> Result<Vec<u8>> {
-        let cfg_path = cfg_path.as_os_str().to_str().context("should be UTF-8")?;
-        let mut cmd = Command::new(&path.0);
-        cmd.kill_on_drop(true)
-            .args(["--config", cfg_path])
-            .arg("--print-api-pk");
-        debug!(?cmd, "running daemon");
-        let output = cmd.output().await.context("unable to run daemon")?;
-        let pk_hex = String::from_utf8(output.stdout)?;
-        let pk = hex::decode(pk_hex.trim())?;
-        Ok(pk)
+    fn pid(&self) -> Option<u32> {
+        self.proc.id()
     }
 }
 
@@ -449,7 +487,7 @@ struct ClientCtx {
     id: DeviceId,
     // NB: These have important drop side effects.
     _work_dir: TempDir,
-    _daemon: Daemon,
+    daemon: Daemon,
 }
 
 impl ClientCtx {
@@ -458,48 +496,50 @@ impl ClientCtx {
 
         let work_dir = TempDir::with_prefix(user_name)?;
 
-        // The path that the daemon will listen on.
-        let uds_api_path = work_dir.path().join("uds.sock");
-
-        let (daemon, pk) = {
+        let daemon = {
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
             let cfg_path = work_dir.join("config.json");
-            let pid_file = work_dir.join("pid");
+
+            let runtime_dir = work_dir.join("run");
+            let state_dir = work_dir.join("state");
+            let cache_dir = work_dir.join("cache");
+            let logs_dir = work_dir.join("logs");
+            let config_dir = work_dir.join("config");
+            for dir in &[&runtime_dir, &state_dir, &cache_dir, &logs_dir, &config_dir] {
+                fs::create_dir_all(dir)
+                    .await
+                    .with_context(|| format!("unable to create directory: {}", dir.display()))?;
+            }
 
             let buf = format!(
                 r#"
-{{
-    "name": "daemon",
-    "work_dir": "{}",
-    "uds_api_path": "{}",
-    "pid_file": "{}",
-    "sync_addr": "localhost:0"
-}}"#,
-                work_dir.as_os_str().to_str().context("should be UTF-8")?,
-                uds_api_path
-                    .as_os_str()
-                    .to_str()
-                    .context("should be UTF-8")?,
-                pid_file.as_os_str().to_str().context("should be UTF-8")?,
+                name: "daemon"
+                runtime_dir: {runtime_dir:?}
+                state_dir: {state_dir:?}
+                cache_dir: {cache_dir:?}
+                logs_dir: {logs_dir:?}
+                config_dir: {config_dir:?}
+                sync_addr: "localhost:0"
+                "#
             );
             fs::write(&cfg_path, buf).await?;
 
-            let pk = Daemon::get_api_pk(daemon_path, &cfg_path).await?;
-            let daemon = Daemon::spawn(daemon_path, &work_dir, &cfg_path).await?;
-            (daemon, pk)
+            Daemon::spawn(daemon_path, &work_dir, &cfg_path).await?
         };
 
-        // Give the daemon time to start up.
+        // The path that the daemon will listen on.
+        let uds_sock = work_dir.path().join("daemon").join("run").join("uds.sock");
+
+        // Give the daemon time to start up and write its public key.
         sleep(Duration::from_millis(100)).await;
 
         let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         let mut client = (|| {
             Client::builder()
-                .with_daemon_api_pk(&pk)
-                .with_daemon_uds_path(&uds_api_path)
+                .with_daemon_uds_path(&uds_sock)
                 .with_daemon_aqc_addr(&any_addr)
                 .connect()
         })
@@ -520,7 +560,7 @@ impl ClientCtx {
             pk,
             id,
             _work_dir: work_dir,
-            _daemon: daemon,
+            daemon,
         })
     }
 
@@ -560,8 +600,79 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    info!("starting example Aranya application");
+    info!("Starting Aranya Example with Metrics Collection");
 
+    let mut metrics_config = MetricsConfig::default();
+
+    if let Ok(push_gateway) = env::var("PROMETHEUS_PUSH_GATEAWAY") {
+        metrics_config.push_gateway_url = Some(push_gateway);
+        metrics_config.http_listen_addr = None;
+    } else if let Ok(listen_addr) = env::var("PROMETHEUS_LISTEN_ADDR") {
+        metrics_config.push_gateway_url = None;
+        metrics_config.http_listen_addr = Some(
+            listen_addr
+                .parse()
+                .context("unable to convert `PROMETHEUS_LISTEN_ADDR`")?,
+        );
+    }
+
+    if let Ok(job_name) = env::var("PROMETHEUS_JOB_NAME") {
+        metrics_config.job_name = job_name;
+    }
+
+    if let Ok(collection_interval) = env::var("COLLECTION_INTERVAL") {
+        if let Ok(collection_interval) = collection_interval.parse::<u64>() {
+            metrics_config.collection_interval = Duration::from_millis(collection_interval);
+        }
+    }
+
+    setup_prometheus_exporter(&metrics_config)?;
+
+    info!("Phase 1: Setting up daemons");
+    let (daemon_pids, demo_context) = setup_demo().await?;
+
+    // TODO(nikki): sleep a tiny bit so the daemons can spin up?
+
+    info!(
+        "Phase 2: Starting metrics collection for PIDs: {:?}",
+        daemon_pids.clone().push(std::process::id())
+    );
+    let mut metrics_collector = ProcessMetricsCollector::new(metrics_config, daemon_pids);
+
+    info!("Phase 3: Running demo with real-time metrics collection");
+    let metrics_handle =
+        tokio::spawn(async move { metrics_collector.start_collection_loop().await });
+
+    let demo_result = run_demo_body(demo_context).await;
+
+    // Wait a moment so we can make sure we capture all metrics state
+    sleep(Duration::from_secs(2)).await;
+
+    metrics_handle.abort();
+
+    match demo_result {
+        Ok(()) => {
+            info!("Demo completed successfully");
+            counter!("demo_operations_total", "operation" => "success").increment(1);
+        }
+        Err(ref e) => {
+            warn!("Demo failed with error: {e}");
+            counter!("demo_operations_total", "operation" => "failure").increment(1);
+        }
+    }
+
+    demo_result
+}
+
+struct DemoContext {
+    owner: ClientCtx,
+    admin: ClientCtx,
+    operator: ClientCtx,
+    membera: ClientCtx,
+    memberb: ClientCtx,
+}
+
+async fn setup_demo() -> Result<(Vec<u32>, DemoContext)> {
     let daemon_path = {
         let mut args = env::args();
         args.next(); // skip executable name
@@ -569,21 +680,48 @@ async fn main() -> Result<()> {
         DaemonPath(PathBuf::from(exe))
     };
 
+    let mut daemon_pids: Vec<u32> = Vec::new();
+
+    // TODO(nikki): move TeamId here?
+
+    let team_name = "rust_example";
+    let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
+    daemon_pids.push(owner.daemon.pid().unwrap());
+
+    let admin = ClientCtx::new(team_name, "admin", &daemon_path).await?;
+    daemon_pids.push(admin.daemon.pid().unwrap());
+
+    let operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
+    daemon_pids.push(operator.daemon.pid().unwrap());
+
+    let membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
+    daemon_pids.push(membera.daemon.pid().unwrap());
+
+    let memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
+    daemon_pids.push(memberb.daemon.pid().unwrap());
+
+    Ok((
+        daemon_pids,
+        DemoContext {
+            owner,
+            admin,
+            operator,
+            membera,
+            memberb,
+        },
+    ))
+}
+
+async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
-    let team_name = "rust_example";
-    let mut owner = ClientCtx::new(&team_name, "owner", &daemon_path).await?;
-    let mut admin = ClientCtx::new(&team_name, "admin", &daemon_path).await?;
-    let mut operator = ClientCtx::new(&team_name, "operator", &daemon_path).await?;
-    let mut membera = ClientCtx::new(&team_name, "member_a", &daemon_path).await?;
-    let mut memberb = ClientCtx::new(&team_name, "member_b", &daemon_path).await?;
-
     // Create a team.
     info!("creating team");
     let cfg = TeamConfig::builder().build()?;
-    let team_id = owner
+    let team_id = ctx
+        .owner
         .client
         .create_team(cfg)
         .await
@@ -591,35 +729,38 @@ async fn main() -> Result<()> {
     info!(%team_id);
 
     // get sync addresses.
-    let owner_addr = owner.aranya_local_addr().await?;
-    let admin_addr = admin.aranya_local_addr().await?;
-    let operator_addr = operator.aranya_local_addr().await?;
-    let membera_addr = membera.aranya_local_addr().await?;
-    let memberb_addr = memberb.aranya_local_addr().await?;
+    let owner_addr = ctx.owner.aranya_local_addr().await?;
+    let admin_addr = ctx.admin.aranya_local_addr().await?;
+    let operator_addr = ctx.operator.aranya_local_addr().await?;
+    let membera_addr = ctx.membera.aranya_local_addr().await?;
+    let memberb_addr = ctx.memberb.aranya_local_addr().await?;
 
     // get aqc addresses.
-    debug!(?membera.aqc_addr, ?memberb.aqc_addr);
+    debug!(?ctx.membera.aqc_addr, ?ctx.memberb.aqc_addr);
 
     // setup sync peers.
-    let mut owner_team = owner.client.team(team_id);
-    let mut admin_team = admin.client.team(team_id);
-    let mut operator_team = operator.client.team(team_id);
-    let mut membera_team = membera.client.team(team_id);
-    let mut memberb_team = memberb.client.team(team_id);
+    let mut owner_team = ctx.owner.client.team(team_id);
+    let mut admin_team = ctx.admin.client.team(team_id);
+    let mut operator_team = ctx.operator.client.team(team_id);
+    let mut membera_team = ctx.membera.client.team(team_id);
+    let mut memberb_team = ctx.memberb.client.team(team_id);
 
     info!("adding admin to team");
-    owner_team.add_device_to_team(admin.pk).await?;
-    owner_team.assign_role(admin.id, Role::Admin).await?;
+    owner_team.add_device_to_team(ctx.admin.pk).await?;
+    owner_team.assign_role(ctx.admin.id, Role::Admin).await?;
 
     sleep(sleep_interval).await;
 
     info!("adding operator to team");
-    owner_team.add_device_to_team(operator.pk).await?;
+    owner_team.add_device_to_team(ctx.operator.pk).await?;
 
     sleep(sleep_interval).await;
 
     // Admin tries to assign a role
-    match admin_team.assign_role(operator.id, Role::Operator).await {
+    match admin_team
+        .assign_role(ctx.operator.id, Role::Operator)
+        .await
+    {
         Ok(()) => bail!("expected role assignment to fail"),
         Err(Error::Aranya(_)) => {}
         Err(err) => bail!("unexpected error: {err:?}"),
@@ -632,7 +773,9 @@ async fn main() -> Result<()> {
     sleep(sleep_interval).await;
 
     info!("assigning role");
-    admin_team.assign_role(operator.id, Role::Operator).await?;
+    admin_team
+        .assign_role(ctx.operator.id, Role::Operator)
+        .await?;
 
     info!("adding sync peers");
     owner_team
@@ -696,40 +839,48 @@ async fn main() -> Result<()> {
 
     // add membera to team.
     info!("adding membera to team");
-    operator_team.add_device_to_team(membera.pk.clone()).await?;
+    operator_team
+        .add_device_to_team(ctx.membera.pk.clone())
+        .await?;
 
     // add memberb to team.
     info!("adding memberb to team");
-    operator_team.add_device_to_team(memberb.pk).await?;
+    operator_team.add_device_to_team(ctx.memberb.pk).await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
 
     info!("assigning aqc net identifiers");
     operator_team
-        .assign_aqc_net_identifier(membera.id, NetIdentifier(membera.aqc_addr.to_string()))
+        .assign_aqc_net_identifier(
+            ctx.membera.id,
+            NetIdentifier(ctx.membera.aqc_addr.to_string()),
+        )
         .await?;
     operator_team
-        .assign_aqc_net_identifier(memberb.id, NetIdentifier(memberb.aqc_addr.to_string()))
+        .assign_aqc_net_identifier(
+            ctx.memberb.id,
+            NetIdentifier(ctx.memberb.aqc_addr.to_string()),
+        )
         .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
 
     // fact database queries
-    let mut queries = membera.client.queries(team_id);
+    let mut queries = ctx.membera.client.queries(team_id);
     let devices = queries.devices_on_team().await?;
     info!("membera devices on team: {:?}", devices.iter().count());
-    let role = queries.device_role(membera.id).await?;
+    let role = queries.device_role(ctx.membera.id).await?;
     info!("membera role: {:?}", role);
-    let keybundle = queries.device_keybundle(membera.id).await?;
+    let keybundle = queries.device_keybundle(ctx.membera.id).await?;
     info!("membera keybundle: {:?}", keybundle);
-    let queried_membera_net_ident = queries.aqc_net_identifier(membera.id).await?;
+    let queried_membera_net_ident = queries.aqc_net_identifier(ctx.membera.id).await?;
     info!(
         "membera queried_membera_net_ident: {:?}",
         queried_membera_net_ident
     );
-    let queried_memberb_net_ident = queries.aqc_net_identifier(memberb.id).await?;
+    let queried_memberb_net_ident = queries.aqc_net_identifier(ctx.memberb.id).await?;
     info!(
         "memberb queried_memberb_net_ident: {:?}",
         queried_memberb_net_ident
@@ -743,9 +894,13 @@ async fn main() -> Result<()> {
     let label3 = operator_team.create_label("label3".to_string()).await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
-    operator_team.assign_label(membera.id, label3, op).await?;
+    operator_team
+        .assign_label(ctx.membera.id, label3, op)
+        .await?;
     info!("assigning label to memberb");
-    operator_team.assign_label(memberb.id, label3, op).await?;
+    operator_team
+        .assign_label(ctx.memberb.id, label3, op)
+        .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -753,32 +908,31 @@ async fn main() -> Result<()> {
     // membera creates a bidirectional channel.
     info!("membera creating acq bidi channel");
     // Prepare arguments that need to be captured by the async move block
-    let memberb_net_identifier = NetIdentifier(memberb.aqc_addr.to_string());
+    let memberb_net_identifier = NetIdentifier(ctx.memberb.aqc_addr.to_string());
 
     let create_handle = tokio::spawn(async move {
-        let channel_result = membera
+        let channel_result = ctx
+            .membera
             .client
             .aqc()
             .create_bidi_channel(team_id, memberb_net_identifier, label3)
             .await;
-        (channel_result, membera) // Return membera along with the result
+        (channel_result, ctx.membera) // Return membera along with the result
     });
 
     // memberb receives a bidirectional channel.
     info!("memberb receiving acq bidi channel");
-    let mut received_aqc_chan = loop {
-        let chan = memberb.client.aqc().receive_channel().await?;
-        match chan {
-            AqcPeerChannel::Bidi(channel) => break channel,
-            _ => bail!("expected a bidirectional channel"),
-        }
+    let AqcPeerChannel::Bidi(mut received_aqc_chan) =
+        ctx.memberb.client.aqc().receive_channel().await?
+    else {
+        bail!("expected a bidirectional channel");
     };
 
     // Now await the completion of membera's channel creation
     let (created_aqc_chan_result, membera_returned) = create_handle
         .await
         .context("Task for membera creating bidi channel panicked")?;
-    membera = membera_returned; // Assign the moved membera back
+    ctx.membera = membera_returned; // Assign the moved membera back
     let mut created_aqc_chan =
         created_aqc_chan_result.context("Membera failed to create bidi channel")?;
 
@@ -804,9 +958,9 @@ async fn main() -> Result<()> {
     assert_eq!(bytes, msg);
 
     info!("revoking label from membera");
-    operator_team.revoke_label(membera.id, label3).await?;
+    operator_team.revoke_label(ctx.membera.id, label3).await?;
     info!("revoking label from memberb");
-    operator_team.revoke_label(memberb.id, label3).await?;
+    operator_team.revoke_label(ctx.memberb.id, label3).await?;
     info!("deleting label");
     admin_team.delete_label(label3).await?;
 

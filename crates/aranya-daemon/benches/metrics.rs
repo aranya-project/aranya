@@ -1,4 +1,4 @@
-use std::{thread::sleep, time::Duration};
+use std::net::Ipv4Addr;
 
 use anyhow::Result;
 use aranya_daemon::{config::Config, Daemon};
@@ -13,26 +13,25 @@ fn main() {
     divan::main();
 }
 
-// NOTE: We currently have to have a synchronous functions for divan to work correctly, so we spawn
-// a runtime and block on all async calls.
+// NOTE: divan currently requires sync functions to work, so we spawn a runtime and block on async.
 #[divan::bench]
 fn daemon_startup() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
+
     let cfg = Config {
         name: "daemon".into(),
-        work_dir: work_dir.clone(),
-        uds_api_path: work_dir.join("uds.sock"),
-        pid_file: work_dir.join("pid"),
-        sync_addr: Addr::new("localhost", 0)?,
+        runtime_dir: work_dir.join("run"),
+        state_dir: work_dir.join("state"),
+        cache_dir: work_dir.join("cache"),
+        logs_dir: work_dir.join("log"),
+        config_dir: work_dir.join("config"),
+        sync_addr: addr_any,
         afc: None,
         aqc: None,
     };
 
     let rt = Runtime::new()?;
-    let daemon = rt.block_on(Daemon::load(cfg))?;
-    let handle = rt.spawn(daemon.run()).abort_handle();
-    sleep(Duration::from_millis(1));
-    handle.abort();
-
+    let _daemon = rt.block_on(Daemon::load(cfg))?;
     Ok(())
 }
