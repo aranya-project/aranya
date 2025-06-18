@@ -1594,7 +1594,7 @@ AranyaError aranya_add_team_ext(struct AranyaClient *client,
                                 struct AranyaExtError *__ext_err);
 
 /**
- * Remove a team from the local device store.
+ * Remove a team from local device storage.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -1605,7 +1605,7 @@ AranyaError aranya_remove_team(struct AranyaClient *client,
                                const struct AranyaTeamId *team);
 
 /**
- * Remove a team from the local device store.
+ * Remove a team from local device storage.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).

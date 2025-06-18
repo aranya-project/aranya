@@ -9,7 +9,6 @@ use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_crypto::dangerous::spideroak_crypto::hex;
-use aranya_daemon_api::CreateTeamResponse;
 use bytes::Bytes;
 use tracing::error;
 
@@ -959,8 +958,7 @@ pub fn create_team(
 ) -> Result<(), imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
-    let CreateTeamResponse { team_id: id, .. } =
-        client.rt.block_on(client.inner.create_team(cfg.into()))?;
+    let id = client.rt.block_on(client.inner.create_team(cfg.into()))?;
 
     team_id.write(id.into());
     Ok(())
@@ -969,7 +967,7 @@ pub fn create_team(
 /// Return PSK seed encrypted for another device on the team.
 /// The PSK seed will be encrypted using the public encryption key of the specified device on the team.
 ///
-pub fn get_psk_seed_encrypted(
+pub fn encrypt_psk_seed_for_peer(
     _client: &mut Client,
     _team_id: &TeamId,
     _device: &DeviceId,

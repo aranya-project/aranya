@@ -28,7 +28,7 @@ custom_id! {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {
-    pub seed: Box<[u8]>,
+    seed: SeedType,
 }
 
 impl QuicSyncConfig {
@@ -36,21 +36,20 @@ impl QuicSyncConfig {
         QuicSyncConfigBuilder::default()
     }
 
-    pub fn seed(&self) -> &[u8] {
+    pub fn seed(&self) -> &SeedType {
         &self.seed
     }
 }
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    seed: Option<Box<[u8]>>,
+    seed: Option<SeedType>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Configures the seed.
-    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
+    /// Sets the seed.
+    pub fn seed(mut self, seed: SeedType) -> Self {
         self.seed = Some(seed);
-
         self
     }
 
@@ -136,15 +135,7 @@ impl<CS: CipherSuite> QuicSyncSeed<CS> {
 
     #[inline]
     pub fn id(&self) -> QuicSyncSeedId {
-        // ID = HMAC(
-        //     key=GroupKey,
-        //     message="QuicSyncKeyId-v1",
-        //     outputBytes=64,
-        // )
-        // TODO: fix this. Commented out to get things to compile. This file will be removed anyways soon.
-        //let mut h = Hmac::<CS::Hash>::new(&self.seed);
-        //h.update(b"QuicSyncKeyId-v1");
-        QuicSyncSeedId::default()
+        Id::new::<CS>(&self.seed, b"QuicSyncKeyId-v1").into()
     }
 
     pub fn gen_psk(&self) -> Result<QuicSyncPSK<CS>> {
@@ -207,4 +198,22 @@ impl<CS: CipherSuite> UnwrappedKey<CS> for QuicSyncSeed<CS> {
             }),
         }
     }
+}
+
+// TODO: Create analogous type in aranya-client
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum GenSeedMode {
+    Raw,
+    Wrapped { recv_pk: Box<[u8]> },
+}
+
+// Manually implement debug because of Raw variant?
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SeedType {
+    Raw(Box<[u8]>),
+    Wrapped {
+        encrypted_seed: Box<[u8]>,
+        encap_key: Box<[u8]>,
+        sender_pk: Box<[u8]>,
+    },
 }
