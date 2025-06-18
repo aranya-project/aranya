@@ -5,10 +5,9 @@ use std::{
     time::Duration,
 };
 
-use aranya_policy_text::text;
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{aqc::AqcPeerChannel, client::Client, Error, SyncPeerConfig, TeamConfig};
-use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -145,7 +144,12 @@ impl ClientCtx {
     }
 
     fn aqc_net_id(&self) -> NetIdentifier {
-        NetIdentifier(self.aqc_addr.to_string().try_into().expect("addr is valid text"))
+        NetIdentifier(
+            self.aqc_addr
+                .to_string()
+                .try_into()
+                .expect("addr is valid text"),
+        )
     }
 }
 

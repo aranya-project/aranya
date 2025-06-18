@@ -195,7 +195,6 @@ dependencies = [
  "aranya-daemon",
  "aranya-daemon-api",
  "aranya-internal-s2n-quic",
- "aranya-policy-text",
  "aranya-util",
  "backon",
  "buggy",

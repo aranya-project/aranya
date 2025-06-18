@@ -20,7 +20,7 @@ use aranya_crypto::{
     zeroize::{Zeroize, ZeroizeOnDrop},
     Id,
 };
-pub use aranya_policy_text::Text;
+pub use aranya_policy_text::{text, Text};
 use aranya_util::Addr;
 use buggy::Bug;
 pub use semver::Version;
