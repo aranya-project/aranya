@@ -4,6 +4,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
+use aranya_client::config::{QuicSyncPskSeedMode, SeedType};
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -249,7 +250,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
-    seed: Seed,
+    mode: QuicSyncPskSeedMode,
 }
 
 impl QuicSyncConfig {
@@ -270,7 +271,7 @@ impl Typed for QuicSyncConfig {
 impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .raw_seed(value.seed.get_boxed())
+            .mode(value.mode)
             .build()
             .expect("All fields are set")
     }
@@ -278,22 +279,50 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    seed: Option<Seed>,
+    mode: Option<QuicSyncPskSeedMode>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Sets the seed.
-    pub fn seed(&mut self, seed: Seed) {
-        self.seed = Some(seed);
+    /// Sets the PSK seed mode.
+    pub fn mode(&mut self, mode: QuicSyncPskSeedMode) {
+        self.mode = Some(mode);
+    }
+
+    /// Sets mode to generate PSK seed.
+    pub fn generate(&mut self) {
+        self.mode = Some(QuicSyncPskSeedMode::GeneratePskSeed);
+    }
+
+    /// Sets wrapped PSK seed
+    pub fn wrapped_seed(
+        &mut self,
+        encrypted_seed: Box<[u8]>,
+        encap_key: Box<[u8]>,
+        sender_pk: Box<[u8]>,
+    ) {
+        self.mode = Some(QuicSyncPskSeedMode::WrappedPskSeed {
+            seed: SeedType::Wrapped {
+                encrypted_seed,
+                encap_key,
+                sender_pk,
+            },
+        });
+    }
+
+    /// Sets raw PSK seed
+    pub fn raw_seed(&mut self, seed: Box<[u8]>) {
+        self.mode = Some(QuicSyncPskSeedMode::RawPskSeed {
+            seed: SeedType::Raw(seed),
+        });
     }
 
     /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig, Error> {
-        let Some(seed) = self.seed else {
+        let Some(mode) = self.mode else {
             return Err(InvalidArg::new("seed", "`seed` field not set").into());
         };
 
-        Ok(QuicSyncConfig { seed })
+        Ok(QuicSyncConfig { mode })
     }
 }
 
@@ -309,11 +338,11 @@ impl Builder for QuicSyncConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        let Some(seed) = self.seed else {
+        let Some(mode) = self.mode else {
             return Err(InvalidArg::new("seed", "`seed` field not set").into());
         };
 
-        Self::Output::init(out, QuicSyncConfig { seed });
+        Self::Output::init(out, QuicSyncConfig { mode });
         Ok(())
     }
 }

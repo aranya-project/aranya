@@ -336,17 +336,8 @@ typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[64];
+    uint8_t __for_size_only[72];
 } AranyaQuicSyncConfigBuilder;
-
-typedef struct ARANYA_ALIGNED(8) AranyaSeed {
-    /**
-     * This field only exists for size purposes. It is
-     * UNDEFINED BEHAVIOR to read from or write to it.
-     * @private
-     */
-    uint8_t __for_size_only[56];
-} AranyaSeed;
 
 typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
     /**
@@ -354,7 +345,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[64];
+    uint8_t __for_size_only[72];
 } AranyaQuicSyncConfig;
 
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
@@ -363,7 +354,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[64];
+    uint8_t __for_size_only[72];
 } AranyaTeamConfigBuilder;
 
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
@@ -372,7 +363,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[64];
+    uint8_t __for_size_only[72];
 } AranyaTeamConfig;
 
 /**
@@ -1027,29 +1018,89 @@ AranyaError aranya_quic_sync_config_builder_cleanup_ext(struct AranyaQuicSyncCon
                                                         struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to set seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * Attempts to set PSK generation mode value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the team config builder
- * @param out a pointer to write the team config to
+ * @param cfg a pointer to the quic sync config builder
+ * @param seed a pointer the raw PSK seed
  */
-AranyaError aranya_quic_sync_config_seed(struct AranyaQuicSyncConfigBuilder *cfg,
-                                         const struct AranyaSeed *seed);
+AranyaError aranya_quic_sync_config_generate(struct AranyaQuicSyncConfigBuilder *cfg);
 
 /**
- * Attempts to set seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * Attempts to set PSK generation mode value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the team config builder
- * @param out a pointer to write the team config to
+ * @param cfg a pointer to the quic sync config builder
+ * @param seed a pointer the raw PSK seed
  */
-AranyaError aranya_quic_sync_config_seed_ext(struct AranyaQuicSyncConfigBuilder *cfg,
-                                             const struct AranyaSeed *seed,
-                                             struct AranyaExtError *__ext_err);
+AranyaError aranya_quic_sync_config_generate_ext(struct AranyaQuicSyncConfigBuilder *cfg,
+                                                 struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to set wrapped seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the quic sync config builder
+ * @param seed a pointer the raw PSK seed
+ */
+AranyaError aranya_quic_sync_config_wrapped_seed(struct AranyaQuicSyncConfigBuilder *cfg,
+                                                 const uint8_t *seed,
+                                                 size_t seed_len,
+                                                 const uint8_t *encap_key,
+                                                 size_t encap_key_len,
+                                                 const uint8_t *sender_pk,
+                                                 size_t sender_pk_len);
+
+/**
+ * Attempts to set wrapped seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the quic sync config builder
+ * @param seed a pointer the raw PSK seed
+ */
+AranyaError aranya_quic_sync_config_wrapped_seed_ext(struct AranyaQuicSyncConfigBuilder *cfg,
+                                                     const uint8_t *seed,
+                                                     size_t seed_len,
+                                                     const uint8_t *encap_key,
+                                                     size_t encap_key_len,
+                                                     const uint8_t *sender_pk,
+                                                     size_t sender_pk_len,
+                                                     struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to set raw seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the quic sync config builder
+ * @param seed a pointer the raw PSK seed
+ */
+AranyaError aranya_quic_sync_config_raw_seed(struct AranyaQuicSyncConfigBuilder *cfg,
+                                             const uint8_t *seed,
+                                             size_t seed_len);
+
+/**
+ * Attempts to set raw seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the quic sync config builder
+ * @param seed a pointer the raw PSK seed
+ */
+AranyaError aranya_quic_sync_config_raw_seed_ext(struct AranyaQuicSyncConfigBuilder *cfg,
+                                                 const uint8_t *seed,
+                                                 size_t seed_len,
+                                                 struct AranyaExtError *__ext_err);
 
 /**
  * Attempts to construct a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
@@ -1544,23 +1595,27 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
  *
  */
-AranyaError aranya_get_psk_seed_encrypted(struct AranyaClient *_client,
-                                          const struct AranyaTeamId *_team_id,
-                                          const struct AranyaDeviceId *_device,
-                                          const uint8_t *_seed,
-                                          size_t _seed_len);
+AranyaError aranya_encrypt_psk_seed_for_peer(struct AranyaClient *_client,
+                                             const struct AranyaTeamId *_team_id,
+                                             const struct AranyaDeviceId *_device,
+                                             uint8_t *_seed,
+                                             size_t *_seed_len,
+                                             uint8_t *_encap_key,
+                                             size_t *_encap_key_len);
 
 /**
  * Return PSK seed encrypted for another device on the team.
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
  *
  */
-AranyaError aranya_get_psk_seed_encrypted_ext(struct AranyaClient *_client,
-                                              const struct AranyaTeamId *_team_id,
-                                              const struct AranyaDeviceId *_device,
-                                              const uint8_t *_seed,
-                                              size_t _seed_len,
-                                              struct AranyaExtError *__ext_err);
+AranyaError aranya_encrypt_psk_seed_for_peer_ext(struct AranyaClient *_client,
+                                                 const struct AranyaTeamId *_team_id,
+                                                 const struct AranyaDeviceId *_device,
+                                                 uint8_t *_seed,
+                                                 size_t *_seed_len,
+                                                 uint8_t *_encap_key,
+                                                 size_t *_encap_key_len,
+                                                 struct AranyaExtError *__ext_err);
 
 /**
  * Add a team to the local device store.

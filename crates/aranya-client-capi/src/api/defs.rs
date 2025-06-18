@@ -659,25 +659,54 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
     cfg.aqc((**aqc_config).clone());
 }
 
-#[aranya_capi_core::opaque(size = 64, align = 8)]
+#[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
 
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 64, align = 8)]
+#[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
 
-/// Attempts to set seed value on [`QuicSyncConfigBuilder`].
+/// Attempts to set PSK generation mode value on [`QuicSyncConfigBuilder`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param cfg a pointer to the team config builder
-/// @param out a pointer to write the team config to
-pub fn quic_sync_config_seed(
+/// @param cfg a pointer to the quic sync config builder
+/// @param seed a pointer the raw PSK seed
+pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), imp::Error> {
+    cfg.generate();
+    Ok(())
+}
+
+/// Attempts to set wrapped seed value on [`QuicSyncConfigBuilder`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param cfg a pointer to the quic sync config builder
+/// @param seed a pointer the raw PSK seed
+pub fn quic_sync_config_wrapped_seed(
     cfg: &mut QuicSyncConfigBuilder,
-    seed: &Seed,
+    seed: &[u8],
+    encap_key: &[u8],
+    sender_pk: &[u8],
 ) -> Result<(), imp::Error> {
-    cfg.seed(seed.get_seed());
+    cfg.wrapped_seed(Box::from(seed), Box::from(encap_key), Box::from(sender_pk));
+    Ok(())
+}
+
+/// Attempts to set raw seed value on [`QuicSyncConfigBuilder`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param cfg a pointer to the quic sync config builder
+/// @param seed a pointer the raw PSK seed
+pub fn quic_sync_config_raw_seed(
+    cfg: &mut QuicSyncConfigBuilder,
+    seed: &[u8],
+) -> Result<(), imp::Error> {
+    cfg.raw_seed(Box::from(seed));
     Ok(())
 }
 
@@ -697,11 +726,11 @@ pub fn quic_sync_config_build(
     Ok(())
 }
 
-#[aranya_capi_core::opaque(size = 64, align = 8)]
+#[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 64, align = 8)]
+#[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 
 /// Configures QUIC syncer for [`TeamConfigBuilder`].
@@ -971,7 +1000,10 @@ pub fn encrypt_psk_seed_for_peer(
     _client: &mut Client,
     _team_id: &TeamId,
     _device: &DeviceId,
-    _seed: &[u8],
+    _seed: *mut MaybeUninit<u8>,
+    _seed_len: &mut usize,
+    _encap_key: *mut MaybeUninit<u8>,
+    _encap_key_len: &mut usize,
 ) -> Result<(), imp::Error> {
     // TODO: get encrypted PSK seed from daemon.
     todo!();
