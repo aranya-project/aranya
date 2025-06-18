@@ -202,6 +202,7 @@ impl DeviceCtx {
         Ok(self.client.local_addr().await?)
     }
 
+    #[allow(unused, reason = "module compiled for each test file")]
     pub fn aqc_net_id(&mut self) -> NetIdentifier {
         NetIdentifier(
             self.client
