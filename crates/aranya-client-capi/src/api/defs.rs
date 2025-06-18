@@ -9,6 +9,7 @@ use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_crypto::dangerous::spideroak_crypto::hex;
+use aranya_daemon_api::Text;
 use bytes::Bytes;
 use tracing::error;
 
@@ -386,10 +387,10 @@ impl From<&LabelId> for aranya_daemon_api::LabelId {
 pub struct LabelName(*const c_char);
 
 impl LabelName {
-    unsafe fn as_underlying(self) -> Result<String, imp::Error> {
+    unsafe fn as_underlying(self) -> Result<Text, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(String::from(cstr.to_str()?))
+        Ok(Text::try_from(cstr)?)
     }
 }
 
@@ -419,9 +420,7 @@ impl NetIdentifier {
     unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
         // SAFETY: Caller must ensure the pointer is a valid C String.
         let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(aranya_daemon_api::NetIdentifier(String::from(
-            cstr.to_str()?,
-        )))
+        Ok(aranya_daemon_api::NetIdentifier(Text::try_from(cstr)?))
     }
 }
 

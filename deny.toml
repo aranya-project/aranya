@@ -133,6 +133,8 @@ exceptions = [
     { allow = ["AGPL-3.0"], crate = "aranya-policy-ifgen-macro" },
     { allow = ["AGPL-3.0"], crate = "aranya-policy-lang" },
     { allow = ["AGPL-3.0"], crate = "aranya-policy-module" },
+    { allow = ["AGPL-3.0"], crate = "aranya-policy-text" },
+    { allow = ["AGPL-3.0"], crate = "aranya-policy-text-macro" },
     { allow = ["AGPL-3.0"], crate = "aranya-policy-vm" },
     { allow = ["AGPL-3.0"], crate = "aranya-runtime" },
 

@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context, Result};
 use aranya_client::{client::Client, SyncPeerConfig};
 use aranya_daemon::{config::Config, Daemon, DaemonHandle};
-use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
+use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use tokio::{fs, time};
@@ -200,5 +200,18 @@ impl DeviceCtx {
 
     pub async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.local_addr().await?)
+    }
+
+    #[allow(unused, reason = "module compiled for each test file")]
+    pub fn aqc_net_id(&mut self) -> NetIdentifier {
+        NetIdentifier(
+            self.client
+                .aqc()
+                .server_addr()
+                .expect("can get server addr")
+                .to_string()
+                .try_into()
+                .expect("socket addr is valid text"),
+        )
     }
 }
