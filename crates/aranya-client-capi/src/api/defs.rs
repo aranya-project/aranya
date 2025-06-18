@@ -9,7 +9,6 @@ use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_crypto::dangerous::spideroak_crypto::hex;
-use aranya_daemon_api::CreateTeamResponse;
 use bytes::Bytes;
 use tracing::error;
 
@@ -919,9 +918,8 @@ pub fn revoke_label(
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
-    // FIXME(Steve): Return id and psk with out params
-    let CreateTeamResponse { team_id, .. } =
-        client.rt.block_on(client.inner.create_team(cfg.into()))?;
+    // FIXME(Steve): Pass in PSK?
+    let team_id = client.rt.block_on(client.inner.create_team(cfg.into()))?;
     Ok(team_id.into())
 }
 

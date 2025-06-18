@@ -173,12 +173,7 @@ impl Daemon {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
 
-            let data = QSData {
-                psk_store,
-                store: local_store,
-                engine: eng,
-                seed_id_dir,
-            };
+            let data = QSData { psk_store };
 
             let api = DaemonApiServer::new(
                 client,
@@ -189,6 +184,9 @@ impl Daemon {
                 peers,
                 recv_effects,
                 aqc,
+                local_store,
+                eng,
+                seed_id_dir,
                 Some(data),
             )?;
             Ok(Self {

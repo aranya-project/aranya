@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{QuicSyncConfig, TeamConfig};
-use aranya_daemon_api::{CreateTeamResponse, Role};
+use aranya_daemon_api::{GenSeedMode, Role, SeedType};
 use test_log::test;
 use tracing::{debug, info};
 
@@ -184,22 +184,26 @@ async fn test_add_team() -> Result<()> {
 
     // Create the initial team, and get our TeamId and seed.
     let cfg = TeamConfig::builder().build()?;
-    let CreateTeamResponse {
-        team_id,
-        seed: Some(seed),
-    } = team
+    let team_id = team
         .owner
         .client
         .create_team(cfg)
         .await
-        .expect("expected to create team")
-    else {
-        panic!("Only implemented when using the QUIC syncer. Handle other syncer types")
-    };
+        .expect("expected to create team");
     info!(?team_id);
 
+    let SeedType::Raw(seed) = team
+        .owner
+        .client
+        .load_psk_seed(GenSeedMode::Raw, team_id)
+        .await
+        .expect("able to load seed")
+    else {
+        panic!("Only raw seeds are supported");
+    };
+
     let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().seed(seed).build()?;
+        let qs_cfg = QuicSyncConfig::builder().raw_seed(seed).build()?;
         TeamConfig::builder().quic_sync(qs_cfg).build()?
     };
 

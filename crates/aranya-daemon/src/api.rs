@@ -12,7 +12,7 @@ pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    CreateTeamResponse, DaemonApi, QuicSyncSeed, CE, CS,
+    DaemonApi, GenSeedMode, QuicSyncSeed, SeedType,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -33,10 +33,11 @@ use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 use crate::{
     actions::Actions,
     aqc::Aqc,
-    daemon::KS,
+    daemon::{CE, CS, KS},
     keystore::LocalStore,
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::task::SyncPeers,
+    util::{load_seed, SeedDir},
     Client, EF,
 };
 
@@ -84,6 +85,9 @@ impl DaemonApiServer {
         peers: SyncPeers,
         recv_effects: EffectReceiver,
         aqc: Aqc<CE, KS>,
+        store: LocalStore<KS>,
+        engine: CE,
+        seed_id_dir: SeedDir,
         quic: Option<quic_sync::Data>,
     ) -> Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
@@ -98,6 +102,8 @@ impl DaemonApiServer {
             peers: Mutex::new(peers),
             effect_handler,
             aqc,
+            store_engine: Mutex::new((store, engine)),
+            seed_id_dir,
             quic: Mutex::new(quic),
         }));
         Ok(Self {
@@ -223,7 +229,6 @@ impl EffectHandler {
 ///
 /// This is separated out so we only have to clone one [`Arc`]
 /// (inside [`Api`]).
-#[derive(Debug)]
 struct ApiInner {
     client: Client,
     /// Local socket address of the API.
@@ -234,12 +239,26 @@ struct ApiInner {
     peers: Mutex<SyncPeers>,
     effect_handler: EffectHandler,
     aqc: Arc<Aqc<CE, KS>>,
+    store_engine: Mutex<(LocalStore<KS>, CE)>,
+    seed_id_dir: SeedDir,
     quic: Mutex<Option<quic_sync::Data>>,
 }
 
 impl ApiInner {
     fn get_pk(&self) -> api::Result<KeyBundle> {
         Ok(KeyBundle::try_from(&self.pk).context("bad key bundle")?)
+    }
+}
+
+impl std::fmt::Debug for ApiInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Inner API Data")
+            .field("seed_id_dir", &self.seed_id_dir)
+            .field("client", &self.client)
+            .field("local_addr", &self.local_addr)
+            .field("pk", &self.pk)
+            .field("aqc", &self.aqc)
+            .finish_non_exhaustive()
     }
 }
 
@@ -344,19 +363,23 @@ impl DaemonApi for Api {
             let mut guard = self.quic.lock().await;
             let quic_data = guard.as_mut().context("quic syncing is not enabled")?;
 
-            let seed = QuicSyncSeed::<CS>::from_bytes(cfg.seed())?;
-            insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
+            let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
+
+            let SeedType::Raw(ref raw_seed_bytes) = cfg.seed() else {
+                return Err(anyhow::anyhow!("Wrapped keys are not supported!").into());
+            };
+            let seed = QuicSyncSeed::<CS>::from_bytes(raw_seed_bytes)?;
+            insert_seed(engine, store, seed.clone())
                 .context("could not insert seed into keystore")?;
 
-            if let Err(e) = quic_data
+            if let Err(e) = self
                 .seed_id_dir
                 .append(&team, &seed.id())
                 .await
                 .context("could not write seed id to file")
             {
                 error!(%e);
-                remove_seed(&mut quic_data.store, seed.clone())
-                    .context("could not remove seed from keystore")?;
+                remove_seed(store, seed.clone()).context("could not remove seed from keystore")?;
                 return Err(e.into());
             };
 
@@ -401,7 +424,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         cfg: api::TeamConfig,
-    ) -> api::Result<CreateTeamResponse> {
+    ) -> api::Result<api::TeamId> {
         info!("create_team");
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
@@ -413,49 +436,42 @@ impl DaemonApi for Api {
             .context("unable to create team")?;
         debug!(?graph_id);
 
-        let seed = match *self.quic.lock().await {
-            Some(ref mut quic_data) => {
-                let seed = QuicSyncSeed::<CS>::new(&mut Rng);
-                insert_seed(&mut quic_data.engine, &mut quic_data.store, seed.clone())
-                    .context("could not insert seed into keystore")?;
+        let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
 
-                let team_id = api::TeamId::from(*graph_id.as_array());
-                if let Err(e) = quic_data
-                    .seed_id_dir
-                    .append(&team_id, &seed.id())
-                    .await
-                    .context("could not write seed id to file")
-                {
-                    error!(%e);
-                    remove_seed(&mut quic_data.store, seed.clone())
-                        .context("could not remove seed from keystore")?;
-                    return Err(e.into());
-                };
+        // Always generate a seed when a team is created. Use the value in the team config?
+        let seed = QuicSyncSeed::<CS>::new(&mut Rng);
+        insert_seed(engine, store, seed.clone()).context("could not insert seed into keystore")?;
 
-                let psk = seed.gen_psk()?;
-                // Insert PSK into the store
-                {
-                    let psk_ref = Arc::new(
-                        PresharedKey::external(psk.identity(), psk.raw_secret())
-                            .context("unable to create PSK")?
-                            .with_hash_alg(HashAlgorithm::SHA384)
-                            .expect("Valid hash algorithm"),
-                    );
-                    quic_data
-                        .psk_store
-                        .insert(team_id, psk_ref)
-                        .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
-                }
-
-                Some(Box::from(seed.as_bytes()))
-            }
-            None => None,
+        let team_id = api::TeamId::from(*graph_id.as_array());
+        if let Err(e) = self
+            .seed_id_dir
+            .append(&team_id, &seed.id())
+            .await
+            .context("could not write seed id to file")
+        {
+            error!(%e);
+            remove_seed(store, seed.clone()).context("could not remove seed from keystore")?;
+            return Err(e.into());
         };
 
-        Ok(CreateTeamResponse {
-            team_id: graph_id.into_id().into(),
-            seed,
-        })
+        if let Some(ref mut quic_data) = *self.quic.lock().await {
+            let psk = seed.gen_psk()?;
+            // Insert PSK into the store
+            {
+                let psk_ref = Arc::new(
+                    PresharedKey::external(psk.identity(), psk.raw_secret())
+                        .context("unable to create PSK")?
+                        .with_hash_alg(HashAlgorithm::SHA384)
+                        .expect("Valid hash algorithm"),
+                );
+                quic_data
+                    .psk_store
+                    .insert(team_id, psk_ref)
+                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+            }
+        }
+
+        Ok(graph_id.into_id().into())
     }
 
     #[instrument(skip(self))]
@@ -954,6 +970,25 @@ impl DaemonApi for Api {
             }
         }
         Ok(labels)
+    }
+
+    async fn load_psk_seed(
+        self,
+        _context: context::Context,
+        mode: GenSeedMode,
+        team_id: api::TeamId,
+    ) -> api::Result<SeedType> {
+        if !matches!(mode, GenSeedMode::Raw) {
+            return Err(anyhow::anyhow!("Wrapped keys are not supported!").into());
+        }
+
+        let seed_id = self.seed_id_dir.get(&team_id).await?;
+        let (ref mut store, ref mut eng) = *self.store_engine.lock().await;
+
+        let seed =
+            load_seed(eng, store, &seed_id)?.context("Missing seed entry in the keystore")?;
+
+        Ok(SeedType::Raw(Box::from(seed.as_bytes())))
     }
 }
 

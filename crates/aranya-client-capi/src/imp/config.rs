@@ -241,7 +241,7 @@ impl Typed for QuicSyncConfig {
 impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .seed(value.seed)
+            .raw_seed(value.seed) // TODO: Update this to support raw and wrapped variants
             .build()
             .expect("All fields are set")
     }

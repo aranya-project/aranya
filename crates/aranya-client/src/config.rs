@@ -81,8 +81,35 @@ impl Default for SyncPeerConfigBuilder {
 }
 
 #[derive(Clone)]
+pub enum SeedType {
+    Raw(Box<[u8]>),
+    Wrapped {
+        encrypted_seed: Box<[u8]>,
+        encap_key: Box<[u8]>,
+        sender_pk: Box<[u8]>,
+    },
+}
+
+impl From<SeedType> for aranya_daemon_api::SeedType {
+    fn from(value: SeedType) -> Self {
+        match value {
+            SeedType::Raw(seed) => Self::Raw(seed),
+            SeedType::Wrapped {
+                encrypted_seed,
+                encap_key,
+                sender_pk,
+            } => Self::Wrapped {
+                encrypted_seed,
+                encap_key,
+                sender_pk,
+            },
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct QuicSyncConfig {
-    seed: Box<[u8]>,
+    seed: SeedType,
 }
 
 impl QuicSyncConfig {
@@ -93,27 +120,44 @@ impl QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    seed: Option<Box<[u8]>>,
+    seed: Option<SeedType>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Sets the seed.
-    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
-        self.seed = Some(seed);
+    /// Sets the raw seed.
+    /// Overwrites [`Self::wrapped_seed`]
+    pub fn raw_seed(mut self, seed: Box<[u8]>) -> Self {
+        self.seed = Some(SeedType::Raw(seed));
+        self
+    }
+
+    /// Sets the wrapped seed.
+    /// Overwrites [`Self::raw_seed`]
+    pub fn wrapped_seed(
+        mut self,
+        encrypted_seed: Box<[u8]>,
+        encap_key: Box<[u8]>,
+        sender_pk: Box<[u8]>,
+    ) -> Self {
+        self.seed = Some(SeedType::Wrapped {
+            encrypted_seed,
+            encap_key,
+            sender_pk,
+        });
         self
     }
 
     /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig> {
-        let Some(psk) = self.seed else {
+        let Some(seed) = self.seed else {
             return Err(ConfigError::InvalidArg(InvalidArg::new(
                 "seed",
-                "must call `QuicSyncConfigBuilder::seed`",
+                "must call `QuicSyncConfigBuilder::raw_seed or QuicSyncConfigBuilder::wrapped_seed`",
             ))
             .into());
         };
 
-        Ok(QuicSyncConfig { seed: psk })
+        Ok(QuicSyncConfig { seed })
     }
 }
 
@@ -133,7 +177,7 @@ impl TeamConfig {
 impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .seed(value.seed)
+            .seed(value.seed.into())
             .build()
             .expect("All fields are set")
     }
