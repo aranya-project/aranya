@@ -95,35 +95,44 @@ impl QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    seed_mode: Option<GenSeedMode>,
+    seed_mode: GenSeedMode,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the seed to be generated.
     /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`]
     pub fn gen_seed(mut self) -> Self {
-        self.seed_mode = Some(GenSeedMode::Generate);
+        self.seed_mode = GenSeedMode::Generate;
         self
     }
 
     /// Sets the seed IKM.
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
-    pub fn seed_ikm(mut self, ikm: Box<[u8]>) -> Self {
-        self.seed_mode = Some(GenSeedMode::IKM(ikm));
+    pub fn seed_ikm(mut self, ikm: [u8; 32]) -> Self {
+        self.seed_mode = GenSeedMode::IKM(ikm);
         self
     }
 
     /// Sets the wrapped seed.
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
-    pub fn wrapped_seed(mut self, recv_pk: Box<[u8]>) -> Self {
-        self.seed_mode = Some(GenSeedMode::Wrapped { recv_pk });
+    pub fn wrapped_seed(
+        mut self,
+        sender_pk: Box<[u8]>,
+        encap_key: Box<[u8]>,
+        encrypted_seed: Box<[u8]>,
+    ) -> Self {
+        self.seed_mode = GenSeedMode::Wrapped {
+            sender_pk,
+            encap_key,
+            encrypted_seed,
+        };
         self
     }
 
     /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig> {
         Ok(QuicSyncConfig {
-            seed_mode: self.seed_mode.unwrap_or_default(),
+            seed_mode: self.seed_mode,
         })
     }
 }

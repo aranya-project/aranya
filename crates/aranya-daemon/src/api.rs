@@ -393,14 +393,13 @@ impl DaemonApi for Api {
 
             let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
 
-            let GenSeedMode::IKM(ref ikm) = cfg.seed() else {
+            let GenSeedMode::IKM(ref ikm) = cfg.seed_mode() else {
                 return Err(
                     anyhow::anyhow!("Only passing in IKM for the seed is supported!").into(),
                 );
             };
 
-            let ikm: [u8; 32] = ikm.deref().try_into().context("ikm must be 32 bytes")?;
-            let seed = PskSeed::<CS>::import_from_ikm(&ikm, &team.into_id().into());
+            let seed = PskSeed::<CS>::import_from_ikm(ikm, &team.into_id().into());
             insert_seed(engine, store, seed.clone())
                 .context("could not insert seed into keystore")?;
 
@@ -485,12 +484,11 @@ impl DaemonApi for Api {
         {
             let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
 
-            let GenSeedMode::IKM(ref ikm) = qs_cfg.seed() else {
+            let GenSeedMode::IKM(ref ikm) = qs_cfg.seed_mode() else {
                 return Err(
                     anyhow::anyhow!("Only passing in IKM for the seed is supported!").into(),
                 );
             };
-            let ikm: [u8; 32] = ikm.deref().try_into().context("ikm must be 32 bytes")?;
 
             let seed = PskSeed::<CS>::import_from_ikm(&ikm, &team_id.into_id().into());
             insert_seed(engine, store, seed.clone())

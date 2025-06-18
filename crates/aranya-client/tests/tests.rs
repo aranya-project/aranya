@@ -183,7 +183,7 @@ async fn test_add_team() -> Result<()> {
     let mut team = TeamCtx::new("test_add_team", work_dir).await?;
 
     // Create the initial team, and get our TeamId.
-    let seed_ikm = Box::from([0; 32]); // TODO: Randomize this
+    let seed_ikm = [0; 32]; // TODO: Randomize this
     let cfg = {
         let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
         TeamConfig::builder().quic_sync(qs_cfg).build()?
