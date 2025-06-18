@@ -110,7 +110,7 @@ pub(crate) async fn load_team_psk_pairs(
             let psk = PresharedKey::external(identity, secret)
                 .context("unable to create PSK")?
                 .with_hash_alg(HashAlgorithm::SHA384)
-                .expect("Valid hash algorithm");
+                .context("Invalid hash algorithm")?;
 
             out.push((team_id, Arc::new(psk)));
         }

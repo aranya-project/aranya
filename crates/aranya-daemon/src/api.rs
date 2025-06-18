@@ -416,26 +416,24 @@ impl DaemonApi for Api {
 
             // TODO: Use a real policy ID
             // TODO: Iterate over all cipher suite IDs
-            let psk_res_iter = seed.generate_psks(
+            for psk_res in seed.generate_psks(
                 QUIC_SYNC_PSK_CONTEXT,
                 team.into_id().into(),
                 PolicyId::default(),
                 [CipherSuiteId::TlsAes256GcmSha384].iter().copied(),
-            );
-            for res in psk_res_iter {
-                if let Ok(psk) = res {
-                    let identity = psk.identity().as_bytes();
-                    let secret = psk.raw_secret_bytes();
-                    let psk = PresharedKey::external(identity, secret)
-                        .context("unable to create PSK")?
-                        .with_hash_alg(HashAlgorithm::SHA384)
-                        .expect("Valid hash algorithm");
+            ) {
+                let psk = psk_res.context("unable to generate psk")?;
+                let identity = psk.identity().as_bytes();
+                let secret = psk.raw_secret_bytes();
+                let psk = PresharedKey::external(identity, secret)
+                    .context("unable to create PSK")?
+                    .with_hash_alg(HashAlgorithm::SHA384)
+                    .expect("Valid hash algorithm");
 
-                    quic_data
-                        .psk_store
-                        .insert(team, Arc::new(psk))
-                        .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
-                }
+                quic_data
+                    .psk_store
+                    .insert(team, Arc::new(psk))
+                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
             }
         }
 
@@ -490,7 +488,7 @@ impl DaemonApi for Api {
                 );
             };
 
-            let seed = PskSeed::<CS>::import_from_ikm(&ikm, &team_id.into_id().into());
+            let seed = PskSeed::<CS>::import_from_ikm(ikm, &team_id.into_id().into());
             insert_seed(engine, store, seed.clone())
                 .context("could not insert seed into keystore")?;
 
@@ -508,26 +506,24 @@ impl DaemonApi for Api {
 
             // TODO: Use a real policy ID
             // TODO: Iterate over all cipher suite IDs
-            let psk_res_iter = seed.generate_psks(
+            for psk_res in seed.generate_psks(
                 QUIC_SYNC_PSK_CONTEXT,
                 team_id.into_id().into(),
                 PolicyId::default(),
                 [CipherSuiteId::TlsAes256GcmSha384].iter().copied(),
-            );
-            for res in psk_res_iter {
-                if let Ok(psk) = res {
-                    let identity = psk.identity().as_bytes();
-                    let secret = psk.raw_secret_bytes();
-                    let psk = PresharedKey::external(identity, secret)
-                        .context("unable to create PSK")?
-                        .with_hash_alg(HashAlgorithm::SHA384)
-                        .expect("Valid hash algorithm");
+            ) {
+                let psk = psk_res.context("unable to generate psk")?;
+                let identity = psk.identity().as_bytes();
+                let secret = psk.raw_secret_bytes();
+                let psk = PresharedKey::external(identity, secret)
+                    .context("unable to create PSK")?
+                    .with_hash_alg(HashAlgorithm::SHA384)
+                    .expect("Valid hash algorithm");
 
-                    quic_data
-                        .psk_store
-                        .insert(team_id, Arc::new(psk))
-                        .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
-                }
+                quic_data
+                    .psk_store
+                    .insert(team_id, Arc::new(psk))
+                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
             }
         }
 

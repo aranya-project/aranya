@@ -16,7 +16,7 @@ use tracing::{error, warn};
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
-pub(crate) const QUIC_SYNC_PSK_CONTEXT: &'static [u8] = b"AranyaQuicSync-v1";
+pub(crate) const QUIC_SYNC_PSK_CONTEXT: &[u8] = b"AranyaQuicSync-v1";
 
 /// PSK store that's shared between [`super::Syncer`]
 /// and [`super::Server`]
