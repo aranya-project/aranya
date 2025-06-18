@@ -58,6 +58,40 @@ pub(crate) type EF = policy::Effect;
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
 
+mod invalid_graphs {
+    use std::{
+        collections::HashSet,
+        sync::{Arc, RwLock},
+    };
+
+    use aranya_runtime::GraphId;
+
+    /// Keeps track of which graphs have had a finalization error.
+    ///
+    /// Once a finalization error has occurred for a graph,
+    /// the graph error is permanent.
+    /// The API will prevent subsequent operations on the invalid graph.
+    #[derive(Clone, Debug, Default)]
+    pub(crate) struct InvalidGraphs {
+        // NB: Since the locking is short and not held over await points,
+        // we use a standard rwlock instead of tokio's.
+        map: Arc<RwLock<HashSet<GraphId>>>,
+    }
+
+    impl InvalidGraphs {
+        pub fn insert(&self, graph_id: GraphId) {
+            #[allow(clippy::expect_used)]
+            self.map.write().expect("poisoned").insert(graph_id);
+        }
+
+        pub fn contains(&self, graph_id: GraphId) -> bool {
+            #[allow(clippy::expect_used)]
+            self.map.read().expect("poisoned").contains(&graph_id)
+        }
+    }
+}
+pub(crate) use invalid_graphs::InvalidGraphs;
+
 /// Handle for the spawned daemon.
 ///
 /// Dropping this will abort the daemon's tasks.
@@ -139,8 +173,10 @@ impl Daemon {
             // Sync in the background at some specified interval.
             let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
+            let invalid_graphs = InvalidGraphs::default();
             let state = QuicSyncState::new(psk_store.clone())?;
-            let (syncer, peers) = Syncer::new(client.clone(), send_effects, state);
+            let (syncer, peers) =
+                Syncer::new(client.clone(), send_effects, invalid_graphs.clone(), state);
 
             let graph_ids = client
                 .aranya
@@ -183,6 +219,7 @@ impl Daemon {
                 pks,
                 peers,
                 recv_effects,
+                invalid_graphs,
                 aqc,
                 local_store,
                 eng,

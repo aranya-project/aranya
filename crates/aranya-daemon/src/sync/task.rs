@@ -10,7 +10,7 @@ use std::{collections::HashMap, future::Future, time::Duration};
 
 use anyhow::{Context, Result};
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{storage::GraphId, Engine, Sink};
+use aranya_runtime::{storage::GraphId, ClientError, Engine, Sink};
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::StreamExt;
@@ -22,7 +22,9 @@ use tracing::{error, instrument, trace};
 use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
+    sync::error::SyncError,
     vm_policy::VecSink,
+    InvalidGraphs,
 };
 
 pub mod quic;
@@ -39,7 +41,7 @@ enum Msg {
 /// Contains the information needed to sync with a single peer:
 /// - network address
 /// - Aranya graph id
-#[derive(Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
+#[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
 struct SyncPeer {
     addr: Addr,
     graph_id: GraphId,
@@ -154,6 +156,8 @@ pub struct Syncer<ST> {
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
+    /// Keeps track of invalid graphs due to finalization errors.
+    invalid: InvalidGraphs,
     /// Additional state used by the syncer
     state: ST,
 }
@@ -181,7 +185,12 @@ pub trait SyncState: Sized {
 
 impl<ST> Syncer<ST> {
     /// Creates a new `Syncer`.
-    pub fn new(client: Client, send_effects: EffectSender, state: ST) -> (Self, SyncPeers) {
+    pub(crate) fn new(
+        client: Client,
+        send_effects: EffectSender,
+        invalid: InvalidGraphs,
+        state: ST,
+    ) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
         (
@@ -191,6 +200,7 @@ impl<ST> Syncer<ST> {
                 recv,
                 queue: DelayQueue::new(),
                 send_effects,
+                invalid,
                 state,
             },
             peers,
@@ -232,7 +242,7 @@ impl<ST: SyncState> Syncer<ST> {
                 match msg {
                     Msg::SyncNow{ peer } => {
                         // sync with peer right now.
-                        self.sync(&peer.graph_id, &peer.addr).await?;
+                        self.sync(&peer).await?;
                     },
                     Msg::AddPeer { peer, cfg } => self.add_peer(peer, &cfg),
                     Msg::RemovePeer { peer } => self.remove_peer(peer),
@@ -244,27 +254,45 @@ impl<ST: SyncState> Syncer<ST> {
                 let info = self.peers.get_mut(&peer).assume("peer must exist")?;
                 info.key = self.queue.insert(peer.clone(), info.interval);
                 // sync with peer.
-                self.sync(&peer.graph_id, &peer.addr).await?;
+                self.sync(&peer).await?;
             }
         }
         Ok(())
     }
 
     /// Sync with a peer.
-    #[instrument(skip_all, fields(peer = %peer, graph_id = %id))]
-    pub async fn sync(&mut self, id: &GraphId, peer: &Addr) -> SyncResult<()> {
+    #[instrument(skip_all, fields(peer = ?peer))]
+    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<()> {
         trace!("syncing with peer");
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
-            <ST as SyncState>::sync_impl(self, *id, &mut sink, peer)
+            if let Err(e) = <ST as SyncState>::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
                 .await
                 .context("sync_peer error")
-                .inspect_err(|err| error!("{err:?}"))?;
-            sink.collect().context("could not collect effcects")?
+                .inspect_err(|err| error!("{err:?}"))
+            {
+                // If a finalization error has occurred, remove all sync peers for that team.
+                if e.downcast_ref::<ClientError>()
+                    .is_some_and(|err| matches!(err, ClientError::ParallelFinalize))
+                {
+                    // Remove sync peers for graph that had finalization error.
+                    self.peers.retain(|p, info| {
+                        let keep = p.graph_id != peer.graph_id;
+                        if !keep {
+                            self.queue.remove(&info.key);
+                        }
+                        keep
+                    });
+                    self.invalid.insert(peer.graph_id);
+                }
+                return Err(SyncError::Other(e));
+            }
+            sink.collect()
+                .context("could not collect effects from sync")?
         };
         let n = effects.len();
         self.send_effects
-            .send((*id, effects))
+            .send((peer.graph_id, effects))
             .await
             .context("unable to send effects")?;
         trace!(?n, "completed sync");
