@@ -10,7 +10,7 @@ use aranya_daemon_api::{
         PublicApiKey,
     },
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Version, CS,
+    Text, Version, CS,
 };
 use aranya_util::Addr;
 use tarpc::context;
@@ -404,7 +404,7 @@ impl Team<'_> {
     }
 
     /// Create a label.
-    pub async fn create_label(&mut self, label_name: String) -> Result<LabelId> {
+    pub async fn create_label(&mut self, label_name: Text) -> Result<LabelId> {
         self.client
             .daemon
             .create_label(context::current(), self.id, label_name)

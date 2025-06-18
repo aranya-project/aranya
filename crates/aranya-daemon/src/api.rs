@@ -12,7 +12,7 @@ pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, CE, CS,
+    DaemonApi, Text, CE, CS,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -653,7 +653,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        label_name: String,
+        label_name: Text,
     ) -> api::Result<api::LabelId> {
         self.check_team_valid(team).await?;
 

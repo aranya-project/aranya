@@ -37,6 +37,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 aranya-daemon = { path = "../aranya-daemon" }
+aranya-policy-text = { workspace = true }
 
 backon = { workspace = true }
 serial_test = { workspace = true }
