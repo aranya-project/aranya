@@ -47,7 +47,7 @@ impl PskStore {
                 inner: SyncMutex::new(PskStoreInner {
                     active_team: None,
                     team_identities,
-                    identity_psk,
+                    identity_team: identity_psk,
                 }),
                 active_team_tx,
             },
@@ -63,15 +63,24 @@ impl PskStore {
                     .entry(team_id)
                     .or_default()
                     .push(Arc::clone(&psk));
-                inner.identity_psk.insert(PskIdAsKey(psk), team_id);
+                inner.identity_team.insert(PskIdAsKey(psk), team_id);
                 Ok(())
             }
             Err(e) => bail!(e.to_string()),
         }
     }
 
-    pub(crate) fn remove(&self, _id: TeamId) -> Result<()> {
-        todo!("Implement this method. https://github.com/aranya-project/aranya/pull/302")
+    pub(crate) fn remove(&self, team_id: TeamId) -> Result<()> {
+        match self.inner.lock() {
+            Ok(ref mut inner) => {
+                inner.team_identities.remove(&team_id);
+
+                inner.identity_team.retain(|_, other| *other != team_id);
+
+                Ok(())
+            }
+            Err(e) => bail!(e.to_string()),
+        }
     }
 
     #[allow(clippy::expect_used)]
@@ -105,14 +114,14 @@ impl server::SelectsPresharedKeys for PskStore {
             .inspect_err(|e| error!("mutex poisoned: {e}"))
             .ok()?;
 
-        let (k, _) = inner.identity_psk.get_key_value(identity)?;
+        let (k, _) = inner.identity_team.get_key_value(identity)?;
         Some(k.0.clone())
     }
 
     #[allow(clippy::expect_used)]
     fn chosen(&self, identity: &[u8]) {
         let inner = self.inner.lock().expect("poisoned mutex");
-        let Some(team_id) = inner.identity_psk.get(identity) else {
+        let Some(team_id) = inner.identity_team.get(identity) else {
             warn!("identity removed?");
             return;
         };
@@ -126,7 +135,7 @@ impl server::SelectsPresharedKeys for PskStore {
 #[derive(Debug)]
 struct PskStoreInner {
     team_identities: HashMap<TeamId, Vec<Arc<PresharedKey>>>,
-    identity_psk: HashMap<PskIdAsKey, TeamId>,
+    identity_team: HashMap<PskIdAsKey, TeamId>,
     active_team: Option<TeamId>,
 }
 
