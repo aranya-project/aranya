@@ -259,6 +259,15 @@ impl From<aranya_crypto::Id> for Id {
     }
 }
 
+/// The size in bytes of an ID
+pub const ARANYA_SEED_LEN: usize = 64;
+
+// TODO: compile time check for seed size
+
+// PSK Seed
+#[aranya_capi_core::opaque(size = 56, align = 8)]
+pub type Seed = Safe<imp::Seed>;
+
 /// Team ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -650,14 +659,58 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
     cfg.aqc((**aqc_config).clone());
 }
 
-#[aranya_capi_core::opaque(size = 64, align = 8)]
+#[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
 
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 64, align = 8)]
+#[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
 
-/// Attempts to construct a [`TeamConfig`].
+/// Attempts to set PSK generation mode value on [`QuicSyncConfigBuilder`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param cfg a pointer to the quic sync config builder
+/// @param seed a pointer the raw PSK seed
+pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), imp::Error> {
+    cfg.generate();
+    Ok(())
+}
+
+/// Attempts to set wrapped seed value on [`QuicSyncConfigBuilder`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param cfg a pointer to the quic sync config builder
+/// @param seed a pointer the raw PSK seed
+pub fn quic_sync_config_wrapped_seed(
+    cfg: &mut QuicSyncConfigBuilder,
+    seed: &[u8],
+    encap_key: &[u8],
+    sender_pk: &[u8],
+) -> Result<(), imp::Error> {
+    cfg.wrapped_seed(Box::from(seed), Box::from(encap_key), Box::from(sender_pk));
+    Ok(())
+}
+
+/// Attempts to set raw seed value on [`QuicSyncConfigBuilder`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param cfg a pointer to the quic sync config builder
+/// @param seed a pointer the raw PSK seed
+pub fn quic_sync_config_raw_seed(
+    cfg: &mut QuicSyncConfigBuilder,
+    seed: &[u8],
+) -> Result<(), imp::Error> {
+    cfg.raw_seed(Box::from(seed));
+    Ok(())
+}
+
+/// Attempts to construct a [`QuicSyncConfig`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
@@ -673,12 +726,24 @@ pub fn quic_sync_config_build(
     Ok(())
 }
 
-#[aranya_capi_core::opaque(size = 64, align = 8)]
+#[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 64, align = 8)]
+#[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
+
+/// Configures QUIC syncer for [`TeamConfigBuilder`].
+///
+/// By default, the QUIC syncer config is not set. It is an error to call
+/// [`team_config_build`] before setting the interval with
+/// this function
+///
+/// @param cfg a pointer to the builder for a team config
+/// @param quic Set the QUIC syncer config
+pub fn team_config_builder_set_quic_syncer(cfg: &mut TeamConfigBuilder, quic: &QuicSyncConfig) {
+    cfg.quic(quic.imp());
+}
 
 /// Attempts to construct a [`TeamConfig`].
 ///
@@ -915,11 +980,33 @@ pub fn revoke_label(
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
+pub fn create_team(
+    client: &mut Client,
+    cfg: &TeamConfig,
+    team_id: &mut MaybeUninit<TeamId>,
+) -> Result<(), imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
-    let team_id = client.rt.block_on(client.inner.create_team(cfg.into()))?;
-    Ok(team_id.into())
+    let id = client.rt.block_on(client.inner.create_team(cfg.into()))?;
+
+    team_id.write(id.into());
+    Ok(())
+}
+
+/// Return PSK seed encrypted for another device on the team.
+/// The PSK seed will be encrypted using the public encryption key of the specified device on the team.
+///
+pub fn encrypt_psk_seed_for_peer(
+    _client: &mut Client,
+    _team_id: &TeamId,
+    _device: &DeviceId,
+    _seed: *mut MaybeUninit<u8>,
+    _seed_len: &mut usize,
+    _encap_key: *mut MaybeUninit<u8>,
+    _encap_key_len: &mut usize,
+) -> Result<(), imp::Error> {
+    // TODO: get encrypted PSK seed from daemon.
+    todo!();
 }
 
 /// Add a team to the local device store.
@@ -934,7 +1021,6 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.imp();
-
     let cfg: &imp::TeamConfig = cfg.deref();
     client
         .rt

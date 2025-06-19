@@ -201,7 +201,7 @@ async fn main() -> Result<()> {
     // Create the team config
     let seed_ikm = [0u8; 32]; // TODO: Randomize this
     let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+        let qs_cfg = QuicSyncConfig::builder().raw_seed(Box::new(seed_ikm)).build()?;
         TeamConfig::builder().quic_sync(qs_cfg).build()?
     };
 

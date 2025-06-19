@@ -1,13 +1,37 @@
 use core::{ffi::c_char, mem::MaybeUninit, ptr};
-use std::ops::Deref;
 
 use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
+use aranya_daemon_api::GenSeedMode;
 
 use super::Error;
 use crate::api::defs::{self, Duration};
+
+/// A QUIC syncer PSK seed.
+#[derive(Clone, Debug)]
+pub struct Seed {
+    pub(crate) inner: Box<[u8]>,
+}
+
+impl Typed for Seed {
+    const TYPE_ID: TypeId = TypeId::new(0x7B426A10);
+}
+
+impl Seed {
+    pub fn new(seed: Box<[u8]>) -> Self {
+        Self { inner: seed }
+    }
+
+    pub fn get_seed(&self) -> Self {
+        self.clone()
+    }
+
+    pub fn get_boxed(&self) -> Box<[u8]> {
+        self.inner.clone()
+    }
+}
 
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
@@ -226,10 +250,15 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
-    seed: Box<[u8]>,
+    mode: GenSeedMode,
 }
 
 impl QuicSyncConfig {
+    /// Useful for deref coercion.
+    pub(crate) fn imp(&self) -> &Self {
+        self
+    }
+
     pub fn builder() -> QuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }
@@ -242,13 +271,7 @@ impl Typed for QuicSyncConfig {
 impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .seed_ikm(
-                value
-                    .seed
-                    .deref()
-                    .try_into()
-                    .expect("can convert to 32 byte array"),
-            ) // TODO: Update this to support other variants
+            .mode(value.mode)
             .build()
             .expect("All fields are set")
     }
@@ -256,23 +279,47 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    seed: Option<Box<[u8]>>,
+    mode: Option<GenSeedMode>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Sets the seed.
-    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
-        self.seed = Some(seed);
-        self
+    /// Sets the PSK seed mode.
+    pub fn mode(&mut self, mode: GenSeedMode) {
+        self.mode = Some(mode);
+    }
+
+    /// Sets mode to generate PSK seed.
+    pub fn generate(&mut self) {
+        self.mode = Some(GenSeedMode::Generate);
+    }
+
+    /// Sets wrapped PSK seed
+    pub fn wrapped_seed(
+        &mut self,
+        encrypted_seed: Box<[u8]>,
+        encap_key: Box<[u8]>,
+        sender_pk: Box<[u8]>,
+    ) {
+        self.mode = Some(GenSeedMode::Wrapped {
+            sender_pk,
+            encap_key,
+            encrypted_seed,
+        });
+    }
+
+    /// Sets raw PSK seed
+    pub fn raw_seed(&mut self, _seed: Box<[u8]>) {
+        // TODO: convert `Box<u8>` to `[u8; 32]`
+        self.mode = Some(GenSeedMode::IKM([0u8; 32]));
     }
 
     /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig, Error> {
-        let Some(seed) = self.seed else {
+        let Some(mode) = self.mode else {
             return Err(InvalidArg::new("seed", "`seed` field not set").into());
         };
 
-        Ok(QuicSyncConfig { seed })
+        Ok(QuicSyncConfig { mode })
     }
 }
 
@@ -288,11 +335,11 @@ impl Builder for QuicSyncConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        let Some(seed) = self.seed else {
+        let Some(mode) = self.mode else {
             return Err(InvalidArg::new("seed", "`seed` field not set").into());
         };
 
-        Self::Output::init(out, QuicSyncConfig { seed });
+        Self::Output::init(out, QuicSyncConfig { mode });
         Ok(())
     }
 }
@@ -332,6 +379,13 @@ pub struct TeamConfigBuilder {
 
 impl Typed for TeamConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0x112905E7);
+}
+
+impl TeamConfigBuilder {
+    /// Sets the QUIC syncer config.
+    pub fn quic(&mut self, quic: &QuicSyncConfig) {
+        self.quic_sync = Some(quic.clone());
+    }
 }
 
 impl Builder for TeamConfigBuilder {

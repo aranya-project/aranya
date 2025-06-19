@@ -84,7 +84,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone)]
 pub struct QuicSyncConfig {
-    seed_mode: GenSeedMode,
+    mode: GenSeedMode,
 }
 
 impl QuicSyncConfig {
@@ -95,21 +95,27 @@ impl QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    seed_mode: GenSeedMode,
+    mode: Option<GenSeedMode>,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Sets the seed to be generated.
-    /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`]
-    pub fn gen_seed(mut self) -> Self {
-        self.seed_mode = GenSeedMode::Generate;
+    /// Sets the PSK mode.
+    pub fn mode(mut self, mode: GenSeedMode) -> Self {
+        self.mode = Some(mode);
         self
     }
 
-    /// Sets the seed IKM.
-    /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
-    pub fn seed_ikm(mut self, ikm: [u8; 32]) -> Self {
-        self.seed_mode = GenSeedMode::IKM(ikm);
+    /// Sets PSK mode to generate.
+    pub fn generate(mut self) -> Self {
+        self.mode = Some(GenSeedMode::Generate);
+        self
+    }
+
+    /// Sets the raw seed.
+    /// Overwrites [`Self::wrapped_seed`]
+    pub fn raw_seed(mut self, _seed: Box<[u8]>) -> Self {
+        // TODO: convert `Box<[u8]>` to `[u8; 32]`
+        self.mode = Some(GenSeedMode::IKM([0u8; 32]));
         self
     }
 
@@ -121,19 +127,25 @@ impl QuicSyncConfigBuilder {
         encap_key: Box<[u8]>,
         encrypted_seed: Box<[u8]>,
     ) -> Self {
-        self.seed_mode = GenSeedMode::Wrapped {
+        self.mode = Some(GenSeedMode::Wrapped {
             sender_pk,
             encap_key,
             encrypted_seed,
-        };
+        });
         self
     }
 
     /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig> {
-        Ok(QuicSyncConfig {
-            seed_mode: self.seed_mode,
-        })
+        let Some(mode) = self.mode else {
+            return Err(ConfigError::InvalidArg(InvalidArg::new(
+                "seed",
+                "must call `QuicSyncConfigBuilder::raw_seed or QuicSyncConfigBuilder::wrapped_seed`",
+            ))
+            .into());
+        };
+
+        Ok(QuicSyncConfig { mode })
     }
 }
 
@@ -153,7 +165,7 @@ impl TeamConfig {
 impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .seed(value.seed_mode)
+            .seed(value.mode)
             .build()
             .expect("All fields are set")
     }
