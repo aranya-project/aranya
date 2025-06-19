@@ -687,7 +687,6 @@ pub trait DaemonApi {
     async fn query_labels(team: TeamId) -> Result<Vec<Label>>;
     /// Query whether a label exists.
     async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
-    async fn load_psk_seed(mode: GenSeedMode, team: TeamId) -> Result<SeedType>;
 }
 
 #[cfg(test)]

@@ -95,3 +95,7 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
+
+[patch.crates-io]
+# Patch using a specific branch
+aranya-crypto = { git = "https://github.com/aranya-project/aranya-core", branch = "issue/301" }

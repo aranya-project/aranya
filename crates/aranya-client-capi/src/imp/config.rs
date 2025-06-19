@@ -4,7 +4,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_client::config::{QuicSyncPskSeedMode, SeedType};
+use aranya_daemon_api::GenSeedMode;
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -250,7 +250,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
-    mode: QuicSyncPskSeedMode,
+    mode: GenSeedMode,
 }
 
 impl QuicSyncConfig {
@@ -279,18 +279,18 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    mode: Option<QuicSyncPskSeedMode>,
+    mode: Option<GenSeedMode>,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
-    pub fn mode(&mut self, mode: QuicSyncPskSeedMode) {
+    pub fn mode(&mut self, mode: GenSeedMode) {
         self.mode = Some(mode);
     }
 
     /// Sets mode to generate PSK seed.
     pub fn generate(&mut self) {
-        self.mode = Some(QuicSyncPskSeedMode::GeneratePskSeed);
+        self.mode = Some(GenSeedMode::Generate);
     }
 
     /// Sets wrapped PSK seed
@@ -300,20 +300,17 @@ impl QuicSyncConfigBuilder {
         encap_key: Box<[u8]>,
         sender_pk: Box<[u8]>,
     ) {
-        self.mode = Some(QuicSyncPskSeedMode::WrappedPskSeed {
-            seed: SeedType::Wrapped {
-                encrypted_seed,
-                encap_key,
-                sender_pk,
-            },
+        self.mode = Some(GenSeedMode::Wrapped {
+            sender_pk,
+            encap_key,
+            encrypted_seed,
         });
     }
 
     /// Sets raw PSK seed
-    pub fn raw_seed(&mut self, seed: Box<[u8]>) {
-        self.mode = Some(QuicSyncPskSeedMode::RawPskSeed {
-            seed: SeedType::Raw(seed),
-        });
+    pub fn raw_seed(&mut self, _seed: Box<[u8]>) {
+        // TODO: convert `Box<u8>` to `[u8; 32]`
+        self.mode = Some(GenSeedMode::IKM([0u8; 32]));
     }
 
     /// Builds the config.
