@@ -22,7 +22,7 @@ use tracing::{error, instrument, trace};
 use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
-    sync::error::SyncError,
+    sync::{error::SyncError, task::quic::PeerCacheMap},
     vm_policy::VecSink,
     InvalidGraphs,
 };
@@ -42,9 +42,16 @@ enum Msg {
 /// - network address
 /// - Aranya graph id
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
-struct SyncPeer {
+pub(crate) struct SyncPeer {
     addr: Addr,
     graph_id: GraphId,
+}
+
+impl SyncPeer {
+    /// Creates a new `SyncPeer`.
+    pub(crate) fn new(addr: Addr, graph_id: GraphId) -> Self {
+        Self { addr, graph_id }
+    }
 }
 
 /// Handles adding and removing sync peers.
@@ -82,7 +89,7 @@ impl SyncPeers {
         cfg: SyncPeerConfig,
     ) -> Result<()> {
         let peer = Msg::AddPeer {
-            peer: SyncPeer { addr, graph_id },
+            peer: SyncPeer::new(addr, graph_id),
             cfg: cfg.clone(),
         };
         if let Err(e) = self.send.send(peer).await.context("unable to add peer") {
@@ -160,6 +167,11 @@ pub struct Syncer<ST> {
     invalid: InvalidGraphs,
     /// Additional state used by the syncer
     state: ST,
+    /// Sync server address.
+    server_addr: Addr,
+    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
+    /// Lock must be acquired after [`Self::client`]
+    caches: PeerCacheMap,
 }
 
 struct PeerInfo {
@@ -173,12 +185,15 @@ struct PeerInfo {
 /// object.
 pub trait SyncState: Sized {
     /// Syncs with the peer.
+    ///
+    /// Returns the number of commands that were received and successfully processed.
     fn sync_impl<S>(
         syncer: &mut Syncer<Self>,
         id: GraphId,
         sink: &mut S,
+        server_addr: Addr,
         peer: &Addr,
-    ) -> impl Future<Output = SyncResult<()>> + Send
+    ) -> impl Future<Output = SyncResult<usize>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
 }
@@ -190,6 +205,8 @@ impl<ST> Syncer<ST> {
         send_effects: EffectSender,
         invalid: InvalidGraphs,
         state: ST,
+        server_addr: Addr,
+        caches: PeerCacheMap,
     ) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
@@ -202,6 +219,8 @@ impl<ST> Syncer<ST> {
                 send_effects,
                 invalid,
                 state,
+                server_addr,
+                caches,
             },
             peers,
         )
@@ -262,33 +281,44 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = ?peer))]
-    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<()> {
+    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<usize> {
         trace!("syncing with peer");
-        let effects: Vec<EF> = {
+        let (effects, cmd_count): (Vec<EF>, usize) = {
             let mut sink = VecSink::new();
-            if let Err(e) = <ST as SyncState>::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
-                .await
-                .context("sync_peer error")
-                .inspect_err(|err| error!("{err:?}"))
+            let cmd_count = match <ST as SyncState>::sync_impl(
+                self,
+                peer.graph_id,
+                &mut sink,
+                self.server_addr,
+                &peer.addr,
+            )
+            .await
+            .context("sync_peer error")
+            .inspect_err(|err| error!("{err:?}"))
             {
-                // If a finalization error has occurred, remove all sync peers for that team.
-                if e.downcast_ref::<ClientError>()
-                    .is_some_and(|err| matches!(err, ClientError::ParallelFinalize))
-                {
-                    // Remove sync peers for graph that had finalization error.
-                    self.peers.retain(|p, info| {
-                        let keep = p.graph_id != peer.graph_id;
-                        if !keep {
-                            self.queue.remove(&info.key);
-                        }
-                        keep
-                    });
-                    self.invalid.insert(peer.graph_id);
+                Ok(count) => count,
+                Err(e) => {
+                    // If a finalization error has occurred, remove all sync peers for that team.
+                    if e.downcast_ref::<ClientError>()
+                        .is_some_and(|err| matches!(err, ClientError::ParallelFinalize))
+                    {
+                        // Remove sync peers for graph that had finalization error.
+                        self.peers.retain(|p, info| {
+                            let keep = p.graph_id != peer.graph_id;
+                            if !keep {
+                                self.queue.remove(&info.key);
+                            }
+                            keep
+                        });
+                        self.invalid.insert(peer.graph_id);
+                    }
+                    return Err(SyncError::Other(e));
                 }
-                return Err(SyncError::Other(e));
-            }
-            sink.collect()
-                .context("could not collect effects from sync")?
+            };
+            let effects = sink
+                .collect()
+                .context("could not collect effects from sync")?;
+            (effects, cmd_count)
         };
         let n = effects.len();
         self.send_effects
@@ -296,6 +326,6 @@ impl<ST: SyncState> Syncer<ST> {
             .await
             .context("unable to send effects")?;
         trace!(?n, "completed sync");
-        Ok(())
+        Ok(cmd_count)
     }
 }
