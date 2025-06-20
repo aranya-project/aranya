@@ -918,7 +918,6 @@ pub fn revoke_label(
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
-    // FIXME(Steve): Pass in PSK?
     let team_id = client.rt.block_on(client.inner.create_team(cfg.into()))?;
     Ok(team_id.into())
 }

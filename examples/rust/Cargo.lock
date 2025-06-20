@@ -97,14 +97,14 @@ dependencies = [
 [[package]]
 name = "aranya-crypto"
 version = "0.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "803d5194111f4404a3180b293564334c0d8945da5efb901853d8a7e3f278ce7f"
+source = "git+https://github.com/aranya-project/aranya-core?branch=issue%2F301#35609ab59144a3a0e4b876e9acdc3f0a180c7957"
 dependencies = [
  "buggy",
  "byteorder",
  "cfg-if",
  "ciborium",
  "ciborium-io",
+ "derive-where",
  "proptest",
  "rustix",
  "serde",
@@ -588,6 +588,17 @@ checksum = "e7c1832837b905bbfb5101e07cc24c8deddf52f93225eee6ead5f4d63d53ddcb"
 dependencies = [
  "const-oid",
  "zeroize",
+]
+
+[[package]]
+name = "derive-where"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "510c292c8cf384b1a340b816a9a6cf2599eb8f566a44949024af88418000c50b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -2037,9 +2048,9 @@ dependencies = [
 
 [[package]]
 name = "spideroak-crypto"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb9104419294271e35d214416fce160cd27aaae6284f4fc721abd2e968ef5a90"
+checksum = "0391e11840a14f462baa45fdb3bb19433e613a1468951f2b248a0ff40648f384"
 dependencies = [
  "aes-gcm",
  "buggy",

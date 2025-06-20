@@ -70,7 +70,7 @@ impl<CS: CipherSuite> Ctx<CS> {
         info: &[u8],
     ) -> Result<(Self, Encap<CS>), HpkeError> {
         let (enc, send) =
-            Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_send(rng, Mode::Base, pk.as_inner(), info)?;
+            Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_send(rng, Mode::Base, pk.as_inner(), [info])?;
         // NB: These are the reverse of the server's keys.
         let (open_key, open_nonce) = {
             let key = send.export(Self::SERVER_KEY_CTX)?;
@@ -92,8 +92,12 @@ impl<CS: CipherSuite> Ctx<CS> {
     fn server(sk: &ApiKey<CS>, info: &[u8], enc: &[u8]) -> Result<Self, HpkeError> {
         let enc = Encap::<CS>::import(enc)?;
 
-        let recv =
-            Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_recv(Mode::Base, &enc, sk.as_inner(), info)?;
+        let recv = Hpke::<CS::Kem, CS::Kdf, CS::Aead>::setup_recv(
+            Mode::Base,
+            &enc,
+            sk.as_inner(),
+            [info],
+        )?;
         // NB: These are the reverse of the client's keys.
         let (seal_key, seal_nonce) = {
             let key = recv.export(Self::SERVER_KEY_CTX)?;

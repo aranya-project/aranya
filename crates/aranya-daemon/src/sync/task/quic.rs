@@ -75,6 +75,7 @@ mod psk;
 mod version;
 
 pub use psk::PskStore;
+pub(crate) use psk::QUIC_SYNC_PSK_CONTEXT;
 pub use version::Version;
 
 /// Errors specific to the QUIC syncer
