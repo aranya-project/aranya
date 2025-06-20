@@ -89,7 +89,7 @@ impl SyncPeers {
         cfg: SyncPeerConfig,
     ) -> Result<()> {
         let peer = Msg::AddPeer {
-            peer: SyncPeer { addr, graph_id },
+            peer: SyncPeer::new(addr, graph_id),
             cfg: cfg.clone(),
         };
         if let Err(e) = self.send.send(peer).await.context("unable to add peer") {
