@@ -8,14 +8,14 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
-    default::WrappedKey, policy::GroupId, Csprng, Encap, EncryptionKey, Engine as _, KeyStore as _,
-    KeyStoreExt as _, Rng,
+    default::WrappedKey, policy::GroupId, Csprng, DeviceId, Encap, EncryptionKey, Engine as _,
+    KeyStore as _, KeyStoreExt as _, Rng,
 };
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, SeedMode,
+    DaemonApi, SeedMode, Text,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -101,7 +101,7 @@ impl DaemonApiServer {
         let api = Api(Arc::new(ApiInner {
             client,
             local_addr,
-            pk,
+            pk: std::sync::Mutex::new(pk),
             peers: Mutex::new(peers),
             effect_handler,
             invalid,
@@ -238,7 +238,7 @@ struct ApiInner {
     /// Local socket address of the API.
     local_addr: SocketAddr,
     /// Public keys of current device.
-    pk: PublicKeys<CS>,
+    pk: std::sync::Mutex<PublicKeys<CS>>,
     /// Aranya sync peers,
     peers: Mutex<SyncPeers>,
     /// Handles graph effects from the syncer.
@@ -253,7 +253,14 @@ struct ApiInner {
 
 impl ApiInner {
     fn get_pk(&self) -> api::Result<KeyBundle> {
-        Ok(KeyBundle::try_from(&self.pk).context("bad key bundle")?)
+        let pk = self.pk.lock().expect("poisoned");
+        Ok(KeyBundle::try_from(&*pk).context("bad key bundle")?)
+    }
+
+    fn device_id(&self) -> api::Result<DeviceId> {
+        let pk = self.pk.lock().expect("poisoned");
+        let id = pk.ident_pk.id()?;
+        Ok(id)
     }
 }
 
@@ -314,13 +321,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self))]
     async fn get_device_id(self, _: context::Context) -> api::Result<api::DeviceId> {
-        Ok(self
-            .pk
-            .ident_pk
-            .id()
-            .context("unable to get device ID")?
-            .into_id()
-            .into())
+        self.device_id().map(|id| id.into_id().into())
     }
 
     #[instrument(skip(self))]
@@ -407,7 +408,7 @@ impl DaemonApi for Api {
                     encrypted_seed,
                 } => {
                     let enc_sk: EncryptionKey<CS> = {
-                        let enc_id = self.pk.enc_pk.id()?;
+                        let enc_id = self.pk.lock().expect("poisoned").enc_pk.id()?;
                         let (ref store, ref mut eng) = *self.store_engine.lock().await;
                         store
                             .get_key(eng, enc_id.into_id())
@@ -652,7 +653,7 @@ impl DaemonApi for Api {
             .actions(&graph)
             .create_aqc_bidi_channel_off_graph(peer_id, label.into_id().into())
             .await?;
-        let id = self.pk.ident_pk.id()?;
+        let id = self.device_id()?;
 
         let Some(Effect::AqcBidiChannelCreated(e)) =
             find_effect!(&effects, Effect::AqcBidiChannelCreated(e) if e.author_id == id.into())
@@ -688,7 +689,7 @@ impl DaemonApi for Api {
             .await
             .context("did not find peer")?;
 
-        let id = self.pk.ident_pk.id()?;
+        let id = self.device_id()?;
         let (ctrl, effects) = self
             .client
             .actions(&graph)
@@ -741,7 +742,7 @@ impl DaemonApi for Api {
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
-            let our_device_id = self.pk.ident_pk.id()?;
+            let our_device_id = self.device_id()?;
 
             let effects = self.client.session_receive(&mut session, &cmd).await?;
             self.effect_handler.handle_effects(graph, &effects).await?;
@@ -778,7 +779,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        label_name: String,
+        label_name: Text,
     ) -> api::Result<api::LabelId> {
         self.check_team_valid(team).await?;
 

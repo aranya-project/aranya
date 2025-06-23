@@ -21,6 +21,7 @@ use aranya_crypto::{
     zeroize::{Zeroize, ZeroizeOnDrop},
     Engine, Id,
 };
+pub use aranya_policy_text::{text, Text};
 use aranya_util::Addr;
 use buggy::Bug;
 pub use semver::Version;
@@ -141,7 +142,7 @@ pub struct TeamConfig {
 
 /// A device's network identifier.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-pub struct NetIdentifier(pub String);
+pub struct NetIdentifier(pub Text);
 
 impl Borrow<str> for NetIdentifier {
     #[inline]
@@ -582,7 +583,7 @@ pub enum ChanOp {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Label {
     pub id: LabelId,
-    pub name: String,
+    pub name: Text,
 }
 
 #[tarpc::service]
@@ -643,7 +644,7 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     // Create a label.
-    async fn create_label(team: TeamId, name: String) -> Result<LabelId>;
+    async fn create_label(team: TeamId, name: Text) -> Result<LabelId>;
     // Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     // Assign a label to a device.
