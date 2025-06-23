@@ -7,7 +7,10 @@ use core::{future, net::SocketAddr, ops::Deref, pin::pin};
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
-use aranya_crypto::{default::WrappedKey, Csprng, Engine as _, KeyStore as _, Rng};
+use aranya_crypto::{
+    default::WrappedKey, policy::GroupId, Csprng, Encap, EncryptionKey, Engine as _, KeyStore as _,
+    KeyStoreExt as _, Rng,
+};
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
@@ -391,13 +394,41 @@ impl DaemonApi for Api {
                 .psk_store
                 .clone();
 
-            let GenSeedMode::IKM(ref ikm) = cfg.seed_mode() else {
-                return Err(
-                    anyhow::anyhow!("Only passing in IKM for the seed is supported!").into(),
-                );
+            let seed = match cfg.seed_mode() {
+                GenSeedMode::Generate => {
+                    return Err(api::Error::from_msg(
+                        "Must provide PSK seed from team creation",
+                    ));
+                }
+                GenSeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team),
+                GenSeedMode::Wrapped {
+                    sender_pk,
+                    encap_key,
+                    encrypted_seed,
+                } => {
+                    let enc_sk: EncryptionKey<CS> = {
+                        let enc_id = self.pk.enc_pk.id()?;
+                        let (ref store, ref mut eng) = *self.store_engine.lock().await;
+                        store
+                            .get_key(eng, enc_id.into_id())
+                            .context("keystore error")?
+                            .context("missing enc_sk")?
+                    };
+
+                    // TODO(jdygert): ser/de these in one struct?
+                    let sender_pk = postcard::from_bytes(sender_pk).context("bad sender_pk")?;
+                    let encap = Encap::from_bytes(encap_key).context("bad encap")?;
+                    let encrypted_seed =
+                        postcard::from_bytes(encrypted_seed).context("bad encrypted seed")?;
+
+                    let group = GroupId::from(team.into_id());
+                    let seed = enc_sk
+                        .open_psk_seed(&encap, encrypted_seed, &sender_pk, &group)
+                        .context("could not open psk seed")?;
+                    qs::PskSeed(seed)
+                }
             };
 
-            let seed = qs::PskSeed::import_from_ikm(ikm, team);
             self.add_seed(team, seed.clone()).await?;
 
             for psk_res in seed.generate_psks(team) {
@@ -456,13 +487,16 @@ impl DaemonApi for Api {
                 .psk_store
                 .clone();
 
-            let GenSeedMode::IKM(ref ikm) = qs_cfg.seed_mode() else {
-                return Err(
-                    anyhow::anyhow!("Only passing in IKM for the seed is supported!").into(),
-                );
+            let seed = match qs_cfg.seed_mode() {
+                GenSeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
+                GenSeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
+                GenSeedMode::Wrapped { .. } => {
+                    return Err(api::Error::from_msg(
+                        "Cannot create team with existing wrapped PSK seed",
+                    ))
+                }
             };
 
-            let seed = qs::PskSeed::import_from_ikm(ikm, team_id);
             self.add_seed(team_id, seed.clone()).await?;
 
             for psk_res in seed.generate_psks(team_id) {

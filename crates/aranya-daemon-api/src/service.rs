@@ -41,6 +41,11 @@ pub type CS = <DefaultEngine as Engine>::CS;
 pub struct Error(String);
 
 impl Error {
+    pub fn from_msg(err: &str) -> Self {
+        error!(?err);
+        Self(err.into())
+    }
+
     pub fn from_err<E: error::Error>(err: E) -> Self {
         error!(?err);
         Self(format!("{err:?}"))

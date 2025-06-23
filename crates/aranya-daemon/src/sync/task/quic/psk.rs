@@ -7,7 +7,8 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_crypto::{
-    id::IdError, policy::GroupId, tls::PskSeedId, Identified as _, KeyStoreExt as _, PolicyId,
+    id::IdError, policy::GroupId, tls::PskSeedId, Csprng, Identified as _, KeyStoreExt as _,
+    PolicyId,
 };
 use aranya_daemon_api::{CipherSuiteId, TeamId};
 use buggy::BugExt as _;
@@ -27,19 +28,24 @@ pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 const QUIC_SYNC_PSK_CONTEXT: &[u8] = b"AranyaQuicSync-v1";
 
 #[derive(Clone)]
-pub(crate) struct PskSeed(aranya_crypto::tls::PskSeed<CS>);
+pub(crate) struct PskSeed(pub(crate) aranya_crypto::tls::PskSeed<CS>);
 
 impl PskSeed {
-    pub(crate) fn load(eng: &mut CE, store: &mut KS, id: &PskSeedId) -> Result<Option<Self>> {
-        store
-            .get_key(eng, id.into_id())
-            .map(|r| r.map(Self))
-            .map_err(Into::into)
+    pub(crate) fn new(rng: &mut impl Csprng, team: TeamId) -> Self {
+        let group = GroupId::from(team.into_id());
+        Self(aranya_crypto::tls::PskSeed::new(rng, &group))
     }
 
     pub(crate) fn import_from_ikm(ikm: &[u8; 32], team: TeamId) -> Self {
         let group = GroupId::from(team.into_id());
         Self(aranya_crypto::tls::PskSeed::import_from_ikm(ikm, &group))
+    }
+
+    pub(crate) fn load(eng: &mut CE, store: &mut KS, id: &PskSeedId) -> Result<Option<Self>> {
+        store
+            .get_key(eng, id.into_id())
+            .map(|r| r.map(Self))
+            .map_err(Into::into)
     }
 
     pub(crate) fn id(&self) -> Result<PskSeedId, IdError> {
