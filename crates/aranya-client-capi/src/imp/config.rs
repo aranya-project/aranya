@@ -4,7 +4,8 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::GenSeedMode;
+use aranya_daemon_api::{GenSeedMode, TeamId};
+use serde::{Deserialize, Serialize};
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -31,6 +32,48 @@ impl Seed {
     pub fn get_boxed(&self) -> Box<[u8]> {
         self.inner.clone()
     }
+}
+
+/// A wrapped, encapsulated PSK seed.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EncapSeed {
+    seed: Box<[u8]>,
+    encap_key: Box<[u8]>,
+    peer_enc_pk: Box<[u8]>,
+}
+
+impl EncapSeed {
+    /// Useful for deref coercion.
+    pub(crate) fn imp(&self) -> &Self {
+        self
+    }
+}
+
+impl Typed for EncapSeed {
+    const TYPE_ID: TypeId = TypeId::new(0x3DFFE1A0);
+}
+
+/// Information to send a peer containing the team ID and an encapsulated PSK seed.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct WrappedSeedForPeer {
+    team_id: TeamId,
+    seed: EncapSeed,
+}
+
+impl WrappedSeedForPeer {
+    /// Returns the team ID.
+    pub fn get_team_id(&self) -> TeamId {
+        self.team_id
+    }
+
+    /// Returns the encapsulated PSK seed.
+    pub fn get_encap_seed(&self) -> EncapSeed {
+        self.seed.clone()
+    }
+}
+
+impl Typed for WrappedSeedForPeer {
+    const TYPE_ID: TypeId = TypeId::new(0xCDF0E170);
 }
 
 /// Configuration info for Aranya
@@ -294,16 +337,11 @@ impl QuicSyncConfigBuilder {
     }
 
     /// Sets wrapped PSK seed
-    pub fn wrapped_seed(
-        &mut self,
-        encrypted_seed: Box<[u8]>,
-        encap_key: Box<[u8]>,
-        sender_pk: Box<[u8]>,
-    ) {
+    pub fn wrapped_seed(&mut self, encap_seed: EncapSeed) {
         self.mode = Some(GenSeedMode::Wrapped {
-            sender_pk,
-            encap_key,
-            encrypted_seed,
+            sender_pk: encap_seed.peer_enc_pk,
+            encap_key: encap_seed.encap_key,
+            encrypted_seed: encap_seed.seed,
         });
     }
 
