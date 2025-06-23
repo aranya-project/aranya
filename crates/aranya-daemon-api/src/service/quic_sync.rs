@@ -2,66 +2,41 @@
 
 use core::hash::Hash;
 
-use aranya_crypto::custom_id;
+use aranya_crypto::{custom_id, tls::EncryptedPskSeed, Encap, EncryptionPublicKey};
 use serde::{Deserialize, Serialize};
+
+use crate::CS;
 
 custom_id! {
     /// A QUIC sync PSK ID.
     pub struct QuicSyncPskId;
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {
-    seed_mode: GenSeedMode,
+    pub seed_mode: SeedMode,
 }
 
-impl QuicSyncConfig {
-    pub fn builder() -> QuicSyncConfigBuilder {
-        QuicSyncConfigBuilder::default()
-    }
-
-    pub fn seed_mode(&self) -> &GenSeedMode {
-        &self.seed_mode
-    }
-}
-
-#[derive(Default)]
-pub struct QuicSyncConfigBuilder {
-    seed_mode: GenSeedMode,
-}
-
-impl QuicSyncConfigBuilder {
-    /// Sets the seed type.
-    pub fn seed(mut self, seed_mode: GenSeedMode) -> Self {
-        self.seed_mode = seed_mode;
-        self
-    }
-
-    pub fn build(self) -> anyhow::Result<QuicSyncConfig> {
-        Ok(QuicSyncConfig {
-            seed_mode: self.seed_mode,
-        })
-    }
-}
-
-// Rename this? GenSeedMode is confusing because a seed is being passed in with the `Wrapped` variant
-// TODO: Create analogous type in aranya-client
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum GenSeedMode {
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Serialize, Deserialize)]
+pub enum SeedMode {
     /// The default option. Used in the create_team API
     Generate,
     /// Used in the create_team and add_team APIs
     IKM([u8; 32]),
     /// Used in the add_team API
-    Wrapped {
-        sender_pk: Box<[u8]>,
-        encap_key: Box<[u8]>,
-        encrypted_seed: Box<[u8]>,
-    },
+    Wrapped(WrappedSeed),
 }
 
-impl Default for GenSeedMode {
+impl Default for SeedMode {
     fn default() -> Self {
         Self::Generate
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WrappedSeed {
+    pub sender_pk: EncryptionPublicKey<CS>,
+    pub encap_key: Encap<CS>,
+    pub encrypted_seed: EncryptedPskSeed<CS>,
 }

@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use aranya_daemon_api::GenSeedMode;
+use aranya_daemon_api::SeedMode;
 
 use crate::{error::InvalidArg, ConfigError, Result};
 
@@ -84,7 +84,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone)]
 pub struct QuicSyncConfig {
-    seed_mode: GenSeedMode,
+    seed_mode: SeedMode,
 }
 
 impl QuicSyncConfig {
@@ -95,25 +95,28 @@ impl QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    seed_mode: GenSeedMode,
+    seed_mode: SeedMode,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the seed to be generated.
+    ///
     /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`]
     pub fn gen_seed(mut self) -> Self {
-        self.seed_mode = GenSeedMode::Generate;
+        self.seed_mode = SeedMode::Generate;
         self
     }
 
     /// Sets the seed IKM.
+    ///
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
     pub fn seed_ikm(mut self, ikm: [u8; 32]) -> Self {
-        self.seed_mode = GenSeedMode::IKM(ikm);
+        self.seed_mode = SeedMode::IKM(ikm);
         self
     }
 
     /// Sets the wrapped seed.
+    ///
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
     pub fn wrapped_seed(
         mut self,
@@ -121,7 +124,7 @@ impl QuicSyncConfigBuilder {
         encap_key: Box<[u8]>,
         encrypted_seed: Box<[u8]>,
     ) -> Self {
-        self.seed_mode = GenSeedMode::Wrapped {
+        self.seed_mode = SeedMode::Wrapped {
             sender_pk,
             encap_key,
             encrypted_seed,
@@ -152,10 +155,9 @@ impl TeamConfig {
 
 impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
-        Self::builder()
-            .seed(value.seed_mode)
-            .build()
-            .expect("All fields are set")
+        aranya_daemon_api::QuicSyncConfig {
+            seed_mode: value.seed_mode,
+        }
     }
 }
 

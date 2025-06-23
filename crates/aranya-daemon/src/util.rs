@@ -1,20 +1,20 @@
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{bail, Context as _, Result};
-use aranya_crypto::{
-    default::WrappedKey,
-    tls::{CipherSuiteId, Psk, PskSeed, PskSeedId},
-    Engine, Id, Identified as _, KeyStore, KeyStoreExt, PolicyId,
-};
+use anyhow::Result;
+use aranya_crypto::{tls::PskSeedId, Id};
 use aranya_daemon_api::TeamId;
 use aranya_util::create_dir_all;
-use s2n_quic::provider::tls::rustls::rustls::crypto::{hash::HashAlgorithm, PresharedKey};
+use s2n_quic::provider::tls::rustls::rustls::crypto::PresharedKey;
 use tokio::{
-    fs::{read, read_dir, OpenOptions},
+    fs::{read, read_dir, File},
     io::AsyncWriteExt,
 };
 
-use crate::{keystore::LocalStore, sync::task::quic::QUIC_SYNC_PSK_CONTEXT, CE, CS, KS};
+use crate::{
+    keystore::LocalStore,
+    sync::task::quic::{self as qs},
+    CE, KS,
+};
 
 #[derive(Debug)]
 pub(crate) struct SeedDir(PathBuf);
@@ -25,18 +25,18 @@ impl SeedDir {
         Ok(Self(p))
     }
 
+    pub(crate) async fn get(&self, team_id: &TeamId) -> Result<PskSeedId> {
+        Self::read_id(self.0.join(team_id.to_string())).await
+    }
+
     pub(crate) async fn append(&self, team_id: &TeamId, seed_id: &PskSeedId) -> Result<()> {
         let file_name = self.0.join(team_id.to_string());
 
         // fail if a file with the same name already exists
-        let mut file = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(file_name)
-            .await?;
+        let mut file = File::create_new(file_name).await?;
 
         file.write_all(seed_id.as_bytes()).await?;
-        file.flush().await?;
+        file.sync_data().await?;
 
         Ok(())
     }
@@ -46,13 +46,8 @@ impl SeedDir {
         let mut out = Vec::new();
 
         while let Some(entry) = entries.next_entry().await? {
-            let file_name = entry.file_name().into_string().map_err(|s| {
-                anyhow::anyhow!("could not convert OsString: `{:?}` into String", s)
-            })?;
-            let team_id = TeamId::decode(file_name)?;
-
+            let team_id = TeamId::decode(entry.file_name().as_encoded_bytes())?;
             let seed_id = Self::read_id(entry.path()).await?;
-
             out.push((team_id, seed_id));
         }
 
@@ -72,42 +67,21 @@ impl SeedDir {
     }
 }
 
-#[inline]
-pub(crate) fn load_seed(
-    eng: &mut CE,
-    store: &mut KS,
-    id: &PskSeedId,
-) -> Result<Option<PskSeed<CS>>> {
-    store.get_key(eng, id.into_id()).map_err(Into::into)
-}
-
 pub(crate) async fn load_team_psk_pairs(
     eng: &mut CE,
-    store: &mut KS,
+    store: &mut LocalStore<KS>,
     dir: &SeedDir,
 ) -> Result<Vec<(TeamId, Arc<PresharedKey>)>> {
     let pairs = dir.list().await?;
     let mut out = Vec::new();
 
     for (team_id, seed_id) in pairs {
-        let Some(seed) = load_seed(eng, store, &seed_id)? else {
+        let Some(seed) = qs::PskSeed::load(eng, store, &seed_id)? else {
             continue;
         };
 
-        // Groups are teams for now.
-        let group_id = team_id.into_id().into();
-        // TODO: Use real value for policy ID
-        let policy_id = PolicyId::default();
-        let psk_iter = seed
-            .generate_psks(
-                QUIC_SYNC_PSK_CONTEXT,
-                group_id,
-                policy_id,
-                CipherSuiteId::all().iter().copied(),
-            )
-            .flatten();
-        for psk in psk_iter {
-            let psk = psk_to_rustls(psk)?;
+        for psk in seed.generate_psks(team_id) {
+            let psk = psk?;
             out.push((team_id, Arc::new(psk)));
         }
     }
@@ -115,44 +89,11 @@ pub(crate) async fn load_team_psk_pairs(
     Ok(out)
 }
 
-fn psk_to_rustls(psk: Psk<CS>) -> Result<PresharedKey> {
-    let identity = psk.identity().as_bytes();
-    let secret = psk.raw_secret_bytes();
-    let alg = match psk.identity().cipher_suite() {
-        CipherSuiteId::TlsAes128GcmSha256 => HashAlgorithm::SHA256,
-        CipherSuiteId::TlsAes256GcmSha384 => HashAlgorithm::SHA384,
-        CipherSuiteId::TlsChaCha20Poly1305Sha256 => HashAlgorithm::SHA256,
-        CipherSuiteId::TlsAes128CcmSha256 => HashAlgorithm::SHA256,
-        CipherSuiteId::TlsAes128Ccm8Sha256 => HashAlgorithm::SHA256,
-        cs => bail!("unknown ciphersuite {cs}"),
-    };
-    let psk = PresharedKey::external(identity, secret)
-        .context("unable to create PSK")?
-        .with_hash_alg(alg)
-        .context("Invalid hash algorithm")?;
-    Ok(psk)
-}
-
-/// Inserts a seed into the daemon's local keystore
-pub(crate) fn insert_seed(
-    eng: &mut CE,
-    store: &mut LocalStore<KS>,
-    seed: PskSeed<CS>,
-) -> Result<()> {
-    store.try_insert(seed.id()?.into_id(), eng.wrap(seed)?)?;
-    Ok(())
-}
-
-/// Removes a seed from the daemon's local keystore
-pub(crate) fn remove_seed(store: &mut LocalStore<KS>, seed: PskSeed<CS>) -> Result<()> {
-    store.remove::<WrappedKey<CS>>(seed.id()?.into_id())?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
 
+    use anyhow::Context as _;
     use aranya_crypto::Rng;
     use tempfile::tempdir;
     use test_log::test;

@@ -19,8 +19,9 @@ use aranya_crypto::{
     id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    Engine, Id,
+    EncryptionPublicKey, Engine, Id,
 };
+pub use aranya_policy_text::{text, Text};
 use aranya_util::Addr;
 use buggy::Bug;
 pub use semver::Version;
@@ -41,6 +42,11 @@ pub type CS = <DefaultEngine as Engine>::CS;
 pub struct Error(String);
 
 impl Error {
+    pub fn from_msg(err: &str) -> Self {
+        error!(?err);
+        Self(err.into())
+    }
+
     pub fn from_err<E: error::Error>(err: E) -> Self {
         error!(?err);
         Self(format!("{err:?}"))
@@ -129,14 +135,14 @@ pub enum Role {
 
 // Note: any fields added to this type should be public
 /// A configuration for creating or adding a team to a daemon.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TeamConfig {
     pub quic_sync: Option<QuicSyncConfig>,
 }
 
 /// A device's network identifier.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-pub struct NetIdentifier(pub String);
+pub struct NetIdentifier(pub Text);
 
 impl Borrow<str> for NetIdentifier {
     #[inline]
@@ -577,7 +583,7 @@ pub enum ChanOp {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Label {
     pub id: LabelId,
-    pub name: String,
+    pub name: Text,
 }
 
 #[tarpc::service]
@@ -614,6 +620,11 @@ pub trait DaemonApi {
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 
+    async fn encrypt_psk_seed_for_peer(
+        team: TeamId,
+        peer_enc_pk: EncryptionPublicKey<CS>,
+    ) -> Result<WrappedSeed>;
+
     /// Add device to the team.
     async fn add_device_to_team(team: TeamId, keys: KeyBundle) -> Result<()>;
     /// Remove device from the team.
@@ -638,7 +649,7 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     // Create a label.
-    async fn create_label(team: TeamId, name: String) -> Result<LabelId>;
+    async fn create_label(team: TeamId, name: Text) -> Result<LabelId>;
     // Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     // Assign a label to a device.
