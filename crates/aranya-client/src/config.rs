@@ -1,6 +1,7 @@
 use core::time::Duration;
 
 use aranya_daemon_api::SeedMode;
+use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
 
@@ -93,7 +94,7 @@ impl QuicSyncConfig {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct QuicSyncConfigBuilder {
     seed_mode: SeedMode,
 }
@@ -118,18 +119,13 @@ impl QuicSyncConfigBuilder {
     /// Sets the wrapped seed.
     ///
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
-    pub fn wrapped_seed(
-        mut self,
-        sender_pk: Box<[u8]>,
-        encap_key: Box<[u8]>,
-        encrypted_seed: Box<[u8]>,
-    ) -> Self {
-        self.seed_mode = SeedMode::Wrapped {
-            sender_pk,
-            encap_key,
-            encrypted_seed,
-        };
-        self
+    pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
+        let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
+            error!(?err);
+            ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
+        })?;
+        self.seed_mode = SeedMode::Wrapped(wrapped);
+        Ok(self)
     }
 
     /// Builds the config.

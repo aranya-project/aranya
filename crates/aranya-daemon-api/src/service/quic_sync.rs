@@ -18,7 +18,7 @@ pub struct QuicSyncConfig {
 }
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum SeedMode {
     /// The default option. Used in the create_team API
     Generate,
@@ -39,4 +39,14 @@ pub struct WrappedSeed {
     pub sender_pk: EncryptionPublicKey<CS>,
     pub encap_key: Encap<CS>,
     pub encrypted_seed: EncryptedPskSeed<CS>,
+}
+
+impl Clone for WrappedSeed {
+    fn clone(&self) -> Self {
+        Self {
+            sender_pk: self.sender_pk.clone(),
+            encap_key: Encap::from_bytes(self.encap_key.as_bytes()).expect("can round trip"),
+            encrypted_seed: self.encrypted_seed.clone(),
+        }
+    }
 }
