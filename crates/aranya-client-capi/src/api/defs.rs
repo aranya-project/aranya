@@ -12,7 +12,7 @@ use aranya_crypto::dangerous::spideroak_crypto::hex;
 use bytes::Bytes;
 use tracing::error;
 
-use crate::imp::{self, aqc::consume_bytes};
+use crate::imp::{self, aqc::consume_bytes, peer_seed_serialize};
 
 /// An error code.
 ///
@@ -997,42 +997,41 @@ pub fn create_team(
     Ok(())
 }
 
-/// Return PSK seed encrypted for another device on the team.
+/// Return serialized PSK seed encrypted for another device on the team.
 /// The PSK seed will be encrypted using the public encryption key of the specified device on the team.
-pub fn encrypt_psk_seed_for_peer(
+pub unsafe fn psk_seed_encrypt_for_peer(
     _client: &mut Client,
-    _team_id: &TeamId,
+    team_id: &TeamId,
     _device: &DeviceId,
-    _seed: *mut MaybeUninit<u8>,
-    _seed_len: &mut usize,
+    seed: *mut MaybeUninit<u8>,
+    seed_len: &mut usize,
 ) -> Result<(), imp::Error> {
     // TODO: get encrypted PSK seed from daemon.
+    let psk_seed: imp::WrappedSeedForPeer = imp::WrappedSeedForPeer {
+        team_id: team_id.into(),
+        seed: imp::EncapSeed::new(
+            Box::new([0u8; 32]),
+            Box::new([0u8; 32]),
+            Box::new([0u8; 32]),
+        ),
+    };
 
-    // TODO: serialize PSK to send to peer.
-    todo!();
+    // SAFETY: Must trust caller provides valid ptr/len for psk seed buffer.
+    unsafe { peer_seed_serialize(&psk_seed, seed, seed_len)? }
+    Ok(())
 }
 
 /// Receive encrypted PSK seed from a peer.
-pub fn psk_seed_receive(
-    _psk_bytes: &[u8],
-    _seed: &mut MaybeUninit<WrappedSeedForPeer>,
+pub fn psk_seed_receive_from_peer(
+    psk_bytes: &[u8],
+    team_id: &mut MaybeUninit<TeamId>,
+    seed: &mut MaybeUninit<EncapSeed>,
 ) -> Result<(), imp::Error> {
-    // TODO: deserilize received PSK seed bytes.
+    let peer_seed = imp::peer_seed_deserialize(psk_bytes)?;
+
+    team_id.write(peer_seed.get_team_id().into());
+    EncapSeed::init(seed, peer_seed.get_encap_seed());
     todo!()
-}
-
-/// Return team ID of a PSK received from a peer.
-pub fn psk_seed_for_peer_get_team_id(psk: &WrappedSeedForPeer) -> Result<TeamId, imp::Error> {
-    Ok(psk.get_team_id().into())
-}
-
-/// Return the encapsulated PSK seed from a PSK received from a peer.
-pub fn psk_seed_for_peer_get_encap_seed(
-    peer_seed: &WrappedSeedForPeer,
-    encap_seed: &mut MaybeUninit<EncapSeed>,
-) -> Result<(), imp::Error> {
-    EncapSeed::init(encap_seed, peer_seed.get_encap_seed());
-    Ok(())
 }
 
 /// Add a team to the local device store.

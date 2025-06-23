@@ -357,19 +357,24 @@ AranyaError init_team(Team *t) {
             fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
             return err;
         }
-        uint8_t *seed        = NULL;
-        size_t seed_len      = 0;
-        uint8_t *encap_key   = NULL;
-        size_t encap_key_len = 0;
-        // TODO: get sender encryption public key from API.
-        uint8_t *sender_pk   = NULL;
-        size_t sender_pk_len = 0;
-        aranya_encrypt_psk_seed_for_peer(&t->clients.owner.client, &t->id,
-                                         &t->clients_arr[i].id, seed, &seed_len,
-                                         encap_key, &encap_key_len);
-        err = aranya_quic_sync_config_wrapped_seed(&quic_build, seed, seed_len,
-                                                   encap_key, encap_key_len,
-                                                   sender_pk, sender_pk_len);
+        uint8_t *seed   = NULL;
+        size_t seed_len = 0;
+        err = aranya_psk_seed_encrypt_for_peer(&t->clients.owner.client, &t->id,
+                                               &t->clients_arr[i].id, seed,
+                                               &seed_len);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to encrypt psk seed for peer\n");
+            return err;
+        }
+        AranyaEncapSeed encap_seed;
+        AranyaTeamId team_id_from_peer;
+        err = aranya_psk_seed_receive_from_peer(
+            seed, seed_len, &team_id_from_peer, &encap_seed);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to receive psk seed from peer\n");
+            return err;
+        }
+        err = aranya_quic_sync_config_wrapped_seed(&quic_build, &encap_seed);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr,
                     "unable to set `AranyaQuicSyncConfigBuilder` seed\n");
@@ -406,7 +411,7 @@ AranyaError init_team(Team *t) {
         }
 
         Client *client = &t->clients_arr[i];
-        err            = aranya_add_team(&client->client, &t->id, &cfg);
+        err = aranya_add_team(&client->client, &team_id_from_peer, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to add_team() for client: %s\n",
                     client_names[i]);

@@ -37,12 +37,21 @@ impl Seed {
 /// A wrapped, encapsulated PSK seed.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EncapSeed {
-    seed: Box<[u8]>,
-    encap_key: Box<[u8]>,
-    peer_enc_pk: Box<[u8]>,
+    // TODO: don't make these fields public.
+    pub seed: Box<[u8]>,
+    pub encap_key: Box<[u8]>,
+    pub peer_enc_pk: Box<[u8]>,
 }
 
 impl EncapSeed {
+    pub fn new(seed: Box<[u8]>, encap_key: Box<[u8]>, peer_enc_pk: Box<[u8]>) -> Self {
+        Self {
+            seed,
+            encap_key,
+            peer_enc_pk,
+        }
+    }
+
     /// Useful for deref coercion.
     pub(crate) fn imp(&self) -> &Self {
         self
@@ -56,8 +65,8 @@ impl Typed for EncapSeed {
 /// Information to send a peer containing the team ID and an encapsulated PSK seed.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WrappedSeedForPeer {
-    team_id: TeamId,
-    seed: EncapSeed,
+    pub team_id: TeamId,
+    pub seed: EncapSeed,
 }
 
 impl WrappedSeedForPeer {
@@ -70,6 +79,33 @@ impl WrappedSeedForPeer {
     pub fn get_encap_seed(&self) -> EncapSeed {
         self.seed.clone()
     }
+}
+
+/// Serializes a [`WrappedSeedForPeer`] into the output buffer.
+pub unsafe fn peer_seed_serialize(
+    peer_seed: &WrappedSeedForPeer,
+    buf: *mut MaybeUninit<u8>,
+    buf_len: &mut usize,
+) -> Result<(), Error> {
+    let data = postcard::to_allocvec(&peer_seed)?;
+
+    if *buf_len < data.len() {
+        *buf_len = data.len();
+        return Err(Error::BufferTooSmall);
+    }
+    // SAFETY: Must trust caller provides valid ptr/len.
+    let out = aranya_capi_core::try_as_mut_slice!(buf, *buf_len);
+    for (dst, src) in out.iter_mut().zip(&data) {
+        dst.write(*src);
+    }
+    *buf_len = data.len();
+
+    Ok(())
+}
+
+/// Deserializes peer PSK seed buffer into a [`WrappedSeedForPeer`].
+pub fn peer_seed_deserialize(buf: &[u8]) -> Result<WrappedSeedForPeer, Error> {
+    Ok(postcard::from_bytes(buf)?)
 }
 
 impl Typed for WrappedSeedForPeer {

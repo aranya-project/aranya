@@ -339,6 +339,15 @@ typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
     uint8_t __for_size_only[72];
 } AranyaQuicSyncConfigBuilder;
 
+typedef struct ARANYA_ALIGNED(8) AranyaEncapSeed {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[96];
+} AranyaEncapSeed;
+
 typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
     /**
      * This field only exists for size purposes. It is
@@ -1050,12 +1059,7 @@ AranyaError aranya_quic_sync_config_generate_ext(struct AranyaQuicSyncConfigBuil
  * @param seed a pointer the raw PSK seed
  */
 AranyaError aranya_quic_sync_config_wrapped_seed(struct AranyaQuicSyncConfigBuilder *cfg,
-                                                 const uint8_t *seed,
-                                                 size_t seed_len,
-                                                 const uint8_t *encap_key,
-                                                 size_t encap_key_len,
-                                                 const uint8_t *sender_pk,
-                                                 size_t sender_pk_len);
+                                                 const struct AranyaEncapSeed *encap_seed);
 
 /**
  * Attempts to set wrapped seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
@@ -1067,12 +1071,7 @@ AranyaError aranya_quic_sync_config_wrapped_seed(struct AranyaQuicSyncConfigBuil
  * @param seed a pointer the raw PSK seed
  */
 AranyaError aranya_quic_sync_config_wrapped_seed_ext(struct AranyaQuicSyncConfigBuilder *cfg,
-                                                     const uint8_t *seed,
-                                                     size_t seed_len,
-                                                     const uint8_t *encap_key,
-                                                     size_t encap_key_len,
-                                                     const uint8_t *sender_pk,
-                                                     size_t sender_pk_len,
+                                                     const struct AranyaEncapSeed *encap_seed,
                                                      struct AranyaExtError *__ext_err);
 
 /**
@@ -1593,29 +1592,40 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
 /**
  * Return PSK seed encrypted for another device on the team.
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
- *
  */
-AranyaError aranya_encrypt_psk_seed_for_peer(struct AranyaClient *_client,
-                                             const struct AranyaTeamId *_team_id,
+AranyaError aranya_psk_seed_encrypt_for_peer(struct AranyaClient *_client,
+                                             const struct AranyaTeamId *team_id,
                                              const struct AranyaDeviceId *_device,
-                                             uint8_t *_seed,
-                                             size_t *_seed_len,
-                                             uint8_t *_encap_key,
-                                             size_t *_encap_key_len);
+                                             uint8_t *seed,
+                                             size_t *seed_len);
 
 /**
  * Return PSK seed encrypted for another device on the team.
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
- *
  */
-AranyaError aranya_encrypt_psk_seed_for_peer_ext(struct AranyaClient *_client,
-                                                 const struct AranyaTeamId *_team_id,
+AranyaError aranya_psk_seed_encrypt_for_peer_ext(struct AranyaClient *_client,
+                                                 const struct AranyaTeamId *team_id,
                                                  const struct AranyaDeviceId *_device,
-                                                 uint8_t *_seed,
-                                                 size_t *_seed_len,
-                                                 uint8_t *_encap_key,
-                                                 size_t *_encap_key_len,
+                                                 uint8_t *seed,
+                                                 size_t *seed_len,
                                                  struct AranyaExtError *__ext_err);
+
+/**
+ * Receive encrypted PSK seed from a peer.
+ */
+AranyaError aranya_psk_seed_receive_from_peer(const uint8_t *psk_bytes,
+                                              size_t psk_bytes_len,
+                                              struct AranyaTeamId *team_id,
+                                              struct AranyaEncapSeed *seed);
+
+/**
+ * Receive encrypted PSK seed from a peer.
+ */
+AranyaError aranya_psk_seed_receive_from_peer_ext(const uint8_t *psk_bytes,
+                                                  size_t psk_bytes_len,
+                                                  struct AranyaTeamId *team_id,
+                                                  struct AranyaEncapSeed *seed,
+                                                  struct AranyaExtError *__ext_err);
 
 /**
  * Add a team to the local device store.
