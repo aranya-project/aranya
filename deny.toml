@@ -121,7 +121,6 @@ exceptions = [
     { allow = ["AGPL-3.0"], crate = "aranya-crypto-ffi" },
     { allow = ["AGPL-3.0"], crate = "aranya-device-ffi" },
     { allow = ["AGPL-3.0"], crate = "aranya-envelope-ffi" },
-    { allow = ["AGPL-3.0"], crate = "aranya-fast-channels" },
     { allow = ["AGPL-3.0"], crate = "aranya-idam-ffi" },
     { allow = ["AGPL-3.0"], crate = "aranya-libc" },
     { allow = ["AGPL-3.0"], crate = "aranya-perspective-ffi" },
