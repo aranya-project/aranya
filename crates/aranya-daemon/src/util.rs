@@ -1,9 +1,9 @@
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{Context as _, Result};
+use anyhow::{bail, Context as _, Result};
 use aranya_crypto::{
     default::WrappedKey,
-    tls::{CipherSuiteId, PskSeed, PskSeedId},
+    tls::{CipherSuiteId, Psk, PskSeed, PskSeedId},
     Engine, Id, Identified as _, KeyStore, KeyStoreExt, PolicyId,
 };
 use aranya_daemon_api::TeamId;
@@ -94,29 +94,43 @@ pub(crate) async fn load_team_psk_pairs(
             continue;
         };
 
-        // TODO: Iterate over all cipher suite IDs
+        // Groups are teams for now.
+        let group_id = team_id.into_id().into();
         // TODO: Use real value for policy ID
+        let policy_id = PolicyId::default();
         let psk_iter = seed
             .generate_psks(
                 QUIC_SYNC_PSK_CONTEXT,
-                team_id.into_id().into(),
-                PolicyId::default(),
-                [CipherSuiteId::TlsAes256GcmSha384].iter().copied(),
+                group_id,
+                policy_id,
+                CipherSuiteId::all().iter().copied(),
             )
             .flatten();
         for psk in psk_iter {
-            let identity = psk.identity().as_bytes();
-            let secret = psk.raw_secret_bytes();
-            let psk = PresharedKey::external(identity, secret)
-                .context("unable to create PSK")?
-                .with_hash_alg(HashAlgorithm::SHA384)
-                .context("Invalid hash algorithm")?;
-
+            let psk = psk_to_rustls(psk)?;
             out.push((team_id, Arc::new(psk)));
         }
     }
 
     Ok(out)
+}
+
+fn psk_to_rustls(psk: Psk<CS>) -> Result<PresharedKey> {
+    let identity = psk.identity().as_bytes();
+    let secret = psk.raw_secret_bytes();
+    let alg = match psk.identity().cipher_suite() {
+        CipherSuiteId::TlsAes128GcmSha256 => HashAlgorithm::SHA256,
+        CipherSuiteId::TlsAes256GcmSha384 => HashAlgorithm::SHA384,
+        CipherSuiteId::TlsChaCha20Poly1305Sha256 => HashAlgorithm::SHA256,
+        CipherSuiteId::TlsAes128CcmSha256 => HashAlgorithm::SHA256,
+        CipherSuiteId::TlsAes128Ccm8Sha256 => HashAlgorithm::SHA256,
+        cs => bail!("unknown ciphersuite {cs}"),
+    };
+    let psk = PresharedKey::external(identity, secret)
+        .context("unable to create PSK")?
+        .with_hash_alg(alg)
+        .context("Invalid hash algorithm")?;
+    Ok(psk)
 }
 
 /// Inserts a seed into the daemon's local keystore
