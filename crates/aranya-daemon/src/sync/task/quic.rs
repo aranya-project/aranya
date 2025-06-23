@@ -282,18 +282,17 @@ impl Syncer<State> {
     where
         A: Serialize + DeserializeOwned + Clone,
     {
-        info!("client sending sync request to QUIC sync server");
-        let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+        info!(?peer, "sending sync request to");
+        // Must lock aranya then caches to prevent deadlock.
+        let mut aranya = self.client.aranya.lock().await;
+        let key = PeerCacheKey::new(*peer, id);
+        let mut caches = self.caches.lock().await;
+        let cache = caches.entry(key).or_default();
 
-        let (len, _) = {
-            let mut client = self.client.lock().await;
-            let mut caches = self.caches.lock().await;
-            let key = PeerCacheKey::new(*peer, id);
-            let cache = caches.entry(key).or_default();
-            syncer
-                .poll(&mut send_buf, client.provider(), cache)
-                .context("sync poll failed")?
-        };
+        let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
+        let (len, _) = syncer
+            .poll(&mut send_buf, aranya.provider(), cache)
+            .context("sync poll failed")?;
         debug!(?len, "sync poll finished");
         send_buf.truncate(len);
 
@@ -355,12 +354,12 @@ impl Syncer<State> {
         if let Some(cmds) = syncer.receive(&data)? {
             debug!(num = cmds.len(), "received commands");
             if !cmds.is_empty() {
-                let mut client = self.client.lock().await;
-                let mut trx = client.transaction(*id);
-                client
+                let mut aranya = self.client.aranya.lock().await;
+                let mut trx = aranya.transaction(*id);
+                aranya
                     .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
-                client.commit(&mut trx, sink).context("commit failed")?;
+                aranya.commit(&mut trx, sink).context("commit failed")?;
                 // TODO: Update heads
                 // client.update_heads(
                 //     id,
@@ -611,12 +610,14 @@ where
         resp.receive(request_msg).context("sync recv failed")?;
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
-        let mut caches = caches.lock().await;
-        let key = PeerCacheKey::new(peer_server_addr, storage_id);
-        let cache = caches.entry(key).or_default();
-        let len = resp
-            .poll(&mut buf, client.lock().await.provider(), cache)
-            .context("sync resp poll failed")?;
+        let len = {
+            let mut aranya = client.aranya.lock().await;
+            let mut caches = caches.lock().await;
+            let key = PeerCacheKey::new(peer_server_addr, storage_id);
+            let cache = caches.entry(key).or_default();
+            resp.poll(&mut buf, aranya.provider(), cache)
+                .context("sync resp poll failed")?
+        };
         debug!(len = len, "sync poll finished");
         buf.truncate(len);
         Ok(buf.into())

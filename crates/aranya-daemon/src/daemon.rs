@@ -193,8 +193,8 @@ impl Daemon {
                 send_effects,
                 invalid_graphs.clone(),
                 state,
-                cfg.sync_addr,
-                caches.clone(),
+                local_addr.into(),
+                caches,
             );
 
             let graph_ids = client
