@@ -11,6 +11,7 @@ use tokio::{
 };
 
 use crate::{
+    keystore::LocalStore,
     sync::task::quic::{self as qs},
     CE, KS,
 };
@@ -22,6 +23,10 @@ impl SeedDir {
     pub(crate) async fn new(p: PathBuf) -> Result<Self> {
         create_dir_all(&p).await?;
         Ok(Self(p))
+    }
+
+    pub(crate) async fn get(&self, team_id: &TeamId) -> Result<PskSeedId> {
+        Self::read_id(self.0.join(team_id.to_string())).await
     }
 
     pub(crate) async fn append(&self, team_id: &TeamId, seed_id: &PskSeedId) -> Result<()> {
@@ -64,7 +69,7 @@ impl SeedDir {
 
 pub(crate) async fn load_team_psk_pairs(
     eng: &mut CE,
-    store: &mut KS,
+    store: &mut LocalStore<KS>,
     dir: &SeedDir,
 ) -> Result<Vec<(TeamId, Arc<PresharedKey>)>> {
     let pairs = dir.list().await?;

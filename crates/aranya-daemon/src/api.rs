@@ -8,14 +8,14 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
-    default::WrappedKey, policy::GroupId, Csprng, DeviceId, Encap, EncryptionKey, Engine as _,
-    KeyStore as _, KeyStoreExt as _, Rng,
+    default::WrappedKey, policy::GroupId, Csprng, DeviceId, EncryptionKey, EncryptionPublicKey,
+    Engine as _, KeyStore as _, KeyStoreExt as _, Rng,
 };
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, SeedMode, Text,
+    DaemonApi, SeedMode, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -395,18 +395,14 @@ impl DaemonApi for Api {
                 .psk_store
                 .clone();
 
-            let seed = match &cfg.seed_mode {
+            let seed = match cfg.seed_mode {
                 SeedMode::Generate => {
                     return Err(api::Error::from_msg(
                         "Must provide PSK seed from team creation",
                     ));
                 }
-                SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team),
-                SeedMode::Wrapped {
-                    sender_pk,
-                    encap_key,
-                    encrypted_seed,
-                } => {
+                SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(&ikm, team),
+                SeedMode::Wrapped(wrapped) => {
                     let enc_sk: EncryptionKey<CS> = {
                         let enc_id = self.pk.lock().expect("poisoned").enc_pk.id()?;
                         let (ref store, ref mut eng) = *self.store_engine.lock().await;
@@ -416,15 +412,14 @@ impl DaemonApi for Api {
                             .context("missing enc_sk")?
                     };
 
-                    // TODO(jdygert): ser/de these in one struct?
-                    let sender_pk = postcard::from_bytes(sender_pk).context("bad sender_pk")?;
-                    let encap = Encap::from_bytes(encap_key).context("bad encap")?;
-                    let encrypted_seed =
-                        postcard::from_bytes(encrypted_seed).context("bad encrypted seed")?;
-
                     let group = GroupId::from(team.into_id());
                     let seed = enc_sk
-                        .open_psk_seed(&encap, encrypted_seed, &sender_pk, &group)
+                        .open_psk_seed(
+                            &wrapped.encap_key,
+                            wrapped.encrypted_seed,
+                            &wrapped.sender_pk,
+                            &group,
+                        )
                         .context("could not open psk seed")?;
                     qs::PskSeed(seed)
                 }
@@ -516,6 +511,40 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         todo!();
+    }
+
+    #[instrument(skip(self))]
+    async fn encrypt_psk_seed_for_peer(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        peer_enc_pk: EncryptionPublicKey<CS>,
+    ) -> aranya_daemon_api::Result<WrappedSeed> {
+        let enc_pk = self.pk.lock().expect("poisoned").enc_pk.clone();
+
+        let (seed, enc_sk) = {
+            let (ref store, ref mut eng) = *self.store_engine.lock().await;
+            let seed = {
+                let seed_id = self.seed_id_dir.get(&team).await?;
+                qs::PskSeed::load(eng, store, &seed_id)?.context("no seed in dir")?
+            };
+            let enc_sk: EncryptionKey<CS> = store
+                .get_key(eng, enc_pk.id()?.into_id())
+                .context("keystore error")?
+                .context("missing enc_sk")?;
+            (seed, enc_sk)
+        };
+
+        let group = GroupId::from(team.into_id());
+        let (encap_key, encrypted_seed) = enc_sk
+            .seal_psk_seed(&mut Rng, &seed.0, &peer_enc_pk, &group)
+            .context("could not seal psk seed")?;
+
+        Ok(WrappedSeed {
+            sender_pk: enc_pk,
+            encap_key,
+            encrypted_seed,
+        })
     }
 
     #[instrument(skip(self))]

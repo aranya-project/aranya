@@ -2,35 +2,41 @@
 
 use core::hash::Hash;
 
-use aranya_crypto::custom_id;
+use aranya_crypto::{custom_id, tls::EncryptedPskSeed, Encap, EncryptionPublicKey};
 use serde::{Deserialize, Serialize};
+
+use crate::CS;
 
 custom_id! {
     /// A QUIC sync PSK ID.
     pub struct QuicSyncPskId;
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {
     pub seed_mode: SeedMode,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum SeedMode {
     /// The default option. Used in the create_team API
     Generate,
     /// Used in the create_team and add_team APIs
     IKM([u8; 32]),
     /// Used in the add_team API
-    Wrapped {
-        sender_pk: Box<[u8]>,
-        encap_key: Box<[u8]>,
-        encrypted_seed: Box<[u8]>,
-    },
+    Wrapped(WrappedSeed),
 }
 
 impl Default for SeedMode {
     fn default() -> Self {
         Self::Generate
     }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WrappedSeed {
+    pub sender_pk: EncryptionPublicKey<CS>,
+    pub encap_key: Encap<CS>,
+    pub encrypted_seed: EncryptedPskSeed<CS>,
 }

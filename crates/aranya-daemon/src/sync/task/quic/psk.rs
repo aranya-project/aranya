@@ -21,7 +21,7 @@ use s2n_quic::provider::tls::rustls::rustls::{
 use tokio::sync::mpsc;
 use tracing::{error, warn};
 
-use crate::{CE, CS, KS};
+use crate::{keystore::LocalStore, CE, CS, KS};
 
 pub(crate) type TeamIdPSKPair = (TeamId, Arc<PresharedKey>);
 
@@ -41,7 +41,11 @@ impl PskSeed {
         Self(aranya_crypto::tls::PskSeed::import_from_ikm(ikm, &group))
     }
 
-    pub(crate) fn load(eng: &mut CE, store: &mut KS, id: &PskSeedId) -> Result<Option<Self>> {
+    pub(crate) fn load(
+        eng: &mut CE,
+        store: &LocalStore<KS>,
+        id: &PskSeedId,
+    ) -> Result<Option<Self>> {
         store
             .get_key(eng, id.into_id())
             .map(|r| r.map(Self))
