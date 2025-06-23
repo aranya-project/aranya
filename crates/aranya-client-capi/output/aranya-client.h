@@ -1590,7 +1590,7 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
                                    struct AranyaExtError *__ext_err);
 
 /**
- * Return PSK seed encrypted for another device on the team.
+ * Return serialized PSK seed encrypted for another device on the team.
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
  */
 AranyaError aranya_psk_seed_encrypt_for_peer(struct AranyaClient *_client,
@@ -1600,7 +1600,7 @@ AranyaError aranya_psk_seed_encrypt_for_peer(struct AranyaClient *_client,
                                              size_t *seed_len);
 
 /**
- * Return PSK seed encrypted for another device on the team.
+ * Return serialized PSK seed encrypted for another device on the team.
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
  */
 AranyaError aranya_psk_seed_encrypt_for_peer_ext(struct AranyaClient *_client,

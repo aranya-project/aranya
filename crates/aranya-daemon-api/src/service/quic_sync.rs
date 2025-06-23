@@ -12,7 +12,7 @@ custom_id! {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {
-    seed_mode: GenSeedMode,
+    pub seed_mode: GenSeedMode,
 }
 
 impl QuicSyncConfig {
