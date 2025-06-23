@@ -12,42 +12,11 @@ custom_id! {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {
-    seed_mode: GenSeedMode,
+    pub seed_mode: SeedMode,
 }
 
-impl QuicSyncConfig {
-    pub fn builder() -> QuicSyncConfigBuilder {
-        QuicSyncConfigBuilder::default()
-    }
-
-    pub fn seed_mode(&self) -> &GenSeedMode {
-        &self.seed_mode
-    }
-}
-
-#[derive(Default)]
-pub struct QuicSyncConfigBuilder {
-    seed_mode: GenSeedMode,
-}
-
-impl QuicSyncConfigBuilder {
-    /// Sets the seed type.
-    pub fn seed(mut self, seed_mode: GenSeedMode) -> Self {
-        self.seed_mode = seed_mode;
-        self
-    }
-
-    pub fn build(self) -> anyhow::Result<QuicSyncConfig> {
-        Ok(QuicSyncConfig {
-            seed_mode: self.seed_mode,
-        })
-    }
-}
-
-// Rename this? GenSeedMode is confusing because a seed is being passed in with the `Wrapped` variant
-// TODO: Create analogous type in aranya-client
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum GenSeedMode {
+pub enum SeedMode {
     /// The default option. Used in the create_team API
     Generate,
     /// Used in the create_team and add_team APIs
@@ -60,7 +29,7 @@ pub enum GenSeedMode {
     },
 }
 
-impl Default for GenSeedMode {
+impl Default for SeedMode {
     fn default() -> Self {
         Self::Generate
     }

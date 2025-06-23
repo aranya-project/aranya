@@ -15,7 +15,7 @@ pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, GenSeedMode,
+    DaemonApi, SeedMode,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -394,14 +394,14 @@ impl DaemonApi for Api {
                 .psk_store
                 .clone();
 
-            let seed = match cfg.seed_mode() {
-                GenSeedMode::Generate => {
+            let seed = match &cfg.seed_mode {
+                SeedMode::Generate => {
                     return Err(api::Error::from_msg(
                         "Must provide PSK seed from team creation",
                     ));
                 }
-                GenSeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team),
-                GenSeedMode::Wrapped {
+                SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team),
+                SeedMode::Wrapped {
                     sender_pk,
                     encap_key,
                     encrypted_seed,
@@ -487,10 +487,10 @@ impl DaemonApi for Api {
                 .psk_store
                 .clone();
 
-            let seed = match qs_cfg.seed_mode() {
-                GenSeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
-                GenSeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
-                GenSeedMode::Wrapped { .. } => {
+            let seed = match &qs_cfg.seed_mode {
+                SeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
+                SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
+                SeedMode::Wrapped { .. } => {
                     return Err(api::Error::from_msg(
                         "Cannot create team with existing wrapped PSK seed",
                     ))
