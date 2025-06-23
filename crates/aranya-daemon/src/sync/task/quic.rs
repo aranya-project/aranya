@@ -70,8 +70,8 @@ const QUIC_SYNC_VERSION: Version = Version::V1;
 mod psk;
 mod version;
 
+pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
-pub(crate) use psk::QUIC_SYNC_PSK_CONTEXT;
 pub use version::Version;
 
 /// Errors specific to the QUIC syncer
