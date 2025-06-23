@@ -86,13 +86,10 @@ impl DaemonApiServer {
         let effect_handler = EffectHandler {
             aqc: Arc::clone(&aqc),
         };
-        let device_id = pk.ident_pk.id()?;
-        let pk = KeyBundle::try_from(&pk)?;
         let api = Api(Arc::new(ApiInner {
             client,
             local_addr,
-            device_id,
-            pk,
+            pk: std::sync::Mutex::new(pk),
             peers: Mutex::new(peers),
             effect_handler,
             invalid,
@@ -226,10 +223,8 @@ struct ApiInner {
     client: Client,
     /// Local socket address of the API.
     local_addr: SocketAddr,
-    /// ID of current device.
-    device_id: DeviceId,
     /// Public keys of current device.
-    pk: KeyBundle,
+    pk: std::sync::Mutex<PublicKeys<CS>>,
     /// Aranya sync peers,
     peers: Mutex<SyncPeers>,
     /// Handles graph effects from the syncer.
@@ -237,6 +232,19 @@ struct ApiInner {
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,
     aqc: Arc<Aqc<CE, KS>>,
+}
+
+impl ApiInner {
+    fn get_pk(&self) -> api::Result<KeyBundle> {
+        let pk = self.pk.lock().expect("poisoned");
+        Ok(KeyBundle::try_from(&*pk).context("bad key bundle")?)
+    }
+
+    fn device_id(&self) -> api::Result<DeviceId> {
+        let pk = self.pk.lock().expect("poisoned");
+        let id = pk.ident_pk.id()?;
+        Ok(id)
+    }
 }
 
 /// Implements [`DaemonApi`].
@@ -276,12 +284,15 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self))]
     async fn get_key_bundle(self, _: context::Context) -> api::Result<api::KeyBundle> {
-        Ok(self.pk.clone().into())
+        Ok(self
+            .get_pk()
+            .context("unable to get device public keys")?
+            .into())
     }
 
     #[instrument(skip(self))]
     async fn get_device_id(self, _: context::Context) -> api::Result<api::DeviceId> {
-        Ok(self.device_id.into_id().into())
+        self.device_id().map(|id| id.into_id().into())
     }
 
     #[instrument(skip(self))]
@@ -365,7 +376,7 @@ impl DaemonApi for Api {
 
         let nonce = &mut [0u8; 16];
         Rng.fill_bytes(nonce);
-        let pk = self.pk.clone();
+        let pk = self.get_pk()?;
         let (graph_id, _) = self
             .client
             .create_team(pk, Some(nonce))
@@ -517,7 +528,7 @@ impl DaemonApi for Api {
             .actions(&graph)
             .create_aqc_bidi_channel_off_graph(peer_id, label.into_id().into())
             .await?;
-        let id = self.device_id;
+        let id = self.device_id()?;
 
         let Some(Effect::AqcBidiChannelCreated(e)) =
             find_effect!(&effects, Effect::AqcBidiChannelCreated(e) if e.author_id == id.into())
@@ -553,7 +564,7 @@ impl DaemonApi for Api {
             .await
             .context("did not find peer")?;
 
-        let id = self.device_id;
+        let id = self.device_id()?;
         let (ctrl, effects) = self
             .client
             .actions(&graph)
@@ -606,7 +617,7 @@ impl DaemonApi for Api {
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
-            let our_device_id = self.device_id;
+            let our_device_id = self.device_id()?;
 
             let effects = self.client.session_receive(&mut session, &cmd).await?;
             self.effect_handler.handle_effects(graph, &effects).await?;
