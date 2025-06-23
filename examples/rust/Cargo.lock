@@ -96,15 +96,16 @@ dependencies = [
 
 [[package]]
 name = "aranya-crypto"
-version = "0.7.1"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "803d5194111f4404a3180b293564334c0d8945da5efb901853d8a7e3f278ce7f"
+checksum = "b6cdec0994309ae7e89ff00e7a4ec4bb23f7db1a7b576b67e93e39272a257320"
 dependencies = [
  "buggy",
  "byteorder",
  "cfg-if",
  "ciborium",
  "ciborium-io",
+ "derive-where",
  "proptest",
  "rustix",
  "serde",
@@ -122,6 +123,7 @@ version = "0.6.1"
 dependencies = [
  "anyhow",
  "aranya-crypto",
+ "aranya-policy-text",
  "aranya-util",
  "buggy",
  "bytes",
@@ -205,6 +207,29 @@ dependencies = [
  "s2n-codec",
  "s2n-quic-core",
  "s2n-quic-crypto",
+]
+
+[[package]]
+name = "aranya-policy-text"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a32afb76cab14f2fd18563e234bc2c7c7bd49fcf719f03bc6066759a4bff9f04"
+dependencies = [
+ "aranya-policy-text-macro",
+ "serde",
+ "thiserror 2.0.12",
+]
+
+[[package]]
+name = "aranya-policy-text-macro"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9edc5cab895eb10bf04b1c1377dd35b67b029dbc23e8f4d51f7230781b9e5f3f"
+dependencies = [
+ "macro-string",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -587,6 +612,17 @@ checksum = "e7c1832837b905bbfb5101e07cc24c8deddf52f93225eee6ead5f4d63d53ddcb"
 dependencies = [
  "const-oid",
  "zeroize",
+]
+
+[[package]]
+name = "derive-where"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "510c292c8cf384b1a340b816a9a6cf2599eb8f566a44949024af88418000c50b"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
 ]
 
 [[package]]
@@ -1172,6 +1208,17 @@ name = "log"
 version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
+
+[[package]]
+name = "macro-string"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b27834086c65ec3f9387b096d66e99f221cf081c2b738042aa252bcd41204e3"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.101",
+]
 
 [[package]]
 name = "matchers"
@@ -2036,9 +2083,9 @@ dependencies = [
 
 [[package]]
 name = "spideroak-crypto"
-version = "0.5.3"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb9104419294271e35d214416fce160cd27aaae6284f4fc721abd2e968ef5a90"
+checksum = "0391e11840a14f462baa45fdb3bb19433e613a1468951f2b248a0ff40648f384"
 dependencies = [
  "aes-gcm",
  "buggy",
