@@ -1013,12 +1013,12 @@ pub unsafe fn psk_seed_encrypt_for_peer(
             .queries(team_id.into())
             .device_keybundle(device.into()),
     )?;
-    let pk = from_bytes(keys.encoding.as_slice())?;
+    let enc_pk = from_bytes(keys.encoding.as_slice())?;
     let wrapped_seed = client.rt.block_on(
         client
             .inner
             .team(team_id.into())
-            .encrypt_psk_seed_for_peer(pk),
+            .encrypt_psk_seed_for_peer(enc_pk),
     )?;
     let peer_seed = imp::WrappedSeedForPeer {
         team_id: team_id.into(),

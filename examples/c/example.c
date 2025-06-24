@@ -281,10 +281,12 @@ AranyaError init_team(Team *t) {
         fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
         return err;
     }
-    err = aranya_quic_sync_config_generate(&owner_quic_build);
+    size_t seed_len = 32;
+    uint8_t *seed   = calloc(seed_len, 1);
+    err = aranya_quic_sync_config_raw_seed(&owner_quic_build, seed, seed_len);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr,
-                "unable to set `AranyaQuicSyncConfigBuilder` seed generation "
+                "unable to set `AranyaQuicSyncConfigBuilder` raw IKM seed"
                 "mode\n");
         return err;
     }
@@ -401,27 +403,11 @@ AranyaError init_team(Team *t) {
             fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
             return err;
         }
-        uint8_t *seed   = NULL;
-        size_t seed_len = 0;
-        err = aranya_psk_seed_encrypt_for_peer(&t->clients.owner.client, &t->id,
-                                               &t->clients_arr[i].id, seed,
-                                               &seed_len);
+        err = aranya_quic_sync_config_raw_seed(&quic_build, seed, seed_len);
         if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to encrypt psk seed for peer\n");
-            return err;
-        }
-        AranyaEncapSeed encap_seed;
-        AranyaTeamId team_id_from_peer;
-        err = aranya_psk_seed_receive_from_peer(
-            seed, seed_len, &team_id_from_peer, &encap_seed);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to receive psk seed from peer\n");
-            return err;
-        }
-        err = aranya_quic_sync_config_wrapped_seed(&quic_build, &encap_seed);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr,
-                    "unable to set `AranyaQuicSyncConfigBuilder` seed\n");
+            fprintf(
+                stderr,
+                "unable to set `AranyaQuicSyncConfigBuilder` raw IKM seed\n");
             return err;
         }
         AranyaQuicSyncConfig quic_cfg;
@@ -455,7 +441,7 @@ AranyaError init_team(Team *t) {
         }
 
         Client *client = &t->clients_arr[i];
-        err = aranya_add_team(&client->client, &team_id_from_peer, &cfg);
+        err            = aranya_add_team(&client->client, &t->id, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to add_team() for client: %s\n",
                     client_names[i]);
