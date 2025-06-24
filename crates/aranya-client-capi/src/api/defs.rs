@@ -264,8 +264,6 @@ impl From<aranya_crypto::Id> for Id {
 /// The size in bytes of an ID
 pub const ARANYA_SEED_LEN: usize = 64;
 
-// TODO: compile time check for seed size
-
 // PSK Seed
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type Seed = Safe<imp::Seed>;
@@ -672,25 +670,24 @@ pub type WrappedSeedForPeer = Safe<imp::WrappedSeedForPeer>;
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
 
-/// Attempts to set PSK generation mode value on [`QuicSyncConfigBuilder`].
+/// Attempts to set PSK seed generation mode value on [`QuicSyncConfigBuilder`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the quic sync config builder
-/// @param seed a pointer the raw PSK seed
 pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), imp::Error> {
     cfg.generate();
     Ok(())
 }
 
-/// Attempts to set wrapped seed value on [`QuicSyncConfigBuilder`].
+/// Attempts to set wrapped PSK seed value on [`QuicSyncConfigBuilder`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the quic sync config builder
-/// @param seed a pointer the raw PSK seed
+/// @param encap_seed a pointer the encapsulated PSK seed
 pub fn quic_sync_config_wrapped_seed(
     cfg: &mut QuicSyncConfigBuilder,
     encap_seed: &EncapSeed,
@@ -699,13 +696,13 @@ pub fn quic_sync_config_wrapped_seed(
     Ok(())
 }
 
-/// Attempts to set raw seed value on [`QuicSyncConfigBuilder`].
+/// Attempts to set raw seed IKM value on [`QuicSyncConfigBuilder`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the quic sync config builder
-/// @param seed a pointer the raw PSK seed
+/// @param seed a pointer the raw PSK seed IKM
 pub fn quic_sync_config_raw_seed(
     cfg: &mut QuicSyncConfigBuilder,
     seed: &[u8],
@@ -984,21 +981,26 @@ pub fn revoke_label(
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn create_team(
-    client: &mut Client,
-    cfg: &TeamConfig,
-    team_id: &mut MaybeUninit<TeamId>,
-) -> Result<(), imp::Error> {
+pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
-    let id = client.rt.block_on(client.inner.create_team(cfg.into()))?;
+    let team_id = client.rt.block_on(client.inner.create_team(cfg.into()))?;
 
-    team_id.write(id.into());
-    Ok(())
+    Ok(team_id.into())
 }
 
 /// Return serialized PSK seed encrypted for another device on the team.
 /// The PSK seed will be encrypted using the public encryption key of the specified device on the team.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team_id the team's ID [`TeamId`].
+/// @param[in] device the peer's device ID [`DeviceId`].
+/// @param[out] seed the serialized, encrypted PSK seed.
+/// @param[out] seed_len the number of bytes written to the seed buffer.
+///
+/// @relates AranyaClient.
+///
+/// Note: this function is not currently supported.
 pub unsafe fn psk_seed_encrypt_for_peer(
     client: &mut Client,
     team_id: &TeamId,
@@ -1031,6 +1033,12 @@ pub unsafe fn psk_seed_encrypt_for_peer(
 }
 
 /// Receive encrypted PSK seed from a peer.
+///
+/// @param[in] psk_bytes the serialized PSK bytes received from a peer.
+/// @param[out] team_id the team's ID [`TeamId`].
+/// @param[out] seed the encrypted PSK seed [`EncapSeed`].
+///
+/// Note: this function is not currently supported.
 pub fn psk_seed_receive_from_peer(
     psk_bytes: &[u8],
     team_id: &mut MaybeUninit<TeamId>,

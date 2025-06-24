@@ -1027,74 +1027,72 @@ AranyaError aranya_quic_sync_config_builder_cleanup_ext(struct AranyaQuicSyncCon
                                                         struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to set PSK generation mode value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * Attempts to set PSK seed generation mode value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the quic sync config builder
- * @param seed a pointer the raw PSK seed
  */
 AranyaError aranya_quic_sync_config_generate(struct AranyaQuicSyncConfigBuilder *cfg);
 
 /**
- * Attempts to set PSK generation mode value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * Attempts to set PSK seed generation mode value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the quic sync config builder
- * @param seed a pointer the raw PSK seed
  */
 AranyaError aranya_quic_sync_config_generate_ext(struct AranyaQuicSyncConfigBuilder *cfg,
                                                  struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to set wrapped seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * Attempts to set wrapped PSK seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the quic sync config builder
- * @param seed a pointer the raw PSK seed
+ * @param encap_seed a pointer the encapsulated PSK seed
  */
 AranyaError aranya_quic_sync_config_wrapped_seed(struct AranyaQuicSyncConfigBuilder *cfg,
                                                  const struct AranyaEncapSeed *encap_seed);
 
 /**
- * Attempts to set wrapped seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * Attempts to set wrapped PSK seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the quic sync config builder
- * @param seed a pointer the raw PSK seed
+ * @param encap_seed a pointer the encapsulated PSK seed
  */
 AranyaError aranya_quic_sync_config_wrapped_seed_ext(struct AranyaQuicSyncConfigBuilder *cfg,
                                                      const struct AranyaEncapSeed *encap_seed,
                                                      struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to set raw seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * Attempts to set raw seed IKM value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the quic sync config builder
- * @param seed a pointer the raw PSK seed
+ * @param seed a pointer the raw PSK seed IKM
  */
 AranyaError aranya_quic_sync_config_raw_seed(struct AranyaQuicSyncConfigBuilder *cfg,
                                              const uint8_t *seed,
                                              size_t seed_len);
 
 /**
- * Attempts to set raw seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * Attempts to set raw seed IKM value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the quic sync config builder
- * @param seed a pointer the raw PSK seed
+ * @param seed a pointer the raw PSK seed IKM
  */
 AranyaError aranya_quic_sync_config_raw_seed_ext(struct AranyaQuicSyncConfigBuilder *cfg,
                                                  const uint8_t *seed,
@@ -1573,7 +1571,7 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
  */
 AranyaError aranya_create_team(struct AranyaClient *client,
                                const struct AranyaTeamConfig *cfg,
-                               struct AranyaTeamId *team_id);
+                               struct AranyaTeamId *__output);
 
 /**
  * Create a new graph/team with the current device as the owner.
@@ -1586,12 +1584,22 @@ AranyaError aranya_create_team(struct AranyaClient *client,
  */
 AranyaError aranya_create_team_ext(struct AranyaClient *client,
                                    const struct AranyaTeamConfig *cfg,
-                                   struct AranyaTeamId *team_id,
+                                   struct AranyaTeamId *__output,
                                    struct AranyaExtError *__ext_err);
 
 /**
  * Return serialized PSK seed encrypted for another device on the team.
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the peer's device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] seed the serialized, encrypted PSK seed.
+ * @param[out] seed_len the number of bytes written to the seed buffer.
+ *
+ * @relates AranyaClient.
+ *
+ * Note: this function is not currently supported.
  */
 AranyaError aranya_psk_seed_encrypt_for_peer(struct AranyaClient *client,
                                              const struct AranyaTeamId *team_id,
@@ -1602,6 +1610,16 @@ AranyaError aranya_psk_seed_encrypt_for_peer(struct AranyaClient *client,
 /**
  * Return serialized PSK seed encrypted for another device on the team.
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the peer's device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] seed the serialized, encrypted PSK seed.
+ * @param[out] seed_len the number of bytes written to the seed buffer.
+ *
+ * @relates AranyaClient.
+ *
+ * Note: this function is not currently supported.
  */
 AranyaError aranya_psk_seed_encrypt_for_peer_ext(struct AranyaClient *client,
                                                  const struct AranyaTeamId *team_id,
@@ -1612,6 +1630,12 @@ AranyaError aranya_psk_seed_encrypt_for_peer_ext(struct AranyaClient *client,
 
 /**
  * Receive encrypted PSK seed from a peer.
+ *
+ * @param[in] psk_bytes the serialized PSK bytes received from a peer.
+ * @param[out] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] seed the encrypted PSK seed [`AranyaEncapSeed`](@ref AranyaEncapSeed).
+ *
+ * Note: this function is not currently supported.
  */
 AranyaError aranya_psk_seed_receive_from_peer(const uint8_t *psk_bytes,
                                               size_t psk_bytes_len,
@@ -1620,6 +1644,12 @@ AranyaError aranya_psk_seed_receive_from_peer(const uint8_t *psk_bytes,
 
 /**
  * Receive encrypted PSK seed from a peer.
+ *
+ * @param[in] psk_bytes the serialized PSK bytes received from a peer.
+ * @param[out] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] seed the encrypted PSK seed [`AranyaEncapSeed`](@ref AranyaEncapSeed).
+ *
+ * Note: this function is not currently supported.
  */
 AranyaError aranya_psk_seed_receive_from_peer_ext(const uint8_t *psk_bytes,
                                                   size_t psk_bytes_len,
