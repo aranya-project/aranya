@@ -40,7 +40,7 @@ use crate::{
     policy::{ChanOp, Effect, KeyBundle, Role},
     sync::task::{quic as qs, SyncPeers},
     util::SeedDir,
-    Client, InvalidGraphs, EF,
+    AranyaStore, Client, InvalidGraphs, EF,
 };
 
 mod quic_sync;
@@ -88,8 +88,7 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
         invalid: InvalidGraphs,
         aqc: Aqc<CE, KS>,
-        store: LocalStore<KS>,
-        engine: CE,
+        crypto: Crypto,
         seed_id_dir: SeedDir,
         quic: Option<quic_sync::Data>,
     ) -> anyhow::Result<Self> {
@@ -106,7 +105,7 @@ impl DaemonApiServer {
             effect_handler,
             invalid,
             aqc,
-            store_engine: Mutex::new((store, engine)),
+            crypto: Mutex::new(crypto),
             seed_id_dir,
             quic,
         }));
@@ -246,9 +245,15 @@ struct ApiInner {
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,
     aqc: Arc<Aqc<CE, KS>>,
-    store_engine: Mutex<(LocalStore<KS>, CE)>,
+    crypto: Mutex<Crypto>,
     seed_id_dir: SeedDir,
     quic: Option<quic_sync::Data>,
+}
+
+pub(crate) struct Crypto {
+    pub(crate) engine: CE,
+    pub(crate) local_store: LocalStore<KS>,
+    pub(crate) aranya_store: AranyaStore<KS>,
 }
 
 impl ApiInner {
@@ -405,11 +410,12 @@ impl DaemonApi for Api {
                 SeedMode::Wrapped(wrapped) => {
                     let enc_sk: EncryptionKey<CS> = {
                         let enc_id = self.pk.lock().expect("poisoned").enc_pk.id()?;
-                        let (ref store, ref mut eng) = *self.store_engine.lock().await;
-                        store
-                            .get_key(eng, enc_id.into_id())
+                        let crypto = &mut *self.crypto.lock().await;
+                        crypto
+                            .aranya_store
+                            .get_key(&mut crypto.engine, enc_id.into_id())
                             .context("keystore error")?
-                            .context("missing enc_sk")?
+                            .context("missing enc_sk in add_team")?
                     };
 
                     let group = GroupId::from(team.into_id());
@@ -523,15 +529,17 @@ impl DaemonApi for Api {
         let enc_pk = self.pk.lock().expect("poisoned").enc_pk.clone();
 
         let (seed, enc_sk) = {
-            let (ref store, ref mut eng) = *self.store_engine.lock().await;
+            let crypto = &mut *self.crypto.lock().await;
             let seed = {
                 let seed_id = self.seed_id_dir.get(&team).await?;
-                qs::PskSeed::load(eng, store, &seed_id)?.context("no seed in dir")?
+                qs::PskSeed::load(&mut crypto.engine, &crypto.local_store, &seed_id)?
+                    .context("no seed in dir")?
             };
-            let enc_sk: EncryptionKey<CS> = store
-                .get_key(eng, enc_pk.id()?.into_id())
+            let enc_sk: EncryptionKey<CS> = crypto
+                .aranya_store
+                .get_key(&mut crypto.engine, enc_pk.id()?.into_id())
                 .context("keystore error")?
-                .context("missing enc_sk")?;
+                .context("missing enc_sk for encrypt seed")?;
             (seed, enc_sk)
         };
 
@@ -1083,14 +1091,18 @@ impl DaemonApi for Api {
 
 impl Api {
     async fn add_seed(&mut self, team: api::TeamId, seed: qs::PskSeed) -> anyhow::Result<()> {
-        let (ref mut store, ref mut engine) = *self.store_engine.lock().await;
+        let crypto = &mut *self.crypto.lock().await;
 
         let id = seed.id().context("getting seed id")?.into_id();
 
-        let key = engine
+        let key = crypto
+            .engine
             .wrap(seed.clone().into_inner())
             .context("wrapping seed")?;
-        store.try_insert(id, key).context("inserting seed")?;
+        crypto
+            .local_store
+            .try_insert(id, key)
+            .context("inserting seed")?;
 
         if let Err(e) = self
             .seed_id_dir
@@ -1099,7 +1111,8 @@ impl Api {
             .context("could not write seed id to file")
         {
             error!(%e);
-            store
+            crypto
+                .local_store
                 .remove::<WrappedKey<CS>>(id)
                 .context("could not remove seed from keystore")?;
             return Err(e);

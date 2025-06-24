@@ -183,16 +183,14 @@ async fn test_add_team() -> Result<()> {
     let mut team = TeamCtx::new("test_add_team", work_dir).await?;
 
     // Create the initial team, and get our TeamId.
-    let seed_ikm = team.owner.client.rand().await;
-    let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
-    };
-
     let team_id = team
         .owner
         .client
-        .create_team(cfg.clone())
+        .create_team({
+            TeamConfig::builder()
+                .quic_sync(QuicSyncConfig::builder().build()?)
+                .build()?
+        })
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -226,7 +224,20 @@ async fn test_add_team() -> Result<()> {
         Err(_) => bail!("Unexpected error"),
     }
 
-    admin.add_team(cfg.clone()).await?;
+    let admin_seed = owner
+        .encrypt_psk_seed_for_peer(&team.admin.pk.encoding)
+        .await?;
+    admin
+        .add_team({
+            TeamConfig::builder()
+                .quic_sync(
+                    QuicSyncConfig::builder()
+                        .wrapped_seed(&admin_seed)?
+                        .build()?,
+                )
+                .build()?
+        })
+        .await?;
     sleep(SLEEP_INTERVAL).await;
     admin.sync_now(owner_addr.into(), None).await?;
     sleep(SLEEP_INTERVAL).await;
