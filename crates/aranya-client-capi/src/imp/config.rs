@@ -38,11 +38,15 @@ impl Seed {
 /// A wrapped, encapsulated PSK seed.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EncapSeed {
-    // TODO: don't make these fields public.
-    pub seed: WrappedSeed,
+    seed: WrappedSeed,
 }
 
 impl EncapSeed {
+    /// Allocates new [`EncapSeed`].
+    pub fn new(seed: WrappedSeed) -> Self {
+        Self { seed }
+    }
+
     /// Useful for deref coercion.
     pub(crate) fn imp(&self) -> &Self {
         self
@@ -56,11 +60,16 @@ impl Typed for EncapSeed {
 /// Information to send a peer containing the team ID and an encapsulated PSK seed.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WrappedSeedForPeer {
-    pub team_id: TeamId,
-    pub seed: EncapSeed,
+    team_id: TeamId,
+    seed: EncapSeed,
 }
 
 impl WrappedSeedForPeer {
+    /// Allocates new wrapped seed.
+    pub fn new(team_id: TeamId, seed: EncapSeed) -> Self {
+        Self { team_id, seed }
+    }
+
     /// Returns the team ID.
     pub fn get_team_id(&self) -> TeamId {
         self.team_id

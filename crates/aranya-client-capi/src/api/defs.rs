@@ -673,6 +673,8 @@ pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
 /// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the quic sync config builder
+///
+/// Note: this mode is not currently supported.
 pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), imp::Error> {
     cfg.generate();
     Ok(())
@@ -685,6 +687,8 @@ pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), 
 ///
 /// @param cfg a pointer to the quic sync config builder
 /// @param encap_seed a pointer the encapsulated PSK seed
+///
+/// Note: this mode is not currently supported.
 pub fn quic_sync_config_wrapped_seed(
     cfg: &mut QuicSyncConfigBuilder,
     encap_seed: &EncapSeed,
@@ -1019,10 +1023,7 @@ pub unsafe fn psk_seed_encrypt_for_peer(
             .team(team_id.into())
             .encrypt_psk_seed_for_peer(enc_pk),
     )?;
-    let peer_seed = imp::WrappedSeedForPeer {
-        team_id: team_id.into(),
-        seed: imp::EncapSeed { seed: wrapped_seed },
-    };
+    let peer_seed = imp::WrappedSeedForPeer::new(team_id.into(), imp::EncapSeed::new(wrapped_seed));
 
     // SAFETY: Must trust caller provides valid ptr/len for psk seed buffer.
     unsafe { peer_seed_serialize(&peer_seed, seed, seed_len)? }

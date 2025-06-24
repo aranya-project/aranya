@@ -1028,6 +1028,8 @@ AranyaError aranya_quic_sync_config_builder_cleanup_ext(struct AranyaQuicSyncCon
  * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the quic sync config builder
+ *
+ * Note: this mode is not currently supported.
  */
 AranyaError aranya_quic_sync_config_generate(struct AranyaQuicSyncConfigBuilder *cfg);
 
@@ -1038,6 +1040,8 @@ AranyaError aranya_quic_sync_config_generate(struct AranyaQuicSyncConfigBuilder 
  * with the memory pointed to by `cfg`.
  *
  * @param cfg a pointer to the quic sync config builder
+ *
+ * Note: this mode is not currently supported.
  */
 AranyaError aranya_quic_sync_config_generate_ext(struct AranyaQuicSyncConfigBuilder *cfg,
                                                  struct AranyaExtError *__ext_err);
@@ -1050,6 +1054,8 @@ AranyaError aranya_quic_sync_config_generate_ext(struct AranyaQuicSyncConfigBuil
  *
  * @param cfg a pointer to the quic sync config builder
  * @param encap_seed a pointer the encapsulated PSK seed
+ *
+ * Note: this mode is not currently supported.
  */
 AranyaError aranya_quic_sync_config_wrapped_seed(struct AranyaQuicSyncConfigBuilder *cfg,
                                                  const struct AranyaEncapSeed *encap_seed);
@@ -1062,6 +1068,8 @@ AranyaError aranya_quic_sync_config_wrapped_seed(struct AranyaQuicSyncConfigBuil
  *
  * @param cfg a pointer to the quic sync config builder
  * @param encap_seed a pointer the encapsulated PSK seed
+ *
+ * Note: this mode is not currently supported.
  */
 AranyaError aranya_quic_sync_config_wrapped_seed_ext(struct AranyaQuicSyncConfigBuilder *cfg,
                                                      const struct AranyaEncapSeed *encap_seed,
