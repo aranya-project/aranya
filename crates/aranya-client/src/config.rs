@@ -108,22 +108,25 @@ impl QuicSyncConfigBuilder {
 
     /// Sets the seed to be generated.
     ///
-    /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`]
+    /// This option is only valid when used in [`super::Client::create_team`].
+    /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`].
     pub fn gen_seed(mut self) -> Self {
         self.seed_mode = SeedMode::Generate;
         self
     }
 
-    /// Sets the seed IKM.
+    /// Sets the seed mode to 'IKM'.
     ///
+    /// This option is valid in both [`super::Client::create_team`] and [`super::Team::add_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
     pub fn seed_ikm(mut self, ikm: [u8; 32]) -> Self {
         self.seed_mode = SeedMode::IKM(ikm);
         self
     }
 
-    /// Sets the wrapped seed.
+    /// Sets the seed mode to 'Wrapped'.
     ///
+    /// This option is only valid in [`super::Team::add_team`].
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
     pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
         let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {

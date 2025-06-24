@@ -243,15 +243,6 @@ impl Client {
             .map_err(aranya_error)
     }
 
-    /// Remove a team from local device storage.
-    pub async fn remove_team(&mut self, team: TeamId) -> Result<()> {
-        self.daemon
-            .remove_team(context::current(), team)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
     /// Generate 32 random bytes from a CSPRNG.
     /// Can be used as IKM for a generating a PSK seed.
     pub async fn rand(&self) -> [u8; 32] {
@@ -347,6 +338,16 @@ impl Team<'_> {
         self.client
             .daemon
             .add_team(context::current(), self.id, cfg.into())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Remove a team from local device storage.
+    pub async fn remove_team(&mut self) -> Result<()> {
+        self.client
+            .daemon
+            .remove_team(context::current(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
