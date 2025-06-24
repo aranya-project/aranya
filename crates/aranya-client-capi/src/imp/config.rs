@@ -4,7 +4,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::{GenSeedMode, TeamId};
+use aranya_daemon_api::{SeedMode, TeamId, WrappedSeed};
 use serde::{Deserialize, Serialize};
 
 use super::Error;
@@ -38,20 +38,10 @@ impl Seed {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EncapSeed {
     // TODO: don't make these fields public.
-    pub seed: Box<[u8]>,
-    pub encap_key: Box<[u8]>,
-    pub peer_enc_pk: Box<[u8]>,
+    pub seed: WrappedSeed,
 }
 
 impl EncapSeed {
-    pub fn new(seed: Box<[u8]>, encap_key: Box<[u8]>, peer_enc_pk: Box<[u8]>) -> Self {
-        Self {
-            seed,
-            encap_key,
-            peer_enc_pk,
-        }
-    }
-
     /// Useful for deref coercion.
     pub(crate) fn imp(&self) -> &Self {
         self
@@ -329,7 +319,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
-    mode: GenSeedMode,
+    mode: SeedMode,
 }
 
 impl QuicSyncConfig {
@@ -358,33 +348,29 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    mode: Option<GenSeedMode>,
+    mode: Option<SeedMode>,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
-    pub fn mode(&mut self, mode: GenSeedMode) {
+    pub fn mode(&mut self, mode: SeedMode) {
         self.mode = Some(mode);
     }
 
     /// Sets mode to generate PSK seed.
     pub fn generate(&mut self) {
-        self.mode = Some(GenSeedMode::Generate);
+        self.mode = Some(SeedMode::Generate);
     }
 
     /// Sets wrapped PSK seed
     pub fn wrapped_seed(&mut self, encap_seed: EncapSeed) {
-        self.mode = Some(GenSeedMode::Wrapped {
-            sender_pk: encap_seed.peer_enc_pk,
-            encap_key: encap_seed.encap_key,
-            encrypted_seed: encap_seed.seed,
-        });
+        self.mode = Some(SeedMode::Wrapped(encap_seed.seed));
     }
 
     /// Sets raw PSK seed
     pub fn raw_seed(&mut self, _seed: Box<[u8]>) {
         // TODO: convert `Box<u8>` to `[u8; 32]`
-        self.mode = Some(GenSeedMode::IKM([0u8; 32]));
+        self.mode = Some(SeedMode::IKM([0u8; 32]));
     }
 
     /// Builds the config.

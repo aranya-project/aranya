@@ -11,6 +11,7 @@ use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_crypto::dangerous::spideroak_crypto::hex;
 use aranya_daemon_api::Text;
 use bytes::Bytes;
+use postcard::from_bytes;
 use tracing::error;
 
 use crate::imp::{self, aqc::consume_bytes, peer_seed_serialize};
@@ -658,17 +659,17 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
     cfg.aqc((**aqc_config).clone());
 }
 
-#[aranya_capi_core::opaque(size = 72, align = 8)]
+#[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
 
-#[aranya_capi_core::opaque(size = 96, align = 8)]
+#[aranya_capi_core::opaque(size = 280, align = 8)]
 pub type EncapSeed = Safe<imp::EncapSeed>;
 
-#[aranya_capi_core::opaque(size = 96, align = 8)]
+#[aranya_capi_core::opaque(size = 312, align = 8)]
 pub type WrappedSeedForPeer = Safe<imp::WrappedSeedForPeer>;
 
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 72, align = 8)]
+#[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
 
 /// Attempts to set PSK generation mode value on [`QuicSyncConfigBuilder`].
@@ -729,11 +730,11 @@ pub fn quic_sync_config_build(
     Ok(())
 }
 
-#[aranya_capi_core::opaque(size = 72, align = 8)]
+#[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 72, align = 8)]
+#[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 
 /// Configures QUIC syncer for [`TeamConfigBuilder`].
@@ -999,24 +1000,33 @@ pub fn create_team(
 /// Return serialized PSK seed encrypted for another device on the team.
 /// The PSK seed will be encrypted using the public encryption key of the specified device on the team.
 pub unsafe fn psk_seed_encrypt_for_peer(
-    _client: &mut Client,
+    client: &mut Client,
     team_id: &TeamId,
-    _device: &DeviceId,
+    device: &DeviceId,
     seed: *mut MaybeUninit<u8>,
     seed_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    // TODO: get encrypted PSK seed from daemon.
-    let psk_seed: imp::WrappedSeedForPeer = imp::WrappedSeedForPeer {
+    let client = client.imp();
+    let keys = client.rt.block_on(
+        client
+            .inner
+            .queries(team_id.into())
+            .device_keybundle(device.into()),
+    )?;
+    let pk = from_bytes(keys.encoding.as_slice())?;
+    let wrapped_seed = client.rt.block_on(
+        client
+            .inner
+            .team(team_id.into())
+            .encrypt_psk_seed_for_peer(pk),
+    )?;
+    let peer_seed = imp::WrappedSeedForPeer {
         team_id: team_id.into(),
-        seed: imp::EncapSeed::new(
-            Box::new([0u8; 32]),
-            Box::new([0u8; 32]),
-            Box::new([0u8; 32]),
-        ),
+        seed: imp::EncapSeed { seed: wrapped_seed },
     };
 
     // SAFETY: Must trust caller provides valid ptr/len for psk seed buffer.
-    unsafe { peer_seed_serialize(&psk_seed, seed, seed_len)? }
+    unsafe { peer_seed_serialize(&peer_seed, seed, seed_len)? }
     Ok(())
 }
 
@@ -1030,7 +1040,8 @@ pub fn psk_seed_receive_from_peer(
 
     team_id.write(peer_seed.get_team_id().into());
     EncapSeed::init(seed, peer_seed.get_encap_seed());
-    todo!()
+
+    Ok(())
 }
 
 /// Add a team to the local device store.

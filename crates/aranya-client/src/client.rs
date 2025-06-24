@@ -3,14 +3,14 @@
 use std::{io, net::SocketAddr, path::Path};
 
 use anyhow::Context as _;
-use aranya_crypto::Rng;
+use aranya_crypto::{EncryptionPublicKey, Rng};
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Text, Version, CS,
+    Text, Version, WrappedSeed, CS,
 };
 use aranya_util::Addr;
 use tarpc::context;
@@ -283,6 +283,19 @@ pub struct Team<'a> {
 }
 
 impl Team<'_> {
+    /// Encrypt PSK seed for peer.
+    pub async fn encrypt_psk_seed_for_peer(
+        &mut self,
+        peer_enc_pk: EncryptionPublicKey<CS>,
+    ) -> Result<WrappedSeed> {
+        self.client
+            .daemon
+            .encrypt_psk_seed_for_peer(context::current(), self.id, peer_enc_pk)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Adds a peer for automatic periodic Aranya state syncing.
     pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
