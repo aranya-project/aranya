@@ -250,3 +250,52 @@ async fn test_add_team() -> Result<()> {
 
     return Ok(());
 }
+
+/// Tests that devices can be removed from the team.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_remove_team() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let mut team = TeamCtx::new("test_remove_team", work_dir).await?;
+
+    // Create the initial team, and get our TeamId.
+    let team_id = team
+        .create_and_add_team()
+        .await
+        .expect("expected to create team");
+    info!(?team_id);
+
+    team.add_all_sync_peers(team_id).await?;
+
+    let mut owner = team.owner.client.team(team_id);
+    let mut admin = team.admin.client.team(team_id);
+
+    // Add the operator as a new device.
+    info!("adding operator to team");
+    owner.add_device_to_team(team.operator.pk.clone()).await?;
+
+    // Add the admin as a new device.
+    owner.add_device_to_team(team.admin.pk.clone()).await?;
+
+    // Give the admin its role.
+    owner.assign_role(team.admin.id, Role::Admin).await?;
+
+    sleep(SLEEP_INTERVAL).await;
+
+    // We should be able to successfully assign a role.
+    admin.assign_role(team.operator.id, Role::Operator).await?;
+
+    // Remove the team from the admin's local storage
+    admin.remove_team().await?;
+
+    sleep(SLEEP_INTERVAL).await;
+
+    // Role assignment should fail
+    match admin.assign_role(team.operator.id, Role::Member).await {
+        Ok(_) => bail!("Expected role assignment to fail"),
+        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(_) => bail!("Unexpected error"),
+    }
+
+    Ok(())
+}

@@ -1,12 +1,12 @@
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use aranya_crypto::{tls::PskSeedId, Id};
 use aranya_daemon_api::TeamId;
 use aranya_util::create_dir_all;
 use s2n_quic::provider::tls::rustls::rustls::crypto::PresharedKey;
 use tokio::{
-    fs::{read, read_dir, File},
+    fs::{read, read_dir, remove_file, File},
     io::AsyncWriteExt,
 };
 
@@ -37,6 +37,15 @@ impl SeedDir {
 
         file.write_all(seed_id.as_bytes()).await?;
         file.sync_data().await?;
+
+        Ok(())
+    }
+
+    pub(crate) async fn remove(&self, team_id: &TeamId) -> Result<()> {
+        let file_name = self.0.join(team_id.to_string());
+        remove_file(file_name)
+            .await
+            .context("could not remove seed id file")?;
 
         Ok(())
     }
@@ -135,6 +144,30 @@ mod tests {
         expected.sort_unstable();
 
         assert_eq!(out, expected);
+
+        Ok(())
+    }
+
+    #[test(tokio::test(flavor = "multi_thread"))]
+    async fn test_append_and_remove() -> Result<()> {
+        let tmp_dir = tempdir()?;
+        let path = tmp_dir.path().join("seeds");
+
+        let seed_dir = SeedDir::new(path)
+            .await
+            .context("could not create seed dir")?;
+
+        for _ in 0..100 {
+            let team_id = Id::random(&mut Rng).into();
+            let seed_id = Id::random(&mut Rng).into();
+
+            seed_dir
+                .append(&team_id, &seed_id)
+                .await
+                .context("could not append")?;
+
+            assert!(seed_dir.remove(&team_id).await.is_ok())
+        }
 
         Ok(())
     }

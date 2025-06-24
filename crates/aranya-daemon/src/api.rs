@@ -452,6 +452,8 @@ impl DaemonApi for Api {
                 .remove(team)
                 .inspect_err(|err| error!(err = ?err, "unable to remove PSK"))?
         }
+
+        self.seed_id_dir.remove(&team).await?;
         self.client
             .aranya
             .lock()
