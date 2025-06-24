@@ -134,9 +134,7 @@ impl TeamCtx {
         // Create the initial team, and get our TeamId.
         let seed_ikm = self.owner.client.rand().await;
         let cfg = {
-            let qs_cfg = QuicSyncConfig::builder()
-                .raw_seed(Box::new(seed_ikm))
-                .build()?;
+            let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
             TeamConfig::builder().quic_sync(qs_cfg).build()?
         };
 
