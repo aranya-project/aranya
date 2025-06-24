@@ -5,8 +5,9 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::{SeedMode, TeamId, WrappedSeed};
+use aranya_daemon_api::{SeedMode, TeamId};
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -38,12 +39,12 @@ impl Seed {
 /// A wrapped, encapsulated PSK seed.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EncapSeed {
-    seed: WrappedSeed,
+    seed: Vec<u8>,
 }
 
 impl EncapSeed {
     /// Allocates new [`EncapSeed`].
-    pub fn new(seed: WrappedSeed) -> Self {
+    pub fn new(seed: Vec<u8>) -> Self {
         Self { seed }
     }
 
@@ -373,8 +374,14 @@ impl QuicSyncConfigBuilder {
     }
 
     /// Sets wrapped PSK seed
-    pub fn wrapped_seed(&mut self, encap_seed: EncapSeed) {
-        self.mode = Some(SeedMode::Wrapped(encap_seed.seed));
+    pub fn wrapped_seed(&mut self, encap_seed: EncapSeed) -> Result<(), Error> {
+        let wrapped = postcard::from_bytes(&encap_seed.seed).map_err(|err| {
+            error!(?err);
+            InvalidArg::new("wrapped_seed", "could not deserialize")
+        })?;
+        self.mode = Some(SeedMode::Wrapped(wrapped));
+
+        Ok(())
     }
 
     /// Sets raw PSK seed

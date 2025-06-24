@@ -693,7 +693,7 @@ pub fn quic_sync_config_wrapped_seed(
     cfg: &mut QuicSyncConfigBuilder,
     encap_seed: &EncapSeed,
 ) -> Result<(), imp::Error> {
-    cfg.wrapped_seed(encap_seed.imp().clone());
+    cfg.wrapped_seed(encap_seed.imp().clone())?;
     Ok(())
 }
 

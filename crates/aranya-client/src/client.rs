@@ -3,16 +3,17 @@
 use std::{io, net::SocketAddr, path::Path};
 
 use anyhow::Context as _;
-use aranya_crypto::{EncryptionPublicKey, Rng};
+use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Text, Version, WrappedSeed, CS,
+    Text, Version, CS,
 };
 use aranya_util::Addr;
+use buggy::BugExt as _;
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
@@ -251,6 +252,15 @@ impl Client {
             .map_err(aranya_error)
     }
 
+    /// Generate 32 random bytes from a CSPRNG.
+    /// Can be used as IKM for a generating a PSK seed.
+    pub async fn rand(&self) -> [u8; 32] {
+        let mut out = [0; 32];
+        <Rng as Csprng>::fill_bytes(&mut Rng, &mut out);
+
+        out
+    }
+
     /// Get an existing team.
     pub fn team(&mut self, id: TeamId) -> Team<'_> {
         Team { client: self, id }
@@ -284,16 +294,19 @@ pub struct Team<'a> {
 
 impl Team<'_> {
     /// Encrypt PSK seed for peer.
-    pub async fn encrypt_psk_seed_for_peer(
-        &mut self,
-        peer_enc_pk: EncryptionPublicKey<CS>,
-    ) -> Result<WrappedSeed> {
-        self.client
+    pub async fn encrypt_psk_seed_for_peer(&mut self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
+        let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
+            .context("bad peer_enc_pk")
+            .map_err(error::other)?;
+        let wrapped = self
+            .client
             .daemon
             .encrypt_psk_seed_for_peer(context::current(), self.id, peer_enc_pk)
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
+            .map_err(aranya_error)?;
+        let wrapped = postcard::to_allocvec(&wrapped).assume("can serialize")?;
+        Ok(wrapped)
     }
 
     /// Adds a peer for automatic periodic Aranya state syncing.

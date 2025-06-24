@@ -201,7 +201,14 @@ impl Daemon {
                     }
                     peers
                 };
-                Aqc::new(eng.clone(), pks.ident_pk.id()?, aranya_store, peers)
+                Aqc::new(
+                    eng.clone(),
+                    pks.ident_pk.id()?,
+                    aranya_store
+                        .try_clone()
+                        .context("unable to clone keystore")?,
+                    peers,
+                )
             };
 
             // TODO: Fix this when other syncer types are supported
@@ -210,6 +217,12 @@ impl Daemon {
             };
 
             let data = QSData { psk_store };
+
+            let crypto = crate::api::Crypto {
+                engine: eng,
+                local_store,
+                aranya_store,
+            };
 
             let api = DaemonApiServer::new(
                 client,
@@ -221,8 +234,7 @@ impl Daemon {
                 recv_effects,
                 invalid_graphs,
                 aqc,
-                local_store,
-                eng,
+                crypto,
                 seed_id_dir,
                 Some(data),
             )?;
