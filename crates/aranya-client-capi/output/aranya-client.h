@@ -93,6 +93,11 @@
 /**
  * The size in bytes of a PSK seed IKM.
  */
+#define ARANYA_WRAPPED_SEED_LEN 304
+
+/**
+ * The size in bytes of a PSK seed IKM.
+ */
 #define ARANYA_SEED_LEN 32
 
 /**
@@ -1601,7 +1606,7 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the peer's device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param[out] seed the serialized, encrypted PSK seed.
  * @param[out] seed_len the number of bytes written to the seed buffer.
  *
@@ -1611,7 +1616,8 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
  */
 AranyaError aranya_psk_seed_encrypt_for_peer(struct AranyaClient *client,
                                              const struct AranyaTeamId *team_id,
-                                             const struct AranyaDeviceId *device,
+                                             const uint8_t *keybundle,
+                                             size_t keybundle_len,
                                              uint8_t *seed,
                                              size_t *seed_len);
 
@@ -1621,7 +1627,7 @@ AranyaError aranya_psk_seed_encrypt_for_peer(struct AranyaClient *client,
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[in] device the peer's device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
  * @param[out] seed the serialized, encrypted PSK seed.
  * @param[out] seed_len the number of bytes written to the seed buffer.
  *
@@ -1631,7 +1637,8 @@ AranyaError aranya_psk_seed_encrypt_for_peer(struct AranyaClient *client,
  */
 AranyaError aranya_psk_seed_encrypt_for_peer_ext(struct AranyaClient *client,
                                                  const struct AranyaTeamId *team_id,
-                                                 const struct AranyaDeviceId *device,
+                                                 const uint8_t *keybundle,
+                                                 size_t keybundle_len,
                                                  uint8_t *seed,
                                                  size_t *seed_len,
                                                  struct AranyaExtError *__ext_err);

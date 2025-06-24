@@ -11,7 +11,6 @@ use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_crypto::dangerous::spideroak_crypto::hex;
 use aranya_daemon_api::Text;
 use bytes::Bytes;
-use postcard::from_bytes;
 use tracing::error;
 
 use crate::imp::{self, aqc::consume_bytes, peer_seed_serialize};
@@ -260,6 +259,10 @@ impl From<aranya_crypto::Id> for Id {
         }
     }
 }
+
+/// The size in bytes of a PSK seed IKM.
+// TODO: compute this?
+pub const ARANYA_WRAPPED_SEED_LEN: usize = 304;
 
 /// The size in bytes of a PSK seed IKM.
 pub const ARANYA_SEED_LEN: usize = 32;
@@ -998,7 +1001,7 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team_id the team's ID [`TeamId`].
-/// @param[in] device the peer's device ID [`DeviceId`].
+/// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
 /// @param[out] seed the serialized, encrypted PSK seed.
 /// @param[out] seed_len the number of bytes written to the seed buffer.
 ///
@@ -1008,23 +1011,18 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 pub unsafe fn psk_seed_encrypt_for_peer(
     client: &mut Client,
     team_id: &TeamId,
-    device: &DeviceId,
+    keybundle: &[u8],
     seed: *mut MaybeUninit<u8>,
     seed_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
-    let keys = client.rt.block_on(
-        client
-            .inner
-            .queries(team_id.into())
-            .device_keybundle(device.into()),
-    )?;
-    let enc_pk = from_bytes(keys.encoding.as_slice())?;
+    let keybundle = imp::key_bundle_deserialize(keybundle)?;
+
     let wrapped_seed = client.rt.block_on(
         client
             .inner
             .team(team_id.into())
-            .encrypt_psk_seed_for_peer(enc_pk),
+            .encrypt_psk_seed_for_peer(&keybundle.encoding),
     )?;
     let peer_seed = imp::WrappedSeedForPeer::new(team_id.into(), imp::EncapSeed::new(wrapped_seed));
 
