@@ -91,11 +91,6 @@
 #define ARANYA_ID_LEN 32
 
 /**
- * The size in bytes of an ID
- */
-#define ARANYA_SEED_LEN 64
-
-/**
  * The size in bytes of an ID converted to a human-readable base58 string.
  */
 #define ARANYA_ID_STR_LEN (((ARANYA_ID_LEN * 1375) / 1000) + 1)
