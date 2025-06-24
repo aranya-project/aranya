@@ -710,7 +710,7 @@ pub fn quic_sync_config_raw_seed(
     cfg: &mut QuicSyncConfigBuilder,
     seed: &[u8],
 ) -> Result<(), imp::Error> {
-    cfg.raw_seed(Box::from(seed));
+    cfg.raw_seed(Box::from(seed))?;
     Ok(())
 }
 

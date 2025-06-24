@@ -1,5 +1,6 @@
 use core::{ffi::c_char, mem::MaybeUninit, ptr};
 
+use anyhow::Context;
 use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
@@ -368,9 +369,12 @@ impl QuicSyncConfigBuilder {
     }
 
     /// Sets raw PSK seed
-    pub fn raw_seed(&mut self, _seed: Box<[u8]>) {
-        // TODO: convert `Box<u8>` to `[u8; 32]`
-        self.mode = Some(SeedMode::IKM([0u8; 32]));
+    pub fn raw_seed(&mut self, seed: Box<[u8]>) -> Result<(), Error> {
+        self.mode = Some(SeedMode::IKM(
+            seed.as_ref().try_into().context("invalid IKM")?,
+        ));
+
+        Ok(())
     }
 
     /// Builds the config.
