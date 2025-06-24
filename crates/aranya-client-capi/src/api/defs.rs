@@ -261,6 +261,9 @@ impl From<aranya_crypto::Id> for Id {
     }
 }
 
+/// The size in bytes of a PSK seed IKM.
+pub const ARANYA_SEED_LEN: usize = 32;
+
 // PSK Seed
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type Seed = Safe<imp::Seed>;

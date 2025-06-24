@@ -281,9 +281,10 @@ AranyaError init_team(Team *t) {
         fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
         return err;
     }
-    size_t seed_len = 32;
-    uint8_t *seed   = calloc(seed_len, 1);
-    err = aranya_quic_sync_config_raw_seed(&owner_quic_build, seed, seed_len);
+
+    uint8_t *seed = calloc(ARANYA_SEED_LEN, 1);
+    err           = aranya_quic_sync_config_raw_seed(&owner_quic_build, seed,
+                                                     ARANYA_SEED_LEN);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr,
                 "unable to set `AranyaQuicSyncConfigBuilder` raw IKM seed"
@@ -403,7 +404,8 @@ AranyaError init_team(Team *t) {
             fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
             return err;
         }
-        err = aranya_quic_sync_config_raw_seed(&quic_build, seed, seed_len);
+        err = aranya_quic_sync_config_raw_seed(&quic_build, seed,
+                                               ARANYA_SEED_LEN);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(
                 stderr,
