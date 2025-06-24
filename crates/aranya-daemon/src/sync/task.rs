@@ -6,7 +6,7 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, future::Future, time::Duration};
+use std::{collections::HashMap, future::Future};
 
 use anyhow::{Context, Result};
 use aranya_daemon_api::SyncPeerConfig;
@@ -136,7 +136,7 @@ pub struct Syncer<ST> {
     /// Aranya client to allow syncing the Aranya graph with another peer.
     pub client: Client,
     /// Keeps track of peer info.
-    peers: HashMap<SyncPeer, PeerInfo>,
+    peers: HashMap<SyncPeer, (SyncPeerConfig, Key)>,
     /// Receives added/removed peers.
     recv: mpsc::Receiver<Msg>,
     /// Delay queue for getting the next peer to sync with.
@@ -145,17 +145,8 @@ pub struct Syncer<ST> {
     send_effects: EffectSender,
     /// Keeps track of invalid graphs due to finalization errors.
     invalid: InvalidGraphs,
-    /// Configuration values for syncing
-    cfgs: HashMap<SyncPeer, SyncPeerConfig>,
     /// Additional state used by the syncer
     _state: ST,
-}
-
-struct PeerInfo {
-    /// Sync interval.
-    interval: Duration,
-    /// Key used to remove peer from queue.
-    key: Key,
 }
 
 /// Types that contain additional data that are part of a [`Syncer`]
@@ -190,7 +181,6 @@ impl<ST> Syncer<ST> {
                 queue: DelayQueue::new(),
                 send_effects,
                 invalid,
-                cfgs: HashMap::new(),
                 _state,
             },
             peers,
@@ -202,23 +192,18 @@ impl<ST> Syncer<ST> {
         let key = self.queue.insert(peer.clone(), cfg.interval);
         self.peers
             .entry(peer.clone())
-            .and_modify(|info| {
-                self.queue.remove(&info.key);
-                info.interval = cfg.interval;
-                info.key = key;
+            .and_modify(|(curr_cfg, curr_key)| {
+                self.queue.remove(curr_key);
+                *curr_cfg = cfg.clone();
+                *curr_key = key;
             })
-            .or_insert(PeerInfo {
-                interval: cfg.interval,
-                key,
-            });
-
-        let _ = self.cfgs.insert(peer, cfg);
+            .or_insert((cfg, key));
     }
 
     /// Remove a peer from the delay queue.
     fn remove_peer(&mut self, peer: SyncPeer) {
-        if let Some(info) = self.peers.remove(&peer) {
-            self.queue.remove(&info.key);
+        if let Some((_, key)) = self.peers.remove(&peer) {
+            self.queue.remove(&key);
         }
     }
 }
@@ -243,8 +228,8 @@ impl<ST: SyncState> Syncer<ST> {
             // get next peer from delay queue.
             Some(expired) = self.queue.next() => {
                 let peer = expired.into_inner();
-                let info = self.peers.get_mut(&peer).assume("peer must exist")?;
-                info.key = self.queue.insert(peer.clone(), info.interval);
+                let (cfg, key) = self.peers.get_mut(&peer).assume("peer must exist")?;
+                *key = self.queue.insert(peer.clone(), cfg.interval);
                 // sync with peer.
                 self.sync(&peer).await?;
             }
@@ -267,10 +252,10 @@ impl<ST: SyncState> Syncer<ST> {
                     .is_some_and(|err| matches!(err, ClientError::ParallelFinalize))
                 {
                     // Remove sync peers for graph that had finalization error.
-                    self.peers.retain(|p, info| {
+                    self.peers.retain(|p, (_, key)| {
                         let keep = p.graph_id != peer.graph_id;
                         if !keep {
-                            self.queue.remove(&info.key);
+                            self.queue.remove(key);
                         }
                         keep
                     });
