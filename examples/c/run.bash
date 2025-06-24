@@ -2,6 +2,8 @@
 
 # Copyright (c) SpiderOak, Inc. All rights reserved.
 
+# Run the Aranya C examples.
+
 set -xeuo pipefail
 
 if command -v shellcheck; then
