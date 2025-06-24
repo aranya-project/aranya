@@ -1,16 +1,9 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
-use core::hash::Hash;
-
-use aranya_crypto::{custom_id, tls::EncryptedPskSeed, Encap, EncryptionPublicKey};
+use aranya_crypto::{tls::EncryptedPskSeed, Encap, EncryptionPublicKey};
 use serde::{Deserialize, Serialize};
 
 use crate::CS;
-
-custom_id! {
-    /// A QUIC sync PSK ID.
-    pub struct QuicSyncPskId;
-}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {

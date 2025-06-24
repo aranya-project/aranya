@@ -100,7 +100,7 @@ fn psk_to_rustls(psk: aranya_crypto::tls::Psk<CS>) -> Result<PresharedKey> {
 #[derive(Debug)]
 pub struct PskStore {
     inner: SyncMutex<PskStoreInner>,
-    // Optional sender to report the selected team
+    // sender to report the selected team
     active_team_tx: mpsc::Sender<TeamId>,
 }
 
