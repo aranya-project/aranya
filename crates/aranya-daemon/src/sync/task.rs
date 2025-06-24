@@ -191,7 +191,7 @@ impl<ST> Syncer<ST> {
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
         let key = self.queue.insert(peer.clone(), cfg.interval);
         self.peers
-            .entry(peer.clone())
+            .entry(peer)
             .and_modify(|(curr_cfg, curr_key)| {
                 self.queue.remove(curr_key);
                 *curr_cfg = cfg.clone();
