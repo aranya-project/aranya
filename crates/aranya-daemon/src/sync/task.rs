@@ -48,8 +48,6 @@ struct SyncPeer {
 pub struct SyncPeers {
     /// Send messages to add/remove peers.
     send: mpsc::Sender<Msg>,
-    /// Configuration values for syncing
-    cfgs: HashMap<(Addr, GraphId), SyncPeerConfig>,
 }
 
 /// A response to a sync request.
@@ -64,10 +62,7 @@ pub(crate) enum SyncResponse {
 impl SyncPeers {
     /// Create a new peer manager.
     fn new(send: mpsc::Sender<Msg>) -> Self {
-        Self {
-            send,
-            cfgs: HashMap::new(),
-        }
+        Self { send }
     }
 
     /// Add peer to [`Syncer`].
@@ -89,8 +84,6 @@ impl SyncPeers {
             self.sync_now(addr, graph_id, Some(cfg.clone())).await?
         }
 
-        self.cfgs.insert((addr, graph_id), cfg);
-
         Ok(())
     }
 
@@ -107,8 +100,6 @@ impl SyncPeers {
             error!(?e, "error removing peer from syncer");
             return Err(e);
         }
-
-        self.cfgs.remove(&(addr, graph_id));
 
         Ok(())
     }
@@ -154,6 +145,8 @@ pub struct Syncer<ST> {
     send_effects: EffectSender,
     /// Keeps track of invalid graphs due to finalization errors.
     invalid: InvalidGraphs,
+    /// Configuration values for syncing
+    cfgs: HashMap<SyncPeer, SyncPeerConfig>,
     /// Additional state used by the syncer
     _state: ST,
 }
@@ -197,6 +190,7 @@ impl<ST> Syncer<ST> {
                 queue: DelayQueue::new(),
                 send_effects,
                 invalid,
+                cfgs: HashMap::new(),
                 _state,
             },
             peers,
@@ -204,10 +198,10 @@ impl<ST> Syncer<ST> {
     }
 
     /// Add a peer to the delay queue, overwriting an existing one.
-    fn add_peer(&mut self, peer: SyncPeer, cfg: &SyncPeerConfig) {
+    fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
         let key = self.queue.insert(peer.clone(), cfg.interval);
         self.peers
-            .entry(peer)
+            .entry(peer.clone())
             .and_modify(|info| {
                 self.queue.remove(&info.key);
                 info.interval = cfg.interval;
@@ -217,6 +211,8 @@ impl<ST> Syncer<ST> {
                 interval: cfg.interval,
                 key,
             });
+
+        let _ = self.cfgs.insert(peer, cfg);
     }
 
     /// Remove a peer from the delay queue.
@@ -240,7 +236,7 @@ impl<ST: SyncState> Syncer<ST> {
                         // sync with peer right now.
                         self.sync(&peer).await?;
                     },
-                    Msg::AddPeer { peer, cfg } => self.add_peer(peer, &cfg),
+                    Msg::AddPeer { peer, cfg } => self.add_peer(peer, cfg),
                     Msg::RemovePeer { peer } => self.remove_peer(peer),
                 }
             }
