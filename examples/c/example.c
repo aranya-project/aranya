@@ -247,6 +247,12 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 AranyaError init_team(Team *t) {
     AranyaError err;
 
+    Client *owner = &t->clients.owner;
+    Client *admin = &t->clients.admin;
+    Client *operator= & t->clients.operator;
+    Client *membera = &t->clients.membera;
+    Client *memberb = &t->clients.memberb;
+
     // initialize team clients.
     for (int i = 0; i < NUM_CLIENTS; i++) {
         printf("initializing client: %s\n", client_names[i]);
@@ -343,6 +349,44 @@ AranyaError init_team(Team *t) {
     if (memcmp(decodedId.bytes, t->id.id.bytes, ARANYA_ID_LEN) != 0) {
         fprintf(stderr, "application failed: Decoded ID doesn't match\n");
         return ARANYA_ERROR_OTHER;
+    }
+
+    // Team members are added to the team by first calling
+    // `aranya_add_device_to_team`, passing in the submitter's client, the
+    // team ID and the public key of the device to be added. In a real world
+    // scenario, the keys would be exchanged outside of Aranya using
+    // something like `scp`.
+
+    // add admin to team.
+    err = aranya_add_device_to_team(&owner->client, &t->id, admin->pk,
+                                    admin->pk_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to add admin to team\n");
+        return err;
+    }
+
+    // add operator to team.
+    err = aranya_add_device_to_team(&owner->client,
+                                    &t->id, operator->pk, operator->pk_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to add operator to team\n");
+        return err;
+    }
+
+    // add membera to team.
+    err = aranya_add_device_to_team(&owner->client, &t->id, membera->pk,
+                                    membera->pk_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to add membera to team\n");
+        return err;
+    }
+
+    // add memberb to team.
+    err = aranya_add_device_to_team(&owner->client, &t->id, memberb->pk,
+                                    memberb->pk_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to add memberb to team\n");
+        return err;
     }
 
     // add_team() for each non-owner device
@@ -493,16 +537,6 @@ AranyaError run(Team *t) {
     err = init_team(t);
     EXPECT("unable to initialize team", err);
 
-    // add admin to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, admin->pk,
-                                    admin->pk_len);
-    EXPECT("error adding admin to team", err);
-
-    // add operator to team.
-    err = aranya_add_device_to_team(&owner->client,
-                                    &t->id, operator->pk, operator->pk_len);
-    EXPECT("error adding operator to team", err);
-
     // upgrade role to admin.
     err = aranya_assign_role(&owner->client, &t->id, &admin->id,
                              ARANYA_ROLE_ADMIN);
@@ -552,22 +586,6 @@ AranyaError run(Team *t) {
     printf("adding sync peers\n");
     err = add_sync_peers(t, &cfg);
     EXPECT("error adding sync peers", err);
-
-    // Team members are added to the team by first calling
-    // `aranya_add_device_to_team`, passing in the submitter's client, the
-    // team ID and the public key of the device to be added. In a real world
-    // scenario, the keys would be exchanged outside of Aranya using
-    // something like `scp`.
-
-    // add membera to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, membera->pk,
-                                    membera->pk_len);
-    EXPECT("error adding membera to team", err);
-
-    // add memberb to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, memberb->pk,
-                                    memberb->pk_len);
-    EXPECT("error adding memberb to team", err);
 
     sleep(1);
 
