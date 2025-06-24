@@ -8,14 +8,14 @@ use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
-    default::WrappedKey, policy::GroupId, Csprng, Encap, EncryptionKey, Engine as _, KeyStore as _,
-    KeyStoreExt as _, Rng,
+    default::WrappedKey, policy::GroupId, Csprng, DeviceId, EncryptionKey, EncryptionPublicKey,
+    Engine as _, KeyStore as _, KeyStoreExt as _, Rng,
 };
 pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, GenSeedMode,
+    DaemonApi, SeedMode, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -101,7 +101,7 @@ impl DaemonApiServer {
         let api = Api(Arc::new(ApiInner {
             client,
             local_addr,
-            pk,
+            pk: std::sync::Mutex::new(pk),
             peers: Mutex::new(peers),
             effect_handler,
             invalid,
@@ -238,7 +238,7 @@ struct ApiInner {
     /// Local socket address of the API.
     local_addr: SocketAddr,
     /// Public keys of current device.
-    pk: PublicKeys<CS>,
+    pk: std::sync::Mutex<PublicKeys<CS>>,
     /// Aranya sync peers,
     peers: Mutex<SyncPeers>,
     /// Handles graph effects from the syncer.
@@ -253,7 +253,14 @@ struct ApiInner {
 
 impl ApiInner {
     fn get_pk(&self) -> api::Result<KeyBundle> {
-        Ok(KeyBundle::try_from(&self.pk).context("bad key bundle")?)
+        let pk = self.pk.lock().expect("poisoned");
+        Ok(KeyBundle::try_from(&*pk).context("bad key bundle")?)
+    }
+
+    fn device_id(&self) -> api::Result<DeviceId> {
+        let pk = self.pk.lock().expect("poisoned");
+        let id = pk.ident_pk.id()?;
+        Ok(id)
     }
 }
 
@@ -314,13 +321,7 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self))]
     async fn get_device_id(self, _: context::Context) -> api::Result<api::DeviceId> {
-        Ok(self
-            .pk
-            .ident_pk
-            .id()
-            .context("unable to get device ID")?
-            .into_id()
-            .into())
+        self.device_id().map(|id| id.into_id().into())
     }
 
     #[instrument(skip(self))]
@@ -394,20 +395,16 @@ impl DaemonApi for Api {
                 .psk_store
                 .clone();
 
-            let seed = match cfg.seed_mode() {
-                GenSeedMode::Generate => {
+            let seed = match cfg.seed_mode {
+                SeedMode::Generate => {
                     return Err(api::Error::from_msg(
                         "Must provide PSK seed from team creation",
                     ));
                 }
-                GenSeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team),
-                GenSeedMode::Wrapped {
-                    sender_pk,
-                    encap_key,
-                    encrypted_seed,
-                } => {
+                SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(&ikm, team),
+                SeedMode::Wrapped(wrapped) => {
                     let enc_sk: EncryptionKey<CS> = {
-                        let enc_id = self.pk.enc_pk.id()?;
+                        let enc_id = self.pk.lock().expect("poisoned").enc_pk.id()?;
                         let (ref store, ref mut eng) = *self.store_engine.lock().await;
                         store
                             .get_key(eng, enc_id.into_id())
@@ -415,15 +412,14 @@ impl DaemonApi for Api {
                             .context("missing enc_sk")?
                     };
 
-                    // TODO(jdygert): ser/de these in one struct?
-                    let sender_pk = postcard::from_bytes(sender_pk).context("bad sender_pk")?;
-                    let encap = Encap::from_bytes(encap_key).context("bad encap")?;
-                    let encrypted_seed =
-                        postcard::from_bytes(encrypted_seed).context("bad encrypted seed")?;
-
                     let group = GroupId::from(team.into_id());
                     let seed = enc_sk
-                        .open_psk_seed(&encap, encrypted_seed, &sender_pk, &group)
+                        .open_psk_seed(
+                            &wrapped.encap_key,
+                            wrapped.encrypted_seed,
+                            &wrapped.sender_pk,
+                            &group,
+                        )
                         .context("could not open psk seed")?;
                     qs::PskSeed(seed)
                 }
@@ -487,10 +483,10 @@ impl DaemonApi for Api {
                 .psk_store
                 .clone();
 
-            let seed = match qs_cfg.seed_mode() {
-                GenSeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
-                GenSeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
-                GenSeedMode::Wrapped { .. } => {
+            let seed = match &qs_cfg.seed_mode {
+                SeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
+                SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
+                SeedMode::Wrapped { .. } => {
                     return Err(api::Error::from_msg(
                         "Cannot create team with existing wrapped PSK seed",
                     ))
@@ -515,6 +511,40 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         todo!();
+    }
+
+    #[instrument(skip(self))]
+    async fn encrypt_psk_seed_for_peer(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        peer_enc_pk: EncryptionPublicKey<CS>,
+    ) -> aranya_daemon_api::Result<WrappedSeed> {
+        let enc_pk = self.pk.lock().expect("poisoned").enc_pk.clone();
+
+        let (seed, enc_sk) = {
+            let (ref store, ref mut eng) = *self.store_engine.lock().await;
+            let seed = {
+                let seed_id = self.seed_id_dir.get(&team).await?;
+                qs::PskSeed::load(eng, store, &seed_id)?.context("no seed in dir")?
+            };
+            let enc_sk: EncryptionKey<CS> = store
+                .get_key(eng, enc_pk.id()?.into_id())
+                .context("keystore error")?
+                .context("missing enc_sk")?;
+            (seed, enc_sk)
+        };
+
+        let group = GroupId::from(team.into_id());
+        let (encap_key, encrypted_seed) = enc_sk
+            .seal_psk_seed(&mut Rng, &seed.0, &peer_enc_pk, &group)
+            .context("could not seal psk seed")?;
+
+        Ok(WrappedSeed {
+            sender_pk: enc_pk,
+            encap_key,
+            encrypted_seed,
+        })
     }
 
     #[instrument(skip(self))]
@@ -652,7 +682,7 @@ impl DaemonApi for Api {
             .actions(&graph)
             .create_aqc_bidi_channel_off_graph(peer_id, label.into_id().into())
             .await?;
-        let id = self.pk.ident_pk.id()?;
+        let id = self.device_id()?;
 
         let Some(Effect::AqcBidiChannelCreated(e)) =
             find_effect!(&effects, Effect::AqcBidiChannelCreated(e) if e.author_id == id.into())
@@ -688,7 +718,7 @@ impl DaemonApi for Api {
             .await
             .context("did not find peer")?;
 
-        let id = self.pk.ident_pk.id()?;
+        let id = self.device_id()?;
         let (ctrl, effects) = self
             .client
             .actions(&graph)
@@ -741,7 +771,7 @@ impl DaemonApi for Api {
         let graph = GraphId::from(team.into_id());
         let mut session = self.client.session_new(&graph).await?;
         for cmd in ctrl {
-            let our_device_id = self.pk.ident_pk.id()?;
+            let our_device_id = self.device_id()?;
 
             let effects = self.client.session_receive(&mut session, &cmd).await?;
             self.effect_handler.handle_effects(graph, &effects).await?;
@@ -778,7 +808,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        label_name: String,
+        label_name: Text,
     ) -> api::Result<api::LabelId> {
         self.check_team_valid(team).await?;
 

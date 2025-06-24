@@ -1,6 +1,7 @@
 use core::time::Duration;
 
-use aranya_daemon_api::GenSeedMode;
+use aranya_daemon_api::SeedMode;
+use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
 
@@ -84,7 +85,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone)]
 pub struct QuicSyncConfig {
-    pub seed_mode: GenSeedMode,
+    pub seed_mode: SeedMode,
 }
 
 impl QuicSyncConfig {
@@ -93,14 +94,14 @@ impl QuicSyncConfig {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct QuicSyncConfigBuilder {
-    pub seed_mode: GenSeedMode,
+    pub seed_mode: SeedMode,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
-    pub fn mode(mut self, mode: GenSeedMode) -> Self {
+    pub fn mode(mut self, mode: SeedMode) -> Self {
         self.seed_mode = mode;
         self
     }
@@ -109,7 +110,7 @@ impl QuicSyncConfigBuilder {
     ///
     /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`]
     pub fn gen_seed(mut self) -> Self {
-        self.seed_mode = GenSeedMode::Generate;
+        self.seed_mode = SeedMode::Generate;
         self
     }
 
@@ -117,25 +118,20 @@ impl QuicSyncConfigBuilder {
     ///
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
     pub fn seed_ikm(mut self, ikm: [u8; 32]) -> Self {
-        self.seed_mode = GenSeedMode::IKM(ikm);
+        self.seed_mode = SeedMode::IKM(ikm);
         self
     }
 
     /// Sets the wrapped seed.
     ///
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
-    pub fn wrapped_seed(
-        mut self,
-        sender_pk: Box<[u8]>,
-        encap_key: Box<[u8]>,
-        encrypted_seed: Box<[u8]>,
-    ) -> Self {
-        self.seed_mode = GenSeedMode::Wrapped {
-            sender_pk,
-            encap_key,
-            encrypted_seed,
-        };
-        self
+    pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
+        let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
+            error!(?err);
+            ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
+        })?;
+        self.seed_mode = SeedMode::Wrapped(wrapped);
+        Ok(self)
     }
 
     /// Builds the config.
