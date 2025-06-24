@@ -3,7 +3,7 @@
 use std::{io, net::SocketAddr, path::Path};
 
 use anyhow::Context as _;
-use aranya_crypto::Rng;
+use aranya_crypto::{Csprng, Rng};
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
@@ -249,6 +249,15 @@ impl Client {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
+    }
+
+    /// Generate 32 random bytes from a CSPRNG.
+    /// Can be used as IKM for a generating a PSK seed.
+    pub async fn rand(&self) -> [u8; 32] {
+        let mut out = [0; 32];
+        <Rng as Csprng>::fill_bytes(&mut Rng, &mut out);
+
+        out
     }
 
     /// Get an existing team.
