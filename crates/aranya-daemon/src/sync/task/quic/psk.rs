@@ -10,7 +10,7 @@ use aranya_crypto::{
     id::IdError, policy::GroupId, tls::PskSeedId, Csprng, Identified as _, KeyStoreExt as _,
     PolicyId,
 };
-use aranya_daemon_api::{CipherSuiteId, TeamId};
+use aranya_daemon_api::{CipherSuiteId, TeamId, SEED_IKM_SIZE};
 use buggy::BugExt as _;
 use s2n_quic::provider::tls::rustls::rustls::{
     client,
@@ -36,7 +36,7 @@ impl PskSeed {
         Self(aranya_crypto::tls::PskSeed::new(rng, &group))
     }
 
-    pub(crate) fn import_from_ikm(ikm: &[u8; 32], team: TeamId) -> Self {
+    pub(crate) fn import_from_ikm(ikm: &[u8; SEED_IKM_SIZE], team: TeamId) -> Self {
         let group = GroupId::from(team.into_id());
         Self(aranya_crypto::tls::PskSeed::import_from_ikm(ikm, &group))
     }
@@ -100,7 +100,7 @@ fn psk_to_rustls(psk: aranya_crypto::tls::Psk<CS>) -> Result<PresharedKey> {
 #[derive(Debug)]
 pub struct PskStore {
     inner: SyncMutex<PskStoreInner>,
-    // Optional sender to report the selected team
+    // sender to report the selected team
     active_team_tx: mpsc::Sender<TeamId>,
 }
 
@@ -215,6 +215,8 @@ impl server::SelectsPresharedKeys for PskStore {
 struct PskStoreInner {
     team_identities: HashMap<TeamId, Vec<Arc<PresharedKey>>>,
     identity_team: HashMap<PskIdAsKey, TeamId>,
+    /// Indicates the "active team".
+    /// Used by [`PskStore`] to restrict the PSKs that are offered by the client.
     active_team: Option<TeamId>,
 }
 

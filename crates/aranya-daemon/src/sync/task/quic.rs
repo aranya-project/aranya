@@ -384,6 +384,8 @@ pub struct Server<EN, SP> {
     server: QuicServer,
     /// Tracks running tasks.
     set: JoinSet<()>,
+    /// Indicates the "active team".
+    /// Used to ensure that the chosen PSK corresponds to an incoming sync request.
     active_team: Arc<SyncMutex<Option<TeamId>>>,
     /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
     /// Lock must be acquired after [`Self::aranya`]

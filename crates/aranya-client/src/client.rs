@@ -3,16 +3,17 @@
 use std::{io, net::SocketAddr, path::Path};
 
 use anyhow::Context as _;
-use aranya_crypto::Rng;
+use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
 use aranya_daemon_api::{
     crypto::{
         txp::{self, LengthDelimitedCodec},
         PublicApiKey,
     },
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Text, Version, CS,
+    Text, Version, CS, SEED_IKM_SIZE,
 };
 use aranya_util::Addr;
+use buggy::BugExt as _;
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
@@ -242,13 +243,13 @@ impl Client {
             .map_err(aranya_error)
     }
 
-    /// Remove a team from local device storage.
-    pub async fn remove_team(&mut self, team: TeamId) -> Result<()> {
-        self.daemon
-            .remove_team(context::current(), team)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
+    /// Generate [`SEED_IKM_SIZE`] random bytes from a CSPRNG.
+    /// Can be used as IKM for a generating a PSK seed.
+    pub async fn rand(&self) -> [u8; SEED_IKM_SIZE] {
+        let mut out = [0; SEED_IKM_SIZE];
+        <Rng as Csprng>::fill_bytes(&mut Rng, &mut out);
+
+        out
     }
 
     /// Get an existing team.
@@ -283,6 +284,24 @@ pub struct Team<'a> {
 }
 
 impl Team<'_> {
+    /// Encrypt PSK seed for peer.
+    /// `peer_enc_pk` is the public encryption key of the peer device.
+    /// See [`KeyBundle::encoding`].
+    pub async fn encrypt_psk_seed_for_peer(&mut self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
+        let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
+            .context("bad peer_enc_pk")
+            .map_err(error::other)?;
+        let wrapped = self
+            .client
+            .daemon
+            .encrypt_psk_seed_for_peer(context::current(), self.id, peer_enc_pk)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        let wrapped = postcard::to_allocvec(&wrapped).assume("can serialize")?;
+        Ok(wrapped)
+    }
+
     /// Adds a peer for automatic periodic Aranya state syncing.
     pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
@@ -321,6 +340,16 @@ impl Team<'_> {
         self.client
             .daemon
             .add_team(context::current(), self.id, cfg.into())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Remove a team from local device storage.
+    pub async fn remove_team(&mut self) -> Result<()> {
+        self.client
+            .daemon
+            .remove_team(context::current(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
