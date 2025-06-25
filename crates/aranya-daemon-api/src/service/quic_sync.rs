@@ -14,12 +14,28 @@ pub struct QuicSyncConfig {
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+/// Specifies how PSK seeds are provided when creating or joining teams.
+///
+/// Teams share a single PSK seed that is used to derive Pre-Shared Keys (PSKs)
+/// for QUIC connections between team members.
 pub enum SeedMode {
-    /// The default option. Used in the create_team API
+    /// Generates a new random seed.
+    ///
+    /// Used by team owners in the `create_team` API when establishing a new team.
     Generate,
-    /// Used in the create_team and add_team APIs
+
+    /// Provides raw input key material to derive a seed.
+    ///
+    /// The IKM must be exactly 32 bytes. This mode is available in both:
+    /// - `create_team`: Allows team owners to specify deterministic seed material
+    /// - `add_team`: Allows non-owners to join using pre-shared key material
     IKM([u8; SEED_IKM_SIZE]),
-    /// Used in the add_team API
+
+    /// Provides an encrypted seed for secure distribution.
+    ///
+    /// Used by non-owners in the `add_team` API to join an existing team.
+    /// Seeds are wrapped (encrypted) to prevent plaintext exposure during
+    /// the join process.
     Wrapped(WrappedSeed),
 }
 

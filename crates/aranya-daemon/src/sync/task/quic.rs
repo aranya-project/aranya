@@ -87,7 +87,6 @@ pub enum Error {
     /// QUIC client config error
     #[error("QUIC client config error: {0}")]
     ClientConfig(buggy::Bug),
-    // TODO: Improve message
     /// Invalid PSK used for syncing
     #[error("Invalid PSK used when attempting to sync")]
     InvalidPSK,
@@ -103,7 +102,8 @@ pub struct State {
     /// Address -> Connection map used for re-using connections
     /// when making outgoing sync requests
     conns: BTreeMap<Addr, Connection>,
-    /// Shared PSK store
+    /// PSK store shared between the daemon API server and QUIC syncer client and server.
+    /// This store is modified by [`crate::api::DaemonApiServer`].
     store: Arc<PskStore>,
 }
 
