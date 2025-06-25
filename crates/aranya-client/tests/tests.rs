@@ -299,7 +299,7 @@ async fn test_remove_team() -> Result<()> {
     Ok(())
 }
 
-/// Tests that devices can be removed from the team.
+/// Tests that devices can sync to multiple teams.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_multi_team_sync() -> Result<()> {
     // Set up our team context so we can run the test.
