@@ -10,7 +10,7 @@ use aranya_daemon_api::{
         PublicApiKey,
     },
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Text, Version, CS, SEED_IKM_SIZE,
+    Text, Version, CS,
 };
 use aranya_util::Addr;
 use buggy::BugExt as _;
@@ -243,13 +243,10 @@ impl Client {
             .map_err(aranya_error)
     }
 
-    /// Generate [`SEED_IKM_SIZE`] random bytes from a CSPRNG.
-    /// Can be used as IKM for a generating a PSK seed.
-    pub async fn rand(&self) -> [u8; SEED_IKM_SIZE] {
-        let mut out = [0; SEED_IKM_SIZE];
-        <Rng as Csprng>::fill_bytes(&mut Rng, &mut out);
-
-        out
+    /// Generate random bytes from a CSPRNG.
+    /// Can be used to generate IKM for a generating a PSK seed.
+    pub async fn rand(&self, buf: &mut [u8]) {
+        <Rng as Csprng>::fill_bytes(&mut Rng, buf);
     }
 
     /// Get an existing team.

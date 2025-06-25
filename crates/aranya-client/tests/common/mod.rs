@@ -10,7 +10,7 @@ use aranya_daemon::{
     config::{self as daemon_cfg, Config},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId};
+use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId, SEED_IKM_SIZE};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use tokio::{fs, time};
@@ -132,7 +132,11 @@ impl TeamCtx {
 
     pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
-        let seed_ikm = self.owner.client.rand().await;
+        let seed_ikm = {
+            let mut buf = [0; SEED_IKM_SIZE];
+            self.owner.client.rand(&mut buf).await;
+            buf
+        };
         let cfg = {
             let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
             TeamConfig::builder().quic_sync(qs_cfg).build()?
