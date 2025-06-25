@@ -746,8 +746,13 @@ pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 ///
 /// @param cfg a pointer to the builder for a team config
 /// @param quic Set the QUIC syncer config
-pub fn team_config_builder_set_quic_syncer(cfg: &mut TeamConfigBuilder, quic: &QuicSyncConfig) {
-    cfg.quic(quic.imp());
+pub fn team_config_builder_set_quic_syncer(
+    cfg: &mut TeamConfigBuilder,
+    quic: OwnedPtr<QuicSyncConfig>,
+) {
+    // SAFETY: the user is responsible for passing in a valid QuicSyncConfig pointer.
+    let quic = unsafe { quic.read() };
+    cfg.quic(&quic);
 }
 
 /// Attempts to construct a [`TeamConfig`].

@@ -314,11 +314,6 @@ pub struct QuicSyncConfig {
 }
 
 impl QuicSyncConfig {
-    /// Useful for deref coercion.
-    pub(crate) fn imp(&self) -> &Self {
-        self
-    }
-
     pub fn builder() -> QuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }
