@@ -1122,13 +1122,13 @@ impl Api {
 
         let id = seed.id().context("getting seed id")?.into_id();
 
-        let key = crypto
+        let wrapped_key = crypto
             .engine
             .wrap(seed.clone().into_inner())
             .context("wrapping seed")?;
         crypto
             .local_store
-            .try_insert(id, key)
+            .try_insert(id, wrapped_key)
             .context("inserting seed")?;
 
         if let Err(e) = self
