@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use aranya_daemon_api::{SeedMode, WrappedSeed, SEED_IKM_SIZE};
+use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
 use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
@@ -100,6 +100,13 @@ pub struct QuicSyncConfigBuilder {
 }
 
 impl QuicSyncConfigBuilder {
+    /// Sets the PSK seed mode.
+    #[doc(hidden)]
+    pub fn mode(mut self, mode: SeedMode) -> Self {
+        self.seed_mode = mode;
+        self
+    }
+
     /// Sets the seed to be generated.
     ///
     /// This option is only valid when used in [`super::Client::create_team`].
@@ -122,20 +129,12 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is only valid in [`super::Team::add_team`].
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
-    pub fn wrapped_seed_from_bytes(self, wrapped_seed: &[u8]) -> Result<Self> {
+    pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
         let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
             error!(?err);
             ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
         })?;
-        self.wrapped_seed(wrapped)
-    }
-
-    /// Sets the seed mode to 'Wrapped'.
-    ///
-    /// This option is only valid in [`super::Team::add_team`].
-    /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
-    pub fn wrapped_seed(mut self, wrapped_seed: WrappedSeed) -> Result<Self> {
-        self.seed_mode = SeedMode::Wrapped(wrapped_seed);
+        self.seed_mode = SeedMode::Wrapped(wrapped);
         Ok(self)
     }
 
