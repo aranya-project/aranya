@@ -342,7 +342,9 @@ typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
 /**
  * Raw PSK seed IKM for QUIC syncer.
  */
-typedef uint8_t AranyaSeedIkm[ARANYA_SEED_IKM_LEN];
+typedef struct AranyaSeedIkm {
+    uint8_t bytes[ARANYA_SEED_IKM_LEN];
+} AranyaSeedIkm;
 
 typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
     /**
@@ -1088,7 +1090,7 @@ AranyaError aranya_quic_sync_config_wrapped_seed_ext(struct AranyaQuicSyncConfig
  * @param ikm a pointer the raw PSK seed IKM
  */
 AranyaError aranya_quic_sync_config_raw_seed_ikm(struct AranyaQuicSyncConfigBuilder *cfg,
-                                                 const AranyaSeedIkm *ikm);
+                                                 const struct AranyaSeedIkm *ikm);
 
 /**
  * Attempts to set raw seed IKM value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
@@ -1100,7 +1102,7 @@ AranyaError aranya_quic_sync_config_raw_seed_ikm(struct AranyaQuicSyncConfigBuil
  * @param ikm a pointer the raw PSK seed IKM
  */
 AranyaError aranya_quic_sync_config_raw_seed_ikm_ext(struct AranyaQuicSyncConfigBuilder *cfg,
-                                                     const AranyaSeedIkm *ikm,
+                                                     const struct AranyaSeedIkm *ikm,
                                                      struct AranyaExtError *__ext_err);
 
 /**

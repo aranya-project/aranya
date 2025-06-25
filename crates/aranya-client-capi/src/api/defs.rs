@@ -694,7 +694,7 @@ pub fn quic_sync_config_wrapped_seed(
 }
 
 /// Raw PSK seed IKM for QUIC syncer.
-#[repr(transparent)]
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
 pub struct SeedIkm {
     bytes: [u8; ARANYA_SEED_IKM_LEN],
