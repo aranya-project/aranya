@@ -447,21 +447,36 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        let mut errors = vec![];
         if let Some(data) = &self.quic {
-            data.psk_store
+            let _ = data
+                .psk_store
                 .remove(team)
-                .inspect_err(|err| error!(err = ?err, "unable to remove PSK"))?
+                .inspect_err(|err| error!(err = ?err, "unable to remove PSK"))
+                .map_err(|err| errors.push(err));
         }
 
-        self.seed_id_dir.remove(&team).await?;
-        self.client
+        let _ = self
+            .seed_id_dir
+            .remove(&team)
+            .await
+            .map_err(|err| errors.push(err));
+
+        let _ = self
+            .client
             .aranya
             .lock()
             .await
             .remove_graph(team.into_id().into())
-            .context("unable to remove graph from storage")?;
+            .context("unable to remove graph from storage")
+            .map_err(|err| errors.push(err));
 
-        Ok(())
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            // TODO(Steve): Concatenate errors. Preserve error chains
+            Err(errors.pop().expect("has at least 1 error").into())
+        }
     }
 
     #[instrument(skip(self))]
