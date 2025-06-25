@@ -93,11 +93,6 @@
 /**
  * The size in bytes of a PSK seed IKM.
  */
-#define ARANYA_WRAPPED_SEED_LEN 304
-
-/**
- * The size in bytes of a PSK seed IKM.
- */
 #define ARANYA_SEED_IKM_LEN 32
 
 /**

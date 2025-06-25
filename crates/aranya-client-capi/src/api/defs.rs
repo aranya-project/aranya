@@ -261,10 +261,6 @@ impl From<aranya_crypto::Id> for Id {
 }
 
 /// The size in bytes of a PSK seed IKM.
-// TODO: compute this?
-pub const ARANYA_WRAPPED_SEED_LEN: usize = 304;
-
-/// The size in bytes of a PSK seed IKM.
 pub const ARANYA_SEED_IKM_LEN: usize = 32;
 
 // PSK Seed

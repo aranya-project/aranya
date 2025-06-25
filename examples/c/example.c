@@ -432,23 +432,39 @@ AranyaError init_team(Team *t) {
                 return err;
             }
         } else {
-            uint8_t *wrapped_seed   = calloc(ARANYA_WRAPPED_SEED_LEN, 1);
-            size_t wrapped_seed_len = 400;
+            printf("encrypting PSK seed for peer\n");
+            size_t wrapped_seed_len = 100;
+            uint8_t *wrapped_seed   = calloc(wrapped_seed_len, 1);
             err                     = aranya_psk_seed_encrypt_for_peer(
                 &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
                 t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
+            if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+                printf("handling buffer too small error\n");
+                wrapped_seed = realloc(wrapped_seed, wrapped_seed_len);
+                err          = aranya_psk_seed_encrypt_for_peer(
+                    &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
+                    t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
+            }
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
                         "unable to encrypt psk seed for peer, seed_len=%zu\n",
                         wrapped_seed_len);
                 return err;
             }
-            uint8_t *received_seed   = calloc(ARANYA_WRAPPED_SEED_LEN, 1);
-            size_t received_seed_len = 400;
+            printf("receiving PSK seed from peer\n");
+            size_t received_seed_len = 100;
+            uint8_t *received_seed   = calloc(received_seed_len, 1);
             AranyaTeamId team_id_from_peer;
             err = aranya_psk_seed_receive_from_peer(
                 wrapped_seed, wrapped_seed_len, &team_id_from_peer,
                 received_seed, &received_seed_len);
+            if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+                printf("handling buffer too small error\n");
+                received_seed = realloc(received_seed, received_seed_len);
+                err           = aranya_psk_seed_receive_from_peer(
+                    wrapped_seed, wrapped_seed_len, &team_id_from_peer,
+                    received_seed, &received_seed_len);
+            }
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr, "unable to receive psk seed from peer\n");
                 return err;
