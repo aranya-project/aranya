@@ -400,37 +400,25 @@ impl DaemonApi for Api {
 
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        let mut errors = vec![];
         if let Some(data) = &self.quic {
-            let _ = self
-                .remove_team_quic_sync(team, data)
-                .inspect_err(|err| warn!(%err))
-                .map_err(|err| errors.push(err));
+            self.remove_team_quic_sync(team, data)
+                .inspect_err(|err| warn!(%err))?;
         }
 
-        let _ = self
-            .seed_id_dir
+        self.seed_id_dir
             .remove(&team)
             .await
-            .inspect_err(|err| warn!(%err))
-            .map_err(|err| errors.push(err));
+            .inspect_err(|err| warn!(%err))?;
 
-        let _ = self
-            .client
+        self.client
             .aranya
             .lock()
             .await
             .remove_graph(team.into_id().into())
             .context("unable to remove graph from storage")
-            .inspect_err(|err| warn!(%err))
-            .map_err(|err| errors.push(err));
+            .inspect_err(|err| warn!(%err))?;
 
-        if errors.is_empty() {
-            Ok(())
-        } else {
-            // TODO(Steve): Concatenate errors. Preserve error chains
-            Err(errors.pop().expect("has at least 1 error").into())
-        }
+        Ok(())
     }
 
     #[instrument(skip(self))]
