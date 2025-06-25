@@ -44,36 +44,23 @@ use s2n_quic::{
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{io::AsyncReadExt, sync::mpsc, task::JoinSet};
 use tracing::{debug, error, info, instrument};
-use version::{check_version, VERSION_ERR};
 
 use super::SyncResponse;
 use crate::{
     aranya::Client as AranyaClient,
     sync::{
-        prot::SyncProtocol,
         task::{SyncState, Syncer},
         Result as SyncResult, SyncError,
     },
 };
 
 mod psk;
-mod version;
 
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
-pub use version::Version;
-
-const SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
-const ALPN_QUIC_SYNC: &[u8] = const {
-    match SYNC_PROTOCOL {
-        SyncProtocol::V1 => b"quic_sync_v1",
-    }
-};
-
-/// QUIC Syncer Version
-const QUIC_SYNC_VERSION: Version = Version::V1;
+const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
 
 /// Errors specific to the QUIC syncer
 #[derive(Debug, thiserror::Error)]
@@ -272,11 +259,7 @@ impl Syncer<State> {
         debug!(?len, "sync poll finished");
         send_buf.truncate(len);
 
-        // TODO: `send_all`?
-        send.send(Bytes::from_owner([QUIC_SYNC_VERSION as u8]))
-            .await
-            .map_err(Error::from)?;
-        send.send(Bytes::from_owner(send_buf))
+        send.send(Bytes::from(send_buf))
             .await
             .map_err(Error::from)?;
         send.close().await.map_err(Error::from)?;
@@ -306,15 +289,8 @@ impl Syncer<State> {
             .context("failed to read sync response")?;
         debug!(?peer, n = recv_buf.len(), "received sync response");
 
-        // check sync version
-        let Some((version_byte, sync_response)) = recv_buf.split_first() else {
-            error!("Empty sync response");
-            return Err(anyhow::anyhow!("Empty sync request").into());
-        };
-        check_version(*version_byte, QUIC_SYNC_VERSION)?;
-
         // process the sync response.
-        let resp = postcard::from_bytes(sync_response)
+        let resp = postcard::from_bytes(&recv_buf)
             .context("postcard unable to deserialize sync response")?;
         let data = match resp {
             SyncResponse::Ok(data) => data,
@@ -511,25 +487,14 @@ where
 
         let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
-            Err(SyncError::Version) => {
-                send.send(Bytes::from_owner([VERSION_ERR]))
-                    .await
-                    .map_err(Error::from)?;
-                send.close().await.map_err(Error::from)?;
-                return Ok(());
-            }
             Err(err) => SyncResponse::Err(format!("{err:?}")),
         };
         // Serialize the sync response.
         let data =
             postcard::to_allocvec(&resp).context("postcard unable to serialize sync response")?;
 
-        // TODO: `send_all`?
         let data_len = data.len();
-        send.send(Bytes::from_owner([QUIC_SYNC_VERSION as u8]))
-            .await
-            .context("Could not send version byte")?;
-        send.send(Bytes::from_owner(data))
+        send.send(Bytes::from(data))
             .await
             .context("Could not send sync response")?;
         send.close().await.map_err(Error::from)?;
@@ -547,13 +512,6 @@ where
     ) -> SyncResult<Box<[u8]>> {
         info!("server responding to sync request");
 
-        // Check sync version
-        let Some((version_byte, sync_request)) = request_data.split_first() else {
-            error!("Empty sync request");
-            return Err(anyhow::anyhow!("Empty sync request").into());
-        };
-        check_version(*version_byte, QUIC_SYNC_VERSION)?;
-
         // TODO: Use real server address
         let server_address = ();
         let mut resp = SyncResponder::new(server_address);
@@ -561,7 +519,7 @@ where
         let SyncType::Poll {
             request: request_msg,
             address: (),
-        } = postcard::from_bytes(sync_request).map_err(|e| anyhow::anyhow!(e))?
+        } = postcard::from_bytes(request_data).map_err(|e| anyhow::anyhow!(e))?
         else {
             bug!("Other sync types are not implemented");
         };
