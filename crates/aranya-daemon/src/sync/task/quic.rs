@@ -99,8 +99,7 @@ pub enum Error {
 pub struct State {
     /// QUIC client to make sync requests and handle sync responses.
     client: QuicClient,
-    /// Address -> Connection map used for re-using connections
-    /// when making outgoing sync requests
+    /// Address -> Connection map to lookup existing connections before creating a new connection.
     conns: BTreeMap<Addr, Connection>,
     /// PSK store shared between the daemon API server and QUIC syncer client and server.
     /// This store is modified by [`crate::api::DaemonApiServer`].
