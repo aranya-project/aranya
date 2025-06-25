@@ -442,34 +442,10 @@ impl DaemonApi for Api {
 
         match cfg.quic_sync {
             Some(qs_cfg) => {
-                let psk_store = self
-                    .quic
-                    .as_ref()
-                    .context("quic syncing is not enabled")?
-                    .psk_store
-                    .clone();
-
-                let seed = match &qs_cfg.seed_mode {
-                    SeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
-                    SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
-                    SeedMode::Wrapped { .. } => {
-                        return Err(api::Error::from_msg(
-                            "Cannot create team with existing wrapped PSK seed",
-                        ))
-                    }
-                };
-
-                self.add_seed(team_id, seed.clone()).await?;
-
-                for psk_res in seed.generate_psks(team_id) {
-                    let psk = psk_res.context("unable to generate psk")?;
-                    psk_store
-                        .insert(team_id, Arc::new(psk))
-                        .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
-                }
+                self.create_team_quic_sync(team_id, qs_cfg).await?;
             }
             None => {
-                warn!("Missing QUIC sync config");
+                warn!("Missing QUIC syqnc config");
 
                 let seed = qs::PskSeed::new(&mut Rng, team_id);
                 self.add_seed(team_id, seed).await?;
