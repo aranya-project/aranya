@@ -330,10 +330,15 @@ impl Typed for QuicSyncConfig {
 
 impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
-        Self::builder()
-            .mode(value.mode)
-            .build()
-            .expect("All fields are set")
+        let mut builder = Self::builder();
+        builder = match value.mode {
+            SeedMode::Generate => builder.gen_seed(),
+            SeedMode::IKM(ikm) => builder.seed_ikm(ikm),
+            SeedMode::Wrapped(wrapped_seed) => builder
+                .wrapped_seed(wrapped_seed)
+                .expect("set wrapped seed"),
+        };
+        builder.build().expect("All fields are set")
     }
 }
 

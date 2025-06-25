@@ -232,7 +232,7 @@ async fn test_add_team() -> Result<()> {
             TeamConfig::builder()
                 .quic_sync(
                     QuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed)?
+                        .wrapped_seed_from_bytes(&admin_seed)?
                         .build()?,
                 )
                 .build()?
@@ -354,7 +354,7 @@ async fn test_multi_team_sync() -> Result<()> {
                 TeamConfig::builder()
                     .quic_sync(
                         QuicSyncConfig::builder()
-                            .wrapped_seed(&admin_seed)?
+                            .wrapped_seed_from_bytes(&admin_seed)?
                             .build()?,
                     )
                     .build()?
