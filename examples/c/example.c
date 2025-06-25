@@ -290,9 +290,8 @@ AranyaError init_team(Team *t) {
     }
 
     AranyaSeedIkm ikm;
-    uint8_t *ptr = (uint8_t *)&ikm;
     for (uint8_t i = 0; i < sizeof(AranyaSeedIkm); i++) {
-        ptr[i] = i;
+        ikm.bytes[i] = i;
     }
     if (t->seed_mode == RAW_IKM) {
         err = aranya_quic_sync_config_raw_seed_ikm(&owner_quic_build, &ikm);
