@@ -157,7 +157,7 @@ impl State {
     /// Creates a new instance
     pub fn new(psk_store: Arc<PskStore>) -> SyncResult<Self>
 where {
-        // Create Client Config (INSECURE: Skips server cert verification)
+        // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
             .with_custom_certificate_verifier(SkipServerVerification::new())
