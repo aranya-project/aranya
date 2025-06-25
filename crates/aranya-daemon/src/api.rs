@@ -392,76 +392,93 @@ impl DaemonApi for Api {
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        if let Some(cfg) = cfg.quic_sync {
-            let psk_store = self
-                .quic
-                .as_ref()
-                .context("quic syncing is not enabled")?
-                .psk_store
-                .clone();
+        match cfg.quic_sync {
+            Some(cfg) => {
+                let psk_store = self
+                    .quic
+                    .as_ref()
+                    .context("quic syncing is not enabled")?
+                    .psk_store
+                    .clone();
 
-            let seed = match cfg.seed_mode {
-                SeedMode::Generate => {
-                    return Err(api::Error::from_msg(
-                        "Must provide PSK seed from team creation",
-                    ));
+                let seed = match cfg.seed_mode {
+                    SeedMode::Generate => {
+                        return Err(api::Error::from_msg(
+                            "Must provide PSK seed from team creation",
+                        ));
+                    }
+                    SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(&ikm, team),
+                    SeedMode::Wrapped(wrapped) => {
+                        let enc_sk: EncryptionKey<CS> = {
+                            let enc_id = self.pk.lock().expect("poisoned").enc_pk.id()?;
+                            let crypto = &mut *self.crypto.lock().await;
+                            crypto
+                                .aranya_store
+                                .get_key(&mut crypto.engine, enc_id.into_id())
+                                .context("keystore error")?
+                                .context("missing enc_sk in add_team")?
+                        };
+
+                        let group = GroupId::from(team.into_id());
+                        let seed = enc_sk
+                            .open_psk_seed(
+                                &wrapped.encap_key,
+                                wrapped.encrypted_seed,
+                                &wrapped.sender_pk,
+                                &group,
+                            )
+                            .context("could not open psk seed")?;
+                        qs::PskSeed(seed)
+                    }
+                };
+
+                self.add_seed(team, seed.clone()).await?;
+
+                for psk_res in seed.generate_psks(team) {
+                    let psk = psk_res.context("unable to generate psk")?;
+                    psk_store
+                        .insert(team, Arc::new(psk))
+                        .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
                 }
-                SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(&ikm, team),
-                SeedMode::Wrapped(wrapped) => {
-                    let enc_sk: EncryptionKey<CS> = {
-                        let enc_id = self.pk.lock().expect("poisoned").enc_pk.id()?;
-                        let crypto = &mut *self.crypto.lock().await;
-                        crypto
-                            .aranya_store
-                            .get_key(&mut crypto.engine, enc_id.into_id())
-                            .context("keystore error")?
-                            .context("missing enc_sk in add_team")?
-                    };
 
-                    let group = GroupId::from(team.into_id());
-                    let seed = enc_sk
-                        .open_psk_seed(
-                            &wrapped.encap_key,
-                            wrapped.encrypted_seed,
-                            &wrapped.sender_pk,
-                            &group,
-                        )
-                        .context("could not open psk seed")?;
-                    qs::PskSeed(seed)
-                }
-            };
-
-            self.add_seed(team, seed.clone()).await?;
-
-            for psk_res in seed.generate_psks(team) {
-                let psk = psk_res.context("unable to generate psk")?;
-                psk_store
-                    .insert(team, Arc::new(psk))
-                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+                Ok(())
             }
+            None => Err(anyhow!("Missing QUIC sync config").into()),
         }
-
-        // TODO: Implement for other syncer types
-        Ok(())
     }
 
     #[instrument(skip(self))]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        let mut errors = vec![];
         if let Some(data) = &self.quic {
-            data.psk_store
+            let _ = data
+                .psk_store
                 .remove(team)
-                .inspect_err(|err| error!(err = ?err, "unable to remove PSK"))?
+                .inspect_err(|err| error!(err = ?err, "unable to remove PSK"))
+                .map_err(|err| errors.push(err));
         }
 
-        self.seed_id_dir.remove(&team).await?;
-        self.client
+        let _ = self
+            .seed_id_dir
+            .remove(&team)
+            .await
+            .map_err(|err| errors.push(err));
+
+        let _ = self
+            .client
             .aranya
             .lock()
             .await
             .remove_graph(team.into_id().into())
-            .context("unable to remove graph from storage")?;
+            .context("unable to remove graph from storage")
+            .map_err(|err| errors.push(err));
 
-        Ok(())
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            // TODO(Steve): Concatenate errors. Preserve error chains
+            Err(errors.pop().expect("has at least 1 error").into())
+        }
     }
 
     #[instrument(skip(self))]
@@ -483,31 +500,39 @@ impl DaemonApi for Api {
         debug!(?graph_id);
         let team_id: api::TeamId = graph_id.into_id().into();
 
-        if let Some(qs_cfg) = cfg.quic_sync {
-            let psk_store = self
-                .quic
-                .as_ref()
-                .context("quic syncing is not enabled")?
-                .psk_store
-                .clone();
+        match cfg.quic_sync {
+            Some(qs_cfg) => {
+                let psk_store = self
+                    .quic
+                    .as_ref()
+                    .context("quic syncing is not enabled")?
+                    .psk_store
+                    .clone();
 
-            let seed = match &qs_cfg.seed_mode {
-                SeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
-                SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
-                SeedMode::Wrapped { .. } => {
-                    return Err(api::Error::from_msg(
-                        "Cannot create team with existing wrapped PSK seed",
-                    ))
+                let seed = match &qs_cfg.seed_mode {
+                    SeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
+                    SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
+                    SeedMode::Wrapped { .. } => {
+                        return Err(api::Error::from_msg(
+                            "Cannot create team with existing wrapped PSK seed",
+                        ))
+                    }
+                };
+
+                self.add_seed(team_id, seed.clone()).await?;
+
+                for psk_res in seed.generate_psks(team_id) {
+                    let psk = psk_res.context("unable to generate psk")?;
+                    psk_store
+                        .insert(team_id, Arc::new(psk))
+                        .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
                 }
-            };
+            }
+            None => {
+                warn!("Missing QUIC sync config");
 
-            self.add_seed(team_id, seed.clone()).await?;
-
-            for psk_res in seed.generate_psks(team_id) {
-                let psk = psk_res.context("unable to generate psk")?;
-                psk_store
-                    .insert(team_id, Arc::new(psk))
-                    .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+                let seed = qs::PskSeed::new(&mut Rng, team_id);
+                self.add_seed(team_id, seed).await?;
             }
         }
 
@@ -1097,13 +1122,13 @@ impl Api {
 
         let id = seed.id().context("getting seed id")?.into_id();
 
-        let key = crypto
+        let wrapped_key = crypto
             .engine
             .wrap(seed.clone().into_inner())
             .context("wrapping seed")?;
         crypto
             .local_store
-            .try_insert(id, key)
+            .try_insert(id, wrapped_key)
             .context("inserting seed")?;
 
         if let Err(e) = self

@@ -10,7 +10,7 @@ use aranya_daemon_api::{
         PublicApiKey,
     },
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
-    Text, Version, CS,
+    Text, Version, CS, SEED_IKM_SIZE,
 };
 use aranya_util::Addr;
 use buggy::BugExt as _;
@@ -243,10 +243,10 @@ impl Client {
             .map_err(aranya_error)
     }
 
-    /// Generate 32 random bytes from a CSPRNG.
+    /// Generate [`SEED_IKM_SIZE`] random bytes from a CSPRNG.
     /// Can be used as IKM for a generating a PSK seed.
-    pub async fn rand(&self) -> [u8; 32] {
-        let mut out = [0; 32];
+    pub async fn rand(&self) -> [u8; SEED_IKM_SIZE] {
+        let mut out = [0; SEED_IKM_SIZE];
         <Rng as Csprng>::fill_bytes(&mut Rng, &mut out);
 
         out
@@ -285,6 +285,8 @@ pub struct Team<'a> {
 
 impl Team<'_> {
     /// Encrypt PSK seed for peer.
+    /// `peer_enc_pk` is the public encryption key of the peer device.
+    /// See [`KeyBundle::encoding`].
     pub async fn encrypt_psk_seed_for_peer(&mut self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
             .context("bad peer_enc_pk")

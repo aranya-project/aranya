@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use aranya_daemon_api::SeedMode;
+use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
 use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
@@ -119,7 +119,7 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is valid in both [`super::Client::create_team`] and [`super::Team::add_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
-    pub fn seed_ikm(mut self, ikm: [u8; 32]) -> Self {
+    pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
         self.seed_mode = SeedMode::IKM(ikm);
         self
     }
