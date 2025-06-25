@@ -2,7 +2,7 @@ use std::{
     env, io, mem,
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 
 use anyhow::{anyhow, bail, Context as _, Result};
@@ -54,11 +54,17 @@ impl Default for MetricsConfig {
     fn default() -> Self {
         Self {
             // poll 4 times a second
-            collection_interval: Duration::from_millis(250),
+            collection_interval: Duration::from_millis(100),
 
             push_gateway_url: Some("http://localhost:9091".to_string()),
             push_interval: Duration::from_secs(1),
-            job_name: "aranya_demo".to_string(),
+            job_name: format!(
+                "aranya_demo_{}",
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs()
+            ),
 
             http_listen_addr: None,
         }
@@ -78,6 +84,8 @@ struct ProcessMetricsCollector {
     _start_time: Instant,
     /// Previous metrics for rate calculations
     previous_metrics: Option<AggregatedMetrics>,
+    /// Total cumulative metrics for this run
+    total_metrics: AggregatedMetrics,
 }
 
 #[derive(Debug)]
@@ -93,6 +101,20 @@ struct AggregatedMetrics {
     //total_network_rx_bytes: u64,
     //total_network_tx_bytes: u64,
     process_count: usize,
+}
+
+impl Default for AggregatedMetrics {
+    fn default() -> Self {
+        Self {
+            timestamp: Instant::now(),
+            total_cpu_user_time_us: 0,
+            total_cpu_system_time_us: 0,
+            total_memory_bytes: 0,
+            total_disk_read_bytes: 0,
+            total_disk_write_bytes: 0,
+            process_count: 0,
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -117,6 +139,7 @@ impl ProcessMetricsCollector {
             child_pids,
             _start_time: Instant::now(),
             previous_metrics: None,
+            total_metrics: AggregatedMetrics::default(),
         }
     }
 
@@ -124,13 +147,28 @@ impl ProcessMetricsCollector {
         let collection_start = Instant::now();
 
         // Collect metrics for the current moment
-        let current_metrics = self.collect_aggregated_metrics()?;
+        let current = self.collect_aggregated_metrics()?;
+
+        // Calculate our totals
+        self.total_metrics = AggregatedMetrics {
+            timestamp: current.timestamp,
+            process_count: current.process_count,
+            total_cpu_user_time_us: current.total_cpu_user_time_us,
+            total_cpu_system_time_us: current.total_cpu_system_time_us,
+            total_memory_bytes: current.total_memory_bytes,
+            // These need to be cumulative since sysinfo only returns bytes since last refresh.
+            total_disk_read_bytes: self.total_metrics.total_disk_read_bytes
+                + current.total_disk_read_bytes,
+            total_disk_write_bytes: self.total_metrics.total_disk_write_bytes
+                + current.total_disk_write_bytes,
+        };
+        println!("Total: {:?}", self.total_metrics);
 
         // Push those values to our backend
-        self.update_prometheus_metrics(&current_metrics)?;
+        self.update_prometheus_metrics(&current)?;
 
         // Save those metrics so we have that delta for the next tick
-        self.previous_metrics = Some(current_metrics);
+        self.previous_metrics = Some(current);
 
         // Record how long it took us to actually collect those metrics
         histogram!("metrics_collection_duration_microseconds")
@@ -162,6 +200,8 @@ impl ProcessMetricsCollector {
         }
 
         metrics.process_count = 1 + self.child_pids.len();
+        println!("{metrics:?}");
+        println!("Processed all metrics for this tick");
 
         Ok(metrics)
     }
@@ -181,7 +221,7 @@ impl ProcessMetricsCollector {
         // Always fallback to sysinfo for disk metrics.
         self.collect_sysinfo_disk_metrics(pid, &mut process_metrics)?;
 
-        println!("{:?}", process_metrics);
+        println!("{process_metrics:?}");
 
         // Aggregate this process's metrics towards the total.
         metrics.total_cpu_user_time_us += process_metrics.cpu_user_time_us;
@@ -273,6 +313,7 @@ impl ProcessMetricsCollector {
             ProcessRefreshKind::nothing().with_disk_usage(),
         );
 
+        // Note that this disk usage is "since last refresh", which in our case is last tick.
         if let Some(process) = self.system.process(pid) {
             let disk_usage = process.disk_usage();
             process_metrics.disk_read_bytes = disk_usage.read_bytes;
@@ -285,15 +326,16 @@ impl ProcessMetricsCollector {
     fn update_prometheus_metrics(&self, current: &AggregatedMetrics) -> Result<()> {
         // Update all absolute metrics.
         // TODO(nikki): add tags for individual PIDs so we can track each daemon?
-        gauge!("cpu_user_time_microseconds_total").set(current.total_cpu_user_time_us as f64);
-        gauge!("cpu_system_time_microseconds_total").set(current.total_cpu_system_time_us as f64);
-        gauge!("memory_total_bytes").set(current.total_memory_bytes as f64);
-        gauge!("disk_read_bytes_total").set(current.total_disk_read_bytes as f64);
-        gauge!("disk_write_bytes_total").set(current.total_disk_write_bytes as f64);
+        let total = &self.total_metrics;
+        gauge!("cpu_user_time_microseconds_total").set(total.total_cpu_user_time_us as f64);
+        gauge!("cpu_system_time_microseconds_total").set(total.total_cpu_system_time_us as f64);
+        gauge!("memory_total_bytes").set(total.total_memory_bytes as f64);
+        gauge!("disk_read_bytes_total").set(total.total_disk_read_bytes as f64);
+        gauge!("disk_write_bytes_total").set(total.total_disk_write_bytes as f64);
         // TODO(nikki): not sure if we should report these here/in each process at the syncer site.
-        //gauge!("network_rx_bytes_total").set(current.total_network_rx_bytes as f64);
-        //gauge!("network_tx_bytes_total").set(current.total_network_tx_bytes as f64);
-        gauge!("monitored_processes_count").set(current.process_count as f64);
+        //gauge!("network_rx_bytes_total").set(total.total_network_rx_bytes as f64);
+        //gauge!("network_tx_bytes_total").set(total.total_network_tx_bytes as f64);
+        gauge!("monitored_processes_count").set(total.process_count as f64);
 
         // Update rate metrics if we have a previous timestep.
         if let Some(previous) = &self.previous_metrics {
@@ -302,26 +344,28 @@ impl ProcessMetricsCollector {
                 .duration_since(previous.timestamp)
                 .as_secs_f64();
             if time_delta > 0.0 {
-                let cpu_user_rate = current
-                    .total_cpu_user_time_us
-                    .saturating_sub(previous.total_cpu_user_time_us)
-                    as f64;
-                let cpu_system_rate = current
-                    .total_cpu_system_time_us
-                    .saturating_sub(previous.total_cpu_system_time_us)
-                    as f64;
-                let disk_read_rate = current
-                    .total_disk_read_bytes
-                    .saturating_sub(previous.total_disk_read_bytes)
-                    as f64;
-                let disk_write_rate = current
-                    .total_disk_write_bytes
-                    .saturating_sub(previous.total_disk_write_bytes)
-                    as f64;
+                // proc_pidinfo returns cpu time since spinup, as well as "current" memory usage so
+                // we need to get the delta since the previous tick.
+                let cpu_user_rate = ((current.total_cpu_user_time_us as f64)
+                    - (previous.total_cpu_user_time_us as f64))
+                    / time_delta;
+                let cpu_system_rate = ((current.total_cpu_system_time_us as f64)
+                    - (previous.total_cpu_system_time_us as f64))
+                    / time_delta;
+                let memory_alloc_rate = ((current.total_memory_bytes as f64)
+                    - (previous.total_memory_bytes as f64))
+                    / time_delta;
+
+                // sysinfo already gives us the bytes "since last refresh", so this is fine.
+                let disk_read_rate = (current.total_disk_read_bytes as f64) / time_delta;
+                let disk_write_rate = (current.total_disk_write_bytes as f64) / time_delta;
+
+                println!("cpu_user_rate: {cpu_user_rate}, cpu_system_rate: {cpu_system_rate}, memory_alloc_rate: {memory_alloc_rate}, disk_read_rate: {disk_read_rate}, disk_write_rate: {disk_write_rate}");
 
                 gauge!("cpu_user_utilization_rate").set(cpu_user_rate);
                 gauge!("cpu_system_utilization_rate").set(cpu_system_rate);
                 gauge!("cpu_total_utilization_rate").set(cpu_user_rate + cpu_system_rate);
+                gauge!("memory_allocation_rate").set(memory_alloc_rate);
                 // TODO(nikki): standardize this on "per second", even if we tick more/less frequently?
                 gauge!("disk_read_bytes_rate").set(disk_read_rate);
                 gauge!("disk_write_bytes_rate").set(disk_write_rate);
@@ -422,6 +466,10 @@ fn setup_prometheus_exporter(config: &MetricsConfig) -> Result<()> {
     describe_gauge!(
         "cpu_total_utilization_rate",
         "Total CPU utilization since last tick"
+    );
+    describe_gauge!(
+        "memory_allocation_rate",
+        "Amount of allocated memory since last tick"
     );
     describe_gauge!(
         "disk_read_bytes_rate",
@@ -646,7 +694,7 @@ async fn main() -> Result<()> {
     let demo_result = run_demo_body(demo_context).await;
 
     // Wait a moment so we can make sure we capture all metrics state
-    sleep(Duration::from_secs(2)).await;
+    sleep(Duration::from_secs(1)).await;
 
     metrics_handle.abort();
 
