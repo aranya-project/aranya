@@ -215,6 +215,8 @@ impl server::SelectsPresharedKeys for PskStore {
 struct PskStoreInner {
     team_identities: HashMap<TeamId, Vec<Arc<PresharedKey>>>,
     identity_team: HashMap<PskIdAsKey, TeamId>,
+    /// Indicates the "active team".
+    /// Used by [`PskStore`] to restrict the PSKs that are offered by the client.
     active_team: Option<TeamId>,
 }
 
