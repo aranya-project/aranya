@@ -134,6 +134,11 @@ impl Daemon {
         let span_id = span.id();
 
         async move {
+            // TODO: Fix this when other syncer types are supported
+            let Some(_qs_config) = &cfg.quic_sync else {
+                anyhow::bail!("Supply a valid QUIC sync config")
+            };
+
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
             let mut eng = Self::load_crypto_engine(&cfg).await?;
@@ -209,11 +214,6 @@ impl Daemon {
                         .context("unable to clone keystore")?,
                     peers,
                 )
-            };
-
-            // TODO: Fix this when other syncer types are supported
-            let Some(_qs_config) = &cfg.quic_sync else {
-                anyhow::bail!("Supply a valid QUIC sync config")
             };
 
             let data = QSData { psk_store };
@@ -334,11 +334,6 @@ impl Daemon {
         )));
 
         let client = Client::new(Arc::clone(&aranya));
-
-        // TODO: Fix this when other syncer types are supported
-        let Some(_qs_config) = &cfg.quic_sync else {
-            anyhow::bail!("Supply a valid QUIC sync config")
-        };
 
         info!(addr = %external_sync_addr, "starting QUIC sync server");
         let server = SyncServer::new(
@@ -469,7 +464,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::{AfcConfig, QSConfig};
+    use crate::config::{AfcConfig, QuicSyncConfig};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -486,7 +481,7 @@ mod tests {
             logs_dir: work_dir.join("logs"),
             config_dir: work_dir.join("config"),
             sync_addr: any,
-            quic_sync: Some(QSConfig {}),
+            quic_sync: Some(QuicSyncConfig {}),
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,

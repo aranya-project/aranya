@@ -723,8 +723,8 @@ pub fn quic_sync_config_raw_seed(
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param cfg a pointer to the team config builder
-/// @param out a pointer to write the team config to
+/// @param cfg a pointer to the QUIC sync config builder [`QuicSyncConfigBuilder `]
+/// @param out a pointer to write the QUIC sync config to [`QuicSyncConfig`]
 pub fn quic_sync_config_build(
     cfg: OwnedPtr<QuicSyncConfigBuilder>,
     out: &mut MaybeUninit<QuicSyncConfig>,
