@@ -445,7 +445,7 @@ impl DaemonApi for Api {
                 self.create_team_quic_sync(team_id, qs_cfg).await?;
             }
             None => {
-                warn!("Missing QUIC syqnc config");
+                warn!("Missing QUIC sync config");
 
                 let seed = qs::PskSeed::new(&mut Rng, team_id);
                 self.add_seed(team_id, seed).await?;
