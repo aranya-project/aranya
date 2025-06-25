@@ -12,6 +12,40 @@ pub(crate) struct Data {
 }
 
 impl Api {
+    pub(super) async fn create_team_quic_sync(
+        &mut self,
+        team_id: api::TeamId,
+        qs_cfg: QuicSyncConfig,
+    ) -> api::Result<()> {
+        let psk_store = self
+            .quic
+            .as_ref()
+            .context("quic syncing is not enabled")?
+            .psk_store
+            .clone();
+
+        let seed = match &qs_cfg.seed_mode {
+            SeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
+            SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
+            SeedMode::Wrapped { .. } => {
+                return Err(api::Error::from_msg(
+                    "Cannot create team with existing wrapped PSK seed",
+                ))
+            }
+        };
+
+        self.add_seed(team_id, seed.clone()).await?;
+
+        for psk_res in seed.generate_psks(team_id) {
+            let psk = psk_res.context("unable to generate psk")?;
+            psk_store
+                .insert(team_id, Arc::new(psk))
+                .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+        }
+
+        Ok(())
+    }
+
     pub(super) async fn add_team_quic_sync(
         &mut self,
         team: api::TeamId,

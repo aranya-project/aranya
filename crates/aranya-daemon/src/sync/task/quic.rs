@@ -97,10 +97,9 @@ pub enum Error {
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
 pub struct State {
-    /// QUIC client to make sync requests and handle sync responses.
+    /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: QuicClient,
-    /// Address -> Connection map used for re-using connections
-    /// when making outgoing sync requests
+    /// Address -> Connection map to lookup existing connections before creating a new connection.
     conns: BTreeMap<Addr, Connection>,
     /// PSK store shared between the daemon API server and QUIC syncer client and server.
     /// This store is modified by [`crate::api::DaemonApiServer`].
@@ -157,7 +156,7 @@ impl State {
     /// Creates a new instance
     pub fn new(psk_store: Arc<PskStore>) -> SyncResult<Self>
 where {
-        // Create Client Config (INSECURE: Skips server cert verification)
+        // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
             .with_custom_certificate_verifier(SkipServerVerification::new())
