@@ -528,7 +528,12 @@ impl DaemonApi for Api {
                         .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
                 }
             }
-            None => warn!("Missing QUIC sync config"),
+            None => {
+                warn!("Missing QUIC sync config");
+
+                let seed = qs::PskSeed::new(&mut Rng, team_id);
+                self.add_seed(team_id, seed).await?;
+            }
         }
 
         Ok(team_id)
