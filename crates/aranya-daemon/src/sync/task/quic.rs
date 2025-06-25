@@ -10,6 +10,7 @@ use core::net::SocketAddr;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     future::Future,
+    net::Ipv4Addr,
     sync::{Arc, Mutex as SyncMutex},
 };
 
@@ -55,6 +56,13 @@ use crate::{
     },
 };
 
+mod psk;
+mod version;
+
+pub(crate) use psk::PskSeed;
+pub use psk::PskStore;
+pub use version::Version;
+
 const SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
 
 /// ALPN protocol identifier for Aranya QUIC sync.
@@ -67,13 +75,6 @@ const ALPN_QUIC_SYNC: &[u8] = const {
 /// QUIC Syncer Version
 const QUIC_SYNC_VERSION: Version = Version::V1;
 
-mod psk;
-mod version;
-
-pub(crate) use psk::PskSeed;
-pub use psk::PskStore;
-pub use version::Version;
-
 /// Errors specific to the QUIC syncer
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -85,14 +86,14 @@ pub enum Error {
     QuicStreamError(#[from] s2n_quic::stream::Error),
     /// QUIC client config error
     #[error("QUIC client config error: {0}")]
-    ClientConfig(anyhow::Error),
+    ClientConfig(buggy::Bug),
     // TODO: Improve message
     /// Invalid PSK used for syncing
     #[error("Invalid PSK used when attempting to sync")]
     InvalidPSK,
     /// QUIC server config error
     #[error("QUIC server config error: {0}")]
-    ServerConfig(anyhow::Error),
+    ServerConfig(buggy::Bug),
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
@@ -170,13 +171,13 @@ where {
 
         let client = QuicClient::builder()
             .with_tls(provider)
-            .context("QUIC client tls config")
+            .assume("can set quic client config")
             .map_err(Error::ClientConfig)?
-            .with_io("0.0.0.0:0")
-            .context("QUIC client io config")
+            .with_io((Ipv4Addr::UNSPECIFIED, 0))
+            .assume("can set quic client addr")
             .map_err(Error::ClientConfig)?
             .start()
-            .context("Could not start quic client")
+            .assume("can start quic client")
             .map_err(Error::ClientConfig)?;
 
         Ok(Self {
@@ -400,16 +401,16 @@ where
         // Use the rustls server provider
         let server = QuicServer::builder()
             .with_tls(tls_server_provider)
-            .context("QUIC server tls config")
+            .assume("can set sync server tls config")
             .map_err(Error::ServerConfig)? // Use the wrapped server config
             .with_io(addr)
-            .context("QUIC server io config")
+            .assume("can set sync server addr")
             .map_err(Error::ServerConfig)?
             .with_congestion_controller(Bbr::default())
-            .context("QUIC server congestion controller config")
+            .assume("can set congestion controller config")
             .map_err(Error::ServerConfig)?
             .start()
-            .context("Could not start QUIC server")?;
+            .assume("can start QUIC server")?;
 
         let active_team = Arc::new(SyncMutex::new(None));
         let mut set = JoinSet::new();
