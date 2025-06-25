@@ -147,6 +147,7 @@ impl TeamCtx {
         };
         info!(?team_id);
 
+        // Owner has the team added due to calling `create_team`, now we assign it to all other peers
         self.admin
             .client
             .team(team_id)
