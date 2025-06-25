@@ -335,7 +335,7 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Add a team to a device's local store
+    /// Add a team to local device storage.
     pub async fn add_team(&self, cfg: TeamConfig) -> Result<()> {
         self.client
             .daemon
