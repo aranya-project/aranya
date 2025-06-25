@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::CS;
 
+pub const SEED_IKM_SIZE: usize = 32;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct QuicSyncConfig {
     pub seed_mode: SeedMode,
@@ -16,7 +18,7 @@ pub enum SeedMode {
     /// The default option. Used in the create_team API
     Generate,
     /// Used in the create_team and add_team APIs
-    IKM([u8; 32]),
+    IKM([u8; SEED_IKM_SIZE]),
     /// Used in the add_team API
     Wrapped(WrappedSeed),
 }
