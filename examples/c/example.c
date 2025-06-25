@@ -289,10 +289,10 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    uint8_t *seed = calloc(ARANYA_SEED_LEN, 1);
+    // TODO: set IKM to something other than all zeros.
+    AranyaSeedIkm ikm;
     if (t->seed_mode == RAW_IKM) {
-        err = aranya_quic_sync_config_raw_seed(&owner_quic_build, seed,
-                                               ARANYA_SEED_LEN);
+        err = aranya_quic_sync_config_raw_seed_ikm(&owner_quic_build, &ikm);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr,
                     "unable to set `AranyaQuicSyncConfigBuilder` raw IKM seed"
@@ -424,8 +424,7 @@ AranyaError init_team(Team *t) {
         }
 
         if (t->seed_mode == RAW_IKM) {
-            err = aranya_quic_sync_config_raw_seed(&quic_build, seed,
-                                                   ARANYA_SEED_LEN);
+            err = aranya_quic_sync_config_raw_seed_ikm(&quic_build, &ikm);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
                         "unable to set `AranyaQuicSyncConfigBuilder` raw IKM "
@@ -433,27 +432,29 @@ AranyaError init_team(Team *t) {
                 return err;
             }
         } else {
-            uint8_t *seed   = calloc(ARANYA_WRAPPED_SEED_LEN, 1);
-            size_t seed_len = ARANYA_WRAPPED_SEED_LEN;
-            err             = aranya_psk_seed_encrypt_for_peer(
+            uint8_t *wrapped_seed   = calloc(ARANYA_WRAPPED_SEED_LEN, 1);
+            size_t wrapped_seed_len = 400;
+            err                     = aranya_psk_seed_encrypt_for_peer(
                 &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
-                t->clients_arr[i].pk_len, seed, &seed_len);
+                t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
                         "unable to encrypt psk seed for peer, seed_len=%zu\n",
-                        seed_len);
+                        wrapped_seed_len);
                 return err;
             }
-            AranyaEncapSeed encap_seed;
+            uint8_t *received_seed   = calloc(ARANYA_WRAPPED_SEED_LEN, 1);
+            size_t received_seed_len = 400;
             AranyaTeamId team_id_from_peer;
             err = aranya_psk_seed_receive_from_peer(
-                seed, seed_len, &team_id_from_peer, &encap_seed);
+                wrapped_seed, wrapped_seed_len, &team_id_from_peer,
+                received_seed, &received_seed_len);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr, "unable to receive psk seed from peer\n");
                 return err;
             }
-            err =
-                aranya_quic_sync_config_wrapped_seed(&quic_build, &encap_seed);
+            err = aranya_quic_sync_config_wrapped_seed(
+                &quic_build, received_seed, received_seed_len);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
                         "unable to set `AranyaQuicSyncConfigBuilder` wrapped "

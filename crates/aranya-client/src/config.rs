@@ -85,7 +85,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone)]
 pub struct QuicSyncConfig {
-    pub seed_mode: SeedMode,
+    seed_mode: SeedMode,
 }
 
 impl QuicSyncConfig {
@@ -96,7 +96,7 @@ impl QuicSyncConfig {
 
 #[derive(Clone, Default)]
 pub struct QuicSyncConfigBuilder {
-    pub seed_mode: SeedMode,
+    seed_mode: SeedMode,
 }
 
 impl QuicSyncConfigBuilder {

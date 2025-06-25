@@ -1,11 +1,10 @@
 use core::{ffi::c_char, mem::MaybeUninit, ptr};
 
-use anyhow::Context;
 use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::{SeedMode, TeamId};
+use aranya_daemon_api::{SeedMode, TeamId, SEED_IKM_SIZE};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -36,27 +35,8 @@ impl Seed {
     }
 }
 
-/// A wrapped, encapsulated PSK seed.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct EncapSeed {
-    seed: Vec<u8>,
-}
-
-impl EncapSeed {
-    /// Allocates new [`EncapSeed`].
-    pub fn new(seed: Vec<u8>) -> Self {
-        Self { seed }
-    }
-
-    /// Useful for deref coercion.
-    pub(crate) fn imp(&self) -> &Self {
-        self
-    }
-}
-
-impl Typed for EncapSeed {
-    const TYPE_ID: TypeId = TypeId::new(0x3DFFE1A0);
-}
+/// A wrapped encapsulated PSK seed.
+pub type EncapSeed = Vec<u8>;
 
 /// Information to send a peer containing the team ID and an encapsulated PSK seed.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -359,47 +339,41 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    mode: Option<SeedMode>,
+    mode: SeedMode,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     pub fn mode(&mut self, mode: SeedMode) {
-        self.mode = Some(mode);
+        self.mode = mode;
     }
 
     /// Sets mode to generate PSK seed.
     pub fn generate(&mut self) {
-        self.mode = Some(SeedMode::Generate);
+        self.mode = SeedMode::Generate;
     }
 
-    /// Sets wrapped PSK seed
+    /// Sets wrapped PSK seed.
     pub fn wrapped_seed(&mut self, encap_seed: EncapSeed) -> Result<(), Error> {
-        let wrapped = postcard::from_bytes(&encap_seed.seed).map_err(|err| {
+        let wrapped = postcard::from_bytes(&encap_seed).map_err(|err| {
             error!(?err);
             InvalidArg::new("wrapped_seed", "could not deserialize")
         })?;
-        self.mode = Some(SeedMode::Wrapped(wrapped));
+        self.mode = SeedMode::Wrapped(wrapped);
 
         Ok(())
     }
 
-    /// Sets raw PSK seed
-    pub fn raw_seed(&mut self, seed: Box<[u8]>) -> Result<(), Error> {
-        self.mode = Some(SeedMode::IKM(
-            seed.as_ref().try_into().context("invalid IKM")?,
-        ));
+    /// Sets raw PSK seed IKM.
+    pub fn raw_seed_ikm(&mut self, ikm: &[u8; SEED_IKM_SIZE]) -> Result<(), Error> {
+        self.mode = SeedMode::IKM(*ikm);
 
         Ok(())
     }
 
     /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig, Error> {
-        let Some(mode) = self.mode else {
-            return Err(InvalidArg::new("seed", "`seed` field not set").into());
-        };
-
-        Ok(QuicSyncConfig { mode })
+        Ok(QuicSyncConfig { mode: self.mode })
     }
 }
 
@@ -415,11 +389,7 @@ impl Builder for QuicSyncConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        let Some(mode) = self.mode else {
-            return Err(InvalidArg::new("seed", "`seed` field not set").into());
-        };
-
-        Self::Output::init(out, QuicSyncConfig { mode });
+        Self::Output::init(out, QuicSyncConfig { mode: self.mode });
         Ok(())
     }
 }

@@ -265,7 +265,7 @@ impl From<aranya_crypto::Id> for Id {
 pub const ARANYA_WRAPPED_SEED_LEN: usize = 304;
 
 /// The size in bytes of a PSK seed IKM.
-pub const ARANYA_SEED_LEN: usize = 32;
+pub const ARANYA_SEED_IKM_LEN: usize = 32;
 
 // PSK Seed
 #[aranya_capi_core::opaque(size = 56, align = 8)]
@@ -663,12 +663,6 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
 
-#[aranya_capi_core::opaque(size = 280, align = 8)]
-pub type EncapSeed = Safe<imp::EncapSeed>;
-
-#[aranya_capi_core::opaque(size = 312, align = 8)]
-pub type WrappedSeedForPeer = Safe<imp::WrappedSeedForPeer>;
-
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
@@ -697,10 +691,17 @@ pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), 
 /// Note: this mode is not currently supported.
 pub fn quic_sync_config_wrapped_seed(
     cfg: &mut QuicSyncConfigBuilder,
-    encap_seed: &EncapSeed,
+    encap_seed: &[u8],
 ) -> Result<(), imp::Error> {
-    cfg.wrapped_seed(encap_seed.imp().clone())?;
+    cfg.wrapped_seed(encap_seed.to_vec())?;
     Ok(())
+}
+
+/// Raw PSK seed IKM for QUIC syncer.
+#[repr(transparent)]
+#[derive(Copy, Clone, Debug)]
+pub struct SeedIkm {
+    bytes: [u8; ARANYA_SEED_IKM_LEN],
 }
 
 /// Attempts to set raw seed IKM value on [`QuicSyncConfigBuilder`].
@@ -709,12 +710,12 @@ pub fn quic_sync_config_wrapped_seed(
 /// with the memory pointed to by `cfg`.
 ///
 /// @param cfg a pointer to the quic sync config builder
-/// @param seed a pointer the raw PSK seed IKM
-pub fn quic_sync_config_raw_seed(
+/// @param ikm a pointer the raw PSK seed IKM
+pub fn quic_sync_config_raw_seed_ikm(
     cfg: &mut QuicSyncConfigBuilder,
-    seed: &[u8],
+    ikm: &SeedIkm,
 ) -> Result<(), imp::Error> {
-    cfg.raw_seed(Box::from(seed))?;
+    cfg.raw_seed_ikm(&ikm.bytes)?;
     Ok(())
 }
 
@@ -1024,7 +1025,7 @@ pub unsafe fn psk_seed_encrypt_for_peer(
             .team(team_id.into())
             .encrypt_psk_seed_for_peer(&keybundle.encoding),
     )?;
-    let peer_seed = imp::WrappedSeedForPeer::new(team_id.into(), imp::EncapSeed::new(wrapped_seed));
+    let peer_seed = imp::WrappedSeedForPeer::new(team_id.into(), wrapped_seed);
 
     // SAFETY: Must trust caller provides valid ptr/len for psk seed buffer.
     unsafe { peer_seed_serialize(&peer_seed, seed, seed_len)? }
@@ -1035,18 +1036,31 @@ pub unsafe fn psk_seed_encrypt_for_peer(
 ///
 /// @param[in] psk_bytes the serialized PSK bytes received from a peer.
 /// @param[out] team_id the team's ID [`TeamId`].
-/// @param[out] seed the encrypted PSK seed [`EncapSeed`].
+/// @param[out] seed the encrypted PSK seed.
+/// @param[out] seed_len the size in bytes of the encrypted PSK seed.
 ///
 /// Note: this function is not currently supported.
-pub fn psk_seed_receive_from_peer(
+pub unsafe fn psk_seed_receive_from_peer(
     psk_bytes: &[u8],
     team_id: &mut MaybeUninit<TeamId>,
-    seed: &mut MaybeUninit<EncapSeed>,
+    seed: *mut MaybeUninit<u8>,
+    seed_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let peer_seed = imp::peer_seed_deserialize(psk_bytes)?;
 
     team_id.write(peer_seed.get_team_id().into());
-    EncapSeed::init(seed, peer_seed.get_encap_seed());
+
+    let data = peer_seed.get_encap_seed();
+    if *seed_len < data.len() {
+        *seed_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    // SAFETY: Must trust caller provides valid ptr/len.
+    let out = aranya_capi_core::try_as_mut_slice!(seed, *seed_len);
+    for (dst, src) in out.iter_mut().zip(&data) {
+        dst.write(*src);
+    }
+    *seed_len = data.len();
 
     Ok(())
 }
