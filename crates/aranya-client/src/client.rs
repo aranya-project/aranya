@@ -285,6 +285,8 @@ pub struct Team<'a> {
 
 impl Team<'_> {
     /// Encrypt PSK seed for peer.
+    /// `peer_enc_pk` is the public encryption key of the peer device.
+    /// See [`KeyBundle::encoding`].
     pub async fn encrypt_psk_seed_for_peer(&mut self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
             .context("bad peer_enc_pk")
