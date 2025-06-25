@@ -13,7 +13,7 @@ use aranya_daemon_api::Text;
 use bytes::Bytes;
 use tracing::error;
 
-use crate::imp::{self, aqc::consume_bytes, peer_seed_serialize};
+use crate::imp::{self, aqc::consume_bytes};
 
 /// An error code.
 ///
@@ -663,12 +663,6 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
 
-#[aranya_capi_core::opaque(size = 280, align = 8)]
-pub type EncapSeed = Safe<imp::EncapSeed>;
-
-#[aranya_capi_core::opaque(size = 312, align = 8)]
-pub type WrappedSeedForPeer = Safe<imp::WrappedSeedForPeer>;
-
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
@@ -697,9 +691,9 @@ pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), 
 /// Note: this mode is not currently supported.
 pub fn quic_sync_config_wrapped_seed(
     cfg: &mut QuicSyncConfigBuilder,
-    encap_seed: &EncapSeed,
+    encap_seed: &[u8],
 ) -> Result<(), imp::Error> {
-    cfg.wrapped_seed(encap_seed.imp().clone())?;
+    cfg.wrapped_seed(encap_seed)?;
     Ok(())
 }
 
@@ -1024,29 +1018,17 @@ pub unsafe fn psk_seed_encrypt_for_peer(
             .team(team_id.into())
             .encrypt_psk_seed_for_peer(&keybundle.encoding),
     )?;
-    let peer_seed = imp::WrappedSeedForPeer::new(team_id.into(), imp::EncapSeed::new(wrapped_seed));
 
     // SAFETY: Must trust caller provides valid ptr/len for psk seed buffer.
-    unsafe { peer_seed_serialize(&peer_seed, seed, seed_len)? }
-    Ok(())
-}
-
-/// Receive encrypted PSK seed from a peer.
-///
-/// @param[in] psk_bytes the serialized PSK bytes received from a peer.
-/// @param[out] team_id the team's ID [`TeamId`].
-/// @param[out] seed the encrypted PSK seed [`EncapSeed`].
-///
-/// Note: this function is not currently supported.
-pub fn psk_seed_receive_from_peer(
-    psk_bytes: &[u8],
-    team_id: &mut MaybeUninit<TeamId>,
-    seed: &mut MaybeUninit<EncapSeed>,
-) -> Result<(), imp::Error> {
-    let peer_seed = imp::peer_seed_deserialize(psk_bytes)?;
-
-    team_id.write(peer_seed.get_team_id().into());
-    EncapSeed::init(seed, peer_seed.get_encap_seed());
+    let out = aranya_capi_core::try_as_mut_slice!(seed, *seed_len);
+    if *seed_len < wrapped_seed.len() {
+        *seed_len = wrapped_seed.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    for (dst, src) in out.iter_mut().zip(&wrapped_seed) {
+        dst.write(*src);
+    }
+    *seed_len = wrapped_seed.len();
 
     Ok(())
 }
