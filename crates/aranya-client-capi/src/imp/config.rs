@@ -11,30 +11,6 @@ use tracing::error;
 use super::Error;
 use crate::api::defs::{self, Duration};
 
-/// A QUIC syncer PSK seed.
-#[derive(Clone, Debug)]
-pub struct Seed {
-    pub(crate) inner: Box<[u8]>,
-}
-
-impl Typed for Seed {
-    const TYPE_ID: TypeId = TypeId::new(0x7B426A10);
-}
-
-impl Seed {
-    pub fn new(seed: Box<[u8]>) -> Self {
-        Self { inner: seed }
-    }
-
-    pub fn get_seed(&self) -> Self {
-        self.clone()
-    }
-
-    pub fn get_boxed(&self) -> Box<[u8]> {
-        self.inner.clone()
-    }
-}
-
 /// A wrapped encapsulated PSK seed.
 pub type EncapSeed = Vec<u8>;
 

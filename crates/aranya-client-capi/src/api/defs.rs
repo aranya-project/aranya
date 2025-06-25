@@ -263,10 +263,6 @@ impl From<aranya_crypto::Id> for Id {
 /// The size in bytes of a PSK seed IKM.
 pub const ARANYA_SEED_IKM_LEN: usize = 32;
 
-// PSK Seed
-#[aranya_capi_core::opaque(size = 56, align = 8)]
-pub type Seed = Safe<imp::Seed>;
-
 /// Team ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -665,12 +661,7 @@ pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
 
 /// Attempts to set PSK seed generation mode value on [`QuicSyncConfigBuilder`].
 ///
-/// This function consumes and releases any resources associated
-/// with the memory pointed to by `cfg`.
-///
 /// @param cfg a pointer to the quic sync config builder
-///
-/// Note: this mode is not currently supported.
 pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), imp::Error> {
     cfg.generate();
     Ok(())
@@ -678,13 +669,8 @@ pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), 
 
 /// Attempts to set wrapped PSK seed value on [`QuicSyncConfigBuilder`].
 ///
-/// This function consumes and releases any resources associated
-/// with the memory pointed to by `cfg`.
-///
 /// @param cfg a pointer to the quic sync config builder
 /// @param encap_seed a pointer the encapsulated PSK seed
-///
-/// Note: this mode is not currently supported.
 pub fn quic_sync_config_wrapped_seed(
     cfg: &mut QuicSyncConfigBuilder,
     encap_seed: &[u8],
@@ -700,10 +686,7 @@ pub struct SeedIkm {
     bytes: [u8; ARANYA_SEED_IKM_LEN],
 }
 
-/// Attempts to set raw seed IKM value on [`QuicSyncConfigBuilder`].
-///
-/// This function consumes and releases any resources associated
-/// with the memory pointed to by `cfg`.
+/// Attempts to set raw PSK seed IKM value on [`QuicSyncConfigBuilder`].
 ///
 /// @param cfg a pointer to the quic sync config builder
 /// @param ikm a pointer the raw PSK seed IKM
@@ -745,7 +728,7 @@ pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 /// this function
 ///
 /// @param cfg a pointer to the builder for a team config
-/// @param quic Set the QUIC syncer config
+/// @param quic set the QUIC syncer config
 pub fn team_config_builder_set_quic_syncer(
     cfg: &mut TeamConfigBuilder,
     quic: OwnedPtr<QuicSyncConfig>,
@@ -1008,8 +991,6 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 /// @param[out] seed_len the number of bytes written to the seed buffer.
 ///
 /// @relates AranyaClient.
-///
-/// Note: this function is not currently supported.
 pub unsafe fn psk_seed_encrypt_for_peer(
     client: &mut Client,
     team_id: &TeamId,
@@ -1039,8 +1020,6 @@ pub unsafe fn psk_seed_encrypt_for_peer(
 /// @param[out] team_id the team's ID [`TeamId`].
 /// @param[out] seed the encrypted PSK seed.
 /// @param[out] seed_len the size in bytes of the encrypted PSK seed.
-///
-/// Note: this function is not currently supported.
 pub unsafe fn psk_seed_receive_from_peer(
     psk_bytes: &[u8],
     team_id: &mut MaybeUninit<TeamId>,

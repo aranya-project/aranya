@@ -1178,7 +1178,7 @@ AranyaError aranya_team_config_builder_cleanup_ext(struct AranyaTeamConfigBuilde
  * this function
  *
  * @param cfg a pointer to the builder for a team config
- * @param quic Set the QUIC syncer config
+ * @param quic set the QUIC syncer config
  */
 AranyaError aranya_team_config_builder_set_quic_syncer(struct AranyaTeamConfigBuilder *cfg,
                                                        struct AranyaQuicSyncConfig *quic);
@@ -1191,7 +1191,7 @@ AranyaError aranya_team_config_builder_set_quic_syncer(struct AranyaTeamConfigBu
  * this function
  *
  * @param cfg a pointer to the builder for a team config
- * @param quic Set the QUIC syncer config
+ * @param quic set the QUIC syncer config
  */
 AranyaError aranya_team_config_builder_set_quic_syncer_ext(struct AranyaTeamConfigBuilder *cfg,
                                                            struct AranyaQuicSyncConfig *quic,
