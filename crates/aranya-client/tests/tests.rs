@@ -238,7 +238,6 @@ async fn test_add_team() -> Result<()> {
                 .build()?
         })
         .await?;
-    sleep(SLEEP_INTERVAL).await;
     admin.sync_now(owner_addr.into(), None).await?;
     sleep(SLEEP_INTERVAL).await;
 

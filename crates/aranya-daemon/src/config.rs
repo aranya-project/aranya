@@ -111,7 +111,7 @@ pub struct Config {
     pub aqc: Option<AqcConfig>,
 
     /// QUIC syncer config
-    pub quic_sync: Option<QSConfig>,
+    pub quic_sync: Option<QuicSyncConfig>,
 }
 
 impl Config {
@@ -220,7 +220,7 @@ pub struct AqcConfig {}
 /// QUIC syncer configuration.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct QSConfig {}
+pub struct QuicSyncConfig {}
 
 fn non_empty_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
 where
@@ -257,7 +257,7 @@ mod tests {
             logs_dir: "/var/log/aranya".parse()?,
             config_dir: "/etc/aranya".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
-            quic_sync: Some(QSConfig {}),
+            quic_sync: Some(QuicSyncConfig {}),
             afc: None,
             aqc: None,
         };
