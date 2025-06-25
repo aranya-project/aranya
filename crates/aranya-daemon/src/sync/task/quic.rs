@@ -97,7 +97,7 @@ pub enum Error {
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
 pub struct State {
-    /// QUIC client to make sync requests and handle sync responses.
+    /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: QuicClient,
     /// Address -> Connection map to lookup existing connections before creating a new connection.
     conns: BTreeMap<Addr, Connection>,
