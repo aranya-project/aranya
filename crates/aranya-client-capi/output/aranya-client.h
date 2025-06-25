@@ -325,13 +325,31 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
     uint8_t __for_size_only[40];
 } AranyaAqcConfig;
 
+typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[64];
+} AranyaQuicSyncConfigBuilder;
+
+typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[64];
+} AranyaQuicSyncConfig;
+
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[16];
+    uint8_t __for_size_only[64];
 } AranyaTeamConfigBuilder;
 
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
@@ -340,7 +358,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[24];
+    uint8_t __for_size_only[64];
 } AranyaTeamConfig;
 
 /**
@@ -955,6 +973,71 @@ AranyaError aranya_client_config_builder_set_aqc_config_ext(struct AranyaClientC
                                                             struct AranyaExtError *__ext_err);
 
 /**
+ * Initializes `AranyaQuicSyncConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaQuicSyncConfigBuilder
+ */
+AranyaError aranya_quic_sync_config_builder_init(struct AranyaQuicSyncConfigBuilder *out);
+
+/**
+ * Initializes `AranyaQuicSyncConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaQuicSyncConfigBuilder
+ */
+AranyaError aranya_quic_sync_config_builder_init_ext(struct AranyaQuicSyncConfigBuilder *out,
+                                                     struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_quic_sync_config_builder_init`.
+ *
+ * @relates AranyaQuicSyncConfigBuilder
+ */
+AranyaError aranya_quic_sync_config_builder_cleanup(struct AranyaQuicSyncConfigBuilder *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_quic_sync_config_builder_init`.
+ *
+ * @relates AranyaQuicSyncConfigBuilder
+ */
+AranyaError aranya_quic_sync_config_builder_cleanup_ext(struct AranyaQuicSyncConfigBuilder *ptr,
+                                                        struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to construct a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the QUIC sync config builder [`QuicSyncConfigBuilder `]
+ * @param out a pointer to write the QUIC sync config to [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ */
+AranyaError aranya_quic_sync_config_build(struct AranyaQuicSyncConfigBuilder *cfg,
+                                          struct AranyaQuicSyncConfig *out);
+
+/**
+ * Attempts to construct a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the QUIC sync config builder [`QuicSyncConfigBuilder `]
+ * @param out a pointer to write the QUIC sync config to [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ */
+AranyaError aranya_quic_sync_config_build_ext(struct AranyaQuicSyncConfigBuilder *cfg,
+                                              struct AranyaQuicSyncConfig *out,
+                                              struct AranyaExtError *__ext_err);
+
+/**
  * Initializes `AranyaTeamConfigBuilder`.
  *
  * When no longer needed, `out`'s resources must be released
@@ -1422,7 +1505,7 @@ AranyaError aranya_add_team_ext(struct AranyaClient *client,
                                 struct AranyaExtError *__ext_err);
 
 /**
- * Remove a team from the local device store.
+ * Remove a team from local device storage.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -1433,7 +1516,7 @@ AranyaError aranya_remove_team(struct AranyaClient *client,
                                const struct AranyaTeamId *team);
 
 /**
- * Remove a team from the local device store.
+ * Remove a team from local device storage.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
