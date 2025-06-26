@@ -15,26 +15,43 @@ pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
     custom_id,
-    default::{DefaultCipherSuite, DefaultEngine},
+    default::DefaultEngine,
+    id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    Id,
+    EncryptionPublicKey, Engine, Id,
 };
+pub use aranya_policy_text::{text, Text};
 use aranya_util::Addr;
 use buggy::Bug;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
+pub mod quic_sync;
+pub use quic_sync::*;
+
 /// CE = Crypto Engine
 pub type CE = DefaultEngine;
 /// CS = Cipher Suite
-pub type CS = DefaultCipherSuite;
+pub type CS = <DefaultEngine as Engine>::CS;
 
 /// An error returned by the API.
 // TODO: enum?
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Error(String);
+
+impl Error {
+    pub fn from_msg(err: &str) -> Self {
+        error!(?err);
+        Self(err.into())
+    }
+
+    pub fn from_err<E: error::Error>(err: E) -> Self {
+        error!(?err);
+        Self(format!("{err:?}"))
+    }
+}
 
 impl From<Bug> for Error {
     fn from(err: Bug) -> Self {
@@ -57,8 +74,8 @@ impl From<semver::Error> for Error {
     }
 }
 
-impl From<aranya_crypto::id::IdError> for Error {
-    fn from(err: aranya_crypto::id::IdError) -> Self {
+impl From<IdError> for Error {
+    fn from(err: IdError) -> Self {
         error!(%err);
         Self(err.to_string())
     }
@@ -116,15 +133,16 @@ pub enum Role {
     Member,
 }
 
+// Note: any fields added to this type should be public
 /// A configuration for creating or adding a team to a daemon.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TeamConfig {
-    // TODO(nikki): any fields added to this should be public
+    pub quic_sync: Option<QuicSyncConfig>,
 }
 
 /// A device's network identifier.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-pub struct NetIdentifier(pub String);
+pub struct NetIdentifier(pub Text);
 
 impl Borrow<str> for NetIdentifier {
     #[inline]
@@ -565,7 +583,7 @@ pub enum ChanOp {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Label {
     pub id: LabelId,
-    pub name: String,
+    pub name: Text,
 }
 
 #[tarpc::service]
@@ -594,13 +612,18 @@ pub trait DaemonApi {
     /// add a team to the local device store that was created by someone else. Not an aranya action/command.
     async fn add_team(team: TeamId, cfg: TeamConfig) -> Result<()>;
 
-    /// remove a team from the local device store.
+    /// Remove a team from local device storage.
     async fn remove_team(team: TeamId) -> Result<()>;
 
     /// Create a new graph/team with the current device as the owner.
     async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
+
+    async fn encrypt_psk_seed_for_peer(
+        team: TeamId,
+        peer_enc_pk: EncryptionPublicKey<CS>,
+    ) -> Result<WrappedSeed>;
 
     /// Add device to the team.
     async fn add_device_to_team(team: TeamId, keys: KeyBundle) -> Result<()>;
@@ -626,7 +649,7 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     // Create a label.
-    async fn create_label(team: TeamId, name: String) -> Result<LabelId>;
+    async fn create_label(team: TeamId, name: Text) -> Result<LabelId>;
     // Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     // Assign a label to a device.

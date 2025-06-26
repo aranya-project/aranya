@@ -6,7 +6,7 @@ use aranya_daemon_api::{LabelId, NetIdentifier, TeamId};
 use tarpc::context;
 use tracing::{debug, instrument};
 
-use super::{AqcBidiChannel, AqcPeerChannel, AqcSendChannel, TryReceiveError};
+use super::{net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcSendChannel};
 use crate::{
     error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
@@ -62,7 +62,7 @@ impl<'a> AqcChannels<'a> {
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created bidi channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0)
+        let peer_addr = tokio::net::lookup_host(peer.0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()
@@ -106,7 +106,7 @@ impl<'a> AqcChannels<'a> {
             .map_err(aranya_error)?;
         debug!(%label_id, num_psks = psks.len(), "created uni channel");
 
-        let peer_addr = tokio::net::lookup_host(peer.0)
+        let peer_addr = tokio::net::lookup_host(peer.0.as_str())
             .await
             .map_err(AqcError::AddrResolution)?
             .next()

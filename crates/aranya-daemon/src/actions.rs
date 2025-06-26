@@ -9,7 +9,7 @@ use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
-use aranya_policy_vm::Value;
+use aranya_policy_vm::{ident, Text, Value};
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
     VmPolicy,
@@ -122,7 +122,7 @@ where
 
         let total = sink.effects.len();
         for (i, effect) in sink.effects.iter().enumerate() {
-            debug!(i, total, effect = effect.name);
+            debug!(i, total, effect = effect.name.as_str());
         }
 
         Ok(sink.collect()?)
@@ -230,7 +230,7 @@ where
 
     /// Create a label.
     #[instrument(skip(self), fields(name = %name))]
-    fn create_label(&self, name: String) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn create_label(&self, name: Text) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
             actor.create_label(name)?;
             Ok(())
@@ -283,7 +283,7 @@ where
     fn set_aqc_network_name(
         &self,
         device_id: DeviceId,
-        net_identifier: String,
+        net_identifier: Text,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         info!(%device_id, %net_identifier, "setting AQC network name");
         self.with_actor(move |actor| {
@@ -313,7 +313,7 @@ where
         &self,
     ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {
         self.session_action(move || VmAction {
-            name: "query_aqc_network_names",
+            name: ident!("query_aqc_network_names"),
             args: Cow::Owned(vec![]),
         })
         .and_then(|(_, effects)| {
@@ -344,7 +344,7 @@ where
         label_id: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "create_aqc_bidi_channel",
+            name: ident!("create_aqc_bidi_channel"),
             args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
         })
         .in_current_span()
@@ -375,7 +375,7 @@ where
         label: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "create_aqc_uni_channel",
+            name: ident!("create_aqc_uni_channel"),
             args: Cow::Owned(vec![
                 Value::from(seal_id),
                 Value::from(open_id),
@@ -406,7 +406,7 @@ where
         &self,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_devices_on_team",
+            name: ident!("query_devices_on_team"),
             args: Cow::Owned(vec![]),
         })
         .in_current_span()
@@ -420,7 +420,7 @@ where
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_device_role",
+            name: ident!("query_device_role"),
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
         .in_current_span()
@@ -434,7 +434,7 @@ where
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_device_keybundle",
+            name: ident!("query_device_keybundle"),
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
         .in_current_span()
@@ -448,7 +448,7 @@ where
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_label_assignments",
+            name: ident!("query_label_assignments"),
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
         .in_current_span()
@@ -462,7 +462,7 @@ where
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_aqc_net_identifier",
+            name: ident!("query_aqc_net_identifier"),
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
         .in_current_span()
@@ -476,7 +476,7 @@ where
         label_id: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_label_exists",
+            name: ident!("query_label_exists"),
             args: Cow::Owned(vec![Value::from(label_id)]),
         })
         .in_current_span()
@@ -489,7 +489,7 @@ where
         &self,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
-            name: "query_labels",
+            name: ident!("query_labels"),
             args: Cow::Owned(vec![]),
         })
         .in_current_span()
