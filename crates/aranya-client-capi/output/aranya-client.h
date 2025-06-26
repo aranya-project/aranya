@@ -1640,35 +1640,6 @@ AranyaError aranya_encrypt_psk_seed_for_peer_ext(struct AranyaClient *client,
                                                  struct AranyaExtError *__ext_err);
 
 /**
- * Receive encrypted PSK seed from a peer.
- *
- * @param[in] psk_bytes the serialized PSK bytes received from a peer.
- * @param[out] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[out] seed the encrypted PSK seed.
- * @param[out] seed_len the size in bytes of the encrypted PSK seed.
- */
-AranyaError aranya_psk_seed_receive_from_peer(const uint8_t *psk_bytes,
-                                              size_t psk_bytes_len,
-                                              struct AranyaTeamId *team_id,
-                                              uint8_t *seed,
-                                              size_t *seed_len);
-
-/**
- * Receive encrypted PSK seed from a peer.
- *
- * @param[in] psk_bytes the serialized PSK bytes received from a peer.
- * @param[out] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param[out] seed the encrypted PSK seed.
- * @param[out] seed_len the size in bytes of the encrypted PSK seed.
- */
-AranyaError aranya_psk_seed_receive_from_peer_ext(const uint8_t *psk_bytes,
-                                                  size_t psk_bytes_len,
-                                                  struct AranyaTeamId *team_id,
-                                                  uint8_t *seed,
-                                                  size_t *seed_len,
-                                                  struct AranyaExtError *__ext_err);
-
-/**
  * Add a team to the local device store.
  *
  * NOTE: this function is unfinished and will panic if called.

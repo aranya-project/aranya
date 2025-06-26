@@ -291,7 +291,8 @@ AranyaError init_team(Team *t) {
 
     AranyaSeedIkm ikm;
     if (t->seed_mode == RAW_IKM) {
-        err = aranya_rand(&t->clients.owner.client, ikm.bytes, sizeof(ikm.bytes));
+        err =
+            aranya_rand(&t->clients.owner.client, ikm.bytes, sizeof(ikm.bytes));
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to generate random bytes\n");
             return err;
@@ -460,25 +461,8 @@ AranyaError init_team(Team *t) {
             // Note: this is where the team owner will send the encrypted PSK
             // seed to the peer.
 
-            printf("receiving PSK seed from peer\n");
-            size_t received_seed_len = 100;
-            uint8_t *received_seed   = calloc(received_seed_len, 1);
-            err                      = aranya_psk_seed_receive_from_peer(
-                wrapped_seed, wrapped_seed_len, &team_id_from_peer,
-                received_seed, &received_seed_len);
-            if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
-                printf("handling buffer too small error\n");
-                received_seed = realloc(received_seed, received_seed_len);
-                err           = aranya_psk_seed_receive_from_peer(
-                    wrapped_seed, wrapped_seed_len, &team_id_from_peer,
-                    received_seed, &received_seed_len);
-            }
-            if (err != ARANYA_ERROR_SUCCESS) {
-                fprintf(stderr, "unable to receive psk seed from peer\n");
-                return err;
-            }
             err = aranya_quic_sync_config_wrapped_seed(
-                &quic_build, received_seed, received_seed_len);
+                &quic_build, wrapped_seed, wrapped_seed_len);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
                         "unable to set `AranyaQuicSyncConfigBuilder` wrapped "

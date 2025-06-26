@@ -13,7 +13,7 @@ use aranya_daemon_api::Text;
 use bytes::Bytes;
 use tracing::error;
 
-use crate::imp::{self, aqc::consume_bytes, peer_seed_serialize};
+use crate::imp::{self, aqc::consume_bytes};
 
 /// An error code.
 ///
@@ -675,7 +675,7 @@ pub fn quic_sync_config_wrapped_seed(
     cfg: &mut QuicSyncConfigBuilder,
     encap_seed: &[u8],
 ) -> Result<(), imp::Error> {
-    cfg.wrapped_seed(encap_seed.to_vec())?;
+    cfg.wrapped_seed(encap_seed)?;
     Ok(())
 }
 
@@ -1027,40 +1027,16 @@ pub unsafe fn encrypt_psk_seed_for_peer(
             .team(team_id.into())
             .encrypt_psk_seed_for_peer(&keybundle.encoding),
     )?;
-    let peer_seed = imp::WrappedSeedForPeer::new(team_id.into(), wrapped_seed);
 
-    // SAFETY: Must trust caller provides valid ptr/len for psk seed buffer.
-    unsafe { peer_seed_serialize(&peer_seed, seed, seed_len)? }
-    Ok(())
-}
-
-/// Receive encrypted PSK seed from a peer.
-///
-/// @param[in] psk_bytes the serialized PSK bytes received from a peer.
-/// @param[out] team_id the team's ID [`TeamId`].
-/// @param[out] seed the encrypted PSK seed.
-/// @param[out] seed_len the size in bytes of the encrypted PSK seed.
-pub unsafe fn psk_seed_receive_from_peer(
-    psk_bytes: &[u8],
-    team_id: &mut MaybeUninit<TeamId>,
-    seed: *mut MaybeUninit<u8>,
-    seed_len: &mut usize,
-) -> Result<(), imp::Error> {
-    let peer_seed = imp::peer_seed_deserialize(psk_bytes)?;
-
-    team_id.write(peer_seed.get_team_id().into());
-
-    let data = peer_seed.get_encap_seed();
-    if *seed_len < data.len() {
-        *seed_len = data.len();
+    if *seed_len < wrapped_seed.len() {
+        *seed_len = wrapped_seed.len();
         return Err(imp::Error::BufferTooSmall);
     }
-    // SAFETY: Must trust caller provides valid ptr/len.
     let out = aranya_capi_core::try_as_mut_slice!(seed, *seed_len);
-    for (dst, src) in out.iter_mut().zip(&data) {
+    for (dst, src) in out.iter_mut().zip(&wrapped_seed) {
         dst.write(*src);
     }
-    *seed_len = data.len();
+    *seed_len = wrapped_seed.len();
 
     Ok(())
 }

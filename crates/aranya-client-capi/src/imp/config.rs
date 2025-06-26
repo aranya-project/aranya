@@ -4,70 +4,11 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::{SeedMode, TeamId, SEED_IKM_SIZE};
-use serde::{Deserialize, Serialize};
+use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
 use tracing::error;
 
 use super::Error;
 use crate::api::defs::{self, Duration};
-
-/// A wrapped encapsulated PSK seed.
-pub type EncapSeed = Vec<u8>;
-
-/// Information to send a peer containing the team ID and an encapsulated PSK seed.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct WrappedSeedForPeer {
-    team_id: TeamId,
-    seed: EncapSeed,
-}
-
-impl WrappedSeedForPeer {
-    /// Allocates new wrapped seed.
-    pub fn new(team_id: TeamId, seed: EncapSeed) -> Self {
-        Self { team_id, seed }
-    }
-
-    /// Returns the team ID.
-    pub fn get_team_id(&self) -> TeamId {
-        self.team_id
-    }
-
-    /// Returns the encapsulated PSK seed.
-    pub fn get_encap_seed(&self) -> EncapSeed {
-        self.seed.clone()
-    }
-}
-
-/// Serializes a [`WrappedSeedForPeer`] into the output buffer.
-pub unsafe fn peer_seed_serialize(
-    peer_seed: &WrappedSeedForPeer,
-    buf: *mut MaybeUninit<u8>,
-    buf_len: &mut usize,
-) -> Result<(), Error> {
-    let data = postcard::to_allocvec(&peer_seed)?;
-
-    if *buf_len < data.len() {
-        *buf_len = data.len();
-        return Err(Error::BufferTooSmall);
-    }
-    // SAFETY: Must trust caller provides valid ptr/len.
-    let out = aranya_capi_core::try_as_mut_slice!(buf, *buf_len);
-    for (dst, src) in out.iter_mut().zip(&data) {
-        dst.write(*src);
-    }
-    *buf_len = data.len();
-
-    Ok(())
-}
-
-/// Deserializes peer PSK seed buffer into a [`WrappedSeedForPeer`].
-pub fn peer_seed_deserialize(buf: &[u8]) -> Result<WrappedSeedForPeer, Error> {
-    Ok(postcard::from_bytes(buf)?)
-}
-
-impl Typed for WrappedSeedForPeer {
-    const TYPE_ID: TypeId = TypeId::new(0xCDF0E170);
-}
 
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
@@ -330,8 +271,8 @@ impl QuicSyncConfigBuilder {
     }
 
     /// Sets wrapped PSK seed.
-    pub fn wrapped_seed(&mut self, encap_seed: EncapSeed) -> Result<(), Error> {
-        let wrapped = postcard::from_bytes(&encap_seed).map_err(|err| {
+    pub fn wrapped_seed(&mut self, encap_seed: &[u8]) -> Result<(), Error> {
+        let wrapped = postcard::from_bytes(encap_seed).map_err(|err| {
             error!(?err);
             InvalidArg::new("wrapped_seed", "could not deserialize")
         })?;
