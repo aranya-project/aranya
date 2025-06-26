@@ -19,11 +19,15 @@ use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, instrument, trace};
 
+use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
+    sync::error::SyncError,
     vm_policy::VecSink,
     InvalidGraphs,
 };
+
+pub mod quic;
 
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
@@ -128,7 +132,7 @@ pub struct Syncer<ST> {
     /// Keeps track of invalid graphs due to finalization errors.
     invalid: InvalidGraphs,
     /// Additional state used by the syncer
-    _state: ST,
+    state: ST,
 }
 
 /// Types that contain additional data that are part of a [`Syncer`]
@@ -140,7 +144,7 @@ pub trait SyncState: Sized {
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> impl Future<Output = Result<()>> + Send
+    ) -> impl Future<Output = SyncResult<()>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
 }
@@ -151,7 +155,7 @@ impl<ST> Syncer<ST> {
         client: Client,
         send_effects: EffectSender,
         invalid: InvalidGraphs,
-        _state: ST,
+        state: ST,
     ) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Msg>(128);
         let peers = SyncPeers::new(send);
@@ -163,7 +167,7 @@ impl<ST> Syncer<ST> {
                 queue: DelayQueue::new(),
                 send_effects,
                 invalid,
-                _state,
+                state,
             },
             peers,
         )
@@ -187,7 +191,7 @@ impl<ST> Syncer<ST> {
 
 impl<ST: SyncState> Syncer<ST> {
     /// Syncs with the next peer in the list.
-    pub(crate) async fn next(&mut self) -> Result<()> {
+    pub(crate) async fn next(&mut self) -> SyncResult<()> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
@@ -225,12 +229,13 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = ?peer))]
-    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> Result<()> {
+    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<()> {
         trace!("syncing with peer");
         let effects: Vec<EF> = {
             let mut sink = VecSink::new();
             if let Err(e) = <ST as SyncState>::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
                 .await
+                .context("sync_peer error")
                 .inspect_err(|err| error!("{err:?}"))
             {
                 // If a finalization error has occurred, remove all sync peers for that team.
@@ -247,9 +252,10 @@ impl<ST: SyncState> Syncer<ST> {
                     });
                     self.invalid.insert(peer.graph_id);
                 }
-                return Err(e);
+                return Err(SyncError::Other(e));
             }
-            sink.collect()?
+            sink.collect()
+                .context("could not collect effects from sync")?
         };
         let n = effects.len();
         self.send_effects

@@ -109,6 +109,9 @@ pub struct Config {
     /// AQC configuration.
     #[serde(default)]
     pub aqc: Option<AqcConfig>,
+
+    /// QUIC syncer config
+    pub quic_sync: Option<QuicSyncConfig>,
 }
 
 impl Config {
@@ -162,6 +165,11 @@ impl Config {
         self.state_dir.join("storage")
     }
 
+    /// Path to file containing the seed IDs.
+    pub(crate) fn seed_id_path(&self) -> PathBuf {
+        self.state_dir.join("seeds")
+    }
+
     /// Path to the daemon's UDS API socket.
     pub fn uds_api_sock(&self) -> PathBuf {
         self.runtime_dir.join("uds.sock")
@@ -209,6 +217,11 @@ pub struct AfcConfig {
 #[serde(deny_unknown_fields)]
 pub struct AqcConfig {}
 
+/// QUIC syncer configuration.
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QuicSyncConfig {}
+
 fn non_empty_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
 where
     D: serde::Deserializer<'de>,
@@ -244,10 +257,12 @@ mod tests {
             logs_dir: "/var/log/aranya".parse()?,
             config_dir: "/etc/aranya".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
+            quic_sync: Some(QuicSyncConfig {}),
             afc: None,
             aqc: None,
         };
         assert_eq!(got, want);
+
         Ok(())
     }
 

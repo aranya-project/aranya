@@ -282,6 +282,7 @@ dependencies = [
  "aranya-device-ffi",
  "aranya-envelope-ffi",
  "aranya-idam-ffi",
+ "aranya-internal-s2n-quic",
  "aranya-keygen",
  "aranya-perspective-ffi",
  "aranya-policy-compiler",
@@ -293,6 +294,7 @@ dependencies = [
  "aranya-util",
  "bimap",
  "buggy",
+ "bytes",
  "ciborium",
  "clap",
  "deser-hjson",
@@ -305,6 +307,7 @@ dependencies = [
  "tarpc",
  "tempfile",
  "test-log",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-util",
  "tracing",
@@ -630,6 +633,7 @@ name = "aranya-util"
 version = "0.6.1"
 dependencies = [
  "anyhow",
+ "aranya-internal-s2n-quic",
  "buggy",
  "futures-util",
  "serde",
