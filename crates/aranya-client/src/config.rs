@@ -100,8 +100,14 @@ pub struct QuicSyncConfigBuilder {
 }
 
 impl QuicSyncConfigBuilder {
-    /// Sets the seed mode to 'Generate'.
-    /// This is the default mode.
+    /// Sets the PSK seed mode.
+    #[doc(hidden)]
+    pub fn mode(mut self, mode: SeedMode) -> Self {
+        self.seed_mode = mode;
+        self
+    }
+
+    /// Sets the seed to be generated.
     ///
     /// This option is only valid when used in [`super::Client::create_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`].

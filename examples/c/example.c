@@ -108,11 +108,18 @@ typedef struct {
     AranyaDeviceId id;
 } Client;
 
+// Which PSK seed mode to use for example.
+typedef enum {
+    GENERATE,
+    RAW_IKM,
+} PskSeedMode;
+
 // Aranya team.
 //
 // Contains the team ID and all Aranya clients for the devices on this example's
 // team.
 typedef struct {
+    PskSeedMode seed_mode;
     AranyaTeamId id;
     union {
         struct {
@@ -247,6 +254,12 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
 AranyaError init_team(Team *t) {
     AranyaError err;
 
+    Client *owner = &t->clients.owner;
+    Client *admin = &t->clients.admin;
+    Client *operator= & t->clients.operator;
+    Client *membera = &t->clients.membera;
+    Client *memberb = &t->clients.memberb;
+
     // initialize team clients.
     for (int i = 0; i < NUM_CLIENTS; i++) {
         printf("initializing client: %s\n", client_names[i]);
@@ -268,26 +281,75 @@ AranyaError init_team(Team *t) {
         }
     }
 
-    AranyaTeamConfigBuilder build;
-    err = aranya_team_config_builder_init(&build);
+    // Setup team config for owner device.
+    AranyaQuicSyncConfigBuilder owner_quic_build;
+    err = aranya_quic_sync_config_builder_init(&owner_quic_build);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
+        return err;
+    }
+
+    AranyaSeedIkm ikm;
+    if (t->seed_mode == RAW_IKM) {
+        err =
+            aranya_rand(&t->clients.owner.client, ikm.bytes, sizeof(ikm.bytes));
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to generate random bytes\n");
+            return err;
+        }
+        err = aranya_quic_sync_config_raw_seed_ikm(&owner_quic_build, &ikm);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr,
+                    "unable to set `AranyaQuicSyncConfigBuilder` raw IKM seed"
+                    "mode\n");
+            return err;
+        }
+    } else {
+        err = aranya_quic_sync_config_generate(&owner_quic_build);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr,
+                    "unable to set `AranyaQuicSyncConfigBuilder` generate"
+                    "mode\n");
+            return err;
+        }
+    }
+
+    AranyaQuicSyncConfig owner_quic_cfg;
+    err = aranya_quic_sync_config_build(&owner_quic_build, &owner_quic_cfg);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to init `AranyaQuicSyncConfig`\n");
+        return err;
+    }
+
+    AranyaTeamConfigBuilder owner_build;
+    err = aranya_team_config_builder_init(&owner_build);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
         return err;
     }
 
+    err = aranya_team_config_builder_set_quic_syncer(&owner_build,
+                                                     &owner_quic_cfg);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr,
+                "unable to set `QuicSyncConfig` for "
+                "`AranyaTeamConfigBuilder`\n");
+        return err;
+    }
+
     // NB: A builder's "_build" method consumes the builder, so
     // do _not_ call "_cleanup" afterward.
-    AranyaTeamConfig cfg;
-    err = aranya_team_config_build(&build, &cfg);
+    AranyaTeamConfig owner_cfg;
+    err = aranya_team_config_build(&owner_build, &owner_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
+        fprintf(stderr, "unable to init `AranyaTeamConfig`\n");
         return err;
     }
 
     // have owner create the team.
     // The `aranya_create_team` method is used to create a new graph for the
     // team to operate on.
-    err = aranya_create_team(&t->clients.owner.client, &cfg, &t->id);
+    err = aranya_create_team(&t->clients.owner.client, &owner_cfg, &t->id);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to create team\n");
         return err;
@@ -315,6 +377,139 @@ AranyaError init_team(Team *t) {
         return ARANYA_ERROR_OTHER;
     }
 
+    // Team members are added to the team by first calling
+    // `aranya_add_device_to_team`, passing in the submitter's client, the
+    // team ID and the public key of the device to be added. In a real world
+    // scenario, the keys would be exchanged outside of Aranya using
+    // something like `scp`.
+
+    // add admin to team.
+    err = aranya_add_device_to_team(&owner->client, &t->id, admin->pk,
+                                    admin->pk_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to add admin to team\n");
+        return err;
+    }
+
+    // add operator to team.
+    err = aranya_add_device_to_team(&owner->client,
+                                    &t->id, operator->pk, operator->pk_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to add operator to team\n");
+        return err;
+    }
+
+    // add membera to team.
+    err = aranya_add_device_to_team(&owner->client, &t->id, membera->pk,
+                                    membera->pk_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to add membera to team\n");
+        return err;
+    }
+
+    // add memberb to team.
+    err = aranya_add_device_to_team(&owner->client, &t->id, memberb->pk,
+                                    memberb->pk_len);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr, "unable to add memberb to team\n");
+        return err;
+    }
+
+    // add_team() for each non-owner device
+    for (int i = 1; i < NUM_CLIENTS; i++) {
+        printf("add_team() client: %s\n", client_names[i]);
+
+        // Setup team config for non-owner devices.
+        // QUIC syncer PSK must be set.
+        AranyaQuicSyncConfigBuilder quic_build;
+        err = aranya_quic_sync_config_builder_init(&quic_build);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
+            return err;
+        }
+
+        AranyaTeamId team_id_from_peer = t->id;
+        if (t->seed_mode == RAW_IKM) {
+            err = aranya_quic_sync_config_raw_seed_ikm(&quic_build, &ikm);
+            if (err != ARANYA_ERROR_SUCCESS) {
+                fprintf(stderr,
+                        "unable to set `AranyaQuicSyncConfigBuilder` raw IKM "
+                        "seed\n");
+                return err;
+            }
+        } else {
+            printf("encrypting PSK seed for peer\n");
+            size_t wrapped_seed_len = 100;
+            uint8_t *wrapped_seed   = calloc(wrapped_seed_len, 1);
+            err                     = aranya_encrypt_psk_seed_for_peer(
+                &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
+                t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
+            if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+                printf("handling buffer too small error\n");
+                wrapped_seed = realloc(wrapped_seed, wrapped_seed_len);
+                err          = aranya_encrypt_psk_seed_for_peer(
+                    &t->clients.owner.client, &t->id, t->clients_arr[i].pk,
+                    t->clients_arr[i].pk_len, wrapped_seed, &wrapped_seed_len);
+            }
+            if (err != ARANYA_ERROR_SUCCESS) {
+                fprintf(stderr,
+                        "unable to encrypt psk seed for peer, seed_len=%zu\n",
+                        wrapped_seed_len);
+                return err;
+            }
+
+            // Note: this is where the team owner will send the encrypted PSK
+            // seed to the peer.
+
+            err = aranya_quic_sync_config_wrapped_seed(
+                &quic_build, wrapped_seed, wrapped_seed_len);
+            if (err != ARANYA_ERROR_SUCCESS) {
+                fprintf(stderr,
+                        "unable to set `AranyaQuicSyncConfigBuilder` wrapped "
+                        "seed\n");
+                return err;
+            }
+        }
+
+        AranyaQuicSyncConfig quic_cfg;
+        err = aranya_quic_sync_config_build(&quic_build, &quic_cfg);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to init `AranyaQuicSyncConfig`\n");
+            return err;
+        }
+
+        AranyaTeamConfigBuilder build;
+        err = aranya_team_config_builder_init(&build);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
+            return err;
+        }
+
+        err = aranya_team_config_builder_set_quic_syncer(&build, &quic_cfg);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr,
+                    "unable to set `QuicSyncConfig` for "
+                    "`AranyaTeamConfigBuilder`\n");
+            return err;
+        }
+        // NB: A builder's "_build" method consumes the builder, so
+        // do _not_ call "_cleanup" afterward.
+        AranyaTeamConfig cfg;
+        err = aranya_team_config_build(&build, &cfg);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to init `AranyaTeamConfig`\n");
+            return err;
+        }
+
+        Client *client = &t->clients_arr[i];
+        err = aranya_add_team(&client->client, &team_id_from_peer, &cfg);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to add_team() for client: %s\n",
+                    client_names[i]);
+            return err;
+        }
+    }
+
     return ARANYA_ERROR_SUCCESS;
 }
 
@@ -324,6 +519,12 @@ AranyaError cleanup_team(Team *t) {
     AranyaError retErr = ARANYA_ERROR_SUCCESS;
 
     for (int i = 0; i < NUM_CLIENTS; i++) {
+        err = aranya_remove_team(&t->clients_arr[i].client, &t->id);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "error removing device from team %s: %s\n",
+                    t->clients_arr[i].name, aranya_error_to_str(err));
+            retErr = err;
+        }
         free(t->clients_arr[i].pk);
         err = aranya_client_cleanup(&t->clients_arr[i].client);
         if (err != ARANYA_ERROR_SUCCESS) {
@@ -383,16 +584,6 @@ AranyaError run(Team *t) {
     err = init_team(t);
     EXPECT("unable to initialize team", err);
 
-    // add admin to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, admin->pk,
-                                    admin->pk_len);
-    EXPECT("error adding admin to team", err);
-
-    // add operator to team.
-    err = aranya_add_device_to_team(&owner->client,
-                                    &t->id, operator->pk, operator->pk_len);
-    EXPECT("error adding operator to team", err);
-
     // upgrade role to admin.
     err = aranya_assign_role(&owner->client, &t->id, &admin->id,
                              ARANYA_ROLE_ADMIN);
@@ -443,22 +634,6 @@ AranyaError run(Team *t) {
     err = add_sync_peers(t, &cfg);
     EXPECT("error adding sync peers", err);
 
-    // Team members are added to the team by first calling
-    // `aranya_add_device_to_team`, passing in the submitter's client, the
-    // team ID and the public key of the device to be added. In a real world
-    // scenario, the keys would be exchanged outside of Aranya using
-    // something like `scp`.
-
-    // add membera to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, membera->pk,
-                                    membera->pk_len);
-    EXPECT("error adding membera to team", err);
-
-    // add memberb to team.
-    err = aranya_add_device_to_team(&owner->client, &t->id, memberb->pk,
-                                    memberb->pk_len);
-    EXPECT("error adding memberb to team", err);
-
     sleep(1);
 
     // assign AQC network addresses.
@@ -507,7 +682,7 @@ AranyaError run(Team *t) {
     }
 
     uint8_t memberb_keybundle[1024] = {0};
-    size_t memberb_keybundle_len   = sizeof(memberb_keybundle);
+    size_t memberb_keybundle_len    = sizeof(memberb_keybundle);
     err = aranya_query_device_keybundle(&operator->client, &t->id, &memberb->id,
                                         memberb_keybundle,
                                         &memberb_keybundle_len);
@@ -967,10 +1142,27 @@ exit:
     return err;
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
     Team team       = {0};
     AranyaError err = ARANYA_ERROR_OTHER;
     int retErr      = EXIT_SUCCESS;
+
+    // parse arguments.
+    team.seed_mode = GENERATE;
+    if (argc >= 2) {
+        char *seed_mode_arg = argv[1];
+        if (!strncmp(seed_mode_arg, "raw_seed_ikm", 10)) {
+            team.seed_mode = RAW_IKM;
+        }
+    }
+    switch (team.seed_mode) {
+    case GENERATE:
+        printf("PSK generate seed mode\n");
+        break;
+    case RAW_IKM:
+        printf("Raw PSK IKM seed mode\n");
+        break;
+    }
 
     // TODO: take work_dirs, shm_paths, daemon_socks, IP addresses as input?
 

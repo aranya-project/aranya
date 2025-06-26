@@ -10,6 +10,7 @@ use core::net::SocketAddr;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
     future::Future,
+    net::Ipv4Addr,
     sync::{Arc, Mutex as SyncMutex},
 };
 
@@ -47,36 +48,23 @@ use tokio::{
     task::JoinSet,
 };
 use tracing::{debug, error, info, instrument};
-use version::{check_version, VERSION_ERR};
 
 use super::SyncResponse;
 use crate::{
     aranya::Client as AranyaClient,
     sync::{
-        prot::SyncProtocol,
         task::{SyncState, Syncer},
         Result as SyncResult, SyncError,
     },
 };
 
-const SYNC_PROTOCOL: SyncProtocol = SyncProtocol::V1;
-
-/// ALPN protocol identifier for Aranya QUIC sync.
-const ALPN_QUIC_SYNC: &[u8] = const {
-    match SYNC_PROTOCOL {
-        SyncProtocol::V1 => b"quic_sync_v1",
-    }
-};
-
-/// QUIC Syncer Version
-const QUIC_SYNC_VERSION: Version = Version::V1;
-
 mod psk;
-mod version;
 
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
-pub use version::Version;
+
+/// ALPN protocol identifier for Aranya QUIC sync.
+const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
 
 /// Errors specific to the QUIC syncer
 #[derive(Debug, thiserror::Error)]
@@ -90,13 +78,15 @@ pub enum Error {
     /// QUIC client config error
     #[error("QUIC client config error: {0}")]
     ClientConfig(anyhow::Error),
-    // TODO: Improve message
     /// Invalid PSK used for syncing
     #[error("Invalid PSK used when attempting to sync")]
     InvalidPSK,
     /// QUIC server config error
     #[error("QUIC server config error: {0}")]
     ServerConfig(anyhow::Error),
+    /// An unexpected error occured
+    #[error("An unexpected error occured: {0}")]
+    Bug(buggy::Bug),
 }
 
 /// Key for looking up syncer peer cache in map.
@@ -121,12 +111,12 @@ pub type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
 pub struct State {
-    /// QUIC client to make sync requests and handle sync responses.
+    /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: QuicClient,
-    /// Address -> Connection map used for re-using connections
-    /// when making outgoing sync requests
+    /// Address -> Connection map to lookup existing connections before creating a new connection.
     conns: BTreeMap<Addr, Connection>,
-    /// Shared PSK store
+    /// PSK store shared between the daemon API server and QUIC syncer client and server.
+    /// This store is modified by [`crate::api::DaemonApiServer`].
     store: Arc<PskStore>,
 }
 
@@ -177,8 +167,9 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub fn new(psk_store: Arc<PskStore>) -> SyncResult<Self> {
-        // Create Client Config (INSECURE: Skips server cert verification)
+    pub fn new(psk_store: Arc<PskStore>) -> SyncResult<Self>
+where {
+        // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
             .with_custom_certificate_verifier(SkipServerVerification::new())
@@ -192,13 +183,13 @@ impl State {
 
         let client = QuicClient::builder()
             .with_tls(provider)
-            .context("QUIC client tls config")
+            .context("can't set quic client config")
             .map_err(Error::ClientConfig)?
-            .with_io("0.0.0.0:0")
-            .context("QUIC client io config")
-            .map_err(Error::ClientConfig)?
+            .with_io((Ipv4Addr::UNSPECIFIED, 0))
+            .assume("can set quic client addr")
+            .map_err(Error::Bug)?
             .start()
-            .context("Could not start quic client")
+            .context("can't start quic client")
             .map_err(Error::ClientConfig)?;
 
         Ok(Self {
@@ -296,11 +287,7 @@ impl Syncer<State> {
         debug!(?len, "sync poll finished");
         send_buf.truncate(len);
 
-        // TODO: `send_all`?
-        send.send(Bytes::from_owner([QUIC_SYNC_VERSION as u8]))
-            .await
-            .map_err(Error::from)?;
-        send.send(Bytes::from_owner(send_buf))
+        send.send(Bytes::from(send_buf))
             .await
             .map_err(Error::from)?;
         send.close().await.map_err(Error::from)?;
@@ -333,15 +320,8 @@ impl Syncer<State> {
             .context("failed to read sync response")?;
         debug!(?peer, n = recv_buf.len(), "received sync response");
 
-        // check sync version
-        let Some((version_byte, sync_response)) = recv_buf.split_first() else {
-            error!("Empty sync response");
-            return Err(anyhow::anyhow!("Empty sync request").into());
-        };
-        check_version(*version_byte, QUIC_SYNC_VERSION)?;
-
         // process the sync response.
-        let resp = postcard::from_bytes(sync_response)
+        let resp = postcard::from_bytes(&recv_buf)
             .context("postcard unable to deserialize sync response")?;
         let data = match resp {
             SyncResponse::Ok(data) => data,
@@ -431,16 +411,16 @@ where
         // Use the rustls server provider
         let server = QuicServer::builder()
             .with_tls(tls_server_provider)
-            .context("QUIC server tls config")
+            .context("can't set sync server tls config")
             .map_err(Error::ServerConfig)? // Use the wrapped server config
             .with_io(addr)
-            .context("QUIC server io config")
-            .map_err(Error::ServerConfig)?
+            .assume("can set sync server addr")
+            .map_err(Error::Bug)?
             .with_congestion_controller(Bbr::default())
-            .context("QUIC server congestion controller config")
+            .context("can't set congestion controller config")
             .map_err(Error::ServerConfig)?
             .start()
-            .context("Could not start QUIC server")?;
+            .context("can't start QUIC server")?;
 
         let active_team = Arc::new(SyncMutex::new(None));
         let mut set = JoinSet::new();
@@ -551,25 +531,14 @@ where
 
         let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
-            Err(SyncError::Version) => {
-                send.send(Bytes::from_owner([VERSION_ERR]))
-                    .await
-                    .map_err(Error::from)?;
-                send.close().await.map_err(Error::from)?;
-                return Ok(());
-            }
             Err(err) => SyncResponse::Err(format!("{err:?}")),
         };
         // Serialize the sync response.
         let data =
             postcard::to_allocvec(&resp).context("postcard unable to serialize sync response")?;
 
-        // TODO: `send_all`?
         let data_len = data.len();
-        send.send(Bytes::from_owner([QUIC_SYNC_VERSION as u8]))
-            .await
-            .context("Could not send version byte")?;
-        send.send(Bytes::from_owner(data))
+        send.send(Bytes::from(data))
             .await
             .context("Could not send sync response")?;
         send.close().await.map_err(Error::from)?;
@@ -589,20 +558,13 @@ where
     ) -> SyncResult<Box<[u8]>> {
         info!("server responding to sync request");
 
-        // Check sync version
-        let Some((version_byte, sync_request)) = request_data.split_first() else {
-            error!("Empty sync request");
-            return Err(anyhow::anyhow!("Empty sync request").into());
-        };
-        check_version(*version_byte, QUIC_SYNC_VERSION)?;
-
         let server_address = addr;
         let mut resp = SyncResponder::new(server_address);
 
         let SyncType::Poll {
             request: request_msg,
             address: peer_server_addr,
-        }: SyncType<Addr> = postcard::from_bytes(sync_request).map_err(|e| anyhow::anyhow!(e))?
+        }: SyncType<Addr> = postcard::from_bytes(request_data).map_err(|e| anyhow::anyhow!(e))?
         else {
             bug!("Other sync types are not implemented");
         };

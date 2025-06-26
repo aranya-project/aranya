@@ -1,10 +1,11 @@
 use core::{ffi::c_char, mem::MaybeUninit, ptr};
-use std::ops::Deref;
 
 use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
+use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
+use tracing::error;
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -226,10 +227,15 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
-    seed: Box<[u8]>,
+    mode: SeedMode,
 }
 
 impl QuicSyncConfig {
+    /// Useful for deref coercion.
+    pub(crate) fn imp(&self) -> Self {
+        self.clone()
+    }
+
     pub fn builder() -> QuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }
@@ -242,13 +248,7 @@ impl Typed for QuicSyncConfig {
 impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         Self::builder()
-            .seed_ikm(
-                value
-                    .seed
-                    .deref()
-                    .try_into()
-                    .expect("can convert to 32 byte array"),
-            ) // TODO: Update this to support other variants
+            .mode(value.mode)
             .build()
             .expect("All fields are set")
     }
@@ -256,23 +256,41 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    seed: Option<Box<[u8]>>,
+    mode: SeedMode,
 }
 
 impl QuicSyncConfigBuilder {
-    /// Sets the seed.
-    pub fn seed(mut self, seed: Box<[u8]>) -> Self {
-        self.seed = Some(seed);
-        self
+    /// Sets the PSK seed mode.
+    pub fn mode(&mut self, mode: SeedMode) {
+        self.mode = mode;
+    }
+
+    /// Sets mode to generate PSK seed.
+    pub fn generate(&mut self) {
+        self.mode = SeedMode::Generate;
+    }
+
+    /// Sets wrapped PSK seed.
+    pub fn wrapped_seed(&mut self, encap_seed: &[u8]) -> Result<(), Error> {
+        let wrapped = postcard::from_bytes(encap_seed).map_err(|err| {
+            error!(?err);
+            InvalidArg::new("wrapped_seed", "could not deserialize")
+        })?;
+        self.mode = SeedMode::Wrapped(wrapped);
+
+        Ok(())
+    }
+
+    /// Sets raw PSK seed IKM.
+    pub fn raw_seed_ikm(&mut self, ikm: &[u8; SEED_IKM_SIZE]) -> Result<(), Error> {
+        self.mode = SeedMode::IKM(*ikm);
+
+        Ok(())
     }
 
     /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig, Error> {
-        let Some(seed) = self.seed else {
-            return Err(InvalidArg::new("seed", "`seed` field not set").into());
-        };
-
-        Ok(QuicSyncConfig { seed })
+        Ok(QuicSyncConfig { mode: self.mode })
     }
 }
 
@@ -288,11 +306,7 @@ impl Builder for QuicSyncConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        let Some(seed) = self.seed else {
-            return Err(InvalidArg::new("seed", "`seed` field not set").into());
-        };
-
-        Self::Output::init(out, QuicSyncConfig { seed });
+        Self::Output::init(out, QuicSyncConfig { mode: self.mode });
         Ok(())
     }
 }
@@ -332,6 +346,13 @@ pub struct TeamConfigBuilder {
 
 impl Typed for TeamConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0x112905E7);
+}
+
+impl TeamConfigBuilder {
+    /// Sets the QUIC syncer config.
+    pub fn quic(&mut self, quic: QuicSyncConfig) {
+        self.quic_sync = Some(quic.clone());
+    }
 }
 
 impl Builder for TeamConfigBuilder {
