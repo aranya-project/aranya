@@ -102,7 +102,7 @@ impl DaemonApiServer {
             effect_handler,
             invalid,
             aqc,
-            crypto: Mutex::new(crypto),
+            crypto: tokio::sync::Mutex::new(crypto),
             seed_id_dir,
             quic,
         }));
@@ -242,7 +242,7 @@ struct ApiInner {
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,
     aqc: Arc<Aqc<CE, KS>>,
-    crypto: Mutex<Crypto>,
+    crypto: tokio::sync::Mutex<Crypto>,
     seed_id_dir: SeedDir,
     quic: Option<quic_sync::Data>,
 }
