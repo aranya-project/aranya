@@ -22,10 +22,7 @@ use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
 };
-use tokio::{
-    net::UnixListener,
-    sync::{mpsc, Mutex},
-};
+use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 
 use crate::{
@@ -90,7 +87,7 @@ impl DaemonApiServer {
             client,
             local_addr,
             pk: std::sync::Mutex::new(pk),
-            peers: Mutex::new(peers),
+            peers,
             effect_handler,
             invalid,
             aqc,
@@ -226,7 +223,7 @@ struct ApiInner {
     /// Public keys of current device.
     pk: std::sync::Mutex<PublicKeys<CS>>,
     /// Aranya sync peers,
-    peers: Mutex<SyncPeers>,
+    peers: SyncPeers,
     /// Handles graph effects from the syncer.
     effect_handler: EffectHandler,
     /// Keeps track of which graphs are invalid due to a finalization error.
@@ -306,8 +303,6 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.peers
-            .lock()
-            .await
             .add_peer(peer, team.into_id().into(), cfg)
             .await?;
         Ok(())
@@ -324,8 +319,6 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.peers
-            .lock()
-            .await
             .sync_now(peer, team.into_id().into(), cfg)
             .await?;
         Ok(())
@@ -341,8 +334,6 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.peers
-            .lock()
-            .await
             .remove_peer(peer, team.into_id().into())
             .await
             .context("unable to remove sync peer")?;
