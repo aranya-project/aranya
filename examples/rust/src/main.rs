@@ -358,7 +358,8 @@ async fn main() -> Result<()> {
     sleep(sleep_interval).await;
 
     // fact database queries
-    let mut queries = membera.client.queries(team_id);
+    let queries_team = membera.client.team(team_id);
+    let queries = queries_team.queries();
     let devices = queries.devices_on_team().await?;
     info!("membera devices on team: {:?}", devices.iter().count());
     let role = queries.device_role(membera.id).await?;
