@@ -227,7 +227,6 @@ dependencies = [
  "bytes",
  "postcard",
  "quote",
- "serde",
  "syn 2.0.99",
  "thiserror 2.0.12",
  "tokio",
