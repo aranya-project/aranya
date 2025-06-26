@@ -235,12 +235,17 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
-        self.daemon
+    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<Team<'_>> {
+        let team_id = self
+            .daemon
             .create_team(context::current(), cfg.into())
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
+            .map_err(aranya_error)?;
+        Ok(Team {
+            client: self,
+            id: team_id,
+        })
     }
 
     /// Generate random bytes from a CSPRNG.
@@ -252,6 +257,28 @@ impl Client {
     /// Get an existing team.
     pub fn team(&mut self, id: TeamId) -> Team<'_> {
         Team { client: self, id }
+    }
+
+    /// Add a team to local device storage.
+    pub async fn add_team(&mut self, team_id: TeamId, cfg: TeamConfig) -> Result<Team<'_>> {
+        self.daemon
+            .add_team(context::current(), team_id, cfg.into())
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(Team {
+            client: self,
+            id: team_id,
+        })
+    }
+
+    /// Remove a team from local device storage.
+    pub async fn remove_team(&mut self, team_id: TeamId) -> Result<()> {
+        self.daemon
+            .remove_team(context::current(), team_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
 
     /// Get access to Aranya QUIC Channels.
@@ -281,6 +308,11 @@ pub struct Team<'a> {
 }
 
 impl Team<'_> {
+    /// Return the team's team ID.
+    pub fn team_id(&self) -> TeamId {
+        self.id
+    }
+
     /// Encrypt PSK seed for peer.
     /// `peer_enc_pk` is the public encryption key of the peer device.
     /// See [`KeyBundle::encoding`].
@@ -327,26 +359,6 @@ impl Team<'_> {
         self.client
             .daemon
             .remove_sync_peer(context::current(), addr, self.id)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Add a team to local device storage.
-    pub async fn add_team(&self, cfg: TeamConfig) -> Result<()> {
-        self.client
-            .daemon
-            .add_team(context::current(), self.id, cfg.into())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Remove a team from local device storage.
-    pub async fn remove_team(&mut self) -> Result<()> {
-        self.client
-            .daemon
-            .remove_team(context::current(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)

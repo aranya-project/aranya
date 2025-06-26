@@ -976,7 +976,10 @@ pub fn revoke_label(
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
-    let team_id = client.rt.block_on(client.inner.create_team(cfg.into()))?;
+    let team_id = client
+        .rt
+        .block_on(client.inner.create_team(cfg.into()))?
+        .team_id();
 
     Ok(team_id.into())
 }
@@ -1056,7 +1059,7 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
     let cfg: &imp::TeamConfig = cfg.deref();
     client
         .rt
-        .block_on(client.inner.team(team.into()).add_team(cfg.into()))?;
+        .block_on(client.inner.add_team(team.into(), cfg.into()))?;
     Ok(())
 }
 
@@ -1068,9 +1071,7 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
 /// @relates AranyaClient.
 pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.imp();
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).remove_team())?;
+    client.rt.block_on(client.inner.remove_team(team.into()))?;
     Ok(())
 }
 
