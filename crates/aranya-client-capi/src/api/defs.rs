@@ -1046,8 +1046,6 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 
 /// Add a team to the local device store.
 ///
-/// NOTE: this function is unfinished and will panic if called.
-///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param cfg the Team Configuration [`TeamConfig`].
