@@ -1568,8 +1568,45 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
                                    struct AranyaExtError *__ext_err);
 
 /**
+ * Return random bytes from Aranya's CSPRNG.
+ * This method can be used to generate a PSK seed IKM for the QUIC syncer.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the random bytes.
+ * Writes the number of bytes that would have been returned to `rand_len`.
+ * The application can use `rand_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[out] rand buffer where random bytes are written to.
+ * @param[out] rand_len the number of bytes written to the rand buffer.
+ */
+AranyaError aranya_rand(struct AranyaClient *client,
+                        uint8_t *buf,
+                        size_t *buf_len);
+
+/**
+ * Return random bytes from Aranya's CSPRNG.
+ * This method can be used to generate a PSK seed IKM for the QUIC syncer.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the random bytes.
+ * Writes the number of bytes that would have been returned to `rand_len`.
+ * The application can use `rand_len` to allocate a larger buffer.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[out] rand buffer where random bytes are written to.
+ * @param[out] rand_len the number of bytes written to the rand buffer.
+ */
+AranyaError aranya_rand_ext(struct AranyaClient *client,
+                            uint8_t *buf,
+                            size_t *buf_len,
+                            struct AranyaExtError *__ext_err);
+
+/**
  * Return serialized PSK seed encrypted for another device on the team.
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the seed bytes.
+ * Writes the number of bytes that would have been returned to `seed_len`.
+ * The application can use `seed_len` to allocate a larger buffer.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -1579,7 +1616,7 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_psk_seed_encrypt_for_peer(struct AranyaClient *client,
+AranyaError aranya_encrypt_psk_seed_for_peer(struct AranyaClient *client,
                                              const struct AranyaTeamId *team_id,
                                              const uint8_t *keybundle,
                                              size_t keybundle_len,
@@ -1590,6 +1627,10 @@ AranyaError aranya_psk_seed_encrypt_for_peer(struct AranyaClient *client,
  * Return serialized PSK seed encrypted for another device on the team.
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
  *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the seed bytes.
+ * Writes the number of bytes that would have been returned to `seed_len`.
+ * The application can use `seed_len` to allocate a larger buffer.
+ *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
@@ -1598,7 +1639,7 @@ AranyaError aranya_psk_seed_encrypt_for_peer(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_psk_seed_encrypt_for_peer_ext(struct AranyaClient *client,
+AranyaError aranya_encrypt_psk_seed_for_peer_ext(struct AranyaClient *client,
                                                  const struct AranyaTeamId *team_id,
                                                  const uint8_t *keybundle,
                                                  size_t keybundle_len,

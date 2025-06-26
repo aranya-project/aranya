@@ -735,7 +735,7 @@ pub fn team_config_builder_set_quic_syncer(
 ) {
     // SAFETY: the user is responsible for passing in a valid QuicSyncConfig pointer.
     let quic = unsafe { quic.read() };
-    cfg.quic(&quic);
+    cfg.quic(quic.imp());
 }
 
 /// Attempts to construct a [`TeamConfig`].
@@ -981,8 +981,46 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
     Ok(team_id.into())
 }
 
+/// Return random bytes from Aranya's CSPRNG.
+/// This method can be used to generate a PSK seed IKM for the QUIC syncer.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the random bytes.
+/// Writes the number of bytes that would have been returned to `rand_len`.
+/// The application can use `rand_len` to allocate a larger buffer.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[out] rand buffer where random bytes are written to.
+/// @param[out] rand_len the number of bytes written to the rand buffer.
+pub unsafe fn rand(
+    client: &mut Client,
+    buf: *mut MaybeUninit<u8>,
+    buf_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+
+    let mut rand: Vec<u8> = vec![0; *buf_len];
+    client.rt.block_on(client.inner.rand(rand.as_mut_slice()));
+
+    if *buf_len < rand.len() {
+        *buf_len = rand.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+    // SAFETY: Must trust caller provides valid ptr/len.
+    let out = aranya_capi_core::try_as_mut_slice!(buf, *buf_len);
+    for (dst, src) in out.iter_mut().zip(&rand) {
+        dst.write(*src);
+    }
+    *buf_len = rand.len();
+
+    Ok(())
+}
+
 /// Return serialized PSK seed encrypted for another device on the team.
 /// The PSK seed will be encrypted using the public encryption key of the specified device on the team.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the seed bytes.
+/// Writes the number of bytes that would have been returned to `seed_len`.
+/// The application can use `seed_len` to allocate a larger buffer.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team_id the team's ID [`TeamId`].
@@ -991,7 +1029,7 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 /// @param[out] seed_len the number of bytes written to the seed buffer.
 ///
 /// @relates AranyaClient.
-pub unsafe fn psk_seed_encrypt_for_peer(
+pub unsafe fn encrypt_psk_seed_for_peer(
     client: &mut Client,
     team_id: &TeamId,
     keybundle: &[u8],

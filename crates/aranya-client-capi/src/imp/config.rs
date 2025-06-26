@@ -290,6 +290,11 @@ pub struct QuicSyncConfig {
 }
 
 impl QuicSyncConfig {
+    /// Useful for deref coercion.
+    pub(crate) fn imp(&self) -> Self {
+        self.clone()
+    }
+
     pub fn builder() -> QuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }
@@ -404,7 +409,7 @@ impl Typed for TeamConfigBuilder {
 
 impl TeamConfigBuilder {
     /// Sets the QUIC syncer config.
-    pub fn quic(&mut self, quic: &QuicSyncConfig) {
+    pub fn quic(&mut self, quic: QuicSyncConfig) {
         self.quic_sync = Some(quic.clone());
     }
 }
