@@ -1571,33 +1571,25 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
  * Return random bytes from Aranya's CSPRNG.
  * This method can be used to generate a PSK seed IKM for the QUIC syncer.
  *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the random bytes.
- * Writes the number of bytes that would have been returned to `rand_len`.
- * The application can use `rand_len` to allocate a larger buffer.
- *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[out] rand buffer where random bytes are written to.
- * @param[out] rand_len the number of bytes written to the rand buffer.
+ * @param[out] buf buffer where random bytes are written to.
+ * @param[in] buf_len the size of the buffer.
  */
 AranyaError aranya_rand(struct AranyaClient *client,
                         uint8_t *buf,
-                        size_t *buf_len);
+                        size_t buf_len);
 
 /**
  * Return random bytes from Aranya's CSPRNG.
  * This method can be used to generate a PSK seed IKM for the QUIC syncer.
  *
- * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the random bytes.
- * Writes the number of bytes that would have been returned to `rand_len`.
- * The application can use `rand_len` to allocate a larger buffer.
- *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[out] rand buffer where random bytes are written to.
- * @param[out] rand_len the number of bytes written to the rand buffer.
+ * @param[out] buf buffer where random bytes are written to.
+ * @param[in] buf_len the size of the buffer.
  */
 AranyaError aranya_rand_ext(struct AranyaClient *client,
                             uint8_t *buf,
-                            size_t *buf_len,
+                            size_t buf_len,
                             struct AranyaExtError *__ext_err);
 
 /**

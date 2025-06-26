@@ -1,7 +1,7 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 use core::{
     ffi::{c_char, CStr},
-    ptr,
+    ptr, slice,
 };
 use std::{ffi::OsStr, ops::Deref, os::unix::ffi::OsStrExt, str::FromStr};
 
@@ -984,35 +984,17 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 /// Return random bytes from Aranya's CSPRNG.
 /// This method can be used to generate a PSK seed IKM for the QUIC syncer.
 ///
-/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the random bytes.
-/// Writes the number of bytes that would have been returned to `rand_len`.
-/// The application can use `rand_len` to allocate a larger buffer.
-///
 /// @param[in] client the Aranya Client [`Client`].
-/// @param[out] rand buffer where random bytes are written to.
-/// @param[out] rand_len the number of bytes written to the rand buffer.
-pub unsafe fn rand(
-    client: &mut Client,
-    buf: *mut MaybeUninit<u8>,
-    buf_len: &mut usize,
-) -> Result<(), imp::Error> {
+/// @param[out] buf buffer where random bytes are written to.
+/// @param[in] buf_len the size of the buffer.
+pub unsafe fn rand(client: &mut Client, buf: &mut [MaybeUninit<u8>]) {
     let client = client.imp();
 
-    let mut rand: Vec<u8> = vec![0; *buf_len];
-    client.rt.block_on(client.inner.rand(rand.as_mut_slice()));
+    buf.fill(MaybeUninit::new(0));
+    // SAFETY: We just initialized the buf and are removing MaybeUninit.
+    let buf = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast::<u8>(), buf.len()) };
 
-    if *buf_len < rand.len() {
-        *buf_len = rand.len();
-        return Err(imp::Error::BufferTooSmall);
-    }
-    // SAFETY: Must trust caller provides valid ptr/len.
-    let out = aranya_capi_core::try_as_mut_slice!(buf, *buf_len);
-    for (dst, src) in out.iter_mut().zip(&rand) {
-        dst.write(*src);
-    }
-    *buf_len = rand.len();
-
-    Ok(())
+    client.rt.block_on(client.inner.rand(buf));
 }
 
 /// Return serialized PSK seed encrypted for another device on the team.

@@ -289,16 +289,14 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    size_t rand_len = sizeof(AranyaSeedIkm);
-    uint8_t *rand   = calloc(rand_len, 1);
-    err             = aranya_rand(&t->clients.owner.client, rand, &rand_len);
-    if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to generate random bytes\n");
-        return err;
-    }
+    AranyaSeedIkm ikm;
     if (t->seed_mode == RAW_IKM) {
-        err = aranya_quic_sync_config_raw_seed_ikm(&owner_quic_build,
-                                                   (AranyaSeedIkm *)&rand);
+        err = aranya_rand(&t->clients.owner.client, ikm.bytes, sizeof(ikm.bytes));
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to generate random bytes\n");
+            return err;
+        }
+        err = aranya_quic_sync_config_raw_seed_ikm(&owner_quic_build, &ikm);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr,
                     "unable to set `AranyaQuicSyncConfigBuilder` raw IKM seed"
@@ -431,8 +429,7 @@ AranyaError init_team(Team *t) {
 
         AranyaTeamId team_id_from_peer = t->id;
         if (t->seed_mode == RAW_IKM) {
-            err = aranya_quic_sync_config_raw_seed_ikm(&quic_build,
-                                                       (AranyaSeedIkm *)&rand);
+            err = aranya_quic_sync_config_raw_seed_ikm(&quic_build, &ikm);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
                         "unable to set `AranyaQuicSyncConfigBuilder` raw IKM "
