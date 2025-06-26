@@ -73,13 +73,16 @@ pub enum Error {
     QuicStreamError(#[from] s2n_quic::stream::Error),
     /// QUIC client config error
     #[error("QUIC client config error: {0}")]
-    ClientConfig(buggy::Bug),
+    ClientConfig(anyhow::Error),
     /// Invalid PSK used for syncing
     #[error("Invalid PSK used when attempting to sync")]
     InvalidPSK,
     /// QUIC server config error
     #[error("QUIC server config error: {0}")]
-    ServerConfig(buggy::Bug),
+    ServerConfig(anyhow::Error),
+    /// An unexpected error occured
+    #[error("An unexpected error occured: {0}")]
+    Bug(buggy::Bug),
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
@@ -157,13 +160,13 @@ where {
 
         let client = QuicClient::builder()
             .with_tls(provider)
-            .assume("can set quic client config")
+            .context("can't set quic client config")
             .map_err(Error::ClientConfig)?
             .with_io((Ipv4Addr::UNSPECIFIED, 0))
             .assume("can set quic client addr")
-            .map_err(Error::ClientConfig)?
+            .map_err(Error::Bug)?
             .start()
-            .assume("can start quic client")
+            .context("can't start quic client")
             .map_err(Error::ClientConfig)?;
 
         Ok(Self {
@@ -376,16 +379,16 @@ where
         // Use the rustls server provider
         let server = QuicServer::builder()
             .with_tls(tls_server_provider)
-            .assume("can set sync server tls config")
+            .context("can't set sync server tls config")
             .map_err(Error::ServerConfig)? // Use the wrapped server config
             .with_io(addr)
             .assume("can set sync server addr")
-            .map_err(Error::ServerConfig)?
+            .map_err(Error::Bug)?
             .with_congestion_controller(Bbr::default())
-            .assume("can set congestion controller config")
+            .context("can't set congestion controller config")
             .map_err(Error::ServerConfig)?
             .start()
-            .assume("can start QUIC server")?;
+            .context("can't start QUIC server")?;
 
         let active_team = Arc::new(SyncMutex::new(None));
         let mut set = JoinSet::new();
