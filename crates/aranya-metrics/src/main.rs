@@ -62,7 +62,7 @@ impl Default for MetricsConfig {
                 "aranya_demo_{}",
                 SystemTime::now()
                     .duration_since(UNIX_EPOCH)
-                    .unwrap()
+                    .expect("We're past the Unix Epoch")
                     .as_secs()
             ),
 
@@ -162,7 +162,6 @@ impl ProcessMetricsCollector {
             total_disk_write_bytes: self.total_metrics.total_disk_write_bytes
                 + current.total_disk_write_bytes,
         };
-        println!("Total: {:?}", self.total_metrics);
 
         // Push those values to our backend
         self.update_prometheus_metrics(&current)?;
@@ -171,6 +170,7 @@ impl ProcessMetricsCollector {
         self.previous_metrics = Some(current);
 
         // Record how long it took us to actually collect those metrics
+        #[allow(clippy::cast_precision_loss)]
         histogram!("metrics_collection_duration_microseconds")
             .record(collection_start.elapsed().as_micros() as f64);
 
@@ -200,8 +200,6 @@ impl ProcessMetricsCollector {
         }
 
         metrics.process_count = 1 + self.child_pids.len();
-        println!("{metrics:?}");
-        println!("Processed all metrics for this tick");
 
         Ok(metrics)
     }
@@ -211,7 +209,10 @@ impl ProcessMetricsCollector {
         // First, let's collect metrics for the individual process.
         let mut process_metrics = SingleProcessMetrics::default();
 
-        if let Err(_) = self.collect_native_macos_metrics(pid, &mut process_metrics) {
+        if self
+            .collect_native_macos_metrics(pid, &mut process_metrics)
+            .is_err()
+        {
             // If we're trying to track our own process, we can fallback to rusage.
             if pid == std::process::id() {
                 self.collect_rusage_metrics(&mut process_metrics)?;
@@ -220,8 +221,6 @@ impl ProcessMetricsCollector {
 
         // Always fallback to sysinfo for disk metrics.
         self.collect_sysinfo_disk_metrics(pid, &mut process_metrics)?;
-
-        println!("{process_metrics:?}");
 
         // Aggregate this process's metrics towards the total.
         metrics.total_cpu_user_time_us += process_metrics.cpu_user_time_us;
@@ -244,10 +243,14 @@ impl ProcessMetricsCollector {
         pid: u32,
         process_metrics: &mut SingleProcessMetrics,
     ) -> Result<()> {
+        // SAFETY: This has no alignment requirements, so mem::zeroed is safe.
         let mut task_info = unsafe { mem::zeroed::<proc_taskinfo>() };
 
+        #[allow(clippy::cast_possible_wrap)]
         let pid = pid as pid_t;
 
+        #[allow(clippy::cast_possible_wrap)]
+        // SAFETY: We should have a valid PID, as well as buffer.
         let result = unsafe {
             proc_pidinfo(
                 pid,
@@ -263,12 +266,13 @@ impl ProcessMetricsCollector {
             return Err(io::Error::from_raw_os_error(result).into());
         }
 
+        #[allow(clippy::cast_sign_loss)]
         if result as usize != size_of::<proc_taskinfo>() {
             return Err(anyhow!("Unable to obtain `proc_taskinfo` for PID {pid}!"));
         }
 
         // These are in nanoseconds, convert to microseconds. TODO(nikki): more precision?
-        process_metrics.cpu_system_time_us = task_info.pti_total_user / 1000;
+        process_metrics.cpu_user_time_us = task_info.pti_total_user / 1000;
         process_metrics.cpu_system_time_us = task_info.pti_total_system / 1000;
 
         process_metrics.memory_bytes = task_info.pti_resident_size;
@@ -276,8 +280,11 @@ impl ProcessMetricsCollector {
         Ok(())
     }
 
+    #[allow(clippy::cast_sign_loss)]
     fn collect_rusage_metrics(&self, process_metrics: &mut SingleProcessMetrics) -> Result<()> {
+        // SAFETY: This has no alignment requirements so mem::zeroed is safe for all variants.
         let mut usage = unsafe { mem::zeroed::<rusage>() };
+        // SAFETY: The above is safe and we're passing a valid pointer.
         let result = unsafe { getrusage(RUSAGE_SELF, &raw mut usage) };
 
         if result < 0 {
@@ -327,15 +334,19 @@ impl ProcessMetricsCollector {
         // Update all absolute metrics.
         // TODO(nikki): add tags for individual PIDs so we can track each daemon?
         let total = &self.total_metrics;
-        gauge!("cpu_user_time_microseconds_total").set(total.total_cpu_user_time_us as f64);
-        gauge!("cpu_system_time_microseconds_total").set(total.total_cpu_system_time_us as f64);
-        gauge!("memory_total_bytes").set(total.total_memory_bytes as f64);
-        gauge!("disk_read_bytes_total").set(total.total_disk_read_bytes as f64);
-        gauge!("disk_write_bytes_total").set(total.total_disk_write_bytes as f64);
-        // TODO(nikki): not sure if we should report these here/in each process at the syncer site.
-        //gauge!("network_rx_bytes_total").set(total.total_network_rx_bytes as f64);
-        //gauge!("network_tx_bytes_total").set(total.total_network_tx_bytes as f64);
-        gauge!("monitored_processes_count").set(total.process_count as f64);
+
+        #[allow(clippy::cast_precision_loss)]
+        {
+            gauge!("cpu_user_time_microseconds_total").set(total.total_cpu_user_time_us as f64);
+            gauge!("cpu_system_time_microseconds_total").set(total.total_cpu_system_time_us as f64);
+            gauge!("memory_total_bytes").set(total.total_memory_bytes as f64);
+            gauge!("disk_read_bytes_total").set(total.total_disk_read_bytes as f64);
+            gauge!("disk_write_bytes_total").set(total.total_disk_write_bytes as f64);
+            // TODO(nikki): not sure if we should report these here/in each process at the syncer site.
+            //gauge!("network_rx_bytes_total").set(total.total_network_rx_bytes as f64);
+            //gauge!("network_tx_bytes_total").set(total.total_network_tx_bytes as f64);
+            gauge!("monitored_processes_count").set(total.process_count as f64);
+        }
 
         // Update rate metrics if we have a previous timestep.
         if let Some(previous) = &self.previous_metrics {
@@ -343,6 +354,8 @@ impl ProcessMetricsCollector {
                 .timestamp
                 .duration_since(previous.timestamp)
                 .as_secs_f64();
+
+            #[allow(clippy::cast_precision_loss)]
             if time_delta > 0.0 {
                 // proc_pidinfo returns cpu time since spinup, as well as "current" memory usage so
                 // we need to get the delta since the previous tick.
@@ -359,8 +372,6 @@ impl ProcessMetricsCollector {
                 // sysinfo already gives us the bytes "since last refresh", so this is fine.
                 let disk_read_rate = (current.total_disk_read_bytes as f64) / time_delta;
                 let disk_write_rate = (current.total_disk_write_bytes as f64) / time_delta;
-
-                println!("cpu_user_rate: {cpu_user_rate}, cpu_system_rate: {cpu_system_rate}, memory_alloc_rate: {memory_alloc_rate}, disk_read_rate: {disk_read_rate}, disk_write_rate: {disk_write_rate}");
 
                 gauge!("cpu_user_utilization_rate").set(cpu_user_rate);
                 gauge!("cpu_system_utilization_rate").set(cpu_system_rate);
@@ -694,7 +705,7 @@ async fn main() -> Result<()> {
     let demo_result = run_demo_body(demo_context).await;
 
     // Wait a moment so we can make sure we capture all metrics state
-    sleep(Duration::from_secs(1)).await;
+    sleep(Duration::from_millis(500)).await;
 
     metrics_handle.abort();
 
@@ -728,25 +739,28 @@ async fn setup_demo() -> Result<(Vec<u32>, DemoContext)> {
         DaemonPath(PathBuf::from(exe))
     };
 
-    let mut daemon_pids: Vec<u32> = Vec::new();
-
     // TODO(nikki): move TeamId here?
 
     let team_name = "rust_example";
-    let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
-    daemon_pids.push(owner.daemon.pid().unwrap());
+    const CLIENT_NAMES: [&str; 5] = ["owner", "admin", "operator", "member_a", "member_b"];
+    let mut contexts: [Option<ClientCtx>; CLIENT_NAMES.len()] = Default::default();
+    let mut daemon_pids: Vec<u32> = Vec::with_capacity(CLIENT_NAMES.len());
 
-    let admin = ClientCtx::new(team_name, "admin", &daemon_path).await?;
-    daemon_pids.push(admin.daemon.pid().unwrap());
+    for (i, &user_name) in CLIENT_NAMES.iter().enumerate() {
+        let ctx = ClientCtx::new(team_name, user_name, &daemon_path).await?;
 
-    let operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
-    daemon_pids.push(operator.daemon.pid().unwrap());
+        if let Some(pid) = ctx.daemon.pid() {
+            daemon_pids.push(pid);
+        } else {
+            warn!("Daemon PID not available for user: {user_name}");
+        }
 
-    let membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
-    daemon_pids.push(membera.daemon.pid().unwrap());
+        contexts[i] = Some(ctx);
+    }
 
-    let memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
-    daemon_pids.push(memberb.daemon.pid().unwrap());
+    // If this panics, we have bigger things to worry about.
+    let [owner, admin, operator, membera, memberb] =
+        contexts.map(|ctx| ctx.expect("All contexts should have been initialized"));
 
     Ok((
         daemon_pids,
@@ -1015,6 +1029,9 @@ async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
     info!("completed aqc demo");
 
     info!("completed example Aranya application");
+
+    // sleep a moment so we can get a stable final state for all daemons
+    sleep(Duration::from_millis(500)).await;
 
     Ok(())
 }
