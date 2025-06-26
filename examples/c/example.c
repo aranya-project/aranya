@@ -429,6 +429,7 @@ AranyaError init_team(Team *t) {
             return err;
         }
 
+        AranyaTeamId team_id_from_peer = t->id;
         if (t->seed_mode == RAW_IKM) {
             err = aranya_quic_sync_config_raw_seed_ikm(&quic_build,
                                                        (AranyaSeedIkm *)&rand);
@@ -465,8 +466,7 @@ AranyaError init_team(Team *t) {
             printf("receiving PSK seed from peer\n");
             size_t received_seed_len = 100;
             uint8_t *received_seed   = calloc(received_seed_len, 1);
-            AranyaTeamId team_id_from_peer;
-            err = aranya_psk_seed_receive_from_peer(
+            err                      = aranya_psk_seed_receive_from_peer(
                 wrapped_seed, wrapped_seed_len, &team_id_from_peer,
                 received_seed, &received_seed_len);
             if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
@@ -521,7 +521,7 @@ AranyaError init_team(Team *t) {
         }
 
         Client *client = &t->clients_arr[i];
-        err            = aranya_add_team(&client->client, &t->id, &cfg);
+        err = aranya_add_team(&client->client, &team_id_from_peer, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to add_team() for client: %s\n",
                     client_names[i]);
