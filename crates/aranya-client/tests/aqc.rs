@@ -4,7 +4,7 @@ use std::time::Duration;
 
 mod common;
 use anyhow::Result;
-use aranya_client::{aqc::AqcPeerChannel, TeamConfig};
+use aranya_client::aqc::AqcPeerChannel;
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
 use aranya_daemon_api::{text, ChanOp};
 use buggy::BugExt;
@@ -12,7 +12,6 @@ use bytes::{Bytes, BytesMut};
 use common::{sleep, TeamCtx};
 use futures_util::future::try_join;
 use tempfile::tempdir;
-use tracing::info;
 
 /// Demonstrate nominal usage of AQC channels.
 /// 1. Create bidirectional and unidirectional AQC channels.
@@ -28,15 +27,10 @@ async fn test_aqc_chans() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
+    let team_id = team.create_and_add_team().await?;
+
+    sleep(sleep_interval).await;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -254,16 +248,8 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     let work_dir = tmp.path().to_path_buf();
 
     let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_sender", work_dir).await?;
-
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -341,15 +327,8 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_recvr", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -427,15 +406,8 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans_close_sender_stream", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -567,15 +539,8 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans_delete_chan_send", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
