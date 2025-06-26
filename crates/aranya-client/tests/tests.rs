@@ -126,8 +126,8 @@ async fn test_query_functions() -> Result<()> {
     team.add_all_device_roles(team_id).await?;
 
     // Test all our fact database queries.
-    let memberb = team.membera.client.team(team_id);
-    let queries = memberb.queries();
+    let mut memberb = team.membera.client.team(team_id);
+    let mut queries = memberb.queries();
 
     // First, let's check how many devices are on the team.
     let devices = queries.devices_on_team().await?;
