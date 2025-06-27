@@ -493,7 +493,7 @@ impl Team<'_> {
     pub fn queries(&mut self) -> Queries<'_> {
         Queries {
             client: self.client,
-            id: self.id,
+            team_id: self.team_id,
         }
     }
 }
