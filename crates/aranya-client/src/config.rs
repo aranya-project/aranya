@@ -1,6 +1,7 @@
 use core::time::Duration;
 
-use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
+use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE, TeamId};
+use serde::{Deserialize, Serialize};
 use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
@@ -146,6 +147,12 @@ impl QuicSyncConfigBuilder {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[non_exhaustive]
+pub enum TeamInfo {
+    V1 { id: TeamId, wrapped_seed: Vec<u8> },
+}
+
 #[derive(Clone)]
 /// Configuration info for adding and creating teams.
 pub struct TeamConfig {
@@ -192,6 +199,17 @@ impl TeamConfigBuilder {
         self.quic_sync = Some(cfg);
 
         self
+    }
+
+    pub fn init_from_team_info_v1(team_info: TeamInfo) -> Result<(Self, TeamId)> {
+        let TeamInfo::V1 { id, wrapped_seed } = team_info;
+
+        let builder = {
+            let qs_cfg = QuicSyncConfig::builder().wrapped_seed(&wrapped_seed)?.build()?;
+            Self::new().quic_sync(qs_cfg)
+        };
+
+        Ok((builder, id))
     }
 
     /// Attempts to build a [`TeamConfig`] using the provided parameters.
