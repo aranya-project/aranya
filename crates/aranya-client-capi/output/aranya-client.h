@@ -1642,8 +1642,6 @@ AranyaError aranya_encrypt_psk_seed_for_peer_ext(struct AranyaClient *client,
 /**
  * Add a team to the local device store.
  *
- * NOTE: this function is unfinished and will panic if called.
- *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
@@ -1656,8 +1654,6 @@ AranyaError aranya_add_team(struct AranyaClient *client,
 
 /**
  * Add a team to the local device store.
- *
- * NOTE: this function is unfinished and will panic if called.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
