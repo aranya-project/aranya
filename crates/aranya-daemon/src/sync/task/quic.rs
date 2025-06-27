@@ -249,7 +249,7 @@ impl Syncer<State> {
     where
         A: Serialize + DeserializeOwned + Clone,
     {
-        info!(?peer, "sending sync request to");
+        info!(?peer, "sending sync request to QUIC sync server");
         // Must lock aranya then caches to prevent deadlock.
         let mut aranya = self.client.aranya.lock().await;
         let key = PeerCacheKey::new(*peer, id);

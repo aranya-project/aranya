@@ -976,7 +976,10 @@ pub fn revoke_label(
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
-    let team_id = client.rt.block_on(client.inner.create_team(cfg.into()))?;
+    let team_id = client
+        .rt
+        .block_on(client.inner.create_team(cfg.into()))?
+        .team_id();
 
     Ok(team_id.into())
 }
@@ -1043,8 +1046,6 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 
 /// Add a team to the local device store.
 ///
-/// NOTE: this function is unfinished and will panic if called.
-///
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param cfg the Team Configuration [`TeamConfig`].
@@ -1056,7 +1057,7 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
     let cfg: &imp::TeamConfig = cfg.deref();
     client
         .rt
-        .block_on(client.inner.team(team.into()).add_team(cfg.into()))?;
+        .block_on(client.inner.add_team(team.into(), cfg.into()))?;
     Ok(())
 }
 
@@ -1238,7 +1239,7 @@ pub fn query_devices_on_team(
     let client = client.imp();
     let data = client
         .rt
-        .block_on(client.inner.queries(team.into()).devices_on_team())?;
+        .block_on(client.inner.team(team.into()).queries().devices_on_team())?;
     let data = data.__data();
     let Some(devices) = devices else {
         *devices_len = data.len();
@@ -1278,7 +1279,8 @@ pub unsafe fn query_device_keybundle(
     let keys = client.rt.block_on(
         client
             .inner
-            .queries(team.into())
+            .team(team.into())
+            .queries()
             .device_keybundle(device.into()),
     )?;
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
@@ -1312,7 +1314,8 @@ pub fn query_device_label_assignments(
     let data = client.rt.block_on(
         client
             .inner
-            .queries(team.into())
+            .team(team.into())
+            .queries()
             .device_label_assignments(device.into()),
     )?;
     let data = data.__data();
@@ -1355,7 +1358,7 @@ pub fn query_labels(
     let client = client.imp();
     let data = client
         .rt
-        .block_on(client.inner.queries(team.into()).labels())?;
+        .block_on(client.inner.team(team.into()).queries().labels())?;
     let data = data.__data();
     let Some(labels) = labels else {
         *labels_len = data.len();
@@ -1388,9 +1391,13 @@ pub unsafe fn query_label_exists(
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
     let client = client.imp();
-    let exists = client
-        .rt
-        .block_on(client.inner.queries(team.into()).label_exists(label.into()))?;
+    let exists = client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .queries()
+            .label_exists(label.into()),
+    )?;
     Ok(exists)
 }
 
@@ -1413,7 +1420,8 @@ pub unsafe fn query_aqc_net_identifier(
     let Some(net_identifier) = client.rt.block_on(
         client
             .inner
-            .queries(team.into())
+            .team(team.into())
+            .queries()
             .aqc_net_identifier(device.into()),
     )?
     else {
