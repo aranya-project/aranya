@@ -1,6 +1,6 @@
 use std::{
     env,
-    net::SocketAddr,
+    net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -79,14 +79,8 @@ struct ClientCtx {
 }
 
 impl ClientCtx {
-    pub async fn new(
-        team_name: &str,
-        user_name: &str,
-        daemon_path: &DaemonPath,
-        port: u16,
-    ) -> Result<Self> {
+    pub async fn new(team_name: &str, user_name: &str, daemon_path: &DaemonPath) -> Result<Self> {
         info!(team_name, user_name, "creating `ClientCtx`");
-        let aqc_addr = Addr::new("127.0.0.1", port).expect("unable to init AQC address");
 
         let work_dir = TempDir::with_prefix(user_name)?;
 
@@ -126,17 +120,20 @@ impl ClientCtx {
         // Give the daemon time to start up.
         sleep(Duration::from_millis(100)).await;
 
-        let (mut client, aqc_server_addr) = (|| {
+        let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
+
+        let mut client = (|| {
             Client::builder()
                 .with_daemon_api_pk(&pk)
                 .with_daemon_uds_path(&uds_api_path)
-                .with_daemon_aqc_addr(&aqc_addr)
+                .with_daemon_aqc_addr(&any_addr)
                 .connect()
         })
         .retry(ExponentialBuilder::default())
         .await
         .context("unable to initialize client")?;
 
+        let aqc_server_addr = client.aqc().server_addr().context("exepcted server addr")?;
         let pk = client
             .get_key_bundle()
             .await
@@ -203,11 +200,11 @@ async fn main() -> Result<()> {
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
     let team_name = "rust_example";
-    let mut owner = ClientCtx::new(&team_name, "owner", &daemon_path, 9001).await?;
-    let mut admin = ClientCtx::new(&team_name, "admin", &daemon_path, 9002).await?;
-    let mut operator = ClientCtx::new(&team_name, "operator", &daemon_path, 9003).await?;
-    let mut membera = ClientCtx::new(&team_name, "member_a", &daemon_path, 9004).await?;
-    let mut memberb = ClientCtx::new(&team_name, "member_b", &daemon_path, 9005).await?;
+    let mut owner = ClientCtx::new(&team_name, "owner", &daemon_path).await?;
+    let mut admin = ClientCtx::new(&team_name, "admin", &daemon_path).await?;
+    let mut operator = ClientCtx::new(&team_name, "operator", &daemon_path).await?;
+    let mut membera = ClientCtx::new(&team_name, "member_a", &daemon_path).await?;
+    let mut memberb = ClientCtx::new(&team_name, "member_b", &daemon_path).await?;
 
     // Create a team.
     info!("creating team");

@@ -227,10 +227,6 @@ criteria = "safe-to-deploy"
 version = "0.7.9"
 criteria = "safe-to-deploy"
 
-[[exemptions.deranged]]
-version = "0.4.0"
-criteria = "safe-to-run"
-
 [[exemptions.deser-hjson]]
 version = "2.2.4"
 criteria = "safe-to-deploy"
@@ -313,10 +309,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.ghash]]
 version = "0.5.1"
-criteria = "safe-to-deploy"
-
-[[exemptions.gimli]]
-version = "0.31.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.gloo-timers]]
@@ -455,10 +447,6 @@ criteria = "safe-to-run"
 version = "1.0.15"
 criteria = "safe-to-deploy"
 
-[[exemptions.pem]]
-version = "3.0.5"
-criteria = "safe-to-run"
-
 [[exemptions.pest]]
 version = "2.7.15"
 criteria = "safe-to-deploy"
@@ -551,10 +539,6 @@ criteria = "safe-to-deploy"
 version = "0.2.0"
 criteria = "safe-to-deploy"
 
-[[exemptions.rcgen]]
-version = "0.13.2"
-criteria = "safe-to-run"
-
 [[exemptions.redox_syscall]]
 version = "0.5.8"
 criteria = "safe-to-run"
@@ -581,6 +565,10 @@ criteria = "safe-to-deploy"
 
 [[exemptions.rustix]]
 version = "0.38.42"
+criteria = "safe-to-deploy"
+
+[[exemptions.rustls]]
+version = "0.23.26@git:fc478a5e9d8e2ab08b7d2d3b62f57b422033a18c"
 criteria = "safe-to-deploy"
 
 [[exemptions.rustls-pemfile]]
@@ -706,14 +694,6 @@ criteria = "safe-to-deploy"
 [[exemptions.thiserror-impl]]
 version = "2.0.6"
 criteria = "safe-to-deploy"
-
-[[exemptions.time]]
-version = "0.3.41"
-criteria = "safe-to-run"
-
-[[exemptions.time-core]]
-version = "0.1.4"
-criteria = "safe-to-run"
 
 [[exemptions.tokio]]
 version = "1.42.0"
@@ -877,10 +857,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.yansi]]
 version = "1.0.1"
-criteria = "safe-to-run"
-
-[[exemptions.yasna]]
-version = "0.5.2"
 criteria = "safe-to-run"
 
 [[exemptions.zerocopy]]
