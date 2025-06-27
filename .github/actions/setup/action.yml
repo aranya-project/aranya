@@ -42,3 +42,7 @@ runs:
     - name: Install cargo-make
       run: cargo install --version '0.37.23' --locked cargo-make
       shell: bash
+
+    - name: Install check-external-types
+      run: cargo install --version '0.2.0' --locked cargo-check-external-types
+      shell: bash

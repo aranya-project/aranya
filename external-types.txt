@@ -1,0 +1,961 @@
+Examining all public types...
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/aqc/api.rs:195:5
+    |
+195 |     #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
+    |     ^---------------------------------------------------------^
+    |
+    = in argument named `label_id` of `aranya_client::aqc::AqcChannels::AqcChannels::create_bidi_channel`
+
+error: Unapproved external type `aranya_daemon_api::service::NetIdentifier` referenced in public API
+   --> crates/aranya-client/src/aqc/api.rs:195:5
+    |
+195 |     #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
+    |     ^---------------------------------------------------------^
+    |
+    = in argument named `peer` of `aranya_client::aqc::AqcChannels::AqcChannels::create_bidi_channel`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/aqc/api.rs:195:5
+    |
+195 |     #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
+    |     ^---------------------------------------------------------^
+    |
+    = in argument named `team_id` of `aranya_client::aqc::AqcChannels::AqcChannels::create_bidi_channel`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/aqc/api.rs:240:5
+    |
+240 |     #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
+    |     ^---------------------------------------------------------^
+    |
+    = in argument named `label_id` of `aranya_client::aqc::AqcChannels::AqcChannels::create_uni_channel`
+
+error: Unapproved external type `aranya_daemon_api::service::NetIdentifier` referenced in public API
+   --> crates/aranya-client/src/aqc/api.rs:240:5
+    |
+240 |     #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
+    |     ^---------------------------------------------------------^
+    |
+    = in argument named `peer` of `aranya_client::aqc::AqcChannels::AqcChannels::create_uni_channel`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/aqc/api.rs:240:5
+    |
+240 |     #[instrument(skip_all, fields(%team_id, %peer, %label_id))]
+    |     ^---------------------------------------------------------^
+    |
+    = in argument named `team_id` of `aranya_client::aqc::AqcChannels::AqcChannels::create_uni_channel`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+  --> crates/aranya-client/src/aqc/net/channels.rs:69:5
+   |
+69 |     pub fn label_id(&self) -> LabelId {
+   | ...
+71 |     }␊
+   |     ^
+   |
+   = in return value of `aranya_client::aqc::AqcSenderChannel::AqcSenderChannel::label_id`
+
+error: Unapproved external type `aranya_crypto::aqc::uni::UniChannelId` referenced in public API
+  --> crates/aranya-client/src/aqc/net/channels.rs:74:5
+   |
+74 |     pub fn aqc_id(&self) -> UniChannelId {
+   | ...
+76 |     }␊
+   |     ^
+   |
+   = in return value of `aranya_client::aqc::AqcSenderChannel::AqcSenderChannel::aqc_id`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:120:5
+    |
+120 |     pub fn label_id(&self) -> LabelId {
+    | ...
+122 |     }␊
+    |     ^
+    |
+    = in return value of `aranya_client::aqc::AqcReceiveChannel::AqcReceiveChannel::label_id`
+
+error: Unapproved external type `aranya_crypto::aqc::uni::UniChannelId` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:125:5
+    |
+125 |     pub fn aqc_id(&self) -> UniChannelId {
+    | ...
+127 |     }␊
+    |     ^
+    |
+    = in return value of `aranya_client::aqc::AqcReceiveChannel::AqcReceiveChannel::aqc_id`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:172:5
+    |
+172 |     pub fn label_id(&self) -> LabelId {
+    | ...
+174 |     }␊
+    |     ^
+    |
+    = in return value of `aranya_client::aqc::AqcBidiChannel::AqcBidiChannel::label_id`
+
+error: Unapproved external type `aranya_crypto::aqc::bidi::BidiChannelId` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:177:5
+    |
+177 |     pub fn aqc_id(&self) -> BidiChannelId {
+    | ...
+179 |     }␊
+    |     ^
+    |
+    = in return value of `aranya_client::aqc::AqcBidiChannel::AqcBidiChannel::aqc_id`
+
+error: Unapproved external type `bytes::bytes::Bytes` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:262:5
+    |
+262 |     pub async fn send(&mut self, data: Bytes) -> Result<(), AqcError> {
+    | ...
+265 |     }␊
+    |     ^
+    |
+    = in argument named `data` of `aranya_client::aqc::AqcBidiStream::AqcBidiStream::send`
+
+error: Unapproved external type `bytes::bytes::Bytes` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:279:5
+    |
+279 |     pub async fn receive(&mut self) -> Result<Option<Bytes>, AqcError> {
+    | ...
+281 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::aqc::AqcBidiStream::AqcBidiStream::receive`
+
+error: Unapproved external type `bytes::bytes::Bytes` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:289:5
+    |
+289 |     pub fn try_receive(&mut self) -> Result<Bytes, TryReceiveError> {
+    | ...
+297 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::aqc::AqcBidiStream::AqcBidiStream::try_receive`
+
+error: Unapproved external type `bytes::bytes::Bytes` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:311:5
+    |
+311 |     pub async fn receive(&mut self) -> Result<Option<Bytes>, AqcError> {
+    | ...
+313 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::aqc::AqcReceiveStream::AqcReceiveStream::receive`
+
+error: Unapproved external type `bytes::bytes::Bytes` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:321:5
+    |
+321 |     pub fn try_receive(&mut self) -> Result<Bytes, TryReceiveError> {
+    | ...
+329 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::aqc::AqcReceiveStream::AqcReceiveStream::try_receive`
+
+error: Unapproved external type `bytes::bytes::Bytes` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:338:5
+    |
+338 |     pub async fn send(&mut self, data: Bytes) -> Result<(), AqcError> {
+    | ...
+341 |     }␊
+    |     ^
+    |
+    = in argument named `data` of `aranya_client::aqc::AqcSendStream::AqcSendStream::send`
+
+error: Unapproved external type `bytes::bytes::Bytes` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:385:5
+    |
+385 |     pub async fn receive(&mut self) -> Result<Option<Bytes>, AqcError> {
+    | ...
+390 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::aqc::AqcPeerStream::AqcPeerStream::receive`
+
+error: Unapproved external type `bytes::bytes::Bytes` referenced in public API
+   --> crates/aranya-client/src/aqc/net/channels.rs:398:5
+    |
+398 |     pub fn try_receive(&mut self) -> Result<Bytes, TryReceiveError> {
+    | ...
+403 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::aqc::AqcPeerStream::AqcPeerStream::try_receive`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+  --> crates/aranya-client/src/client.rs:32:5
+   |
+32 |     pub fn iter(&self) -> impl Iterator<Item = &DeviceId> {
+   | ...
+34 |     }␊
+   |     ^
+   |
+   = in generic default binding of `aranya_client::client::Devices::iter`
+
+error: Unapproved external type `aranya_daemon_api::service::Label` referenced in public API
+  --> crates/aranya-client/src/client.rs:48:5
+   |
+48 |     pub fn iter(&self) -> impl Iterator<Item = &Label> {
+   | ...
+50 |     }␊
+   |     ^
+   |
+   = in generic default binding of `aranya_client::client::Labels::iter`
+
+error: Unapproved external type `aranya_util::addr::Addr` referenced in public API
+   --> crates/aranya-client/src/client.rs:127:5
+    |
+127 |     pub fn with_daemon_aqc_addr(mut self, addr: &'a Addr) -> Self {
+    | ...
+130 |     }␊
+    |     ^
+    |
+    = in argument named `addr` of `aranya_client::client::ClientBuilder::with_daemon_aqc_addr`
+
+error: Unapproved external type `aranya_daemon_api::service::KeyBundle` referenced in public API
+   --> crates/aranya-client/src/client.rs:231:5
+    |
+231 |     pub async fn get_key_bundle(&mut self) -> Result<KeyBundle> {
+    | ...
+237 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::Client::Client::get_key_bundle`
+
+error: Unapproved external type `aranya_daemon_api::service::KeyBundle` referenced in public API
+   --> crates/aranya-client/src/client.rs:231:5
+    |
+231 |     pub async fn get_key_bundle(&mut self) -> Result<KeyBundle> {
+    | ...
+237 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::client::Client::get_key_bundle`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:240:5
+    |
+240 |     pub async fn get_device_id(&mut self) -> Result<DeviceId> {
+    | ...
+246 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::Client::Client::get_device_id`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:240:5
+    |
+240 |     pub async fn get_device_id(&mut self) -> Result<DeviceId> {
+    | ...
+246 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::client::Client::get_device_id`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/client.rs:249:5
+    |
+249 |     pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
+    | ...
+255 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::Client::Client::create_team`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/client.rs:249:5
+    |
+249 |     pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
+    | ...
+255 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::client::Client::create_team`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/client.rs:258:5
+    |
+258 |     pub async fn add_team(&mut self, team: TeamId, cfg: TeamConfig) -> Result<()> {
+    | ...
+264 |     }␊
+    |     ^
+    |
+    = in argument named `team` of `aranya_client::Client::Client::add_team`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/client.rs:258:5
+    |
+258 |     pub async fn add_team(&mut self, team: TeamId, cfg: TeamConfig) -> Result<()> {
+    | ...
+264 |     }␊
+    |     ^
+    |
+    = in argument named `team` of `aranya_client::client::Client::add_team`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/client.rs:267:5
+    |
+267 |     pub async fn remove_team(&mut self, _team: TeamId) -> Result<()> {
+    | ...
+269 |     }␊
+    |     ^
+    |
+    = in argument named `_team` of `aranya_client::Client::Client::remove_team`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/client.rs:267:5
+    |
+267 |     pub async fn remove_team(&mut self, _team: TeamId) -> Result<()> {
+    | ...
+269 |     }␊
+    |     ^
+    |
+    = in argument named `_team` of `aranya_client::client::Client::remove_team`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/client.rs:272:5
+    |
+272 |     pub fn team(&mut self, id: TeamId) -> Team<'_> {
+    | ...
+274 |     }␊
+    |     ^
+    |
+    = in argument named `id` of `aranya_client::Client::Client::team`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/client.rs:272:5
+    |
+272 |     pub fn team(&mut self, id: TeamId) -> Team<'_> {
+    | ...
+274 |     }␊
+    |     ^
+    |
+    = in argument named `id` of `aranya_client::client::Client::team`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/client.rs:282:5
+    |
+282 |     pub fn queries(&mut self, id: TeamId) -> Queries<'_> {
+    | ...
+284 |     }␊
+    |     ^
+    |
+    = in argument named `id` of `aranya_client::Client::Client::queries`
+
+error: Unapproved external type `aranya_daemon_api::service::TeamId` referenced in public API
+   --> crates/aranya-client/src/client.rs:282:5
+    |
+282 |     pub fn queries(&mut self, id: TeamId) -> Queries<'_> {
+    | ...
+284 |     }␊
+    |     ^
+    |
+    = in argument named `id` of `aranya_client::client::Client::queries`
+
+error: Unapproved external type `aranya_util::addr::Addr` referenced in public API
+   --> crates/aranya-client/src/client.rs:304:5
+    |
+304 |     pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
+    | ...
+311 |     }␊
+    |     ^
+    |
+    = in argument named `addr` of `aranya_client::Team::Team::add_sync_peer`
+
+error: Unapproved external type `aranya_util::addr::Addr` referenced in public API
+   --> crates/aranya-client/src/client.rs:304:5
+    |
+304 |     pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
+    | ...
+311 |     }␊
+    |     ^
+    |
+    = in argument named `addr` of `aranya_client::client::Team::add_sync_peer`
+
+error: Unapproved external type `aranya_util::addr::Addr` referenced in public API
+   --> crates/aranya-client/src/client.rs:317:5
+    |
+317 |     pub async fn sync_now(&mut self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
+    | ...
+324 |     }␊
+    |     ^
+    |
+    = in argument named `addr` of `aranya_client::Team::Team::sync_now`
+
+error: Unapproved external type `aranya_util::addr::Addr` referenced in public API
+   --> crates/aranya-client/src/client.rs:317:5
+    |
+317 |     pub async fn sync_now(&mut self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
+    | ...
+324 |     }␊
+    |     ^
+    |
+    = in argument named `addr` of `aranya_client::client::Team::sync_now`
+
+error: Unapproved external type `aranya_util::addr::Addr` referenced in public API
+   --> crates/aranya-client/src/client.rs:327:5
+    |
+327 |     pub async fn remove_sync_peer(&mut self, addr: Addr) -> Result<()> {
+    | ...
+334 |     }␊
+    |     ^
+    |
+    = in argument named `addr` of `aranya_client::Team::Team::remove_sync_peer`
+
+error: Unapproved external type `aranya_util::addr::Addr` referenced in public API
+   --> crates/aranya-client/src/client.rs:327:5
+    |
+327 |     pub async fn remove_sync_peer(&mut self, addr: Addr) -> Result<()> {
+    | ...
+334 |     }␊
+    |     ^
+    |
+    = in argument named `addr` of `aranya_client::client::Team::remove_sync_peer`
+
+error: Unapproved external type `aranya_daemon_api::service::KeyBundle` referenced in public API
+   --> crates/aranya-client/src/client.rs:347:5
+    |
+347 |     pub async fn add_device_to_team(&mut self, keys: KeyBundle) -> Result<()> {
+    | ...
+354 |     }␊
+    |     ^
+    |
+    = in argument named `keys` of `aranya_client::Team::Team::add_device_to_team`
+
+error: Unapproved external type `aranya_daemon_api::service::KeyBundle` referenced in public API
+   --> crates/aranya-client/src/client.rs:347:5
+    |
+347 |     pub async fn add_device_to_team(&mut self, keys: KeyBundle) -> Result<()> {
+    | ...
+354 |     }␊
+    |     ^
+    |
+    = in argument named `keys` of `aranya_client::client::Team::add_device_to_team`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:357:5
+    |
+357 |     pub async fn remove_device_from_team(&mut self, device: DeviceId) -> Result<()> {
+    | ...
+364 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::Team::Team::remove_device_from_team`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:357:5
+    |
+357 |     pub async fn remove_device_from_team(&mut self, device: DeviceId) -> Result<()> {
+    | ...
+364 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::client::Team::remove_device_from_team`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:367:5
+    |
+367 |     pub async fn assign_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    | ...
+374 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::Team::Team::assign_role`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:367:5
+    |
+367 |     pub async fn assign_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    | ...
+374 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::client::Team::assign_role`
+
+error: Unapproved external type `aranya_daemon_api::service::Role` referenced in public API
+   --> crates/aranya-client/src/client.rs:367:5
+    |
+367 |     pub async fn assign_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    | ...
+374 |     }␊
+    |     ^
+    |
+    = in argument named `role` of `aranya_client::Team::Team::assign_role`
+
+error: Unapproved external type `aranya_daemon_api::service::Role` referenced in public API
+   --> crates/aranya-client/src/client.rs:367:5
+    |
+367 |     pub async fn assign_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    | ...
+374 |     }␊
+    |     ^
+    |
+    = in argument named `role` of `aranya_client::client::Team::assign_role`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:377:5
+    |
+377 |     pub async fn revoke_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    | ...
+384 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::Team::Team::revoke_role`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:377:5
+    |
+377 |     pub async fn revoke_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    | ...
+384 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::client::Team::revoke_role`
+
+error: Unapproved external type `aranya_daemon_api::service::Role` referenced in public API
+   --> crates/aranya-client/src/client.rs:377:5
+    |
+377 |     pub async fn revoke_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    | ...
+384 |     }␊
+    |     ^
+    |
+    = in argument named `role` of `aranya_client::Team::Team::revoke_role`
+
+error: Unapproved external type `aranya_daemon_api::service::Role` referenced in public API
+   --> crates/aranya-client/src/client.rs:377:5
+    |
+377 |     pub async fn revoke_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
+    | ...
+384 |     }␊
+    |     ^
+    |
+    = in argument named `role` of `aranya_client::client::Team::revoke_role`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:391:5
+    |
+391 |     pub async fn assign_aqc_net_identifier(
+    | ...
+402 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::Team::Team::assign_aqc_net_identifier`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:391:5
+    |
+391 |     pub async fn assign_aqc_net_identifier(
+    | ...
+402 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::client::Team::assign_aqc_net_identifier`
+
+error: Unapproved external type `aranya_daemon_api::service::NetIdentifier` referenced in public API
+   --> crates/aranya-client/src/client.rs:391:5
+    |
+391 |     pub async fn assign_aqc_net_identifier(
+    | ...
+402 |     }␊
+    |     ^
+    |
+    = in argument named `net_identifier` of `aranya_client::Team::Team::assign_aqc_net_identifier`
+
+error: Unapproved external type `aranya_daemon_api::service::NetIdentifier` referenced in public API
+   --> crates/aranya-client/src/client.rs:391:5
+    |
+391 |     pub async fn assign_aqc_net_identifier(
+    | ...
+402 |     }␊
+    |     ^
+    |
+    = in argument named `net_identifier` of `aranya_client::client::Team::assign_aqc_net_identifier`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:405:5
+    |
+405 |     pub async fn remove_aqc_net_identifier(
+    | ...
+416 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::Team::Team::remove_aqc_net_identifier`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:405:5
+    |
+405 |     pub async fn remove_aqc_net_identifier(
+    | ...
+416 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::client::Team::remove_aqc_net_identifier`
+
+error: Unapproved external type `aranya_daemon_api::service::NetIdentifier` referenced in public API
+   --> crates/aranya-client/src/client.rs:405:5
+    |
+405 |     pub async fn remove_aqc_net_identifier(
+    | ...
+416 |     }␊
+    |     ^
+    |
+    = in argument named `net_identifier` of `aranya_client::Team::Team::remove_aqc_net_identifier`
+
+error: Unapproved external type `aranya_daemon_api::service::NetIdentifier` referenced in public API
+   --> crates/aranya-client/src/client.rs:405:5
+    |
+405 |     pub async fn remove_aqc_net_identifier(
+    | ...
+416 |     }␊
+    |     ^
+    |
+    = in argument named `net_identifier` of `aranya_client::client::Team::remove_aqc_net_identifier`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/client.rs:419:5
+    |
+419 |     pub async fn create_label(&mut self, label_name: String) -> Result<LabelId> {
+    | ...
+426 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::Team::Team::create_label`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/client.rs:419:5
+    |
+419 |     pub async fn create_label(&mut self, label_name: String) -> Result<LabelId> {
+    | ...
+426 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::client::Team::create_label`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/client.rs:429:5
+    |
+429 |     pub async fn delete_label(&mut self, label_id: LabelId) -> Result<()> {
+    | ...
+436 |     }␊
+    |     ^
+    |
+    = in argument named `label_id` of `aranya_client::Team::Team::delete_label`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/client.rs:429:5
+    |
+429 |     pub async fn delete_label(&mut self, label_id: LabelId) -> Result<()> {
+    | ...
+436 |     }␊
+    |     ^
+    |
+    = in argument named `label_id` of `aranya_client::client::Team::delete_label`
+
+error: Unapproved external type `aranya_daemon_api::service::ChanOp` referenced in public API
+   --> crates/aranya-client/src/client.rs:439:5
+    |
+439 |     pub async fn assign_label(
+    | ...
+451 |     }␊
+    |     ^
+    |
+    = in argument named `op` of `aranya_client::Team::Team::assign_label`
+
+error: Unapproved external type `aranya_daemon_api::service::ChanOp` referenced in public API
+   --> crates/aranya-client/src/client.rs:439:5
+    |
+439 |     pub async fn assign_label(
+    | ...
+451 |     }␊
+    |     ^
+    |
+    = in argument named `op` of `aranya_client::client::Team::assign_label`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:439:5
+    |
+439 |     pub async fn assign_label(
+    | ...
+451 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::Team::Team::assign_label`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:439:5
+    |
+439 |     pub async fn assign_label(
+    | ...
+451 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::client::Team::assign_label`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/client.rs:439:5
+    |
+439 |     pub async fn assign_label(
+    | ...
+451 |     }␊
+    |     ^
+    |
+    = in argument named `label_id` of `aranya_client::Team::Team::assign_label`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/client.rs:439:5
+    |
+439 |     pub async fn assign_label(
+    | ...
+451 |     }␊
+    |     ^
+    |
+    = in argument named `label_id` of `aranya_client::client::Team::assign_label`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:454:5
+    |
+454 |     pub async fn revoke_label(&mut self, device: DeviceId, label_id: LabelId) -> Result<()> {
+    | ...
+461 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::Team::Team::revoke_label`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:454:5
+    |
+454 |     pub async fn revoke_label(&mut self, device: DeviceId, label_id: LabelId) -> Result<()> {
+    | ...
+461 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::client::Team::revoke_label`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/client.rs:454:5
+    |
+454 |     pub async fn revoke_label(&mut self, device: DeviceId, label_id: LabelId) -> Result<()> {
+    | ...
+461 |     }␊
+    |     ^
+    |
+    = in argument named `label_id` of `aranya_client::Team::Team::revoke_label`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/client.rs:454:5
+    |
+454 |     pub async fn revoke_label(&mut self, device: DeviceId, label_id: LabelId) -> Result<()> {
+    | ...
+461 |     }␊
+    |     ^
+    |
+    = in argument named `label_id` of `aranya_client::client::Team::revoke_label`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:483:5
+    |
+483 |     pub async fn device_role(&mut self, device: DeviceId) -> Result<Role> {
+    | ...
+490 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::client::Queries::device_role`
+
+error: Unapproved external type `aranya_daemon_api::service::Role` referenced in public API
+   --> crates/aranya-client/src/client.rs:483:5
+    |
+483 |     pub async fn device_role(&mut self, device: DeviceId) -> Result<Role> {
+    | ...
+490 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::client::Queries::device_role`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:493:5
+    |
+493 |     pub async fn device_keybundle(&mut self, device: DeviceId) -> Result<KeyBundle> {
+    | ...
+500 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::client::Queries::device_keybundle`
+
+error: Unapproved external type `aranya_daemon_api::service::KeyBundle` referenced in public API
+   --> crates/aranya-client/src/client.rs:493:5
+    |
+493 |     pub async fn device_keybundle(&mut self, device: DeviceId) -> Result<KeyBundle> {
+    | ...
+500 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::client::Queries::device_keybundle`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:503:5
+    |
+503 |     pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
+    | ...
+512 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::client::Queries::device_label_assignments`
+
+error: Unapproved external type `aranya_daemon_api::service::DeviceId` referenced in public API
+   --> crates/aranya-client/src/client.rs:515:5
+    |
+515 |     pub async fn aqc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
+    | ...
+522 |     }␊
+    |     ^
+    |
+    = in argument named `device` of `aranya_client::client::Queries::aqc_net_identifier`
+
+error: Unapproved external type `aranya_daemon_api::service::NetIdentifier` referenced in public API
+   --> crates/aranya-client/src/client.rs:515:5
+    |
+515 |     pub async fn aqc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
+    | ...
+522 |     }␊
+    |     ^
+    |
+    = in generic arg of `aranya_client::client::Queries::aqc_net_identifier`
+
+error: Unapproved external type `aranya_daemon_api::service::LabelId` referenced in public API
+   --> crates/aranya-client/src/client.rs:525:5
+    |
+525 |     pub async fn label_exists(&mut self, label_id: LabelId) -> Result<bool> {
+    | ...
+532 |     }␊
+    |     ^
+    |
+    = in argument named `label_id` of `aranya_client::client::Queries::label_exists`
+
+error: Unapproved external type `buggy::Bug` referenced in public API
+  --> crates/aranya-client/src/error.rs:32:9
+   |
+32 |     Bug(#[from] buggy::Bug),
+   |         ^-----^
+   |
+   = in generic arg of `aranya_client::Error::Error`
+
+error: Unapproved external type `buggy::Bug` referenced in public API
+  --> crates/aranya-client/src/error.rs:32:9
+   |
+32 |     Bug(#[from] buggy::Bug),
+   |         ^-----^
+   |
+   = in generic arg of `aranya_client::error::Error`
+
+error: Unapproved external type `buggy::Bug` referenced in public API
+  --> crates/aranya-client/src/error.rs:32:17
+   |
+32 |     Bug(#[from] buggy::Bug),
+   |                 ^--------^
+   |
+   = in struct field of `aranya_client::Error::Error::Bug::0`
+
+error: Unapproved external type `buggy::Bug` referenced in public API
+  --> crates/aranya-client/src/error.rs:32:17
+   |
+32 |     Bug(#[from] buggy::Bug),
+   |                 ^--------^
+   |
+   = in struct field of `aranya_client::error::Error::Bug::0`
+
+error: Unapproved external type `anyhow::Error` referenced in public API
+  --> crates/aranya-client/src/error.rs:43:5
+   |
+43 |     #[from]
+   |     ^-----^
+   |
+   = in generic arg of `aranya_client::error::OtherError`
+
+error: Unapproved external type `aranya_daemon_api::service::Error` referenced in public API
+  --> crates/aranya-client/src/error.rs:58:5
+   |
+58 |     #[from]
+   |     ^-----^
+   |
+   = in generic arg of `aranya_client::error::AranyaError`
+
+error: Unapproved external type `s2n_quic_core::connection::error::Error` referenced in public API
+   --> crates/aranya-client/src/error.rs:130:21
+    |
+130 |     ConnectionError(#[from] s2n_quic::connection::Error),
+    |                     ^-----^
+    |
+    = in generic arg of `aranya_client::error::AqcError`
+
+error: Unapproved external type `s2n_quic_core::connection::error::Error` referenced in public API
+   --> crates/aranya-client/src/error.rs:130:29
+    |
+130 |     ConnectionError(#[from] s2n_quic::connection::Error),
+    |                             ^-------------------------^
+    |
+    = in struct field of `aranya_client::error::AqcError::ConnectionError::0`
+
+error: Unapproved external type `s2n_quic_core::stream::error::StreamError` referenced in public API
+   --> crates/aranya-client/src/error.rs:134:17
+    |
+134 |     StreamError(#[from] s2n_quic::stream::Error),
+    |                 ^-----^
+    |
+    = in generic arg of `aranya_client::error::AqcError`
+
+error: Unapproved external type `s2n_quic_core::stream::error::StreamError` referenced in public API
+   --> crates/aranya-client/src/error.rs:134:25
+    |
+134 |     StreamError(#[from] s2n_quic::stream::Error),
+    |                         ^---------------------^
+    |
+    = in struct field of `aranya_client::error::AqcError::StreamError::0`
+
+error: Unapproved external type `s2n_quic::provider::StartError` referenced in public API
+   --> crates/aranya-client/src/error.rs:142:17
+    |
+142 |     ServerStart(#[from] s2n_quic::provider::StartError),
+    |                 ^-----^
+    |
+    = in generic arg of `aranya_client::error::AqcError`
+
+error: Unapproved external type `s2n_quic::provider::StartError` referenced in public API
+   --> crates/aranya-client/src/error.rs:142:25
+    |
+142 |     ServerStart(#[from] s2n_quic::provider::StartError),
+    |                         ^----------------------------^
+    |
+    = in struct field of `aranya_client::error::AqcError::ServerStart::0`
+
+error: Unapproved external type `postcard::error::Error` referenced in public API
+   --> crates/aranya-client/src/error.rs:146:11
+    |
+146 |     Serde(postcard::Error),
+    |           ^-------------^
+    |
+    = in struct field of `aranya_client::error::AqcError::Serde::0`
+
+error: Unapproved external type `buggy::Bug` referenced in public API
+   --> crates/aranya-client/src/error.rs:160:9
+    |
+160 |     Bug(#[from] buggy::Bug),
+    |         ^-----^
+    |
+    = in generic arg of `aranya_client::error::AqcError`
+
+error: Unapproved external type `buggy::Bug` referenced in public API
+   --> crates/aranya-client/src/error.rs:160:17
+    |
+160 |     Bug(#[from] buggy::Bug),
+    |                 ^--------^
+    |
+    = in struct field of `aranya_client::error::AqcError::Bug::0`
+
+100 errors, 0 warnings emitted
+Error while executing command, exit code: 1
