@@ -18,6 +18,7 @@ buggy = { workspace = true }
 
 anyhow = { workspace = true }
 futures-util = { workspace = true }
+s2n-quic = { workspace = true }
 serde = { workspace = true }
 tokio = { workspace = true, features = [
     "rt-multi-thread",

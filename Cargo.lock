@@ -188,7 +188,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-client"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -272,7 +272,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "aranya-aqc-util",
@@ -282,6 +282,7 @@ dependencies = [
  "aranya-device-ffi",
  "aranya-envelope-ffi",
  "aranya-idam-ffi",
+ "aranya-internal-s2n-quic",
  "aranya-keygen",
  "aranya-perspective-ffi",
  "aranya-policy-compiler",
@@ -293,6 +294,7 @@ dependencies = [
  "aranya-util",
  "bimap",
  "buggy",
+ "bytes",
  "ciborium",
  "clap",
  "deser-hjson",
@@ -305,6 +307,7 @@ dependencies = [
  "tarpc",
  "tempfile",
  "test-log",
+ "thiserror 2.0.12",
  "tokio",
  "tokio-util",
  "tracing",
@@ -313,7 +316,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon-api"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -427,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-keygen"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -627,9 +630,10 @@ dependencies = [
 
 [[package]]
 name = "aranya-util"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "anyhow",
+ "aranya-internal-s2n-quic",
  "buggy",
  "futures-util",
  "serde",

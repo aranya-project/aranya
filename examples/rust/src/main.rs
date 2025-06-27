@@ -6,7 +6,9 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{aqc::AqcPeerChannel, client::Client, Error, SyncPeerConfig, TeamConfig};
+use aranya_client::{
+    aqc::AqcPeerChannel, client::Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
+};
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -96,7 +98,8 @@ impl ClientCtx {
                 cache_dir: {cache_dir:?}
                 logs_dir: {logs_dir:?}
                 config_dir: {config_dir:?}
-                sync_addr: "localhost:0"
+                sync_addr: "127.0.0.1:0"
+                quic_sync: {{ }}
                 "#
             );
             fs::write(&cfg_path, buf).await?;
@@ -204,15 +207,17 @@ async fn main() -> Result<()> {
     let mut membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
     let mut memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
 
-    // Create a team.
-    info!("creating team");
-    let cfg = TeamConfig::builder().build()?;
-    let team_id = owner
-        .client
-        .create_team(cfg)
-        .await
-        .context("expected to create team")?;
-    info!(%team_id);
+    // Create the team config
+    let seed_ikm = {
+        let mut buf = [0; 32];
+        owner.client.rand(&mut buf).await;
+        buf
+    };
+    let cfg = {
+        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
+    };
+
 
     // get sync addresses.
     let owner_addr = owner.aranya_local_addr().await?;
@@ -224,13 +229,22 @@ async fn main() -> Result<()> {
     // get aqc addresses.
     debug!(?membera.aqc_addr, ?memberb.aqc_addr);
 
-    // setup sync peers.
-    let mut owner_team = owner.client.team(team_id);
-    let mut admin_team = admin.client.team(team_id);
-    let mut operator_team = operator.client.team(team_id);
-    let mut membera_team = membera.client.team(team_id);
-    let mut memberb_team = memberb.client.team(team_id);
+    // Create a team.
+    info!("creating team");
+    let mut owner_team = owner
+        .client
+        .create_team(cfg.clone())
+        .await
+        .context("expected to create team")?;
+    let team_id = owner_team.team_id();
+    info!(%team_id);
 
+    let mut admin_team = admin.client.add_team(team_id, cfg.clone()).await?;
+    let mut operator_team = operator.client.add_team(team_id, cfg.clone()).await?;
+    let mut membera_team = membera.client.add_team(team_id, cfg.clone()).await?;
+    let mut memberb_team = memberb.client.add_team(team_id, cfg.clone()).await?;
+
+    // setup sync peers.
     info!("adding admin to team");
     owner_team.add_device_to_team(admin.pk).await?;
     owner_team.assign_role(admin.id, Role::Admin).await?;
@@ -341,7 +355,8 @@ async fn main() -> Result<()> {
     sleep(sleep_interval).await;
 
     // fact database queries
-    let mut queries = membera.client.queries(team_id);
+    let mut queries_team = membera.client.team(team_id);
+    let mut queries = queries_team.queries();
     let devices = queries.devices_on_team().await?;
     info!("membera devices on team: {:?}", devices.iter().count());
     let role = queries.device_role(membera.id).await?;

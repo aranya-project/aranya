@@ -6,7 +6,7 @@ use aranya_daemon_api::{LabelId, NetIdentifier, TeamId};
 use tarpc::context;
 use tracing::{debug, instrument};
 
-use super::{AqcBidiChannel, AqcPeerChannel, AqcSendChannel, TryReceiveError};
+use super::{net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcSendChannel};
 use crate::{
     error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
