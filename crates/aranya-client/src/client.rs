@@ -258,11 +258,6 @@ impl Client {
     pub fn aqc(&mut self) -> AqcChannels<'_> {
         AqcChannels::new(self)
     }
-
-    /// Get access to fact database queries.
-    pub fn queries(&mut self, id: TeamId) -> Queries<'_> {
-        Queries { client: self, id }
-    }
 }
 
 /// Represents an Aranya Team.
@@ -477,6 +472,14 @@ impl Team<'_> {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
+    }
+
+    /// Get access to fact database queries.
+    pub fn queries(&mut self) -> Queries<'_> {
+        Queries {
+            client: self.client,
+            id: self.id,
+        }
     }
 }
 

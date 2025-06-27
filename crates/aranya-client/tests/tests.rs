@@ -84,52 +84,29 @@ async fn test_remove_devices() -> Result<()> {
     team.add_all_device_roles(team_id).await?;
 
     // Remove devices from the team while checking that the device count decreases each time a device is removed.
-    {
-        let mut queries = team.owner.client.queries(team_id);
-        assert_eq!(queries.devices_on_team().await?.iter().count(), 5);
-    }
-    {
-        let mut owner = team.owner.client.team(team_id);
-        owner.remove_device_from_team(team.membera.id).await?;
-    }
-    {
-        let mut queries = team.owner.client.queries(team_id);
-        assert_eq!(queries.devices_on_team().await?.iter().count(), 4);
-    }
-    {
-        let mut owner = team.owner.client.team(team_id);
-        owner.remove_device_from_team(team.memberb.id).await?;
-    }
-    {
-        let mut queries = team.owner.client.queries(team_id);
-        assert_eq!(queries.devices_on_team().await?.iter().count(), 3);
-    }
-    {
-        let mut owner = team.owner.client.team(team_id);
-        owner.revoke_role(team.operator.id, Role::Operator).await?;
-        owner.remove_device_from_team(team.operator.id).await?;
-    }
-    {
-        let mut queries = team.owner.client.queries(team_id);
-        assert_eq!(queries.devices_on_team().await?.iter().count(), 2);
-    }
-    {
-        let mut owner = team.owner.client.team(team_id);
-        owner.revoke_role(team.admin.id, Role::Admin).await?;
-        owner.remove_device_from_team(team.admin.id).await?;
-    }
-    {
-        let mut queries = team.owner.client.queries(team_id);
-        assert_eq!(queries.devices_on_team().await?.iter().count(), 1);
-    }
-    {
-        let mut owner = team.owner.client.team(team_id);
-        owner.revoke_role(team.owner.id, Role::Owner).await?;
-        owner
-            .remove_device_from_team(team.owner.id)
-            .await
-            .expect_err("owner should not be able to remove itself from team");
-    }
+    let mut owner = team.owner.client.team(team_id);
+
+    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 5);
+
+    owner.remove_device_from_team(team.membera.id).await?;
+    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 4);
+
+    owner.remove_device_from_team(team.memberb.id).await?;
+    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 3);
+
+    owner.revoke_role(team.operator.id, Role::Operator).await?;
+    owner.remove_device_from_team(team.operator.id).await?;
+    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 2);
+
+    owner.revoke_role(team.admin.id, Role::Admin).await?;
+    owner.remove_device_from_team(team.admin.id).await?;
+    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 1);
+
+    owner.revoke_role(team.owner.id, Role::Owner).await?;
+    owner
+        .remove_device_from_team(team.owner.id)
+        .await
+        .expect_err("owner should not be able to remove itself from team");
 
     Ok(())
 }
@@ -149,7 +126,8 @@ async fn test_query_functions() -> Result<()> {
     team.add_all_device_roles(team_id).await?;
 
     // Test all our fact database queries.
-    let mut queries = team.membera.client.queries(team_id);
+    let mut memberb = team.membera.client.team(team_id);
+    let mut queries = memberb.queries();
 
     // First, let's check how many devices are on the team.
     let devices = queries.devices_on_team().await?;
