@@ -1238,7 +1238,7 @@ pub fn query_devices_on_team(
     let client = client.imp();
     let data = client
         .rt
-        .block_on(client.inner.queries(team.into()).devices_on_team())?;
+        .block_on(client.inner.team(team.into()).queries().devices_on_team())?;
     let data = data.__data();
     let Some(devices) = devices else {
         *devices_len = data.len();
@@ -1278,7 +1278,8 @@ pub unsafe fn query_device_keybundle(
     let keys = client.rt.block_on(
         client
             .inner
-            .queries(team.into())
+            .team(team.into())
+            .queries()
             .device_keybundle(device.into()),
     )?;
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
@@ -1312,7 +1313,8 @@ pub fn query_device_label_assignments(
     let data = client.rt.block_on(
         client
             .inner
-            .queries(team.into())
+            .team(team.into())
+            .queries()
             .device_label_assignments(device.into()),
     )?;
     let data = data.__data();
@@ -1355,7 +1357,7 @@ pub fn query_labels(
     let client = client.imp();
     let data = client
         .rt
-        .block_on(client.inner.queries(team.into()).labels())?;
+        .block_on(client.inner.team(team.into()).queries().labels())?;
     let data = data.__data();
     let Some(labels) = labels else {
         *labels_len = data.len();
@@ -1388,9 +1390,13 @@ pub unsafe fn query_label_exists(
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
     let client = client.imp();
-    let exists = client
-        .rt
-        .block_on(client.inner.queries(team.into()).label_exists(label.into()))?;
+    let exists = client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .queries()
+            .label_exists(label.into()),
+    )?;
     Ok(exists)
 }
 
@@ -1413,7 +1419,8 @@ pub unsafe fn query_aqc_net_identifier(
     let Some(net_identifier) = client.rt.block_on(
         client
             .inner
-            .queries(team.into())
+            .team(team.into())
+            .queries()
             .aqc_net_identifier(device.into()),
     )?
     else {
