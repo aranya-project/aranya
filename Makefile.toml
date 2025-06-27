@@ -257,3 +257,32 @@ category = "examples"
 description = "Run Rust example application"
 cwd = "examples/rust"
 script = "./run.bash"
+
+# Metrics
+
+# Run `aranya-metrics`
+[tasks.metrics]
+category = "metrics"
+description = "Run Metrics Crate"
+script = '''
+#!/usr/bin/env bash
+echo "Building our binaries..."
+cargo build --bin aranya-daemon
+cargo build --bin aranya-metrics
+
+echo "Starting pushgateway..."
+pushgateway &
+PUSHGATEWAY_PID=$!
+
+sleep 1
+
+cleanup() {
+    echo "Cleaning up..."
+    kill $PUSHGATEWAY_PID 2>/dev/null
+    wait $PUSHGATEWAY_PID 2>/dev/null
+}
+trap cleanup EXIT
+
+echo "Running metrics collection..."
+cargo run --bin aranya-metrics -- $(pwd)/target/release/aranya-daemon
+'''
