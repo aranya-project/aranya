@@ -12,7 +12,7 @@
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
-use aranya_client::{QuicSyncConfig, TeamConfig};
+use aranya_client::TeamConfig;
 use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
@@ -161,14 +161,15 @@ async fn test_add_team() -> Result<()> {
     let mut team = TeamCtx::new("test_add_team", work_dir).await?;
 
     // Create the initial team, and get our TeamId.
+    let owner_cfg = {
+        let mut team_cfg_builder = TeamConfig::builder();
+        let _ = team_cfg_builder.quic_sync();
+        team_cfg_builder.build()?
+    };
     let team_id = team
         .owner
         .client
-        .create_team({
-            TeamConfig::builder()
-                .quic_sync(QuicSyncConfig::builder().build()?)
-                .build()?
-        })
+        .create_team(owner_cfg)
         .await
         .expect("expected to create team");
     info!(?team_id);
@@ -205,17 +206,14 @@ async fn test_add_team() -> Result<()> {
     let admin_seed = owner
         .encrypt_psk_seed_for_peer(&team.admin.pk.encoding)
         .await?;
-    admin
-        .add_team({
-            TeamConfig::builder()
-                .quic_sync(
-                    QuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed)?
-                        .build()?,
-                )
-                .build()?
-        })
-        .await?;
+
+    let admin_cfg = {
+        let mut team_cfg_builder = TeamConfig::builder();
+        let qs_cfg_builder = team_cfg_builder.quic_sync();
+        qs_cfg_builder.wrapped_seed(&admin_seed)?;
+        team_cfg_builder.build()?
+    };
+    admin.add_team(admin_cfg).await?;
     admin.sync_now(owner_addr.into(), None).await?;
     sleep(SLEEP_INTERVAL).await;
 
@@ -326,18 +324,15 @@ async fn test_multi_team_sync() -> Result<()> {
             .encrypt_psk_seed_for_peer(&admin2_device.pk.encoding)
             .await?;
 
+        let admin_cfg = {
+            let mut team_cfg_builder = TeamConfig::builder();
+            let qs_cfg_builder = team_cfg_builder.quic_sync();
+            qs_cfg_builder.wrapped_seed(&admin_seed)?;
+            team_cfg_builder.build()?
+        };
+
         // Admin2 adds team1 to it's local storage using the wrapped seed
-        admin2
-            .add_team({
-                TeamConfig::builder()
-                    .quic_sync(
-                        QuicSyncConfig::builder()
-                            .wrapped_seed(&admin_seed)?
-                            .build()?,
-                    )
-                    .build()?
-            })
-            .await?;
+        admin2.add_team(admin_cfg).await?;
         admin2.sync_now(owner1_addr.into(), None).await?;
 
         sleep(SLEEP_INTERVAL).await;

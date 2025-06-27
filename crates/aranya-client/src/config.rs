@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE, TeamId};
+use aranya_daemon_api::{SeedMode, TeamId, SEED_IKM_SIZE};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
@@ -84,6 +84,7 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
+// Fields added here should be set in QuicSyncConfigBuilder::from_cfg
 #[derive(Clone)]
 pub struct QuicSyncConfig {
     seed_mode: SeedMode,
@@ -95,6 +96,10 @@ impl QuicSyncConfig {
     }
 }
 
+/// The builder for a [`QuicSyncConfig`].
+///
+/// The default seed mode is 'Generated'.
+/// This can be overwritten by calling [`Self::wrapped_seed`] or [`Self::seed_ikm`]
 #[derive(Clone, Default)]
 pub struct QuicSyncConfigBuilder {
     seed_mode: SeedMode,
@@ -103,16 +108,23 @@ pub struct QuicSyncConfigBuilder {
 impl QuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
-    pub fn mode(mut self, mode: SeedMode) -> Self {
+    pub fn mode(&mut self, mode: SeedMode) -> &mut Self {
         self.seed_mode = mode;
         self
     }
 
-    /// Sets the seed to be generated.
+    /// Sets values using a QuicSyncConfig
+    #[doc(hidden)]
+    pub fn set_from_cfg(&mut self, cfg: QuicSyncConfig) -> &mut Self {
+        self.seed_mode = cfg.seed_mode;
+        self
+    }
+
+    /// Set the seed mode to 'Generated'.
     ///
     /// This option is only valid when used in [`super::Client::create_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`].
-    pub fn gen_seed(mut self) -> Self {
+    pub fn gen_seed(&mut self) -> &mut Self {
         self.seed_mode = SeedMode::Generate;
         self
     }
@@ -121,7 +133,7 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is valid in both [`super::Client::create_team`] and [`super::Team::add_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
-    pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
+    pub fn seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) -> &mut Self {
         self.seed_mode = SeedMode::IKM(ikm);
         self
     }
@@ -130,7 +142,7 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is only valid in [`super::Team::add_team`].
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
-    pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
+    pub fn wrapped_seed(&mut self, wrapped_seed: &[u8]) -> Result<&mut Self> {
         let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
             error!(?err);
             ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
@@ -185,7 +197,7 @@ impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
 /// Builder for a [`TeamConfig`]
 #[derive(Clone, Default)]
 pub struct TeamConfigBuilder {
-    quic_sync: Option<QuicSyncConfig>,
+    quic_sync: Option<QuicSyncConfigBuilder>,
 }
 
 impl TeamConfigBuilder {
@@ -194,19 +206,21 @@ impl TeamConfigBuilder {
         Self::default()
     }
 
-    /// Configures the quic_sync config.
-    pub fn quic_sync(mut self, cfg: QuicSyncConfig) -> Self {
-        self.quic_sync = Some(cfg);
-
-        self
+    /// Returns a mutable reference to the inner [`QuicSyncConfigBuilder`].
+    /// This method must be called to initialize a QUIC sync config builder with default values.
+    pub fn quic_sync(&mut self) -> &mut QuicSyncConfigBuilder {
+        self.quic_sync.get_or_insert_default()
     }
 
     pub fn init_from_team_info_v1(team_info: TeamInfo) -> Result<(Self, TeamId)> {
         let TeamInfo::V1 { id, wrapped_seed } = team_info;
 
         let builder = {
-            let qs_cfg = QuicSyncConfig::builder().wrapped_seed(&wrapped_seed)?.build()?;
-            Self::new().quic_sync(qs_cfg)
+            let mut team_cfg_builder = Self::new();
+            let qs_builder = team_cfg_builder.quic_sync();
+            qs_builder.wrapped_seed(&wrapped_seed)?;
+
+            team_cfg_builder
         };
 
         Ok((builder, id))
@@ -214,8 +228,11 @@ impl TeamConfigBuilder {
 
     /// Attempts to build a [`TeamConfig`] using the provided parameters.
     pub fn build(self) -> Result<TeamConfig> {
-        Ok(TeamConfig {
-            quic_sync: self.quic_sync,
-        })
+        let quic_sync = self
+            .quic_sync
+            .map(|qs_cfg_builder| qs_cfg_builder.build())
+            .transpose()?;
+
+        Ok(TeamConfig { quic_sync })
     }
 }
