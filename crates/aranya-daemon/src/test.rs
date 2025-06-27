@@ -46,10 +46,7 @@ use crate::{
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
-        task::{
-            quic::{PeerCacheMap, PskStore},
-            SyncPeer,
-        },
+        task::{quic::PskStore, PeerCacheMap, SyncPeer},
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore, InvalidGraphs,

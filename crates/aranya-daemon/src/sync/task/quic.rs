@@ -18,8 +18,8 @@ use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequestMessage, SyncRequester,
-    SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
+    Engine, GraphId, Sink, StorageProvider, SyncRequestMessage, SyncRequester, SyncResponder,
+    SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     rustls::{NoCertResolver, SkipServerVerification},
@@ -42,18 +42,14 @@ use s2n_quic::{
     Client as QuicClient, Connection, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{
-    io::AsyncReadExt,
-    sync::{mpsc, Mutex},
-    task::JoinSet,
-};
+use tokio::{io::AsyncReadExt, sync::mpsc, task::JoinSet};
 use tracing::{debug, error, info, instrument};
 
 use super::SyncResponse;
 use crate::{
     aranya::Client as AranyaClient,
     sync::{
-        task::{SyncState, Syncer},
+        task::{PeerCacheKey, PeerCacheMap, SyncState, Syncer},
         Result as SyncResult, SyncError,
     },
 };
@@ -88,26 +84,6 @@ pub enum Error {
     #[error("An unexpected error occured: {0}")]
     Bug(buggy::Bug),
 }
-
-/// Key for looking up syncer peer cache in map.
-#[derive(Ord, PartialOrd, Eq, PartialEq)]
-pub struct PeerCacheKey {
-    /// The peer address.
-    pub addr: Addr,
-    /// The Aranya graph ID.
-    pub id: GraphId,
-}
-
-impl PeerCacheKey {
-    fn new(addr: Addr, id: GraphId) -> Self {
-        Self { addr, id }
-    }
-}
-
-/// Thread-safe map of peer caches
-/// For a given peer, there's should only be one cache. If separate caches are used
-/// for the server and state it will reduce the efficiency of the syncer.
-pub type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
 pub struct State {

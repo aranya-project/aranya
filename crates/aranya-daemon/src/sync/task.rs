@@ -6,23 +6,28 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, future::Future, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    future::Future,
+    sync::Arc,
+    time::Duration,
+};
 
 use anyhow::{Context, Result};
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{storage::GraphId, ClientError, Engine, Sink};
+use aranya_runtime::{storage::GraphId, ClientError, Engine, PeerCache, Sink};
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, instrument, trace};
 
 use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
-    sync::{error::SyncError, task::quic::PeerCacheMap},
+    sync::error::SyncError,
     vm_policy::VecSink,
     InvalidGraphs,
 };
@@ -148,6 +153,26 @@ impl SyncPeers {
 }
 
 type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
+
+/// Key for looking up syncer peer cache in map.
+#[derive(Ord, PartialOrd, Eq, PartialEq)]
+pub struct PeerCacheKey {
+    /// The peer address.
+    pub addr: Addr,
+    /// The Aranya graph ID.
+    pub id: GraphId,
+}
+
+impl PeerCacheKey {
+    fn new(addr: Addr, id: GraphId) -> Self {
+        Self { addr, id }
+    }
+}
+
+/// Thread-safe map of peer caches
+/// For a given peer, there's should only be one cache. If separate caches are used
+/// for the server and state it will reduce the efficiency of the syncer.
+pub type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
 
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.

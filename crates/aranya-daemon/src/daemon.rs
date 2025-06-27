@@ -34,8 +34,8 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{PeerCacheMap, PskStore, State as QuicSyncState},
-        Syncer,
+        quic::{PskStore, State as QuicSyncState},
+        PeerCacheMap, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
