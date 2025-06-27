@@ -1069,9 +1069,7 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
 /// @relates AranyaClient.
 pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.imp();
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).remove_team())?;
+    client.rt.block_on(client.inner.remove_team(team.into()))?;
     Ok(())
 }
 

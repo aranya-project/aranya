@@ -362,26 +362,6 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Add a team to local device storage.
-    pub async fn add_team(&self, cfg: TeamConfig) -> Result<()> {
-        self.client
-            .daemon
-            .add_team(context::current(), self.team_id, cfg.into())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Remove a team from local device storage.
-    pub async fn remove_team(&mut self) -> Result<()> {
-        self.client
-            .daemon
-            .remove_team(context::current(), self.team_id)
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
     /// Close the team and stop all operations on the graph.
     pub async fn close_team(&mut self) -> Result<()> {
         self.client
