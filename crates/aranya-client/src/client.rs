@@ -1,6 +1,6 @@
 //! Client-daemon connection.
 
-use std::{io, net::SocketAddr, path::Path};
+use std::{io, net::SocketAddr, path::Path, sync::Arc};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
@@ -15,7 +15,7 @@ use aranya_daemon_api::{
 use aranya_util::Addr;
 use buggy::BugExt as _;
 use tarpc::context;
-use tokio::{fs, net::UnixStream};
+use tokio::{fs, net::UnixStream, sync::Mutex};
 use tracing::{debug, error, info, instrument};
 
 use crate::{
@@ -128,9 +128,9 @@ impl<'a> ClientBuilder<'a> {
 #[derive(Debug)]
 pub struct Client {
     /// RPC connection to the daemon
-    pub(crate) daemon: DaemonApiClient,
+    pub(crate) daemon: Arc<Mutex<DaemonApiClient>>,
     /// Support for AQC
-    pub(crate) aqc: AqcClient,
+    pub(crate) aqc: Arc<Mutex<AqcClient>>,
 }
 
 impl Client {
@@ -197,7 +197,10 @@ impl Client {
             .next()
             .expect("expected AQC server address");
         let aqc = AqcClient::new(aqc_server_addr, daemon.clone()).await?;
-        let client = Self { daemon, aqc };
+        let client = Self {
+            daemon: Arc::new(Mutex::new(daemon)),
+            aqc: Arc::new(Mutex::new(aqc)),
+        };
 
         Ok(client)
     }
@@ -205,20 +208,19 @@ impl Client {
     /// Returns the address that the Aranya sync server is bound to.
     pub async fn local_addr(&self) -> Result<SocketAddr> {
         self.daemon
+            .lock()
+            .await
             .aranya_local_addr(context::current())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
-    /// Returns the address that the AQC client is bound to.
-    pub async fn aqc_client_addr(&self) -> Result<SocketAddr> {
-        Ok(self.aqc.client_addr()?)
-    }
-
     /// Gets the public key bundle for this device.
     pub async fn get_key_bundle(&mut self) -> Result<KeyBundle> {
         self.daemon
+            .lock()
+            .await
             .get_key_bundle(context::current())
             .await
             .map_err(IpcError::new)?
@@ -228,6 +230,8 @@ impl Client {
     /// Gets the public device ID for this device.
     pub async fn get_device_id(&mut self) -> Result<DeviceId> {
         self.daemon
+            .lock()
+            .await
             .get_device_id(context::current())
             .await
             .map_err(IpcError::new)?
@@ -235,15 +239,17 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<Team<'_>> {
+    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<Team> {
         let team_id = self
             .daemon
+            .lock()
+            .await
             .create_team(context::current(), cfg.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         Ok(Team {
-            client: self,
+            daemon: self.daemon.clone(),
             team_id,
         })
     }
@@ -255,22 +261,24 @@ impl Client {
     }
 
     /// Get an existing team.
-    pub fn team(&mut self, team_id: TeamId) -> Team<'_> {
+    pub fn team(&mut self, team_id: TeamId) -> Team {
         Team {
-            client: self,
+            daemon: self.daemon.clone(),
             team_id,
         }
     }
 
     /// Add a team to local device storage.
-    pub async fn add_team(&mut self, team_id: TeamId, cfg: TeamConfig) -> Result<Team<'_>> {
+    pub async fn add_team(&mut self, team_id: TeamId, cfg: TeamConfig) -> Result<Team> {
         self.daemon
+            .lock()
+            .await
             .add_team(context::current(), team_id, cfg.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
         Ok(Team {
-            client: self,
+            daemon: self.daemon.clone(),
             team_id,
         })
     }
@@ -278,6 +286,8 @@ impl Client {
     /// Remove a team from local device storage.
     pub async fn remove_team(&mut self, team_id: TeamId) -> Result<()> {
         self.daemon
+            .lock()
+            .await
             .remove_team(context::current(), team_id)
             .await
             .map_err(IpcError::new)?
@@ -285,8 +295,8 @@ impl Client {
     }
 
     /// Get access to Aranya QUIC Channels.
-    pub fn aqc(&mut self) -> AqcChannels<'_> {
-        AqcChannels::new(self)
+    pub fn aqc(&mut self) -> AqcChannels {
+        AqcChannels::new(self.daemon.clone(), self.aqc.clone())
     }
 }
 
@@ -300,12 +310,12 @@ impl Client {
 /// - creating/assigning/deleting labels.
 /// - creating/deleting fast channels.
 /// - assigning network identifiers to devices.
-pub struct Team<'a> {
-    client: &'a mut Client,
+pub struct Team {
+    daemon: Arc<Mutex<DaemonApiClient>>,
     team_id: TeamId,
 }
 
-impl Team<'_> {
+impl Team {
     /// Return the team's ID.
     pub fn team_id(&self) -> TeamId {
         self.team_id
@@ -319,8 +329,9 @@ impl Team<'_> {
             .context("bad peer_enc_pk")
             .map_err(error::other)?;
         let wrapped = self
-            .client
             .daemon
+            .lock()
+            .await
             .encrypt_psk_seed_for_peer(context::current(), self.team_id, peer_enc_pk)
             .await
             .map_err(IpcError::new)?
@@ -331,8 +342,9 @@ impl Team<'_> {
 
     /// Adds a peer for automatic periodic Aranya state syncing.
     pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .add_sync_peer(context::current(), addr, self.team_id, config.into())
             .await
             .map_err(IpcError::new)?
@@ -344,8 +356,9 @@ impl Team<'_> {
     /// If `config` is `None`, default values (including those from the daemon) will
     /// be used.
     pub async fn sync_now(&mut self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .sync_now(context::current(), addr, self.team_id, cfg.map(Into::into))
             .await
             .map_err(IpcError::new)?
@@ -354,8 +367,9 @@ impl Team<'_> {
 
     /// Removes a peer from automatic Aranya state syncing.
     pub async fn remove_sync_peer(&mut self, addr: Addr) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .remove_sync_peer(context::current(), addr, self.team_id)
             .await
             .map_err(IpcError::new)?
@@ -364,8 +378,9 @@ impl Team<'_> {
 
     /// Close the team and stop all operations on the graph.
     pub async fn close_team(&mut self) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .close_team(context::current(), self.team_id)
             .await
             .map_err(IpcError::new)?
@@ -374,8 +389,9 @@ impl Team<'_> {
 
     /// Add a device to the team with the default `Member` role.
     pub async fn add_device_to_team(&mut self, keys: KeyBundle) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .add_device_to_team(context::current(), self.team_id, keys)
             .await
             .map_err(IpcError::new)?
@@ -384,8 +400,9 @@ impl Team<'_> {
 
     /// Remove a device from the team.
     pub async fn remove_device_from_team(&mut self, device: DeviceId) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .remove_device_from_team(context::current(), self.team_id, device)
             .await
             .map_err(IpcError::new)?
@@ -394,8 +411,9 @@ impl Team<'_> {
 
     /// Assign a role to a device.
     pub async fn assign_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .assign_role(context::current(), self.team_id, device, role)
             .await
             .map_err(IpcError::new)?
@@ -404,8 +422,9 @@ impl Team<'_> {
 
     /// Revoke a role from a device. This sets the device's role back to the default `Member` role.
     pub async fn revoke_role(&mut self, device: DeviceId, role: Role) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .revoke_role(context::current(), self.team_id, device, role)
             .await
             .map_err(IpcError::new)?
@@ -422,8 +441,9 @@ impl Team<'_> {
         device: DeviceId,
         net_identifier: NetIdentifier,
     ) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .assign_aqc_net_identifier(context::current(), self.team_id, device, net_identifier)
             .await
             .map_err(IpcError::new)?
@@ -436,8 +456,9 @@ impl Team<'_> {
         device: DeviceId,
         net_identifier: NetIdentifier,
     ) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .remove_aqc_net_identifier(context::current(), self.team_id, device, net_identifier)
             .await
             .map_err(IpcError::new)?
@@ -446,8 +467,9 @@ impl Team<'_> {
 
     /// Create a label.
     pub async fn create_label(&mut self, label_name: Text) -> Result<LabelId> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .create_label(context::current(), self.team_id, label_name)
             .await
             .map_err(IpcError::new)?
@@ -456,8 +478,9 @@ impl Team<'_> {
 
     /// Delete a label.
     pub async fn delete_label(&mut self, label_id: LabelId) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .delete_label(context::current(), self.team_id, label_id)
             .await
             .map_err(IpcError::new)?
@@ -471,8 +494,9 @@ impl Team<'_> {
         label_id: LabelId,
         op: ChanOp,
     ) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .assign_label(context::current(), self.team_id, device, label_id, op)
             .await
             .map_err(IpcError::new)?
@@ -481,8 +505,9 @@ impl Team<'_> {
 
     /// Revoke a label from a device.
     pub async fn revoke_label(&mut self, device: DeviceId, label_id: LabelId) -> Result<()> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .revoke_label(context::current(), self.team_id, device, label_id)
             .await
             .map_err(IpcError::new)?
@@ -490,25 +515,26 @@ impl Team<'_> {
     }
 
     /// Get access to fact database queries.
-    pub fn queries(&mut self) -> Queries<'_> {
+    pub fn queries(&mut self) -> Queries {
         Queries {
-            client: self.client,
+            daemon: self.daemon.clone(),
             team_id: self.team_id,
         }
     }
 }
 
-pub struct Queries<'a> {
-    client: &'a mut Client,
+pub struct Queries {
+    daemon: Arc<Mutex<DaemonApiClient>>,
     team_id: TeamId,
 }
 
-impl Queries<'_> {
+impl Queries {
     /// Returns the list of devices on the current team.
     pub async fn devices_on_team(&mut self) -> Result<Devices> {
         let data = self
-            .client
             .daemon
+            .lock()
+            .await
             .query_devices_on_team(context::current(), self.team_id)
             .await
             .map_err(IpcError::new)?
@@ -518,8 +544,9 @@ impl Queries<'_> {
 
     /// Returns the role of the current device.
     pub async fn device_role(&mut self, device: DeviceId) -> Result<Role> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .query_device_role(context::current(), self.team_id, device)
             .await
             .map_err(IpcError::new)?
@@ -528,8 +555,9 @@ impl Queries<'_> {
 
     /// Returns the keybundle of the current device.
     pub async fn device_keybundle(&mut self, device: DeviceId) -> Result<KeyBundle> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .query_device_keybundle(context::current(), self.team_id, device)
             .await
             .map_err(IpcError::new)?
@@ -539,8 +567,9 @@ impl Queries<'_> {
     /// Returns a list of labels assiged to the current device.
     pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
         let data = self
-            .client
             .daemon
+            .lock()
+            .await
             .query_device_label_assignments(context::current(), self.team_id, device)
             .await
             .map_err(IpcError::new)?
@@ -550,8 +579,9 @@ impl Queries<'_> {
 
     /// Returns the AQC network identifier assigned to the current device.
     pub async fn aqc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .query_aqc_net_identifier(context::current(), self.team_id, device)
             .await
             .map_err(IpcError::new)?
@@ -560,8 +590,9 @@ impl Queries<'_> {
 
     /// Returns whether a label exists.
     pub async fn label_exists(&mut self, label_id: LabelId) -> Result<bool> {
-        self.client
-            .daemon
+        self.daemon
+            .lock()
+            .await
             .query_label_exists(context::current(), self.team_id, label_id)
             .await
             .map_err(IpcError::new)?
@@ -571,8 +602,9 @@ impl Queries<'_> {
     /// Returns a list of labels on the team.
     pub async fn labels(&mut self) -> Result<Labels> {
         let data = self
-            .client
             .daemon
+            .lock()
+            .await
             .query_labels(context::current(), self.team_id)
             .await
             .map_err(IpcError::new)?

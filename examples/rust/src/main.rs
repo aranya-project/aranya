@@ -125,7 +125,7 @@ impl ClientCtx {
         .await
         .context("unable to initialize client")?;
 
-        let aqc_server_addr = client.aqc().server_addr().context("exepcted server addr")?;
+        let aqc_server_addr = client.aqc().server_addr().await.context("expected server addr")?;
         let pk = client
             .get_key_bundle()
             .await
@@ -355,8 +355,7 @@ async fn main() -> Result<()> {
     sleep(sleep_interval).await;
 
     // fact database queries
-    let mut queries_team = membera.client.team(team_id);
-    let mut queries = queries_team.queries();
+    let mut queries = membera_team.queries();
     let devices = queries.devices_on_team().await?;
     info!("membera devices on team: {:?}", devices.iter().count());
     let role = queries.device_role(membera.id).await?;
