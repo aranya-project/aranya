@@ -41,10 +41,10 @@ async fn test_aqc_chans() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id().await)
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id().await)
         .await?;
 
     // wait for syncing.
@@ -78,7 +78,7 @@ async fn test_aqc_chans() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                team.memberb.aqc_net_id(),
+                team.memberb.aqc_net_id().await,
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),
@@ -164,7 +164,7 @@ async fn test_aqc_chans() -> Result<()> {
         let (mut uni_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_uni_channel(
                 team_id,
-                team.memberb.aqc_net_id(),
+                team.memberb.aqc_net_id().await,
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),
@@ -195,12 +195,12 @@ async fn test_aqc_chans() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                team.memberb.aqc_net_id(),
+                team.memberb.aqc_net_id().await,
                 label2,
             ),
             async {
                 Ok(loop {
-                    let peer_channel_result = team.memberb.client.aqc().try_receive_channel();
+                    let peer_channel_result = team.memberb.client.aqc().try_receive_channel().await;
                     if let Ok(peer_channel) = peer_channel_result {
                         break peer_channel;
                     }
@@ -260,10 +260,10 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id().await)
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id().await)
         .await?;
 
     // wait for syncing.
@@ -302,10 +302,11 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     sleep(sleep_interval).await;
 
     let err = try_join(
-        team.membera
-            .client
-            .aqc()
-            .create_bidi_channel(team_id, team.memberb.aqc_net_id(), label3),
+        team.membera.client.aqc().create_bidi_channel(
+            team_id,
+            team.memberb.aqc_net_id().await,
+            label3,
+        ),
         team.memberb.client.aqc().receive_channel(),
     )
     .await
@@ -339,10 +340,10 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id().await)
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id().await)
         .await?;
 
     // wait for syncing.
@@ -381,10 +382,11 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     sleep(sleep_interval).await;
 
     let err = try_join(
-        team.membera
-            .client
-            .aqc()
-            .create_bidi_channel(team_id, team.memberb.aqc_net_id(), label3),
+        team.membera.client.aqc().create_bidi_channel(
+            team_id,
+            team.memberb.aqc_net_id().await,
+            label3,
+        ),
         team.memberb.client.aqc().receive_channel(),
     )
     .await
@@ -418,10 +420,10 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id().await)
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id().await)
         .await?;
 
     // wait for syncing.
@@ -455,7 +457,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                team.memberb.aqc_net_id(),
+                team.memberb.aqc_net_id().await,
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),
@@ -551,10 +553,10 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id().await)
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id().await)
         .await?;
 
     // wait for syncing.
@@ -588,7 +590,7 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                team.memberb.aqc_net_id(),
+                team.memberb.aqc_net_id().await,
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),

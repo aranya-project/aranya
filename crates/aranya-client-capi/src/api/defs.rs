@@ -1677,7 +1677,10 @@ pub fn aqc_try_receive_channel(
     client: &mut Client,
     channel: &mut MaybeUninit<AqcPeerChannel>,
 ) -> Result<AqcChannelType, imp::Error> {
-    let chan = client.inner.aqc().try_receive_channel()?;
+    let client = client.imp();
+    let chan = client
+        .rt
+        .block_on(client.inner.aqc().try_receive_channel())?;
 
     let chan_type = match chan {
         aqc::AqcPeerChannel::Bidi { .. } => AqcChannelType::Bidirectional,

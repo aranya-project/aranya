@@ -240,11 +240,12 @@ impl DeviceCtx {
     }
 
     #[allow(unused, reason = "module compiled for each test file")]
-    pub fn aqc_net_id(&mut self) -> NetIdentifier {
+    pub async fn aqc_net_id(&mut self) -> NetIdentifier {
         NetIdentifier(
             self.client
                 .aqc()
                 .server_addr()
+                .await
                 .expect("can get server addr")
                 .to_string()
                 .try_into()
