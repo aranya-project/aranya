@@ -224,7 +224,7 @@ AranyaError init_client(Client *c, const char *name, const char *daemon_addr,
     // `pk_len` is intentionally set to small size to show how to
     // handle reallocations.
     c->pk_len = 1;
-    c->pk     = malloc(c->pk_len);
+    c->pk     = calloc(c->pk_len, 1);
     if (c->pk == NULL) {
         abort();
     }

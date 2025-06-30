@@ -6,13 +6,13 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, future::Future, time::Duration};
+use std::{collections::HashMap, future::Future};
 
 use anyhow::{Context, Result};
 use aranya_daemon_api::SyncPeerConfig;
 use aranya_runtime::{storage::GraphId, ClientError, Engine, Sink};
 use aranya_util::Addr;
-use buggy::BugExt;
+use buggy::{Bug, BugExt};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -32,9 +32,17 @@ pub mod quic;
 /// Message sent from [`SyncPeers`] to [`Syncer`] via mpsc.
 #[derive(Clone)]
 enum Msg {
-    SyncNow { peer: SyncPeer },
-    AddPeer { peer: SyncPeer, cfg: SyncPeerConfig },
-    RemovePeer { peer: SyncPeer },
+    SyncNow {
+        peer: SyncPeer,
+        cfg: Option<SyncPeerConfig>,
+    },
+    AddPeer {
+        peer: SyncPeer,
+        cfg: SyncPeerConfig,
+    },
+    RemovePeer {
+        peer: SyncPeer,
+    },
 }
 
 /// A sync peer.
@@ -51,9 +59,7 @@ struct SyncPeer {
 #[derive(Clone, Debug)]
 pub struct SyncPeers {
     /// Send messages to add/remove peers.
-    send: mpsc::Sender<Msg>,
-    /// Configuration values for syncing
-    cfgs: HashMap<(Addr, GraphId), SyncPeerConfig>,
+    sender: mpsc::Sender<Msg>,
 }
 
 /// A response to a sync request.
@@ -67,54 +73,32 @@ pub(crate) enum SyncResponse {
 
 impl SyncPeers {
     /// Create a new peer manager.
-    fn new(send: mpsc::Sender<Msg>) -> Self {
-        Self {
-            send,
-            cfgs: HashMap::new(),
-        }
+    fn new(sender: mpsc::Sender<Msg>) -> Self {
+        Self { sender }
+    }
+
+    async fn send(&self, msg: Msg) -> Result<(), Bug> {
+        self.sender
+            .send(msg)
+            .await
+            .assume("syncer peer channel closed")
     }
 
     /// Add peer to [`Syncer`].
     pub(crate) async fn add_peer(
-        &mut self,
+        &self,
         addr: Addr,
         graph_id: GraphId,
         cfg: SyncPeerConfig,
-    ) -> Result<()> {
-        let peer = Msg::AddPeer {
-            peer: SyncPeer { addr, graph_id },
-            cfg: cfg.clone(),
-        };
-        if let Err(e) = self.send.send(peer).await.context("unable to add peer") {
-            error!(?e, "error adding peer to syncer");
-            return Err(e);
-        }
-        if cfg.sync_now {
-            self.sync_now(addr, graph_id, Some(cfg.clone())).await?
-        }
-
-        self.cfgs.insert((addr, graph_id), cfg);
-
-        Ok(())
+    ) -> Result<(), Bug> {
+        let peer = SyncPeer { addr, graph_id };
+        self.send(Msg::AddPeer { peer, cfg }).await
     }
 
     /// Remove peer from [`Syncer`].
-    pub(crate) async fn remove_peer(&mut self, addr: Addr, graph_id: GraphId) -> Result<()> {
-        if let Err(e) = self
-            .send
-            .send(Msg::RemovePeer {
-                peer: SyncPeer { addr, graph_id },
-            })
-            .await
-            .context("unable to remove peer")
-        {
-            error!(?e, "error removing peer from syncer");
-            return Err(e);
-        }
-
-        self.cfgs.remove(&(addr, graph_id));
-
-        Ok(())
+    pub(crate) async fn remove_peer(&self, addr: Addr, graph_id: GraphId) -> Result<(), Bug> {
+        let peer = SyncPeer { addr, graph_id };
+        self.send(Msg::RemovePeer { peer }).await
     }
 
     /// Sync with a peer immediately.
@@ -122,21 +106,10 @@ impl SyncPeers {
         &self,
         addr: Addr,
         graph_id: GraphId,
-        _cfg: Option<SyncPeerConfig>,
-    ) -> Result<()> {
-        let peer = Msg::SyncNow {
-            peer: SyncPeer { addr, graph_id },
-        };
-        if let Err(e) = self
-            .send
-            .send(peer)
-            .await
-            .context("unable to add sync now peer")
-        {
-            error!(?e, "error adding sync now peer to syncer");
-            return Err(e);
-        }
-        Ok(())
+        cfg: Option<SyncPeerConfig>,
+    ) -> Result<(), Bug> {
+        let peer = SyncPeer { addr, graph_id };
+        self.send(Msg::SyncNow { peer, cfg }).await
     }
 }
 
@@ -149,7 +122,7 @@ pub struct Syncer<ST> {
     /// Aranya client to allow syncing the Aranya graph with another peer.
     pub client: Client,
     /// Keeps track of peer info.
-    peers: HashMap<SyncPeer, PeerInfo>,
+    peers: HashMap<SyncPeer, (SyncPeerConfig, Key)>,
     /// Receives added/removed peers.
     recv: mpsc::Receiver<Msg>,
     /// Delay queue for getting the next peer to sync with.
@@ -160,13 +133,6 @@ pub struct Syncer<ST> {
     invalid: InvalidGraphs,
     /// Additional state used by the syncer
     state: ST,
-}
-
-struct PeerInfo {
-    /// Sync interval.
-    interval: Duration,
-    /// Key used to remove peer from queue.
-    key: Key,
 }
 
 /// Types that contain additional data that are part of a [`Syncer`]
@@ -208,25 +174,17 @@ impl<ST> Syncer<ST> {
     }
 
     /// Add a peer to the delay queue, overwriting an existing one.
-    fn add_peer(&mut self, peer: SyncPeer, cfg: &SyncPeerConfig) {
-        let key = self.queue.insert(peer.clone(), cfg.interval);
-        self.peers
-            .entry(peer)
-            .and_modify(|info| {
-                self.queue.remove(&info.key);
-                info.interval = cfg.interval;
-                info.key = key;
-            })
-            .or_insert(PeerInfo {
-                interval: cfg.interval,
-                key,
-            });
+    fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
+        let new_key = self.queue.insert(peer.clone(), cfg.interval);
+        if let Some((_, old_key)) = self.peers.insert(peer, (cfg, new_key)) {
+            self.queue.remove(&old_key);
+        }
     }
 
     /// Remove a peer from the delay queue.
     fn remove_peer(&mut self, peer: SyncPeer) {
-        if let Some(info) = self.peers.remove(&peer) {
-            self.queue.remove(&info.key);
+        if let Some((_, key)) = self.peers.remove(&peer) {
+            self.queue.remove(&key);
         }
     }
 }
@@ -240,19 +198,28 @@ impl<ST: SyncState> Syncer<ST> {
             // receive added/removed peers.
             Some(msg) = self.recv.recv() => {
                 match msg {
-                    Msg::SyncNow{ peer } => {
+                    Msg::SyncNow{ peer, cfg: _cfg } => {
                         // sync with peer right now.
                         self.sync(&peer).await?;
                     },
-                    Msg::AddPeer { peer, cfg } => self.add_peer(peer, &cfg),
-                    Msg::RemovePeer { peer } => self.remove_peer(peer),
+                    Msg::AddPeer { peer, cfg } => {
+                        let mut result = Ok(());
+                        if cfg.sync_now {
+                            result = self.sync(&peer).await;
+                        }
+                        self.add_peer(peer, cfg);
+                        result?;
+                    }
+                    Msg::RemovePeer { peer } => {
+                        self.remove_peer(peer);
+                    }
                 }
             }
             // get next peer from delay queue.
             Some(expired) = self.queue.next() => {
                 let peer = expired.into_inner();
-                let info = self.peers.get_mut(&peer).assume("peer must exist")?;
-                info.key = self.queue.insert(peer.clone(), info.interval);
+                let (cfg, key) = self.peers.get_mut(&peer).assume("peer must exist")?;
+                *key = self.queue.insert(peer.clone(), cfg.interval);
                 // sync with peer.
                 self.sync(&peer).await?;
             }
@@ -276,10 +243,10 @@ impl<ST: SyncState> Syncer<ST> {
                     .is_some_and(|err| matches!(err, ClientError::ParallelFinalize))
                 {
                     // Remove sync peers for graph that had finalization error.
-                    self.peers.retain(|p, info| {
+                    self.peers.retain(|p, (_, key)| {
                         let keep = p.graph_id != peer.graph_id;
                         if !keep {
-                            self.queue.remove(&info.key);
+                            self.queue.remove(key);
                         }
                         keep
                     });
