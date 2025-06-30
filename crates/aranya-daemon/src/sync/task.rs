@@ -246,10 +246,12 @@ impl<ST: SyncState> Syncer<ST> {
                         self.sync(&peer).await?;
                     },
                     Msg::AddPeer { peer, cfg } => {
-                        self.add_peer(peer.clone(), cfg.clone());
+                        let mut result = Ok(0);
                         if cfg.sync_now {
-                            self.sync(&peer).await?;
+                            result = self.sync(&peer).await;
                         }
+                        self.add_peer(peer, cfg);
+                        result?;
                     }
                     Msg::RemovePeer { peer } => {
                         self.remove_peer(peer);
