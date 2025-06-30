@@ -35,7 +35,7 @@ use crate::{
     policy,
     sync::task::{
         quic::{PskStore, State as QuicSyncState},
-        Syncer,
+        PeerCacheMap, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
@@ -57,6 +57,14 @@ pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
+
+/// Sync configuration for setting up Aranya.
+struct SyncParams {
+    psk_store: Arc<PskStore>,
+    active_team_rx: Receiver<TeamId>,
+    caches: PeerCacheMap,
+    external_sync_addr: Addr,
+}
 
 mod invalid_graphs {
     use std::{
@@ -134,6 +142,8 @@ impl Daemon {
         let span_id = span.id();
 
         async move {
+            // Create a shared PeerCacheMap
+            let caches = Arc::new(Mutex::new(BTreeMap::new()));
             // TODO: Fix this when other syncer types are supported
             let Some(_qs_config) = &cfg.quic_sync else {
                 anyhow::bail!("Supply a valid QUIC sync config")
@@ -168,9 +178,12 @@ impl Daemon {
                     .try_clone()
                     .context("unable to clone keystore")?,
                 &pks,
-                cfg.sync_addr,
-                Arc::clone(&psk_store),
-                active_team_rx,
+                SyncParams {
+                    psk_store: Arc::clone(&psk_store),
+                    active_team_rx,
+                    caches: caches.clone(),
+                    external_sync_addr: cfg.sync_addr,
+                },
             )
             .await?;
             let local_addr = sync_server.local_addr()?;
@@ -180,8 +193,14 @@ impl Daemon {
 
             let invalid_graphs = InvalidGraphs::default();
             let state = QuicSyncState::new(psk_store.clone())?;
-            let (syncer, peers) =
-                Syncer::new(client.clone(), send_effects, invalid_graphs.clone(), state);
+            let (syncer, peers) = Syncer::new(
+                client.clone(),
+                send_effects,
+                invalid_graphs.clone(),
+                state,
+                local_addr.into(),
+                caches,
+            );
 
             let graph_ids = client
                 .aranya
@@ -320,9 +339,7 @@ impl Daemon {
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
-        external_sync_addr: Addr,
-        psk_store: Arc<PskStore>,
-        active_team_rx: Receiver<TeamId>,
+        sync_params: SyncParams,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
@@ -335,12 +352,13 @@ impl Daemon {
 
         let client = Client::new(Arc::clone(&aranya));
 
-        info!(addr = %external_sync_addr, "starting QUIC sync server");
+        info!(addr = %sync_params.external_sync_addr, "starting QUIC sync server");
         let server = SyncServer::new(
             client.clone(),
-            &external_sync_addr,
-            psk_store,
-            active_team_rx,
+            &sync_params.external_sync_addr,
+            sync_params.psk_store,
+            sync_params.active_team_rx,
+            sync_params.caches,
         )
         .await
         .context("unable to initialize QUIC sync server")?;
