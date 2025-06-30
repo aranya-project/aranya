@@ -144,32 +144,21 @@ impl TeamCtx {
             team_cfg_builder.build()?
         };
 
-        let team_id = {
+        let team = {
             self.owner
                 .client
                 .create_team(cfg.clone())
                 .await
                 .expect("expected to create team")
         };
+        let team_id = team.team_id();
         info!(?team_id);
 
         // Owner has the team added due to calling `create_team`, now we assign it to all other peers
-        self.admin
-            .client
-            .team(team_id)
-            .add_team(cfg.clone())
-            .await?;
-        self.operator
-            .client
-            .team(team_id)
-            .add_team(cfg.clone())
-            .await?;
-        self.membera
-            .client
-            .team(team_id)
-            .add_team(cfg.clone())
-            .await?;
-        self.memberb.client.team(team_id).add_team(cfg).await?;
+        self.admin.client.add_team(team_id, cfg.clone()).await?;
+        self.operator.client.add_team(team_id, cfg.clone()).await?;
+        self.membera.client.add_team(team_id, cfg.clone()).await?;
+        self.memberb.client.add_team(team_id, cfg).await?;
 
         Ok(team_id)
     }

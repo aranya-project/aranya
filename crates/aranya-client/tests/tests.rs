@@ -12,7 +12,7 @@
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
-use aranya_client::TeamConfig;
+use aranya_client::{config::TeamInfo, TeamConfig, TeamConfigBuilder};
 use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
@@ -160,26 +160,23 @@ async fn test_add_team() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_add_team", work_dir).await?;
 
+    // Grab the shorthand for our address.
+    let owner_addr = team.owner.aranya_local_addr().await?;
+
     // Create the initial team, and get our TeamId.
     let owner_cfg = {
         let mut team_cfg_builder = TeamConfig::builder();
         let _ = team_cfg_builder.quic_sync();
         team_cfg_builder.build()?
     };
-    let team_id = team
+    let mut owner = team
         .owner
         .client
         .create_team(owner_cfg)
         .await
         .expect("expected to create team");
+    let team_id = owner.team_id();
     info!(?team_id);
-
-    // Grab the shorthand for our address.
-    let owner_addr = team.owner.aranya_local_addr().await?;
-
-    // Grab the shorthand for the teams we need to operate on.
-    let mut owner = team.owner.client.team(team_id);
-    let mut admin = team.admin.client.team(team_id);
 
     // Add the admin as a new device.
     info!("adding admin to team");
@@ -193,35 +190,48 @@ async fn test_add_team() -> Result<()> {
     owner.assign_role(team.admin.id, Role::Admin).await?;
 
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
-    admin.sync_now(owner_addr.into(), None).await?;
-    sleep(TLS_HANDSHAKE_DURATION).await;
+    {
+        let mut admin = team.admin.client.team(team_id);
+        admin.sync_now(owner_addr.into(), None).await?;
+        sleep(TLS_HANDSHAKE_DURATION).await;
 
-    // Now, we try to assign a role using the admin, which is expected to fail.
-    match admin.assign_role(team.operator.id, Role::Operator).await {
-        Ok(_) => bail!("Expected role assignment to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(_) => bail!("Unexpected error"),
+        // Now, we try to assign a role using the admin, which is expected to fail.
+        match admin.assign_role(team.operator.id, Role::Operator).await {
+            Ok(_) => bail!("Expected role assignment to fail"),
+            Err(aranya_client::Error::Aranya(_)) => {}
+            Err(_) => bail!("Unexpected error"),
+        }
     }
 
     let admin_seed = owner
         .encrypt_psk_seed_for_peer(&team.admin.pk.encoding)
         .await?;
 
+    let team_info_for_admin = TeamInfo::V1 {
+        id: team_id,
+        wrapped_seed: admin_seed,
+    };
+
     let admin_cfg = {
-        let mut team_cfg_builder = TeamConfig::builder();
-        let qs_cfg_builder = team_cfg_builder.quic_sync();
-        qs_cfg_builder.wrapped_seed(&admin_seed)?;
+        // QuicSyncConfigBuilder is initialized
+        let (team_cfg_builder, _team_id_from_peer) =
+            TeamConfigBuilder::from_team_info_v1(team_info_for_admin)?;
+
         team_cfg_builder.build()?
     };
-    admin.add_team(admin_cfg).await?;
-    admin.sync_now(owner_addr.into(), None).await?;
-    sleep(SLEEP_INTERVAL).await;
 
-    // Now we should be able to successfully assign a role.
-    admin
-        .assign_role(team.operator.id, Role::Operator)
-        .await
-        .context("Assigning a role should not fail here!")?;
+    team.admin.client.add_team(team_id, admin_cfg).await?;
+    {
+        let mut admin = team.admin.client.team(team_id);
+        admin.sync_now(owner_addr.into(), None).await?;
+        sleep(SLEEP_INTERVAL).await;
+
+        // Now we should be able to successfully assign a role.
+        admin
+            .assign_role(team.operator.id, Role::Operator)
+            .await
+            .context("Assigning a role should not fail here!")?;
+    }
 
     return Ok(());
 }
@@ -242,34 +252,40 @@ async fn test_remove_team() -> Result<()> {
 
     team.add_all_sync_peers(team_id).await?;
 
-    let mut owner = team.owner.client.team(team_id);
-    let mut admin = team.admin.client.team(team_id);
+    {
+        let mut owner = team.owner.client.team(team_id);
+        let mut admin = team.admin.client.team(team_id);
 
-    // Add the operator as a new device.
-    info!("adding operator to team");
-    owner.add_device_to_team(team.operator.pk.clone()).await?;
+        // Add the operator as a new device.
+        info!("adding operator to team");
+        owner.add_device_to_team(team.operator.pk.clone()).await?;
 
-    // Add the admin as a new device.
-    owner.add_device_to_team(team.admin.pk.clone()).await?;
+        // Add the admin as a new device.
+        owner.add_device_to_team(team.admin.pk.clone()).await?;
 
-    // Give the admin its role.
-    owner.assign_role(team.admin.id, Role::Admin).await?;
+        // Give the admin its role.
+        owner.assign_role(team.admin.id, Role::Admin).await?;
 
-    sleep(SLEEP_INTERVAL).await;
+        sleep(SLEEP_INTERVAL).await;
 
-    // We should be able to successfully assign a role.
-    admin.assign_role(team.operator.id, Role::Operator).await?;
+        // We should be able to successfully assign a role.
+        admin.assign_role(team.operator.id, Role::Operator).await?;
+    }
 
     // Remove the team from the admin's local storage
-    admin.remove_team().await?;
+    team.admin.client.remove_team(team_id).await?;
 
     sleep(SLEEP_INTERVAL).await;
 
-    // Role assignment should fail
-    match admin.assign_role(team.operator.id, Role::Member).await {
-        Ok(_) => bail!("Expected role assignment to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
-        Err(_) => bail!("Unexpected error"),
+    {
+        let mut admin = team.admin.client.team(team_id);
+
+        // Role assignment should fail
+        match admin.assign_role(team.operator.id, Role::Member).await {
+            Ok(_) => bail!("Expected role assignment to fail"),
+            Err(aranya_client::Error::Aranya(_)) => {}
+            Err(_) => bail!("Unexpected error"),
+        }
     }
 
     Ok(())
@@ -306,23 +322,24 @@ async fn test_multi_team_sync() -> Result<()> {
 
     // Admin2 syncs on team 1
     {
-        let admin2_device = &mut team2.admin;
         let owner1_addr = team1.owner.aranya_local_addr().await?;
         let mut owner1 = team1.owner.client.team(team_id_1);
 
-        let mut admin2 = admin2_device.client.team(team_id_1);
+        let admin_seed = {
+            let admin2_device = &mut team2.admin;
 
-        let admin_keys = admin2_device.pk.clone();
-        owner1.add_device_to_team(admin_keys).await?;
+            let admin_keys = admin2_device.pk.clone();
+            owner1.add_device_to_team(admin_keys).await?;
 
-        // Assign Admin2 the Admin role on team 1.
-        owner1.assign_role(admin2_device.id, Role::Admin).await?;
-        sleep(SLEEP_INTERVAL).await;
+            // Assign Admin2 the Admin role on team 1.
+            owner1.assign_role(admin2_device.id, Role::Admin).await?;
+            sleep(SLEEP_INTERVAL).await;
 
-        // Create a wrapped seed for Admin2
-        let admin_seed = owner1
-            .encrypt_psk_seed_for_peer(&admin2_device.pk.encoding)
-            .await?;
+            // Create a wrapped seed for Admin2
+            owner1
+                .encrypt_psk_seed_for_peer(&admin2_device.pk.encoding)
+                .await?
+        };
 
         let admin_cfg = {
             let mut team_cfg_builder = TeamConfig::builder();
@@ -332,11 +349,14 @@ async fn test_multi_team_sync() -> Result<()> {
         };
 
         // Admin2 adds team1 to it's local storage using the wrapped seed
-        admin2.add_team(admin_cfg).await?;
-        admin2.sync_now(owner1_addr.into(), None).await?;
+        team2.admin.client.add_team(team_id_1, admin_cfg).await?;
+        {
+            let mut admin2 = team2.admin.client.team(team_id_1);
+            admin2.sync_now(owner1_addr.into(), None).await?;
 
-        sleep(SLEEP_INTERVAL).await;
-        admin2.assign_role(team1.membera.id, Role::Operator).await?;
+            sleep(SLEEP_INTERVAL).await;
+            admin2.assign_role(team1.membera.id, Role::Operator).await?;
+        }
     }
 
     // Admin2 syncs on team 2

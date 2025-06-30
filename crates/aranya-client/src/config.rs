@@ -131,7 +131,7 @@ impl QuicSyncConfigBuilder {
 
     /// Sets the seed mode to 'IKM'.
     ///
-    /// This option is valid in both [`super::Client::create_team`] and [`super::Team::add_team`].
+    /// This option is valid in both [`super::Client::create_team`] and [`super::Client::add_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
     pub fn seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) -> &mut Self {
         self.seed_mode = SeedMode::IKM(ikm);
@@ -140,7 +140,7 @@ impl QuicSyncConfigBuilder {
 
     /// Sets the seed mode to 'Wrapped'.
     ///
-    /// This option is only valid in [`super::Team::add_team`].
+    /// This option is only valid in [`super::Client::add_team`].
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
     pub fn wrapped_seed(&mut self, wrapped_seed: &[u8]) -> Result<&mut Self> {
         let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {

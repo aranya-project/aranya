@@ -222,14 +222,6 @@ async fn main() -> Result<()> {
         team_cfg_builder.build()?
     };
 
-    // Create a team.
-    info!("creating team");
-    let team_id = owner
-        .client
-        .create_team(cfg.clone())
-        .await
-        .context("expected to create team")?;
-    info!(%team_id);
 
     // get sync addresses.
     let owner_addr = owner.aranya_local_addr().await?;
@@ -241,17 +233,22 @@ async fn main() -> Result<()> {
     // get aqc addresses.
     debug!(?membera.aqc_addr, ?memberb.aqc_addr);
 
+    // Create a team.
+    info!("creating team");
+    let mut owner_team = owner
+        .client
+        .create_team(cfg.clone())
+        .await
+        .context("expected to create team")?;
+    let team_id = owner_team.team_id();
+    info!(%team_id);
+
+    let mut admin_team = admin.client.add_team(team_id, cfg.clone()).await?;
+    let mut operator_team = operator.client.add_team(team_id, cfg.clone()).await?;
+    let mut membera_team = membera.client.add_team(team_id, cfg.clone()).await?;
+    let mut memberb_team = memberb.client.add_team(team_id, cfg.clone()).await?;
+
     // setup sync peers.
-    let mut owner_team = owner.client.team(team_id);
-    let mut admin_team = admin.client.team(team_id);
-    let mut operator_team = operator.client.team(team_id);
-    let mut membera_team = membera.client.team(team_id);
-    let mut memberb_team = memberb.client.team(team_id);
-
-    for member in [&admin_team, &operator_team, &membera_team, &memberb_team] {
-        member.add_team(cfg.clone()).await?;
-    }
-
     info!("adding admin to team");
     owner_team.add_device_to_team(admin.pk).await?;
     owner_team.assign_role(admin.id, Role::Admin).await?;
