@@ -364,6 +364,13 @@ typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
     uint8_t __for_size_only[288];
 } AranyaTeamConfigBuilder;
 
+/**
+ * Team ID.
+ */
+typedef struct AranyaTeamId {
+    struct AranyaId id;
+} AranyaTeamId;
+
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
     /**
      * This field only exists for size purposes. It is
@@ -401,13 +408,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
  * A type to represent a span of time in nanoseconds.
  */
 typedef uint64_t AranyaDuration;
-
-/**
- * Team ID.
- */
-typedef struct AranyaTeamId {
-    struct AranyaId id;
-} AranyaTeamId;
 
 /**
  * An AQC label name.
@@ -1145,11 +1145,91 @@ AranyaError aranya_team_config_builder_cleanup_ext(struct AranyaTeamConfigBuilde
                                                    struct AranyaExtError *__ext_err);
 
 /**
+ * Serializes team information into a byte buffer.
+ *
+ * Creates a TeamInfo V1 struct from the wrapped seed and team ID,
+ * then serializes it.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the serialized data.
+ * Writes the number of bytes that would have been returned to `buf_len`.
+ * The application can use `buf_len` to allocate a larger buffer.
+ *
+ * @param[in] wrapped_seed the serialized representation of a wrapped seed.
+ * @param[out] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] buf buffer to write the serialized team info to.
+ * @param[out] buf_len the size of the buffer, updated with the actual bytes written.
+ */
+AranyaError aranya_to_team_info_v1_bytes(const uint8_t *wrapped_seed,
+                                         size_t wrapped_seed_len,
+                                         const struct AranyaTeamId *team_id,
+                                         uint8_t *buf,
+                                         size_t *buf_len);
+
+/**
+ * Serializes team information into a byte buffer.
+ *
+ * Creates a TeamInfo V1 struct from the wrapped seed and team ID,
+ * then serializes it.
+ *
+ * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the serialized data.
+ * Writes the number of bytes that would have been returned to `buf_len`.
+ * The application can use `buf_len` to allocate a larger buffer.
+ *
+ * @param[in] wrapped_seed the serialized representation of a wrapped seed.
+ * @param[out] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] buf buffer to write the serialized team info to.
+ * @param[out] buf_len the size of the buffer, updated with the actual bytes written.
+ */
+AranyaError aranya_to_team_info_v1_bytes_ext(const uint8_t *wrapped_seed,
+                                             size_t wrapped_seed_len,
+                                             const struct AranyaTeamId *team_id,
+                                             uint8_t *buf,
+                                             size_t *buf_len,
+                                             struct AranyaExtError *__ext_err);
+
+/**
+ * Initializes team and QUIC sync config builders from serialized team info.
+ *
+ * Deserializes team information data and creates initialized builders that can be used
+ * to build a team config.
+ *
+ * @param[in] team_info_bytes serialized team information bytes (created by [`aranya_to_team_info_v1_bytes`](@ref aranya_to_team_info_v1_bytes)).
+ * @param[out] team_cfg_builder the uninitialized team config builder [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder).
+ * @param[out] qs_cfg_builder the uninitialized QUIC sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * @param[out] team_id returns the team's ID [`AranyaTeamId`](@ref AranyaTeamId) extracted from the team info.
+ *
+ * @relates AranyaTeamConfigBuilder.
+ */
+AranyaError aranya_team_config_builder_init_from_team_info_v1_bytes(const uint8_t *team_info_bytes,
+                                                                    size_t team_info_bytes_len,
+                                                                    struct AranyaTeamConfigBuilder *team_cfg_builder,
+                                                                    struct AranyaQuicSyncConfigBuilder *qs_cfg_builder,
+                                                                    struct AranyaTeamId *team_id);
+
+/**
+ * Initializes team and QUIC sync config builders from serialized team info.
+ *
+ * Deserializes team information data and creates initialized builders that can be used
+ * to build a team config.
+ *
+ * @param[in] team_info_bytes serialized team information bytes (created by [`aranya_to_team_info_v1_bytes`](@ref aranya_to_team_info_v1_bytes)).
+ * @param[out] team_cfg_builder the uninitialized team config builder [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder).
+ * @param[out] qs_cfg_builder the uninitialized QUIC sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * @param[out] team_id returns the team's ID [`AranyaTeamId`](@ref AranyaTeamId) extracted from the team info.
+ *
+ * @relates AranyaTeamConfigBuilder.
+ */
+AranyaError aranya_team_config_builder_init_from_team_info_v1_bytes_ext(const uint8_t *team_info_bytes,
+                                                                        size_t team_info_bytes_len,
+                                                                        struct AranyaTeamConfigBuilder *team_cfg_builder,
+                                                                        struct AranyaQuicSyncConfigBuilder *qs_cfg_builder,
+                                                                        struct AranyaTeamId *team_id,
+                                                                        struct AranyaExtError *__ext_err);
+
+/**
  * Configures QUIC syncer for [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder).
  *
- * By default, the QUIC syncer config is not set. It is an error to call
- * [`aranya_team_config_build`](@ref aranya_team_config_build) before setting the interval with
- * this function
+ * By default, the QUIC syncer config is not set.
  *
  * @param cfg a pointer to the builder for a team config
  * @param quic set the QUIC syncer config
@@ -1160,9 +1240,7 @@ AranyaError aranya_team_config_builder_set_quic_syncer(struct AranyaTeamConfigBu
 /**
  * Configures QUIC syncer for [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder).
  *
- * By default, the QUIC syncer config is not set. It is an error to call
- * [`aranya_team_config_build`](@ref aranya_team_config_build) before setting the interval with
- * this function
+ * By default, the QUIC syncer config is not set.
  *
  * @param cfg a pointer to the builder for a team config
  * @param quic set the QUIC syncer config

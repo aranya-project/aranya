@@ -7,7 +7,10 @@ use std::{ffi::OsStr, ops::Deref, os::unix::ffi::OsStrExt, str::FromStr};
 
 use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
-use aranya_client::aqc::{self, AqcPeerStream};
+use aranya_client::{
+    aqc::{self, AqcPeerStream},
+    config::TeamInfo,
+};
 use aranya_crypto::dangerous::spideroak_crypto::hex;
 use aranya_daemon_api::Text;
 use bytes::Bytes;
@@ -721,11 +724,78 @@ pub type TeamConfig = Safe<imp::TeamConfig>;
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 
+/// Serializes team information into a byte buffer.
+///
+/// Creates a TeamInfo V1 struct from the wrapped seed and team ID,
+/// then serializes it.
+///
+/// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the serialized data.
+/// Writes the number of bytes that would have been returned to `buf_len`.
+/// The application can use `buf_len` to allocate a larger buffer.
+///
+/// @param[in] wrapped_seed the serialized representation of a wrapped seed.
+/// @param[out] team_id the team's ID [`TeamId`].
+/// @param[out] buf buffer to write the serialized team info to.
+/// @param[out] buf_len the size of the buffer, updated with the actual bytes written.
+pub unsafe fn to_team_info_v1_bytes(
+    wrapped_seed: &[u8],
+    team_id: &TeamId,
+    buf: *mut MaybeUninit<u8>,
+    buf_len: &mut usize,
+) -> Result<(), imp::Error> {
+    let wrapped_seed = wrapped_seed.to_vec();
+    let team_info = TeamInfo::V1 {
+        id: team_id.into(),
+        wrapped_seed,
+    };
+
+    let data = postcard::to_allocvec(&team_info)?;
+
+    if *buf_len < data.len() {
+        *buf_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+
+    // SAFETY: Must trust caller provides valid ptr/len.
+    let out = aranya_capi_core::try_as_mut_slice!(buf, *buf_len);
+    for (dst, src) in out.iter_mut().zip(&data) {
+        dst.write(*src);
+    }
+    *buf_len = data.len();
+
+    Ok(())
+}
+
+/// Initializes team and QUIC sync config builders from serialized team info.
+///
+/// Deserializes team information data and creates initialized builders that can be used
+/// to build a team config.
+///
+/// @param[in] team_info_bytes serialized team information bytes (created by [`to_team_info_v1_bytes`]).
+/// @param[out] team_cfg_builder the uninitialized team config builder [`TeamConfigBuilder`].
+/// @param[out] qs_cfg_builder the uninitialized QUIC sync config builder [`QuicSyncConfigBuilder`].
+/// @param[out] team_id returns the team's ID [`TeamId`] extracted from the team info.
+///
+/// @relates AranyaTeamConfigBuilder.
+pub fn team_config_builder_init_from_team_info_v1_bytes(
+    team_info_bytes: &[u8],
+    team_cfg_builder: &mut MaybeUninit<TeamConfigBuilder>,
+    qs_cfg_builder: &mut MaybeUninit<QuicSyncConfigBuilder>,
+    team_id: &mut TeamId,
+) -> Result<(), imp::Error> {
+    let team_info = postcard::from_bytes(team_info_bytes)?;
+    let (team_builder, qs_builder, id) = imp::TeamConfigBuilder::from_team_info_v1(team_info)?;
+
+    TeamConfigBuilder::init(team_cfg_builder, team_builder);
+    QuicSyncConfigBuilder::init(qs_cfg_builder, qs_builder);
+    *team_id = id;
+
+    Ok(())
+}
+
 /// Configures QUIC syncer for [`TeamConfigBuilder`].
 ///
-/// By default, the QUIC syncer config is not set. It is an error to call
-/// [`team_config_build`] before setting the interval with
-/// this function
+/// By default, the QUIC syncer config is not set.
 ///
 /// @param cfg a pointer to the builder for a team config
 /// @param quic set the QUIC syncer config

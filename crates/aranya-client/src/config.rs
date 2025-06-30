@@ -164,7 +164,6 @@ impl QuicSyncConfigBuilder {
 /// This enum contains versioned team data that can be serialized and used to
 /// reconstruct team configs on different devices.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "version")]
 #[non_exhaustive]
 pub enum TeamInfo {
     V1 {

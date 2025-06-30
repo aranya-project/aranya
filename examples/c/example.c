@@ -421,12 +421,9 @@ AranyaError init_team(Team *t) {
 
         // Setup team config for non-owner devices.
         // QUIC syncer PSK must be set.
+
+        AranyaTeamConfigBuilder build;
         AranyaQuicSyncConfigBuilder quic_build;
-        err = aranya_quic_sync_config_builder_init(&quic_build);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
-            return err;
-        }
 
         AranyaTeamId team_id_from_peer = t->id;
         if (t->seed_mode == RAW_IKM) {
@@ -437,7 +434,20 @@ AranyaError init_team(Team *t) {
                         "seed\n");
                 return err;
             }
+
+            err = aranya_quic_sync_config_builder_init(&quic_build);
+            if (err != ARANYA_ERROR_SUCCESS) {
+                fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
+                return err;
+            }
+
+            err = aranya_team_config_builder_init(&build);
+            if (err != ARANYA_ERROR_SUCCESS) {
+                fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
+                return err;
+            }
         } else {
+            // Owner creates a wrapped seed for each peer on the team
             printf("encrypting PSK seed for peer\n");
             size_t wrapped_seed_len = 100;
             uint8_t *wrapped_seed   = calloc(wrapped_seed_len, 1);
@@ -458,15 +468,28 @@ AranyaError init_team(Team *t) {
                 return err;
             }
 
-            // Note: this is where the team owner will send the encrypted PSK
-            // seed to the peer.
+            size_t team_info_buf_len = 100;
+            uint8_t *team_info_buf   = calloc(team_info_buf_len, 1);
+            err = aranya_to_team_info_v1_bytes(wrapped_seed, wrapped_seed_len, &team_id_from_peer, team_info_buf, &team_info_buf_len);
+            if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+                printf("handling buffer too small error\n");
+                team_info_buf = realloc(team_info_buf, team_info_buf_len);
+                err = aranya_to_team_info_v1_bytes(wrapped_seed, wrapped_seed_len, &team_id_from_peer, team_info_buf, &team_info_buf_len);
+            }
 
-            err = aranya_quic_sync_config_wrapped_seed(
-                &quic_build, wrapped_seed, wrapped_seed_len);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
-                        "unable to set `AranyaQuicSyncConfigBuilder` wrapped "
-                        "seed\n");
+                        "unable to serialize team ID and wrapped seed to TeamInfo version 1, team_info_buf_len=%zu\n",
+                        team_info_buf_len);
+                return err;
+            }
+
+            // Note: this is where the team owner will send the serialized team info data
+            // to the peer.
+
+            err = aranya_team_config_builder_init_from_team_info_v1_bytes(team_info_buf, team_info_buf_len, &build, &quic_build, &team_id_from_peer);
+            if (err != ARANYA_ERROR_SUCCESS) {
+                fprintf(stderr, "unable to init `AranyaTeamConfigBuilder` and AranyaQuicSyncConfigBuilder from TeamInfo V1 bytes \n");
                 return err;
             }
         }
@@ -475,13 +498,6 @@ AranyaError init_team(Team *t) {
         err = aranya_quic_sync_config_build(&quic_build, &quic_cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to init `AranyaQuicSyncConfig`\n");
-            return err;
-        }
-
-        AranyaTeamConfigBuilder build;
-        err = aranya_team_config_builder_init(&build);
-        if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
             return err;
         }
 

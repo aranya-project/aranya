@@ -4,11 +4,12 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
+use aranya_client::config::TeamInfo;
 use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
 use tracing::error;
 
 use super::Error;
-use crate::api::defs::{self, Duration};
+use crate::api::defs::{self, Duration, TeamId};
 
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
@@ -253,7 +254,7 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct QuicSyncConfigBuilder {
     mode: SeedMode,
 }
@@ -349,6 +350,26 @@ impl Typed for TeamConfigBuilder {
 }
 
 impl TeamConfigBuilder {
+    pub(crate) fn from_team_info_v1(
+        team_info: TeamInfo,
+    ) -> Result<(Self, QuicSyncConfigBuilder, TeamId), Error> {
+        let TeamInfo::V1 { id, wrapped_seed } = team_info else {
+            return Err(InvalidArg::new("team_info", "expecting a `TeamInfo::V1`").into());
+        };
+
+        let (team_builder, qs_builder) = {
+            let mut team_cfg_builder = Self::default();
+            let mut qs_builder = QuicSyncConfig::builder();
+            qs_builder.wrapped_seed(&wrapped_seed)?;
+
+            team_cfg_builder.quic(qs_builder.clone().build()?); // Remove?
+
+            (team_cfg_builder, qs_builder)
+        };
+
+        Ok((team_builder, qs_builder, id.into()))
+    }
+
     /// Sets the QUIC syncer config.
     pub fn quic(&mut self, quic: QuicSyncConfig) {
         self.quic_sync = Some(quic.clone());
