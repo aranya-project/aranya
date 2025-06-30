@@ -46,7 +46,7 @@ use crate::{
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
-        task::{quic::PskStore, PeerCacheMap, SyncPeer},
+        task::{quic::PskStore, PeerCacheKey, PeerCacheMap, SyncPeer},
     },
     vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore, InvalidGraphs,
@@ -359,6 +359,21 @@ impl TestCtx {
             .await
             .context("unable to elevate admin role")?;
         admin.sync_check_cache(owner, Some(3)).await?;
+
+        let admin_caches = admin.syncer.get_peer_caches();
+        let owner_key = PeerCacheKey {
+            addr: owner.local_addr,
+            id: admin.graph_id,
+        };
+        let admin_cache_size = admin_caches
+            .lock()
+            .await
+            .get(&owner_key)
+            .unwrap()
+            .heads()
+            .len();
+        assert!(admin_cache_size > 0);
+
         owner
             .actions()
             .add_member(DeviceKeyBundle::try_from(&operator.pk)?)
@@ -370,6 +385,17 @@ impl TestCtx {
             .await
             .context("unable to elevate operator role")?;
         operator.sync_check_cache(owner, Some(5)).await?;
+
+        let operator_caches = operator.syncer.get_peer_caches();
+        let operator_cache_size = operator_caches
+            .lock()
+            .await
+            .get(&owner_key)
+            .unwrap()
+            .heads()
+            .len();
+        assert!(operator_cache_size > 0);
+
         operator
             .actions()
             .add_member(DeviceKeyBundle::try_from(&membera.pk)?)

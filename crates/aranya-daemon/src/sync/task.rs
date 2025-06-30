@@ -128,7 +128,7 @@ impl SyncPeers {
 type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 
 /// Key for looking up syncer peer cache in map.
-#[derive(Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct PeerCacheKey {
     /// The peer address.
     pub addr: Addr,
@@ -313,5 +313,11 @@ impl<ST: SyncState> Syncer<ST> {
             .context("unable to send effects")?;
         trace!(?n, "completed sync");
         Ok(cmd_count)
+    }
+
+    /// Get peer caches.
+    #[cfg(test)]
+    pub fn get_peer_caches(&self) -> PeerCacheMap {
+        self.caches.clone()
     }
 }
