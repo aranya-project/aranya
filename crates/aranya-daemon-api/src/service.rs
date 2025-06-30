@@ -22,7 +22,7 @@ use aranya_crypto::{
     zeroize::{Zeroize, ZeroizeOnDrop},
     EncryptionPublicKey, Engine, Id,
 };
-pub use aranya_policy_text::{text, Text};
+pub use aranya_policy_text::{text, InvalidText, Text};
 use aranya_util::Addr;
 use buggy::Bug;
 pub use semver::Version;
@@ -127,15 +127,6 @@ pub struct KeyBundle {
     pub identity: Vec<u8>,
     pub signing: Vec<u8>,
     pub encoding: Vec<u8>,
-}
-
-/// A device's role on the team.
-#[derive(Copy, Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
-pub enum Role {
-    Owner,
-    Admin,
-    Operator,
-    Member,
 }
 
 // Note: any fields added to this type should be public
@@ -691,13 +682,6 @@ impl fmt::Display for Op {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.to_str().fmt(f)
     }
-}
-
-/// A label.
-#[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
-pub struct Label {
-    pub id: LabelId,
-    pub name: Text,
 }
 
 #[tarpc::service]

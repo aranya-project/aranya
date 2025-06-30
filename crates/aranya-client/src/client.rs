@@ -1,6 +1,12 @@
 //! Client-daemon connection.
 
-use std::{borrow::Cow, ffi::CStr, fmt, io, net::SocketAddr, path::Path, str::Utf8Error};
+use std::{
+    ffi::CStr,
+    fmt, io,
+    net::SocketAddr,
+    path::Path,
+    str::{FromStr, Utf8Error},
+};
 
 use anyhow::Context as _;
 use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
@@ -107,7 +113,7 @@ custom_id! {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Role {
     pub id: RoleId,
-    pub name: String,
+    pub name: Text,
     pub author_id: DeviceId,
 }
 
@@ -155,57 +161,55 @@ impl Ops {
 
 /// A device's network identifier.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub struct NetIdentifier<'a>(Cow<'a, str>);
+pub struct NetIdentifier(Text);
 
-impl NetIdentifier<'_> {
+impl NetIdentifier {
     pub(crate) fn into_api(self) -> api::NetIdentifier {
-        api::NetIdentifier(self.0.into_owned())
+        api::NetIdentifier(self.0)
     }
 }
 
-impl AsRef<str> for NetIdentifier<'_> {
+impl AsRef<str> for NetIdentifier {
     #[inline]
     fn as_ref(&self) -> &str {
         self.0.as_ref()
     }
 }
 
-impl<'a> TryFrom<&'a str> for NetIdentifier<'a> {
+impl TryFrom<&str> for NetIdentifier {
     type Error = InvalidNetIdentifier;
 
     #[inline]
-    fn try_from(id: &'a str) -> Result<Self, Self::Error> {
-        if id.as_bytes().contains(&0) {
-            Err(InvalidNetIdentifier(()))
-        } else {
-            Ok(Self(Cow::Borrowed(id)))
-        }
+    fn try_from(id: &str) -> Result<Self, Self::Error> {
+        Text::from_str(id)
+            .map_err(|_| InvalidNetIdentifier(()))
+            .map(Self)
     }
 }
 
-impl<'a> TryFrom<&'a CStr> for NetIdentifier<'a> {
+impl TryFrom<&CStr> for NetIdentifier {
     type Error = InvalidNetIdentifier;
 
     #[inline]
-    fn try_from(id: &'a CStr) -> Result<Self, Self::Error> {
-        Self::try_from(id.to_str()?)
+    fn try_from(id: &CStr) -> Result<Self, Self::Error> {
+        Text::try_from(id)
+            .map_err(|_| InvalidNetIdentifier(()))
+            .map(Self)
     }
 }
 
-impl TryFrom<String> for NetIdentifier<'_> {
+impl TryFrom<String> for NetIdentifier {
     type Error = InvalidNetIdentifier;
 
     #[inline]
     fn try_from(id: String) -> Result<Self, Self::Error> {
-        if id.as_bytes().contains(&0) {
-            Err(InvalidNetIdentifier(()))
-        } else {
-            Ok(Self(Cow::Owned(id)))
-        }
+        Text::try_from(id)
+            .map_err(|_| InvalidNetIdentifier(()))
+            .map(Self)
     }
 }
 
-impl fmt::Display for NetIdentifier<'_> {
+impl fmt::Display for NetIdentifier {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
     }
@@ -441,8 +445,11 @@ impl Client {
             .create_team(context::current(), cfg.into())
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
-            .map(TeamId::from_api)
+            .map_err(aranya_error)?;
+        Ok(Team {
+            client: self,
+            id: team_id,
+        })
     }
 
     /// Add a team to the local device store.
@@ -454,16 +461,14 @@ impl Client {
             .map_err(aranya_error)
     }
 
-
     /// Remove a team from local device storage.
     pub async fn remove_team(&mut self, team_id: TeamId) -> Result<()> {
         self.daemon
-            .remove_team(context::current(), team_id)
+            .remove_team(context::current(), team_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
-
 
     /// Get an existing team.
     pub fn team(&mut self, id: TeamId) -> Team<'_> {
@@ -478,7 +483,6 @@ impl Client {
     pub async fn rand(&self, buf: &mut [u8]) {
         <Rng as Csprng>::fill_bytes(&mut Rng, buf);
     }
-
 
     /// Get access to Aranya QUIC Channels.
     pub fn aqc(&mut self) -> AqcChannels<'_> {
@@ -512,7 +516,7 @@ pub struct Team<'a> {
 impl Team<'_> {
     /// Return the team's ID.
     pub fn team_id(&self) -> TeamId {
-        self.team_id
+        TeamId::from_api(self.id)
     }
 
     /// Encrypt PSK seed for peer.
@@ -525,7 +529,7 @@ impl Team<'_> {
         let wrapped = self
             .client
             .daemon
-            .encrypt_psk_seed_for_peer(context::current(), self.team_id, peer_enc_pk)
+            .encrypt_psk_seed_for_peer(context::current(), self.id, peer_enc_pk)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -537,7 +541,7 @@ impl Team<'_> {
     pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
             .daemon
-            .add_sync_peer(context::current(), addr, self.team_id, config.into())
+            .add_sync_peer(context::current(), addr, self.id, config.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -550,7 +554,7 @@ impl Team<'_> {
     pub async fn sync_now(&mut self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
         self.client
             .daemon
-            .sync_now(context::current(), addr, self.team_id, cfg.map(Into::into))
+            .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -560,7 +564,7 @@ impl Team<'_> {
     pub async fn remove_sync_peer(&mut self, addr: Addr) -> Result<()> {
         self.client
             .daemon
-            .remove_sync_peer(context::current(), addr, self.team_id)
+            .remove_sync_peer(context::current(), addr, self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -570,7 +574,7 @@ impl Team<'_> {
     pub async fn close_team(&mut self) -> Result<()> {
         self.client
             .daemon
-            .close_team(context::current(), self.team_id)
+            .close_team(context::current(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -650,13 +654,13 @@ impl Team<'_> {
     /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
-    pub async fn assign_aqc_net_identifier<'a, I>(
+    pub async fn assign_aqc_net_identifier<I>(
         &mut self,
         device: DeviceId,
         net_identifier: I,
     ) -> Result<()>
     where
-        I: TryInto<NetIdentifier<'a>, Error = InvalidNetIdentifier>,
+        I: TryInto<NetIdentifier, Error = InvalidNetIdentifier>,
     {
         self.client
             .daemon
@@ -672,13 +676,13 @@ impl Team<'_> {
     }
 
     /// Disassociate an AQC network identifier from a device.
-    pub async fn remove_aqc_net_identifier<'a, I>(
+    pub async fn remove_aqc_net_identifier<I>(
         &mut self,
         device: DeviceId,
         net_identifier: I,
     ) -> Result<()>
     where
-        I: TryInto<NetIdentifier<'a>, Error = InvalidNetIdentifier>,
+        I: TryInto<NetIdentifier, Error = InvalidNetIdentifier>,
     {
         self.client
             .daemon
@@ -763,7 +767,7 @@ impl Team<'_> {
     pub fn queries(&mut self) -> Queries<'_> {
         Queries {
             client: self.client,
-            team_id: self.team_id,
+            id: self.id,
         }
     }
 }
@@ -779,7 +783,7 @@ impl Queries<'_> {
         let data = self
             .client
             .daemon
-            .query_devices_on_team(context::current(), self.team_id)
+            .query_devices_on_team(context::current(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -834,10 +838,7 @@ impl Queries<'_> {
     }
 
     /// Returns the AQC network identifier assigned to the current device.
-    pub async fn aqc_net_identifier<'a>(
-        &mut self,
-        device: DeviceId,
-    ) -> Result<Option<NetIdentifier<'a>>> {
+    pub async fn aqc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
         let id = self
             .client
             .daemon
@@ -845,8 +846,7 @@ impl Queries<'_> {
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
-            .map(|id| NetIdentifier::try_from(id.0))
-            .transpose()?;
+            .map(|id| NetIdentifier(id.0));
         Ok(id)
     }
 
@@ -865,7 +865,7 @@ impl Queries<'_> {
         let data = self
             .client
             .daemon
-            .query_labels(context::current(), self.team_id)
+            .query_labels(context::current(), self.id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?

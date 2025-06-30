@@ -56,18 +56,18 @@ impl<'a> AqcChannels<'a> {
     ///
     /// This method is NOT cancellation safe. Cancelling the resulting future might lose data.
     #[instrument(skip_all, fields(%team_id, %label_id))]
-    pub async fn create_bidi_channel<'i, I>(
+    pub async fn create_bidi_channel<I>(
         &mut self,
         team_id: TeamId,
         peer: I,
         label_id: LabelId,
     ) -> crate::Result<AqcBidiChannel>
     where
-        I: TryInto<NetIdentifier<'i>, Error = InvalidNetIdentifier>,
+        I: TryInto<NetIdentifier, Error = InvalidNetIdentifier>,
     {
         debug!("creating bidi channel");
 
-        let peer: NetIdentifier<'i> = peer.try_into()?;
+        let peer: NetIdentifier = peer.try_into()?;
 
         let (aqc_ctrl, psks) = self
             .client
@@ -110,18 +110,18 @@ impl<'a> AqcChannels<'a> {
     ///
     /// This method is NOT cancellation safe. Cancelling the resulting future might lose data.
     #[instrument(skip_all, fields(%team_id, %label_id))]
-    pub async fn create_uni_channel<'i, I>(
+    pub async fn create_uni_channel<I>(
         &mut self,
         team_id: TeamId,
         peer: I,
         label_id: LabelId,
     ) -> crate::Result<AqcSendChannel>
     where
-        I: TryInto<NetIdentifier<'i>, Error = InvalidNetIdentifier>,
+        I: TryInto<NetIdentifier, Error = InvalidNetIdentifier>,
     {
         debug!("creating aqc uni channel");
 
-        let peer: NetIdentifier<'i> = peer.try_into()?;
+        let peer: NetIdentifier = peer.try_into()?;
 
         let (aqc_ctrl, psks) = self
             .client
