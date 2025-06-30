@@ -6,8 +6,10 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{aqc::AqcPeerChannel, client::Client, Error, SyncPeerConfig, TeamConfig};
-use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_client::{
+    aqc::AqcPeerChannel, client::Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
+};
+use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -96,7 +98,8 @@ impl ClientCtx {
                 cache_dir: {cache_dir:?}
                 logs_dir: {logs_dir:?}
                 config_dir: {config_dir:?}
-                sync_addr: "localhost:0"
+                sync_addr: "127.0.0.1:0"
+                quic_sync: {{ }}
                 "#
             );
             fs::write(&cfg_path, buf).await?;
@@ -141,6 +144,15 @@ impl ClientCtx {
 
     async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.local_addr().await?)
+    }
+
+    fn aqc_net_id(&self) -> NetIdentifier {
+        NetIdentifier(
+            self.aqc_addr
+                .to_string()
+                .try_into()
+                .expect("addr is valid text"),
+        )
     }
 }
 
@@ -195,15 +207,17 @@ async fn main() -> Result<()> {
     let mut membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
     let mut memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
 
-    // Create a team.
-    info!("creating team");
-    let cfg = TeamConfig::builder().build()?;
-    let team_id = owner
-        .client
-        .create_team(cfg)
-        .await
-        .context("expected to create team")?;
-    info!(%team_id);
+    // Create the team config
+    let seed_ikm = {
+        let mut buf = [0; 32];
+        owner.client.rand(&mut buf).await;
+        buf
+    };
+    let cfg = {
+        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
+    };
+
 
     // get sync addresses.
     let owner_addr = owner.aranya_local_addr().await?;
@@ -215,13 +229,22 @@ async fn main() -> Result<()> {
     // get aqc addresses.
     debug!(?membera.aqc_addr, ?memberb.aqc_addr);
 
-    // setup sync peers.
-    let mut owner_team = owner.client.team(team_id);
-    let mut admin_team = admin.client.team(team_id);
-    let mut operator_team = operator.client.team(team_id);
-    let mut membera_team = membera.client.team(team_id);
-    let mut memberb_team = memberb.client.team(team_id);
+    // Create a team.
+    info!("creating team");
+    let mut owner_team = owner
+        .client
+        .create_team(cfg.clone())
+        .await
+        .context("expected to create team")?;
+    let team_id = owner_team.team_id();
+    info!(%team_id);
 
+    let mut admin_team = admin.client.add_team(team_id, cfg.clone()).await?;
+    let mut operator_team = operator.client.add_team(team_id, cfg.clone()).await?;
+    let mut membera_team = membera.client.add_team(team_id, cfg.clone()).await?;
+    let mut memberb_team = memberb.client.add_team(team_id, cfg.clone()).await?;
+
+    // setup sync peers.
     info!("adding admin to team");
     owner_team.add_device_to_team(admin.pk).await?;
     owner_team.assign_role(admin.id, Role::Admin).await?;
@@ -315,24 +338,25 @@ async fn main() -> Result<()> {
 
     // add memberb to team.
     info!("adding memberb to team");
-    operator_team.add_device_to_team(memberb.pk).await?;
+    operator_team.add_device_to_team(memberb.pk.clone()).await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
 
     info!("assigning aqc net identifiers");
     operator_team
-        .assign_aqc_net_identifier(membera.id, NetIdentifier(membera.aqc_addr.to_string()))
+        .assign_aqc_net_identifier(membera.id, membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(memberb.id, NetIdentifier(memberb.aqc_addr.to_string()))
+        .assign_aqc_net_identifier(memberb.id, memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
 
     // fact database queries
-    let mut queries = membera.client.queries(team_id);
+    let mut queries_team = membera.client.team(team_id);
+    let mut queries = queries_team.queries();
     let devices = queries.devices_on_team().await?;
     info!("membera devices on team: {:?}", devices.iter().count());
     let role = queries.device_role(membera.id).await?;
@@ -355,7 +379,7 @@ async fn main() -> Result<()> {
 
     info!("demo aqc functionality");
     info!("creating aqc label");
-    let label3 = operator_team.create_label("label3".to_string()).await?;
+    let label3 = operator_team.create_label(text!("label3")).await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
     operator_team.assign_label(membera.id, label3, op).await?;
@@ -368,7 +392,7 @@ async fn main() -> Result<()> {
     // membera creates a bidirectional channel.
     info!("membera creating acq bidi channel");
     // Prepare arguments that need to be captured by the async move block
-    let memberb_net_identifier = NetIdentifier(memberb.aqc_addr.to_string());
+    let memberb_net_identifier = memberb.aqc_net_id();
 
     let create_handle = tokio::spawn(async move {
         let channel_result = membera

@@ -40,13 +40,16 @@ buggy = { workspace = true }
 
 anyhow = { workspace = true }
 bimap = "0.6"
+bytes = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }
 deser-hjson = { version = "2" }
 futures-util = { workspace = true }
 postcard = { workspace = true }
+s2n-quic = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true, features = [
     "rt-multi-thread",
     "io-util",

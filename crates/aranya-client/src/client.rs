@@ -3,7 +3,7 @@
 use std::{borrow::Cow, ffi::CStr, fmt, io, net::SocketAddr, path::Path, str::Utf8Error};
 
 use anyhow::Context as _;
-use aranya_crypto::Rng;
+use aranya_crypto::{Csprng, EncryptionPublicKey, Rng};
 use aranya_daemon_api::{
     self as api,
     crypto::{
@@ -16,6 +16,7 @@ use aranya_daemon_api::{
 pub use aranya_daemon_api::{KeyBundle, Op};
 use aranya_policy_text::Text;
 use aranya_util::Addr;
+use buggy::BugExt as _;
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
@@ -338,9 +339,9 @@ impl Client {
     }
 
     /// Creates a client connection to the daemon.
-    #[instrument(skip_all, fields(?uds_path))]
+    #[instrument(skip_all)]
     async fn connect(uds_path: &Path, aqc_addr: &Addr) -> Result<Self> {
-        info!("connecting to daemon");
+        info!(path = ?uds_path, "connecting to daemon");
 
         let daemon = {
             let pk = {
@@ -434,8 +435,9 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<TeamId> {
-        self.daemon
+    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<Team<'_>> {
+        let team_id = self
+            .daemon
             .create_team(context::current(), cfg.into())
             .await
             .map_err(IpcError::new)?
@@ -452,10 +454,16 @@ impl Client {
             .map_err(aranya_error)
     }
 
-    /// Remove a team from the local device store.
-    pub async fn remove_team(&mut self, _team: TeamId) -> Result<()> {
-        todo!()
+
+    /// Remove a team from local device storage.
+    pub async fn remove_team(&mut self, team_id: TeamId) -> Result<()> {
+        self.daemon
+            .remove_team(context::current(), team_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
     }
+
 
     /// Get an existing team.
     pub fn team(&mut self, id: TeamId) -> Team<'_> {
@@ -464,6 +472,13 @@ impl Client {
             id: id.into_api(),
         }
     }
+
+    /// Generate random bytes from a CSPRNG.
+    /// Can be used to generate IKM for a generating a PSK seed.
+    pub async fn rand(&self, buf: &mut [u8]) {
+        <Rng as Csprng>::fill_bytes(&mut Rng, buf);
+    }
+
 
     /// Get access to Aranya QUIC Channels.
     pub fn aqc(&mut self) -> AqcChannels<'_> {
@@ -495,11 +510,34 @@ pub struct Team<'a> {
 }
 
 impl Team<'_> {
+    /// Return the team's ID.
+    pub fn team_id(&self) -> TeamId {
+        self.team_id
+    }
+
+    /// Encrypt PSK seed for peer.
+    /// `peer_enc_pk` is the public encryption key of the peer device.
+    /// See [`KeyBundle::encoding`].
+    pub async fn encrypt_psk_seed_for_peer(&mut self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
+        let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
+            .context("bad peer_enc_pk")
+            .map_err(error::other)?;
+        let wrapped = self
+            .client
+            .daemon
+            .encrypt_psk_seed_for_peer(context::current(), self.team_id, peer_enc_pk)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        let wrapped = postcard::to_allocvec(&wrapped).assume("can serialize")?;
+        Ok(wrapped)
+    }
+
     /// Adds a peer for automatic periodic Aranya state syncing.
     pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
             .daemon
-            .add_sync_peer(context::current(), addr, self.id, config.into())
+            .add_sync_peer(context::current(), addr, self.team_id, config.into())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -512,7 +550,7 @@ impl Team<'_> {
     pub async fn sync_now(&mut self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
         self.client
             .daemon
-            .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
+            .sync_now(context::current(), addr, self.team_id, cfg.map(Into::into))
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -522,7 +560,7 @@ impl Team<'_> {
     pub async fn remove_sync_peer(&mut self, addr: Addr) -> Result<()> {
         self.client
             .daemon
-            .remove_sync_peer(context::current(), addr, self.id)
+            .remove_sync_peer(context::current(), addr, self.team_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -532,7 +570,7 @@ impl Team<'_> {
     pub async fn close_team(&mut self) -> Result<()> {
         self.client
             .daemon
-            .close_team(context::current(), self.id)
+            .close_team(context::current(), self.team_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
@@ -658,7 +696,7 @@ impl Team<'_> {
     /// Create a label.
     pub async fn create_label(
         &mut self,
-        label_name: String,
+        label_name: Text,
         managing_role_id: RoleId,
     ) -> Result<LabelId> {
         self.client
@@ -720,6 +758,14 @@ impl Team<'_> {
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
+
+    /// Get access to fact database queries.
+    pub fn queries(&mut self) -> Queries<'_> {
+        Queries {
+            client: self.client,
+            team_id: self.team_id,
+        }
+    }
 }
 
 pub struct Queries<'a> {
@@ -733,7 +779,7 @@ impl Queries<'_> {
         let data = self
             .client
             .daemon
-            .query_devices_on_team(context::current(), self.id)
+            .query_devices_on_team(context::current(), self.team_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?
@@ -819,7 +865,7 @@ impl Queries<'_> {
         let data = self
             .client
             .daemon
-            .query_labels(context::current(), self.id)
+            .query_labels(context::current(), self.team_id)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?

@@ -4,15 +4,14 @@ use std::time::Duration;
 
 mod common;
 use anyhow::Result;
-use aranya_client::{aqc::AqcPeerChannel, TeamConfig};
+use aranya_client::aqc::AqcPeerChannel;
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
-use aranya_daemon_api::{ChanOp, NetIdentifier};
+use aranya_daemon_api::{text, ChanOp};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
 use common::{sleep, TeamCtx};
 use futures_util::future::try_join;
 use tempfile::tempdir;
-use tracing::info;
 
 /// Demonstrate nominal usage of AQC channels.
 /// 1. Create bidirectional and unidirectional AQC channels.
@@ -28,15 +27,10 @@ async fn test_aqc_chans() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
+    let team_id = team.create_and_add_team().await?;
+
+    sleep(sleep_interval).await;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -47,16 +41,10 @@ async fn test_aqc_chans() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(
-            team.membera.id,
-            NetIdentifier(team.membera.client.aqc().server_addr()?.to_string()),
-        )
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(
-            team.memberb.id,
-            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
-        )
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
@@ -65,7 +53,7 @@ async fn test_aqc_chans() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team.create_label("label1".to_string()).await?;
+    let label1 = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label1, op)
@@ -74,7 +62,7 @@ async fn test_aqc_chans() -> Result<()> {
         .assign_label(team.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label("label2".to_string()).await?;
+    let label2 = operator_team.create_label(text!("label2")).await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label2, op)
@@ -90,7 +78,7 @@ async fn test_aqc_chans() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+                team.memberb.aqc_net_id(),
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),
@@ -176,7 +164,7 @@ async fn test_aqc_chans() -> Result<()> {
         let (mut uni_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_uni_channel(
                 team_id,
-                NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+                team.memberb.aqc_net_id(),
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),
@@ -207,7 +195,7 @@ async fn test_aqc_chans() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+                team.memberb.aqc_net_id(),
                 label2,
             ),
             async {
@@ -260,16 +248,8 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     let work_dir = tmp.path().to_path_buf();
 
     let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_sender", work_dir).await?;
-
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -280,16 +260,10 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(
-            team.membera.id,
-            NetIdentifier(team.membera.client.aqc().server_addr()?.to_string()),
-        )
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(
-            team.memberb.id,
-            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
-        )
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
@@ -298,7 +272,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team.create_label("label1".to_string()).await?;
+    let label1 = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label1, op)
@@ -307,7 +281,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .assign_label(team.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label("label2".to_string()).await?;
+    let label2 = operator_team.create_label(text!("label2")).await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label2, op)
@@ -316,7 +290,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .assign_label(team.memberb.id, label2, op)
         .await?;
 
-    let label3 = operator_team.create_label("label3".to_string()).await?;
+    let label3 = operator_team.create_label(text!("label3")).await?;
     let op = ChanOp::SendRecv;
     // assign label 3 to only the receiver, we are testing if the sender can create
     // a channel without the label assignment
@@ -328,11 +302,10 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     sleep(sleep_interval).await;
 
     let err = try_join(
-        team.membera.client.aqc().create_bidi_channel(
-            team_id,
-            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
-            label3,
-        ),
+        team.membera
+            .client
+            .aqc()
+            .create_bidi_channel(team_id, team.memberb.aqc_net_id(), label3),
         team.memberb.client.aqc().receive_channel(),
     )
     .await
@@ -354,15 +327,8 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_recvr", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -373,16 +339,10 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(
-            team.membera.id,
-            NetIdentifier(team.membera.client.aqc().server_addr()?.to_string()),
-        )
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(
-            team.memberb.id,
-            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
-        )
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
@@ -391,7 +351,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team.create_label("label1".to_string()).await?;
+    let label1 = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label1, op)
@@ -400,7 +360,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .assign_label(team.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label("label2".to_string()).await?;
+    let label2 = operator_team.create_label(text!("label2")).await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label2, op)
@@ -409,7 +369,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .assign_label(team.memberb.id, label2, op)
         .await?;
 
-    let label3 = operator_team.create_label("label3".to_string()).await?;
+    let label3 = operator_team.create_label(text!("label3")).await?;
     let op = ChanOp::SendRecv;
     // assign label 3 to only the sender, we are testing if the receiver can receive
     // a channel without the label assignment
@@ -421,11 +381,10 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     sleep(sleep_interval).await;
 
     let err = try_join(
-        team.membera.client.aqc().create_bidi_channel(
-            team_id,
-            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
-            label3,
-        ),
+        team.membera
+            .client
+            .aqc()
+            .create_bidi_channel(team_id, team.memberb.aqc_net_id(), label3),
         team.memberb.client.aqc().receive_channel(),
     )
     .await
@@ -447,15 +406,8 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans_close_sender_stream", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -466,16 +418,10 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(
-            team.membera.id,
-            NetIdentifier(team.membera.client.aqc().server_addr()?.to_string()),
-        )
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(
-            team.memberb.id,
-            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
-        )
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
@@ -484,7 +430,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team.create_label("label1".to_string()).await?;
+    let label1 = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label1, op)
@@ -493,7 +439,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         .assign_label(team.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label("label2".to_string()).await?;
+    let label2 = operator_team.create_label(text!("label2")).await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label2, op)
@@ -509,7 +455,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+                team.memberb.aqc_net_id(),
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),
@@ -593,15 +539,8 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans_delete_chan_send", work_dir).await?;
 
-    let cfg = TeamConfig::builder().build()?;
     // create team.
-    let team_id = team
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .expect("expected to create team");
-    info!(?team_id);
+    let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -612,16 +551,10 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     let mut operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(
-            team.membera.id,
-            NetIdentifier(team.membera.client.aqc().server_addr()?.to_string()),
-        )
+        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(
-            team.memberb.id,
-            NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
-        )
+        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
@@ -630,7 +563,7 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team.create_label("label1".to_string()).await?;
+    let label1 = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label1, op)
@@ -639,7 +572,7 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         .assign_label(team.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label("label2".to_string()).await?;
+    let label2 = operator_team.create_label(text!("label2")).await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label2, op)
@@ -655,7 +588,7 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         let (mut bidi_chan1, peer_channel) = try_join(
             team.membera.client.aqc().create_bidi_channel(
                 team_id,
-                NetIdentifier(team.memberb.client.aqc().server_addr()?.to_string()),
+                team.memberb.aqc_net_id(),
                 label1,
             ),
             team.memberb.client.aqc().receive_channel(),

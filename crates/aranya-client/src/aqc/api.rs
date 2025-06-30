@@ -5,7 +5,7 @@ use std::net::SocketAddr;
 use tarpc::context;
 use tracing::{debug, instrument};
 
-use super::{AqcBidiChannel, AqcPeerChannel, AqcSendChannel, TryReceiveError};
+use super::{net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcSendChannel};
 use crate::{
     client::{InvalidNetIdentifier, LabelId, NetIdentifier, TeamId},
     error::{aranya_error, no_addr, AqcError, IpcError},
