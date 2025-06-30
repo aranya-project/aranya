@@ -427,17 +427,17 @@ AranyaError init_team(Team *t) {
 
         AranyaTeamId team_id_from_peer = t->id;
         if (t->seed_mode == RAW_IKM) {
+            err = aranya_quic_sync_config_builder_init(&quic_build);
+            if (err != ARANYA_ERROR_SUCCESS) {
+                fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
+                return err;
+            }
+
             err = aranya_quic_sync_config_raw_seed_ikm(&quic_build, &ikm);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
                         "unable to set `AranyaQuicSyncConfigBuilder` raw IKM "
                         "seed\n");
-                return err;
-            }
-
-            err = aranya_quic_sync_config_builder_init(&quic_build);
-            if (err != ARANYA_ERROR_SUCCESS) {
-                fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
                 return err;
             }
 
