@@ -1,6 +1,8 @@
 #![allow(rustdoc::broken_intra_doc_links)]
 use core::{
     ffi::{c_char, CStr},
+    ops::Deref,
+    ptr,
     ptr, slice,
 };
 use std::{ffi::OsStr, ops::Deref, os::unix::ffi::OsStrExt, str::FromStr};
@@ -270,8 +272,8 @@ pub struct TeamId {
     id: Id,
 }
 
-impl From<aranya_daemon_api::TeamId> for TeamId {
-    fn from(value: aranya_daemon_api::TeamId) -> Self {
+impl From<aranya_client::TeamId> for TeamId {
+    fn from(value: aranya_client::TeamId) -> Self {
         Self {
             id: Id {
                 bytes: value.into(),
@@ -280,7 +282,7 @@ impl From<aranya_daemon_api::TeamId> for TeamId {
     }
 }
 
-impl From<&TeamId> for aranya_daemon_api::TeamId {
+impl From<&TeamId> for aranya_client::TeamId {
     fn from(value: &TeamId) -> Self {
         value.id.bytes.into()
     }
@@ -293,8 +295,8 @@ pub struct DeviceId {
     id: Id,
 }
 
-impl From<aranya_daemon_api::DeviceId> for DeviceId {
-    fn from(value: aranya_daemon_api::DeviceId) -> Self {
+impl From<aranya_client::DeviceId> for DeviceId {
+    fn from(value: aranya_client::DeviceId) -> Self {
         Self {
             id: Id {
                 bytes: value.into(),
@@ -303,35 +305,62 @@ impl From<aranya_daemon_api::DeviceId> for DeviceId {
     }
 }
 
-impl From<&DeviceId> for aranya_daemon_api::DeviceId {
+impl From<&DeviceId> for aranya_client::DeviceId {
     fn from(value: &DeviceId) -> Self {
         value.id.bytes.into()
     }
 }
 
-/// An enum containing team roles defined in the Aranya policy.
-#[repr(u8)]
+/// A role.
+#[aranya_capi_core::derive(Cleanup)]
+#[aranya_capi_core::opaque(size = 104, align = 8)]
+pub type Role = Safe<imp::Role>;
+
+/// Uniquely identifies a [`Role`].
+#[repr(C)]
 #[derive(Copy, Clone, Debug)]
-pub enum Role {
-    /// Owner role.
-    Owner,
-    /// Admin role.
-    Admin,
-    /// Operator role.
-    Operator,
-    /// Member role.
-    Member,
+pub struct RoleId {
+    id: Id,
 }
 
-impl From<Role> for aranya_daemon_api::Role {
-    fn from(value: Role) -> Self {
-        match value {
-            Role::Owner => Self::Owner,
-            Role::Admin => Self::Admin,
-            Role::Operator => Self::Operator,
-            Role::Member => Self::Member,
+impl From<aranya_client::RoleId> for RoleId {
+    fn from(value: aranya_client::RoleId) -> Self {
+        Self {
+            id: Id {
+                bytes: value.into(),
+            },
         }
     }
+}
+
+impl From<&RoleId> for aranya_client::RoleId {
+    fn from(value: &RoleId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
+/// Get ID of role.
+///
+/// @param role the role [`Role`].
+pub fn role_get_id(role: &Role) -> RoleId {
+    role.deref().id.into()
+}
+
+/// Get name of role.
+///
+/// The resulting string must not be freed.
+///
+/// @param role the role [`Role`].
+#[aranya_capi_core::no_ext_error]
+pub fn role_get_name(role: &Role) -> *const c_char {
+    role.deref().name.as_ptr().cast()
+}
+
+/// Get the author of a role.
+///
+/// @param role the role [`Role`].
+pub fn role_get_author(role: &Role) -> DeviceId {
+    role.deref().author_id.into()
 }
 
 /// Valid channel operations for a label assignment.
@@ -349,7 +378,7 @@ pub enum ChanOp {
     SendRecv,
 }
 
-impl From<ChanOp> for aranya_daemon_api::ChanOp {
+impl From<ChanOp> for aranya_client::ChanOp {
     fn from(value: ChanOp) -> Self {
         match value {
             ChanOp::RecvOnly => Self::RecvOnly,
@@ -366,8 +395,8 @@ pub struct LabelId {
     id: Id,
 }
 
-impl From<aranya_daemon_api::LabelId> for LabelId {
-    fn from(value: aranya_daemon_api::LabelId) -> Self {
+impl From<aranya_client::LabelId> for LabelId {
+    fn from(value: aranya_client::LabelId) -> Self {
         Self {
             id: Id {
                 bytes: value.into(),
@@ -376,7 +405,7 @@ impl From<aranya_daemon_api::LabelId> for LabelId {
     }
 }
 
-impl From<&LabelId> for aranya_daemon_api::LabelId {
+impl From<&LabelId> for aranya_client::LabelId {
     fn from(value: &LabelId) -> Self {
         value.id.bytes.into()
     }
@@ -419,11 +448,14 @@ impl Addr {
 #[derive(Copy, Clone, Debug)]
 pub struct NetIdentifier(*const c_char);
 
-impl NetIdentifier {
-    unsafe fn as_underlying(self) -> Result<aranya_daemon_api::NetIdentifier, imp::Error> {
-        // SAFETY: Caller must ensure the pointer is a valid C String.
-        let cstr = unsafe { CStr::from_ptr(self.0) };
-        Ok(aranya_daemon_api::NetIdentifier(Text::try_from(cstr)?))
+impl TryFrom<NetIdentifier> for aranya_client::NetIdentifier<'_> {
+    type Error = aranya_client::InvalidNetIdentifier;
+
+    fn try_from(id: NetIdentifier) -> Result<Self, Self::Error> {
+        // SAFETY: We have to trust that the pointer is a valid
+        // C string.
+        let cstr = unsafe { CStr::from_ptr(id.0) };
+        aranya_client::NetIdentifier::try_from(cstr)
     }
 }
 
@@ -434,8 +466,8 @@ pub struct AqcBidiChannelId {
     id: Id,
 }
 
-impl From<aranya_daemon_api::AqcBidiChannelId> for AqcBidiChannelId {
-    fn from(value: aranya_daemon_api::AqcBidiChannelId) -> Self {
+impl From<aqc::AqcBidiChannelId> for AqcBidiChannelId {
+    fn from(value: aqc::AqcBidiChannelId) -> Self {
         Self {
             id: Id {
                 bytes: value.into(),
@@ -444,7 +476,7 @@ impl From<aranya_daemon_api::AqcBidiChannelId> for AqcBidiChannelId {
     }
 }
 
-impl From<&AqcBidiChannelId> for aranya_daemon_api::AqcBidiChannelId {
+impl From<&AqcBidiChannelId> for aqc::AqcBidiChannelId {
     fn from(value: &AqcBidiChannelId) -> Self {
         value.id.bytes.into()
     }
@@ -457,8 +489,8 @@ pub struct AqcUniChannelId {
     id: Id,
 }
 
-impl From<aranya_daemon_api::AqcUniChannelId> for AqcUniChannelId {
-    fn from(value: aranya_daemon_api::AqcUniChannelId) -> Self {
+impl From<aqc::AqcUniChannelId> for AqcUniChannelId {
+    fn from(value: aqc::AqcUniChannelId) -> Self {
         Self {
             id: Id {
                 bytes: value.into(),
@@ -467,7 +499,7 @@ impl From<aranya_daemon_api::AqcUniChannelId> for AqcUniChannelId {
     }
 }
 
-impl From<&AqcUniChannelId> for aranya_daemon_api::AqcUniChannelId {
+impl From<&AqcUniChannelId> for aqc::AqcUniChannelId {
     fn from(value: &AqcUniChannelId) -> Self {
         value.id.bytes.into()
     }
@@ -859,6 +891,26 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
     cfg.sync_now(false);
 }
 
+/// Setup default roles on team.
+///
+/// This sets up the following roles with default permissions as
+/// defined in Aranya's default policy:
+/// - admin
+/// - operator
+/// - member
+///
+/// @param client the Aranya Client [`Client`].
+/// @param team the team's ID [`TeamId`].
+///
+/// @relates AranyaClient.
+pub fn setup_default_riles(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+    let client = client.imp();
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).setup_default_roles())?;
+    Ok(())
+}
+
 /// Assign a role to a device.
 ///
 /// This will change the device's current role to the new role assigned.
@@ -868,21 +920,21 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param role the role [`Role`] to assign to the device.
+/// @param role_id the ID of the role to assign to the device.
 ///
 /// @relates AranyaClient.
 pub fn assign_role(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    role: Role,
+    role_id: &RoleId,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .assign_role(device.into(), role.into()),
+            .assign_role(device.into(), role_id.into()),
     )?;
     Ok(())
 }
@@ -894,21 +946,21 @@ pub fn assign_role(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param device the device's ID [`DeviceId`].
-/// @param role the role [`Role`] to revoke from the device.
+/// @param role_id the ID of the role to revoke from the device.
 ///
 /// @relates AranyaClient.
 pub fn revoke_role(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    role: Role,
+    role_id: &RoleId,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
     client.rt.block_on(
         client
             .inner
             .team(team.into())
-            .revoke_role(device.into(), role.into()),
+            .revoke_role(device.into(), role_id.into()),
     )?;
     Ok(())
 }
@@ -920,19 +972,25 @@ pub fn revoke_role(
 /// @param client the Aranya Client [`Client`].
 /// @param team the team's ID [`TeamId`].
 /// @param name label name string [`LabelName`].
+/// @param managing_role_id the ID of the role that manages this
+///        label [`RoleId`].
 ///
 /// @relates AranyaClient.
 pub fn create_label(
     client: &mut Client,
     team: &TeamId,
     name: LabelName,
+    managing_role_id: &RoleId,
 ) -> Result<LabelId, imp::Error> {
     let client = client.imp();
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
-    let label_id = client
-        .rt
-        .block_on(client.inner.team(team.into()).create_label(name))?;
+    let label_id = client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .create_label(name, managing_role_id.into()),
+    )?;
     Ok(label_id.into())
 }
 
@@ -1143,19 +1201,24 @@ pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> 
 /// @param team the team's ID [`TeamId`].
 /// @param keybundle serialized keybundle byte buffer `KeyBundle`.
 /// @param keybundle_len is the length of the serialized keybundle.
+/// @param role_id the ID of the role to assign to the device.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_device_to_team(
     client: &mut Client,
     team: &TeamId,
     keybundle: &[u8],
+    role_id: Option<&RoleId>,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).add_device_to_team(keybundle))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .add_device_to_team(keybundle, role_id.map(Into::into)),
+    )?;
     Ok(())
 }
 
@@ -1499,8 +1562,6 @@ pub unsafe fn aqc_assign_net_identifier(
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
-    let net_identifier = unsafe { net_identifier.as_underlying() }?;
     client.rt.block_on(
         client
             .inner
@@ -1527,8 +1588,6 @@ pub unsafe fn aqc_remove_net_identifier(
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
-    // SAFETY: Caller must ensure `net_identifier` is a valid C String.
-    let net_identifier = unsafe { net_identifier.as_underlying() }?;
     client.rt.block_on(
         client
             .inner
@@ -1603,9 +1662,6 @@ pub unsafe fn aqc_create_bidi_channel(
     label_id: &LabelId,
     channel: &mut MaybeUninit<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `peer` is a valid C String.
-    let peer = unsafe { peer.as_underlying() }?;
-
     let client = client.imp();
     let chan = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
@@ -1635,9 +1691,6 @@ pub unsafe fn aqc_create_uni_channel(
     label_id: &LabelId,
     channel: &mut MaybeUninit<AqcSendChannel>,
 ) -> Result<(), imp::Error> {
-    // SAFETY: Caller must ensure `peer` is a valid C String.
-    let peer = unsafe { peer.as_underlying() }?;
-
     let client = client.imp();
     let chan = client.rt.block_on(client.inner.aqc().create_uni_channel(
         team.into(),

@@ -5,10 +5,11 @@ use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_aqc_util::LabelId;
-use aranya_crypto::{Csprng, DeviceId, Rng};
+use aranya_crypto::{Csprng, DeviceId, Id, Rng};
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
+use aranya_policy_text::Text;
 use aranya_policy_vm::{ident, Text, Value};
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
@@ -20,7 +21,7 @@ use tracing::{debug, info, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
-    policy::{ActorExt, ChanOp, Effect, KeyBundle, Role},
+    policy::{ActorExt, ChanOp, Effect, KeyBundle},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -178,61 +179,79 @@ where
     }
 
     /// Adds a Member instance to the team.
-    #[instrument(skip_all)]
-    fn add_member(&self, keys: KeyBundle) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    #[instrument(skip_all, fields(?role_id))]
+    fn add_device(
+        &self,
+        keys: KeyBundle,
+        role_id: Option<Id>,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.add_member(keys)?;
+            actor.add_device(keys, role_id)?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Remove a Member instance from the team.
+    /// Remove a device from the team.
     #[instrument(skip(self), fields(device_id = %device_id))]
-    fn remove_member(
+    fn remove_device(
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.remove_member(device_id.into())?;
+            actor.remove_device(device_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Sets up the default team roles.
+    #[instrument(skip(self))]
+    fn setup_default_roles(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.setup_default_roles()?;
             Ok(())
         })
         .in_current_span()
     }
 
     /// Assigns role to a team member.
-    #[instrument(skip_all)]
+    #[instrument(skip(self), fields(%device_id, %role_id))]
     fn assign_role(
         &self,
         device_id: DeviceId,
-        role: Role,
+        role_id: Id,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_role(device_id.into(), role)?;
+            actor.assign_role(device_id.into(), role_id)?;
             Ok(())
         })
         .in_current_span()
     }
 
     /// Revokes role from a team member.
-    #[instrument(skip_all)]
+    #[instrument(skip(self), fields(%device_id, %role_id))]
     fn revoke_role(
         &self,
         device_id: DeviceId,
-        role: Role,
+        role_id: Id,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.revoke_role(device_id.into(), role)?;
+            actor.revoke_role(device_id.into(), role_id)?;
             Ok(())
         })
         .in_current_span()
     }
 
     /// Create a label.
-    #[instrument(skip(self), fields(name = %name))]
-    fn create_label(&self, name: Text) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    #[instrument(skip(self), fields(%name, %managing_role_id))]
+    fn create_label(
+        &self,
+        name: Text,
+        managing_role_id: Id,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_label(name)?;
+            actor.create_label(name.to_string(), managing_role_id)?;
             Ok(())
         })
         .in_current_span()
@@ -287,7 +306,7 @@ where
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         info!(%device_id, %net_identifier, "setting AQC network name");
         self.with_actor(move |actor| {
-            actor.set_aqc_network_name(device_id.into(), net_identifier)?;
+            actor.set_aqc_network_name(device_id.into(), net_identifier.to_string())?;
             Ok(())
         })
         .in_current_span()

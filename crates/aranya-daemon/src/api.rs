@@ -18,6 +18,7 @@ use aranya_daemon_api::{
     DaemonApi, SeedMode, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
+use aranya_policy_text::Text;
 use aranya_runtime::GraphId;
 use aranya_util::{task::scope, Addr};
 use futures_util::{StreamExt, TryStreamExt};
@@ -185,14 +186,8 @@ impl EffectHandler {
             match effect {
                 TeamCreated(_team_created) => {}
                 TeamTerminated(_team_terminated) => {}
-                MemberAdded(_member_added) => {}
-                MemberRemoved(_member_removed) => {}
-                OwnerAssigned(_owner_assigned) => {}
-                AdminAssigned(_admin_assigned) => {}
-                OperatorAssigned(_operator_assigned) => {}
-                OwnerRevoked(_owner_revoked) => {}
-                AdminRevoked(_admin_revoked) => {}
-                OperatorRevoked(_operator_revoked) => {}
+                DeviceAdded(_) => {}
+                DeviceRemoved(_) => {}
                 LabelCreated(_) => {}
                 LabelDeleted(_) => {}
                 LabelAssigned(_) => {}
@@ -213,12 +208,17 @@ impl EffectHandler {
                 AqcUniChannelCreated(_) => {}
                 AqcUniChannelReceived(_) => {}
                 QueryDevicesOnTeamResult(_) => {}
-                QueryDeviceRoleResult(_) => {}
+                QueryDeviceRolesResult(_) => {}
                 QueryDeviceKeyBundleResult(_) => {}
                 QueryAqcNetIdentifierResult(_) => {}
                 QueriedLabelAssignment(_) => {}
                 QueryLabelExistsResult(_) => {}
                 QueryAqcNetworkNamesOutput(_) => {}
+                RoleCreated(_) => {}
+                RoleAssigned(_) => {}
+                RoleRevoked(_) => {}
+                OperationUpdated(_) => {}
+                LabelUpdated(_) => {}
             }
         }
         Ok(())
@@ -495,12 +495,13 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         keys: api::KeyBundle,
+        role_id: Option<api::RoleId>,
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
         self.client
             .actions(&team.into_id().into())
-            .add_member(keys.into())
+            .add_device(keys.into(), role_id.map(|r| r.into_id()))
             .await
             .context("unable to add device to team")?;
         Ok(())
@@ -517,9 +518,19 @@ impl DaemonApi for Api {
 
         self.client
             .actions(&team.into_id().into())
-            .remove_member(device.into_id().into())
+            .remove_device(device.into_id().into())
             .await
             .context("unable to remove device from team")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn setup_default_roles(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        self.client
+            .actions(&team.into_id().into())
+            .setup_default_roles()
+            .await
+            .context("unable to setup default roles")?;
         Ok(())
     }
 
@@ -529,7 +540,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         device: api::DeviceId,
-        role: api::Role,
+        role: api::RoleId,
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
@@ -547,7 +558,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         device: api::DeviceId,
-        role: api::Role,
+        role: api::RoleId,
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
@@ -751,13 +762,14 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         label_name: Text,
+        managing_role_id: api::RoleId,
     ) -> api::Result<api::LabelId> {
         self.check_team_valid(team).await?;
 
         let effects = self
             .client
             .actions(&team.into_id().into())
-            .create_label(label_name)
+            .create_label(label_name, managing_role_id.into_id())
             .await
             .context("unable to create AQC label")?;
         if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
@@ -866,14 +878,15 @@ impl DaemonApi for Api {
         }
         return Ok(devices);
     }
+
     /// Query device role.
     #[instrument(skip(self))]
-    async fn query_device_role(
+    async fn query_device_roles(
         self,
         _: context::Context,
         team: api::TeamId,
         device: api::DeviceId,
-    ) -> api::Result<api::Role> {
+    ) -> api::Result<Box<[api::Role]>> {
         self.check_team_valid(team).await?;
 
         let (_ctrl, effects) = self
@@ -882,14 +895,19 @@ impl DaemonApi for Api {
             .query_device_role_off_graph(device.into_id().into())
             .await
             .context("unable to query device role")?;
-        if let Some(Effect::QueryDeviceRoleResult(e)) =
-            find_effect!(&effects, Effect::QueryDeviceRoleResult(_e))
-        {
-            Ok(api::Role::from(e.role))
-        } else {
-            Err(anyhow!("unable to query device role").into())
+        let mut roles: Vec<api::Role> = Vec::new();
+        for e in effects {
+            if let Effect::QueryDeviceRolesResult(e) = e {
+                roles.push(api::Role {
+                    id: e.role_id.into(),
+                    name: e.name.try_into()?,
+                    author_id: e.author_id.into(),
+                });
+            }
         }
+        Ok(roles.into_boxed_slice())
     }
+
     /// Query device keybundle.
     #[instrument(skip(self))]
     async fn query_device_keybundle(
@@ -934,10 +952,10 @@ impl DaemonApi for Api {
         let mut labels: Vec<api::Label> = Vec::new();
         for e in effects {
             if let Effect::QueriedLabelAssignment(e) = e {
-                debug!("found label: {}", e.label_id);
                 labels.push(api::Label {
                     id: e.label_id.into(),
-                    name: e.label_name,
+                    name: e.label_name.try_into()?,
+                    author_id: e.label_author_id.into(),
                 });
             }
         }
@@ -963,7 +981,7 @@ impl DaemonApi for Api {
             if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
                 find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
             {
-                return Ok(Some(api::NetIdentifier(e.net_identifier)));
+                return Ok(Some(api::NetIdentifier(e.net_identifier.try_into()?)));
             }
         }
         Ok(None)
@@ -1012,10 +1030,10 @@ impl DaemonApi for Api {
         let mut labels: Vec<api::Label> = Vec::new();
         for e in effects {
             if let Effect::QueriedLabel(e) = e {
-                debug!("found label: {}", e.label_id);
                 labels.push(api::Label {
                     id: e.label_id.into(),
-                    name: e.label_name,
+                    name: e.label_name.try_into()?,
+                    author_id: e.label_author_id.into(),
                 });
             }
         }
@@ -1072,28 +1090,6 @@ impl From<KeyBundle> for api::KeyBundle {
             identity: value.ident_key,
             signing: value.sign_key,
             encoding: value.enc_key,
-        }
-    }
-}
-
-impl From<api::Role> for Role {
-    fn from(value: api::Role) -> Self {
-        match value {
-            api::Role::Owner => Role::Owner,
-            api::Role::Admin => Role::Admin,
-            api::Role::Operator => Role::Operator,
-            api::Role::Member => Role::Member,
-        }
-    }
-}
-
-impl From<Role> for api::Role {
-    fn from(value: Role) -> Self {
-        match value {
-            Role::Owner => api::Role::Owner,
-            Role::Admin => api::Role::Admin,
-            Role::Operator => api::Role::Operator,
-            Role::Member => api::Role::Member,
         }
     }
 }
