@@ -159,10 +159,20 @@ impl QuicSyncConfigBuilder {
     }
 }
 
+/// Represents team configuration information in various versions.
+///
+/// This enum contains versioned team data that can be serialized and used to
+/// reconstruct team configs on different devices.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(tag = "version")]
 #[non_exhaustive]
 pub enum TeamInfo {
-    V1 { id: TeamId, wrapped_seed: Vec<u8> },
+    V1 {
+        /// Unique identifier for the team
+        id: TeamId,
+        /// Serialized representation of [`aranya_daemon_api::WrappedSeed`]
+        wrapped_seed: Vec<u8>,
+    },
 }
 
 #[derive(Clone)]
@@ -212,7 +222,22 @@ impl TeamConfigBuilder {
         self.quic_sync.get_or_insert_default()
     }
 
-    pub fn init_from_team_info_v1(team_info: TeamInfo) -> Result<(Self, TeamId)> {
+    /// Creates a [`TeamConfigBuilder`] from persisted team information.
+    ///
+    /// Extracts the team ID and encrypted seed data from the provided team info
+    /// and initializes a builder with the appropriate QUIC sync configuration.
+    ///
+    /// # Returns
+    ///
+    /// Returns a tuple containing:
+    /// * The initialized [`TeamConfigBuilder`]
+    /// * The [`TeamId`] extracted from the team info
+    ///
+    /// # Errors
+    ///
+    /// This method will return an error if:
+    /// * The wrapped seed data cannot be deserialized to a [`aranya_daemon_api::WrappedSeed`]
+    pub fn from_team_info_v1(team_info: TeamInfo) -> Result<(Self, TeamId)> {
         let TeamInfo::V1 { id, wrapped_seed } = team_info;
 
         let builder = {
@@ -228,10 +253,10 @@ impl TeamConfigBuilder {
 
     /// Attempts to build a [`TeamConfig`] using the provided parameters.
     pub fn build(self) -> Result<TeamConfig> {
-        let quic_sync = self
-            .quic_sync
-            .map(|qs_cfg_builder| qs_cfg_builder.build())
-            .transpose()?;
+        let quic_sync = match self.quic_sync {
+            Some(qs_cfg_builder) => Some(qs_cfg_builder.build()?),
+            None => None,
+        };
 
         Ok(TeamConfig { quic_sync })
     }

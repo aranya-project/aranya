@@ -276,9 +276,24 @@ pub struct Team<'a> {
 }
 
 impl Team<'_> {
-    /// Encrypt PSK seed for peer.
-    /// `peer_enc_pk` is the public encryption key of the peer device.
-    /// See [`KeyBundle::encoding`].
+    /// Encrypts a PSK seed for a specific peer device.
+    ///
+    /// # Arguments
+    ///
+    /// * `peer_enc_pk` - The serialized public encryption key of the peer device.
+    ///   See [`KeyBundle::encoding`].
+    ///
+    /// # Returns
+    ///
+    /// Returns the serialized representation of a [`aranya_daemon_api::WrappedSeed`]
+    /// that can be transmitted to the peer device.
+    ///
+    /// # Errors
+    ///
+    /// This method will return an error if:
+    /// * The peer encryption key cannot be deserialized
+    /// * The daemon fails to encrypt the PSK seed
+    /// * The wrapped seed cannot be serialized
     pub async fn encrypt_psk_seed_for_peer(&mut self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
             .context("bad peer_enc_pk")
