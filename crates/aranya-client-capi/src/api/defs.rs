@@ -163,9 +163,9 @@ pub type ExtError = Safe<imp::ExtError>;
 /// @param msg_len length of the message buffer.
 ///
 /// @relates AranyaExtError.
-pub fn ext_error_msg(
+pub unsafe fn ext_error_msg(
     err: &ExtError,
-    msg: &mut MaybeUninit<c_char>,
+    msg: *mut MaybeUninit<c_char>,
     msg_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let msg = aranya_capi_core::try_as_mut_slice!(msg, *msg_len);
@@ -536,9 +536,9 @@ pub const ARANYA_ID_STR_LEN: usize = (ARANYA_ID_LEN * 1375) / 1000 + 1;
 ///
 /// @relates AranyaId.
 #[aranya_capi_core::no_ext_error]
-pub fn id_to_str(
+pub unsafe fn id_to_str(
     id: &Id,
-    str: &mut MaybeUninit<c_char>,
+    str: *mut MaybeUninit<c_char>,
     str_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
@@ -1276,10 +1276,10 @@ pub unsafe fn sync_now(
 /// @param devices_len returns the length of the devices list [`DeviceId`].
 ///
 /// @relates AranyaClient.
-pub fn query_devices_on_team(
+pub unsafe fn query_devices_on_team(
     client: &mut Client,
     team: &TeamId,
-    devices: Option<&mut MaybeUninit<DeviceId>>,
+    devices: *mut MaybeUninit<DeviceId>,
     devices_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
@@ -1287,10 +1287,6 @@ pub fn query_devices_on_team(
         .rt
         .block_on(client.inner.team(team.into()).queries().devices_on_team())?;
     let data = data.__data();
-    let Some(devices) = devices else {
-        *devices_len = data.len();
-        return Err(imp::Error::BufferTooSmall);
-    };
     let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
     if *devices_len < data.len() {
         *devices_len = data.len();
@@ -1349,11 +1345,11 @@ pub unsafe fn query_device_keybundle(
 /// @param labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn query_device_label_assignments(
+pub unsafe fn query_device_label_assignments(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    labels: Option<&mut MaybeUninit<LabelId>>,
+    labels: *mut MaybeUninit<LabelId>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
@@ -1365,10 +1361,6 @@ pub fn query_device_label_assignments(
             .device_label_assignments(device.into()),
     )?;
     let data = data.__data();
-    let Some(labels) = labels else {
-        *labels_len = data.len();
-        return Err(imp::Error::BufferTooSmall);
-    };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     if *labels_len < data.len() {
         *labels_len = data.len();
@@ -1395,10 +1387,10 @@ pub fn query_device_label_assignments(
 /// @param labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn query_labels(
+pub unsafe fn query_labels(
     client: &mut Client,
     team: &TeamId,
-    labels: Option<&mut MaybeUninit<LabelId>>,
+    labels: *mut MaybeUninit<LabelId>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
@@ -1406,10 +1398,6 @@ pub fn query_labels(
         .rt
         .block_on(client.inner.team(team.into()).queries().labels())?;
     let data = data.__data();
-    let Some(labels) = labels else {
-        *labels_len = data.len();
-        return Err(imp::Error::BufferTooSmall);
-    };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write(src.id.into());
@@ -1459,7 +1447,7 @@ pub unsafe fn query_aqc_net_identifier(
     client: &mut Client,
     team: &TeamId,
     device: &DeviceId,
-    ident: &mut MaybeUninit<c_char>,
+    ident: *mut MaybeUninit<c_char>,
     ident_len: &mut usize,
 ) -> Result<bool, imp::Error> {
     let client = client.imp();
