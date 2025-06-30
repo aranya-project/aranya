@@ -105,7 +105,6 @@ impl SyncState for State {
         syncer: &mut Syncer<Self>,
         id: GraphId,
         sink: &mut S,
-        server_addr: Addr,
         peer: &Addr,
     ) -> impl Future<Output = SyncResult<usize>> + Send
     where
@@ -122,7 +121,7 @@ impl SyncState for State {
             // TODO: spawn a task for send/recv?
             let (mut recv, mut send) = stream.split();
 
-            let mut sync_requester = SyncRequester::new(id, &mut Rng, server_addr);
+            let mut sync_requester = SyncRequester::new(id, &mut Rng, syncer.server_addr);
 
             // send sync request.
             syncer

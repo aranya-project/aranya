@@ -63,6 +63,7 @@ struct SyncParams {
     psk_store: Arc<PskStore>,
     active_team_rx: Receiver<TeamId>,
     caches: PeerCacheMap,
+    external_sync_addr: Addr,
 }
 
 mod invalid_graphs {
@@ -177,11 +178,11 @@ impl Daemon {
                     .try_clone()
                     .context("unable to clone keystore")?,
                 &pks,
-                cfg.sync_addr,
                 SyncParams {
                     psk_store: Arc::clone(&psk_store),
                     active_team_rx,
                     caches: caches.clone(),
+                    external_sync_addr: cfg.sync_addr,
                 },
             )
             .await?;
@@ -338,7 +339,6 @@ impl Daemon {
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
-        external_sync_addr: Addr,
         sync_params: SyncParams,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
@@ -352,10 +352,10 @@ impl Daemon {
 
         let client = Client::new(Arc::clone(&aranya));
 
-        info!(addr = %external_sync_addr, "starting QUIC sync server");
+        info!(addr = %sync_params.external_sync_addr, "starting QUIC sync server");
         let server = SyncServer::new(
             client.clone(),
-            &external_sync_addr,
+            &sync_params.external_sync_addr,
             sync_params.psk_store,
             sync_params.active_team_rx,
             sync_params.caches,

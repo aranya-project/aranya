@@ -182,7 +182,6 @@ pub trait SyncState: Sized {
         syncer: &mut Syncer<Self>,
         id: GraphId,
         sink: &mut S,
-        server_addr: Addr,
         peer: &Addr,
     ) -> impl Future<Output = SyncResult<usize>> + Send
     where
@@ -247,7 +246,10 @@ impl<ST: SyncState> Syncer<ST> {
                         self.sync(&peer).await?;
                     },
                     Msg::AddPeer { peer, cfg } => {
-                        self.add_peer(peer, cfg);
+                        self.add_peer(peer.clone(), cfg.clone());
+                        if cfg.sync_now {
+                            self.sync(&peer).await?;
+                        }
                     }
                     Msg::RemovePeer { peer } => {
                         self.remove_peer(peer);
@@ -272,36 +274,31 @@ impl<ST: SyncState> Syncer<ST> {
         trace!("syncing with peer");
         let (effects, cmd_count): (Vec<EF>, usize) = {
             let mut sink = VecSink::new();
-            let cmd_count = match <ST as SyncState>::sync_impl(
-                self,
-                peer.graph_id,
-                &mut sink,
-                self.server_addr,
-                &peer.addr,
-            )
-            .await
-            .context("sync_peer error")
-            .inspect_err(|err| error!("{err:?}"))
-            {
-                Ok(count) => count,
-                Err(e) => {
-                    // If a finalization error has occurred, remove all sync peers for that team.
-                    if e.downcast_ref::<ClientError>()
-                        .is_some_and(|err| matches!(err, ClientError::ParallelFinalize))
-                    {
-                        // Remove sync peers for graph that had finalization error.
-                        self.peers.retain(|p, (_, key)| {
-                            let keep = p.graph_id != peer.graph_id;
-                            if !keep {
-                                self.queue.remove(key);
-                            }
-                            keep
-                        });
-                        self.invalid.insert(peer.graph_id);
+            let cmd_count =
+                match <ST as SyncState>::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
+                    .await
+                    .context("sync_peer error")
+                    .inspect_err(|err| error!("{err:?}"))
+                {
+                    Ok(count) => count,
+                    Err(e) => {
+                        // If a finalization error has occurred, remove all sync peers for that team.
+                        if e.downcast_ref::<ClientError>()
+                            .is_some_and(|err| matches!(err, ClientError::ParallelFinalize))
+                        {
+                            // Remove sync peers for graph that had finalization error.
+                            self.peers.retain(|p, (_, key)| {
+                                let keep = p.graph_id != peer.graph_id;
+                                if !keep {
+                                    self.queue.remove(key);
+                                }
+                                keep
+                            });
+                            self.invalid.insert(peer.graph_id);
+                        }
+                        return Err(SyncError::Other(e));
                     }
-                    return Err(SyncError::Other(e));
-                }
-            };
+                };
             let effects = sink
                 .collect()
                 .context("could not collect effects from sync")?;
