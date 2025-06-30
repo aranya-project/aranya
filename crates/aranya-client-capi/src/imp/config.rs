@@ -154,19 +154,26 @@ impl Typed for SyncPeerConfig {
     const TYPE_ID: TypeId = TypeId::new(0x44BE85E7);
 }
 
-impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
-    fn from(value: SyncPeerConfig) -> Self {
+impl TryFrom<SyncPeerConfig> for aranya_client::SyncPeerConfig {
+    type Error = Error;
+
+    fn try_from(value: SyncPeerConfig) -> Result<Self, Self::Error> {
         Self::builder()
             .interval(value.interval.into())
             .sync_now(value.sync_now)
             .build()
-            .expect("All values are set")
+            .map_err(|err| match err {
+                aranya_client::Error::Config(config_err) => Error::Config(config_err),
+                client_err => Error::Client(client_err),
+            })
     }
 }
 
-impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
-    fn from(value: &SyncPeerConfig) -> Self {
-        value.clone().into()
+impl TryFrom<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
+    type Error = Error;
+
+    fn try_from(value: &SyncPeerConfig) -> Result<Self, Self::Error> {
+        value.clone().try_into()
     }
 }
 
@@ -245,12 +252,17 @@ impl Typed for QuicSyncConfig {
     const TYPE_ID: TypeId = TypeId::new(0xADF0F970);
 }
 
-impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
-    fn from(value: QuicSyncConfig) -> Self {
+impl TryFrom<QuicSyncConfig> for aranya_client::QuicSyncConfig {
+    type Error = Error;
+
+    fn try_from(value: QuicSyncConfig) -> Result<Self, Self::Error> {
         Self::builder()
             .mode(value.mode)
             .build()
-            .expect("All fields are set")
+            .map_err(|err| match err {
+                aranya_client::Error::Config(config_err) => Error::Config(config_err),
+                client_err => Error::Client(client_err),
+            })
     }
 }
 
@@ -317,20 +329,27 @@ pub struct TeamConfig {
     quic_sync: Option<QuicSyncConfig>,
 }
 
-impl From<TeamConfig> for aranya_client::TeamConfig {
-    fn from(value: TeamConfig) -> Self {
+impl TryFrom<TeamConfig> for aranya_client::TeamConfig {
+    type Error = Error;
+
+    fn try_from(value: TeamConfig) -> Result<Self, Self::Error> {
         let mut builder = Self::builder();
         if let Some(cfg) = value.quic_sync {
-            builder = builder.quic_sync(cfg.into());
+            builder = builder.quic_sync(cfg.try_into()?);
         }
 
-        builder.build().expect("All fields set")
+        builder.build().map_err(|err| match err {
+            aranya_client::Error::Config(config_err) => Error::Config(config_err),
+            client_err => Error::Client(client_err),
+        })
     }
 }
 
-impl From<&TeamConfig> for aranya_client::TeamConfig {
-    fn from(value: &TeamConfig) -> Self {
-        Self::from(value.to_owned())
+impl TryFrom<&TeamConfig> for aranya_client::TeamConfig {
+    type Error = Error;
+
+    fn try_from(value: &TeamConfig) -> Result<Self, Self::Error> {
+        Self::try_from(value.to_owned())
     }
 }
 
