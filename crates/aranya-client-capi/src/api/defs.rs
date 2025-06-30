@@ -548,7 +548,6 @@ pub fn id_to_str(
 
 /// Decodes `str` into an [`Id`].
 ///
-///
 /// @param str pointer to a null-terminated string.
 ///
 /// @relates AranyaId.
@@ -575,6 +574,7 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
 }
 
 /// Configuration info for Aranya.
+///
 /// Use a [`ClientConfigBuilder`] to construct this object.
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type ClientConfig = Safe<imp::ClientConfig>;
@@ -616,6 +616,7 @@ pub fn client_config_builder_set_daemon_uds_path(
 }
 
 /// Configuration info for Aranya QUIC Channels.
+///
 /// Use a [`AqcConfigBuilder`] to construct this object.
 #[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type AqcConfig = Safe<imp::AqcConfig>;
@@ -665,11 +666,13 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
 }
 
 /// QUIC syncer configuration.
+///
 /// Use a [`QuicSyncConfigBuilder`] to construct this object.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
 
 /// A builder for initializing a [`QuicSyncConfig`].
+///
 /// The [`QuicSyncConfig`] is an optional part of initializing a [`TeamConfig`].
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
@@ -739,6 +742,7 @@ pub fn quic_sync_config_build(
 }
 
 /// Team configuration.
+///
 /// Use a [`TeamConfigBuilder`] to construct this object.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
@@ -786,6 +790,7 @@ pub fn team_config_build(
 }
 
 /// Sync Peer config.
+///
 /// Use a [`SyncPeerConfigBuilder`] to construct this object.
 #[aranya_capi_core::opaque(size = 32, align = 8)]
 pub type SyncPeerConfig = Safe<imp::SyncPeerConfig>;
@@ -1026,6 +1031,7 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 }
 
 /// Return random bytes from Aranya's CSPRNG.
+///
 /// This method can be used to generate a PSK seed IKM for the QUIC syncer.
 ///
 /// @param[in] client the Aranya Client [`Client`].
@@ -1042,6 +1048,7 @@ pub unsafe fn rand(client: &mut Client, buf: &mut [MaybeUninit<u8>]) {
 }
 
 /// Return serialized PSK seed encrypted for another device on the team.
+///
 /// The PSK seed will be encrypted using the public encryption key of the specified device on the team.
 ///
 /// Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the seed bytes.

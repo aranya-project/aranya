@@ -273,6 +273,7 @@ typedef struct ARANYA_ALIGNED(16) AranyaClient {
 
 /**
  * Configuration info for Aranya.
+ *
  * Use a [`AranyaClientConfigBuilder`](@ref AranyaClientConfigBuilder) to construct this object.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaClientConfig {
@@ -324,6 +325,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfigBuilder {
 
 /**
  * Configuration info for Aranya QUIC Channels.
+ *
  * Use a [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder) to construct this object.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
@@ -337,6 +339,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
 
 /**
  * A builder for initializing a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
+ *
  * The [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig) is an optional part of initializing a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  */
 typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
@@ -357,6 +360,7 @@ typedef struct AranyaSeedIkm {
 
 /**
  * QUIC syncer configuration.
+ *
  * Use a [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder) to construct this object.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
@@ -382,6 +386,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
 
 /**
  * Team configuration.
+ *
  * Use a [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder) to construct this object.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
@@ -407,6 +412,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfigBuilder {
 
 /**
  * Sync Peer config.
+ *
  * Use a [`AranyaSyncPeerConfigBuilder`](@ref AranyaSyncPeerConfigBuilder) to construct this object.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
@@ -785,7 +791,6 @@ AranyaError aranya_id_to_str(const struct AranyaId *id,
 
 /**
  * Decodes `str` into an [`AranyaId`](@ref AranyaId).
- *
  *
  * @param str pointer to a null-terminated string.
  *
@@ -1652,6 +1657,7 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
 
 /**
  * Return random bytes from Aranya's CSPRNG.
+ *
  * This method can be used to generate a PSK seed IKM for the QUIC syncer.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -1664,6 +1670,7 @@ AranyaError aranya_rand(struct AranyaClient *client,
 
 /**
  * Return random bytes from Aranya's CSPRNG.
+ *
  * This method can be used to generate a PSK seed IKM for the QUIC syncer.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -1677,6 +1684,7 @@ AranyaError aranya_rand_ext(struct AranyaClient *client,
 
 /**
  * Return serialized PSK seed encrypted for another device on the team.
+ *
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the seed bytes.
@@ -1700,6 +1708,7 @@ AranyaError aranya_encrypt_psk_seed_for_peer(struct AranyaClient *client,
 
 /**
  * Return serialized PSK seed encrypted for another device on the team.
+ *
  * The PSK seed will be encrypted using the public encryption key of the specified device on the team.
  *
  * Returns an `AranyaBufferTooSmall` error if the output buffer is too small to hold the seed bytes.
