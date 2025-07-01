@@ -8,7 +8,7 @@ use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
 use tracing::error;
 
 use super::Error;
-use crate::api::defs::{self, Duration};
+use crate::api::defs::{self, Duration, TeamId};
 
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
@@ -311,14 +311,14 @@ impl Builder for QuicSyncConfigBuilder {
     }
 }
 
-/// Configuration info when creating or adding a team in Aranya
+/// Configuration info when adding a team in Aranya
 #[derive(Clone, Debug)]
-pub struct TeamConfig {
+pub struct CreateTeamConfig {
     quic_sync: Option<QuicSyncConfig>,
 }
 
-impl From<TeamConfig> for aranya_client::AddTeamConfig {
-    fn from(value: TeamConfig) -> Self {
+impl From<CreateTeamConfig> for aranya_client::CreateTeamConfig {
+    fn from(value: CreateTeamConfig) -> Self {
         let mut builder = Self::builder();
         if let Some(cfg) = value.quic_sync {
             builder = builder.quic_sync(cfg.into());
@@ -328,35 +328,35 @@ impl From<TeamConfig> for aranya_client::AddTeamConfig {
     }
 }
 
-impl From<&TeamConfig> for aranya_client::AddTeamConfig {
-    fn from(value: &TeamConfig) -> Self {
+impl From<&CreateTeamConfig> for aranya_client::CreateTeamConfig {
+    fn from(value: &CreateTeamConfig) -> Self {
         Self::from(value.to_owned())
     }
 }
 
-impl Typed for TeamConfig {
+impl Typed for CreateTeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
 }
 
-/// Builder for a [`TeamConfig`]
+/// Builder for a [`CreateTeamConfig`]
 #[derive(Clone, Debug, Default)]
-pub struct TeamConfigBuilder {
+pub struct CreateTeamConfigBuilder {
     quic_sync: Option<QuicSyncConfig>,
 }
 
-impl Typed for TeamConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x112905E7);
+impl Typed for CreateTeamConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x69F54A43);
 }
 
-impl TeamConfigBuilder {
+impl CreateTeamConfigBuilder {
     /// Sets the QUIC syncer config.
     pub fn quic(&mut self, quic: QuicSyncConfig) {
         self.quic_sync = Some(quic.clone());
     }
 }
 
-impl Builder for TeamConfigBuilder {
-    type Output = defs::TeamConfig;
+impl Builder for CreateTeamConfigBuilder {
+    type Output = defs::CreateTeamConfig;
     type Error = Error;
 
     /// # Safety
@@ -365,7 +365,81 @@ impl Builder for TeamConfigBuilder {
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
         Self::Output::init(
             out,
-            TeamConfig {
+            CreateTeamConfig {
+                quic_sync: self.quic_sync,
+            },
+        );
+        Ok(())
+    }
+}
+
+/// Configuration info when adding a team in Aranya
+#[derive(Clone, Debug)]
+pub struct AddTeamConfig {
+    id: TeamId,
+    quic_sync: Option<QuicSyncConfig>,
+}
+
+impl From<AddTeamConfig> for aranya_client::AddTeamConfig {
+    fn from(value: AddTeamConfig) -> Self {
+        let mut builder = Self::builder();
+        if let Some(cfg) = value.quic_sync {
+            builder = builder.quic_sync(cfg.into()).id((&value.id).into());
+        }
+
+        builder.build().expect("All fields set")
+    }
+}
+
+impl From<&AddTeamConfig> for aranya_client::AddTeamConfig {
+    fn from(value: &AddTeamConfig) -> Self {
+        Self::from(value.to_owned())
+    }
+}
+
+impl Typed for AddTeamConfig {
+    const TYPE_ID: TypeId = TypeId::new(0xA05F7519);
+}
+
+/// Builder for a [`AddTeamConfig`]
+#[derive(Clone, Debug, Default)]
+pub struct AddTeamConfigBuilder {
+    id: Option<TeamId>,
+    quic_sync: Option<QuicSyncConfig>,
+}
+
+impl Typed for AddTeamConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x112905E7);
+}
+
+impl AddTeamConfigBuilder {
+    /// Sets the QUIC syncer config.
+    pub fn quic(&mut self, quic: QuicSyncConfig) {
+        self.quic_sync = Some(quic.clone());
+    }
+
+    /// Sets the ID field.
+    pub fn id(&mut self, id: TeamId) {
+        self.id = Some(id);
+    }
+}
+
+impl Builder for AddTeamConfigBuilder {
+    type Output = defs::AddTeamConfig;
+    type Error = Error;
+
+    /// # Safety
+    ///
+    /// No special considerations.
+    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
+        let Some(id) = self.id else {
+            return Err(InvalidArg::new("id", "field not set").into());
+        };
+
+        Self::Output::init(
+            out,
+            AddTeamConfig {
+                id,
                 quic_sync: self.quic_sync,
             },
         );

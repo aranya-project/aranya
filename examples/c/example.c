@@ -321,14 +321,14 @@ AranyaError init_team(Team *t) {
         return err;
     }
 
-    AranyaTeamConfigBuilder owner_build;
-    err = aranya_team_config_builder_init(&owner_build);
+    AranyaCreateTeamConfigBuilder owner_build;
+    err = aranya_create_team_config_builder_init(&owner_build);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
+        fprintf(stderr, "unable to init `AranyaCreateTeamConfigBuilder`\n");
         return err;
     }
 
-    err = aranya_team_config_builder_set_quic_syncer(&owner_build,
+    err = aranya_create_team_config_builder_set_quic_syncer(&owner_build,
                                                      &owner_quic_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr,
@@ -339,10 +339,10 @@ AranyaError init_team(Team *t) {
 
     // NB: A builder's "_build" method consumes the builder, so
     // do _not_ call "_cleanup" afterward.
-    AranyaTeamConfig owner_cfg;
-    err = aranya_team_config_build(&owner_build, &owner_cfg);
+    AranyaCreateTeamConfig owner_cfg;
+    err = aranya_create_team_config_build(&owner_build, &owner_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaTeamConfig`\n");
+        fprintf(stderr, "unable to init `AranyaCreateTeamConfig`\n");
         return err;
     }
 
@@ -478,31 +478,48 @@ AranyaError init_team(Team *t) {
             return err;
         }
 
-        AranyaTeamConfigBuilder build;
-        err = aranya_team_config_builder_init(&build);
+        AranyaAddTeamConfigBuilder build;
+        err = aranya_add_team_config_builder_init(&build);
         if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
+            fprintf(stderr, "unable to init `AranyaAddTeamConfigBuilder`\n");
             return err;
         }
 
-        err = aranya_team_config_builder_set_quic_syncer(&build, &quic_cfg);
+        err = aranya_add_team_config_builder_set_quic_syncer(&build, &quic_cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr,
                     "unable to set `QuicSyncConfig` for "
-                    "`AranyaTeamConfigBuilder`\n");
+                    "`AranyaAddTeamConfigBuilder`\n");
             return err;
         }
+
+        err = aranya_add_team_config_builder_set_quic_syncer(&build, &quic_cfg);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr,
+                    "unable to set `QuicSyncConfig` for "
+                    "`AranyaAddTeamConfigBuilder`\n");
+            return err;
+        }
+
+        err = aranya_add_team_config_builder_set_id(&build, &team_id_from_peer);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr,
+                    "unable to set `Id` for "
+                    "`AranyaAddTeamConfigBuilder`\n");
+            return err;
+        }
+
         // NB: A builder's "_build" method consumes the builder, so
         // do _not_ call "_cleanup" afterward.
-        AranyaTeamConfig cfg;
-        err = aranya_team_config_build(&build, &cfg);
+        AranyaAddTeamConfig cfg;
+        err = aranya_add_team_config_build(&build, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaTeamConfig`\n");
+            fprintf(stderr, "unable to init `AranyaAddTeamConfig`\n");
             return err;
         }
 
         Client *client = &t->clients_arr[i];
-        err = aranya_add_team(&client->client, &team_id_from_peer, &cfg);
+        err = aranya_add_team(&client->client, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to add_team() for client: %s\n",
                     client_names[i]);

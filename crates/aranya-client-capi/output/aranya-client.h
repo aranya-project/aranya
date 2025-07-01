@@ -340,7 +340,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
 /**
  * A builder for initializing a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
  *
- * The [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig) is an optional part of initializing a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * The [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig) is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig) or [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
  */
 typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
     /**
@@ -373,30 +373,63 @@ typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
 } AranyaQuicSyncConfig;
 
 /**
- * A builder for initializing a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * A builder for initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
  */
-typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
+typedef struct ARANYA_ALIGNED(8) AranyaAddTeamConfigBuilder {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[288];
-} AranyaTeamConfigBuilder;
+    uint8_t __for_size_only[328];
+} AranyaAddTeamConfigBuilder;
 
 /**
- * Team configuration.
- *
- * Use a [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder) to construct this object.
+ * A builder for initializing a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
  */
-typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
+typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamConfigBuilder {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
     uint8_t __for_size_only[288];
-} AranyaTeamConfig;
+} AranyaCreateTeamConfigBuilder;
+
+/**
+ * Team ID.
+ */
+typedef struct AranyaTeamId {
+    struct AranyaId id;
+} AranyaTeamId;
+
+/**
+ * Team configuration used when joining a team.
+ *
+ * Use an [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder) to construct this object.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaAddTeamConfig {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[320];
+} AranyaAddTeamConfig;
+
+/**
+ * Team configuration used when creating a team.
+ *
+ * Use an [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder) to construct this object.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamConfig {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[288];
+} AranyaCreateTeamConfig;
 
 /**
  * Builder for a Sync Peer config [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig).
@@ -428,13 +461,6 @@ typedef struct ARANYA_ALIGNED(8) AranyaSyncPeerConfig {
  * A type to represent a span of time in nanoseconds.
  */
 typedef uint64_t AranyaDuration;
-
-/**
- * Team ID.
- */
-typedef struct AranyaTeamId {
-    struct AranyaId id;
-} AranyaTeamId;
 
 /**
  * An AQC label name.
@@ -1167,104 +1193,223 @@ AranyaError aranya_quic_sync_config_build_ext(struct AranyaQuicSyncConfigBuilder
                                               struct AranyaExtError *__ext_err);
 
 /**
- * Initializes `AranyaTeamConfigBuilder`.
+ * Initializes `AranyaAddTeamConfigBuilder`.
  *
  * When no longer needed, `out`'s resources must be released
  * with its cleanup routine.
  *
- * @relates AranyaTeamConfigBuilder
+ * @relates AranyaAddTeamConfigBuilder
  */
-AranyaError aranya_team_config_builder_init(struct AranyaTeamConfigBuilder *out);
+AranyaError aranya_add_team_config_builder_init(struct AranyaAddTeamConfigBuilder *out);
 
 /**
- * Initializes `AranyaTeamConfigBuilder`.
+ * Initializes `AranyaAddTeamConfigBuilder`.
  *
  * When no longer needed, `out`'s resources must be released
  * with its cleanup routine.
  *
- * @relates AranyaTeamConfigBuilder
+ * @relates AranyaAddTeamConfigBuilder
  */
-AranyaError aranya_team_config_builder_init_ext(struct AranyaTeamConfigBuilder *out,
+AranyaError aranya_add_team_config_builder_init_ext(struct AranyaAddTeamConfigBuilder *out,
+                                                    struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_add_team_config_builder_init`.
+ *
+ * @relates AranyaAddTeamConfigBuilder
+ */
+AranyaError aranya_add_team_config_builder_cleanup(struct AranyaAddTeamConfigBuilder *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_add_team_config_builder_init`.
+ *
+ * @relates AranyaAddTeamConfigBuilder
+ */
+AranyaError aranya_add_team_config_builder_cleanup_ext(struct AranyaAddTeamConfigBuilder *ptr,
+                                                       struct AranyaExtError *__ext_err);
+
+/**
+ * Initializes `AranyaCreateTeamConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaCreateTeamConfigBuilder
+ */
+AranyaError aranya_create_team_config_builder_init(struct AranyaCreateTeamConfigBuilder *out);
+
+/**
+ * Initializes `AranyaCreateTeamConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaCreateTeamConfigBuilder
+ */
+AranyaError aranya_create_team_config_builder_init_ext(struct AranyaCreateTeamConfigBuilder *out,
+                                                       struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_create_team_config_builder_init`.
+ *
+ * @relates AranyaCreateTeamConfigBuilder
+ */
+AranyaError aranya_create_team_config_builder_cleanup(struct AranyaCreateTeamConfigBuilder *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_create_team_config_builder_init`.
+ *
+ * @relates AranyaCreateTeamConfigBuilder
+ */
+AranyaError aranya_create_team_config_builder_cleanup_ext(struct AranyaCreateTeamConfigBuilder *ptr,
+                                                          struct AranyaExtError *__ext_err);
+
+/**
+ * Configures QUIC syncer for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
+ *
+ * By default, the QUIC syncer config is not set.
+ *
+ * @param cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ *
+ * @relates AranyaAddTeamConfigBuilder.
+ */
+AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamConfigBuilder *cfg,
+                                                           struct AranyaQuicSyncConfig *quic);
+
+/**
+ * Configures QUIC syncer for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
+ *
+ * By default, the QUIC syncer config is not set.
+ *
+ * @param cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ *
+ * @relates AranyaAddTeamConfigBuilder.
+ */
+AranyaError aranya_add_team_config_builder_set_quic_syncer_ext(struct AranyaAddTeamConfigBuilder *cfg,
+                                                               struct AranyaQuicSyncConfig *quic,
+                                                               struct AranyaExtError *__ext_err);
+
+/**
+ * Configures team ID field for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
+ *
+ * By default, the ID is not set.
+ *
+ * @param cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param id a pointer to a [`AranyaTeamId`](@ref AranyaTeamId)
+ *
+ * @relates AranyaAddTeamConfigBuilder.
+ */
+AranyaError aranya_add_team_config_builder_set_id(struct AranyaAddTeamConfigBuilder *cfg,
+                                                  const struct AranyaTeamId *id);
+
+/**
+ * Configures team ID field for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
+ *
+ * By default, the ID is not set.
+ *
+ * @param cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param id a pointer to a [`AranyaTeamId`](@ref AranyaTeamId)
+ *
+ * @relates AranyaAddTeamConfigBuilder.
+ */
+AranyaError aranya_add_team_config_builder_set_id_ext(struct AranyaAddTeamConfigBuilder *cfg,
+                                                      const struct AranyaTeamId *id,
+                                                      struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to construct an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param out a pointer to write the team config to [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig)
+ *
+ * @relates AranyaAddTeamConfigBuilder.
+ */
+AranyaError aranya_add_team_config_build(struct AranyaAddTeamConfigBuilder *cfg,
+                                         struct AranyaAddTeamConfig *out);
+
+/**
+ * Attempts to construct an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param out a pointer to write the team config to [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig)
+ *
+ * @relates AranyaAddTeamConfigBuilder.
+ */
+AranyaError aranya_add_team_config_build_ext(struct AranyaAddTeamConfigBuilder *cfg,
+                                             struct AranyaAddTeamConfig *out,
+                                             struct AranyaExtError *__ext_err);
+
+/**
+ * Configures QUIC syncer for [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder).
+ *
+ * By default, the QUIC syncer config is not set.
+ *
+ * @param cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
+ * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ *
+ * @relates AranyaCreateTeamConfigBuilder.
+ */
+AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreateTeamConfigBuilder *cfg,
+                                                              struct AranyaQuicSyncConfig *quic);
+
+/**
+ * Configures QUIC syncer for [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder).
+ *
+ * By default, the QUIC syncer config is not set.
+ *
+ * @param cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
+ * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ *
+ * @relates AranyaCreateTeamConfigBuilder.
+ */
+AranyaError aranya_create_team_config_builder_set_quic_syncer_ext(struct AranyaCreateTeamConfigBuilder *cfg,
+                                                                  struct AranyaQuicSyncConfig *quic,
+                                                                  struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to construct a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the team config builder [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
+ * @param out a pointer to write the team config to [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig)
+ *
+ * @relates AranyaCreateTeamConfigBuilder.
+ */
+AranyaError aranya_create_team_config_build(struct AranyaCreateTeamConfigBuilder *cfg,
+                                            struct AranyaCreateTeamConfig *out);
+
+/**
+ * Attempts to construct a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param cfg a pointer to the team config builder [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
+ * @param out a pointer to write the team config to [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig)
+ *
+ * @relates AranyaCreateTeamConfigBuilder.
+ */
+AranyaError aranya_create_team_config_build_ext(struct AranyaCreateTeamConfigBuilder *cfg,
+                                                struct AranyaCreateTeamConfig *out,
                                                 struct AranyaExtError *__ext_err);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_team_config_builder_init`.
- *
- * @relates AranyaTeamConfigBuilder
- */
-AranyaError aranya_team_config_builder_cleanup(struct AranyaTeamConfigBuilder *ptr);
-
-/**
- * Releases any resources associated with `ptr`.
- *
- * `ptr` must either be null or initialized by `::aranya_team_config_builder_init`.
- *
- * @relates AranyaTeamConfigBuilder
- */
-AranyaError aranya_team_config_builder_cleanup_ext(struct AranyaTeamConfigBuilder *ptr,
-                                                   struct AranyaExtError *__ext_err);
-
-/**
- * Configures QUIC syncer for [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder).
- *
- * By default, the QUIC syncer config is not set. It is an error to call
- * [`aranya_team_config_build`](@ref aranya_team_config_build) before setting the interval with
- * this function
- *
- * @param cfg a pointer to the builder for a team config [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
- * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
- *
- * @relates AranyaTeamConfigBuilder.
- */
-AranyaError aranya_team_config_builder_set_quic_syncer(struct AranyaTeamConfigBuilder *cfg,
-                                                       struct AranyaQuicSyncConfig *quic);
-
-/**
- * Configures QUIC syncer for [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder).
- *
- * By default, the QUIC syncer config is not set. It is an error to call
- * [`aranya_team_config_build`](@ref aranya_team_config_build) before setting the interval with
- * this function
- *
- * @param cfg a pointer to the builder for a team config [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
- * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
- *
- * @relates AranyaTeamConfigBuilder.
- */
-AranyaError aranya_team_config_builder_set_quic_syncer_ext(struct AranyaTeamConfigBuilder *cfg,
-                                                           struct AranyaQuicSyncConfig *quic,
-                                                           struct AranyaExtError *__ext_err);
-
-/**
- * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
- *
- * This function consumes and releases any resources associated
- * with the memory pointed to by `cfg`.
- *
- * @param cfg a pointer to the team config builder [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
- * @param out a pointer to write the team config to [`AranyaTeamConfig`](@ref AranyaTeamConfig)
- *
- * @relates AranyaTeamConfigBuilder.
- */
-AranyaError aranya_team_config_build(struct AranyaTeamConfigBuilder *cfg,
-                                     struct AranyaTeamConfig *out);
-
-/**
- * Attempts to construct a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
- *
- * This function consumes and releases any resources associated
- * with the memory pointed to by `cfg`.
- *
- * @param cfg a pointer to the team config builder [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
- * @param out a pointer to write the team config to [`AranyaTeamConfig`](@ref AranyaTeamConfig)
- *
- * @relates AranyaTeamConfigBuilder.
- */
-AranyaError aranya_team_config_build_ext(struct AranyaTeamConfigBuilder *cfg,
-                                         struct AranyaTeamConfig *out,
-                                         struct AranyaExtError *__ext_err);
 
 /**
  * Initializes `AranyaSyncPeerConfigBuilder`.
@@ -1632,26 +1777,26 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
  * Create a new graph/team with the current device as the owner.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * @param cfg the Team Configuration [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
  * @param __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team(struct AranyaClient *client,
-                               const struct AranyaTeamConfig *cfg,
+                               const struct AranyaCreateTeamConfig *cfg,
                                struct AranyaTeamId *__output);
 
 /**
  * Create a new graph/team with the current device as the owner.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * @param cfg the Team Configuration [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
  * @param __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team_ext(struct AranyaClient *client,
-                                   const struct AranyaTeamConfig *cfg,
+                                   const struct AranyaCreateTeamConfig *cfg,
                                    struct AranyaTeamId *__output,
                                    struct AranyaExtError *__ext_err);
 
@@ -1735,27 +1880,23 @@ AranyaError aranya_encrypt_psk_seed_for_peer_ext(struct AranyaClient *client,
  * Add a team to the local device store.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * @param cfg the Team Configuration [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_team(struct AranyaClient *client,
-                            const struct AranyaTeamId *team,
-                            const struct AranyaTeamConfig *cfg);
+                            const struct AranyaAddTeamConfig *cfg);
 
 /**
  * Add a team to the local device store.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * @param cfg the Team Configuration [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_team_ext(struct AranyaClient *client,
-                                const struct AranyaTeamId *team,
-                                const struct AranyaTeamConfig *cfg,
+                                const struct AranyaAddTeamConfig *cfg,
                                 struct AranyaExtError *__ext_err);
 
 /**
