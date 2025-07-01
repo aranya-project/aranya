@@ -8,7 +8,6 @@ use std::{ffi::OsStr, ops::Deref, os::unix::ffi::OsStrExt, str::FromStr};
 use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::{self, AqcPeerStream};
-use aranya_crypto::dangerous::spideroak_crypto::hex;
 use aranya_daemon_api::Text;
 use bytes::Bytes;
 use tracing::error;
@@ -486,21 +485,6 @@ pub fn init_logging() -> Result<(), imp::Error> {
         .try_init()
         .context("unable to initialize logging")?;
     Ok(())
-}
-
-/// Decodes the hexadecimal string `src` into `dst` and returns
-/// the number of bytes written to `dst`.
-///
-/// If `src` is a valid hexadecimal string, the number of bytes
-/// written to `dst` will be exactly half the length of `src`.
-/// Therefore, `dst` must be at least half as long as `src`.
-///
-/// @param dst the output buffer
-/// @param src the input hexadecimal string
-pub fn decode_hex(dst: &mut [u8], src: &[u8]) -> Result<usize, imp::Error> {
-    hex::ct_decode(dst, src).map_err(|_| {
-        imp::Error::InvalidArg(InvalidArg::new("src", "not a valid hexadecimal string"))
-    })
 }
 
 /// Gets the public key bundle for this device.
@@ -1840,24 +1824,26 @@ pub fn aqc_bidi_stream_send(
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcBidiStream`].
 /// @param[out] buffer pointer to the target buffer.
-/// @param[in] buffer_len length of the target buffer.
-/// @param[out] __output the number of bytes written to the buffer.
+/// @param[out] buffer_len length of the target buffer.
 ///
 /// @relates AranyaClient.
-pub fn aqc_bidi_stream_try_recv(
+pub unsafe fn aqc_bidi_stream_try_recv(
     stream: &mut AqcBidiStream,
-    mut buffer: &mut [MaybeUninit<u8>],
-) -> Result<usize, imp::Error> {
+    buffer: *mut MaybeUninit<u8>,
+    buffer_len: &mut usize,
+) -> Result<(), imp::Error> {
     let mut written = 0;
-    while !buffer.is_empty() {
-        written += consume_bytes(&mut buffer, &mut stream.data);
+    let mut buf = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
+    while !buf.is_empty() {
+        written += consume_bytes(&mut buf, &mut stream.data);
         match stream.inner.try_receive() {
             Ok(data) => stream.data = data,
             Err(_) if written > 0 => break,
             Err(e) => return Err(e.into()),
         }
     }
-    Ok(written)
+    *buffer_len = written;
+    Ok(())
 }
 
 /// Create a unidirectional stream from an [`AqcBidiChannel`].
@@ -1986,22 +1972,24 @@ pub fn aqc_send_stream_send(
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcReceiveStream`].
 /// @param[out] buffer pointer to the target buffer.
-/// @param[in] buffer_len length of the target buffer.
-/// @param[out] __output the number of bytes written to the buffer.
+/// @param[out] buffer_len length of the target buffer.
 ///
 /// @relates AranyaClient.
-pub fn aqc_recv_stream_try_recv(
+pub unsafe fn aqc_recv_stream_try_recv(
     stream: &mut AqcReceiveStream,
-    mut buffer: &mut [MaybeUninit<u8>],
-) -> Result<usize, imp::Error> {
+    buffer: *mut MaybeUninit<u8>,
+    buffer_len: &mut usize,
+) -> Result<(), imp::Error> {
     let mut written = 0;
-    while !buffer.is_empty() {
-        written += consume_bytes(&mut buffer, &mut stream.data);
+    let mut buf = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
+    while !buf.is_empty() {
+        written += consume_bytes(&mut buf, &mut stream.data);
         match stream.inner.try_receive() {
             Ok(data) => stream.data = data,
             Err(_) if written > 0 => break,
             Err(e) => return Err(e.into()),
         }
     }
-    Ok(written)
+    *buffer_len = written;
+    Ok(())
 }

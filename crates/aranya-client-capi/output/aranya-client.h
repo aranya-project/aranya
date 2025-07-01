@@ -713,41 +713,6 @@ AranyaError aranya_init_logging(void);
 AranyaError aranya_init_logging_ext(struct AranyaExtError *__ext_err);
 
 /**
- * Decodes the hexadecimal string `src` into `dst` and returns
- * the number of bytes written to `dst`.
- *
- * If `src` is a valid hexadecimal string, the number of bytes
- * written to `dst` will be exactly half the length of `src`.
- * Therefore, `dst` must be at least half as long as `src`.
- *
- * @param dst the output buffer
- * @param src the input hexadecimal string
- */
-AranyaError aranya_decode_hex(uint8_t *dst,
-                              size_t dst_len,
-                              const uint8_t *src,
-                              size_t src_len,
-                              size_t *__output);
-
-/**
- * Decodes the hexadecimal string `src` into `dst` and returns
- * the number of bytes written to `dst`.
- *
- * If `src` is a valid hexadecimal string, the number of bytes
- * written to `dst` will be exactly half the length of `src`.
- * Therefore, `dst` must be at least half as long as `src`.
- *
- * @param dst the output buffer
- * @param src the input hexadecimal string
- */
-AranyaError aranya_decode_hex_ext(uint8_t *dst,
-                                  size_t dst_len,
-                                  const uint8_t *src,
-                                  size_t src_len,
-                                  size_t *__output,
-                                  struct AranyaExtError *__ext_err);
-
-/**
  * Gets the public key bundle for this device.
  *
  * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -2753,15 +2718,13 @@ AranyaError aranya_aqc_bidi_stream_send_ext(struct AranyaClient *client,
  *
  * @param[in]  stream the receiving side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
  * @param[out] buffer pointer to the target buffer.
- * @param[in] buffer_len length of the target buffer.
- * @param[out] __output the number of bytes written to the buffer.
+ * @param[out] buffer_len length of the target buffer.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_bidi_stream_try_recv(struct AranyaAqcBidiStream *stream,
                                             uint8_t *buffer,
-                                            size_t buffer_len,
-                                            size_t *__output);
+                                            size_t *buffer_len);
 
 /**
  * Receive some data from an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
@@ -2771,15 +2734,13 @@ AranyaError aranya_aqc_bidi_stream_try_recv(struct AranyaAqcBidiStream *stream,
  *
  * @param[in]  stream the receiving side of a stream [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
  * @param[out] buffer pointer to the target buffer.
- * @param[in] buffer_len length of the target buffer.
- * @param[out] __output the number of bytes written to the buffer.
+ * @param[out] buffer_len length of the target buffer.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_bidi_stream_try_recv_ext(struct AranyaAqcBidiStream *stream,
                                                 uint8_t *buffer,
-                                                size_t buffer_len,
-                                                size_t *__output,
+                                                size_t *buffer_len,
                                                 struct AranyaExtError *__ext_err);
 
 /**
@@ -2969,15 +2930,13 @@ AranyaError aranya_aqc_send_stream_send_ext(struct AranyaClient *client,
  *
  * @param[in]  stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
  * @param[out] buffer pointer to the target buffer.
- * @param[in] buffer_len length of the target buffer.
- * @param[out] __output the number of bytes written to the buffer.
+ * @param[out] buffer_len length of the target buffer.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_recv_stream_try_recv(struct AranyaAqcReceiveStream *stream,
                                             uint8_t *buffer,
-                                            size_t buffer_len,
-                                            size_t *__output);
+                                            size_t *buffer_len);
 
 /**
  * Receive some data from an [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
@@ -2987,15 +2946,13 @@ AranyaError aranya_aqc_recv_stream_try_recv(struct AranyaAqcReceiveStream *strea
  *
  * @param[in]  stream the receiving side of a stream [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
  * @param[out] buffer pointer to the target buffer.
- * @param[in] buffer_len length of the target buffer.
- * @param[out] __output the number of bytes written to the buffer.
+ * @param[out] buffer_len length of the target buffer.
  *
  * @relates AranyaClient.
  */
 AranyaError aranya_aqc_recv_stream_try_recv_ext(struct AranyaAqcReceiveStream *stream,
                                                 uint8_t *buffer,
-                                                size_t buffer_len,
-                                                size_t *__output,
+                                                size_t *buffer_len,
                                                 struct AranyaExtError *__ext_err);
 
 #ifdef __cplusplus
