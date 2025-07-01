@@ -181,7 +181,7 @@ impl fmt::Display for NetIdentifier {
 pub type AqcCtrl = Vec<Box<[u8]>>;
 
 /// A secret.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
 pub struct Secret(Box<[u8]>);
 
 impl Secret {

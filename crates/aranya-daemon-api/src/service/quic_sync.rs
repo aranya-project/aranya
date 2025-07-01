@@ -9,7 +9,7 @@ use std::{
 use aranya_crypto::{tls::EncryptedPskSeed, Encap, EncryptionPublicKey};
 use serde::{Deserialize, Serialize};
 
-use crate::CS;
+use crate::{Secret, CS};
 
 pub const SEED_IKM_SIZE: usize = 32;
 
@@ -35,7 +35,7 @@ pub enum SeedMode {
     /// The IKM must be exactly 32 bytes. This mode is available in both:
     /// - `create_team`: Allows team owners to specify deterministic seed material
     /// - `add_team`: Allows non-owners to join using pre-shared key material
-    IKM([u8; SEED_IKM_SIZE]),
+    IKM(Secret),
 
     /// Provides an encrypted seed for secure distribution.
     ///
@@ -56,10 +56,11 @@ impl fmt::Debug for SeedMode {
         match self {
             SeedMode::Generate => f.debug_struct("SeedMode::Generate").finish(),
             SeedMode::IKM(ikm) => {
-                // TODO: use aranya-crypto hasher.
                 let mut hasher = DefaultHasher::new();
                 ikm.hash(&mut hasher);
-                write!(f, "SeedMode::IKM [{}]", hasher.finish())
+                f.debug_struct("SeedMode::Ikm")
+                    .field("ikm", &hasher.finish())
+                    .finish_non_exhaustive()
             }
             SeedMode::Wrapped(_) => f.debug_struct("SeedMode::Wrapped").finish(),
         }
