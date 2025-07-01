@@ -180,8 +180,48 @@ impl fmt::Display for NetIdentifier {
 /// A serialized command for AQC.
 pub type AqcCtrl = Vec<Box<[u8]>>;
 
+/// A PSK IKM.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Ikm([u8; 32]);
+
+impl Ikm {
+    /// Provides access to the raw IKM bytes.
+    #[inline]
+    pub fn raw_ikm_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl<T> From<T> for Ikm
+where
+    T: Into<[u8; 32]>,
+{
+    fn from(value: T) -> Self {
+        Self(value.into())
+    }
+}
+
+impl ConstantTimeEq for Ikm {
+    fn ct_eq(&self, other: &Self) -> Choice {
+        self.0.ct_eq(&other.0)
+    }
+}
+
+impl ZeroizeOnDrop for Ikm {}
+impl Drop for Ikm {
+    fn drop(&mut self) {
+        self.0.zeroize()
+    }
+}
+
+impl fmt::Debug for Ikm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Ikm").finish_non_exhaustive()
+    }
+}
+
 /// A secret.
-#[derive(Clone, Debug, Serialize, Deserialize, Hash)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Secret(Box<[u8]>);
 
 impl Secret {
@@ -211,6 +251,12 @@ impl ZeroizeOnDrop for Secret {}
 impl Drop for Secret {
     fn drop(&mut self) {
         self.0.zeroize()
+    }
+}
+
+impl fmt::Debug for Secret {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Secret").finish_non_exhaustive()
     }
 }
 
