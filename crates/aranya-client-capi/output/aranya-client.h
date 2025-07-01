@@ -561,7 +561,7 @@ extern "C" {
  *
  * The resulting pointer must NOT be freed.
  *
- * @param err `u32` error code from `AranyaError`.
+ * @param[in] err `u32` error code from `AranyaError`.
  *
  * @relates AranyaError.
  */
@@ -620,9 +620,9 @@ AranyaError aranya_ext_error_cleanup_ext(struct AranyaExtError *ptr,
  * updates `msg_len` with the length of the message and
  * returns `::ARANYA_ERROR_BUFFER_TOO_SMALL`.
  *
- * @param err the error to get a message for [`AranyaExtError`](@ref AranyaExtError).
- * @param msg buffer to copy error message into.
- * @param msg_len length of the message buffer.
+ * @param[in] err the error to get a message for [`AranyaExtError`](@ref AranyaExtError).
+ * @param[out] msg buffer to copy error message into.
+ * @param[in,out] msg_len length of the message buffer.
  *
  * @relates AranyaExtError.
  */
@@ -643,9 +643,9 @@ AranyaError aranya_ext_error_msg(const struct AranyaExtError *err,
  * updates `msg_len` with the length of the message and
  * returns `::ARANYA_ERROR_BUFFER_TOO_SMALL`.
  *
- * @param err the error to get a message for [`AranyaExtError`](@ref AranyaExtError).
- * @param msg buffer to copy error message into.
- * @param msg_len length of the message buffer.
+ * @param[in] err the error to get a message for [`AranyaExtError`](@ref AranyaExtError).
+ * @param[out] msg buffer to copy error message into.
+ * @param[in,out] msg_len length of the message buffer.
  *
  * @relates AranyaExtError.
  */
@@ -657,8 +657,8 @@ AranyaError aranya_ext_error_msg_ext(const struct AranyaExtError *err,
 /**
  * Initializes a new client instance.
  *
- * @param client the uninitialized Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param config the client's configuration [`AranyaClientConfig`](@ref AranyaClientConfig).
+ * @param[out] client the uninitialized Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] config the client's configuration [`AranyaClientConfig`](@ref AranyaClientConfig).
  *
  * @relates AranyaClient.
  */
@@ -668,8 +668,8 @@ AranyaError aranya_client_init(struct AranyaClient *client,
 /**
  * Initializes a new client instance.
  *
- * @param client the uninitialized Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param config the client's configuration [`AranyaClientConfig`](@ref AranyaClientConfig).
+ * @param[out] client the uninitialized Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] config the client's configuration [`AranyaClientConfig`](@ref AranyaClientConfig).
  *
  * @relates AranyaClient.
  */
@@ -713,46 +713,11 @@ AranyaError aranya_init_logging(void);
 AranyaError aranya_init_logging_ext(struct AranyaExtError *__ext_err);
 
 /**
- * Decodes the hexadecimal string `src` into `dst` and returns
- * the number of bytes written to `dst`.
- *
- * If `src` is a valid hexadecimal string, the number of bytes
- * written to `dst` will be exactly half the length of `src`.
- * Therefore, `dst` must be at least half as long as `src`.
- *
- * @param dst the output buffer
- * @param src the input hexadecimal string
- */
-AranyaError aranya_decode_hex(uint8_t *dst,
-                              size_t dst_len,
-                              const uint8_t *src,
-                              size_t src_len,
-                              size_t *__output);
-
-/**
- * Decodes the hexadecimal string `src` into `dst` and returns
- * the number of bytes written to `dst`.
- *
- * If `src` is a valid hexadecimal string, the number of bytes
- * written to `dst` will be exactly half the length of `src`.
- * Therefore, `dst` must be at least half as long as `src`.
- *
- * @param dst the output buffer
- * @param src the input hexadecimal string
- */
-AranyaError aranya_decode_hex_ext(uint8_t *dst,
-                                  size_t dst_len,
-                                  const uint8_t *src,
-                                  size_t src_len,
-                                  size_t *__output,
-                                  struct AranyaExtError *__ext_err);
-
-/**
  * Gets the public key bundle for this device.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param keybundle keybundle byte buffer `KeyBundle`.
- * @param keybundle_len returns the length of the serialized keybundle.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[out] keybundle keybundle byte buffer `KeyBundle`.
+ * @param[in,out] keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
@@ -763,9 +728,9 @@ AranyaError aranya_get_key_bundle(struct AranyaClient *client,
 /**
  * Gets the public key bundle for this device.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param keybundle keybundle byte buffer `KeyBundle`.
- * @param keybundle_len returns the length of the serialized keybundle.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[out] keybundle keybundle byte buffer `KeyBundle`.
+ * @param[in,out] keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
@@ -779,9 +744,9 @@ AranyaError aranya_get_key_bundle_ext(struct AranyaClient *client,
  *
  * To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
  *
- * @param device ID [`AranyaId`](@ref AranyaId).
- * @param str ID string [`AranyaId`](@ref AranyaId).
- * @param str_len returns the length of `str`
+ * @param[in] device ID [`AranyaId`](@ref AranyaId).
+ * @param[out] str ID string [`AranyaId`](@ref AranyaId).
+ * @param[in,out] str_len returns the length of `str`
  *
  * @relates AranyaId.
  */
@@ -792,7 +757,7 @@ AranyaError aranya_id_to_str(const struct AranyaId *id,
 /**
  * Decodes `str` into an [`AranyaId`](@ref AranyaId).
  *
- * @param str pointer to a null-terminated string.
+ * @param[in] str pointer to a null-terminated string.
  *
  * @relates AranyaId.
  */
@@ -801,8 +766,8 @@ AranyaError aranya_id_from_str(const char *str, struct AranyaId *__output);
 /**
  * Gets the public device ID.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param __output the client's device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[out] __output the client's device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
  *
  * @relates AranyaClient.
  */
@@ -812,8 +777,8 @@ AranyaError aranya_get_device_id(struct AranyaClient *client,
 /**
  * Gets the public device ID.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param __output the client's device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[out] __output the client's device ID [`AranyaDeviceId`](@ref AranyaDeviceId).
  *
  * @relates AranyaClient.
  */
@@ -867,8 +832,8 @@ AranyaError aranya_client_config_builder_cleanup_ext(struct AranyaClientConfigBu
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the client config builder
- * @param out a pointer to write the client config to
+ * @param[in] cfg a pointer to the client config builder
+ * @param[out] out a pointer to write the client config to
  *
  * @relates AranyaClientConfigBuilder.
  */
@@ -881,8 +846,8 @@ AranyaError aranya_client_config_build(struct AranyaClientConfigBuilder *cfg,
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the client config builder
- * @param out a pointer to write the client config to
+ * @param[in] cfg a pointer to the client config builder
+ * @param[out] out a pointer to write the client config to
  *
  * @relates AranyaClientConfigBuilder.
  */
@@ -893,8 +858,8 @@ AranyaError aranya_client_config_build_ext(struct AranyaClientConfigBuilder *cfg
 /**
  * Sets Unix Domain Socket path that the daemon is listening on.
  *
- * @param cfg a pointer to the client config builder
- * @param address a string containing the address
+ * @param[in,out] cfg a pointer to the client config builder
+ * @param[in] address a string containing the address
  *
  * @relates AranyaClientConfigBuilder.
  */
@@ -904,8 +869,8 @@ AranyaError aranya_client_config_builder_set_daemon_uds_path(struct AranyaClient
 /**
  * Sets Unix Domain Socket path that the daemon is listening on.
  *
- * @param cfg a pointer to the client config builder
- * @param address a string containing the address
+ * @param[in,out] cfg a pointer to the client config builder
+ * @param[in] address a string containing the address
  *
  * @relates AranyaClientConfigBuilder.
  */
@@ -959,8 +924,8 @@ AranyaError aranya_aqc_config_builder_cleanup_ext(struct AranyaAqcConfigBuilder 
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the aqc config builder
- * @param out a pointer to write the aqc config to
+ * @param[in] cfg a pointer to the aqc config builder
+ * @param[out] out a pointer to write the aqc config to
  *
  * @relates AranyaAqcConfigBuilder.
  */
@@ -973,8 +938,8 @@ AranyaError aranya_aqc_config_build(struct AranyaAqcConfigBuilder *cfg,
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the aqc config builder
- * @param out a pointer to write the aqc config to
+ * @param[in] cfg a pointer to the aqc config builder
+ * @param[out] out a pointer to write the aqc config to
  *
  * @relates AranyaAqcConfigBuilder.
  */
@@ -986,8 +951,8 @@ AranyaError aranya_aqc_config_build_ext(struct AranyaAqcConfigBuilder *cfg,
  * Sets the network address that the AQC server should listen
  * on.
  *
- * @param cfg a pointer to the aqc config builder
- * @param address a string with the address to bind to
+ * @param[in,out] cfg a pointer to the aqc config builder
+ * @param[in] address a string with the address to bind to
  *
  * @relates AranyaAqcConfigBuilder.
  */
@@ -998,8 +963,8 @@ AranyaError aranya_aqc_config_builder_set_address(struct AranyaAqcConfigBuilder 
  * Sets the network address that the AQC server should listen
  * on.
  *
- * @param cfg a pointer to the aqc config builder
- * @param address a string with the address to bind to
+ * @param[in,out] cfg a pointer to the aqc config builder
+ * @param[in] address a string with the address to bind to
  *
  * @relates AranyaAqcConfigBuilder.
  */
@@ -1010,8 +975,8 @@ AranyaError aranya_aqc_config_builder_set_address_ext(struct AranyaAqcConfigBuil
 /**
  * Sets the configuration for Aranya QUIC Channels.
  *
- * @param cfg a pointer to the client config builder
- * @param aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
+ * @param[in,out] cfg a pointer to the client config builder
+ * @param[in] aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
  *
  * @relates AranyaAqcConfigBuilder.
  */
@@ -1021,8 +986,8 @@ AranyaError aranya_client_config_builder_set_aqc_config(struct AranyaClientConfi
 /**
  * Sets the configuration for Aranya QUIC Channels.
  *
- * @param cfg a pointer to the client config builder
- * @param aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
+ * @param[in,out] cfg a pointer to the client config builder
+ * @param[in] aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
  *
  * @relates AranyaAqcConfigBuilder.
  */
@@ -1073,7 +1038,7 @@ AranyaError aranya_quic_sync_config_builder_cleanup_ext(struct AranyaQuicSyncCon
 /**
  * Attempts to set PSK seed generation mode value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
- * @param cfg a pointer to the quic sync config builder
+ * @param[in,out] cfg a pointer to the quic sync config builder
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
@@ -1082,7 +1047,7 @@ AranyaError aranya_quic_sync_config_generate(struct AranyaQuicSyncConfigBuilder 
 /**
  * Attempts to set PSK seed generation mode value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
- * @param cfg a pointer to the quic sync config builder
+ * @param[in,out] cfg a pointer to the quic sync config builder
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
@@ -1092,8 +1057,8 @@ AranyaError aranya_quic_sync_config_generate_ext(struct AranyaQuicSyncConfigBuil
 /**
  * Attempts to set wrapped PSK seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
- * @param cfg a pointer to the quic sync config builder
- * @param encap_seed a pointer the encapsulated PSK seed
+ * @param[in,out] cfg a pointer to the quic sync config builder
+ * @param[in] encap_seed a pointer the encapsulated PSK seed
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
@@ -1104,8 +1069,8 @@ AranyaError aranya_quic_sync_config_wrapped_seed(struct AranyaQuicSyncConfigBuil
 /**
  * Attempts to set wrapped PSK seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
- * @param cfg a pointer to the quic sync config builder
- * @param encap_seed a pointer the encapsulated PSK seed
+ * @param[in,out] cfg a pointer to the quic sync config builder
+ * @param[in] encap_seed a pointer the encapsulated PSK seed
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
@@ -1117,8 +1082,8 @@ AranyaError aranya_quic_sync_config_wrapped_seed_ext(struct AranyaQuicSyncConfig
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
- * @param cfg a pointer to the quic sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
- * @param ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
+ * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
+ * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
@@ -1128,8 +1093,8 @@ AranyaError aranya_quic_sync_config_raw_seed_ikm(struct AranyaQuicSyncConfigBuil
 /**
  * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
- * @param cfg a pointer to the quic sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
- * @param ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
+ * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
+ * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
@@ -1143,8 +1108,8 @@ AranyaError aranya_quic_sync_config_raw_seed_ikm_ext(struct AranyaQuicSyncConfig
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the QUIC sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
- * @param out a pointer to write the QUIC sync config to [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
+ * @param[out] out a pointer to write the QUIC sync config to [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
@@ -1157,8 +1122,8 @@ AranyaError aranya_quic_sync_config_build(struct AranyaQuicSyncConfigBuilder *cf
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the QUIC sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
- * @param out a pointer to write the QUIC sync config to [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
+ * @param[out] out a pointer to write the QUIC sync config to [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
@@ -1213,8 +1178,8 @@ AranyaError aranya_team_config_builder_cleanup_ext(struct AranyaTeamConfigBuilde
  * [`aranya_team_config_build`](@ref aranya_team_config_build) before setting the interval with
  * this function
  *
- * @param cfg a pointer to the builder for a team config [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
- * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in,out] cfg a pointer to the builder for a team config [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
+ * @param[in] quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
  *
  * @relates AranyaTeamConfigBuilder.
  */
@@ -1228,8 +1193,8 @@ AranyaError aranya_team_config_builder_set_quic_syncer(struct AranyaTeamConfigBu
  * [`aranya_team_config_build`](@ref aranya_team_config_build) before setting the interval with
  * this function
  *
- * @param cfg a pointer to the builder for a team config [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
- * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in,out] cfg a pointer to the builder for a team config [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
+ * @param[in] quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
  *
  * @relates AranyaTeamConfigBuilder.
  */
@@ -1243,8 +1208,8 @@ AranyaError aranya_team_config_builder_set_quic_syncer_ext(struct AranyaTeamConf
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the team config builder [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
- * @param out a pointer to write the team config to [`AranyaTeamConfig`](@ref AranyaTeamConfig)
+ * @param[in] cfg a pointer to the team config builder [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
+ * @param[out] out a pointer to write the team config to [`AranyaTeamConfig`](@ref AranyaTeamConfig)
  *
  * @relates AranyaTeamConfigBuilder.
  */
@@ -1257,8 +1222,8 @@ AranyaError aranya_team_config_build(struct AranyaTeamConfigBuilder *cfg,
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the team config builder [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
- * @param out a pointer to write the team config to [`AranyaTeamConfig`](@ref AranyaTeamConfig)
+ * @param[in] cfg a pointer to the team config builder [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder)
+ * @param[out] out a pointer to write the team config to [`AranyaTeamConfig`](@ref AranyaTeamConfig)
  *
  * @relates AranyaTeamConfigBuilder.
  */
@@ -1312,8 +1277,8 @@ AranyaError aranya_sync_peer_config_builder_cleanup_ext(struct AranyaSyncPeerCon
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the builder for a sync config [`AranyaSyncPeerConfigBuilder`](@ref AranyaSyncPeerConfigBuilder)
- * @param out a pointer to write the sync config to [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig)
+ * @param[in] cfg a pointer to the builder for a sync config [`AranyaSyncPeerConfigBuilder`](@ref AranyaSyncPeerConfigBuilder)
+ * @param[out] out a pointer to write the sync config to [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig)
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1326,8 +1291,8 @@ AranyaError aranya_sync_peer_config_build(struct AranyaSyncPeerConfigBuilder *cf
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the builder for a sync config [`AranyaSyncPeerConfigBuilder`](@ref AranyaSyncPeerConfigBuilder)
- * @param out a pointer to write the sync config to [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig)
+ * @param[in] cfg a pointer to the builder for a sync config [`AranyaSyncPeerConfigBuilder`](@ref AranyaSyncPeerConfigBuilder)
+ * @param[out] out a pointer to write the sync config to [`AranyaSyncPeerConfig`](@ref AranyaSyncPeerConfig)
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1342,8 +1307,8 @@ AranyaError aranya_sync_peer_config_build_ext(struct AranyaSyncPeerConfigBuilder
  * [`aranya_sync_peer_config_build`](@ref aranya_sync_peer_config_build) before setting the interval with
  * this function
  *
- * @param cfg a pointer to the builder for a sync config
- * @param interval Set the interval at which syncing occurs
+ * @param[in,out] cfg a pointer to the builder for a sync config
+ * @param[in] interval Set the interval at which syncing occurs
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1357,8 +1322,8 @@ AranyaError aranya_sync_peer_config_builder_set_interval(struct AranyaSyncPeerCo
  * [`aranya_sync_peer_config_build`](@ref aranya_sync_peer_config_build) before setting the interval with
  * this function
  *
- * @param cfg a pointer to the builder for a sync config
- * @param interval Set the interval at which syncing occurs
+ * @param[in,out] cfg a pointer to the builder for a sync config
+ * @param[in] interval Set the interval at which syncing occurs
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1373,7 +1338,7 @@ AranyaError aranya_sync_peer_config_builder_set_interval_ext(struct AranyaSyncPe
  *
  * By default, the peer is synced with immediately.
  *
- * @param cfg a pointer to the builder for a sync config
+ * @param[in,out] cfg a pointer to the builder for a sync config
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1386,7 +1351,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_now(struct AranyaSyncPeerCo
  *
  * By default, the peer is synced with immediately.
  *
- * @param cfg a pointer to the builder for a sync config
+ * @param[in,out] cfg a pointer to the builder for a sync config
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1399,7 +1364,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_now_ext(struct AranyaSyncPe
  * Overrides [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now) if invoked afterward.
  *
  * By default, the peer is synced with immediately.
- * @param cfg a pointer to the builder for a sync config
+ * @param[in,out] cfg a pointer to the builder for a sync config
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1411,7 +1376,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later(struct AranyaSyncPeer
  * Overrides [`aranya_sync_peer_config_builder_set_sync_now`](@ref aranya_sync_peer_config_builder_set_sync_now) if invoked afterward.
  *
  * By default, the peer is synced with immediately.
- * @param cfg a pointer to the builder for a sync config
+ * @param[in,out] cfg a pointer to the builder for a sync config
  *
  * @relates AranyaSyncPeerConfigBuilder.
  */
@@ -1425,10 +1390,10 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param role the role [`AranyaRole`](@ref AranyaRole) to assign to the device.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] role the role [`AranyaRole`](@ref AranyaRole) to assign to the device.
  *
  * @relates AranyaClient.
  */
@@ -1444,10 +1409,10 @@ AranyaError aranya_assign_role(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param role the role [`AranyaRole`](@ref AranyaRole) to assign to the device.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] role the role [`AranyaRole`](@ref AranyaRole) to assign to the device.
  *
  * @relates AranyaClient.
  */
@@ -1462,10 +1427,10 @@ AranyaError aranya_assign_role_ext(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param role the role [`AranyaRole`](@ref AranyaRole) to revoke from the device.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] role the role [`AranyaRole`](@ref AranyaRole) to revoke from the device.
  *
  * @relates AranyaClient.
  */
@@ -1479,10 +1444,10 @@ AranyaError aranya_revoke_role(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param role the role [`AranyaRole`](@ref AranyaRole) to revoke from the device.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] role the role [`AranyaRole`](@ref AranyaRole) to revoke from the device.
  *
  * @relates AranyaClient.
  */
@@ -1497,9 +1462,9 @@ AranyaError aranya_revoke_role_ext(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] name label name string [`AranyaLabelName`](@ref AranyaLabelName).
  *
  * @relates AranyaClient.
  */
@@ -1513,9 +1478,9 @@ AranyaError aranya_create_label(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param name label name string [`AranyaLabelName`](@ref AranyaLabelName).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] name label name string [`AranyaLabelName`](@ref AranyaLabelName).
  *
  * @relates AranyaClient.
  */
@@ -1530,9 +1495,9 @@ AranyaError aranya_create_label_ext(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param label_id the channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to delete.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] label_id the channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to delete.
  *
  * @relates AranyaClient.
  */
@@ -1545,9 +1510,9 @@ AranyaError aranya_delete_label(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param label_id the channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to delete.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] label_id the channel label ID [`AranyaLabelId`](@ref AranyaLabelId) to delete.
  *
  * @relates AranyaClient.
  */
@@ -1561,10 +1526,10 @@ AranyaError aranya_delete_label_ext(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to assign the label to.
- * @param label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to assign the label to.
+ * @param[in] label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
  *
  * @relates AranyaClient.
  */
@@ -1579,10 +1544,10 @@ AranyaError aranya_assign_label(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to assign the label to.
- * @param label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to assign the label to.
+ * @param[in] label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
  *
  * @relates AranyaClient.
  */
@@ -1598,10 +1563,10 @@ AranyaError aranya_assign_label_ext(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to revoke the label from.
- * @param label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to revoke the label from.
+ * @param[in] label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
  *
  * @relates AranyaClient.
  */
@@ -1615,10 +1580,10 @@ AranyaError aranya_revoke_label(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to revoke the label from.
- * @param label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device ID [`AranyaDeviceId`](@ref AranyaDeviceId) of the device to revoke the label from.
+ * @param[in] label_id the AQC channel label ID [`AranyaLabelId`](@ref AranyaLabelId).
  *
  * @relates AranyaClient.
  */
@@ -1631,9 +1596,9 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
 /**
  * Create a new graph/team with the current device as the owner.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
- * @param __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * @param[out] __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
@@ -1644,9 +1609,9 @@ AranyaError aranya_create_team(struct AranyaClient *client,
 /**
  * Create a new graph/team with the current device as the owner.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
- * @param __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * @param[out] __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
@@ -1694,8 +1659,9 @@ AranyaError aranya_rand_ext(struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param[in] keybundle_len the length of the keybundle
  * @param[out] seed the serialized, encrypted PSK seed.
- * @param[out] seed_len the number of bytes written to the seed buffer.
+ * @param[in,out] seed_len the number of bytes written to the seed buffer.
  *
  * @relates AranyaClient.
  */
@@ -1718,8 +1684,9 @@ AranyaError aranya_encrypt_psk_seed_for_peer(struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team_id the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param[in] keybundle_len the length of the keybundle
  * @param[out] seed the serialized, encrypted PSK seed.
- * @param[out] seed_len the number of bytes written to the seed buffer.
+ * @param[in,out] seed_len the number of bytes written to the seed buffer.
  *
  * @relates AranyaClient.
  */
@@ -1734,9 +1701,9 @@ AranyaError aranya_encrypt_psk_seed_for_peer_ext(struct AranyaClient *client,
 /**
  * Add a team to the local device store.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  *
  * @relates AranyaClient.
  */
@@ -1747,9 +1714,9 @@ AranyaError aranya_add_team(struct AranyaClient *client,
 /**
  * Add a team to the local device store.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  *
  * @relates AranyaClient.
  */
@@ -1761,8 +1728,8 @@ AranyaError aranya_add_team_ext(struct AranyaClient *client,
 /**
  * Remove a team from local device storage.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
@@ -1772,8 +1739,8 @@ AranyaError aranya_remove_team(struct AranyaClient *client,
 /**
  * Remove a team from local device storage.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
@@ -1784,8 +1751,8 @@ AranyaError aranya_remove_team_ext(struct AranyaClient *client,
 /**
  * Close the team and stop all operations on the graph.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
@@ -1795,8 +1762,8 @@ AranyaError aranya_close_team(struct AranyaClient *client,
 /**
  * Close the team and stop all operations on the graph.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
  * @relates AranyaClient.
  */
@@ -1809,10 +1776,10 @@ AranyaError aranya_close_team_ext(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param keybundle serialized keybundle byte buffer `KeyBundle`.
- * @param keybundle_len is the length of the serialized keybundle.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param[in] keybundle_len is the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
@@ -1826,10 +1793,10 @@ AranyaError aranya_add_device_to_team(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param keybundle serialized keybundle byte buffer `KeyBundle`.
- * @param keybundle_len is the length of the serialized keybundle.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+ * @param[in] keybundle_len is the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
@@ -1844,9 +1811,9 @@ AranyaError aranya_add_device_to_team_ext(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
  *
  * @relates AranyaClient.
  */
@@ -1859,9 +1826,9 @@ AranyaError aranya_remove_device_from_team(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
  *
  * @relates AranyaClient.
  */
@@ -1877,10 +1844,10 @@ AranyaError aranya_remove_device_from_team_ext(struct AranyaClient *client,
  * will appear in the tracing logs and
  * Aranya will be unable to sync state with that peer.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param config configuration values for syncing with a peer.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] config configuration values for syncing with a peer.
  *
  * @relates AranyaClient.
  */
@@ -1896,10 +1863,10 @@ AranyaError aranya_add_sync_peer(struct AranyaClient *client,
  * will appear in the tracing logs and
  * Aranya will be unable to sync state with that peer.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param config configuration values for syncing with a peer.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] config configuration values for syncing with a peer.
  *
  * @relates AranyaClient.
  */
@@ -1912,9 +1879,9 @@ AranyaError aranya_add_sync_peer_ext(struct AranyaClient *client,
 /**
  * Remove the peer from automatic Aranya state syncing.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
  *
  * @relates AranyaClient.
  */
@@ -1925,9 +1892,9 @@ AranyaError aranya_remove_sync_peer(struct AranyaClient *client,
 /**
  * Remove the peer from automatic Aranya state syncing.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
  *
  * @relates AranyaClient.
  */
@@ -1947,11 +1914,13 @@ AranyaError aranya_remove_sync_peer_ext(struct AranyaClient *client,
  * This function ignores [`aranya_sync_peer_config_builder_set_interval`](@ref aranya_sync_peer_config_builder_set_interval) and
  * [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later), if set.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param config configuration values for syncing with a peer.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] config configuration values for syncing with a peer.
+ *
  * Default values for a sync config will be used if `config` is `NULL`
+ *
  * @relates AranyaClient.
  */
 AranyaError aranya_sync_now(struct AranyaClient *client,
@@ -1970,11 +1939,13 @@ AranyaError aranya_sync_now(struct AranyaClient *client,
  * This function ignores [`aranya_sync_peer_config_builder_set_interval`](@ref aranya_sync_peer_config_builder_set_interval) and
  * [`aranya_sync_peer_config_builder_set_sync_later`](@ref aranya_sync_peer_config_builder_set_sync_later), if set.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
- * @param config configuration values for syncing with a peer.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] addr the peer's Aranya network address [`AranyaAddr`](@ref AranyaAddr).
+ * @param[in] config configuration values for syncing with a peer.
+ *
  * Default values for a sync config will be used if `config` is `NULL`
+ *
  * @relates AranyaClient.
  */
 AranyaError aranya_sync_now_ext(struct AranyaClient *client,
@@ -1986,10 +1957,10 @@ AranyaError aranya_sync_now_ext(struct AranyaClient *client,
 /**
  * Query devices on team.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param devices returns a list of device IDs on the team [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param devices_len returns the length of the devices list [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] devices returns a list of device IDs on the team [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in,out] devices_len returns the length of the devices list [`AranyaDeviceId`](@ref AranyaDeviceId).
  *
  * @relates AranyaClient.
  */
@@ -2001,10 +1972,10 @@ AranyaError aranya_query_devices_on_team(struct AranyaClient *client,
 /**
  * Query devices on team.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param devices returns a list of device IDs on the team [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param devices_len returns the length of the devices list [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] devices returns a list of device IDs on the team [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in,out] devices_len returns the length of the devices list [`AranyaDeviceId`](@ref AranyaDeviceId).
  *
  * @relates AranyaClient.
  */
@@ -2017,11 +1988,11 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
 /**
  * Query device's keybundle.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param keybundle keybundle byte buffer `KeyBundle`.
- * @param keybundle_len returns the length of the serialized keybundle.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] keybundle keybundle byte buffer `KeyBundle`.
+ * @param[in,out] keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
@@ -2034,11 +2005,11 @@ AranyaError aranya_query_device_keybundle(struct AranyaClient *client,
 /**
  * Query device's keybundle.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param keybundle keybundle byte buffer `KeyBundle`.
- * @param keybundle_len returns the length of the serialized keybundle.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] keybundle keybundle byte buffer `KeyBundle`.
+ * @param[in,out] keybundle_len returns the length of the serialized keybundle.
  *
  * @relates AranyaClient.
  */
@@ -2056,13 +2027,11 @@ AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
  * Writes the number of labels that would have been returned to `labels_len`.
  * The application can use `labels_len` to allocate a larger buffer.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- *
- * Output params:
- * @param labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
- * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
  *
  * @relates AranyaClient.
  */
@@ -2079,13 +2048,11 @@ AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
  * Writes the number of labels that would have been returned to `labels_len`.
  * The application can use `labels_len` to allocate a larger buffer.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- *
- * Output params:
- * @param labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
- * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] labels returns a list of labels assigned to the device [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
  *
  * @relates AranyaClient.
  */
@@ -2103,12 +2070,10 @@ AranyaError aranya_query_device_label_assignments_ext(struct AranyaClient *clien
  * Writes the number of labels that would have been returned to `labels_len`.
  * The application can use `labels_len` to allocate a larger buffer.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- *
- * Output params:
- * @param labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
- * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
  *
  * @relates AranyaClient.
  */
@@ -2124,12 +2089,10 @@ AranyaError aranya_query_labels(struct AranyaClient *client,
  * Writes the number of labels that would have been returned to `labels_len`.
  * The application can use `labels_len` to allocate a larger buffer.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- *
- * Output params:
- * @param labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
- * @param labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[out] labels returns a list of labels [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[in,out] labels_len returns the length of the labels list [`AranyaLabelId`](@ref AranyaLabelId).
  *
  * @relates AranyaClient.
  */
@@ -2142,11 +2105,11 @@ AranyaError aranya_query_labels_ext(struct AranyaClient *client,
 /**
  * Query if a label exists.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param label the label [`AranyaLabelId`](@ref AranyaLabelId).
- * @param __output boolean indicating whether the label exists.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] label the label [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[out] __output boolean indicating whether the label exists.
  *
  * @relates AranyaClient.
  */
@@ -2158,11 +2121,11 @@ AranyaError aranya_query_label_exists(struct AranyaClient *client,
 /**
  * Query if a label exists.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param label the label [`AranyaLabelId`](@ref AranyaLabelId).
- * @param __output boolean indicating whether the label exists.
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] label the label [`AranyaLabelId`](@ref AranyaLabelId).
+ * @param[out] __output boolean indicating whether the label exists.
  *
  * @relates AranyaClient.
  */
@@ -2175,10 +2138,11 @@ AranyaError aranya_query_label_exists_ext(struct AranyaClient *client,
 /**
  * Query device's AQC network identifier.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] ident network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param[in,out] length of ident
  *
  * @relates AranyaClient.
  */
@@ -2192,10 +2156,11 @@ AranyaError aranya_query_aqc_net_identifier(struct AranyaClient *client,
 /**
  * Query device's AQC network identifier.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[out] ident network identifier string [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param[in,out] length of ident
  *
  * @relates AranyaClient.
  */
@@ -2216,10 +2181,10 @@ AranyaError aranya_query_aqc_net_identifier_ext(struct AranyaClient *client,
  * of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
  * OpenChannel and receiving messages. Can take either DNS name or IPV4.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  *
  * @relates AranyaClient.
  */
@@ -2237,10 +2202,10 @@ AranyaError aranya_aqc_assign_net_identifier(struct AranyaClient *client,
  * of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
  * OpenChannel and receiving messages. Can take either DNS name or IPV4.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  *
  * @relates AranyaClient.
  */
@@ -2255,10 +2220,10 @@ AranyaError aranya_aqc_assign_net_identifier_ext(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  *
  * @relates AranyaClient.
  */
@@ -2272,10 +2237,10 @@ AranyaError aranya_aqc_remove_net_identifier(struct AranyaClient *client,
  *
  * Permission to perform this operation is checked against the Aranya policy.
  *
- * @param client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
- * @param device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
- * @param net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ * @param[in] device the device's ID [`AranyaDeviceId`](@ref AranyaDeviceId).
+ * @param[in] net_identifier the device's network identifier [`AranyaNetIdentifier`](@ref AranyaNetIdentifier).
  *
  * @relates AranyaClient.
  */
