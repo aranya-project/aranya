@@ -1988,9 +1988,9 @@ pub unsafe fn aqc_recv_stream_try_recv(
     buffer: *mut MaybeUninit<u8>,
     buffer_len: &mut usize,
 ) -> Result<(), imp::Error> {
-    if *buffer_len == 0 {
+    if buffer.is_null() || *buffer_len == 0 {
         return Err(InvalidArg::new(
-            "stream",
+            "buffer",
             "Tried to call aqc_recv_stream_try_recv with an empty buffer",
         )
         .into());
