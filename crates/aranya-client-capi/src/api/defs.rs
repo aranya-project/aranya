@@ -1832,6 +1832,14 @@ pub unsafe fn aqc_bidi_stream_try_recv(
     buffer: *mut MaybeUninit<u8>,
     buffer_len: &mut usize,
 ) -> Result<(), imp::Error> {
+    if *buffer_len == 0 {
+        return Err(InvalidArg::new(
+            "stream",
+            "Tried to call aqc_bidi_stream_try_recv with an empty buffer",
+        )
+        .into());
+    }
+
     let mut written = 0;
     let mut buf = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
     while !buf.is_empty() {
@@ -1980,6 +1988,14 @@ pub unsafe fn aqc_recv_stream_try_recv(
     buffer: *mut MaybeUninit<u8>,
     buffer_len: &mut usize,
 ) -> Result<(), imp::Error> {
+    if *buffer_len == 0 {
+        return Err(InvalidArg::new(
+            "stream",
+            "Tried to call aqc_recv_stream_try_recv with an empty buffer",
+        )
+        .into());
+    }
+
     let mut written = 0;
     let mut buf = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
     while !buf.is_empty() {
