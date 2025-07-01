@@ -1277,8 +1277,8 @@ AranyaError aranya_create_team_config_builder_cleanup_ext(struct AranyaCreateTea
  *
  * By default, the QUIC syncer config is not set.
  *
- * @param cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param[in] quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1290,8 +1290,8 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamC
  *
  * By default, the QUIC syncer config is not set.
  *
- * @param cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param[in] quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1304,8 +1304,8 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer_ext(struct AranyaAddT
  *
  * By default, the ID is not set.
  *
- * @param cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param id a pointer to a [`AranyaTeamId`](@ref AranyaTeamId)
+ * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param[in] id a pointer to a [`AranyaTeamId`](@ref AranyaTeamId)
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1317,8 +1317,8 @@ AranyaError aranya_add_team_config_builder_set_id(struct AranyaAddTeamConfigBuil
  *
  * By default, the ID is not set.
  *
- * @param cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param id a pointer to a [`AranyaTeamId`](@ref AranyaTeamId)
+ * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param[in] id a pointer to a [`AranyaTeamId`](@ref AranyaTeamId)
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1332,8 +1332,8 @@ AranyaError aranya_add_team_config_builder_set_id_ext(struct AranyaAddTeamConfig
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param out a pointer to write the team config to [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig)
+ * @param[in] cfg a pointer to the team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param[out] out a pointer to write the team config to [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig)
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1346,8 +1346,8 @@ AranyaError aranya_add_team_config_build(struct AranyaAddTeamConfigBuilder *cfg,
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param out a pointer to write the team config to [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig)
+ * @param[in] cfg a pointer to the team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
+ * @param[out] out a pointer to write the team config to [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig)
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1360,8 +1360,8 @@ AranyaError aranya_add_team_config_build_ext(struct AranyaAddTeamConfigBuilder *
  *
  * By default, the QUIC syncer config is not set.
  *
- * @param cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in,out] cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
+ * @param[in] quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
@@ -1373,8 +1373,8 @@ AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreat
  *
  * By default, the QUIC syncer config is not set.
  *
- * @param cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in,out] cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
+ * @param[in] quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
@@ -1388,8 +1388,8 @@ AranyaError aranya_create_team_config_builder_set_quic_syncer_ext(struct AranyaC
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the team config builder [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param out a pointer to write the team config to [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig)
+ * @param[in] cfg a pointer to the team config builder [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
+ * @param[out] out a pointer to write the team config to [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig)
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
@@ -1402,8 +1402,8 @@ AranyaError aranya_create_team_config_build(struct AranyaCreateTeamConfigBuilder
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param cfg a pointer to the team config builder [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param out a pointer to write the team config to [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig)
+ * @param[in] cfg a pointer to the team config builder [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
+ * @param[out] out a pointer to write the team config to [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig)
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */

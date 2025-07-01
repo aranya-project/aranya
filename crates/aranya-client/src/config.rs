@@ -154,7 +154,7 @@ pub struct AddTeamConfig {
 }
 
 impl AddTeamConfig {
-    /// Creates a default [`TeamConfigBuilder`].
+    /// Creates a default [`AddTeamConfigBuilder`].
     pub fn builder() -> AddTeamConfigBuilder {
         Default::default()
     }
@@ -167,7 +167,7 @@ pub struct CreateTeamConfig {
 }
 
 impl CreateTeamConfig {
-    /// Creates a default [`TeamConfigBuilder`].
+    /// Creates a default [`CreateTeamConfigBuilder`].
     pub fn builder() -> CreateTeamConfigBuilder {
         Default::default()
     }
