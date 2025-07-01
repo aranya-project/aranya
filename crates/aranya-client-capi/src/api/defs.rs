@@ -767,8 +767,8 @@ pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 ///
 /// By default, the QUIC syncer config is not set.
 ///
-/// @param cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
-/// @param quic set the QUIC syncer config [`QuicSyncConfig`]
+/// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
+/// @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
 ///
 /// @relates AranyaAddTeamConfigBuilder.
 pub fn add_team_config_builder_set_quic_syncer(
@@ -784,8 +784,8 @@ pub fn add_team_config_builder_set_quic_syncer(
 ///
 /// By default, the ID is not set.
 ///
-/// @param cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
-/// @param id a pointer to a [`TeamId`]
+/// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
+/// @param[in] id a pointer to a [`TeamId`]
 ///
 /// @relates AranyaAddTeamConfigBuilder.
 pub fn add_team_config_builder_set_id(cfg: &mut AddTeamConfigBuilder, id: &TeamId) {
@@ -797,8 +797,8 @@ pub fn add_team_config_builder_set_id(cfg: &mut AddTeamConfigBuilder, id: &TeamI
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param cfg a pointer to the team config builder [`AddTeamConfigBuilder`]
-/// @param out a pointer to write the team config to [`AddTeamConfig`]
+/// @param[in] cfg a pointer to the team config builder [`AddTeamConfigBuilder`]
+/// @param[out] out a pointer to write the team config to [`AddTeamConfig`]
 ///
 /// @relates AranyaAddTeamConfigBuilder.
 pub fn add_team_config_build(
@@ -814,8 +814,8 @@ pub fn add_team_config_build(
 ///
 /// By default, the QUIC syncer config is not set.
 ///
-/// @param cfg a pointer to the builder for a team config [`CreateTeamConfigBuilder`]
-/// @param quic set the QUIC syncer config [`QuicSyncConfig`]
+/// @param[in,out] cfg a pointer to the builder for a team config [`CreateTeamConfigBuilder`]
+/// @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
 ///
 /// @relates AranyaCreateTeamConfigBuilder.
 pub fn create_team_config_builder_set_quic_syncer(
@@ -832,8 +832,8 @@ pub fn create_team_config_builder_set_quic_syncer(
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param cfg a pointer to the team config builder [`CreateTeamConfigBuilder`]
-/// @param out a pointer to write the team config to [`CreateTeamConfig`]
+/// @param[in] cfg a pointer to the team config builder [`CreateTeamConfigBuilder`]
+/// @param[out] out a pointer to write the team config to [`CreateTeamConfig`]
 ///
 /// @relates AranyaCreateTeamConfigBuilder.
 pub fn create_team_config_build(
