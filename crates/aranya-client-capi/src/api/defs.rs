@@ -1024,7 +1024,7 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
     let cfg: &imp::TeamConfig = cfg.deref();
     let team_id = client
         .rt
-        .block_on(client.inner.create_team(cfg.into()))?
+        .block_on(client.inner.create_team(cfg.try_into()?))?
         .team_id();
 
     Ok(team_id.into())
@@ -1105,7 +1105,7 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
     let cfg: &imp::TeamConfig = cfg.deref();
     client
         .rt
-        .block_on(client.inner.add_team(team.into(), cfg.into()))?;
+        .block_on(client.inner.add_team(team.into(), cfg.try_into()?))?;
     Ok(())
 }
 
@@ -1208,7 +1208,7 @@ pub unsafe fn add_sync_peer(
         client
             .inner
             .team(team.into())
-            .add_sync_peer(addr, (*config).clone().into()),
+            .add_sync_peer(addr, (*config).clone().try_into()?),
     )?;
     Ok(())
 }
@@ -1259,12 +1259,13 @@ pub unsafe fn sync_now(
     let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
-    client.rt.block_on(
-        client
-            .inner
-            .team(team.into())
-            .sync_now(addr, config.map(|config| (*config).clone().into())),
-    )?;
+
+    let maybe_cfg = config
+        .map(|config| (*config).clone().try_into())
+        .transpose()?;
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).sync_now(addr, maybe_cfg))?;
     Ok(())
 }
 
