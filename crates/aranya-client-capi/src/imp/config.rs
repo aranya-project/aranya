@@ -4,7 +4,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
+use aranya_daemon_api::{Ikm, SeedMode, SEED_IKM_SIZE};
 use tracing::error;
 
 use super::Error;
@@ -283,7 +283,7 @@ impl QuicSyncConfigBuilder {
 
     /// Sets raw PSK seed IKM.
     pub fn raw_seed_ikm(&mut self, ikm: &[u8; SEED_IKM_SIZE]) -> Result<(), Error> {
-        self.mode = SeedMode::IKM(*ikm);
+        self.mode = SeedMode::IKM(Ikm::from(*ikm));
 
         Ok(())
     }
