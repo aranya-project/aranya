@@ -182,7 +182,7 @@ pub type AqcCtrl = Vec<Box<[u8]>>;
 
 /// A PSK IKM.
 #[derive(Clone, Serialize, Deserialize)]
-pub struct Ikm([u8; 32]);
+pub struct Ikm([u8; SEED_IKM_SIZE]);
 
 impl Ikm {
     /// Provides access to the raw IKM bytes.

@@ -3,7 +3,7 @@
 use aranya_crypto::{tls::EncryptedPskSeed, Encap, EncryptionPublicKey};
 use serde::{Deserialize, Serialize};
 
-use crate::{Secret, CS};
+use crate::{Ikm, CS};
 
 pub const SEED_IKM_SIZE: usize = 32;
 
@@ -29,7 +29,7 @@ pub enum SeedMode {
     /// The IKM must be exactly 32 bytes. This mode is available in both:
     /// - `create_team`: Allows team owners to specify deterministic seed material
     /// - `add_team`: Allows non-owners to join using pre-shared key material
-    IKM(Secret),
+    IKM(Ikm),
 
     /// Provides an encrypted seed for secure distribution.
     ///
