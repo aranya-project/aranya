@@ -375,12 +375,8 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self))]
-    async fn add_team(
-        mut self,
-        _: context::Context,
-        team: api::TeamId,
-        cfg: api::TeamConfig,
-    ) -> api::Result<()> {
+    async fn add_team(mut self, _: context::Context, cfg: api::AddTeamConfig) -> api::Result<()> {
+        let team = cfg.id;
         self.check_team_valid(team).await?;
 
         match cfg.quic_sync {
@@ -416,7 +412,7 @@ impl DaemonApi for Api {
     async fn create_team(
         mut self,
         _: context::Context,
-        cfg: api::TeamConfig,
+        cfg: api::CreateTeamConfig,
     ) -> api::Result<api::TeamId> {
         info!("create_team");
 

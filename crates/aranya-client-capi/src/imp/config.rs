@@ -317,7 +317,7 @@ pub struct TeamConfig {
     quic_sync: Option<QuicSyncConfig>,
 }
 
-impl From<TeamConfig> for aranya_client::TeamConfig {
+impl From<TeamConfig> for aranya_client::AddTeamConfig {
     fn from(value: TeamConfig) -> Self {
         let mut builder = Self::builder();
         if let Some(cfg) = value.quic_sync {
@@ -328,7 +328,7 @@ impl From<TeamConfig> for aranya_client::TeamConfig {
     }
 }
 
-impl From<&TeamConfig> for aranya_client::TeamConfig {
+impl From<&TeamConfig> for aranya_client::AddTeamConfig {
     fn from(value: &TeamConfig) -> Self {
         Self::from(value.to_owned())
     }

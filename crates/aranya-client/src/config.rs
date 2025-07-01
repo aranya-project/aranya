@@ -1,6 +1,6 @@
 use core::time::Duration;
 
-use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
+use aranya_daemon_api::{SeedMode, TeamId, SEED_IKM_SIZE};
 use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
@@ -147,14 +147,28 @@ impl QuicSyncConfigBuilder {
 }
 
 #[derive(Clone)]
-/// Configuration info for adding and creating teams.
-pub struct TeamConfig {
+/// Configuration info for adding teams.
+pub struct AddTeamConfig {
+    id: TeamId,
     quic_sync: Option<QuicSyncConfig>,
 }
 
-impl TeamConfig {
+impl AddTeamConfig {
     /// Creates a default [`TeamConfigBuilder`].
-    pub fn builder() -> TeamConfigBuilder {
+    pub fn builder() -> AddTeamConfigBuilder {
+        Default::default()
+    }
+}
+
+#[derive(Clone)]
+/// Configuration info for adding teams.
+pub struct CreateTeamConfig {
+    quic_sync: Option<QuicSyncConfig>,
+}
+
+impl CreateTeamConfig {
+    /// Creates a default [`TeamConfigBuilder`].
+    pub fn builder() -> CreateTeamConfigBuilder {
         Default::default()
     }
 }
@@ -167,37 +181,85 @@ impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
     }
 }
 
-impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
-    fn from(value: TeamConfig) -> Self {
+impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
+    fn from(value: AddTeamConfig) -> Self {
+        Self {
+            id: value.id,
+            quic_sync: value.quic_sync.map(Into::into),
+        }
+    }
+}
+
+impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
+    fn from(value: CreateTeamConfig) -> Self {
         Self {
             quic_sync: value.quic_sync.map(Into::into),
         }
     }
 }
 
-/// Builder for a [`TeamConfig`]
+/// Builder for a [`AddTeamConfig`]
 #[derive(Clone, Default)]
-pub struct TeamConfigBuilder {
+pub struct AddTeamConfigBuilder {
+    id: Option<TeamId>,
     quic_sync: Option<QuicSyncConfig>,
 }
 
-impl TeamConfigBuilder {
-    /// Creates a new builder for [`TeamConfig`].
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Configures the quic_sync config.
-    pub fn quic_sync(mut self, cfg: QuicSyncConfig) -> Self {
-        self.quic_sync = Some(cfg);
-
+impl AddTeamConfigBuilder {
+    pub fn id(mut self, id: TeamId) -> Self {
+        self.id = Some(id);
         self
     }
 
-    /// Attempts to build a [`TeamConfig`] using the provided parameters.
-    pub fn build(self) -> Result<TeamConfig> {
-        Ok(TeamConfig {
+    /// Attempts to build a [`AddTeamConfig`] using the provided parameters.
+    pub fn build(self) -> Result<AddTeamConfig> {
+        let id = self.id.ok_or_else(|| {
+            ConfigError::InvalidArg(InvalidArg::new(
+                "id",
+                "Missing `id` field when calling `AddTeamConfigBuilder::build`",
+            ))
+        })?;
+
+        Ok(AddTeamConfig {
+            id,
             quic_sync: self.quic_sync,
         })
     }
 }
+
+/// Builder for a [`AddTeamConfig`]
+#[derive(Clone, Default)]
+pub struct CreateTeamConfigBuilder {
+    quic_sync: Option<QuicSyncConfig>,
+}
+
+impl CreateTeamConfigBuilder {
+    /// Attempts to build a [`TeamConfig`] using the provided parameters.
+    pub fn build(self) -> Result<CreateTeamConfig> {
+        Ok(CreateTeamConfig {
+            quic_sync: self.quic_sync,
+        })
+    }
+}
+
+macro_rules! team_config_builder_shared_impl {
+    ($( $name:ident ),*) => {
+        $(
+            impl $name {
+                #[doc = concat!("Creates a new builder for [`", stringify!($name), "`]")]
+                pub fn new() -> Self {
+                    Self::default()
+                }
+
+                /// Configures the quic_sync config.
+                pub fn quic_sync(mut self, cfg: QuicSyncConfig) -> Self {
+                    self.quic_sync = Some(cfg);
+
+                    self
+                }
+        }
+        )*
+    };
+}
+
+team_config_builder_shared_impl!(CreateTeamConfigBuilder, AddTeamConfigBuilder);

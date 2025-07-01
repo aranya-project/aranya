@@ -7,7 +7,8 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    aqc::AqcPeerChannel, client::Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
+    aqc::AqcPeerChannel, client::Client, AddTeamConfig, CreateTeamConfig, Error, QuicSyncConfig,
+    SyncPeerConfig,
 };
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
@@ -213,11 +214,10 @@ async fn main() -> Result<()> {
         owner.client.rand(&mut buf).await;
         buf
     };
-    let cfg = {
+    let create_team_cfg = {
         let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
+        CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
     };
-
 
     // get sync addresses.
     let owner_addr = owner.aranya_local_addr().await?;
@@ -233,16 +233,24 @@ async fn main() -> Result<()> {
     info!("creating team");
     let mut owner_team = owner
         .client
-        .create_team(cfg.clone())
+        .create_team(create_team_cfg)
         .await
         .context("expected to create team")?;
     let team_id = owner_team.team_id();
     info!(%team_id);
 
-    let mut admin_team = admin.client.add_team(team_id, cfg.clone()).await?;
-    let mut operator_team = operator.client.add_team(team_id, cfg.clone()).await?;
-    let mut membera_team = membera.client.add_team(team_id, cfg.clone()).await?;
-    let mut memberb_team = memberb.client.add_team(team_id, cfg.clone()).await?;
+    let add_team_cfg = {
+        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+        AddTeamConfig::builder()
+            .quic_sync(qs_cfg)
+            .id(team_id)
+            .build()?
+    };
+
+    let mut admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
+    let mut operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
+    let mut membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
+    let mut memberb_team = memberb.client.add_team(add_team_cfg).await?;
 
     // setup sync peers.
     info!("adding admin to team");

@@ -134,9 +134,17 @@ pub enum Role {
 }
 
 // Note: any fields added to this type should be public
-/// A configuration for creating or adding a team to a daemon.
+/// A configuration for adding a team to a daemon.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TeamConfig {
+pub struct AddTeamConfig {
+    pub id: TeamId,
+    pub quic_sync: Option<QuicSyncConfig>,
+}
+
+// Note: any fields added to this type should be public
+/// A configuration for creating a team to a daemon.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CreateTeamConfig {
     pub quic_sync: Option<QuicSyncConfig>,
 }
 
@@ -610,13 +618,13 @@ pub trait DaemonApi {
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
 
     /// add a team to the local device store that was created by someone else. Not an aranya action/command.
-    async fn add_team(team: TeamId, cfg: TeamConfig) -> Result<()>;
+    async fn add_team(cfg: AddTeamConfig) -> Result<()>;
 
     /// Remove a team from local device storage.
     async fn remove_team(team: TeamId) -> Result<()>;
 
     /// Create a new graph/team with the current device as the owner.
-    async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
+    async fn create_team(cfg: CreateTeamConfig) -> Result<TeamId>;
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 
