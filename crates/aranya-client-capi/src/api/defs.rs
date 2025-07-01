@@ -1824,7 +1824,7 @@ pub fn aqc_bidi_stream_send(
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcBidiStream`].
 /// @param[out] buffer pointer to the target buffer.
-/// @param[out] buffer_len length of the target buffer.
+/// @param[in,out] buffer_len length of the target buffer.
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_bidi_stream_try_recv(
@@ -1980,7 +1980,7 @@ pub fn aqc_send_stream_send(
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcReceiveStream`].
 /// @param[out] buffer pointer to the target buffer.
-/// @param[out] buffer_len length of the target buffer.
+/// @param[in,out] buffer_len length of the target buffer.
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_recv_stream_try_recv(
