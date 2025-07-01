@@ -1,5 +1,11 @@
 #![allow(clippy::disallowed_macros)] // tarpc uses unreachable
 
+use core::hash::Hash;
+use std::{
+    fmt,
+    hash::{DefaultHasher, Hasher},
+};
+
 use aranya_crypto::{tls::EncryptedPskSeed, Encap, EncryptionPublicKey};
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +19,7 @@ pub struct QuicSyncConfig {
 }
 
 #[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 /// Specifies how PSK seeds are provided when creating or joining teams.
 ///
 /// Teams share a single PSK seed that is used to derive Pre-Shared Keys (PSKs)
@@ -42,6 +48,21 @@ pub enum SeedMode {
 impl Default for SeedMode {
     fn default() -> Self {
         Self::Generate
+    }
+}
+
+impl fmt::Debug for SeedMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SeedMode::Generate => f.debug_struct("SeedMode::Generate").finish(),
+            SeedMode::IKM(ikm) => {
+                // TODO: use aranya-crypto hasher.
+                let mut hasher = DefaultHasher::new();
+                ikm.hash(&mut hasher);
+                write!(f, "SeedMode::IKM [{}]", hasher.finish())
+            }
+            SeedMode::Wrapped(_) => f.debug_struct("SeedMode::Wrapped").finish(),
+        }
     }
 }
 
