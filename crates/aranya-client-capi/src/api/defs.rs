@@ -1824,24 +1824,34 @@ pub fn aqc_bidi_stream_send(
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcBidiStream`].
 /// @param[out] buffer pointer to the target buffer.
-/// @param[in] buffer_len length of the target buffer.
-/// @param[out] __output the number of bytes written to the buffer.
+/// @param[in,out] buffer_len length of the target buffer.
 ///
 /// @relates AranyaClient.
-pub fn aqc_bidi_stream_try_recv(
+pub unsafe fn aqc_bidi_stream_try_recv(
     stream: &mut AqcBidiStream,
-    mut buffer: &mut [MaybeUninit<u8>],
-) -> Result<usize, imp::Error> {
+    buffer: *mut MaybeUninit<u8>,
+    buffer_len: &mut usize,
+) -> Result<(), imp::Error> {
+    if buffer.is_null() || *buffer_len == 0 {
+        return Err(InvalidArg::new(
+            "buffer",
+            "Tried to call aqc_bidi_stream_try_recv with an empty buffer",
+        )
+        .into());
+    }
+
     let mut written = 0;
-    while !buffer.is_empty() {
-        written += consume_bytes(&mut buffer, &mut stream.data);
+    let mut buf = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
+    while !buf.is_empty() {
+        written += consume_bytes(&mut buf, &mut stream.data);
         match stream.inner.try_receive() {
             Ok(data) => stream.data = data,
             Err(_) if written > 0 => break,
             Err(e) => return Err(e.into()),
         }
     }
-    Ok(written)
+    *buffer_len = written;
+    Ok(())
 }
 
 /// Create a unidirectional stream from an [`AqcBidiChannel`].
@@ -1970,22 +1980,32 @@ pub fn aqc_send_stream_send(
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcReceiveStream`].
 /// @param[out] buffer pointer to the target buffer.
-/// @param[in] buffer_len length of the target buffer.
-/// @param[out] __output the number of bytes written to the buffer.
+/// @param[in,out] buffer_len length of the target buffer.
 ///
 /// @relates AranyaClient.
-pub fn aqc_recv_stream_try_recv(
+pub unsafe fn aqc_recv_stream_try_recv(
     stream: &mut AqcReceiveStream,
-    mut buffer: &mut [MaybeUninit<u8>],
-) -> Result<usize, imp::Error> {
+    buffer: *mut MaybeUninit<u8>,
+    buffer_len: &mut usize,
+) -> Result<(), imp::Error> {
+    if buffer.is_null() || *buffer_len == 0 {
+        return Err(InvalidArg::new(
+            "buffer",
+            "Tried to call aqc_recv_stream_try_recv with an empty buffer",
+        )
+        .into());
+    }
+
     let mut written = 0;
-    while !buffer.is_empty() {
-        written += consume_bytes(&mut buffer, &mut stream.data);
+    let mut buf = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
+    while !buf.is_empty() {
+        written += consume_bytes(&mut buf, &mut stream.data);
         match stream.inner.try_receive() {
             Ok(data) => stream.data = data,
             Err(_) if written > 0 => break,
             Err(e) => return Err(e.into()),
         }
     }
-    Ok(written)
+    *buffer_len = written;
+    Ok(())
 }
