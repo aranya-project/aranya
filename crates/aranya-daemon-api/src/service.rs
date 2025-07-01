@@ -192,12 +192,9 @@ impl Ikm {
     }
 }
 
-impl<T> From<T> for Ikm
-where
-    T: Into<[u8; 32]>,
-{
-    fn from(value: T) -> Self {
-        Self(value.into())
+impl From<[u8; SEED_IKM_SIZE]> for Ikm {
+    fn from(value: [u8; SEED_IKM_SIZE]) -> Self {
+        Self(value)
     }
 }
 
