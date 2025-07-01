@@ -198,14 +198,24 @@ impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
     }
 }
 
-/// Builder for a [`AddTeamConfig`]
+/// Common fields shared between team config builders.
+///
+/// This struct contains config options that are available
+/// for both adding existing teams and creating new teams.
 #[derive(Clone, Default)]
-pub struct AddTeamConfigBuilder {
-    id: Option<TeamId>,
+struct CommonBuilderFields {
     quic_sync: Option<QuicSyncConfig>,
 }
 
+/// Builder for [`AddTeamConfig`].
+#[derive(Clone, Default)]
+pub struct AddTeamConfigBuilder {
+    id: Option<TeamId>,
+    common: CommonBuilderFields,
+}
+
 impl AddTeamConfigBuilder {
+    /// Sets the ID of the team to add.
     pub fn id(mut self, id: TeamId) -> Self {
         self.id = Some(id);
         self
@@ -222,44 +232,47 @@ impl AddTeamConfigBuilder {
 
         Ok(AddTeamConfig {
             id,
-            quic_sync: self.quic_sync,
+            quic_sync: self.common.quic_sync,
         })
     }
 }
 
-/// Builder for a [`AddTeamConfig`]
+/// Builder for a [`CreateTeamConfig`]
 #[derive(Clone, Default)]
 pub struct CreateTeamConfigBuilder {
-    quic_sync: Option<QuicSyncConfig>,
+    common: CommonBuilderFields,
 }
 
 impl CreateTeamConfigBuilder {
-    /// Attempts to build a [`TeamConfig`] using the provided parameters.
+    /// Builds the configuration for creating a new team.
     pub fn build(self) -> Result<CreateTeamConfig> {
         Ok(CreateTeamConfig {
-            quic_sync: self.quic_sync,
+            quic_sync: self.common.quic_sync,
         })
     }
 }
 
-macro_rules! team_config_builder_shared_impl {
+/// Implements common methods shared between team config builders.
+macro_rules! team_config_builder_common_impl {
     ($( $name:ident ),*) => {
         $(
             impl $name {
-                #[doc = concat!("Creates a new builder for [`", stringify!($name), "`]")]
+                #[doc = concat!("Creates a new builder for [`", stringify!($name), "`].")]
                 pub fn new() -> Self {
                     Self::default()
                 }
 
-                /// Configures the quic_sync config.
+                /// Configures the quic_sync config..
+                ///
+                /// This is an optional field that configures how the team
+                /// synchronizes data over QUIC connections.
                 pub fn quic_sync(mut self, cfg: QuicSyncConfig) -> Self {
-                    self.quic_sync = Some(cfg);
-
+                    self.common.quic_sync = Some(cfg);
                     self
                 }
-        }
+            }
         )*
     };
 }
 
-team_config_builder_shared_impl!(CreateTeamConfigBuilder, AddTeamConfigBuilder);
+team_config_builder_common_impl!(CreateTeamConfigBuilder, AddTeamConfigBuilder);
