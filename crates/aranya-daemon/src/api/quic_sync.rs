@@ -26,8 +26,7 @@ impl Api {
 
         let seed = match &qs_cfg.seed_mode {
             SeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
-            SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id)
-                .context("unable to import psk seed from ikm")?,
+            SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
             SeedMode::Wrapped { .. } => {
                 return Err(api::Error::from_msg(
                     "Cannot create team with existing wrapped PSK seed",
@@ -65,8 +64,7 @@ impl Api {
                     "Must provide PSK seed from team creation",
                 ));
             }
-            SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(&ikm, team)
-                .context("unable to import psk seed from ikm")?,
+            SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(&ikm, team),
             SeedMode::Wrapped(wrapped) => {
                 let enc_sk: EncryptionKey<CS> = {
                     let enc_id = self.pk.lock().expect("poisoned").enc_pk.id()?;

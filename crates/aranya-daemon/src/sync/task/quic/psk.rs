@@ -36,14 +36,12 @@ impl PskSeed {
         Self(aranya_crypto::tls::PskSeed::new(rng, &group))
     }
 
-    pub(crate) fn import_from_ikm(ikm: &Ikm, team: TeamId) -> Result<Self> {
+    pub(crate) fn import_from_ikm(ikm: &Ikm, team: TeamId) -> Self {
         let group = GroupId::from(team.into_id());
-        Ok(Self(aranya_crypto::tls::PskSeed::import_from_ikm(
-            ikm.raw_ikm_bytes()
-                .try_into()
-                .context("unable to import psk seed from ikm")?,
+        Self(aranya_crypto::tls::PskSeed::import_from_ikm(
+            ikm.raw_ikm_bytes(),
             &group,
-        )))
+        ))
     }
 
     pub(crate) fn load(

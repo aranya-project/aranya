@@ -187,7 +187,7 @@ pub struct Ikm([u8; SEED_IKM_SIZE]);
 impl Ikm {
     /// Provides access to the raw IKM bytes.
     #[inline]
-    pub fn raw_ikm_bytes(&self) -> &[u8] {
+    pub fn raw_ikm_bytes(&self) -> &[u8; SEED_IKM_SIZE] {
         &self.0
     }
 }
