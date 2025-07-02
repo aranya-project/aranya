@@ -838,11 +838,11 @@ static void *membera_aqc_thread(void *arg) {
     sleep(1);
 
     char bidi_buffer[BUFFER_LEN];
-    size_t bidi_recv_length;
+    size_t bidi_recv_length = BUFFER_LEN;
     memset(bidi_buffer, 0, BUFFER_LEN);
     printf("Trying to receive member b's stream data\n");
     POLL(aranya_aqc_bidi_stream_try_recv(&bidi_stream, (uint8_t *)bidi_buffer,
-                                         BUFFER_LEN, &bidi_recv_length),
+                                         &bidi_recv_length),
          "error receiving aqc stream data");
 
     if (strncmp("hello from aqc memberb!", bidi_buffer, BUFFER_LEN)) {
@@ -860,11 +860,11 @@ static void *membera_aqc_thread(void *arg) {
          "error receiving an aqc uni stream");
 
     char uni_buffer[BUFFER_LEN];
-    size_t uni_recv_length;
+    size_t uni_recv_length = BUFFER_LEN;
     memset(bidi_buffer, 0, BUFFER_LEN);
     printf("Trying to receive member b's stream data\n");
     POLL(aranya_aqc_recv_stream_try_recv(&recv_stream, (uint8_t *)uni_buffer,
-                                         BUFFER_LEN, &uni_recv_length),
+                                         &uni_recv_length),
          "error receving aqc stream data");
 
     if (strncmp("hello from aqc uni memberb!", uni_buffer, BUFFER_LEN)) {
@@ -935,12 +935,11 @@ static void *memberb_aqc_thread(void *arg) {
     sleep(1);
 
     char bidi_buffer[BUFFER_LEN];
-    size_t bidi_recv_length;
+    size_t bidi_recv_length = BUFFER_LEN;
     memset(bidi_buffer, 0, BUFFER_LEN);
     printf("Trying to receive the bidi stream data\n");
-    POLL(aranya_aqc_recv_stream_try_recv(&bidi_recv_stream,
-                                         (uint8_t *)bidi_buffer, BUFFER_LEN,
-                                         &bidi_recv_length),
+    POLL(aranya_aqc_recv_stream_try_recv(
+             &bidi_recv_stream, (uint8_t *)bidi_buffer, &bidi_recv_length),
          "error receving aqc stream data");
 
     if (strncmp("hello from aqc membera!", bidi_buffer, BUFFER_LEN)) {
@@ -965,13 +964,12 @@ static void *memberb_aqc_thread(void *arg) {
     sleep(1);
 
     char uni_buffer[BUFFER_LEN];
-    size_t uni_recv_length;
+    size_t uni_recv_length = BUFFER_LEN;
     memset(uni_buffer, 0, BUFFER_LEN);
     printf("Trying to receive the uni stream data\n");
-    POLL(
-        aranya_aqc_recv_stream_try_recv(&uni_recv_stream, (uint8_t *)uni_buffer,
-                                        BUFFER_LEN, &uni_recv_length),
-        "error receving aqc stream data");
+    POLL(aranya_aqc_recv_stream_try_recv(
+             &uni_recv_stream, (uint8_t *)uni_buffer, &uni_recv_length),
+         "error receving aqc stream data");
 
     if (strncmp("hello from aqc uni membera!", uni_buffer, BUFFER_LEN)) {
         fprintf(stderr, "received string doesn't match\n");
