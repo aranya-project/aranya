@@ -1,35 +1,20 @@
 {
-  "image": "mcr.microsoft.com/devcontainers/universal:2",
-  "features": {
-    "ghcr.io/devcontainers/features/rust:1": {}
-  },
-  "hostRequirements": {
-    "cpus": 4
-  },
-  "waitFor": "onCreateCommand",
-  "updateContentCommand": "cargo build",
-  "postCreateCommand": "",
-  "postAttachCommand": {
-    "server": "cargo run"
-  },
-  "portsAttributes": {
-    "8888": {
-      "label": "Application",
-      "onAutoForward": "openPreview"
+  "name": "Codespaces Rust Starter",
+  "extensions": [
+    "coenraads.bracket-pair-colorizer-2",
+    "cschleiden.vscode-github-actions",
+    "github.vscode-pull-request-github",
+    "ms-azuretools.vscode-docker",
+    "ms-vsliveshare.vsliveshare",
+    "vscode-icons-team.vscode-icons",
+    "visualstudioexptteam.vscodeintellicode"
+  ],
+  "dockerFile": "Dockerfile",
+  "settings": {
+    "terminal.integrated.shell.linux": "/usr/bin/zsh",
+    "files.exclude": {
+      "**/CODE_OF_CONDUCT.md": true,
+      "**/LICENSE": true
     }
-  },
-  "customizations": {
-    "codespaces": {
-      "openFiles": [
-        "src/main.rs",
-        "templates/index.html"
-      ]
-    },
-    "vscode": {
-      "extensions": [
-        "rust-lang.rust-analyzer"
-      ]
-    }
-  },
-  "forwardPorts": [8888]
+  }
 }
