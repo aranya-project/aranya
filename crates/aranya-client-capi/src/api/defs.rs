@@ -681,6 +681,8 @@ pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 ///
+/// This method will be deprecated soon since certificates will be used instead of PSKs in the future.
+///
 /// @relates AranyaQuicSyncConfigBuilder.
 pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), imp::Error> {
     cfg.generate();
@@ -691,6 +693,8 @@ pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), 
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] encap_seed a pointer the encapsulated PSK seed
+///
+/// This method will be deprecated soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
 pub fn quic_sync_config_wrapped_seed(
@@ -713,7 +717,7 @@ pub struct SeedIkm {
 /// @param[in,out] cfg a pointer to the quic sync config builder [`QuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
 ///
-/// This method is unstable because [`QuicSyncConfigBuilder`] is unstable.
+/// This method will be deprecated soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
 pub fn quic_sync_config_raw_seed_ikm(

@@ -18,6 +18,8 @@ pub struct QuicSyncConfig {
 ///
 /// Teams share a single PSK seed that is used to derive Pre-Shared Keys (PSKs)
 /// for QUIC connections between team members.
+///
+/// This type will be deprecated soon since certificates will be used instead of PSKs in the future.
 pub enum SeedMode {
     /// Generates a new random seed.
     ///
