@@ -140,7 +140,9 @@ impl TeamCtx {
         let owner_cfg = {
             let mut team_cfg_builder = CreateTeamConfig::builder();
             let qs_cfg_builder = team_cfg_builder.quic_sync();
-            qs_cfg_builder.seed_ikm(seed_ikm);
+            qs_cfg_builder
+                .seed_ikm(seed_ikm)
+                .expect("field is not frozen");
 
             team_cfg_builder.build()?
         };
@@ -158,7 +160,9 @@ impl TeamCtx {
         let cfg = {
             let mut team_cfg_builder = AddTeamConfig::builder();
             let qs_cfg_builder = team_cfg_builder.quic_sync();
-            qs_cfg_builder.seed_ikm(seed_ikm);
+            qs_cfg_builder
+                .seed_ikm(seed_ikm)
+                .expect("field is not frozen");
 
             team_cfg_builder.id(team_id).build()?
         };

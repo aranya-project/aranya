@@ -1,6 +1,7 @@
 use core::time::Duration;
 
 use aranya_daemon_api::{SeedMode, TeamId, SEED_IKM_SIZE};
+use aranya_util::freeze::Freezeable;
 use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
@@ -97,21 +98,34 @@ impl QuicSyncConfig {
 
 #[derive(Clone, Default)]
 pub struct QuicSyncConfigBuilder {
-    seed_mode: SeedMode,
+    seed_mode: Freezeable<SeedMode>,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
-    pub fn mode(&mut self, mode: SeedMode) -> &mut Self {
-        self.seed_mode = mode;
-        self
+    #[inline]
+    pub fn mode(&mut self, mode: SeedMode) -> Result<&mut Self> {
+        let inner = self
+            .seed_mode
+            .try_borrow_mut()
+            .map_err(ConfigError::Frozen)?;
+        *inner = mode;
+        Ok(self)
     }
 
     /// Sets values using a QuicSyncConfig
     #[doc(hidden)]
-    pub fn set_from_cfg(&mut self, cfg: QuicSyncConfig) -> &mut Self {
-        self.seed_mode = cfg.seed_mode;
+    pub fn set_from_cfg(&mut self, cfg: QuicSyncConfig) -> Result<&mut Self> {
+        self.mode(cfg.seed_mode)
+    }
+
+    /// Freezes the PSK seed mode field.
+    /// 
+    /// Prevents future mutation of this field through [`Self::gen_seed`],
+    /// [`Self::seed_ikm`], and [`Self::wrapped_seed`].
+    pub fn freeze_seed_mode(&mut self) -> &mut Self {
+        self.seed_mode.freeze();
         self
     }
 
@@ -119,37 +133,43 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is only valid when used in [`super::Client::create_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`].
-    pub fn gen_seed(&mut self) -> &mut Self {
-        self.seed_mode = SeedMode::Generate;
-        self
+    /// # Errors
+    ///
+    /// Returns an error if the value is currently frozen.
+    pub fn gen_seed(&mut self) -> Result<&mut Self> {
+        self.mode(SeedMode::Generate)
     }
 
     /// Sets the seed mode to 'IKM'.
     ///
     /// This option is valid in both [`super::Client::create_team`] and [`super::Client::add_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
-    pub fn seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) -> &mut Self {
-        self.seed_mode = SeedMode::IKM(ikm.into());
-        self
+    /// # Errors
+    ///
+    /// Returns an error if the value is currently frozen.
+    pub fn seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) -> Result<&mut Self> {
+        self.mode(SeedMode::IKM(ikm.into()))
     }
 
     /// Sets the seed mode to 'Wrapped'.
     ///
     /// This option is only valid in [`super::Client::add_team`].
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
+    /// # Errors
+    ///
+    /// Returns an error if the value is currently frozen.
     pub fn wrapped_seed(&mut self, wrapped_seed: &[u8]) -> Result<&mut Self> {
         let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
             error!(?err);
             ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
         })?;
-        self.seed_mode = SeedMode::Wrapped(wrapped);
-        Ok(self)
+        self.mode(SeedMode::Wrapped(wrapped))
     }
 
     /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig> {
         Ok(QuicSyncConfig {
-            seed_mode: self.seed_mode,
+            seed_mode: self.seed_mode.into_inner(),
         })
     }
 }
