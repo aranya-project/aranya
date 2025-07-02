@@ -1,17 +1,37 @@
-use std::mem::MaybeUninit;
+use std::{mem::MaybeUninit, sync::Arc};
 
 use aranya_capi_core::safe::{TypeId, Typed};
+use tokio::sync::Mutex;
 
 /// An instance of an Aranya Client, along with an async runtime.
 pub struct Client {
-    pub(crate) inner: aranya_client::Client,
-    pub(crate) rt: tokio::runtime::Runtime,
+    pub(crate) inner: Arc<Mutex<aranya_client::Client>>,
+    pub(crate) rt: Arc<Mutex<tokio::runtime::Runtime>>,
 }
 
 impl Client {
     /// Useful for deref coercion.
     pub(crate) fn imp(&mut self) -> &mut Self {
         self
+    }
+
+    /// Get ARC references to client and runtime.
+    pub(crate) fn get_arcs(
+        &self,
+    ) -> (
+        Arc<Mutex<aranya_client::Client>>,
+        Arc<Mutex<tokio::runtime::Runtime>>,
+    ) {
+        (self.inner.clone(), self.rt.clone())
+    }
+}
+
+impl Client {
+    pub(crate) fn new(client: aranya_client::Client, rt: tokio::runtime::Runtime) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(client)),
+            rt: Arc::new(Mutex::new(rt)),
+        }
     }
 }
 

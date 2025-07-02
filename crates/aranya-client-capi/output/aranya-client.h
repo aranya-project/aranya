@@ -210,6 +210,10 @@ enum AranyaError
      */
     ARANYA_ERROR_SERIALIZATION,
     /**
+     * Locking error.
+     */
+    ARANYA_ERROR_TRY_LOCK,
+    /**
      * Some other error occurred.
      */
     ARANYA_ERROR_OTHER,

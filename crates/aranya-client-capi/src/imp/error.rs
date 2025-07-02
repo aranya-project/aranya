@@ -6,6 +6,7 @@ use aranya_capi_core::{
 };
 use aranya_client::{aqc::TryReceiveError, error::AqcError};
 use buggy::Bug;
+use tokio::sync::TryLockError;
 use tracing::warn;
 
 #[derive(Debug, thiserror::Error)]
@@ -43,6 +44,9 @@ pub enum Error {
 
     #[error("serialization errors: {0}")]
     Serialization(#[from] postcard::Error),
+
+    #[error("serialization errors: {0}")]
+    TryLock(#[from] TryLockError),
 
     #[error("{0}")]
     Other(#[from] anyhow::Error),
