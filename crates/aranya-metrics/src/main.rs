@@ -232,7 +232,8 @@ impl ProcessMetricsCollector {
     }
 
     #[cfg(not(target_os = "macos"))]
-    fn collect_process_metrics(&self, pid: u32, metrics: &mut AggregatedMetrics) -> Result<()> {
+    #[allow(dead_code)]
+    fn collect_process_metrics(&self, _pid: u32, _metrics: &mut AggregatedMetrics) -> Result<()> {
         Err(anyhow!("Unsupported target_os!"))
     }
 
@@ -280,6 +281,7 @@ impl ProcessMetricsCollector {
     }
 
     #[allow(clippy::cast_sign_loss)]
+    #[allow(dead_code)]
     fn collect_rusage_metrics(&self, process_metrics: &mut SingleProcessMetrics) -> Result<()> {
         // SAFETY: This has no alignment requirements so mem::zeroed is safe for all variants.
         let mut usage = unsafe { mem::zeroed::<libc::rusage>() };
@@ -307,6 +309,7 @@ impl ProcessMetricsCollector {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn collect_sysinfo_disk_metrics(
         &mut self,
         pid: u32,
