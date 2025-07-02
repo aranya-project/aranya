@@ -83,9 +83,9 @@ impl TeamCtx {
 
     pub async fn add_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
         // Shorthand for the teams we need to operate on.
-        let mut owner_team = self.owner.client.team(team_id);
-        let mut admin_team = self.admin.client.team(team_id);
-        let mut operator_team = self.operator.client.team(team_id);
+        let owner_team = self.owner.client.team(team_id);
+        let admin_team = self.admin.client.team(team_id);
+        let operator_team = self.operator.client.team(team_id);
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
@@ -213,7 +213,7 @@ impl DeviceCtx {
         sleep(SLEEP_INTERVAL).await;
 
         // Initialize the user library - the client will automatically load the daemon's public key.
-        let mut client = (|| {
+        let client = (|| {
             Client::builder()
                 .with_daemon_uds_path(&uds_path)
                 .with_daemon_aqc_addr(&addr_any)
@@ -245,7 +245,6 @@ impl DeviceCtx {
             self.client
                 .aqc()
                 .server_addr()
-                .expect("can get server addr")
                 .to_string()
                 .try_into()
                 .expect("socket addr is valid text"),

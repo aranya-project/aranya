@@ -495,7 +495,7 @@ pub fn init_logging() -> Result<(), imp::Error> {
 ///
 /// @relates AranyaClient.
 pub unsafe fn get_key_bundle(
-    client: &mut Client,
+    client: &Client,
     keybundle: *mut MaybeUninit<u8>,
     keybundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
@@ -551,7 +551,7 @@ pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
 /// @param[out] __output the client's device ID [`DeviceId`].
 ///
 /// @relates AranyaClient.
-pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
+pub fn get_device_id(client: &Client) -> Result<DeviceId, imp::Error> {
     let client = client.imp();
     let id = client.rt.block_on(client.inner.get_device_id())?;
     Ok(id.into())
@@ -856,7 +856,7 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 ///
 /// @relates AranyaClient.
 pub fn assign_role(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     role: Role,
@@ -882,7 +882,7 @@ pub fn assign_role(
 ///
 /// @relates AranyaClient.
 pub fn revoke_role(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     role: Role,
@@ -907,7 +907,7 @@ pub fn revoke_role(
 ///
 /// @relates AranyaClient.
 pub fn create_label(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     name: LabelName,
 ) -> Result<LabelId, imp::Error> {
@@ -929,11 +929,7 @@ pub fn create_label(
 /// @param[in] label_id the channel label ID [`LabelId`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn delete_label(
-    client: &mut Client,
-    team: &TeamId,
-    label_id: &LabelId,
-) -> Result<(), imp::Error> {
+pub fn delete_label(client: &Client, team: &TeamId, label_id: &LabelId) -> Result<(), imp::Error> {
     let client = client.imp();
     client
         .rt
@@ -952,7 +948,7 @@ pub fn delete_label(
 ///
 /// @relates AranyaClient.
 pub fn assign_label(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     label_id: &LabelId,
@@ -980,7 +976,7 @@ pub fn assign_label(
 ///
 /// @relates AranyaClient.
 pub fn revoke_label(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     label_id: &LabelId,
@@ -1003,7 +999,7 @@ pub fn revoke_label(
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
+pub fn create_team(client: &Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
     let team_id = client
@@ -1021,7 +1017,7 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[out] buf buffer where random bytes are written to.
 /// @param[in] buf_len the size of the buffer.
-pub unsafe fn rand(client: &mut Client, buf: &mut [MaybeUninit<u8>]) {
+pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
     let client = client.imp();
 
     buf.fill(MaybeUninit::new(0));
@@ -1048,7 +1044,7 @@ pub unsafe fn rand(client: &mut Client, buf: &mut [MaybeUninit<u8>]) {
 ///
 /// @relates AranyaClient.
 pub unsafe fn encrypt_psk_seed_for_peer(
-    client: &mut Client,
+    client: &Client,
     team_id: &TeamId,
     keybundle: &[u8],
     seed: *mut MaybeUninit<u8>,
@@ -1085,7 +1081,7 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
+pub fn add_team(client: &Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
     client
@@ -1100,7 +1096,7 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
 /// @param[in] team the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+pub fn remove_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.imp();
     client.rt.block_on(client.inner.remove_team(team.into()))?;
     Ok(())
@@ -1112,7 +1108,7 @@ pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error>
 /// @param[in] team the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.imp();
     client
         .rt
@@ -1131,7 +1127,7 @@ pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> 
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_device_to_team(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     keybundle: &[u8],
 ) -> Result<(), imp::Error> {
@@ -1154,7 +1150,7 @@ pub unsafe fn add_device_to_team(
 ///
 /// @relates AranyaClient.
 pub fn remove_device_from_team(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
 ) -> Result<(), imp::Error> {
@@ -1181,7 +1177,7 @@ pub fn remove_device_from_team(
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_sync_peer(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     addr: Addr,
     config: &SyncPeerConfig,
@@ -1206,7 +1202,7 @@ pub unsafe fn add_sync_peer(
 ///
 /// @relates AranyaClient.
 pub unsafe fn remove_sync_peer(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     addr: Addr,
 ) -> Result<(), imp::Error> {
@@ -1238,7 +1234,7 @@ pub unsafe fn remove_sync_peer(
 ///
 /// @relates AranyaClient.
 pub unsafe fn sync_now(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     addr: Addr,
     config: Option<&SyncPeerConfig>,
@@ -1264,7 +1260,7 @@ pub unsafe fn sync_now(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_devices_on_team(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     devices: *mut MaybeUninit<DeviceId>,
     devices_len: &mut usize,
@@ -1298,7 +1294,7 @@ pub unsafe fn query_devices_on_team(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_device_keybundle(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     keybundle: *mut MaybeUninit<u8>,
@@ -1331,7 +1327,7 @@ pub unsafe fn query_device_keybundle(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_device_label_assignments(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     labels: *mut MaybeUninit<LabelId>,
@@ -1371,7 +1367,7 @@ pub unsafe fn query_device_label_assignments(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_labels(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     labels: *mut MaybeUninit<LabelId>,
     labels_len: &mut usize,
@@ -1403,7 +1399,7 @@ pub unsafe fn query_labels(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_label_exists(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
@@ -1428,7 +1424,7 @@ pub unsafe fn query_label_exists(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_aqc_net_identifier(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     ident: *mut MaybeUninit<c_char>,
@@ -1465,7 +1461,7 @@ pub unsafe fn query_aqc_net_identifier(
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_assign_net_identifier(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     net_identifier: NetIdentifier,
@@ -1493,7 +1489,7 @@ pub unsafe fn aqc_assign_net_identifier(
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_remove_net_identifier(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     net_identifier: NetIdentifier,
@@ -1569,7 +1565,7 @@ pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_bidi_channel(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
@@ -1601,7 +1597,7 @@ pub unsafe fn aqc_create_bidi_channel(
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_uni_channel(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
@@ -1630,7 +1626,7 @@ pub unsafe fn aqc_create_uni_channel(
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_bidi_channel(
-    client: &mut Client,
+    client: &Client,
     channel: OwnedPtr<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid AqcBidiChannel pointer.
@@ -1652,7 +1648,7 @@ pub fn aqc_delete_bidi_channel(
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_uni_channel(
-    client: &mut Client,
+    client: &Client,
     channel: OwnedPtr<AqcSendChannel>,
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid AqcSendChannel pointer.
@@ -1694,7 +1690,7 @@ pub fn aqc_delete_uni_channel(
 ///
 /// @relates AranyaClient.
 pub fn aqc_try_receive_channel(
-    client: &mut Client,
+    client: &Client,
     channel: &mut MaybeUninit<AqcPeerChannel>,
 ) -> Result<AqcChannelType, imp::Error> {
     let chan = client.inner.aqc().try_receive_channel()?;
@@ -1778,7 +1774,7 @@ pub fn aqc_get_receive_channel(
 ///
 /// @relates AranyaClient.
 pub fn aqc_bidi_create_bidi_stream(
-    client: &mut Client,
+    client: &Client,
     channel: &mut AqcBidiChannel,
     stream: &mut MaybeUninit<AqcBidiStream>,
 ) -> Result<(), imp::Error> {
@@ -1797,7 +1793,7 @@ pub fn aqc_bidi_create_bidi_stream(
 ///
 /// @relates AranyaClient.
 pub fn aqc_bidi_stream_send(
-    client: &mut Client,
+    client: &Client,
     stream: &mut AqcBidiStream,
     data: &[u8],
 ) -> Result<(), imp::Error> {
@@ -1853,7 +1849,7 @@ pub unsafe fn aqc_bidi_stream_try_recv(
 ///
 /// @relates AranyaClient.
 pub fn aqc_bidi_create_uni_stream(
-    client: &mut Client,
+    client: &Client,
     channel: &mut AqcBidiChannel,
     stream: &mut MaybeUninit<AqcSendStream>,
 ) -> Result<(), imp::Error> {
@@ -1912,7 +1908,7 @@ pub fn aqc_bidi_try_receive_stream(
 ///
 /// @relates AranyaClient.
 pub fn aqc_send_create_uni_stream(
-    client: &mut Client,
+    client: &Client,
     channel: &mut AqcSendChannel,
     stream: &mut MaybeUninit<AqcSendStream>,
 ) -> Result<(), imp::Error> {
@@ -1953,7 +1949,7 @@ pub fn aqc_recv_try_receive_uni_stream(
 ///
 /// @relates AranyaClient.
 pub fn aqc_send_stream_send(
-    client: &mut Client,
+    client: &Client,
     stream: &mut AqcSendStream,
     data: &[u8],
 ) -> Result<(), imp::Error> {
