@@ -1,0 +1,43 @@
+[package]
+name = "sender"
+description = "Example Rust program which sends a file to a receiver using the Aranya client library"
+version = "0.1.0"
+authors = ["SpiderOak, Inc."]
+edition = "2021"
+license = "AGPL-3.0-only"
+repository = "https://github.com/aranya-project/aranya"
+rust-version = "1.85"
+
+[workspace]
+
+[lints.rust]
+# missing_docs = "warn"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unsafe_op_in_unsafe_fn = "warn"
+unused_lifetimes = "warn"
+unused_qualifications = "warn"
+
+[lints.clippy]
+cast_lossless = "warn"
+cast_possible_wrap = "warn"
+cast_precision_loss = "warn"
+cast_sign_loss = "warn"
+panic = "warn"
+unsafe_derive_deserialize = "warn"
+undocumented_unsafe_blocks = "warn"
+unwrap_used = "warn"
+wildcard_imports = "warn"
+
+[dependencies]
+aranya-client = { path = "../../../../crates/aranya-client" }
+aranya-daemon-api = { path = "../../../../crates/aranya-daemon-api" }
+aranya-util = { path = "../../../../crates/aranya-util" }
+
+anyhow = { version = "1.0.97" }
+backon = { version = "1.4.0" }
+buggy = { version = "0.1.0" }
+bytes = { version = "1.10.0" }
+tempfile = { version = "3.17.1" }
+tokio = { version = "1.44.2", features = ["io-util", "macros", "net", "process", "sync"] }
+tracing = { version = "0.1.41" }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
