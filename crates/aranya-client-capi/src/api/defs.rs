@@ -507,7 +507,7 @@ pub unsafe fn get_key_bundle(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -572,7 +572,7 @@ pub unsafe fn get_device_id(client: *mut Client) -> Result<DeviceId, imp::Error>
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -893,7 +893,7 @@ pub unsafe fn assign_role(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -929,7 +929,7 @@ pub unsafe fn revoke_role(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -963,7 +963,7 @@ pub unsafe fn create_label(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -996,7 +996,7 @@ pub unsafe fn delete_label(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1033,7 +1033,7 @@ pub unsafe fn assign_label(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1069,7 +1069,7 @@ pub unsafe fn revoke_label(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1098,7 +1098,7 @@ pub unsafe fn create_team(client: *mut Client, cfg: &TeamConfig) -> Result<TeamI
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1126,7 +1126,7 @@ pub unsafe fn rand(client: *mut Client, buf: &mut [MaybeUninit<u8>]) -> Result<(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1170,7 +1170,7 @@ pub unsafe fn encrypt_psk_seed_for_peer(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1216,7 +1216,7 @@ pub unsafe fn add_team(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1240,7 +1240,7 @@ pub unsafe fn remove_team(client: *mut Client, team: &TeamId) -> Result<(), imp:
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1263,7 +1263,7 @@ pub unsafe fn close_team(client: *mut Client, team: &TeamId) -> Result<(), imp::
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1294,7 +1294,7 @@ pub unsafe fn add_device_to_team(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1330,7 +1330,7 @@ pub unsafe fn remove_device_from_team(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1368,7 +1368,7 @@ pub unsafe fn add_sync_peer(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1402,7 +1402,7 @@ pub unsafe fn remove_sync_peer(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1444,7 +1444,7 @@ pub unsafe fn sync_now(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1480,7 +1480,7 @@ pub unsafe fn query_devices_on_team(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1529,7 +1529,7 @@ pub unsafe fn query_device_keybundle(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1572,7 +1572,7 @@ pub unsafe fn query_device_label_assignments(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1621,7 +1621,7 @@ pub unsafe fn query_labels(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1662,7 +1662,7 @@ pub unsafe fn query_label_exists(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1699,7 +1699,7 @@ pub unsafe fn query_aqc_net_identifier(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1745,7 +1745,7 @@ pub unsafe fn aqc_assign_net_identifier(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1783,7 +1783,7 @@ pub unsafe fn aqc_remove_net_identifier(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1873,7 +1873,7 @@ pub unsafe fn aqc_create_bidi_channel(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1917,7 +1917,7 @@ pub unsafe fn aqc_create_uni_channel(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1955,7 +1955,7 @@ pub unsafe fn aqc_delete_bidi_channel(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -1986,7 +1986,7 @@ pub unsafe fn aqc_delete_uni_channel(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -2034,7 +2034,7 @@ pub unsafe fn aqc_try_receive_channel(
     // SAFETY: Caller must provide valid Client pointer.
     let (client, _rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -2130,7 +2130,7 @@ pub unsafe fn aqc_bidi_create_bidi_stream(
     // SAFETY: Caller must provide valid Client pointer.
     let (_client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -2162,7 +2162,7 @@ pub unsafe fn aqc_bidi_stream_send(
     // SAFETY: Caller must provide valid Client pointer.
     let (_client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -2231,7 +2231,7 @@ pub unsafe fn aqc_bidi_create_uni_stream(
     // SAFETY: Caller must provide valid Client pointer.
     let (_client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -2301,7 +2301,7 @@ pub unsafe fn aqc_send_create_uni_stream(
     // SAFETY: Caller must provide valid Client pointer.
     let (_client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
@@ -2353,7 +2353,7 @@ pub unsafe fn aqc_send_stream_send(
     // SAFETY: Caller must provide valid Client pointer.
     let (_client, rt) = unsafe {
         client
-            .as_mut()
+            .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
                 "unable to get mutable reference to client",
