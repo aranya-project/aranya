@@ -254,10 +254,10 @@ impl CreateTeamConfigBuilder {
 
 /// Implements common methods shared between team config builders.
 macro_rules! team_config_builder_common_impl {
-    ($( $name:ident ),*) => {
+    ($( $builder:ident => $config:ident ),*) => {
         $(
-            impl $name {
-                #[doc = concat!("Creates a new builder for [`", stringify!($name), "`].")]
+            impl $builder {
+                #[doc = concat!("Creates a new builder for [`", stringify!($config), "`].")]
                 pub fn new() -> Self {
                     Self::default()
                 }
@@ -275,4 +275,4 @@ macro_rules! team_config_builder_common_impl {
     };
 }
 
-team_config_builder_common_impl!(CreateTeamConfigBuilder, AddTeamConfigBuilder);
+team_config_builder_common_impl!(CreateTeamConfigBuilder => CreateTeamConfig, AddTeamConfigBuilder => AddTeamConfig);

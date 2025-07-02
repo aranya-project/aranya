@@ -657,7 +657,7 @@ pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
 
 /// A builder for initializing a [`QuicSyncConfig`].
 ///
-/// The [`QuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`] or [`CreateTeamConfig`].
+/// The [`QuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`] or a [`CreateTeamConfig`].
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
@@ -738,7 +738,7 @@ pub type AddTeamConfigBuilder = Safe<imp::AddTeamConfigBuilder>;
 
 /// Team configuration used when creating a team.
 ///
-/// Use an [`CreateTeamConfigBuilder`] to construct this object.
+/// Use a [`CreateTeamConfigBuilder`] to construct this object.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type CreateTeamConfig = Safe<imp::CreateTeamConfig>;
 
@@ -766,14 +766,14 @@ pub fn add_team_config_builder_set_quic_syncer(
 
 /// Configures team ID field for [`AddTeamConfigBuilder`].
 ///
-/// By default, the ID is not set.
+/// By default, the team ID is not set.
 ///
 /// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
 /// @param[in] id a pointer to a [`TeamId`]
 ///
 /// @relates AranyaAddTeamConfigBuilder.
-pub fn add_team_config_builder_set_id(cfg: &mut AddTeamConfigBuilder, id: &TeamId) {
-    cfg.id(*id);
+pub fn add_team_config_builder_set_id(cfg: &mut AddTeamConfigBuilder, team_id: &TeamId) {
+    cfg.id(*team_id);
 }
 
 /// Attempts to construct an [`AddTeamConfig`].

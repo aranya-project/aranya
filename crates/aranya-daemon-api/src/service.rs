@@ -134,7 +134,7 @@ pub enum Role {
 }
 
 // Note: any fields added to this type should be public
-/// A configuration for adding a team to a daemon.
+/// A configuration for adding a team in the daemon.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AddTeamConfig {
     pub id: TeamId,
@@ -142,7 +142,7 @@ pub struct AddTeamConfig {
 }
 
 // Note: any fields added to this type should be public
-/// A configuration for creating a team to a daemon.
+/// A configuration for creating a team in the daemon.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTeamConfig {
     pub quic_sync: Option<QuicSyncConfig>,

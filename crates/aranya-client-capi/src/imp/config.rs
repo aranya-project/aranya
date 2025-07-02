@@ -311,7 +311,7 @@ impl Builder for QuicSyncConfigBuilder {
     }
 }
 
-/// Configuration info when adding a team in Aranya
+/// Configuration info when creating a new team in Aranya.
 #[derive(Clone, Debug)]
 pub struct CreateTeamConfig {
     quic_sync: Option<QuicSyncConfig>,
@@ -373,7 +373,7 @@ impl Builder for CreateTeamConfigBuilder {
     }
 }
 
-/// Configuration info when adding a team in Aranya
+/// Configuration info when adding a team in Aranya.
 #[derive(Clone, Debug)]
 pub struct AddTeamConfig {
     id: TeamId,

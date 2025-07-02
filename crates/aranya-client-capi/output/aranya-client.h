@@ -340,7 +340,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
 /**
  * A builder for initializing a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
  *
- * The [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig) is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig) or [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
+ * The [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig) is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig) or a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
  */
 typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
     /**
@@ -420,7 +420,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamConfig {
 /**
  * Team configuration used when creating a team.
  *
- * Use an [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder) to construct this object.
+ * Use a [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder) to construct this object.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamConfig {
     /**
@@ -1267,7 +1267,7 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer_ext(struct AranyaAddT
 /**
  * Configures team ID field for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
  *
- * By default, the ID is not set.
+ * By default, the team ID is not set.
  *
  * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
  * @param[in] id a pointer to a [`AranyaTeamId`](@ref AranyaTeamId)
@@ -1275,12 +1275,12 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer_ext(struct AranyaAddT
  * @relates AranyaAddTeamConfigBuilder.
  */
 AranyaError aranya_add_team_config_builder_set_id(struct AranyaAddTeamConfigBuilder *cfg,
-                                                  const struct AranyaTeamId *id);
+                                                  const struct AranyaTeamId *team_id);
 
 /**
  * Configures team ID field for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
  *
- * By default, the ID is not set.
+ * By default, the team ID is not set.
  *
  * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
  * @param[in] id a pointer to a [`AranyaTeamId`](@ref AranyaTeamId)
@@ -1288,7 +1288,7 @@ AranyaError aranya_add_team_config_builder_set_id(struct AranyaAddTeamConfigBuil
  * @relates AranyaAddTeamConfigBuilder.
  */
 AranyaError aranya_add_team_config_builder_set_id_ext(struct AranyaAddTeamConfigBuilder *cfg,
-                                                      const struct AranyaTeamId *id,
+                                                      const struct AranyaTeamId *team_id,
                                                       struct AranyaExtError *__ext_err);
 
 /**
