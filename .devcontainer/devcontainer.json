@@ -1,19 +1,35 @@
 {
-	"name": "Codespaces Rust Starter",
-	"extensions": [
-		"cschleiden.vscode-github-actions",
-		"ms-vsliveshare.vsliveshare",
-		"matklad.rust-analyzer",
-		"serayuzgur.crates",
-		"vadimcn.vscode-lldb"
-	],
-	"dockerFile": "Dockerfile",
-	"settings": {
-		"editor.formatOnSave": true,
-		"terminal.integrated.shell.linux": "/usr/bin/zsh",
-		"files.exclude": {
-			"**/CODE_OF_CONDUCT.md": true,
-			"**/LICENSE": true
-		}
-	}
+  "image": "mcr.microsoft.com/devcontainers/universal:2",
+  "features": {
+    "ghcr.io/devcontainers/features/rust:1": {}
+  },
+  "hostRequirements": {
+    "cpus": 4
+  },
+  "waitFor": "onCreateCommand",
+  "updateContentCommand": "cargo build",
+  "postCreateCommand": "",
+  "postAttachCommand": {
+    "server": "cargo run"
+  },
+  "portsAttributes": {
+    "8888": {
+      "label": "Application",
+      "onAutoForward": "openPreview"
+    }
+  },
+  "customizations": {
+    "codespaces": {
+      "openFiles": [
+        "src/main.rs",
+        "templates/index.html"
+      ]
+    },
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer"
+      ]
+    }
+  },
+  "forwardPorts": [8888]
 }
