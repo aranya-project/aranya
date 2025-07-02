@@ -29,6 +29,7 @@ fn daemon_startup() -> Result<()> {
         sync_addr: addr_any,
         afc: None,
         aqc: None,
+        quic_sync: None,
     };
 
     let rt = Runtime::new()?;

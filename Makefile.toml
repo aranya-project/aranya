@@ -267,8 +267,8 @@ description = "Run Metrics Crate"
 script = '''
 #!/usr/bin/env bash
 echo "Building our binaries..."
-cargo build --bin aranya-daemon
-cargo build --bin aranya-metrics
+cargo build --bin aranya-daemon --release
+cargo build --bin aranya-metrics --release
 
 echo "Starting pushgateway..."
 pushgateway &
@@ -284,5 +284,5 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Running metrics collection..."
-cargo run --bin aranya-metrics -- $(pwd)/target/release/aranya-daemon
+cargo run --release --bin aranya-metrics -- $(pwd)/target/release/aranya-daemon
 '''

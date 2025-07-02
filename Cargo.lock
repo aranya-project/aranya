@@ -465,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-metrics"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "aranya-client",

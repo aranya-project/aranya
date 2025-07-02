@@ -6,15 +6,14 @@ use std::{
 };
 
 use anyhow::{anyhow, bail, Context as _, Result};
-use aranya_client::{aqc::AqcPeerChannel, client::Client, Error, SyncPeerConfig, TeamConfig};
-use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_client::{
+    aqc::AqcPeerChannel, Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
+};
+use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
-use backon::{ExponentialBuilder, Retryable};
-use buggy::BugExt;
+use backon::{ExponentialBuilder, Retryable as _};
+use buggy::BugExt as _;
 use bytes::Bytes;
-#[cfg(target_os = "macos")]
-use libc::{c_int, c_void, pid_t, proc_pidinfo, proc_taskinfo, PROC_PIDTASKINFO};
-use libc::{getrusage, rusage, RUSAGE_SELF};
 use metrics::{counter, describe_counter, describe_gauge, describe_histogram, gauge, histogram};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
@@ -244,20 +243,20 @@ impl ProcessMetricsCollector {
         process_metrics: &mut SingleProcessMetrics,
     ) -> Result<()> {
         // SAFETY: This has no alignment requirements, so mem::zeroed is safe.
-        let mut task_info = unsafe { mem::zeroed::<proc_taskinfo>() };
+        let mut task_info = unsafe { mem::zeroed::<libc::proc_taskinfo>() };
 
         #[allow(clippy::cast_possible_wrap)]
-        let pid = pid as pid_t;
+        let pid = pid as libc::pid_t;
 
         #[allow(clippy::cast_possible_wrap)]
         // SAFETY: We should have a valid PID, as well as buffer.
         let result = unsafe {
-            proc_pidinfo(
+            libc::proc_pidinfo(
                 pid,
-                PROC_PIDTASKINFO,
+                libc::PROC_PIDTASKINFO,
                 0,
-                &raw mut task_info as *mut c_void,
-                size_of::<proc_taskinfo>() as c_int,
+                &raw mut task_info as *mut libc::c_void,
+                size_of::<libc::proc_taskinfo>() as libc::c_int,
             )
         };
 
@@ -267,7 +266,7 @@ impl ProcessMetricsCollector {
         }
 
         #[allow(clippy::cast_sign_loss)]
-        if result as usize != size_of::<proc_taskinfo>() {
+        if result as usize != size_of::<libc::proc_taskinfo>() {
             return Err(anyhow!("Unable to obtain `proc_taskinfo` for PID {pid}!"));
         }
 
@@ -283,9 +282,9 @@ impl ProcessMetricsCollector {
     #[allow(clippy::cast_sign_loss)]
     fn collect_rusage_metrics(&self, process_metrics: &mut SingleProcessMetrics) -> Result<()> {
         // SAFETY: This has no alignment requirements so mem::zeroed is safe for all variants.
-        let mut usage = unsafe { mem::zeroed::<rusage>() };
+        let mut usage = unsafe { mem::zeroed::<libc::rusage>() };
         // SAFETY: The above is safe and we're passing a valid pointer.
-        let result = unsafe { getrusage(RUSAGE_SELF, &raw mut usage) };
+        let result = unsafe { libc::getrusage(libc::RUSAGE_SELF, &raw mut usage) };
 
         if result < 0 {
             return Err(io::Error::from_raw_os_error(result))?;
@@ -385,7 +384,7 @@ impl ProcessMetricsCollector {
         Ok(())
     }
 
-    // TODO: inline as a closure?
+    // TODO(nikki): inline as a closure?
     async fn start_collection_loop(&mut self) -> Result<()> {
         let mut interval = tokio::time::interval(self.config.collection_interval);
 
@@ -580,7 +579,8 @@ impl ClientCtx {
                 cache_dir: {cache_dir:?}
                 logs_dir: {logs_dir:?}
                 config_dir: {config_dir:?}
-                sync_addr: "localhost:0"
+                sync_addr: "127.0.0.1:0"
+                quic_sync: {{ }}
                 "#
             );
             fs::write(&cfg_path, buf).await?;
@@ -625,6 +625,15 @@ impl ClientCtx {
 
     async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.local_addr().await?)
+    }
+
+    fn aqc_net_id(&self) -> NetIdentifier {
+        NetIdentifier(
+            self.aqc_addr
+                .to_string()
+                .try_into()
+                .expect("addr is valid text"),
+        )
     }
 }
 
@@ -685,6 +694,7 @@ async fn main() -> Result<()> {
         }
     }
 
+    let job_name = metrics_config.job_name.clone();
     setup_prometheus_exporter(&metrics_config)?;
 
     info!("Phase 1: Setting up daemons");
@@ -711,7 +721,7 @@ async fn main() -> Result<()> {
 
     match demo_result {
         Ok(()) => {
-            info!("Demo completed successfully");
+            info!("Demo completed successfully, job {job_name}");
             counter!("demo_operations_total", "operation" => "success").increment(1);
         }
         Err(ref e) => {
@@ -779,16 +789,16 @@ async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
     let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
-    // Create a team.
-    info!("creating team");
-    let cfg = TeamConfig::builder().build()?;
-    let team_id = ctx
-        .owner
-        .client
-        .create_team(cfg)
-        .await
-        .context("expected to create team")?;
-    info!(%team_id);
+    // Create the team config
+    let seed_ikm = {
+        let mut buf = [0; 32];
+        ctx.owner.client.rand(&mut buf).await;
+        buf
+    };
+    let cfg = {
+        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+        TeamConfig::builder().quic_sync(qs_cfg).build()?
+    };
 
     // get sync addresses.
     let owner_addr = ctx.owner.aranya_local_addr().await?;
@@ -800,13 +810,23 @@ async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
     // get aqc addresses.
     debug!(?ctx.membera.aqc_addr, ?ctx.memberb.aqc_addr);
 
-    // setup sync peers.
-    let mut owner_team = ctx.owner.client.team(team_id);
-    let mut admin_team = ctx.admin.client.team(team_id);
-    let mut operator_team = ctx.operator.client.team(team_id);
-    let mut membera_team = ctx.membera.client.team(team_id);
-    let mut memberb_team = ctx.memberb.client.team(team_id);
+    // Create a team.
+    info!("creating team");
+    let mut owner_team = ctx
+        .owner
+        .client
+        .create_team(cfg.clone())
+        .await
+        .context("expected to create team")?;
+    let team_id = owner_team.team_id();
+    info!(%team_id);
 
+    let mut admin_team = ctx.admin.client.add_team(team_id, cfg.clone()).await?;
+    let mut operator_team = ctx.operator.client.add_team(team_id, cfg.clone()).await?;
+    let mut membera_team = ctx.membera.client.add_team(team_id, cfg.clone()).await?;
+    let mut memberb_team = ctx.memberb.client.add_team(team_id, cfg.clone()).await?;
+
+    // setup sync peers.
     info!("adding admin to team");
     owner_team.add_device_to_team(ctx.admin.pk).await?;
     owner_team.assign_role(ctx.admin.id, Role::Admin).await?;
@@ -907,30 +927,27 @@ async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
 
     // add memberb to team.
     info!("adding memberb to team");
-    operator_team.add_device_to_team(ctx.memberb.pk).await?;
+    operator_team
+        .add_device_to_team(ctx.memberb.pk.clone())
+        .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
 
     info!("assigning aqc net identifiers");
     operator_team
-        .assign_aqc_net_identifier(
-            ctx.membera.id,
-            NetIdentifier(ctx.membera.aqc_addr.to_string()),
-        )
+        .assign_aqc_net_identifier(ctx.membera.id, ctx.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(
-            ctx.memberb.id,
-            NetIdentifier(ctx.memberb.aqc_addr.to_string()),
-        )
+        .assign_aqc_net_identifier(ctx.memberb.id, ctx.memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
     sleep(sleep_interval).await;
 
     // fact database queries
-    let mut queries = ctx.membera.client.queries(team_id);
+    let mut queries_team = ctx.membera.client.team(team_id);
+    let mut queries = queries_team.queries();
     let devices = queries.devices_on_team().await?;
     info!("membera devices on team: {:?}", devices.iter().count());
     let role = queries.device_role(ctx.membera.id).await?;
@@ -953,7 +970,7 @@ async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
 
     info!("demo aqc functionality");
     info!("creating aqc label");
-    let label3 = operator_team.create_label("label3".to_string()).await?;
+    let label3 = operator_team.create_label(text!("label3")).await?;
     let op = ChanOp::SendRecv;
     info!("assigning label to membera");
     operator_team
@@ -970,7 +987,7 @@ async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
     // membera creates a bidirectional channel.
     info!("membera creating acq bidi channel");
     // Prepare arguments that need to be captured by the async move block
-    let memberb_net_identifier = NetIdentifier(ctx.memberb.aqc_addr.to_string());
+    let memberb_net_identifier = ctx.memberb.aqc_net_id();
 
     let create_handle = tokio::spawn(async move {
         let channel_result = ctx
