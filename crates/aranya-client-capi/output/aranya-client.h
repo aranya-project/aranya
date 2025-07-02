@@ -275,6 +275,8 @@ typedef struct ARANYA_ALIGNED(16) AranyaClient {
  * Configuration info for Aranya.
  *
  * Use a [`AranyaClientConfigBuilder`](@ref AranyaClientConfigBuilder) to construct this object.
+ *
+ * This config is unstable because [`AranyaAqcConfig`](@ref AranyaAqcConfig) is unstable.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaClientConfig {
     /**
@@ -301,6 +303,8 @@ typedef struct AranyaDeviceId {
 
 /**
  * Configuration info builder for an Aranya client config [`AranyaClientConfig`](@ref AranyaClientConfig).
+ *
+ * This builder is unstable because [`AranyaClientConfig`](@ref AranyaClientConfig) is unstable.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
     /**
@@ -313,6 +317,8 @@ typedef struct ARANYA_ALIGNED(8) AranyaClientConfigBuilder {
 
 /**
  * Configuration info builder for Aranya QUIC Channels config [`AranyaAqcConfig`](@ref AranyaAqcConfig).
+ *
+ * This builder is unstable because [`AranyaAqcConfig`](@ref AranyaAqcConfig) is unstable.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAqcConfigBuilder {
     /**
@@ -327,6 +333,8 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfigBuilder {
  * Configuration info for Aranya QUIC Channels.
  *
  * Use a [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder) to construct this object.
+ *
+ * This config is unstable.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
     /**
@@ -341,6 +349,8 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
  * A builder for initializing a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
  *
  * The [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig) is an optional part of initializing a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ *
+ * This builder is unstable because [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig) is unstable.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
     /**
@@ -362,6 +372,8 @@ typedef struct AranyaSeedIkm {
  * QUIC syncer configuration.
  *
  * Use a [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder) to construct this object.
+ *
+ * This config is unstable.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
     /**
@@ -374,6 +386,8 @@ typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
 
 /**
  * A builder for initializing a [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ *
+ * This builder is unstable because [`AranyaTeamConfig`](@ref AranyaTeamConfig) is unstable.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
     /**
@@ -388,6 +402,8 @@ typedef struct ARANYA_ALIGNED(8) AranyaTeamConfigBuilder {
  * Team configuration.
  *
  * Use a [`AranyaTeamConfigBuilder`](@ref AranyaTeamConfigBuilder) to construct this object.
+ *
+ * This config is unstable because [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig) is unstable.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaTeamConfig {
     /**
@@ -660,6 +676,7 @@ AranyaError aranya_ext_error_msg_ext(const struct AranyaExtError *err,
  * @param[out] client the uninitialized Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] config the client's configuration [`AranyaClientConfig`](@ref AranyaClientConfig).
  *
+ * This method is unstable because [`AranyaClientConfig`](@ref AranyaClientConfig) is unstable.
  * @relates AranyaClient.
  */
 AranyaError aranya_client_init(struct AranyaClient *client,
@@ -671,6 +688,7 @@ AranyaError aranya_client_init(struct AranyaClient *client,
  * @param[out] client the uninitialized Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] config the client's configuration [`AranyaClientConfig`](@ref AranyaClientConfig).
  *
+ * This method is unstable because [`AranyaClientConfig`](@ref AranyaClientConfig) is unstable.
  * @relates AranyaClient.
  */
 AranyaError aranya_client_init_ext(struct AranyaClient *client,
@@ -978,6 +996,8 @@ AranyaError aranya_aqc_config_builder_set_address_ext(struct AranyaAqcConfigBuil
  * @param[in,out] cfg a pointer to the client config builder
  * @param[in] aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
  *
+ * This method is unstable because [`AranyaAqcConfig`](@ref AranyaAqcConfig) is unstable.
+ *
  * @relates AranyaAqcConfigBuilder.
  */
 AranyaError aranya_client_config_builder_set_aqc_config(struct AranyaClientConfigBuilder *cfg,
@@ -988,6 +1008,8 @@ AranyaError aranya_client_config_builder_set_aqc_config(struct AranyaClientConfi
  *
  * @param[in,out] cfg a pointer to the client config builder
  * @param[in] aqc_config a pointer to a valid AQC config (see [`AranyaAqcConfigBuilder`](@ref AranyaAqcConfigBuilder))
+ *
+ * This method is unstable because [`AranyaAqcConfig`](@ref AranyaAqcConfig) is unstable.
  *
  * @relates AranyaAqcConfigBuilder.
  */
@@ -1040,6 +1062,8 @@ AranyaError aranya_quic_sync_config_builder_cleanup_ext(struct AranyaQuicSyncCon
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  *
+ * This method will be deprecated soon since certificates will be used instead of PSKs in the future.
+ *
  * @relates AranyaQuicSyncConfigBuilder.
  */
 AranyaError aranya_quic_sync_config_generate(struct AranyaQuicSyncConfigBuilder *cfg);
@@ -1048,6 +1072,8 @@ AranyaError aranya_quic_sync_config_generate(struct AranyaQuicSyncConfigBuilder 
  * Attempts to set PSK seed generation mode value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
+ *
+ * This method will be deprecated soon since certificates will be used instead of PSKs in the future.
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
@@ -1060,6 +1086,8 @@ AranyaError aranya_quic_sync_config_generate_ext(struct AranyaQuicSyncConfigBuil
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] encap_seed a pointer the encapsulated PSK seed
  *
+ * This method will be deprecated soon since certificates will be used instead of PSKs in the future.
+ *
  * @relates AranyaQuicSyncConfigBuilder.
  */
 AranyaError aranya_quic_sync_config_wrapped_seed(struct AranyaQuicSyncConfigBuilder *cfg,
@@ -1071,6 +1099,8 @@ AranyaError aranya_quic_sync_config_wrapped_seed(struct AranyaQuicSyncConfigBuil
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] encap_seed a pointer the encapsulated PSK seed
+ *
+ * This method will be deprecated soon since certificates will be used instead of PSKs in the future.
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
@@ -1085,6 +1115,8 @@ AranyaError aranya_quic_sync_config_wrapped_seed_ext(struct AranyaQuicSyncConfig
  * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
  * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
  *
+ * This method will be deprecated soon since certificates will be used instead of PSKs in the future.
+ *
  * @relates AranyaQuicSyncConfigBuilder.
  */
 AranyaError aranya_quic_sync_config_raw_seed_ikm(struct AranyaQuicSyncConfigBuilder *cfg,
@@ -1095,6 +1127,8 @@ AranyaError aranya_quic_sync_config_raw_seed_ikm(struct AranyaQuicSyncConfigBuil
  *
  * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
  * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
+ *
+ * This method will be deprecated soon since certificates will be used instead of PSKs in the future.
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
@@ -1600,6 +1634,8 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
  * @param[in] cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  * @param[out] __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  *
+ * This method is unstable because [`AranyaTeamConfig`](@ref AranyaTeamConfig) is unstable.
+ *
  * @relates AranyaClient.
  */
 AranyaError aranya_create_team(struct AranyaClient *client,
@@ -1612,6 +1648,8 @@ AranyaError aranya_create_team(struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  * @param[out] __output the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * This method is unstable because [`AranyaTeamConfig`](@ref AranyaTeamConfig) is unstable.
  *
  * @relates AranyaClient.
  */
@@ -1705,6 +1743,8 @@ AranyaError aranya_encrypt_psk_seed_for_peer_ext(struct AranyaClient *client,
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
  *
+ * This method is unstable because [`AranyaTeamConfig`](@ref AranyaTeamConfig) is unstable.
+ *
  * @relates AranyaClient.
  */
 AranyaError aranya_add_team(struct AranyaClient *client,
@@ -1717,6 +1757,8 @@ AranyaError aranya_add_team(struct AranyaClient *client,
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
  * @param[in] cfg the Team Configuration [`AranyaTeamConfig`](@ref AranyaTeamConfig).
+ *
+ * This method is unstable because [`AranyaTeamConfig`](@ref AranyaTeamConfig) is unstable.
  *
  * @relates AranyaClient.
  */
