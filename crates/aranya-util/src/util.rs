@@ -45,3 +45,137 @@ pub async fn create_dir_all(path: impl AsRef<Path>) -> io::Result<()> {
     }
     Ok(())
 }
+
+pub mod freeze {
+    use std::ops::Deref;
+
+    use serde::{Deserialize, Serialize};
+
+    /// Attempt to mutate a frozen value
+    #[derive(Clone, Debug)]
+    pub struct FrozenError;
+
+    impl std::fmt::Display for FrozenError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "Attempt to mutate a frozen value")
+        }
+    }
+
+    impl std::error::Error for FrozenError {}
+
+    /// A wrapper type that can toggle between allowing and disallowing mutation.
+    ///
+    /// When frozen, attempts to mutably borrow the inner value will fail.
+    /// The value can always be read immutably regardless of frozen state.
+    ///
+    /// Note: This type may not be that useful if T is [`std::cell::Cell`] or
+    /// [`std::cell::RefCell`]
+    #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+    pub struct Freezeable<T> {
+        value: T,
+        frozen: bool,
+    }
+
+    impl<T> Freezeable<T> {
+        /// Creates a new [`Freezeable`] in the unfrozen state.
+        pub fn new(value: T) -> Self {
+            Self {
+                value,
+                frozen: false,
+            }
+        }
+
+        /// Freezes the value, preventing mutation until unfrozen.
+        pub fn freeze(&mut self) {
+            self.frozen = true;
+        }
+
+        /// Unfreezes the value, allowing mutation again.
+        pub fn unfreeze(&mut self) {
+            self.frozen = false;
+        }
+
+        /// Unwraps the value, consuming the Freezeable.
+        pub fn into_inner(self) -> T {
+            self.value
+        }
+
+        /// Attempts to mutably borrow the inner value.
+        ///
+        /// # Errors
+        ///
+        /// Returns an error if the value is currently frozen.
+        pub fn try_borrow_mut(&mut self) -> Result<&mut T, FrozenError> {
+            if self.frozen {
+                return Err(FrozenError);
+            }
+
+            Ok(&mut self.value)
+        }
+    }
+
+    impl<T> Deref for Freezeable<T> {
+        type Target = T;
+
+        fn deref(&self) -> &Self::Target {
+            &self.value
+        }
+    }
+
+    #[cfg(test)]
+    mod test {
+        use super::*;
+
+        #[derive(Serialize, Deserialize)]
+        struct TestConfig {
+            value: Freezeable<u32>,
+        }
+
+        #[test]
+        fn test_roundtrip() {
+            let test_config = TestConfig {
+                value: Freezeable::new(10),
+            };
+            let json = serde_json::to_string(&test_config).expect("can convert config to json");
+            let mut deserialized_config: TestConfig =
+                serde_json::from_str(&json).expect("can convert back to config");
+
+            assert_eq!(*deserialized_config.value, *test_config.value);
+
+            // Can mutate since value hasn't been frozen
+            assert!(deserialized_config.value.try_borrow_mut().is_ok());
+
+            let inner = deserialized_config
+                .value
+                .try_borrow_mut()
+                .expect("can mutate");
+            *inner = 30;
+
+            assert_eq!(*deserialized_config.value, 30);
+        }
+
+        #[test]
+        fn test_roundtrip_frozen() {
+            let mut test_config = TestConfig {
+                value: Freezeable::new(10),
+            };
+            test_config.value.freeze();
+            let json = serde_json::to_string(&test_config).expect("can convert config to json");
+            let mut deserialized_config: TestConfig =
+                serde_json::from_str(&json).expect("can convert back to config");
+
+            assert_eq!(*deserialized_config.value, *test_config.value);
+
+            // Can't mutate since value hasn't been frozen. Must call Freezeable::unfreeze.
+            assert!(deserialized_config.value.try_borrow_mut().is_err());
+
+            deserialized_config.value.unfreeze();
+            *(deserialized_config
+                .value
+                .try_borrow_mut()
+                .expect("can mutate")) = 5;
+
+            assert_eq!(*deserialized_config.value, 5);
+        }
+    }
+}
