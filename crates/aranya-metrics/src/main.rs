@@ -47,6 +47,8 @@ struct MetricsConfig {
 
     /// HTTP address to listen to (if we're using a scrape endpoint)
     pub http_listen_addr: Option<SocketAddr>,
+    /// How long for a metric to go without an update before it's set idle
+    pub idle_timeout: Option<Duration>,
 }
 
 impl Default for MetricsConfig {
@@ -66,6 +68,7 @@ impl Default for MetricsConfig {
             ),
 
             http_listen_addr: None,
+            idle_timeout: None,
         }
     }
 }
@@ -436,7 +439,9 @@ fn setup_prometheus_exporter(config: &MetricsConfig) -> Result<()> {
         }
     }
 
-    builder = builder.idle_timeout(MetricKindMask::ALL, Some(Duration::from_secs(300)));
+    let timeout = config.idle_timeout.unwrap_or(Duration::from_secs(1));
+    builder = builder.idle_timeout(MetricKindMask::ALL, Some(timeout));
+    
     builder
         .install()
         .context("Failed to install Prometheus exporter")?;
