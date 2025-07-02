@@ -194,6 +194,7 @@ impl From<Duration> for std::time::Duration {
 /// @param[out] client the uninitialized Aranya Client [`Client`].
 /// @param[in] config the client's configuration [`ClientConfig`].
 ///
+/// This method is unstable because [`ClientConfig`] is unstable.
 /// @relates AranyaClient.
 pub unsafe fn client_init(
     client: &mut MaybeUninit<Client>,
@@ -560,10 +561,14 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
 /// Configuration info for Aranya.
 ///
 /// Use a [`ClientConfigBuilder`] to construct this object.
+///
+/// This config is unstable because [`AqcConfig`] is unstable.
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type ClientConfig = Safe<imp::ClientConfig>;
 
 /// Configuration info builder for an Aranya client config [`ClientConfig`].
+///
+/// This builder is unstable because [`ClientConfig`] is unstable.
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
@@ -602,10 +607,14 @@ pub fn client_config_builder_set_daemon_uds_path(
 /// Configuration info for Aranya QUIC Channels.
 ///
 /// Use a [`AqcConfigBuilder`] to construct this object.
+///
+/// This config is unstable.
 #[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type AqcConfig = Safe<imp::AqcConfig>;
 
 /// Configuration info builder for Aranya QUIC Channels config [`AqcConfig`].
+///
+/// This builder is unstable because [`AqcConfig`] is unstable.
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
@@ -644,6 +653,8 @@ pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *cons
 /// @param[in,out] cfg a pointer to the client config builder
 /// @param[in] aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
 ///
+/// This method is unstable because [`AqcConfig`] is unstable.
+///
 /// @relates AranyaAqcConfigBuilder.
 pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
     cfg.aqc((**aqc_config).clone());
@@ -652,12 +663,16 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
 /// QUIC syncer configuration.
 ///
 /// Use a [`QuicSyncConfigBuilder`] to construct this object.
+///
+/// This config is unstable.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
 
 /// A builder for initializing a [`QuicSyncConfig`].
 ///
 /// The [`QuicSyncConfig`] is an optional part of initializing a [`TeamConfig`].
+///
+/// This builder is unstable because [`QuicSyncConfig`] is unstable.
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
@@ -698,6 +713,8 @@ pub struct SeedIkm {
 /// @param[in,out] cfg a pointer to the quic sync config builder [`QuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
 ///
+/// This method is unstable because [`QuicSyncConfigBuilder`] is unstable.
+///
 /// @relates AranyaQuicSyncConfigBuilder.
 pub fn quic_sync_config_raw_seed_ikm(
     cfg: &mut QuicSyncConfigBuilder,
@@ -728,10 +745,14 @@ pub fn quic_sync_config_build(
 /// Team configuration.
 ///
 /// Use a [`TeamConfigBuilder`] to construct this object.
+///
+/// This config is unstable because [`QuicSyncConfig`] is unstable.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
 /// A builder for initializing a [`TeamConfig`].
+///
+/// This builder is unstable because [`TeamConfig`] is unstable.
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
@@ -1001,6 +1022,8 @@ pub fn revoke_label(
 /// @param[in] cfg the Team Configuration [`TeamConfig`].
 /// @param[out] __output the team's ID [`TeamId`].
 ///
+/// This method is unstable because [`TeamConfig`] is unstable.
+///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
@@ -1082,6 +1105,8 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] cfg the Team Configuration [`TeamConfig`].
+///
+/// This method is unstable because [`TeamConfig`] is unstable.
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg

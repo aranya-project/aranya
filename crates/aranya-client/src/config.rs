@@ -83,6 +83,9 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
+/// QUIC syncer configuration.
+///
+/// This config is unstable.
 #[derive(Clone)]
 pub struct QuicSyncConfig {
     seed_mode: SeedMode,
@@ -94,6 +97,9 @@ impl QuicSyncConfig {
     }
 }
 
+/// QUIC syncer configuration builder.
+///
+/// This builder is unstable because [`QuicSyncConfig`] is unstable.
 #[derive(Clone, Default)]
 pub struct QuicSyncConfigBuilder {
     seed_mode: SeedMode,
@@ -146,8 +152,10 @@ impl QuicSyncConfigBuilder {
     }
 }
 
-#[derive(Clone)]
 /// Configuration info for adding and creating teams.
+///
+/// This config is unstable.
+#[derive(Clone)]
 pub struct TeamConfig {
     quic_sync: Option<QuicSyncConfig>,
 }
@@ -175,7 +183,9 @@ impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
     }
 }
 
-/// Builder for a [`TeamConfig`]
+/// Builder for a [`TeamConfig`].
+///
+/// This builder is unstable because [`TeamConfig`] is unstable.
 #[derive(Clone, Default)]
 pub struct TeamConfigBuilder {
     quic_sync: Option<QuicSyncConfig>,

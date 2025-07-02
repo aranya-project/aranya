@@ -235,6 +235,8 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
+    ///
+    /// This method is unstable because [`TeamConfig`] is unstable.
     pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<Team<'_>> {
         let team_id = self
             .daemon
@@ -263,6 +265,8 @@ impl Client {
     }
 
     /// Add a team to local device storage.
+    ///
+    /// This method is unstable because [`TeamConfig`] is unstable.
     pub async fn add_team(&mut self, team_id: TeamId, cfg: TeamConfig) -> Result<Team<'_>> {
         self.daemon
             .add_team(context::current(), team_id, cfg.into())
