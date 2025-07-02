@@ -259,6 +259,8 @@ skip = [
     "getrandom@0.2.15",
     "hash32@0.2.1",
     "heapless@0.7.17",
+    "yoke@0.8.0",
+    "yoke-derive@0.8.0",
     "zerocopy@0.7.35",
     "zerocopy-derive@0.7.35",
 ]
