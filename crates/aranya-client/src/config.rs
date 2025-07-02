@@ -2,6 +2,7 @@ use core::time::Duration;
 
 use aranya_daemon_api::{SeedMode, TeamId, SEED_IKM_SIZE};
 use aranya_util::freeze::Freezeable;
+use serde::{Deserialize, Serialize};
 use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
@@ -96,7 +97,7 @@ impl QuicSyncConfig {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct QuicSyncConfigBuilder {
     seed_mode: Freezeable<SeedMode>,
 }
@@ -121,7 +122,7 @@ impl QuicSyncConfigBuilder {
     }
 
     /// Freezes the PSK seed mode field.
-    /// 
+    ///
     /// Prevents future mutation of this field through [`Self::gen_seed`],
     /// [`Self::seed_ikm`], and [`Self::wrapped_seed`].
     pub fn freeze_seed_mode(&mut self) -> &mut Self {
@@ -230,13 +231,13 @@ impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
 ///
 /// This struct contains config options that are available
 /// for both adding existing teams and creating new teams.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 struct CommonBuilderFields {
     quic_sync: Option<QuicSyncConfigBuilder>,
 }
 
 /// Builder for [`AddTeamConfig`].
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct AddTeamConfigBuilder {
     id: Option<TeamId>,
     common: CommonBuilderFields,
