@@ -5,9 +5,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use aranya_client::{
-    client::Client, config::CreateTeamConfig, AddTeamConfig, QuicSyncConfig, SyncPeerConfig,
-};
+use aranya_client::{client::Client, config::CreateTeamConfig, AddTeamConfig, SyncPeerConfig};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config},
     Daemon, DaemonHandle,
@@ -140,8 +138,13 @@ impl TeamCtx {
             buf
         };
         let owner_cfg = {
-            let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
-            CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
+            let mut team_cfg_builder = CreateTeamConfig::builder();
+            let qs_cfg_builder = team_cfg_builder.quic_sync();
+            qs_cfg_builder
+                .seed_ikm(seed_ikm)
+                .expect("field is not frozen");
+
+            team_cfg_builder.build()?
         };
 
         let team = {
@@ -155,11 +158,13 @@ impl TeamCtx {
         info!(?team_id);
 
         let cfg = {
-            let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
-            AddTeamConfig::builder()
-                .id(team_id)
-                .quic_sync(qs_cfg)
-                .build()?
+            let mut team_cfg_builder = AddTeamConfig::builder();
+            let qs_cfg_builder = team_cfg_builder.quic_sync();
+            qs_cfg_builder
+                .seed_ikm(seed_ikm)
+                .expect("field is not frozen");
+
+            team_cfg_builder.id(team_id).build()?
         };
 
         // Owner has the team added due to calling `create_team`, now we assign it to all other peers

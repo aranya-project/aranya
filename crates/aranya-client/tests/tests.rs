@@ -12,7 +12,7 @@
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
-use aranya_client::{config::CreateTeamConfig, AddTeamConfig, QuicSyncConfig};
+use aranya_client::{config::CreateTeamConfig, AddTeamConfig};
 use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
@@ -164,14 +164,16 @@ async fn test_add_team() -> Result<()> {
     let owner_addr = team.owner.aranya_local_addr().await?;
 
     // Create the initial team, and get our TeamId.
+    let owner_cfg = {
+        let mut team_cfg_builder = CreateTeamConfig::builder();
+        let _ = team_cfg_builder.quic_sync();
+        team_cfg_builder.build()?
+    };
+
     let mut owner = team
         .owner
         .client
-        .create_team({
-            CreateTeamConfig::builder()
-                .quic_sync(QuicSyncConfig::builder().build()?)
-                .build()?
-        })
+        .create_team(owner_cfg)
         .await
         .expect("expected to create team");
     let team_id = owner.team_id();
@@ -205,19 +207,17 @@ async fn test_add_team() -> Result<()> {
     let admin_seed = owner
         .encrypt_psk_seed_for_peer(&team.admin.pk.encoding)
         .await?;
-    team.admin
-        .client
-        .add_team({
-            AddTeamConfig::builder()
-                .id(team_id)
-                .quic_sync(
-                    QuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed)?
-                        .build()?,
-                )
-                .build()?
-        })
-        .await?;
+
+    let admin_cfg = {
+        let mut team_cfg_builder = AddTeamConfig::builder();
+        let qs_cfg_builder = team_cfg_builder.quic_sync();
+
+        qs_cfg_builder.wrapped_seed(&admin_seed)?;
+
+        team_cfg_builder.build()?
+    };
+
+    team.admin.client.add_team(admin_cfg).await?;
     {
         let mut admin = team.admin.client.team(team_id);
         admin.sync_now(owner_addr.into(), None).await?;
@@ -338,21 +338,15 @@ async fn test_multi_team_sync() -> Result<()> {
                 .await?
         };
 
+        let admin_cfg = {
+            let mut team_cfg_builder = AddTeamConfig::builder();
+            let qs_cfg_builder = team_cfg_builder.quic_sync();
+            qs_cfg_builder.wrapped_seed(&admin_seed)?;
+            team_cfg_builder.build()?
+        };
+
         // Admin2 adds team1 to it's local storage using the wrapped seed
-        team2
-            .admin
-            .client
-            .add_team({
-                AddTeamConfig::builder()
-                    .quic_sync(
-                        QuicSyncConfig::builder()
-                            .wrapped_seed(&admin_seed)?
-                            .build()?,
-                    )
-                    .id(team_id_1)
-                    .build()?
-            })
-            .await?;
+        team2.admin.client.add_team(admin_cfg).await?;
         {
             let mut admin2 = team2.admin.client.team(team_id_1);
             admin2.sync_now(owner1_addr.into(), None).await?;

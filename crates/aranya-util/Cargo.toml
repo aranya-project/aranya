@@ -19,7 +19,7 @@ buggy = { workspace = true }
 anyhow = { workspace = true }
 futures-util = { workspace = true }
 s2n-quic = { workspace = true }
-serde = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 tokio = { workspace = true, features = [
     "rt-multi-thread",
     "macros",
@@ -30,5 +30,6 @@ tokio-util = { workspace = true, features = ["rt"] }
 tracing = { workspace = true }
 
 [dev-dependencies]
+serde_json = { version = "1" }
 tokio = { workspace = true, features = ["time"] }
 tokio-util = { workspace = true, features = ["time"] }

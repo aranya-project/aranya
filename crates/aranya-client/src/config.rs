@@ -1,6 +1,8 @@
 use core::time::Duration;
 
 use aranya_daemon_api::{SeedMode, TeamId, SEED_IKM_SIZE};
+use aranya_util::freeze::Freezeable;
+use serde::{Deserialize, Serialize};
 use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
@@ -83,6 +85,7 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
+// Fields added here should be set in QuicSyncConfigBuilder::from_cfg
 #[derive(Clone)]
 pub struct QuicSyncConfig {
     seed_mode: SeedMode,
@@ -94,16 +97,36 @@ impl QuicSyncConfig {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct QuicSyncConfigBuilder {
-    seed_mode: SeedMode,
+    seed_mode: Freezeable<SeedMode>,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
-    pub fn mode(mut self, mode: SeedMode) -> Self {
-        self.seed_mode = mode;
+    #[inline]
+    pub fn mode(&mut self, mode: SeedMode) -> Result<&mut Self> {
+        let inner = self
+            .seed_mode
+            .try_borrow_mut()
+            .map_err(ConfigError::Frozen)?;
+        *inner = mode;
+        Ok(self)
+    }
+
+    /// Sets values using a QuicSyncConfig
+    #[doc(hidden)]
+    pub fn set_from_cfg(&mut self, cfg: QuicSyncConfig) -> Result<&mut Self> {
+        self.mode(cfg.seed_mode)
+    }
+
+    /// Freezes the PSK seed mode field.
+    ///
+    /// Prevents future mutation of this field through [`Self::gen_seed`],
+    /// [`Self::seed_ikm`], and [`Self::wrapped_seed`].
+    pub fn freeze_seed_mode(&mut self) -> &mut Self {
+        self.seed_mode.freeze();
         self
     }
 
@@ -111,37 +134,43 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is only valid when used in [`super::Client::create_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`].
-    pub fn gen_seed(mut self) -> Self {
-        self.seed_mode = SeedMode::Generate;
-        self
+    /// # Errors
+    ///
+    /// Returns an error if the value is currently frozen.
+    pub fn gen_seed(&mut self) -> Result<&mut Self> {
+        self.mode(SeedMode::Generate)
     }
 
     /// Sets the seed mode to 'IKM'.
     ///
     /// This option is valid in both [`super::Client::create_team`] and [`super::Client::add_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
-    pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
-        self.seed_mode = SeedMode::IKM(ikm.into());
-        self
+    /// # Errors
+    ///
+    /// Returns an error if the value is currently frozen.
+    pub fn seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) -> Result<&mut Self> {
+        self.mode(SeedMode::IKM(ikm.into()))
     }
 
     /// Sets the seed mode to 'Wrapped'.
     ///
     /// This option is only valid in [`super::Client::add_team`].
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
-    pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
+    /// # Errors
+    ///
+    /// Returns an error if the value is currently frozen.
+    pub fn wrapped_seed(&mut self, wrapped_seed: &[u8]) -> Result<&mut Self> {
         let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
             error!(?err);
             ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
         })?;
-        self.seed_mode = SeedMode::Wrapped(wrapped);
-        Ok(self)
+        self.mode(SeedMode::Wrapped(wrapped))
     }
 
     /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig> {
         Ok(QuicSyncConfig {
-            seed_mode: self.seed_mode,
+            seed_mode: self.seed_mode.into_inner(),
         })
     }
 }
@@ -202,13 +231,13 @@ impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
 ///
 /// This struct contains config options that are available
 /// for both adding existing teams and creating new teams.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 struct CommonBuilderFields {
-    quic_sync: Option<QuicSyncConfig>,
+    quic_sync: Option<QuicSyncConfigBuilder>,
 }
 
 /// Builder for [`AddTeamConfig`].
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct AddTeamConfigBuilder {
     id: Option<TeamId>,
     common: CommonBuilderFields,
@@ -230,10 +259,12 @@ impl AddTeamConfigBuilder {
             ))
         })?;
 
-        Ok(AddTeamConfig {
-            id,
-            quic_sync: self.common.quic_sync,
-        })
+        let quic_sync = match self.common.quic_sync {
+            Some(qs_cfg_builder) => Some(qs_cfg_builder.build()?),
+            None => None,
+        };
+
+        Ok(AddTeamConfig { id, quic_sync })
     }
 }
 
@@ -246,9 +277,12 @@ pub struct CreateTeamConfigBuilder {
 impl CreateTeamConfigBuilder {
     /// Builds the configuration for creating a new team.
     pub fn build(self) -> Result<CreateTeamConfig> {
-        Ok(CreateTeamConfig {
-            quic_sync: self.common.quic_sync,
-        })
+        let quic_sync = match self.common.quic_sync {
+            Some(qs_cfg_builder) => Some(qs_cfg_builder.build()?),
+            None => None,
+        };
+
+        Ok(CreateTeamConfig { quic_sync })
     }
 }
 
@@ -262,13 +296,13 @@ macro_rules! team_config_builder_common_impl {
                     Self::default()
                 }
 
-                /// Configures the quic_sync config..
+                /// Returns a mutable reference to the inner [`QuicSyncConfigBuilder`].
+                /// This method must be called to initialize a QUIC sync config builder with default values.
                 ///
-                /// This is an optional field that configures how the team
-                /// synchronizes data over QUIC connections.
-                pub fn quic_sync(mut self, cfg: QuicSyncConfig) -> Self {
-                    self.common.quic_sync = Some(cfg);
-                    self
+                /// This is an optional field that configures how the team synchronizes data
+                /// over QUIC connections
+                pub fn quic_sync(&mut self) -> &mut QuicSyncConfigBuilder {
+                    self.common.quic_sync.get_or_insert_default()
                 }
             }
         )*

@@ -1,6 +1,7 @@
 use std::{convert::Infallible, io};
 
 use aranya_daemon_api as api;
+use aranya_util::freeze::FrozenError;
 use tarpc::client::RpcError;
 
 pub type Result<T, E = Error> = core::result::Result<T, E>;
@@ -68,6 +69,9 @@ pub enum ConfigError {
     /// An invalid argument was provided.
     #[error("{0}")]
     InvalidArg(#[from] InvalidArg),
+    /// There was an attempt to mutate a frozen value.
+    #[error("{0}")]
+    Frozen(#[from] FrozenError),
 }
 
 /// An invalid argument.

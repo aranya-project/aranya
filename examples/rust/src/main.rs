@@ -7,8 +7,7 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    aqc::AqcPeerChannel, client::Client, AddTeamConfig, CreateTeamConfig, Error, QuicSyncConfig,
-    SyncPeerConfig,
+    aqc::AqcPeerChannel, client::Client, AddTeamConfig, CreateTeamConfig, Error, SyncPeerConfig,
 };
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
@@ -215,8 +214,12 @@ async fn main() -> Result<()> {
         buf
     };
     let create_team_cfg = {
-        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
-        CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
+        let mut team_cfg_builder = CreateTeamConfig::builder();
+
+        let qs_cfg_builder = team_cfg_builder.quic_sync();
+        qs_cfg_builder.seed_ikm(seed_ikm);
+
+        team_cfg_builder.build()?
     };
 
     // get sync addresses.
@@ -240,11 +243,12 @@ async fn main() -> Result<()> {
     info!(%team_id);
 
     let add_team_cfg = {
-        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
-        AddTeamConfig::builder()
-            .quic_sync(qs_cfg)
-            .id(team_id)
-            .build()?
+        let mut team_cfg_builder = AddTeamConfig::builder();
+
+        let qs_cfg_builder = team_cfg_builder.quic_sync();
+        qs_cfg_builder.seed_ikm(seed_ikm);
+
+        team_cfg_builder.id(team_id).build()?
     };
 
     let mut admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
