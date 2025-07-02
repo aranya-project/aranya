@@ -247,10 +247,10 @@ impl Typed for QuicSyncConfig {
 
 impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
-        Self::builder()
-            .mode(value.mode)
-            .build()
-            .expect("All fields are set")
+        let mut builder = Self::builder();
+        builder.mode(value.mode);
+
+        builder.build().expect("All fields are set")
     }
 }
 
@@ -321,7 +321,8 @@ impl From<CreateTeamConfig> for aranya_client::CreateTeamConfig {
     fn from(value: CreateTeamConfig) -> Self {
         let mut builder = Self::builder();
         if let Some(cfg) = value.quic_sync {
-            builder = builder.quic_sync(cfg.into());
+            let qs_cfg_builder = builder.quic_sync();
+            qs_cfg_builder.set_from_cfg(cfg.into());
         }
 
         builder.build().expect("All fields set")
@@ -386,8 +387,11 @@ impl From<AddTeamConfig> for aranya_client::AddTeamConfig {
     fn from(value: AddTeamConfig) -> Self {
         let mut builder = Self::builder();
         if let Some(cfg) = value.quic_sync {
-            builder = builder.quic_sync(cfg.into()).id((&value.id).into());
+            let qs_cfg_builder = builder.quic_sync();
+            qs_cfg_builder.set_from_cfg(cfg.into());
         }
+
+        let builder = builder.id((&value.id).into());
 
         builder.build().expect("All fields set")
     }
