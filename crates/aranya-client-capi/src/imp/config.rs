@@ -338,21 +338,23 @@ impl Typed for CreateTeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
 }
 
+/// Common fields shared between team config builders.
+///
+/// This struct contains config options that are available
+/// for both adding existing teams and creating new teams.
+#[derive(Clone, Debug, Default)]
+struct CommonBuilderFields {
+    quic_sync: Option<QuicSyncConfig>,
+}
+
 /// Builder for a [`CreateTeamConfig`]
 #[derive(Clone, Debug, Default)]
 pub struct CreateTeamConfigBuilder {
-    quic_sync: Option<QuicSyncConfig>,
+    common: CommonBuilderFields,
 }
 
 impl Typed for CreateTeamConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0x69F54A43);
-}
-
-impl CreateTeamConfigBuilder {
-    /// Sets the QUIC syncer config.
-    pub fn quic(&mut self, quic: QuicSyncConfig) {
-        self.quic_sync = Some(quic.clone());
-    }
 }
 
 impl Builder for CreateTeamConfigBuilder {
@@ -366,7 +368,7 @@ impl Builder for CreateTeamConfigBuilder {
         Self::Output::init(
             out,
             CreateTeamConfig {
-                quic_sync: self.quic_sync,
+                quic_sync: self.common.quic_sync,
             },
         );
         Ok(())
@@ -405,7 +407,7 @@ impl Typed for AddTeamConfig {
 #[derive(Clone, Debug, Default)]
 pub struct AddTeamConfigBuilder {
     id: Option<TeamId>,
-    quic_sync: Option<QuicSyncConfig>,
+    common: CommonBuilderFields,
 }
 
 impl Typed for AddTeamConfigBuilder {
@@ -413,11 +415,6 @@ impl Typed for AddTeamConfigBuilder {
 }
 
 impl AddTeamConfigBuilder {
-    /// Sets the QUIC syncer config.
-    pub fn quic(&mut self, quic: QuicSyncConfig) {
-        self.quic_sync = Some(quic.clone());
-    }
-
     /// Sets the ID field.
     pub fn id(&mut self, id: TeamId) {
         self.id = Some(id);
@@ -440,9 +437,33 @@ impl Builder for AddTeamConfigBuilder {
             out,
             AddTeamConfig {
                 id,
-                quic_sync: self.quic_sync,
+                quic_sync: self.common.quic_sync,
             },
         );
         Ok(())
     }
 }
+
+/// Implements common methods shared between team config builders.
+macro_rules! team_config_builder_common_impl {
+    ($( $builder:ident => $config:ident ),*) => {
+        $(
+            impl $builder {
+                #[doc = concat!("Creates a new builder for [`", stringify!($config), "`].")]
+                pub fn new() -> Self {
+                    Self::default()
+                }
+
+                /// Configures the quic_sync config..
+                ///
+                /// This is an optional field that configures how the team
+                /// synchronizes data over QUIC connections.
+                pub fn quic(&mut self, cfg: QuicSyncConfig) {
+                    self.common.quic_sync = Some(cfg);
+                }
+            }
+        )*
+    };
+}
+
+team_config_builder_common_impl!(CreateTeamConfigBuilder => CreateTeamConfig, AddTeamConfigBuilder => AddTeamConfig);
