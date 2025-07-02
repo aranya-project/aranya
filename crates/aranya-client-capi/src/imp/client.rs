@@ -1,14 +1,31 @@
 use std::mem::MaybeUninit;
 
-use aranya_capi_core::safe::{TypeId, Typed};
+use aranya_capi_core::{
+    safe::{TypeId, Typed},
+    InvalidArg,
+};
+
+use crate::lock::{Guard, Lock};
 
 /// An instance of an Aranya Client, along with an async runtime.
 pub struct Client {
+    pub(crate) lock: Lock<ClientInner>,
+}
+
+impl Client {
+    pub(crate) fn try_lock(&self) -> Result<Guard<'_, ClientInner>, InvalidArg<'static>> {
+        self.lock
+            .try_lock()
+            .map_err(|_| InvalidArg::new("client", "client used concurrently"))
+    }
+}
+
+pub(crate) struct ClientInner {
     pub(crate) inner: aranya_client::Client,
     pub(crate) rt: tokio::runtime::Runtime,
 }
 
-impl Client {
+impl ClientInner {
     /// Useful for deref coercion.
     pub(crate) fn imp(&mut self) -> &mut Self {
         self

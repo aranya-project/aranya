@@ -12,7 +12,10 @@ use aranya_daemon_api::Text;
 use bytes::Bytes;
 use tracing::error;
 
-use crate::imp::{self, aqc::consume_bytes};
+use crate::{
+    imp::{self, aqc::consume_bytes},
+    lock::Lock,
+};
 
 /// An error code.
 ///
@@ -221,7 +224,12 @@ pub unsafe fn client_init(
             .connect()
     })?;
 
-    Client::init(client, imp::Client { rt, inner });
+    Client::init(
+        client,
+        imp::Client {
+            lock: Lock::new(imp::ClientInner { rt, inner }),
+        },
+    );
     Ok(())
 }
 
@@ -495,10 +503,11 @@ pub fn init_logging() -> Result<(), imp::Error> {
 ///
 /// @relates AranyaClient.
 pub unsafe fn get_key_bundle(
-    client: &mut Client,
+    client: *mut Client,
     keybundle: *mut MaybeUninit<u8>,
     keybundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let keys = client.rt.block_on(client.inner.get_key_bundle())?;
     // SAFETY: Must trust caller provides valid ptr/len for keybundle buffer.
@@ -551,7 +560,8 @@ pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
 /// @param[out] __output the client's device ID [`DeviceId`].
 ///
 /// @relates AranyaClient.
-pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
+pub unsafe fn get_device_id(client: *mut Client) -> Result<DeviceId, imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let id = client.rt.block_on(client.inner.get_device_id())?;
     Ok(id.into())
@@ -855,12 +865,13 @@ pub fn sync_peer_config_builder_set_sync_later(cfg: &mut SyncPeerConfigBuilder) 
 /// @param[in] role the role [`Role`] to assign to the device.
 ///
 /// @relates AranyaClient.
-pub fn assign_role(
-    client: &mut Client,
+pub unsafe fn assign_role(
+    client: *mut Client,
     team: &TeamId,
     device: &DeviceId,
     role: Role,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     client.rt.block_on(
         client
@@ -881,12 +892,13 @@ pub fn assign_role(
 /// @param[in] role the role [`Role`] to revoke from the device.
 ///
 /// @relates AranyaClient.
-pub fn revoke_role(
-    client: &mut Client,
+pub unsafe fn revoke_role(
+    client: *mut Client,
     team: &TeamId,
     device: &DeviceId,
     role: Role,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     client.rt.block_on(
         client
@@ -906,11 +918,12 @@ pub fn revoke_role(
 /// @param[in] name label name string [`LabelName`].
 ///
 /// @relates AranyaClient.
-pub fn create_label(
-    client: &mut Client,
+pub unsafe fn create_label(
+    client: *mut Client,
     team: &TeamId,
     name: LabelName,
 ) -> Result<LabelId, imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     // SAFETY: Caller must ensure `name` is a valid C String.
     let name = unsafe { name.as_underlying() }?;
@@ -929,11 +942,12 @@ pub fn create_label(
 /// @param[in] label_id the channel label ID [`LabelId`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn delete_label(
-    client: &mut Client,
+pub unsafe fn delete_label(
+    client: *mut Client,
     team: &TeamId,
     label_id: &LabelId,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     client
         .rt
@@ -951,13 +965,14 @@ pub fn delete_label(
 /// @param[in] label_id the AQC channel label ID [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn assign_label(
-    client: &mut Client,
+pub unsafe fn assign_label(
+    client: *mut Client,
     team: &TeamId,
     device: &DeviceId,
     label_id: &LabelId,
     op: ChanOp,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     client
         .rt
@@ -979,12 +994,13 @@ pub fn assign_label(
 /// @param[in] label_id the AQC channel label ID [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn revoke_label(
-    client: &mut Client,
+pub unsafe fn revoke_label(
+    client: *mut Client,
     team: &TeamId,
     device: &DeviceId,
     label_id: &LabelId,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     client.rt.block_on(
         client
@@ -1003,7 +1019,8 @@ pub fn revoke_label(
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
+pub unsafe fn create_team(client: *mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
     let team_id = client
@@ -1021,7 +1038,8 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[out] buf buffer where random bytes are written to.
 /// @param[in] buf_len the size of the buffer.
-pub unsafe fn rand(client: &mut Client, buf: &mut [MaybeUninit<u8>]) {
+pub unsafe fn rand(client: *mut Client, buf: &mut [MaybeUninit<u8>]) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
 
     buf.fill(MaybeUninit::new(0));
@@ -1029,6 +1047,7 @@ pub unsafe fn rand(client: &mut Client, buf: &mut [MaybeUninit<u8>]) {
     let buf = unsafe { slice::from_raw_parts_mut(buf.as_mut_ptr().cast::<u8>(), buf.len()) };
 
     client.rt.block_on(client.inner.rand(buf));
+    Ok(())
 }
 
 /// Return serialized PSK seed encrypted for another device on the team.
@@ -1048,12 +1067,13 @@ pub unsafe fn rand(client: &mut Client, buf: &mut [MaybeUninit<u8>]) {
 ///
 /// @relates AranyaClient.
 pub unsafe fn encrypt_psk_seed_for_peer(
-    client: &mut Client,
+    client: *mut Client,
     team_id: &TeamId,
     keybundle: &[u8],
     seed: *mut MaybeUninit<u8>,
     seed_len: &mut usize,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
@@ -1085,7 +1105,12 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
+pub unsafe fn add_team(
+    client: *mut Client,
+    team: &TeamId,
+    cfg: &TeamConfig,
+) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
     client
@@ -1100,7 +1125,8 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
 /// @param[in] team the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+pub unsafe fn remove_team(client: *mut Client, team: &TeamId) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     client.rt.block_on(client.inner.remove_team(team.into()))?;
     Ok(())
@@ -1112,7 +1138,8 @@ pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error>
 /// @param[in] team the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+pub unsafe fn close_team(client: *mut Client, team: &TeamId) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     client
         .rt
@@ -1131,10 +1158,11 @@ pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> 
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_device_to_team(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     keybundle: &[u8],
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let keybundle = imp::key_bundle_deserialize(keybundle)?;
 
@@ -1153,11 +1181,12 @@ pub unsafe fn add_device_to_team(
 /// @param[in] device the device's ID [`DeviceId`].
 ///
 /// @relates AranyaClient.
-pub fn remove_device_from_team(
-    client: &mut Client,
+pub unsafe fn remove_device_from_team(
+    client: *mut Client,
     team: &TeamId,
     device: &DeviceId,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     client.rt.block_on(
         client
@@ -1181,11 +1210,12 @@ pub fn remove_device_from_team(
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_sync_peer(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     addr: Addr,
     config: &SyncPeerConfig,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
@@ -1206,10 +1236,11 @@ pub unsafe fn add_sync_peer(
 ///
 /// @relates AranyaClient.
 pub unsafe fn remove_sync_peer(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     addr: Addr,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
@@ -1238,11 +1269,12 @@ pub unsafe fn remove_sync_peer(
 ///
 /// @relates AranyaClient.
 pub unsafe fn sync_now(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     addr: Addr,
     config: Option<&SyncPeerConfig>,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     // SAFETY: Caller must ensure `addr` is a valid C String.
     let addr = unsafe { addr.as_underlying() }?;
@@ -1264,11 +1296,12 @@ pub unsafe fn sync_now(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_devices_on_team(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     devices: *mut MaybeUninit<DeviceId>,
     devices_len: &mut usize,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let data = client
         .rt
@@ -1298,12 +1331,13 @@ pub unsafe fn query_devices_on_team(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_device_keybundle(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     device: &DeviceId,
     keybundle: *mut MaybeUninit<u8>,
     keybundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let keys = client.rt.block_on(
         client
@@ -1331,12 +1365,13 @@ pub unsafe fn query_device_keybundle(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_device_label_assignments(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     device: &DeviceId,
     labels: *mut MaybeUninit<LabelId>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let data = client.rt.block_on(
         client
@@ -1371,11 +1406,12 @@ pub unsafe fn query_device_label_assignments(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_labels(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     labels: *mut MaybeUninit<LabelId>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let data = client
         .rt
@@ -1403,10 +1439,11 @@ pub unsafe fn query_labels(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_label_exists(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let exists = client.rt.block_on(
         client
@@ -1428,12 +1465,13 @@ pub unsafe fn query_label_exists(
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_aqc_net_identifier(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     device: &DeviceId,
     ident: *mut MaybeUninit<c_char>,
     ident_len: &mut usize,
 ) -> Result<bool, imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     let Some(net_identifier) = client.rt.block_on(
         client
@@ -1465,11 +1503,12 @@ pub unsafe fn query_aqc_net_identifier(
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_assign_net_identifier(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     device: &DeviceId,
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     // SAFETY: Caller must ensure `net_identifier` is a valid C String.
     let net_identifier = unsafe { net_identifier.as_underlying() }?;
@@ -1493,11 +1532,12 @@ pub unsafe fn aqc_assign_net_identifier(
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_remove_net_identifier(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     device: &DeviceId,
     net_identifier: NetIdentifier,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     // SAFETY: Caller must ensure `net_identifier` is a valid C String.
     let net_identifier = unsafe { net_identifier.as_underlying() }?;
@@ -1569,12 +1609,13 @@ pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_bidi_channel(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
     channel: &mut MaybeUninit<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
 
@@ -1601,12 +1642,13 @@ pub unsafe fn aqc_create_bidi_channel(
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_uni_channel(
-    client: &mut Client,
+    client: *mut Client,
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
     channel: &mut MaybeUninit<AqcSendChannel>,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
 
@@ -1629,10 +1671,11 @@ pub unsafe fn aqc_create_uni_channel(
 /// @param[in] channel the AQC Channel [`AqcBidiChannel`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn aqc_delete_bidi_channel(
-    client: &mut Client,
+pub unsafe fn aqc_delete_bidi_channel(
+    client: *mut Client,
     channel: OwnedPtr<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     // SAFETY: the user is responsible for passing in a valid AqcBidiChannel pointer.
     let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
 
@@ -1651,13 +1694,14 @@ pub fn aqc_delete_bidi_channel(
 /// @param[in] channel the AQC Channel [`AqcSendChannel`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn aqc_delete_uni_channel(
-    client: &mut Client,
+pub unsafe fn aqc_delete_uni_channel(
+    client: *mut Client,
     channel: OwnedPtr<AqcSendChannel>,
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid AqcSendChannel pointer.
     let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
 
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let client = client.imp();
     client
         .rt
@@ -1693,10 +1737,11 @@ pub fn aqc_delete_uni_channel(
 /// @param[out] __output the corresponding AQC channel type [`AqcChannelType`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_try_receive_channel(
-    client: &mut Client,
+pub unsafe fn aqc_try_receive_channel(
+    client: *mut Client,
     channel: &mut MaybeUninit<AqcPeerChannel>,
 ) -> Result<AqcChannelType, imp::Error> {
+    let mut client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let chan = client.inner.aqc().try_receive_channel()?;
 
     let chan_type = match chan {
@@ -1777,11 +1822,12 @@ pub fn aqc_get_receive_channel(
 /// @param[out] stream the bidirectional AQC stream [`AqcBidiStream`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_bidi_create_bidi_stream(
-    client: &mut Client,
+pub unsafe fn aqc_bidi_create_bidi_stream(
+    client: *mut Client,
     channel: &mut AqcBidiChannel,
     stream: &mut MaybeUninit<AqcBidiStream>,
 ) -> Result<(), imp::Error> {
+    let client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let bidi = client.rt.block_on(channel.inner.create_bidi_stream())?;
 
     AqcBidiStream::init(stream, imp::AqcBidiStream::new(bidi));
@@ -1796,11 +1842,12 @@ pub fn aqc_bidi_create_bidi_stream(
 /// @param[in] data_len length of the data to send.
 ///
 /// @relates AranyaClient.
-pub fn aqc_bidi_stream_send(
-    client: &mut Client,
+pub unsafe fn aqc_bidi_stream_send(
+    client: *mut Client,
     stream: &mut AqcBidiStream,
     data: &[u8],
 ) -> Result<(), imp::Error> {
+    let client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let data = Bytes::copy_from_slice(data);
     Ok(client.rt.block_on(stream.inner.send(data))?)
 }
@@ -1852,11 +1899,12 @@ pub unsafe fn aqc_bidi_stream_try_recv(
 /// @param[out] stream the sending side of a stream [`AqcSendStream`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_bidi_create_uni_stream(
-    client: &mut Client,
+pub unsafe fn aqc_bidi_create_uni_stream(
+    client: *mut Client,
     channel: &mut AqcBidiChannel,
     stream: &mut MaybeUninit<AqcSendStream>,
 ) -> Result<(), imp::Error> {
+    let client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let send = client.rt.block_on(channel.inner.create_uni_stream())?;
 
     AqcSendStream::init(stream, imp::AqcSendStream::new(send));
@@ -1911,11 +1959,12 @@ pub fn aqc_bidi_try_receive_stream(
 /// @param[out] stream the sending side of a stream [`AqcSendStream`].
 ///
 /// @relates AranyaClient.
-pub fn aqc_send_create_uni_stream(
-    client: &mut Client,
+pub unsafe fn aqc_send_create_uni_stream(
+    client: *mut Client,
     channel: &mut AqcSendChannel,
     stream: &mut MaybeUninit<AqcSendStream>,
 ) -> Result<(), imp::Error> {
+    let client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let send = client.rt.block_on(channel.inner.create_uni_stream())?;
 
     AqcSendStream::init(stream, imp::AqcSendStream::new(send));
@@ -1952,11 +2001,12 @@ pub fn aqc_recv_try_receive_uni_stream(
 /// @param[in] data_len length of the data to send.
 ///
 /// @relates AranyaClient.
-pub fn aqc_send_stream_send(
-    client: &mut Client,
+pub unsafe fn aqc_send_stream_send(
+    client: *mut Client,
     stream: &mut AqcSendStream,
     data: &[u8],
 ) -> Result<(), imp::Error> {
+    let client = aranya_capi_core::try_as_ref!(client).try_lock()?;
     let data = Bytes::copy_from_slice(data);
     Ok(client.rt.block_on(stream.inner.send(data))?)
 }
