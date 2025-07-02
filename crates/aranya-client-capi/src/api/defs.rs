@@ -510,7 +510,7 @@ pub unsafe fn get_key_bundle(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -575,7 +575,7 @@ pub unsafe fn get_device_id(client: *mut Client) -> Result<DeviceId, imp::Error>
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -896,7 +896,7 @@ pub unsafe fn assign_role(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -932,7 +932,7 @@ pub unsafe fn revoke_role(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -966,7 +966,7 @@ pub unsafe fn create_label(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -999,7 +999,7 @@ pub unsafe fn delete_label(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1036,7 +1036,7 @@ pub unsafe fn assign_label(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1072,7 +1072,7 @@ pub unsafe fn revoke_label(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1101,7 +1101,7 @@ pub unsafe fn create_team(client: *mut Client, cfg: &TeamConfig) -> Result<TeamI
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1129,7 +1129,7 @@ pub unsafe fn rand(client: *mut Client, buf: &mut [MaybeUninit<u8>]) -> Result<(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1173,7 +1173,7 @@ pub unsafe fn encrypt_psk_seed_for_peer(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1219,7 +1219,7 @@ pub unsafe fn add_team(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1243,7 +1243,7 @@ pub unsafe fn remove_team(client: *mut Client, team: &TeamId) -> Result<(), imp:
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1266,7 +1266,7 @@ pub unsafe fn close_team(client: *mut Client, team: &TeamId) -> Result<(), imp::
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1297,7 +1297,7 @@ pub unsafe fn add_device_to_team(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1333,7 +1333,7 @@ pub unsafe fn remove_device_from_team(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1371,7 +1371,7 @@ pub unsafe fn add_sync_peer(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1405,7 +1405,7 @@ pub unsafe fn remove_sync_peer(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1447,7 +1447,7 @@ pub unsafe fn sync_now(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1483,7 +1483,7 @@ pub unsafe fn query_devices_on_team(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1532,7 +1532,7 @@ pub unsafe fn query_device_keybundle(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1575,7 +1575,7 @@ pub unsafe fn query_device_label_assignments(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1624,7 +1624,7 @@ pub unsafe fn query_labels(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1665,7 +1665,7 @@ pub unsafe fn query_label_exists(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1702,7 +1702,7 @@ pub unsafe fn query_aqc_net_identifier(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1748,7 +1748,7 @@ pub unsafe fn aqc_assign_net_identifier(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1786,7 +1786,7 @@ pub unsafe fn aqc_remove_net_identifier(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1876,7 +1876,7 @@ pub unsafe fn aqc_create_bidi_channel(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1920,7 +1920,7 @@ pub unsafe fn aqc_create_uni_channel(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1958,7 +1958,7 @@ pub unsafe fn aqc_delete_bidi_channel(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -1989,7 +1989,7 @@ pub unsafe fn aqc_delete_uni_channel(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -2037,7 +2037,7 @@ pub unsafe fn aqc_try_receive_channel(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -2133,7 +2133,7 @@ pub unsafe fn aqc_bidi_create_bidi_stream(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -2165,7 +2165,7 @@ pub unsafe fn aqc_bidi_stream_send(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -2234,7 +2234,7 @@ pub unsafe fn aqc_bidi_create_uni_stream(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -2304,7 +2304,7 @@ pub unsafe fn aqc_send_create_uni_stream(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
@@ -2356,7 +2356,7 @@ pub unsafe fn aqc_send_stream_send(
             .as_ref()
             .ok_or(InvalidArg::new(
                 "client",
-                "unable to get mutable reference to client",
+                "unable to get reference to client",
             ))?
             .imp()
             .get_arcs()
