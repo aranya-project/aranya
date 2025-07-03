@@ -15,7 +15,7 @@ pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, SeedMode, Text, WrappedSeed,
+    DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;

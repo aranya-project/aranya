@@ -7,8 +7,8 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    aqc::AqcPeerChannel, client::Client, AddTeamConfig, CreateTeamConfig, Error, QuicSyncConfig,
-    SyncPeerConfig,
+    aqc::AqcPeerChannel, client::Client, AddQuicSyncConfig, AddTeamConfig, CreateQuicSyncConfig,
+    CreateTeamConfig, Error, SyncPeerConfig,
 };
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
@@ -215,7 +215,7 @@ async fn main() -> Result<()> {
         buf
     };
     let create_team_cfg = {
-        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+        let qs_cfg = CreateQuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
         CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
     };
 
@@ -240,7 +240,7 @@ async fn main() -> Result<()> {
     info!(%team_id);
 
     let add_team_cfg = {
-        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+        let qs_cfg = AddQuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
         AddTeamConfig::builder()
             .quic_sync(qs_cfg)
             .id(team_id)

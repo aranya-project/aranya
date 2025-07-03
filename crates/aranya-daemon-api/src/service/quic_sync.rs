@@ -8,22 +8,48 @@ use crate::{Ikm, CS};
 pub const SEED_IKM_SIZE: usize = 32;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct QuicSyncConfig {
-    pub seed_mode: SeedMode,
+pub struct CreateQuicSyncConfig {
+    pub seed_mode: CreateSeedMode,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AddQuicSyncConfig {
+    pub seed_mode: AddSeedMode,
 }
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
-/// Specifies how PSK seeds are provided when creating or joining teams.
+/// Specifies how PSK seeds are provided when creating a new team.
 ///
 /// Teams share a single PSK seed that is used to derive Pre-Shared Keys (PSKs)
 /// for QUIC connections between team members.
-pub enum SeedMode {
+pub enum CreateSeedMode {
     /// Generates a new random seed.
     ///
     /// Used by team owners in the `create_team` API when establishing a new team.
     Generate,
 
+    /// Provides raw input key material to derive a seed.
+    ///
+    /// The IKM must be exactly 32 bytes. This mode is available in both:
+    /// - `create_team`: Allows team owners to specify deterministic seed material
+    /// - `add_team`: Allows non-owners to join using pre-shared key material
+    IKM(Ikm),
+}
+
+impl Default for CreateSeedMode {
+    fn default() -> Self {
+        Self::Generate
+    }
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+/// Specifies how PSK seeds are provided when joining teams.
+///
+/// Teams share a single PSK seed that is used to derive Pre-Shared Keys (PSKs)
+/// for QUIC connections between team members.
+pub enum AddSeedMode {
     /// Provides raw input key material to derive a seed.
     ///
     /// The IKM must be exactly 32 bytes. This mode is available in both:
@@ -37,12 +63,6 @@ pub enum SeedMode {
     /// Seeds are wrapped (encrypted) to prevent plaintext exposure during
     /// the join process.
     Wrapped(WrappedSeed),
-}
-
-impl Default for SeedMode {
-    fn default() -> Self {
-        Self::Generate
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

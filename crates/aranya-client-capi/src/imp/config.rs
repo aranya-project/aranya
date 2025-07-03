@@ -4,7 +4,7 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::{Ikm, SeedMode, SEED_IKM_SIZE};
+use aranya_daemon_api::{CreateSeedMode, Ikm, SEED_IKM_SIZE};
 use tracing::error;
 
 use super::Error;
@@ -227,7 +227,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
-    mode: SeedMode,
+    mode: CreateSeedMode,
 }
 
 impl QuicSyncConfig {
@@ -256,18 +256,18 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    mode: SeedMode,
+    mode: CreateSeedMode,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
-    pub fn mode(&mut self, mode: SeedMode) {
+    pub fn mode(&mut self, mode: CreateSeedMode) {
         self.mode = mode;
     }
 
     /// Sets mode to generate PSK seed.
     pub fn generate(&mut self) {
-        self.mode = SeedMode::Generate;
+        self.mode = CreateSeedMode::Generate;
     }
 
     /// Sets wrapped PSK seed.
@@ -276,14 +276,14 @@ impl QuicSyncConfigBuilder {
             error!(?err);
             InvalidArg::new("wrapped_seed", "could not deserialize")
         })?;
-        self.mode = SeedMode::Wrapped(wrapped);
+        self.mode = CreateSeedMode::Wrapped(wrapped);
 
         Ok(())
     }
 
     /// Sets raw PSK seed IKM.
     pub fn raw_seed_ikm(&mut self, ikm: &[u8; SEED_IKM_SIZE]) -> Result<(), Error> {
-        self.mode = SeedMode::IKM(Ikm::from(*ikm));
+        self.mode = CreateSeedMode::IKM(Ikm::from(*ikm));
 
         Ok(())
     }

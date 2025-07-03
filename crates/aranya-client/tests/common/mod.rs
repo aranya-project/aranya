@@ -6,7 +6,8 @@ use std::{
 
 use anyhow::{Context, Result};
 use aranya_client::{
-    client::Client, config::CreateTeamConfig, AddTeamConfig, QuicSyncConfig, SyncPeerConfig,
+    client::Client, config::CreateTeamConfig, AddQuicSyncConfig, AddTeamConfig,
+    CreateQuicSyncConfig, SyncPeerConfig,
 };
 use aranya_daemon::{
     config::{self as daemon_cfg, Config},
@@ -140,7 +141,7 @@ impl TeamCtx {
             buf
         };
         let owner_cfg = {
-            let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+            let qs_cfg = CreateQuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
             CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
         };
 
@@ -155,7 +156,7 @@ impl TeamCtx {
         info!(?team_id);
 
         let cfg = {
-            let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
+            let qs_cfg = AddQuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
             AddTeamConfig::builder()
                 .id(team_id)
                 .quic_sync(qs_cfg)

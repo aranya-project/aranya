@@ -138,14 +138,14 @@ pub enum Role {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AddTeamConfig {
     pub id: TeamId,
-    pub quic_sync: Option<QuicSyncConfig>,
+    pub quic_sync: Option<AddQuicSyncConfig>,
 }
 
 // Note: any fields added to this type should be public
 /// A configuration for creating a team in the daemon.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreateTeamConfig {
-    pub quic_sync: Option<QuicSyncConfig>,
+    pub quic_sync: Option<CreateQuicSyncConfig>,
 }
 
 /// A device's network identifier.
