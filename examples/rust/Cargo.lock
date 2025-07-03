@@ -150,6 +150,7 @@ dependencies = [
  "backon",
  "buggy",
  "bytes",
+ "futures-util",
  "tempfile",
  "tokio",
  "tracing",
