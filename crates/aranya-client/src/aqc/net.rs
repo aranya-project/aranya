@@ -75,6 +75,24 @@ struct ClientState {
     client_keys: Arc<ClientPresharedKeys>,
 }
 
+impl ClientState {
+    fn connect_ctrl(&mut self, addr: SocketAddr) -> s2n_quic::client::ConnectionAttempt {
+        self.client_keys.set_key(CTRL_PSK.clone());
+        self.quic_client
+            .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
+    }
+
+    fn connect_data(
+        &mut self,
+        addr: SocketAddr,
+        psks: AqcPsks,
+    ) -> s2n_quic::client::ConnectionAttempt {
+        self.client_keys.load_psks(psks);
+        self.quic_client
+            .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
+    }
+}
+
 #[derive(Debug)]
 struct ServerState {
     /// Quic server used to accept channels from peers.
@@ -170,14 +188,12 @@ impl AqcClient {
         psks: AqcUniPsks,
     ) -> Result<channels::AqcSendChannel, AqcError> {
         let channel_id = UniChannelId::from(*psks.channel_id());
-        let mut conn = {
-            let state = self.client_state.lock().await;
-            state.client_keys.load_psks(AqcPsks::Uni(psks));
-            state
-                .quic_client
-                .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
-                .await?
-        };
+        let mut conn = self
+            .client_state
+            .lock()
+            .await
+            .connect_data(addr, AqcPsks::Uni(psks))
+            .await?;
         conn.keep_alive(true)?;
         Ok(channels::AqcSendChannel::new(
             label_id,
@@ -194,14 +210,12 @@ impl AqcClient {
         psks: AqcBidiPsks,
     ) -> Result<channels::AqcBidiChannel, AqcError> {
         let channel_id = BidiChannelId::from(*psks.channel_id());
-        let mut conn = {
-            let state = self.client_state.lock().await;
-            state.client_keys.load_psks(AqcPsks::Bidi(psks));
-            state
-                .quic_client
-                .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
-                .await?
-        };
+        let mut conn = self
+            .client_state
+            .lock()
+            .await
+            .connect_data(addr, AqcPsks::Bidi(psks))
+            .await?;
         conn.keep_alive(true)?;
         Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
     }
@@ -336,14 +350,7 @@ impl AqcClient {
         ctrl: AqcCtrl,
         team_id: TeamId,
     ) -> Result<(), AqcError> {
-        let mut conn = {
-            let state = self.client_state.lock().await;
-            state.client_keys.set_key(CTRL_PSK.clone());
-            state
-                .quic_client
-                .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
-                .await?
-        };
+        let mut conn = self.client_state.lock().await.connect_ctrl(addr).await?;
         let mut stream = conn.open_bidirectional_stream().await?;
 
         let msg = AqcCtrlMessage { team_id, ctrl };
