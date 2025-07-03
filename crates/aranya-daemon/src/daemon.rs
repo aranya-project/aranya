@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io, path::Path, sync::Arc};
+use std::{collections::BTreeMap, fmt, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -406,6 +406,12 @@ impl Daemon {
     }
 }
 
+impl fmt::Debug for Daemon {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Daemon").finish_non_exhaustive()
+    }
+}
+
 /// Tries to read CBOR from `path`.
 async fn try_read_cbor<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<Option<T>> {
     match fs::read(path.as_ref()).await {
@@ -510,5 +516,94 @@ mod tests {
         time::timeout(Duration::from_secs(1), daemon.spawn().join())
             .await
             .expect_err("`Timeout` should return Elapsed");
+    }
+
+    /// Tests running the daemon with QUIC sync configuration missing.
+    #[test(tokio::test)]
+    async fn test_daemon_run_missing_quic_sync() {
+        let dir = tempdir().expect("should be able to create temp dir");
+        let work_dir = dir.path().join("work");
+
+        let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
+        let cfg = Config {
+            name: "name".to_string(),
+            runtime_dir: work_dir.join("run"),
+            state_dir: work_dir.join("state"),
+            cache_dir: work_dir.join("cache"),
+            logs_dir: work_dir.join("logs"),
+            config_dir: work_dir.join("config"),
+            sync_addr: any,
+            quic_sync: None,
+            afc: Some(AfcConfig {
+                shm_path: "/test_daemon1".to_owned(),
+                unlink_on_startup: true,
+                unlink_at_exit: true,
+                create: true,
+                max_chans: 100,
+            }),
+            aqc: None,
+        };
+        for dir in [
+            &cfg.runtime_dir,
+            &cfg.state_dir,
+            &cfg.cache_dir,
+            &cfg.logs_dir,
+            &cfg.config_dir,
+        ] {
+            aranya_util::create_dir_all(dir)
+                .await
+                .expect("should be able to create directory");
+        }
+
+        let daemon = Daemon::load(cfg)
+            .await
+            .expect("should be able to load `Daemon`");
+
+        time::timeout(Duration::from_secs(1), daemon.spawn().join())
+            .await
+            .expect_err("`Timeout` should return Elapsed");
+    }
+
+    /// Tests running the daemon with the QUIC syncer disabled.
+    #[test(tokio::test)]
+    async fn test_daemon_run_quic_syncer_disabled() {
+        let dir = tempdir().expect("should be able to create temp dir");
+        let work_dir = dir.path().join("work");
+
+        let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
+        // Initialize config with QUIC syncer disabled.
+        let cfg = Config {
+            name: "name".to_string(),
+            runtime_dir: work_dir.join("run"),
+            state_dir: work_dir.join("state"),
+            cache_dir: work_dir.join("cache"),
+            logs_dir: work_dir.join("logs"),
+            config_dir: work_dir.join("config"),
+            sync_addr: any,
+            quic_sync: Some(QuicSyncConfig { enabled: false }),
+            afc: Some(AfcConfig {
+                shm_path: "/test_daemon2".to_owned(),
+                unlink_on_startup: true,
+                unlink_at_exit: true,
+                create: true,
+                max_chans: 100,
+            }),
+            aqc: None,
+        };
+        for dir in [
+            &cfg.runtime_dir,
+            &cfg.state_dir,
+            &cfg.cache_dir,
+            &cfg.logs_dir,
+            &cfg.config_dir,
+        ] {
+            aranya_util::create_dir_all(dir)
+                .await
+                .expect("should be able to create directory");
+        }
+
+        Daemon::load(cfg)
+            .await
+            .expect_err("should be unable to load daemon without quic syncer configured");
     }
 }
