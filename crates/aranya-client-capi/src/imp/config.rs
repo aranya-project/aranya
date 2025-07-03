@@ -4,11 +4,11 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::{Ikm, SeedMode, SEED_IKM_SIZE};
+use aranya_daemon_api::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
 use tracing::error;
 
 use super::Error;
-use crate::api::defs::{self, Duration};
+use crate::api::defs::{self, Duration, TeamId};
 
 /// Configuration info for Aranya
 #[derive(Clone, Debug)]
@@ -225,49 +225,121 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct QuicSyncConfig {
-    mode: SeedMode,
+mod quic_sync {
+    use aranya_daemon_api::{AddSeedMode, CreateSeedMode};
+
+    #[derive(Clone)]
+    pub struct Add {
+        pub(super) mode: AddSeedMode,
+    }
+
+    #[derive(Clone)]
+    pub struct Create {
+        pub(super) mode: CreateSeedMode,
+    }
+
+    impl Create {
+        pub(super) fn new(mode: CreateSeedMode) -> Self {
+            Self { mode }
+        }
+    }
+
+    impl Add {
+        pub(super) fn new(mode: AddSeedMode) -> Self {
+            Self { mode }
+        }
+    }
+
+    #[derive(Clone, Default)]
+    pub struct AddBuild {
+        pub(super) mode: Option<AddSeedMode>,
+    }
+
+    #[derive(Clone, Default)]
+    pub struct CreateBuild {
+        pub(super) mode: CreateSeedMode,
+    }
 }
 
-impl QuicSyncConfig {
+#[derive(Clone)]
+pub struct QuicSyncConfig<T> {
+    data: T,
+}
+
+impl<T: Clone> QuicSyncConfig<T> {
     /// Useful for deref coercion.
     pub(crate) fn imp(&self) -> Self {
         self.clone()
     }
+}
 
-    pub fn builder() -> QuicSyncConfigBuilder {
+pub type CreateQuicSyncConfig = QuicSyncConfig<quic_sync::Create>;
+pub type AddQuicSyncConfig = QuicSyncConfig<quic_sync::Add>;
+
+impl CreateQuicSyncConfig {
+    fn new(mode: CreateSeedMode) -> Self {
+        Self {
+            data: quic_sync::Create::new(mode),
+        }
+    }
+
+    pub fn builder() -> CreateQuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }
 }
 
-impl Typed for QuicSyncConfig {
-    const TYPE_ID: TypeId = TypeId::new(0xADF0F970);
-}
+impl AddQuicSyncConfig {
+    fn new(mode: AddSeedMode) -> Self {
+        Self {
+            data: quic_sync::Add::new(mode),
+        }
+    }
 
-impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
-    fn from(value: QuicSyncConfig) -> Self {
-        Self::builder()
-            .mode(value.mode)
-            .build()
-            .expect("All fields are set")
+    pub fn builder() -> AddQuicSyncConfigBuilder {
+        QuicSyncConfigBuilder::default()
     }
 }
 
-#[derive(Default)]
-pub struct QuicSyncConfigBuilder {
-    mode: SeedMode,
+#[derive(Clone, Default)]
+pub struct QuicSyncConfigBuilder<T> {
+    data: T,
 }
 
-impl QuicSyncConfigBuilder {
+pub(crate) type CreateQuicSyncConfigBuilder = QuicSyncConfigBuilder<quic_sync::CreateBuild>;
+pub(crate) type AddQuicSyncConfigBuilder = QuicSyncConfigBuilder<quic_sync::AddBuild>;
+
+impl CreateQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
-    pub fn mode(&mut self, mode: SeedMode) {
-        self.mode = mode;
+    #[doc(hidden)]
+    pub fn mode(&mut self, mode: CreateSeedMode) {
+        self.data.mode = mode;
     }
 
-    /// Sets mode to generate PSK seed.
+    /// Sets the seed to be generated.
+    ///
+    /// Overwrites [`Self::seed_ikm`].
     pub fn generate(&mut self) {
-        self.mode = SeedMode::Generate;
+        self.data.mode = CreateSeedMode::Generate;
+    }
+
+    /// Sets the seed mode to 'IKM'.
+    ///
+    /// Overwrites [`Self::gen_seed`].
+    pub fn raw_seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) {
+        self.data.mode = CreateSeedMode::IKM(ikm.into());
+    }
+}
+
+impl AddQuicSyncConfigBuilder {
+    /// Sets the PSK seed mode.
+    #[doc(hidden)]
+    pub fn mode(&mut self, mode: AddSeedMode) {
+        self.data.mode = Some(mode);
+    }
+
+    /// Sets raw PSK seed IKM.
+    pub fn raw_seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) {
+        self.data.mode = Some(AddSeedMode::IKM(ikm.into()));
     }
 
     /// Sets wrapped PSK seed.
@@ -276,49 +348,186 @@ impl QuicSyncConfigBuilder {
             error!(?err);
             InvalidArg::new("wrapped_seed", "could not deserialize")
         })?;
-        self.mode = SeedMode::Wrapped(wrapped);
+        self.data.mode = Some(AddSeedMode::Wrapped(wrapped));
 
         Ok(())
-    }
-
-    /// Sets raw PSK seed IKM.
-    pub fn raw_seed_ikm(&mut self, ikm: &[u8; SEED_IKM_SIZE]) -> Result<(), Error> {
-        self.mode = SeedMode::IKM(Ikm::from(*ikm));
-
-        Ok(())
-    }
-
-    /// Builds the config.
-    pub fn build(self) -> Result<QuicSyncConfig, Error> {
-        Ok(QuicSyncConfig { mode: self.mode })
     }
 }
 
-impl Typed for QuicSyncConfigBuilder {
+impl Typed for AddQuicSyncConfig {
+    const TYPE_ID: TypeId = TypeId::new(0xADF0F970);
+}
+
+impl Typed for CreateQuicSyncConfig {
+    const TYPE_ID: TypeId = TypeId::new(0xADF0F971);
+}
+
+impl From<AddQuicSyncConfig> for aranya_client::AddQuicSyncConfig {
+    fn from(value: AddQuicSyncConfig) -> Self {
+        Self::builder()
+            .mode(value.data.mode)
+            .build()
+            .expect("All fields are set")
+    }
+}
+
+impl From<CreateQuicSyncConfig> for aranya_client::CreateQuicSyncConfig {
+    fn from(value: CreateQuicSyncConfig) -> Self {
+        Self::builder()
+            .mode(value.data.mode)
+            .build()
+            .expect("All fields are set")
+    }
+}
+
+impl Typed for CreateQuicSyncConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0xEEC2FA47);
 }
 
-impl Builder for QuicSyncConfigBuilder {
-    type Output = defs::QuicSyncConfig;
+impl Typed for AddQuicSyncConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0xEEC2FA48);
+}
+
+impl Builder for CreateQuicSyncConfigBuilder {
+    type Output = defs::CreateQuicSyncConfig;
     type Error = Error;
 
     /// # Safety
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Self::Output::init(out, QuicSyncConfig { mode: self.mode });
+        Self::Output::init(out, CreateQuicSyncConfig::new(self.data.mode));
         Ok(())
     }
 }
 
-/// Configuration info when creating or adding a team in Aranya
-#[derive(Clone, Debug)]
-pub struct TeamConfig {
-    quic_sync: Option<QuicSyncConfig>,
+impl Builder for AddQuicSyncConfigBuilder {
+    type Output = defs::AddQuicSyncConfig;
+    type Error = Error;
+
+    /// # Safety
+    ///
+    /// No special considerations.
+    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
+        let Some(mode) = self.data.mode else {
+            todo!("Don't panic. Return invalid arg error.")
+        };
+
+        Self::Output::init(out, AddQuicSyncConfig::new(mode));
+        Ok(())
+    }
 }
 
-impl From<TeamConfig> for aranya_client::TeamConfig {
-    fn from(value: TeamConfig) -> Self {
+mod team {
+    use super::TeamId;
+
+    #[derive(Clone)]
+    pub struct Add {
+        pub(super) id: TeamId,
+    }
+
+    #[derive(Clone)]
+    pub struct Create;
+
+    impl Add {
+        pub(super) fn new(id: TeamId) -> Self {
+            Self { id }
+        }
+    }
+
+    #[derive(Default)]
+    pub struct AddBuild {
+        pub(super) id: Option<TeamId>,
+    }
+
+    #[derive(Default)]
+    pub struct CreateBuild;
+}
+
+#[derive(Clone)]
+/// Builder for a [`TeamConfig`].
+pub struct TeamConfigBuilder<T, U> {
+    data: T,
+    quic_sync: Option<QuicSyncConfig<U>>,
+}
+
+impl<T: Default, U> Default for TeamConfigBuilder<T, U> {
+    fn default() -> Self {
+        Self {
+            data: T::default(),
+            quic_sync: None,
+        }
+    }
+}
+
+pub type CreateTeamConfigBuilder = TeamConfigBuilder<team::CreateBuild, quic_sync::Create>;
+pub type AddTeamConfigBuilder = TeamConfigBuilder<team::AddBuild, quic_sync::Add>;
+
+#[derive(Clone)]
+/// Configuration info for creating or adding teams.
+pub struct TeamConfig<T, U> {
+    data: T,
+    quic_sync: Option<QuicSyncConfig<U>>,
+}
+
+pub type CreateTeamConfig = TeamConfig<team::Create, quic_sync::Create>;
+pub type AddTeamConfig = TeamConfig<team::Add, quic_sync::Add>;
+
+impl AddTeamConfig {
+    fn new(id: TeamId, quic_sync: Option<AddQuicSyncConfig>) -> Self {
+        Self {
+            data: team::Add::new(id),
+            quic_sync,
+        }
+    }
+
+    /// Creates a default [`AddTeamConfigBuilder`].
+    pub fn builder() -> AddTeamConfigBuilder {
+        TeamConfigBuilder::default()
+    }
+}
+
+impl CreateTeamConfig {
+    fn new(quic_sync: Option<CreateQuicSyncConfig>) -> Self {
+        Self {
+            data: team::Create,
+            quic_sync,
+        }
+    }
+
+    /// Creates a default [`CreateTeamConfigBuilder`].
+    pub fn builder() -> CreateTeamConfigBuilder {
+        TeamConfigBuilder::default()
+    }
+}
+
+impl AddTeamConfigBuilder {
+    /// Sets the ID of the team to add.
+    pub fn id(&mut self, id: TeamId) {
+        self.data.id = Some(id);
+    }
+
+    /// Configures the quic_sync config..
+    ///
+    /// This is an optional field that configures how the team
+    /// synchronizes data over QUIC connections.
+    pub fn quic(&mut self, cfg: AddQuicSyncConfig) {
+        self.quic_sync = Some(cfg);
+    }
+}
+
+impl CreateTeamConfigBuilder {
+    /// Configures the quic_sync config..
+    ///
+    /// This is an optional field that configures how the team
+    /// synchronizes data over QUIC connections.
+    pub fn quic(&mut self, cfg: CreateQuicSyncConfig) {
+        self.quic_sync = Some(cfg);
+    }
+}
+
+impl From<CreateTeamConfig> for aranya_client::CreateTeamConfig {
+    fn from(value: CreateTeamConfig) -> Self {
         let mut builder = Self::builder();
         if let Some(cfg) = value.quic_sync {
             builder = builder.quic_sync(cfg.into());
@@ -328,47 +537,71 @@ impl From<TeamConfig> for aranya_client::TeamConfig {
     }
 }
 
-impl From<&TeamConfig> for aranya_client::TeamConfig {
-    fn from(value: &TeamConfig) -> Self {
+impl From<&CreateTeamConfig> for aranya_client::CreateTeamConfig {
+    fn from(value: &CreateTeamConfig) -> Self {
         Self::from(value.to_owned())
     }
 }
 
-impl Typed for TeamConfig {
+impl Typed for CreateTeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
 }
 
-/// Builder for a [`TeamConfig`]
-#[derive(Clone, Debug, Default)]
-pub struct TeamConfigBuilder {
-    quic_sync: Option<QuicSyncConfig>,
+impl Typed for CreateTeamConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x69F54A43);
 }
 
-impl Typed for TeamConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x112905E7);
-}
-
-impl TeamConfigBuilder {
-    /// Sets the QUIC syncer config.
-    pub fn quic(&mut self, quic: QuicSyncConfig) {
-        self.quic_sync = Some(quic.clone());
-    }
-}
-
-impl Builder for TeamConfigBuilder {
-    type Output = defs::TeamConfig;
+impl Builder for CreateTeamConfigBuilder {
+    type Output = defs::CreateTeamConfig;
     type Error = Error;
 
     /// # Safety
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Self::Output::init(
-            out,
-            TeamConfig {
-                quic_sync: self.quic_sync,
-            },
-        );
+        Self::Output::init(out, CreateTeamConfig::new(self.quic_sync));
+        Ok(())
+    }
+}
+
+impl From<AddTeamConfig> for aranya_client::AddTeamConfig {
+    fn from(value: AddTeamConfig) -> Self {
+        let mut builder = Self::builder();
+        if let Some(cfg) = value.quic_sync {
+            builder = builder.quic_sync(cfg.into()).id((&value.data.id).into());
+        }
+
+        builder.build().expect("All fields set")
+    }
+}
+
+impl From<&AddTeamConfig> for aranya_client::AddTeamConfig {
+    fn from(value: &AddTeamConfig) -> Self {
+        Self::from(value.to_owned())
+    }
+}
+
+impl Typed for AddTeamConfig {
+    const TYPE_ID: TypeId = TypeId::new(0xA05F7519);
+}
+
+impl Typed for AddTeamConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x112905E7);
+}
+
+impl Builder for AddTeamConfigBuilder {
+    type Output = defs::AddTeamConfig;
+    type Error = Error;
+
+    /// # Safety
+    ///
+    /// No special considerations.
+    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
+        let Some(id) = self.data.id else {
+            return Err(InvalidArg::new("id", "field not set").into());
+        };
+
+        Self::Output::init(out, AddTeamConfig::new(id, self.quic_sync));
         Ok(())
     }
 }

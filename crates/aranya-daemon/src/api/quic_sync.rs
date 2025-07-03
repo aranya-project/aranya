@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use aranya_daemon_api::QuicSyncConfig;
+use aranya_daemon_api::{AddSeedMode, CreateQuicSyncConfig, CreateSeedMode};
 
 use super::*;
 use crate::sync::task::quic::PskStore;
@@ -15,7 +15,7 @@ impl Api {
     pub(super) async fn create_team_quic_sync(
         &mut self,
         team_id: api::TeamId,
-        qs_cfg: QuicSyncConfig,
+        qs_cfg: CreateQuicSyncConfig,
     ) -> api::Result<()> {
         let psk_store = self
             .quic
@@ -25,13 +25,8 @@ impl Api {
             .clone();
 
         let seed = match &qs_cfg.seed_mode {
-            SeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
-            SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
-            SeedMode::Wrapped { .. } => {
-                return Err(api::Error::from_msg(
-                    "Cannot create team with existing wrapped PSK seed",
-                ))
-            }
+            CreateSeedMode::Generate => qs::PskSeed::new(&mut Rng, team_id),
+            CreateSeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(ikm, team_id),
         };
 
         self.add_seed(team_id, seed.clone()).await?;
@@ -49,7 +44,7 @@ impl Api {
     pub(super) async fn add_team_quic_sync(
         &mut self,
         team: api::TeamId,
-        cfg: QuicSyncConfig,
+        cfg: api::AddQuicSyncConfig,
     ) -> api::Result<()> {
         let psk_store = self
             .quic
@@ -59,13 +54,8 @@ impl Api {
             .clone();
 
         let seed = match cfg.seed_mode {
-            SeedMode::Generate => {
-                return Err(api::Error::from_msg(
-                    "Must provide PSK seed from team creation",
-                ));
-            }
-            SeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(&ikm, team),
-            SeedMode::Wrapped(wrapped) => {
+            AddSeedMode::IKM(ikm) => qs::PskSeed::import_from_ikm(&ikm, team),
+            AddSeedMode::Wrapped(wrapped) => {
                 let enc_sk: EncryptionKey<CS> = {
                     let enc_id = self.pk.lock().expect("poisoned").enc_pk.id()?;
                     let crypto = &mut *self.crypto.lock().await;

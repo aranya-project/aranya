@@ -651,35 +651,50 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
 
 /// QUIC syncer configuration.
 ///
-/// Use a [`QuicSyncConfigBuilder`] to construct this object.
+/// Use a [`CreateQuicSyncConfigBuilder`] to construct this object.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
+pub type CreateQuicSyncConfig = Safe<imp::CreateQuicSyncConfig>;
 
-/// A builder for initializing a [`QuicSyncConfig`].
+/// QUIC syncer configuration.
 ///
-/// The [`QuicSyncConfig`] is an optional part of initializing a [`TeamConfig`].
+/// Use a [`AddQuicSyncConfigBuilder`] to construct this object.
+#[aranya_capi_core::opaque(size = 288, align = 8)]
+pub type AddQuicSyncConfig = Safe<imp::AddQuicSyncConfig>;
+
+/// A builder for initializing an [`AddQuicSyncConfig`].
+///
+/// The [`QuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`] or a [`CreateTeamConfig`].
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
+pub type AddQuicSyncConfigBuilder = Safe<imp::AddQuicSyncConfigBuilder>;
 
-/// Attempts to set PSK seed generation mode value on [`QuicSyncConfigBuilder`].
+/// A builder for initializing a [`CreateQuicSyncConfig`].
+///
+/// The [`QuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`] or a [`CreateTeamConfig`].
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 288, align = 8)]
+pub type CreateQuicSyncConfigBuilder = Safe<imp::CreateQuicSyncConfigBuilder>;
+
+/// Attempts to set PSK seed generation mode value on [`CreateQuicSyncConfigBuilder`].
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
-pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), imp::Error> {
+pub fn create_quic_sync_config_generate(
+    cfg: &mut CreateQuicSyncConfigBuilder,
+) -> Result<(), imp::Error> {
     cfg.generate();
     Ok(())
 }
 
-/// Attempts to set wrapped PSK seed value on [`QuicSyncConfigBuilder`].
+/// Attempts to set wrapped PSK seed value on [`AddQuicSyncConfigBuilder`].
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] encap_seed a pointer the encapsulated PSK seed
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
-pub fn quic_sync_config_wrapped_seed(
-    cfg: &mut QuicSyncConfigBuilder,
+pub fn add_quic_sync_config_wrapped_seed(
+    cfg: &mut AddQuicSyncConfigBuilder,
     encap_seed: &[u8],
 ) -> Result<(), imp::Error> {
     cfg.wrapped_seed(encap_seed)?;
@@ -693,80 +708,168 @@ pub struct SeedIkm {
     bytes: [u8; ARANYA_SEED_IKM_LEN],
 }
 
-/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`QuicSyncConfigBuilder`].
+/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`CreateQuicSyncConfigBuilder`].
 ///
-/// @param[in,out] cfg a pointer to the quic sync config builder [`QuicSyncConfigBuilder`]
+/// @param[in,out] cfg a pointer to the quic sync config builder [`CreateQuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
-pub fn quic_sync_config_raw_seed_ikm(
-    cfg: &mut QuicSyncConfigBuilder,
+pub fn create_quic_sync_config_raw_seed_ikm(
+    cfg: &mut CreateQuicSyncConfigBuilder,
     ikm: &SeedIkm,
 ) -> Result<(), imp::Error> {
-    cfg.raw_seed_ikm(&ikm.bytes)?;
+    cfg.raw_seed_ikm(ikm.bytes);
     Ok(())
 }
 
-/// Attempts to construct a [`QuicSyncConfig`].
+/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`AddQuicSyncConfigBuilder`].
+///
+/// @param[in,out] cfg a pointer to the quic sync config builder [`AddQuicSyncConfigBuilder`]
+/// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
+///
+/// @relates AranyaQuicSyncConfigBuilder.
+pub fn add_quic_sync_config_raw_seed_ikm(
+    cfg: &mut AddQuicSyncConfigBuilder,
+    ikm: &SeedIkm,
+) -> Result<(), imp::Error> {
+    cfg.raw_seed_ikm(ikm.bytes);
+    Ok(())
+}
+
+/// Attempts to construct a [`CreateQuicSyncConfig`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param[in] cfg a pointer to the QUIC sync config builder [`QuicSyncConfigBuilder`]
-/// @param[out] out a pointer to write the QUIC sync config to [`QuicSyncConfig`]
+/// @param[in] cfg a pointer to the QUIC sync config builder [`CreateQuicSyncConfigBuilder`]
+/// @param[out] out a pointer to write the QUIC sync config to [`CreateQuicSyncConfig`]
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
-pub fn quic_sync_config_build(
-    cfg: OwnedPtr<QuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<QuicSyncConfig>,
+pub fn create_quic_sync_config_build(
+    cfg: OwnedPtr<CreateQuicSyncConfigBuilder>,
+    out: &mut MaybeUninit<CreateQuicSyncConfig>,
 ) -> Result<(), imp::Error> {
     // SAFETY: No special considerations.
     unsafe { cfg.build(out)? }
     Ok(())
 }
 
-/// Team configuration.
+/// Attempts to construct an [`AddQuicSyncConfig`].
 ///
-/// Use a [`TeamConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type TeamConfig = Safe<imp::TeamConfig>;
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param[in] cfg a pointer to the QUIC sync config builder [`AddQuicSyncConfigBuilder`]
+/// @param[out] out a pointer to write the QUIC sync config to [`AddQuicSyncConfig`]
+///
+/// @relates AranyaQuicSyncConfigBuilder.
+pub fn add_quic_sync_config_build(
+    cfg: OwnedPtr<AddQuicSyncConfigBuilder>,
+    out: &mut MaybeUninit<AddQuicSyncConfig>,
+) -> Result<(), imp::Error> {
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
+    Ok(())
+}
 
-/// A builder for initializing a [`TeamConfig`].
+/// Team configuration used when joining a team.
+///
+/// Use an [`AddTeamConfigBuilder`] to construct this object.
+#[aranya_capi_core::opaque(size = 320, align = 8)]
+pub type AddTeamConfig = Safe<imp::AddTeamConfig>;
+
+/// A builder for initializing an [`AddTeamConfig`].
+#[aranya_capi_core::derive(Init, Cleanup)]
+#[aranya_capi_core::opaque(size = 328, align = 8)]
+pub type AddTeamConfigBuilder = Safe<imp::AddTeamConfigBuilder>;
+
+/// Team configuration used when creating a team.
+///
+/// Use a [`CreateTeamConfigBuilder`] to construct this object.
+#[aranya_capi_core::opaque(size = 288, align = 8)]
+pub type CreateTeamConfig = Safe<imp::CreateTeamConfig>;
+
+/// A builder for initializing a [`CreateTeamConfig`].
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
+pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 
-/// Configures QUIC syncer for [`TeamConfigBuilder`].
+/// Configures QUIC syncer for [`AddTeamConfigBuilder`].
 ///
-/// By default, the QUIC syncer config is not set. It is an error to call
-/// [`team_config_build`] before setting the interval with
-/// this function
+/// By default, the QUIC syncer config is not set.
 ///
-/// @param[in,out] cfg a pointer to the builder for a team config [`TeamConfigBuilder`]
+/// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
 /// @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
 ///
-/// @relates AranyaTeamConfigBuilder.
-pub fn team_config_builder_set_quic_syncer(
-    cfg: &mut TeamConfigBuilder,
-    quic: OwnedPtr<QuicSyncConfig>,
+/// @relates AranyaAddTeamConfigBuilder.
+pub fn add_team_config_builder_set_quic_syncer(
+    cfg: &mut AddTeamConfigBuilder,
+    quic: OwnedPtr<AddQuicSyncConfig>,
 ) {
     // SAFETY: the user is responsible for passing in a valid QuicSyncConfig pointer.
     let quic = unsafe { quic.read() };
     cfg.quic(quic.imp());
 }
 
-/// Attempts to construct a [`TeamConfig`].
+/// Configures team ID field for [`AddTeamConfigBuilder`].
+///
+/// By default, the team ID is not set.
+///
+/// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
+/// @param[in] id a pointer to a [`TeamId`]
+///
+/// @relates AranyaAddTeamConfigBuilder.
+pub fn add_team_config_builder_set_id(cfg: &mut AddTeamConfigBuilder, team_id: &TeamId) {
+    cfg.id(*team_id);
+}
+
+/// Attempts to construct an [`AddTeamConfig`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param[in] cfg a pointer to the team config builder [`TeamConfigBuilder`]
-/// @param[out] out a pointer to write the team config to [`TeamConfig`]
+/// @param[in] cfg a pointer to the team config builder [`AddTeamConfigBuilder`]
+/// @param[out] out a pointer to write the team config to [`AddTeamConfig`]
 ///
-/// @relates AranyaTeamConfigBuilder.
-pub fn team_config_build(
-    cfg: OwnedPtr<TeamConfigBuilder>,
-    out: &mut MaybeUninit<TeamConfig>,
+/// @relates AranyaAddTeamConfigBuilder.
+pub fn add_team_config_build(
+    cfg: OwnedPtr<AddTeamConfigBuilder>,
+    out: &mut MaybeUninit<AddTeamConfig>,
+) -> Result<(), imp::Error> {
+    // SAFETY: No special considerations.
+    unsafe { cfg.build(out)? }
+    Ok(())
+}
+
+/// Configures QUIC syncer for [`CreateTeamConfigBuilder`].
+///
+/// By default, the QUIC syncer config is not set.
+///
+/// @param[in,out] cfg a pointer to the builder for a team config [`CreateTeamConfigBuilder`]
+/// @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
+///
+/// @relates AranyaCreateTeamConfigBuilder.
+pub fn create_team_config_builder_set_quic_syncer(
+    cfg: &mut CreateTeamConfigBuilder,
+    quic: OwnedPtr<CreateQuicSyncConfig>,
+) {
+    // SAFETY: the user is responsible for passing in a valid QuicSyncConfig pointer.
+    let quic = unsafe { quic.read() };
+    cfg.quic(quic.imp());
+}
+
+/// Attempts to construct a [`CreateTeamConfig`].
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param[in] cfg a pointer to the team config builder [`CreateTeamConfigBuilder`]
+/// @param[out] out a pointer to write the team config to [`CreateTeamConfig`]
+///
+/// @relates AranyaCreateTeamConfigBuilder.
+pub fn create_team_config_build(
+    cfg: OwnedPtr<CreateTeamConfigBuilder>,
+    out: &mut MaybeUninit<CreateTeamConfig>,
 ) -> Result<(), imp::Error> {
     // SAFETY: No special considerations.
     unsafe { cfg.build(out)? }
@@ -998,14 +1101,13 @@ pub fn revoke_label(
 /// Create a new graph/team with the current device as the owner.
 ///
 /// @param[in] client the Aranya Client [`Client`].
-/// @param[in] cfg the Team Configuration [`TeamConfig`].
+/// @param[in] cfg the Team Configuration [`CreateTeamConfig`].
 /// @param[out] __output the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
+pub fn create_team(client: &mut Client, cfg: &CreateTeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.imp();
-    let cfg: &imp::TeamConfig = cfg.deref();
+    let cfg: &imp::CreateTeamConfig = cfg.deref();
     let team_id = client
         .rt
         .block_on(client.inner.create_team(cfg.into()))?
@@ -1080,17 +1182,13 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 /// Add a team to the local device store.
 ///
 /// @param[in] client the Aranya Client [`Client`].
-/// @param[in] team the team's ID [`TeamId`].
-/// @param[in] cfg the Team Configuration [`TeamConfig`].
+/// @param[in] cfg the Team Configuration [`AddTeamConfig`].
 ///
 /// @relates AranyaClient.
-#[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
+pub fn add_team(client: &mut Client, cfg: &AddTeamConfig) -> Result<(), imp::Error> {
     let client = client.imp();
-    let cfg: &imp::TeamConfig = cfg.deref();
-    client
-        .rt
-        .block_on(client.inner.add_team(team.into(), cfg.into()))?;
+    let cfg: &imp::AddTeamConfig = cfg.deref();
+    client.rt.block_on(client.inner.add_team(cfg.into()))?;
     Ok(())
 }
 
