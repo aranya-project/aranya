@@ -81,7 +81,7 @@ logs_dir = "/var/log/aranya"
 # `$XDG_CONFIG_HOME`.
 config_dir = "/etc/aranya"
 
+[sync.quic]
+enable = true
 # Aranya sync server address.
-sync_addr = "0.0.0.0:4321"
-
-[quic_sync]
+addr = "0.0.0.0:4321"

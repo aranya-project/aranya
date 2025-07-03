@@ -52,9 +52,10 @@ state_dir = "${out}/${device}/state"
 cache_dir = "${out}/${device}/cache"
 logs_dir = "${out}/${device}/log"
 config_dir = "${out}/${device}/config"
-sync_addr = "127.0.0.1:${port}"
 
-[quic_sync]
+[sync.quic]
+enable = true
+addr = "127.0.0.1:${port}"
 EOF
     port=$((port + 1))
 done

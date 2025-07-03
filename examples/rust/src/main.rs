@@ -98,8 +98,10 @@ impl ClientCtx {
                 cache_dir = {cache_dir:?}
                 logs_dir = {logs_dir:?}
                 config_dir = {config_dir:?}
-                sync_addr = "127.0.0.1:0"
-                [quic_sync]
+
+                [sync.quic]
+                enable = true
+                addr = "127.0.0.1:0"
                 "#
             );
             fs::write(&cfg_path, buf).await?;

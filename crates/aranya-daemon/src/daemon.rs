@@ -135,7 +135,7 @@ impl Daemon {
 
         async move {
             // TODO: Fix this when other syncer types are supported
-            let Some(_qs_config) = &cfg.quic_sync else {
+            let Some(qs_config) = &cfg.sync.quic.0 else {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
 
@@ -168,7 +168,7 @@ impl Daemon {
                     .try_clone()
                     .context("unable to clone keystore")?,
                 &pks,
-                cfg.sync_addr,
+                qs_config.addr,
                 Arc::clone(&psk_store),
                 active_team_rx,
             )
@@ -464,7 +464,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::{AfcConfig, QuicSyncConfig};
+    use crate::config::{AqcConfig, Enable, QuicSyncConfig, SyncConfig};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -480,16 +480,10 @@ mod tests {
             cache_dir: work_dir.join("cache"),
             logs_dir: work_dir.join("logs"),
             config_dir: work_dir.join("config"),
-            sync_addr: any,
-            quic_sync: Some(QuicSyncConfig {}),
-            afc: Some(AfcConfig {
-                shm_path: "/test_daemon1".to_owned(),
-                unlink_on_startup: true,
-                unlink_at_exit: true,
-                create: true,
-                max_chans: 100,
-            }),
-            aqc: None,
+            sync: SyncConfig {
+                quic: Enable::enabled(QuicSyncConfig { addr: any }),
+            },
+            aqc: AqcConfig {},
         };
         for dir in [
             &cfg.runtime_dir,

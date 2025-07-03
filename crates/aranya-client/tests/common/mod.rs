@@ -7,7 +7,7 @@ use std::{
 use anyhow::{Context, Result};
 use aranya_client::{client::Client, QuicSyncConfig, SyncPeerConfig, TeamConfig};
 use aranya_daemon::{
-    config::{self as daemon_cfg, Config},
+    config::{self as daemon_cfg, Config, Enable},
     Daemon, DaemonHandle,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId, SEED_IKM_SIZE};
@@ -175,8 +175,6 @@ impl DeviceCtx {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // Setup daemon config.
-        let quic_sync = Some(daemon_cfg::QuicSyncConfig {});
-
         let cfg = Config {
             name: name.into(),
             runtime_dir: work_dir.join("run"),
@@ -184,10 +182,10 @@ impl DeviceCtx {
             cache_dir: work_dir.join("cache"),
             logs_dir: work_dir.join("log"),
             config_dir: work_dir.join("config"),
-            sync_addr: addr_any,
-            afc: None,
-            aqc: None,
-            quic_sync,
+            aqc: daemon_cfg::AqcConfig {},
+            sync: daemon_cfg::SyncConfig {
+                quic: Enable::enabled(daemon_cfg::QuicSyncConfig { addr: addr_any }),
+            },
         };
 
         for dir in [
