@@ -77,7 +77,7 @@ impl ClientCtx {
             let work_dir = work_dir.path().join("daemon");
             fs::create_dir_all(&work_dir).await?;
 
-            let cfg_path = work_dir.join("config.json");
+            let cfg_path = work_dir.join("config.toml");
 
             let runtime_dir = work_dir.join("run");
             let state_dir = work_dir.join("state");
@@ -92,14 +92,14 @@ impl ClientCtx {
 
             let buf = format!(
                 r#"
-                name: "daemon"
-                runtime_dir: {runtime_dir:?}
-                state_dir: {state_dir:?}
-                cache_dir: {cache_dir:?}
-                logs_dir: {logs_dir:?}
-                config_dir: {config_dir:?}
-                sync_addr: "127.0.0.1:0"
-                quic_sync: {{ }}
+                name = "daemon"
+                runtime_dir = {runtime_dir:?}
+                state_dir = {state_dir:?}
+                cache_dir = {cache_dir:?}
+                logs_dir = {logs_dir:?}
+                config_dir = {config_dir:?}
+                sync_addr = "127.0.0.1:0"
+                [quic_sync]
                 "#
             );
             fs::write(&cfg_path, buf).await?;

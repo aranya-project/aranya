@@ -120,7 +120,7 @@ impl Config {
     where
         P: AsRef<Path>,
     {
-        let cfg: Self = read_json(path.as_ref())
+        let cfg: Self = read_toml(path.as_ref())
             .with_context(|| format!("unable to parse config: {}", path.as_ref().display()))?;
         Ok(cfg)
     }
@@ -181,10 +181,10 @@ impl Config {
     }
 }
 
-/// Reads JSON from `path`.
-fn read_json<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T> {
-    let buf = fs::read(path.as_ref())?;
-    Ok(deser_hjson::from_slice(&buf)?)
+/// Reads TOML from `path`.
+fn read_toml<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T> {
+    let buf = fs::read_to_string(path.as_ref())?;
+    Ok(toml::from_str(&buf)?)
 }
 
 /// AFC configuration.
@@ -240,14 +240,14 @@ mod tests {
     use std::net::Ipv4Addr;
 
     use pretty_assertions::assert_eq;
-    use serde_json::json;
+    use toml::toml;
 
     use super::*;
 
     #[test]
     fn test_example_config() -> Result<()> {
         const DIR: &str = env!("CARGO_MANIFEST_DIR");
-        let path = Path::new(DIR).join("example.json");
+        let path = Path::new(DIR).join("example.toml");
         let got = Config::load(path)?;
         let want = Config {
             name: "name".to_string(),
@@ -268,27 +268,31 @@ mod tests {
 
     #[test]
     fn test_config() {
+        #![allow(clippy::disallowed_macros, reason = "toml! uses unreachable!")]
+
         // Missing a required field.
-        let data = json!({
-            "name": "aranya",
-            "runtime_dir": "/var/run/aranya",
-            "state_dir": "/var/lib/aranya",
-            "logs_dir": "/var/log/aranya",
-            "config_dir": "/etc/aranya",
-            "sync_addr": "127.0.0.1:4321",
-        });
-        serde_json::from_value::<Config>(data).expect_err("missing `cache_dir` should be rejected");
+        let data = toml! {
+            name = "aranya"
+            runtime_dir = "/var/run/aranya"
+            state_dir = "/var/lib/aranya"
+            logs_dir = "/var/log/aranya"
+            config_dir = "/etc/aranya"
+            sync_addr = "127.0.0.1:4321"
+        };
+        data.try_into::<Config>()
+            .expect_err("missing `cache_dir` should be rejected");
 
         // A required field is empty.
-        let data = json!({
-            "name": "aranya",
-            "runtime_dir": "/var/run/aranya",
-            "state_dir": "/var/lib/aranya",
-            "cache_dir": "",
-            "logs_dir": "/var/log/aranya",
-            "config_dir": "/etc/aranya",
-            "sync_addr": "127.0.0.1:4321",
-        });
-        serde_json::from_value::<Config>(data).expect_err("empty `cache_dir` should be rejected");
+        let data = toml! {
+            name = "aranya"
+            runtime_dir = "/var/run/aranya"
+            state_dir = "/var/lib/aranya"
+            cache_dir = ""
+            logs_dir = "/var/log/aranya"
+            config_dir = "/etc/aranya"
+            sync_addr = "127.0.0.1:4321"
+        };
+        data.try_into::<Config>()
+            .expect_err("empty `cache_dir` should be rejected");
     }
 }
