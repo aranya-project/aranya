@@ -2,8 +2,6 @@
     // The name of the daemon, used for logging and debugging
     // purposes.
     "name": "name",
-
-
     // The directory where the daemon stores non-essential
     // runtime files and other file objects (sockets, etc.).
     //
@@ -19,7 +17,6 @@
     // See also: systemd `RuntimeDirectory=` and
     // `$XDG_RUNTIME_DIR`.
     "runtime_dir": "/var/run/aranya",
-
     // The directory where the daemon stores non-portable data
     // that should persist between application restarts.
     //
@@ -35,7 +32,6 @@
     // See also: systemd `StateDirectory=` and
     // `$XDG_STATE_HOME`.
     "state_dir": "/var/lib/aranya",
-
     // The directory where the daemon stores non-essential data
     // files.
     //
@@ -51,7 +47,6 @@
     // See also: systemd `CacheDirectory=` and
     // `$XDG_CACHE_HOME`.
     "cache_dir": "/var/cache/aranya",
-
     // The directory where the daemon writes log files.
     //
     // # Multiple Daemon Support
@@ -65,7 +60,6 @@
     //
     // See also: systemd `LogsDirectory=`.
     "logs_dir": "/var/log/aranya",
-
     // The directory where the daemon can find additional
     // configuration files.
     //
@@ -81,9 +75,10 @@
     // See also: systemd `ConfigDirectory=` and
     // `$XDG_CONFIG_HOME`.
     "config_dir": "/etc/aranya",
-
     // Aranya sync server address.
     "sync_addr": "0.0.0.0:4321",
-
-    "quic_sync": {},
+    // QUIC syncer configuration.
+    "quic_sync": {
+        "enabled": false,
+    },
 }
