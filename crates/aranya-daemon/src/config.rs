@@ -2,6 +2,7 @@
 
 use std::{
     fs,
+    net::{IpAddr, Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
 };
 
@@ -113,6 +114,24 @@ pub struct Config {
     /// QUIC syncer config
     #[serde(default)]
     pub quic_sync: Option<QuicSyncConfig>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        let sync_addr = Addr::from(SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0));
+        Self {
+            name: Default::default(),
+            runtime_dir: Default::default(),
+            state_dir: Default::default(),
+            cache_dir: Default::default(),
+            logs_dir: Default::default(),
+            config_dir: Default::default(),
+            sync_addr,
+            afc: Default::default(),
+            aqc: Default::default(),
+            quic_sync: Some(QuicSyncConfig::default()),
+        }
+    }
 }
 
 impl Config {
@@ -327,6 +346,20 @@ mod tests {
         };
         assert_eq!(got, want);
         assert_eq!(want.quic_sync.unwrap().enabled, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_default() -> Result<()> {
+        const DIR: &str = env!("CARGO_MANIFEST_DIR");
+        let path = Path::new(DIR)
+            .join("test_configs")
+            .join("missing_quic_sync.json");
+        let load = Config::load(path)?;
+        assert_eq!(load.quic_sync.unwrap().enabled, true);
+        let default = Config::default();
+        assert_eq!(default.quic_sync.unwrap().enabled, true);
 
         Ok(())
     }

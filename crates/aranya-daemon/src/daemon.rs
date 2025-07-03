@@ -533,7 +533,6 @@ mod tests {
             logs_dir: work_dir.join("logs"),
             config_dir: work_dir.join("config"),
             sync_addr: any,
-            quic_sync: None,
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,
@@ -542,6 +541,7 @@ mod tests {
                 max_chans: 100,
             }),
             aqc: None,
+            ..Config::default()
         };
         for dir in [
             &cfg.runtime_dir,
