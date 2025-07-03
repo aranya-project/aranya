@@ -30,7 +30,7 @@ use crate::{
     api::{ApiKey, DaemonApiServer, QSData},
     aqc::Aqc,
     aranya,
-    config::Config,
+    config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
@@ -135,7 +135,7 @@ impl Daemon {
 
         async move {
             // TODO: Fix this when other syncer types are supported
-            let Some(qs_config) = &cfg.sync.quic.0 else {
+            let Toggle::Enabled(qs_config) = &cfg.sync.quic else {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
 
@@ -464,7 +464,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::{AqcConfig, Enable, QuicSyncConfig, SyncConfig};
+    use crate::config::{AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -481,7 +481,7 @@ mod tests {
             logs_dir: work_dir.join("logs"),
             config_dir: work_dir.join("config"),
             sync: SyncConfig {
-                quic: Enable::enabled(QuicSyncConfig { addr: any }),
+                quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
             },
             aqc: AqcConfig {},
         };

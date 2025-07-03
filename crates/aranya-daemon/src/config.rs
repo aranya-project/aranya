@@ -12,8 +12,8 @@ use serde::{
     Deserialize, Serialize,
 };
 
-mod enable;
-pub use enable::Enable;
+mod toggle;
+pub use toggle::Toggle;
 
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -190,7 +190,7 @@ fn read_toml<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T> {
 pub struct SyncConfig {
     /// QUIC syncer config
     #[serde(default)]
-    pub quic: Enable<QuicSyncConfig>,
+    pub quic: Toggle<QuicSyncConfig>,
 }
 
 /// AQC configuration.
@@ -241,7 +241,7 @@ mod tests {
             logs_dir: "/var/log/aranya".parse()?,
             config_dir: "/etc/aranya".parse()?,
             sync: SyncConfig {
-                quic: Enable::enabled(QuicSyncConfig {
+                quic: Toggle::Enabled(QuicSyncConfig {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
                 }),
             },

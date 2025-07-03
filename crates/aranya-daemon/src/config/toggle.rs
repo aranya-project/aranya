@@ -2,49 +2,46 @@ use serde::{de, ser, Deserialize, Serialize};
 
 /// Serde wrapper for an `enable` field on an optional.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Enable<T>(pub Option<T>);
-
-impl<T> Enable<T> {
-    /// Create an enabled value.
-    pub const fn enabled(value: T) -> Self {
-        Self(Some(value))
-    }
-
-    /// Create a disabled value.
-    pub const fn disabled() -> Self {
-        Self(None)
-    }
+pub enum Toggle<T> {
+    /// An enabled option.
+    ///
+    /// This will serialize as `{ enable: true, ...T }`.
+    Enabled(T),
+    /// A disabled option.
+    ///
+    /// This will serialize as `{ enable: false }`.
+    Disabled,
 }
 
-impl<T> Default for Enable<T> {
+impl<T> Default for Toggle<T> {
     fn default() -> Self {
-        Self(None)
+        Self::Disabled
     }
 }
 
 // TODO: Impl manually? Validate fields in disabled case?
-impl<'de, T: Deserialize<'de>> Deserialize<'de> for Enable<T> {
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Toggle<T> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: de::Deserializer<'de>,
     {
-        let value = imp::E::deserialize(deserializer)?;
-        Ok(Enable(value.into()))
+        imp::E::deserialize(deserializer).map(Self::from)
     }
 }
 
-impl<T: Serialize> Serialize for Enable<T> {
+impl<T: Serialize> Serialize for Toggle<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: ser::Serializer,
     {
-        let value = imp::E::from(self.0.as_ref());
-        value.serialize(serializer)
+        imp::E::from(self).serialize(serializer)
     }
 }
 
 mod imp {
     use serde::{de, ser, Deserialize, Serialize};
+
+    use super::Toggle;
 
     pub struct True;
     impl<'de> Deserialize<'de> for True {
@@ -99,27 +96,26 @@ mod imp {
         },
     }
 
-    impl<T> From<Option<T>> for E<T> {
-        fn from(value: Option<T>) -> Self {
-            if let Some(fields) = value {
-                E::Enabled {
+    impl<'a, T> From<&'a Toggle<T>> for E<&'a T> {
+        fn from(toggle: &'a Toggle<T>) -> E<&'a T> {
+            match toggle {
+                Toggle::Enabled(fields) => Self::Enabled {
                     enable: True,
                     fields,
-                }
-            } else {
-                E::Disabled { enable: False }
+                },
+                Toggle::Disabled => Self::Disabled { enable: False },
             }
         }
     }
 
-    impl<T> From<E<T>> for Option<T> {
+    impl<T> From<E<T>> for Toggle<T> {
         fn from(value: E<T>) -> Self {
             match value {
                 E::Enabled {
                     enable: True,
                     fields,
-                } => Some(fields),
-                E::Disabled { enable: False } => None,
+                } => Toggle::Enabled(fields),
+                E::Disabled { enable: False } => Toggle::Disabled,
             }
         }
     }
