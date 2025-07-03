@@ -1,7 +1,7 @@
 use serde::{de, ser, Deserialize, Serialize};
 
 /// Serde wrapper for an `enable` field on an optional.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum Toggle<T> {
     /// An enabled option.
     ///
@@ -10,13 +10,8 @@ pub enum Toggle<T> {
     /// A disabled option.
     ///
     /// This will serialize as `{ enable: false }`.
+    #[default]
     Disabled,
-}
-
-impl<T> Default for Toggle<T> {
-    fn default() -> Self {
-        Self::Disabled
-    }
 }
 
 // TODO: Impl manually? Validate fields in disabled case?
