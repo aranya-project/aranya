@@ -194,7 +194,6 @@ impl From<Duration> for std::time::Duration {
 /// @param[out] client the uninitialized Aranya Client [`Client`].
 /// @param[in] config the client's configuration [`ClientConfig`].
 ///
-/// This method is unstable because [`ClientConfig`] is unstable.
 /// @relates AranyaClient.
 pub unsafe fn client_init(
     client: &mut MaybeUninit<Client>,
@@ -561,14 +560,10 @@ pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
 /// Configuration info for Aranya.
 ///
 /// Use a [`ClientConfigBuilder`] to construct this object.
-///
-/// This config is unstable because [`AqcConfig`] is unstable.
 #[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type ClientConfig = Safe<imp::ClientConfig>;
 
 /// Configuration info builder for an Aranya client config [`ClientConfig`].
-///
-/// This builder is unstable because [`ClientConfig`] is unstable.
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 72, align = 8)]
 pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
@@ -749,14 +744,10 @@ pub fn quic_sync_config_build(
 /// Team configuration.
 ///
 /// Use a [`TeamConfigBuilder`] to construct this object.
-///
-/// This config is unstable because [`QuicSyncConfig`] is unstable.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type TeamConfig = Safe<imp::TeamConfig>;
 
 /// A builder for initializing a [`TeamConfig`].
-///
-/// This builder is unstable because [`TeamConfig`] is unstable.
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
@@ -1026,7 +1017,7 @@ pub fn revoke_label(
 /// @param[in] cfg the Team Configuration [`TeamConfig`].
 /// @param[out] __output the team's ID [`TeamId`].
 ///
-/// This method is unstable because [`TeamConfig`] is unstable.
+/// This method is unstable because [`QuicSyncConfig`] is unstable.
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
@@ -1110,7 +1101,7 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] cfg the Team Configuration [`TeamConfig`].
 ///
-/// This method is unstable because [`TeamConfig`] is unstable.
+/// This method is unstable because [`QuicSyncConfig`] is unstable.
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg

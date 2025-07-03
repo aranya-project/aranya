@@ -184,8 +184,6 @@ impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
 }
 
 /// Builder for a [`TeamConfig`].
-///
-/// This builder is unstable because [`TeamConfig`] is unstable.
 #[derive(Clone, Default)]
 pub struct TeamConfigBuilder {
     quic_sync: Option<QuicSyncConfig>,
