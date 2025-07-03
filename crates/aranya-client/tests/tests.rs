@@ -85,22 +85,23 @@ async fn test_remove_devices() -> Result<()> {
 
     // Remove devices from the team while checking that the device count decreases each time a device is removed.
     let owner = team.owner.client.team(team_id);
+    let queries = owner.queries();
 
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 5);
+    assert_eq!(queries.devices_on_team().await?.iter().count(), 5);
 
     owner.remove_device_from_team(team.membera.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 4);
+    assert_eq!(queries.devices_on_team().await?.iter().count(), 4);
 
     owner.remove_device_from_team(team.memberb.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 3);
+    assert_eq!(queries.devices_on_team().await?.iter().count(), 3);
 
     owner.revoke_role(team.operator.id, Role::Operator).await?;
     owner.remove_device_from_team(team.operator.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 2);
+    assert_eq!(queries.devices_on_team().await?.iter().count(), 2);
 
     owner.revoke_role(team.admin.id, Role::Admin).await?;
     owner.remove_device_from_team(team.admin.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 1);
+    assert_eq!(queries.devices_on_team().await?.iter().count(), 1);
 
     owner.revoke_role(team.owner.id, Role::Owner).await?;
     owner

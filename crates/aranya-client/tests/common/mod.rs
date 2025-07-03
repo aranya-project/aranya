@@ -1,6 +1,7 @@
 use std::{
     net::{Ipv4Addr, SocketAddr},
     path::PathBuf,
+    ptr,
     time::Duration,
 };
 
@@ -51,30 +52,27 @@ impl TeamCtx {
         })
     }
 
-    pub(super) fn devices(&mut self) -> [&mut DeviceCtx; 5] {
+    fn devices(&self) -> [&DeviceCtx; 5] {
         [
-            &mut self.owner,
-            &mut self.admin,
-            &mut self.operator,
-            &mut self.membera,
-            &mut self.memberb,
+            &self.owner,
+            &self.admin,
+            &self.operator,
+            &self.membera,
+            &self.memberb,
         ]
     }
 
     pub async fn add_all_sync_peers(&mut self, team_id: TeamId) -> Result<()> {
         let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
-        let mut devices = self.devices();
-        for i in 0..devices.len() {
-            let (device, peers) = devices[i..].split_first_mut().expect("expected device");
-            for peer in peers {
+        for device in self.devices() {
+            for peer in self.devices() {
+                if ptr::eq(device, peer) {
+                    continue;
+                }
                 device
                     .client
                     .team(team_id)
                     .add_sync_peer(peer.aranya_local_addr().await?.into(), config.clone())
-                    .await?;
-                peer.client
-                    .team(team_id)
-                    .add_sync_peer(device.aranya_local_addr().await?.into(), config.clone())
                     .await?;
             }
         }
