@@ -602,10 +602,14 @@ pub fn client_config_builder_set_daemon_uds_path(
 /// Configuration info for Aranya QUIC Channels.
 ///
 /// Use a [`AqcConfigBuilder`] to construct this object.
+///
+/// This config is unstable.
 #[aranya_capi_core::opaque(size = 40, align = 8)]
 pub type AqcConfig = Safe<imp::AqcConfig>;
 
 /// Configuration info builder for Aranya QUIC Channels config [`AqcConfig`].
+///
+/// This builder is unstable because [`AqcConfig`] is unstable.
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 24, align = 8)]
 pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
@@ -644,6 +648,8 @@ pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *cons
 /// @param[in,out] cfg a pointer to the client config builder
 /// @param[in] aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
 ///
+/// This method is unstable because [`AqcConfig`] is unstable.
+///
 /// @relates AranyaAqcConfigBuilder.
 pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
     cfg.aqc((**aqc_config).clone());
@@ -652,12 +658,16 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
 /// QUIC syncer configuration.
 ///
 /// Use a [`QuicSyncConfigBuilder`] to construct this object.
+///
+/// This config is unstable.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfig = Safe<imp::QuicSyncConfig>;
 
 /// A builder for initializing a [`QuicSyncConfig`].
 ///
 /// The [`QuicSyncConfig`] is an optional part of initializing a [`TeamConfig`].
+///
+/// This builder is unstable because [`QuicSyncConfig`] is unstable.
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
@@ -665,6 +675,8 @@ pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
 /// Attempts to set PSK seed generation mode value on [`QuicSyncConfigBuilder`].
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
+///
+/// This method will be deprecated soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
 pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), imp::Error> {
@@ -676,6 +688,8 @@ pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), 
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] encap_seed a pointer the encapsulated PSK seed
+///
+/// This method will be deprecated soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
 pub fn quic_sync_config_wrapped_seed(
@@ -697,6 +711,8 @@ pub struct SeedIkm {
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder [`QuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
+///
+/// This method will be deprecated soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
 pub fn quic_sync_config_raw_seed_ikm(
@@ -1001,6 +1017,8 @@ pub fn revoke_label(
 /// @param[in] cfg the Team Configuration [`TeamConfig`].
 /// @param[out] __output the team's ID [`TeamId`].
 ///
+/// This method is unstable because [`QuicSyncConfig`] is unstable.
+///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
 pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
@@ -1082,6 +1100,8 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 /// @param[in] cfg the Team Configuration [`TeamConfig`].
+///
+/// This method is unstable because [`QuicSyncConfig`] is unstable.
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg

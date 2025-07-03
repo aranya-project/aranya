@@ -45,6 +45,8 @@ impl ClientConfigBuilder {
     }
 
     /// Set the config to be used for AQC
+    ///
+    /// This method is unstable because [`AqcConfig`] is unstable.
     pub fn aqc(&mut self, cfg: AqcConfig) {
         self.aqc = Some(cfg);
     }
@@ -89,6 +91,8 @@ impl Default for ClientConfigBuilder {
 }
 
 /// AQC configuration.
+///
+/// This config is unstable.
 #[derive(Clone, Debug)]
 pub struct AqcConfig {
     /// Address to bind AQC server to.
@@ -261,16 +265,22 @@ pub struct QuicSyncConfigBuilder {
 
 impl QuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
+    ///
+    /// This method will be deprecated soon since certificates will be used instead of PSKs in the future.
     pub fn mode(&mut self, mode: SeedMode) {
         self.mode = mode;
     }
 
     /// Sets mode to generate PSK seed.
+    ///
+    /// This method will be deprecated soon since certificates will be used instead of PSKs in the future.
     pub fn generate(&mut self) {
         self.mode = SeedMode::Generate;
     }
 
     /// Sets wrapped PSK seed.
+    ///
+    /// This method will be deprecated soon since certificates will be used instead of PSKs in the future.
     pub fn wrapped_seed(&mut self, encap_seed: &[u8]) -> Result<(), Error> {
         let wrapped = postcard::from_bytes(encap_seed).map_err(|err| {
             error!(?err);
@@ -282,6 +292,8 @@ impl QuicSyncConfigBuilder {
     }
 
     /// Sets raw PSK seed IKM.
+    ///
+    /// This method will be deprecated soon since certificates will be used instead of PSKs in the future.
     pub fn raw_seed_ikm(&mut self, ikm: &[u8; SEED_IKM_SIZE]) -> Result<(), Error> {
         self.mode = SeedMode::IKM(Ikm::from(*ikm));
 
