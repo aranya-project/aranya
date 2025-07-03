@@ -75,7 +75,7 @@ cargo make run-capi-example
 ### Daemon Development
 
 The daemon requires a configuration file (see
-`crates/aranya-daemon/example.json`):
+`crates/aranya-daemon/test_configs/example.json`):
 
 ```bash
 cargo build --bin aranya-daemon --release

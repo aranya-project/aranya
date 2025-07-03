@@ -133,7 +133,7 @@ This snippet can be found in the
 [Rust example](examples/rust/src/main.rs#L198).
 
 Before starting your application, run the daemon by providing the path to a
-[configuration file](crates/aranya-daemon/example.json). Find more details on
+[configuration file](crates/aranya-daemon/test_configs/example.json). Find more details on
 configuring and running the daemon in the `aranya-daemon`
 [README](crates/aranya-daemon/README.md).
 
@@ -213,7 +213,7 @@ This snippet has been modified for simplicity. For actual usage,
 see the [C example](examples/c/example.c#L169).
 
 Before starting your application, run the daemon by providing the path to a
-[configuration file](crates/aranya-daemon/example.json). Find more details on
+[configuration file](crates/aranya-daemon/test_configs/example.json). Find more details on
 configuring and running the daemon in the `aranya-daemon`
 [README](crates/aranya-daemon/README.md).
 
@@ -229,7 +229,7 @@ The examples go through the following steps:
 
 Step 1: Build or download the prebuilt executable from the latest Aranya
 release. After providing a unique configuration file (see
-[example.json](crates/aranya-daemon/example.json)) for each device, run the
+[example.json](crates/aranya-daemon/test_configs/example.json)) for each device, run the
 daemons.
 
 Step 2. The `Owner` initializes the team

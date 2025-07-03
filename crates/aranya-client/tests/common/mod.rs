@@ -175,7 +175,7 @@ impl DeviceCtx {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // Setup daemon config.
-        let quic_sync = Some(daemon_cfg::QuicSyncConfig {});
+        let quic_sync = Some(daemon_cfg::QuicSyncConfig::default());
 
         let cfg = Config {
             name: name.into(),

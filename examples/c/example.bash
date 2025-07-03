@@ -54,7 +54,7 @@ for device in "${devices[@]}"; do
     "logs_dir": "${out}/${device}/log",
     "config_dir": "${out}/${device}/config",
     "sync_addr": "127.0.0.1:${port}",
-    "quic_sync": {},
+    "quic_sync": { "enabled": true },
 }
 EOF
     port=$((port + 1))

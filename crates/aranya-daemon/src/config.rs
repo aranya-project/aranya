@@ -111,6 +111,7 @@ pub struct Config {
     pub aqc: Option<AqcConfig>,
 
     /// QUIC syncer config
+    #[serde(default)]
     pub quic_sync: Option<QuicSyncConfig>,
 }
 
@@ -120,8 +121,12 @@ impl Config {
     where
         P: AsRef<Path>,
     {
-        let cfg: Self = read_json(path.as_ref())
+        let mut cfg: Self = read_json(path.as_ref())
             .with_context(|| format!("unable to parse config: {}", path.as_ref().display()))?;
+        // Enable the QUIC syncer by default.
+        if cfg.quic_sync.is_none() {
+            cfg.quic_sync = Some(QuicSyncConfig::default())
+        }
         Ok(cfg)
     }
 
@@ -220,7 +225,17 @@ pub struct AqcConfig {}
 /// QUIC syncer configuration.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct QuicSyncConfig {}
+pub struct QuicSyncConfig {
+    /// Whether the QUIC syncer is enabled.
+    pub enabled: bool,
+}
+
+impl Default for QuicSyncConfig {
+    fn default() -> Self {
+        // Default to enabling the QUIC syncer.
+        Self { enabled: true }
+    }
+}
 
 fn non_empty_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
 where
@@ -247,7 +262,7 @@ mod tests {
     #[test]
     fn test_example_config() -> Result<()> {
         const DIR: &str = env!("CARGO_MANIFEST_DIR");
-        let path = Path::new(DIR).join("example.json");
+        let path = Path::new(DIR).join("test_configs").join("example.json");
         let got = Config::load(path)?;
         let want = Config {
             name: "name".to_string(),
@@ -257,11 +272,61 @@ mod tests {
             logs_dir: "/var/log/aranya".parse()?,
             config_dir: "/etc/aranya".parse()?,
             sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
-            quic_sync: Some(QuicSyncConfig {}),
+            quic_sync: Some(QuicSyncConfig::default()),
             afc: None,
             aqc: None,
         };
         assert_eq!(got, want);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_missing_quic_sync() -> Result<()> {
+        const DIR: &str = env!("CARGO_MANIFEST_DIR");
+        let path = Path::new(DIR)
+            .join("test_configs")
+            .join("missing_quic_sync.json");
+        let got = Config::load(path)?;
+        let want = Config {
+            name: "name".to_string(),
+            runtime_dir: "/var/run/aranya".parse()?,
+            state_dir: "/var/lib/aranya".parse()?,
+            cache_dir: "/var/cache/aranya".parse()?,
+            logs_dir: "/var/log/aranya".parse()?,
+            config_dir: "/etc/aranya".parse()?,
+            sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
+            quic_sync: Some(QuicSyncConfig::default()),
+            afc: None,
+            aqc: None,
+        };
+        assert_eq!(got, want);
+        assert_eq!(want.quic_sync.unwrap().enabled, true);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_disabled_quic_sync() -> Result<()> {
+        const DIR: &str = env!("CARGO_MANIFEST_DIR");
+        let path = Path::new(DIR)
+            .join("test_configs")
+            .join("disabled_quic_sync.json");
+        let got = Config::load(path)?;
+        let want = Config {
+            name: "name".to_string(),
+            runtime_dir: "/var/run/aranya".parse()?,
+            state_dir: "/var/lib/aranya".parse()?,
+            cache_dir: "/var/cache/aranya".parse()?,
+            logs_dir: "/var/log/aranya".parse()?,
+            config_dir: "/etc/aranya".parse()?,
+            sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
+            quic_sync: Some(QuicSyncConfig { enabled: false }),
+            afc: None,
+            aqc: None,
+        };
+        assert_eq!(got, want);
+        assert_eq!(want.quic_sync.unwrap().enabled, false);
 
         Ok(())
     }

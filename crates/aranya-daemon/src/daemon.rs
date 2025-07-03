@@ -30,7 +30,7 @@ use crate::{
     api::{ApiKey, DaemonApiServer, QSData},
     aqc::Aqc,
     aranya,
-    config::Config,
+    config::{Config, QuicSyncConfig},
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
@@ -135,7 +135,7 @@ impl Daemon {
 
         async move {
             // TODO: Fix this when other syncer types are supported
-            let Some(_qs_config) = &cfg.quic_sync else {
+            if let Some(QuicSyncConfig { enabled: false }) = &cfg.quic_sync {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
 
@@ -481,7 +481,7 @@ mod tests {
             logs_dir: work_dir.join("logs"),
             config_dir: work_dir.join("config"),
             sync_addr: any,
-            quic_sync: Some(QuicSyncConfig {}),
+            quic_sync: Some(QuicSyncConfig::default()),
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,

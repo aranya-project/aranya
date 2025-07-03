@@ -36,7 +36,7 @@ Create a config file for the daemon before running it. Refer to
 this documentation on the JSON config file parameters:
 [config](src/config.rs).
 
-An example daemon configuration file can be found [here](example.json).
+An example daemon configuration file can be found [here](test_configs/example.json).
 
 ## Running the daemon
 

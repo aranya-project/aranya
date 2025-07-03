@@ -99,7 +99,7 @@ impl ClientCtx {
                 logs_dir: {logs_dir:?}
                 config_dir: {config_dir:?}
                 sync_addr: "127.0.0.1:0"
-                quic_sync: {{ }}
+                quic_sync: {{ "enabled": true }}
                 "#
             );
             fs::write(&cfg_path, buf).await?;
