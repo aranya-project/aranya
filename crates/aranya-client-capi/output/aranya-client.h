@@ -338,18 +338,32 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
 } AranyaAqcConfig;
 
 /**
- * A builder for initializing a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
+ * A builder for initializing an [`AranyaAddQuicSyncConfig`](@ref AranyaAddQuicSyncConfig).
  *
- * The [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig) is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig) or a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
+ * The [`QuicSyncConfig`] is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig) or a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
  */
-typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfigBuilder {
+typedef struct ARANYA_ALIGNED(8) AranyaAddQuicSyncConfigBuilder {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
     uint8_t __for_size_only[288];
-} AranyaQuicSyncConfigBuilder;
+} AranyaAddQuicSyncConfigBuilder;
+
+/**
+ * A builder for initializing a [`AranyaCreateQuicSyncConfig`](@ref AranyaCreateQuicSyncConfig).
+ *
+ * The [`QuicSyncConfig`] is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig) or a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaCreateQuicSyncConfigBuilder {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[288];
+} AranyaCreateQuicSyncConfigBuilder;
 
 /**
  * Raw PSK seed IKM for QUIC syncer.
@@ -361,16 +375,30 @@ typedef struct AranyaSeedIkm {
 /**
  * QUIC syncer configuration.
  *
- * Use a [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder) to construct this object.
+ * Use a [`AranyaCreateQuicSyncConfigBuilder`](@ref AranyaCreateQuicSyncConfigBuilder) to construct this object.
  */
-typedef struct ARANYA_ALIGNED(8) AranyaQuicSyncConfig {
+typedef struct ARANYA_ALIGNED(8) AranyaCreateQuicSyncConfig {
     /**
      * This field only exists for size purposes. It is
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
     uint8_t __for_size_only[288];
-} AranyaQuicSyncConfig;
+} AranyaCreateQuicSyncConfig;
+
+/**
+ * QUIC syncer configuration.
+ *
+ * Use a [`AranyaAddQuicSyncConfigBuilder`](@ref AranyaAddQuicSyncConfigBuilder) to construct this object.
+ */
+typedef struct ARANYA_ALIGNED(8) AranyaAddQuicSyncConfig {
+    /**
+     * This field only exists for size purposes. It is
+     * UNDEFINED BEHAVIOR to read from or write to it.
+     * @private
+     */
+    uint8_t __for_size_only[288];
+} AranyaAddQuicSyncConfig;
 
 /**
  * A builder for initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
@@ -1022,140 +1050,232 @@ AranyaError aranya_client_config_builder_set_aqc_config_ext(struct AranyaClientC
                                                             struct AranyaExtError *__ext_err);
 
 /**
- * Initializes `AranyaQuicSyncConfigBuilder`.
+ * Initializes `AranyaAddQuicSyncConfigBuilder`.
  *
  * When no longer needed, `out`'s resources must be released
  * with its cleanup routine.
  *
- * @relates AranyaQuicSyncConfigBuilder
+ * @relates AranyaAddQuicSyncConfigBuilder
  */
-AranyaError aranya_quic_sync_config_builder_init(struct AranyaQuicSyncConfigBuilder *out);
+AranyaError aranya_add_quic_sync_config_builder_init(struct AranyaAddQuicSyncConfigBuilder *out);
 
 /**
- * Initializes `AranyaQuicSyncConfigBuilder`.
+ * Initializes `AranyaAddQuicSyncConfigBuilder`.
  *
  * When no longer needed, `out`'s resources must be released
  * with its cleanup routine.
  *
- * @relates AranyaQuicSyncConfigBuilder
+ * @relates AranyaAddQuicSyncConfigBuilder
  */
-AranyaError aranya_quic_sync_config_builder_init_ext(struct AranyaQuicSyncConfigBuilder *out,
-                                                     struct AranyaExtError *__ext_err);
+AranyaError aranya_add_quic_sync_config_builder_init_ext(struct AranyaAddQuicSyncConfigBuilder *out,
+                                                         struct AranyaExtError *__ext_err);
 
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_quic_sync_config_builder_init`.
+ * `ptr` must either be null or initialized by `::aranya_add_quic_sync_config_builder_init`.
  *
- * @relates AranyaQuicSyncConfigBuilder
+ * @relates AranyaAddQuicSyncConfigBuilder
  */
-AranyaError aranya_quic_sync_config_builder_cleanup(struct AranyaQuicSyncConfigBuilder *ptr);
+AranyaError aranya_add_quic_sync_config_builder_cleanup(struct AranyaAddQuicSyncConfigBuilder *ptr);
 
 /**
  * Releases any resources associated with `ptr`.
  *
- * `ptr` must either be null or initialized by `::aranya_quic_sync_config_builder_init`.
+ * `ptr` must either be null or initialized by `::aranya_add_quic_sync_config_builder_init`.
  *
- * @relates AranyaQuicSyncConfigBuilder
+ * @relates AranyaAddQuicSyncConfigBuilder
  */
-AranyaError aranya_quic_sync_config_builder_cleanup_ext(struct AranyaQuicSyncConfigBuilder *ptr,
+AranyaError aranya_add_quic_sync_config_builder_cleanup_ext(struct AranyaAddQuicSyncConfigBuilder *ptr,
+                                                            struct AranyaExtError *__ext_err);
+
+/**
+ * Initializes `AranyaCreateQuicSyncConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaCreateQuicSyncConfigBuilder
+ */
+AranyaError aranya_create_quic_sync_config_builder_init(struct AranyaCreateQuicSyncConfigBuilder *out);
+
+/**
+ * Initializes `AranyaCreateQuicSyncConfigBuilder`.
+ *
+ * When no longer needed, `out`'s resources must be released
+ * with its cleanup routine.
+ *
+ * @relates AranyaCreateQuicSyncConfigBuilder
+ */
+AranyaError aranya_create_quic_sync_config_builder_init_ext(struct AranyaCreateQuicSyncConfigBuilder *out,
+                                                            struct AranyaExtError *__ext_err);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_create_quic_sync_config_builder_init`.
+ *
+ * @relates AranyaCreateQuicSyncConfigBuilder
+ */
+AranyaError aranya_create_quic_sync_config_builder_cleanup(struct AranyaCreateQuicSyncConfigBuilder *ptr);
+
+/**
+ * Releases any resources associated with `ptr`.
+ *
+ * `ptr` must either be null or initialized by `::aranya_create_quic_sync_config_builder_init`.
+ *
+ * @relates AranyaCreateQuicSyncConfigBuilder
+ */
+AranyaError aranya_create_quic_sync_config_builder_cleanup_ext(struct AranyaCreateQuicSyncConfigBuilder *ptr,
+                                                               struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to set PSK seed generation mode value on [`AranyaCreateQuicSyncConfigBuilder`](@ref AranyaCreateQuicSyncConfigBuilder).
+ *
+ * @param[in,out] cfg a pointer to the quic sync config builder
+ *
+ * @relates AranyaQuicSyncConfigBuilder.
+ */
+AranyaError aranya_create_quic_sync_config_generate(struct AranyaCreateQuicSyncConfigBuilder *cfg);
+
+/**
+ * Attempts to set PSK seed generation mode value on [`AranyaCreateQuicSyncConfigBuilder`](@ref AranyaCreateQuicSyncConfigBuilder).
+ *
+ * @param[in,out] cfg a pointer to the quic sync config builder
+ *
+ * @relates AranyaQuicSyncConfigBuilder.
+ */
+AranyaError aranya_create_quic_sync_config_generate_ext(struct AranyaCreateQuicSyncConfigBuilder *cfg,
                                                         struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to set PSK seed generation mode value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
- *
- * @param[in,out] cfg a pointer to the quic sync config builder
- *
- * @relates AranyaQuicSyncConfigBuilder.
- */
-AranyaError aranya_quic_sync_config_generate(struct AranyaQuicSyncConfigBuilder *cfg);
-
-/**
- * Attempts to set PSK seed generation mode value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
- *
- * @param[in,out] cfg a pointer to the quic sync config builder
- *
- * @relates AranyaQuicSyncConfigBuilder.
- */
-AranyaError aranya_quic_sync_config_generate_ext(struct AranyaQuicSyncConfigBuilder *cfg,
-                                                 struct AranyaExtError *__ext_err);
-
-/**
- * Attempts to set wrapped PSK seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * Attempts to set wrapped PSK seed value on [`AranyaAddQuicSyncConfigBuilder`](@ref AranyaAddQuicSyncConfigBuilder).
  *
  * @param[in,out] cfg a pointer to the quic sync config builder
  * @param[in] encap_seed a pointer the encapsulated PSK seed
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
-AranyaError aranya_quic_sync_config_wrapped_seed(struct AranyaQuicSyncConfigBuilder *cfg,
-                                                 const uint8_t *encap_seed,
-                                                 size_t encap_seed_len);
-
-/**
- * Attempts to set wrapped PSK seed value on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
- *
- * @param[in,out] cfg a pointer to the quic sync config builder
- * @param[in] encap_seed a pointer the encapsulated PSK seed
- *
- * @relates AranyaQuicSyncConfigBuilder.
- */
-AranyaError aranya_quic_sync_config_wrapped_seed_ext(struct AranyaQuicSyncConfigBuilder *cfg,
+AranyaError aranya_add_quic_sync_config_wrapped_seed(struct AranyaAddQuicSyncConfigBuilder *cfg,
                                                      const uint8_t *encap_seed,
-                                                     size_t encap_seed_len,
-                                                     struct AranyaExtError *__ext_err);
+                                                     size_t encap_seed_len);
 
 /**
- * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * Attempts to set wrapped PSK seed value on [`AranyaAddQuicSyncConfigBuilder`](@ref AranyaAddQuicSyncConfigBuilder).
  *
- * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
+ * @param[in,out] cfg a pointer to the quic sync config builder
+ * @param[in] encap_seed a pointer the encapsulated PSK seed
+ *
+ * @relates AranyaQuicSyncConfigBuilder.
+ */
+AranyaError aranya_add_quic_sync_config_wrapped_seed_ext(struct AranyaAddQuicSyncConfigBuilder *cfg,
+                                                         const uint8_t *encap_seed,
+                                                         size_t encap_seed_len,
+                                                         struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaCreateQuicSyncConfigBuilder`](@ref AranyaCreateQuicSyncConfigBuilder).
+ *
+ * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaCreateQuicSyncConfigBuilder`](@ref AranyaCreateQuicSyncConfigBuilder)
  * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
-AranyaError aranya_quic_sync_config_raw_seed_ikm(struct AranyaQuicSyncConfigBuilder *cfg,
-                                                 const struct AranyaSeedIkm *ikm);
+AranyaError aranya_create_quic_sync_config_raw_seed_ikm(struct AranyaCreateQuicSyncConfigBuilder *cfg,
+                                                        const struct AranyaSeedIkm *ikm);
 
 /**
- * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder).
+ * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaCreateQuicSyncConfigBuilder`](@ref AranyaCreateQuicSyncConfigBuilder).
  *
- * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
+ * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaCreateQuicSyncConfigBuilder`](@ref AranyaCreateQuicSyncConfigBuilder)
  * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
-AranyaError aranya_quic_sync_config_raw_seed_ikm_ext(struct AranyaQuicSyncConfigBuilder *cfg,
-                                                     const struct AranyaSeedIkm *ikm,
+AranyaError aranya_create_quic_sync_config_raw_seed_ikm_ext(struct AranyaCreateQuicSyncConfigBuilder *cfg,
+                                                            const struct AranyaSeedIkm *ikm,
+                                                            struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaAddQuicSyncConfigBuilder`](@ref AranyaAddQuicSyncConfigBuilder).
+ *
+ * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaAddQuicSyncConfigBuilder`](@ref AranyaAddQuicSyncConfigBuilder)
+ * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
+ *
+ * @relates AranyaQuicSyncConfigBuilder.
+ */
+AranyaError aranya_add_quic_sync_config_raw_seed_ikm(struct AranyaAddQuicSyncConfigBuilder *cfg,
+                                                     const struct AranyaSeedIkm *ikm);
+
+/**
+ * Attempts to set raw PSK seed IKM value [`AranyaSeedIkm`](@ref AranyaSeedIkm) on [`AranyaAddQuicSyncConfigBuilder`](@ref AranyaAddQuicSyncConfigBuilder).
+ *
+ * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaAddQuicSyncConfigBuilder`](@ref AranyaAddQuicSyncConfigBuilder)
+ * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
+ *
+ * @relates AranyaQuicSyncConfigBuilder.
+ */
+AranyaError aranya_add_quic_sync_config_raw_seed_ikm_ext(struct AranyaAddQuicSyncConfigBuilder *cfg,
+                                                         const struct AranyaSeedIkm *ikm,
+                                                         struct AranyaExtError *__ext_err);
+
+/**
+ * Attempts to construct a [`AranyaCreateQuicSyncConfig`](@ref AranyaCreateQuicSyncConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaCreateQuicSyncConfigBuilder`](@ref AranyaCreateQuicSyncConfigBuilder)
+ * @param[out] out a pointer to write the QUIC sync config to [`AranyaCreateQuicSyncConfig`](@ref AranyaCreateQuicSyncConfig)
+ *
+ * @relates AranyaQuicSyncConfigBuilder.
+ */
+AranyaError aranya_create_quic_sync_config_build(struct AranyaCreateQuicSyncConfigBuilder *cfg,
+                                                 struct AranyaCreateQuicSyncConfig *out);
+
+/**
+ * Attempts to construct a [`AranyaCreateQuicSyncConfig`](@ref AranyaCreateQuicSyncConfig).
+ *
+ * This function consumes and releases any resources associated
+ * with the memory pointed to by `cfg`.
+ *
+ * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaCreateQuicSyncConfigBuilder`](@ref AranyaCreateQuicSyncConfigBuilder)
+ * @param[out] out a pointer to write the QUIC sync config to [`AranyaCreateQuicSyncConfig`](@ref AranyaCreateQuicSyncConfig)
+ *
+ * @relates AranyaQuicSyncConfigBuilder.
+ */
+AranyaError aranya_create_quic_sync_config_build_ext(struct AranyaCreateQuicSyncConfigBuilder *cfg,
+                                                     struct AranyaCreateQuicSyncConfig *out,
                                                      struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
+ * Attempts to construct an [`AranyaAddQuicSyncConfig`](@ref AranyaAddQuicSyncConfig).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
- * @param[out] out a pointer to write the QUIC sync config to [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaAddQuicSyncConfigBuilder`](@ref AranyaAddQuicSyncConfigBuilder)
+ * @param[out] out a pointer to write the QUIC sync config to [`AranyaAddQuicSyncConfig`](@ref AranyaAddQuicSyncConfig)
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
-AranyaError aranya_quic_sync_config_build(struct AranyaQuicSyncConfigBuilder *cfg,
-                                          struct AranyaQuicSyncConfig *out);
+AranyaError aranya_add_quic_sync_config_build(struct AranyaAddQuicSyncConfigBuilder *cfg,
+                                              struct AranyaAddQuicSyncConfig *out);
 
 /**
- * Attempts to construct a [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig).
+ * Attempts to construct an [`AranyaAddQuicSyncConfig`](@ref AranyaAddQuicSyncConfig).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
- * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaQuicSyncConfigBuilder`](@ref AranyaQuicSyncConfigBuilder)
- * @param[out] out a pointer to write the QUIC sync config to [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaAddQuicSyncConfigBuilder`](@ref AranyaAddQuicSyncConfigBuilder)
+ * @param[out] out a pointer to write the QUIC sync config to [`AranyaAddQuicSyncConfig`](@ref AranyaAddQuicSyncConfig)
  *
  * @relates AranyaQuicSyncConfigBuilder.
  */
-AranyaError aranya_quic_sync_config_build_ext(struct AranyaQuicSyncConfigBuilder *cfg,
-                                              struct AranyaQuicSyncConfig *out,
-                                              struct AranyaExtError *__ext_err);
+AranyaError aranya_add_quic_sync_config_build_ext(struct AranyaAddQuicSyncConfigBuilder *cfg,
+                                                  struct AranyaAddQuicSyncConfig *out,
+                                                  struct AranyaExtError *__ext_err);
 
 /**
  * Initializes `AranyaAddTeamConfigBuilder`.
@@ -1243,12 +1363,12 @@ AranyaError aranya_create_team_config_builder_cleanup_ext(struct AranyaCreateTea
  * By default, the QUIC syncer config is not set.
  *
  * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
 AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamConfigBuilder *cfg,
-                                                           struct AranyaQuicSyncConfig *quic);
+                                                           struct AranyaAddQuicSyncConfig *quic);
 
 /**
  * Configures QUIC syncer for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
@@ -1256,12 +1376,12 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamC
  * By default, the QUIC syncer config is not set.
  *
  * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
 AranyaError aranya_add_team_config_builder_set_quic_syncer_ext(struct AranyaAddTeamConfigBuilder *cfg,
-                                                               struct AranyaQuicSyncConfig *quic,
+                                                               struct AranyaAddQuicSyncConfig *quic,
                                                                struct AranyaExtError *__ext_err);
 
 /**
@@ -1326,12 +1446,12 @@ AranyaError aranya_add_team_config_build_ext(struct AranyaAddTeamConfigBuilder *
  * By default, the QUIC syncer config is not set.
  *
  * @param[in,out] cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
 AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreateTeamConfigBuilder *cfg,
-                                                              struct AranyaQuicSyncConfig *quic);
+                                                              struct AranyaCreateQuicSyncConfig *quic);
 
 /**
  * Configures QUIC syncer for [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder).
@@ -1339,12 +1459,12 @@ AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreat
  * By default, the QUIC syncer config is not set.
  *
  * @param[in,out] cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`AranyaQuicSyncConfig`](@ref AranyaQuicSyncConfig)
+ * @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
 AranyaError aranya_create_team_config_builder_set_quic_syncer_ext(struct AranyaCreateTeamConfigBuilder *cfg,
-                                                                  struct AranyaQuicSyncConfig *quic,
+                                                                  struct AranyaCreateQuicSyncConfig *quic,
                                                                   struct AranyaExtError *__ext_err);
 
 /**
