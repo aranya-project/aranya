@@ -1,6 +1,9 @@
 //! Aranya graph actions/effects API.
 
-use core::{future::Future, marker::PhantomData};
+use core::{
+    future::{self, Future},
+    marker::PhantomData,
+};
 use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Context, Result};
@@ -10,7 +13,7 @@ use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_text::Text;
-use aranya_policy_vm::{ident, Text, Value};
+use aranya_policy_vm::{ident, Value};
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
     VmPolicy,
@@ -243,6 +246,18 @@ where
         .in_current_span()
     }
 
+    /// Invokes `query_team_roles` to return all roles in the
+    /// team.
+    #[instrument(skip(self))]
+    fn query_team_roles_off_graph(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("query_team_roles"),
+            args: Cow::Owned(vec![]),
+        })
+        .map_ok(|(_, effects)| effects)
+        .in_current_span()
+    }
+
     /// Create a label.
     #[instrument(skip(self), fields(%name, %managing_role_id))]
     fn create_label(
@@ -251,7 +266,7 @@ where
         managing_role_id: Id,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_label(name.to_string(), managing_role_id)?;
+            actor.create_label(name, managing_role_id)?;
             Ok(())
         })
         .in_current_span()
@@ -306,7 +321,7 @@ where
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         info!(%device_id, %net_identifier, "setting AQC network name");
         self.with_actor(move |actor| {
-            actor.set_aqc_network_name(device_id.into(), net_identifier.to_string())?;
+            actor.set_aqc_network_name(device_id.into(), net_identifier)?;
             Ok(())
         })
         .in_current_span()
@@ -336,7 +351,7 @@ where
             args: Cow::Owned(vec![]),
         })
         .and_then(|(_, effects)| {
-            std::future::ready(
+            future::ready(
                 effects
                     .into_iter()
                     .map(|eff| {
@@ -431,17 +446,18 @@ where
         .in_current_span()
     }
 
-    /// Query device role off-graph.
+    /// Invokes `query_device_roles`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_device_role_off_graph(
+    fn query_device_roles_off_graph(
         &self,
         device_id: DeviceId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.session_action(move || VmAction {
-            name: ident!("query_device_role"),
+            name: ident!("query_device_roles"),
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
+        .map_ok(|(_, effects)| effects)
         .in_current_span()
     }
 

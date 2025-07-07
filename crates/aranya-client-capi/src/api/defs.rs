@@ -2,16 +2,18 @@
 use core::{
     ffi::{c_char, CStr},
     ops::Deref,
-    ptr,
     ptr, slice,
+    str::FromStr,
 };
-use std::{ffi::OsStr, ops::Deref, os::unix::ffi::OsStrExt, str::FromStr};
+use std::{ffi::OsStr, os::unix::ffi::OsStrExt};
 
 use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
-use aranya_client::aqc::{self, AqcPeerStream};
+use aranya_client::{
+    aqc::{self, AqcPeerStream},
+    Text,
+};
 use aranya_crypto::dangerous::spideroak_crypto::hex;
-use aranya_daemon_api::Text;
 use bytes::Bytes;
 use tracing::error;
 
@@ -448,7 +450,7 @@ impl Addr {
 #[derive(Copy, Clone, Debug)]
 pub struct NetIdentifier(*const c_char);
 
-impl TryFrom<NetIdentifier> for aranya_client::NetIdentifier<'_> {
+impl TryFrom<NetIdentifier> for aranya_client::NetIdentifier {
     type Error = aranya_client::InvalidNetIdentifier;
 
     fn try_from(id: NetIdentifier) -> Result<Self, Self::Error> {

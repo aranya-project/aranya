@@ -29,6 +29,8 @@ async fn test_sync_now() -> Result<()> {
 
     // Create the initial team, and get our TeamId and seed.
     let team_id = team.create_and_add_team().await?;
+    let roles = team.owner.client.team(team_id).setup_default_roles()?;
+    let roles = team.add_all_device_roles(team_id).await?;
 
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
@@ -39,17 +41,21 @@ async fn test_sync_now() -> Result<()> {
 
     // Add the admin as a new device, but don't give it a role.
     info!("adding admin to team");
-    owner.add_device_to_team(team.admin.pk.clone()).await?;
+    owner
+        .add_device_to_team(team.admin.pk.clone(), None)
+        .await?;
 
     // Add the operator as a new device, but don't give it a role.
     info!("adding operator to team");
-    owner.add_device_to_team(team.operator.pk.clone()).await?;
+    owner
+        .add_device_to_team(team.operator.pk.clone(), None)
+        .await?;
 
     // Finally, let's give the admin its role, but don't sync with peers.
-    owner.assign_role(team.admin.id, Role::Admin).await?;
+    owner.assign_role(team.admin.id, roles.admin.id).await?;
 
     // Now, we try to assign a role using the admin, which is expected to fail.
-    match admin.assign_role(team.operator.id, Role::Operator).await {
+    match admin.assign_role(team.operator.id, roles.operator.id).await {
         Ok(_) => bail!("Expected role assignment to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(_) => bail!("Unexpected error"),
@@ -60,7 +66,9 @@ async fn test_sync_now() -> Result<()> {
     sleep(SLEEP_INTERVAL).await;
 
     // Now we should be able to successfully assign a role.
-    admin.assign_role(team.operator.id, Role::Operator).await?;
+    admin
+        .assign_role(team.operator.id, roles.operator.id)
+        .await?;
 
     Ok(())
 }
@@ -81,7 +89,7 @@ async fn test_remove_devices() -> Result<()> {
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
-    team.add_all_device_roles(team_id).await?;
+    let roles = team.add_all_device_roles(team_id).await?;
 
     // Remove devices from the team while checking that the device count decreases each time a device is removed.
     let mut owner = team.owner.client.team(team_id);
@@ -94,15 +102,17 @@ async fn test_remove_devices() -> Result<()> {
     owner.remove_device_from_team(team.memberb.id).await?;
     assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 3);
 
-    owner.revoke_role(team.operator.id, Role::Operator).await?;
+    owner
+        .revoke_role(team.operator.id, roles.operator.id)
+        .await?;
     owner.remove_device_from_team(team.operator.id).await?;
     assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 2);
 
-    owner.revoke_role(team.admin.id, Role::Admin).await?;
+    owner.revoke_role(team.admin.id, roles.admin.id).await?;
     owner.remove_device_from_team(team.admin.id).await?;
     assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 1);
 
-    owner.revoke_role(team.owner.id, Role::Owner).await?;
+    owner.revoke_role(team.owner.id, roles.owner.id).await?;
     owner
         .remove_device_from_team(team.owner.id)
         .await
@@ -111,41 +121,43 @@ async fn test_remove_devices() -> Result<()> {
     Ok(())
 }
 
-/// Tests functionality to make sure that we can query the fact database for various things.
+/// TODO
 #[test(tokio::test(flavor = "multi_thread"))]
-async fn test_query_functions() -> Result<()> {
-    // Set up our team context so we can run the test.
+async fn test_query_roles() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
 
-    // Create the initial team, and get our TeamId and seed.
     let team_id = team.create_and_add_team().await?;
 
-    // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
-    team.add_all_device_roles(team_id).await?;
+    let roles = team.add_all_device_roles(team_id).await?;
 
-    // Test all our fact database queries.
     let mut memberb = team.membera.client.team(team_id);
     let mut queries = memberb.queries();
 
-    // First, let's check how many devices are on the team.
     let devices = queries.devices_on_team().await?;
     assert_eq!(devices.iter().count(), 5);
-    debug!("membera devices on team: {:?}", devices.iter().count());
+    debug!(
+        count = %devices.iter().count(),
+        "`membera` devices on team",
+    );
 
     // Check the specific role(s) a device has.
-    let role = queries.device_role(team.membera.id).await?;
-    assert_eq!(role, Role::Member);
-    debug!("membera role: {:?}", role);
+    let dev_roles = team
+        .membera
+        .client
+        .team(team_id)
+        .device(team.membera.id)
+        .roles()
+        .await?
+        .iter()
+        .cloned()
+        .collect::<Vec<_>>();
+    assert_eq!(dev_roles, vec![roles.member.id],);
 
     // Make sure that we have the correct keybundle.
     let keybundle = queries.device_keybundle(team.membera.id).await?;
     debug!("membera keybundle: {:?}", keybundle);
-
-    // TODO(nikki): device_label_assignments, label_exists, labels
-
-    // TODO(nikki): if cfg!(feature = "aqc") { aqc_net_identifier } and have aqc on by default.
 
     Ok(())
 }
@@ -179,11 +191,15 @@ async fn test_add_team() -> Result<()> {
 
     // Add the admin as a new device.
     info!("adding admin to team");
-    owner.add_device_to_team(team.admin.pk.clone()).await?;
+    owner
+        .add_device_to_team(team.admin.pk.clone(), None)
+        .await?;
 
     // Add the operator as a new device.
     info!("adding operator to team");
-    owner.add_device_to_team(team.operator.pk.clone()).await?;
+    owner
+        .add_device_to_team(team.operator.pk.clone(), None)
+        .await?;
 
     // Give the admin its role.
     owner.assign_role(team.admin.id, Role::Admin).await?;
@@ -254,10 +270,14 @@ async fn test_remove_team() -> Result<()> {
 
         // Add the operator as a new device.
         info!("adding operator to team");
-        owner.add_device_to_team(team.operator.pk.clone()).await?;
+        owner
+            .add_device_to_team(team.operator.pk.clone(), None)
+            .await?;
 
         // Add the admin as a new device.
-        owner.add_device_to_team(team.admin.pk.clone()).await?;
+        owner
+            .add_device_to_team(team.admin.pk.clone(), None)
+            .await?;
 
         // Give the admin its role.
         owner.assign_role(team.admin.id, Role::Admin).await?;
@@ -325,7 +345,7 @@ async fn test_multi_team_sync() -> Result<()> {
             let admin2_device = &mut team2.admin;
 
             let admin_keys = admin2_device.pk.clone();
-            owner1.add_device_to_team(admin_keys).await?;
+            owner1.add_device_to_team(admin_keys, None).await?;
 
             // Assign Admin2 the Admin role on team 1.
             owner1.assign_role(admin2_device.id, Role::Admin).await?;

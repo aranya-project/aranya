@@ -269,7 +269,7 @@ Queries the roles assigned to a device.
 
 ```policy
 action query_device_roles(device_id id) {
-    map AssignedRole[device_id: id, role_id: ?] as f {
+    map AssignedRole[device_id: device_id, role_id: ?] as f {
         publish QueryDeviceRoles {
             device_id: f.device_id,
             role_id: f.role_id,
@@ -284,6 +284,8 @@ effect QueryDeviceRolesResult {
     name string,
     // The ID of the device that created the role.
     author_id id,
+    // Is this a default role?
+    default bool,
 }
 
 command QueryDeviceRoles {
@@ -305,7 +307,8 @@ command QueryDeviceRoles {
             emit QueryDeviceRolesResult {
                 role_id: role.role_id,
                 name: role.name,
-                author_id: author.device_id,
+                author_id: role.author_id,
+                default: role.default,
             }
         }
     }
@@ -375,7 +378,7 @@ where
 
 ```policy
 // An RBAC role.
-fact Role[role_id id]=>{name string, author_id id}
+fact Role[role_id id]=>{name string, author_id id, default bool}
 ```
 
 Generating a role's ID from its originating command prevents
@@ -578,6 +581,8 @@ effect RoleCreated {
     author_id id,
     // ID of the role that manages this role.
     managing_role_id id,
+    // Is this a "default" role?
+    default bool,
 }
 ```
 
@@ -632,7 +637,11 @@ command SetupDefaultRole {
         match this.name {
             "admin" => {
                 finish {
-                    create Role[role_id: role_id]=>{name: this.name, author_id: author.device_id}
+                    create Role[role_id: role_id]=>{
+                        name: this.name,
+                        author_id: author.device_id,
+                        default: true,
+                    }
 
                     // TODO: operations
 
@@ -640,12 +649,17 @@ command SetupDefaultRole {
                         role_id: role_id,
                         name: this.name,
                         author_id: author.device_id,
+                        default: true,
                     }
                 }
             }
             "operator" => {
                 finish {
-                    create Role[role_id: role_id]=>{name: this.name, author_id: author.device_id}
+                    create Role[role_id: role_id]=>{
+                        name: this.name,
+                        author_id: author.device_id,
+                        default: true,
+                    }
 
                     // TODO: operations
 
@@ -653,12 +667,17 @@ command SetupDefaultRole {
                         role_id: role_id,
                         name: this.name,
                         author_id: author.device_id,
+                        default: true,
                     }
                 }
             }
             "member" => {
                 finish {
-                    create Role[role_id: role_id]=>{name: this.name, author_id: author.device_id}
+                    create Role[role_id: role_id]=>{
+                        name: this.name,
+                        author_id: author.device_id,
+                        default: true,
+                    }
 
                     // TODO: operations
 
@@ -666,6 +685,7 @@ command SetupDefaultRole {
                         role_id: role_id,
                         name: this.name,
                         author_id: author.device_id,
+                        default: true,
                     }
                 }
             }
@@ -798,6 +818,53 @@ command RevokeRole {
                 device_id: target.device_id,
                 role_id: role.role_id,
                 author_id: author.device_id,
+            }
+        }
+    }
+}
+```
+
+### Role Queries
+
+```policy
+// Emits `QueryTeamRoles` for each role on the team.
+action query_team_roles() {
+    map Role[role_id: ?] as f {
+        publish QueryTeamRoles { role_id: f.role_id }
+    }
+}
+
+// Emitted when a role is queried by `query_team_roles`.
+effect QueriedTeamRole {
+    // The ID of the role.
+    role_id id,
+    // The name of the role.
+    name string,
+    // The ID of the device that created the role.
+    author_id id,
+    // Is this a default role?
+    default bool,
+}
+
+command QueryTeamRoles {
+    fields {
+        role_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let role = check_unwrap query Role[role_id: this.role_id]
+
+        finish {
+            emit QueriedTeamRole {
+                role_id: role.role_id,
+                name: role.name,
+                author_id: role.author_id,
+                default: role.default,
             }
         }
     }

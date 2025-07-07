@@ -18,7 +18,6 @@ use aranya_daemon_api::{
     DaemonApi, SeedMode, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
-use aranya_policy_text::Text;
 use aranya_runtime::GraphId;
 use aranya_util::{task::scope, Addr};
 use futures_util::{StreamExt, TryStreamExt};
@@ -38,7 +37,7 @@ use crate::{
     aqc::Aqc,
     daemon::{CE, CS, KS},
     keystore::LocalStore,
-    policy::{ChanOp, Effect, KeyBundle, Role},
+    policy::{ChanOp, Effect, KeyBundle, RoleCreated},
     sync::task::{quic as qs, SyncPeers},
     util::SeedDir,
     AranyaStore, Client, InvalidGraphs, EF,
@@ -220,6 +219,7 @@ impl EffectHandler {
                 RoleCreated(_) => {}
                 RoleAssigned(_) => {}
                 RoleRevoked(_) => {}
+                QueriedTeamRole(_) => {}
                 OperationUpdated(_) => {}
                 LabelUpdated(_) => {}
             }
@@ -534,13 +534,33 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self))]
-    async fn setup_default_roles(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        self.client
+    async fn setup_default_roles(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+    ) -> api::Result<Box<[api::Role]>> {
+        let roles = self
+            .client
             .actions(&team.into_id().into())
             .setup_default_roles()
             .await
-            .context("unable to setup default roles")?;
-        Ok(())
+            .context("unable to setup default roles")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::RoleCreated(e @ RoleCreated { default: true, .. }) = e {
+                    Some(api::Role {
+                        id: e.role_id.into(),
+                        name: e.name,
+                        author_id: e.author_id.into(),
+                        default: e.default,
+                    })
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
+            })
+            .collect();
+        Ok(roles)
     }
 
     #[instrument(skip(self))]
@@ -577,6 +597,38 @@ impl DaemonApi for Api {
             .await
             .context("unable to revoke device role")?;
         Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn query_team_roles(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+    ) -> api::Result<Box<[api::Role]>> {
+        self.check_team_valid(team).await?;
+
+        let roles = self
+            .client
+            .actions(&team.into_id().into())
+            .query_team_roles_off_graph()
+            .await
+            .context("unable to query team roles")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueriedTeamRole(e) = e {
+                    Some(api::Role {
+                        id: e.role_id.into(),
+                        name: e.name,
+                        author_id: e.author_id.into(),
+                        default: e.default,
+                    })
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
+            })
+            .collect();
+        Ok(roles)
     }
 
     #[instrument(skip(self))]
@@ -888,7 +940,7 @@ impl DaemonApi for Api {
         return Ok(devices);
     }
 
-    /// Query device role.
+    /// Queries all the roles assigned to `device`.
     #[instrument(skip(self))]
     async fn query_device_roles(
         self,
@@ -898,23 +950,28 @@ impl DaemonApi for Api {
     ) -> api::Result<Box<[api::Role]>> {
         self.check_team_valid(team).await?;
 
-        let (_ctrl, effects) = self
+        let roles = self
             .client
             .actions(&team.into_id().into())
-            .query_device_role_off_graph(device.into_id().into())
+            .query_device_roles_off_graph(device.into_id().into())
             .await
-            .context("unable to query device role")?;
-        let mut roles: Vec<api::Role> = Vec::new();
-        for e in effects {
-            if let Effect::QueryDeviceRolesResult(e) = e {
-                roles.push(api::Role {
-                    id: e.role_id.into(),
-                    name: e.name.try_into()?,
-                    author_id: e.author_id.into(),
-                });
-            }
-        }
-        Ok(roles.into_boxed_slice())
+            .context("unable to query device role")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryDeviceRolesResult(e) = e {
+                    Some(api::Role {
+                        id: e.role_id.into(),
+                        name: e.name,
+                        author_id: e.author_id.into(),
+                        default: e.default,
+                    })
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
+            })
+            .collect();
+        Ok(roles)
     }
 
     /// Query device keybundle.
@@ -963,7 +1020,7 @@ impl DaemonApi for Api {
             if let Effect::QueriedLabelAssignment(e) = e {
                 labels.push(api::Label {
                     id: e.label_id.into(),
-                    name: e.label_name.try_into()?,
+                    name: e.label_name,
                     author_id: e.label_author_id.into(),
                 });
             }
@@ -990,7 +1047,7 @@ impl DaemonApi for Api {
             if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
                 find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
             {
-                return Ok(Some(api::NetIdentifier(e.net_identifier.try_into()?)));
+                return Ok(Some(api::NetIdentifier(e.net_identifier)));
             }
         }
         Ok(None)
@@ -1041,7 +1098,7 @@ impl DaemonApi for Api {
             if let Effect::QueriedLabel(e) = e {
                 labels.push(api::Label {
                     id: e.label_id.into(),
-                    name: e.label_name.try_into()?,
+                    name: e.label_name,
                     author_id: e.label_author_id.into(),
                 });
             }

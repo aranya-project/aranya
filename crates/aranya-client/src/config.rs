@@ -1,12 +1,15 @@
 use core::time::Duration;
 
-use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
 use tracing::error;
 
-use crate::{error::InvalidArg, ConfigError, Result};
+use crate::{
+    error::InvalidArg,
+    sync::{SeedMode, SEED_IKM_SIZE},
+    ConfigError, Result,
+};
 
 /// Configuration info for syncing with a peer.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct SyncPeerConfig {
     interval: Duration,
     sync_now: bool,
@@ -29,6 +32,7 @@ impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
 }
 
 /// Builder for a [`SyncPeerConfig`]
+#[derive(Clone, Debug)]
 pub struct SyncPeerConfigBuilder {
     interval: Option<Duration>,
     sync_now: bool,
@@ -83,7 +87,7 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
     seed_mode: SeedMode,
 }
@@ -94,7 +98,7 @@ impl QuicSyncConfig {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct QuicSyncConfigBuilder {
     seed_mode: SeedMode,
 }
@@ -102,6 +106,7 @@ pub struct QuicSyncConfigBuilder {
 impl QuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
+    #[must_use]
     pub fn mode(mut self, mode: SeedMode) -> Self {
         self.seed_mode = mode;
         self
@@ -111,8 +116,9 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is only valid when used in [`super::Client::create_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`].
+    #[must_use]
     pub fn gen_seed(mut self) -> Self {
-        self.seed_mode = SeedMode::Generate;
+        self.seed_mode = SeedMode::generate();
         self
     }
 
@@ -120,8 +126,9 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is valid in both [`super::Client::create_team`] and [`super::Client::add_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
+    #[must_use]
     pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
-        self.seed_mode = SeedMode::IKM(ikm);
+        self.seed_mode = SeedMode::from_ikm(ikm);
         self
     }
 
@@ -129,12 +136,13 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is only valid in [`super::Client::add_team`].
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
+    #[must_use]
     pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
         let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
             error!(?err);
             ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
         })?;
-        self.seed_mode = SeedMode::Wrapped(wrapped);
+        self.seed_mode = SeedMode::from_wrapped(wrapped);
         Ok(self)
     }
 
@@ -146,8 +154,8 @@ impl QuicSyncConfigBuilder {
     }
 }
 
-#[derive(Clone)]
 /// Configuration info for adding and creating teams.
+#[derive(Clone, Debug)]
 pub struct TeamConfig {
     quic_sync: Option<QuicSyncConfig>,
 }
@@ -162,7 +170,7 @@ impl TeamConfig {
 impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
         aranya_daemon_api::QuicSyncConfig {
-            seed_mode: value.seed_mode,
+            seed_mode: value.seed_mode.0,
         }
     }
 }
@@ -176,7 +184,7 @@ impl From<TeamConfig> for aranya_daemon_api::TeamConfig {
 }
 
 /// Builder for a [`TeamConfig`]
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct TeamConfigBuilder {
     quic_sync: Option<QuicSyncConfig>,
 }

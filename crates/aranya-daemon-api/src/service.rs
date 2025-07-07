@@ -116,9 +116,14 @@ custom_id! {
 
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Role {
+    /// Uniquely identifies the role.
     pub id: RoleId,
+    /// The role's friendly name.
     pub name: Text,
+    /// The author of the role.
     pub author_id: DeviceId,
+    /// Is this a default role?
+    pub default: bool,
 }
 
 /// A device's public key bundle.
@@ -733,11 +738,13 @@ pub trait DaemonApi {
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
 
     /// Configures the team with default roles from policy.
-    async fn setup_default_roles(team: TeamId) -> Result<()>;
+    async fn setup_default_roles(team: TeamId) -> Result<Box<[Role]>>;
     /// Assign a role to a device.
     async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
+    /// Returns the current team roles.
+    async fn query_team_roles(team: TeamId) -> Result<Box<[Role]>>;
 
     /// Assign a QUIC channels network identifier to a device.
     async fn assign_aqc_net_identifier(

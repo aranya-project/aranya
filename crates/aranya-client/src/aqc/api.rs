@@ -63,11 +63,11 @@ impl<'a> AqcChannels<'a> {
         label_id: LabelId,
     ) -> crate::Result<AqcBidiChannel>
     where
-        I: TryInto<NetIdentifier, Error = InvalidNetIdentifier>,
+        I: TryInto<NetIdentifier>,
     {
         debug!("creating bidi channel");
 
-        let peer: NetIdentifier = peer.try_into()?;
+        let peer: NetIdentifier = peer.try_into().map_err(|_| InvalidNetIdentifier(()))?;
 
         let (aqc_ctrl, psks) = self
             .client
@@ -117,11 +117,11 @@ impl<'a> AqcChannels<'a> {
         label_id: LabelId,
     ) -> crate::Result<AqcSendChannel>
     where
-        I: TryInto<NetIdentifier, Error = InvalidNetIdentifier>,
+        I: TryInto<NetIdentifier>,
     {
         debug!("creating aqc uni channel");
 
-        let peer: NetIdentifier = peer.try_into()?;
+        let peer: NetIdentifier = peer.try_into().map_err(|_| InvalidNetIdentifier(()))?;
 
         let (aqc_ctrl, psks) = self
             .client

@@ -4,8 +4,10 @@ use aranya_capi_core::{
     safe::{TypeId, Typed},
     Builder, InvalidArg,
 };
-use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
-use tracing::error;
+use aranya_client::{
+    self as client,
+    sync::{SeedMode, SEED_IKM_SIZE},
+};
 
 use super::Error;
 use crate::api::defs::{self, Duration};
@@ -154,7 +156,7 @@ impl Typed for SyncPeerConfig {
     const TYPE_ID: TypeId = TypeId::new(0x44BE85E7);
 }
 
-impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
+impl From<SyncPeerConfig> for client::SyncPeerConfig {
     fn from(value: SyncPeerConfig) -> Self {
         Self::builder()
             .interval(value.interval.into())
@@ -164,7 +166,7 @@ impl From<SyncPeerConfig> for aranya_client::SyncPeerConfig {
     }
 }
 
-impl From<&SyncPeerConfig> for aranya_client::SyncPeerConfig {
+impl From<&SyncPeerConfig> for client::SyncPeerConfig {
     fn from(value: &SyncPeerConfig) -> Self {
         value.clone().into()
     }
@@ -227,7 +229,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
-    mode: SeedMode,
+    cfg: client::QuicSyncConfig,
 }
 
 impl QuicSyncConfig {
@@ -245,52 +247,46 @@ impl Typed for QuicSyncConfig {
     const TYPE_ID: TypeId = TypeId::new(0xADF0F970);
 }
 
-impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
+impl From<QuicSyncConfig> for client::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
-        Self::builder()
-            .mode(value.mode)
-            .build()
-            .expect("All fields are set")
+        value.cfg
     }
 }
 
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
-    mode: SeedMode,
+    builder: client::QuicSyncConfigBuilder,
 }
 
 impl QuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     pub fn mode(&mut self, mode: SeedMode) {
-        self.mode = mode;
+        self.builder = self.builder.clone().mode(mode);
     }
 
     /// Sets mode to generate PSK seed.
     pub fn generate(&mut self) {
-        self.mode = SeedMode::Generate;
+        self.builder = self.builder.clone().gen_seed();
     }
 
     /// Sets wrapped PSK seed.
-    pub fn wrapped_seed(&mut self, encap_seed: &[u8]) -> Result<(), Error> {
-        let wrapped = postcard::from_bytes(encap_seed).map_err(|err| {
-            error!(?err);
-            InvalidArg::new("wrapped_seed", "could not deserialize")
-        })?;
-        self.mode = SeedMode::Wrapped(wrapped);
-
+    pub fn wrapped_seed(&mut self, wrapped: &[u8]) -> Result<(), Error> {
+        self.builder = self.builder.clone().wrapped_seed(wrapped)?;
         Ok(())
     }
 
     /// Sets raw PSK seed IKM.
     pub fn raw_seed_ikm(&mut self, ikm: &[u8; SEED_IKM_SIZE]) -> Result<(), Error> {
-        self.mode = SeedMode::IKM(*ikm);
-
+        self.builder = self.builder.clone().seed_ikm(*ikm);
         Ok(())
     }
 
     /// Builds the config.
     pub fn build(self) -> Result<QuicSyncConfig, Error> {
-        Ok(QuicSyncConfig { mode: self.mode })
+        self.builder
+            .build()
+            .map_err(Into::into)
+            .map(|cfg| QuicSyncConfig { cfg })
     }
 }
 
@@ -306,7 +302,7 @@ impl Builder for QuicSyncConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Self::Output::init(out, QuicSyncConfig { mode: self.mode });
+        Self::Output::init(out, self.build()?);
         Ok(())
     }
 }
@@ -317,7 +313,7 @@ pub struct TeamConfig {
     quic_sync: Option<QuicSyncConfig>,
 }
 
-impl From<TeamConfig> for aranya_client::TeamConfig {
+impl From<TeamConfig> for client::TeamConfig {
     fn from(value: TeamConfig) -> Self {
         let mut builder = Self::builder();
         if let Some(cfg) = value.quic_sync {
@@ -328,7 +324,7 @@ impl From<TeamConfig> for aranya_client::TeamConfig {
     }
 }
 
-impl From<&TeamConfig> for aranya_client::TeamConfig {
+impl From<&TeamConfig> for client::TeamConfig {
     fn from(value: &TeamConfig) -> Self {
         Self::from(value.to_owned())
     }

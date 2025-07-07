@@ -67,6 +67,7 @@ custom_id! {
 
 /// A label.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[non_exhaustive]
 pub struct Label {
     pub id: LabelId,
     pub name: Text,
@@ -111,9 +112,13 @@ custom_id! {
 
 /// A role.
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd)]
+#[non_exhaustive]
 pub struct Role {
+    /// Uniquely identifies the role.
     pub id: RoleId,
+    /// The humman-readable name of the role.
     pub name: Text,
+    /// The unique ID of the author of the role.
     pub author_id: DeviceId,
 }
 
@@ -127,23 +132,26 @@ impl Role {
     }
 }
 
-/// List of roles.
+/// A set of [`Role`]s.
+#[derive(Clone, Debug)]
 pub struct Roles {
-    data: Box<[Role]>,
+    roles: Box<[Role]>,
 }
 
 impl Roles {
+    /// Returns an iterator over the roles.
     pub fn iter(&self) -> impl Iterator<Item = &Role> {
-        self.data.iter()
+        self.roles.iter()
     }
 
     #[doc(hidden)]
     pub fn __into_data(self) -> Box<[Role]> {
-        self.data
+        self.roles
     }
 }
 
 /// List of operations.
+#[derive(Clone, Debug)]
 pub struct Ops {
     data: Vec<Op>,
 }
@@ -173,6 +181,15 @@ impl AsRef<str> for NetIdentifier {
     #[inline]
     fn as_ref(&self) -> &str {
         self.0.as_ref()
+    }
+}
+
+impl TryFrom<SocketAddr> for NetIdentifier {
+    type Error = InvalidNetIdentifier;
+
+    #[inline]
+    fn try_from(addr: SocketAddr) -> Result<Self, Self::Error> {
+        Self::try_from(addr.to_string())
     }
 }
 
@@ -218,7 +235,7 @@ impl fmt::Display for NetIdentifier {
 /// The [`NetIdentifier`] is invalid.
 #[derive(Debug, thiserror::Error)]
 #[error("invalid net identifier")]
-pub struct InvalidNetIdentifier(());
+pub struct InvalidNetIdentifier(pub(crate) ());
 
 impl From<InvalidNetIdentifier> for Error {
     #[inline]
@@ -260,6 +277,7 @@ impl ChanOp {
 }
 
 /// Builds a [`Client`].
+#[derive(Clone, Debug)]
 pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]
@@ -508,6 +526,7 @@ impl Client {
 /// - creating/assigning/deleting labels.
 /// - creating/deleting fast channels.
 /// - assigning network identifiers to devices.
+#[derive(Debug)]
 pub struct Team<'a> {
     client: &'a mut Client,
     id: api::TeamId,
@@ -517,6 +536,15 @@ impl Team<'_> {
     /// Return the team's ID.
     pub fn team_id(&self) -> TeamId {
         TeamId::from_api(self.id)
+    }
+
+    /// Returns the [`Device`] corresponding with `id`.
+    pub fn device(&mut self, id: DeviceId) -> Device<'_> {
+        Device {
+            client: self.client,
+            team_id: self.id,
+            id: id.into_api(),
+        }
     }
 
     /// Encrypt PSK seed for peer.
@@ -610,13 +638,24 @@ impl Team<'_> {
     }
 
     /// Sets up the default team roles.
-    pub async fn setup_default_roles(&mut self) -> Result<()> {
-        self.client
+    ///
+    /// It returns the newly created roles.
+    pub async fn setup_default_roles(&mut self) -> Result<Roles> {
+        let roles = self
+            .client
             .daemon
             .setup_default_roles(context::current(), self.id)
             .await
             .map_err(IpcError::new)?
-            .map_err(aranya_error)
+            .map_err(aranya_error)?
+            // This _should_ just be `into_iter`, but the
+            // compiler chooses the `&Box` impl. It's the same
+            // end result, though.
+            .into_vec()
+            .into_iter()
+            .map(Role::from_api)
+            .collect();
+        Ok(Roles { roles })
     }
 
     /// Assign a role to a device.
@@ -649,6 +688,37 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    /// Returns an iterator over the roles in the team.
+    pub async fn roles(&mut self) -> Result<Roles> {
+        let roles = self
+            .client
+            .daemon
+            .query_team_roles(context::current(), self.id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?
+            // This _should_ just be `into_iter`, but the
+            // compiler chooses the `&Box` impl. It's the same
+            // end result, though.
+            .into_vec()
+            .into_iter()
+            .map(Role::from_api)
+            .collect();
+        Ok(Roles { roles })
+    }
+
+    /// Looks up a role given its ID.
+    pub async fn role(&mut self, _id: RoleId) -> Result<Option<Role>> {
+        // self.client
+        //     .daemon
+        //     .query_role(context::current(), self.id, id.into_api())
+        //     .await
+        //     .map_err(IpcError::new)?
+        //     .map_err(aranya_error)
+        //     .map(|role| role.map(Role::from_api))
+        todo!()
+    }
+
     /// Associate a network identifier to a device for use with AQC.
     ///
     /// If the address already exists for this device, it is replaced with the new address. Capable
@@ -660,7 +730,7 @@ impl Team<'_> {
         net_identifier: I,
     ) -> Result<()>
     where
-        I: TryInto<NetIdentifier, Error = InvalidNetIdentifier>,
+        I: TryInto<NetIdentifier>,
     {
         self.client
             .daemon
@@ -668,7 +738,10 @@ impl Team<'_> {
                 context::current(),
                 self.id,
                 device.into_api(),
-                net_identifier.try_into()?.into_api(),
+                net_identifier
+                    .try_into()
+                    .map_err(|_| InvalidNetIdentifier(()))?
+                    .into_api(),
             )
             .await
             .map_err(IpcError::new)?
@@ -682,7 +755,7 @@ impl Team<'_> {
         net_identifier: I,
     ) -> Result<()>
     where
-        I: TryInto<NetIdentifier, Error = InvalidNetIdentifier>,
+        I: TryInto<NetIdentifier>,
     {
         self.client
             .daemon
@@ -690,7 +763,10 @@ impl Team<'_> {
                 context::current(),
                 self.id,
                 device.into_api(),
-                net_identifier.try_into()?.into_api(),
+                net_identifier
+                    .try_into()
+                    .map_err(|_| InvalidNetIdentifier(()))?
+                    .into_api(),
             )
             .await
             .map_err(IpcError::new)?
@@ -698,17 +774,20 @@ impl Team<'_> {
     }
 
     /// Create a label.
-    pub async fn create_label(
+    pub async fn create_label<T>(
         &mut self,
-        label_name: Text,
+        label_name: T,
         managing_role_id: RoleId,
-    ) -> Result<LabelId> {
+    ) -> Result<LabelId>
+    where
+        T: TryInto<Text, Error: Into<Error>>,
+    {
         self.client
             .daemon
             .create_label(
                 context::current(),
                 self.id,
-                label_name,
+                label_name.try_into().map_err(Into::into)?,
                 managing_role_id.into_api(),
             )
             .await
@@ -772,6 +851,7 @@ impl Team<'_> {
     }
 }
 
+#[derive(Debug)]
 pub struct Queries<'a> {
     client: &'a mut Client,
     id: api::TeamId,
@@ -791,25 +871,6 @@ impl Queries<'_> {
             .map(DeviceId::from_api)
             .collect();
         Ok(Devices { data })
-    }
-
-    /// Returns the role of the current device.
-    pub async fn device_role(&mut self, device: DeviceId) -> Result<Roles> {
-        let data = self
-            .client
-            .daemon
-            .query_device_roles(context::current(), self.id, device.into_api())
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)?
-            // This _should_ just be `into_iter`, but the
-            // compiler chooses the `&Box` impl. It's the same
-            // end result, though.
-            .into_vec()
-            .into_iter()
-            .map(Role::from_api)
-            .collect();
-        Ok(Roles { data })
     }
 
     /// Returns the keybundle of the current device.
@@ -873,5 +934,39 @@ impl Queries<'_> {
             .map(Label::from_api)
             .collect();
         Ok(Labels { data })
+    }
+}
+
+/// Represents an Aranya device
+#[derive(Debug)]
+pub struct Device<'a> {
+    client: &'a mut Client,
+    id: api::DeviceId,
+    team_id: api::TeamId,
+}
+
+impl Device<'_> {
+    /// Returns the device's unique ID.
+    pub fn id(&self) -> DeviceId {
+        DeviceId::from_api(self.id)
+    }
+
+    /// Returns all roles assigned to the device.
+    pub async fn roles(&mut self) -> Result<Roles> {
+        let roles = self
+            .client
+            .daemon
+            .query_device_roles(context::current(), self.team_id, self.id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?
+            // This _should_ just be `into_iter`, but the
+            // compiler chooses the `&Box` impl. It's the same
+            // end result, though.
+            .into_vec()
+            .into_iter()
+            .map(Role::from_api)
+            .collect();
+        Ok(Roles { roles })
     }
 }

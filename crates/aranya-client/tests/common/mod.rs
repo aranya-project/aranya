@@ -4,13 +4,16 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result};
-use aranya_client::{client::Client, QuicSyncConfig, SyncPeerConfig, TeamConfig};
+use anyhow::{anyhow, Context, Result};
+use aranya_client::{
+    client::Client, DeviceId, NetIdentifier, QuicSyncConfig, Role, RoleId, Roles, SyncPeerConfig,
+    TeamConfig, TeamId, Text,
+};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId, SEED_IKM_SIZE};
+use aranya_daemon_api::{KeyBundle, SEED_IKM_SIZE};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use tokio::{fs, time};
@@ -32,6 +35,8 @@ pub struct TeamCtx {
     pub operator: DeviceCtx,
     pub membera: DeviceCtx,
     pub memberb: DeviceCtx,
+    /// Set by [`TeamCtx::add_all_device_roles`].
+    pub roles: Option<DefaultRoles>,
 }
 
 impl TeamCtx {
@@ -48,6 +53,7 @@ impl TeamCtx {
             operator,
             membera,
             memberb,
+            roles: None,
         })
     }
 
@@ -87,18 +93,23 @@ impl TeamCtx {
         let mut admin_team = self.admin.client.team(team_id);
         let mut operator_team = self.operator.client.team(team_id);
 
-        // Add the admin as a new device, and assign its role.
+        let roles = self.roles.as_ref().unwrap();
+
+        // Add the admin as a new device and assign its role in
+        // one step.
         info!("adding admin to team");
-        owner_team.add_device_to_team(self.admin.pk.clone()).await?;
-        owner_team.assign_role(self.admin.id, Role::Admin).await?;
+        owner_team
+            .add_device_to_team(self.admin.pk.clone(), Some(roles.admin().id))
+            .await?;
 
         // Make sure it sees the configuration change.
         sleep(SLEEP_INTERVAL).await;
 
-        // Add the operator as a new device.
+        // Add the operator as a new device and then have the
+        // admin assign its role.
         info!("adding operator to team");
         owner_team
-            .add_device_to_team(self.operator.pk.clone())
+            .add_device_to_team(self.operator.pk.clone(), None)
             .await?;
 
         // Make sure it sees the configuration change.
@@ -106,7 +117,7 @@ impl TeamCtx {
 
         // Assign the operator its role.
         admin_team
-            .assign_role(self.operator.id, Role::Operator)
+            .assign_role(self.operator.id, roles.operator.id)
             .await?;
 
         // Make sure it sees the configuration change.
@@ -115,13 +126,13 @@ impl TeamCtx {
         // Add member A as a new device.
         info!("adding membera to team");
         operator_team
-            .add_device_to_team(self.membera.pk.clone())
+            .add_device_to_team(self.membera.pk.clone(), None)
             .await?;
 
         // Add member A as a new device.
         info!("adding memberb to team");
         operator_team
-            .add_device_to_team(self.memberb.pk.clone())
+            .add_device_to_team(self.memberb.pk.clone(), None)
             .await?;
 
         // Make sure they see the configuration change.
@@ -241,14 +252,94 @@ impl DeviceCtx {
 
     #[allow(unused, reason = "module compiled for each test file")]
     pub fn aqc_net_id(&mut self) -> NetIdentifier {
-        NetIdentifier(
-            self.client
-                .aqc()
-                .server_addr()
-                .expect("can get server addr")
-                .to_string()
-                .try_into()
-                .expect("socket addr is valid text"),
-        )
+        self.client
+            .aqc()
+            .server_addr()
+            .expect("can get server addr")
+            .to_string()
+            .try_into()
+            .expect("`SocketAddr` is a valid `NetIdentifier`")
+    }
+}
+
+/// The default roles for a team.
+///
+/// Created by [`TeamCtx::add_all_device_roles`].
+#[derive(Clone, Debug)]
+pub struct DefaultRoles {
+    owner: Role,
+    admin: Role,
+    operator: Role,
+    member: Role,
+}
+
+impl DefaultRoles {
+    /// Returns the 'owner' role.
+    pub fn owner(&self) -> &Role {
+        &self.owner
+    }
+
+    /// Returns the 'owner' role.
+    pub fn admin(&self) -> &Role {
+        &self.admin
+    }
+
+    /// Returns the 'owner' role.
+    pub fn operator(&self) -> &Role {
+        &self.operator
+    }
+
+    /// Returns the 'owner' role.
+    pub fn member(&self) -> &Role {
+        &self.member
+    }
+}
+
+impl TryFrom<Roles> for DefaultRoles {
+    type Error = anyhow::Error;
+
+    fn try_from(roles: Roles) -> Result<Self> {
+        #[derive(Clone, Default, Debug)]
+        struct Tmp {
+            owner: Option<Role>,
+            admin: Option<Role>,
+            operator: Option<Role>,
+            member: Option<Role>,
+        }
+        let Tmp {
+            owner,
+            admin,
+            operator,
+            member,
+        } = roles
+            .iter()
+            .cloned()
+            .try_fold(Tmp::default(), |mut acc, role| {
+                let name = role.name.as_str();
+                let dst = match name {
+                    "owner" => &mut acc.owner,
+                    "admin" => &mut acc.admin,
+                    "operator" => &mut acc.operator,
+                    "member" => &mut acc.member,
+                    name => unreachable!("unexpected role: {name}"),
+                };
+                match dst {
+                    Some(_) => {
+                        // Each of the default roles has a unique
+                        // name.
+                        Err(anyhow!("duplicate role name: {name}"))
+                    }
+                    None => {
+                        *dst = Some(role);
+                        Ok(acc)
+                    }
+                }
+            })?;
+        Ok(Self {
+            owner: owner.context("missing owner role")?,
+            admin: admin.context("missing admin role")?,
+            operator: operator.context("missing operator role")?,
+            member: member.context("missing member role")?,
+        })
     }
 }
