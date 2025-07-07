@@ -10,35 +10,31 @@ use crate::api::defs::{self, TeamId};
 
 pub(crate) mod quic_sync;
 pub(crate) use quic_sync::{
-    Add, AddQuicSyncConfig, AddQuicSyncConfigBuilder, Create, CreateQuicSyncConfig,
-    CreateQuicSyncConfigBuilder, QuicSyncConfig,
+    AddQuicSyncConfig, AddQuicSyncConfigBuilder, CreateQuicSyncConfig, CreateQuicSyncConfigBuilder,
+    QuicSyncConfig,
 };
 
-mod team {
-    use super::TeamId;
-
-    #[derive(Clone)]
-    pub struct Add {
-        pub(super) id: TeamId,
-    }
-
-    #[derive(Clone)]
-    pub struct Create;
-
-    impl Add {
-        pub(super) fn new(id: TeamId) -> Self {
-            Self { id }
-        }
-    }
-
-    #[derive(Default)]
-    pub struct AddBuild {
-        pub(super) id: Option<TeamId>,
-    }
-
-    #[derive(Default)]
-    pub struct CreateBuild;
+#[derive(Clone)]
+pub struct Add {
+    pub(super) id: TeamId,
 }
+
+#[derive(Clone)]
+pub struct Create;
+
+impl Add {
+    pub(super) fn new(id: TeamId) -> Self {
+        Self { id }
+    }
+}
+
+#[derive(Default)]
+pub struct AddBuild {
+    pub(super) id: Option<TeamId>,
+}
+
+#[derive(Default)]
+pub struct CreateBuild;
 
 #[derive(Clone)]
 /// Builder for a [`TeamConfig`].
@@ -56,8 +52,8 @@ impl<T: Default, U> Default for TeamConfigBuilder<T, U> {
     }
 }
 
-pub type CreateTeamConfigBuilder = TeamConfigBuilder<team::CreateBuild, Create>;
-pub type AddTeamConfigBuilder = TeamConfigBuilder<team::AddBuild, Add>;
+pub type CreateTeamConfigBuilder = TeamConfigBuilder<CreateBuild, quic_sync::Create>;
+pub type AddTeamConfigBuilder = TeamConfigBuilder<AddBuild, quic_sync::Add>;
 
 #[derive(Clone)]
 /// Configuration info for creating or adding teams.
@@ -66,13 +62,13 @@ pub struct TeamConfig<T, U> {
     quic_sync: Option<QuicSyncConfig<U>>,
 }
 
-pub type CreateTeamConfig = TeamConfig<team::Create, Create>;
-pub type AddTeamConfig = TeamConfig<team::Add, Add>;
+pub type CreateTeamConfig = TeamConfig<Create, quic_sync::Create>;
+pub type AddTeamConfig = TeamConfig<Add, quic_sync::Add>;
 
 impl AddTeamConfig {
     fn new(id: TeamId, quic_sync: Option<AddQuicSyncConfig>) -> Self {
         Self {
-            data: team::Add::new(id),
+            data: Add::new(id),
             quic_sync,
         }
     }
@@ -86,7 +82,7 @@ impl AddTeamConfig {
 impl CreateTeamConfig {
     fn new(quic_sync: Option<CreateQuicSyncConfig>) -> Self {
         Self {
-            data: team::Create,
+            data: Create,
             quic_sync,
         }
     }
