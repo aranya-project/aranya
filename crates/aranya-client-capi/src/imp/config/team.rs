@@ -10,8 +10,8 @@ use crate::api::defs::{self, TeamId};
 
 pub(crate) mod quic_sync;
 pub(crate) use quic_sync::{
-    AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
-    QuicSyncConfig,
+    AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateTeamQuicSyncConfig,
+    CreateTeamQuicSyncConfigBuilder, QuicSyncConfig,
 };
 
 #[derive(Clone)]

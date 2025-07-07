@@ -7,13 +7,15 @@ use crate::{Ikm, CS};
 
 pub const SEED_IKM_SIZE: usize = 32;
 
+/// Configuration for creating a new team with QUIC synchronization.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct CreateQuicSyncConfig {
+pub struct CreateTeamQuicSyncConfig {
     pub seed_mode: CreateSeedMode,
 }
 
+/// Configuration for adding members to an existing team with QUIC synchronization.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AddQuicSyncConfig {
+pub struct AddTeamQuicSyncConfig {
     pub seed_mode: AddSeedMode,
 }
 

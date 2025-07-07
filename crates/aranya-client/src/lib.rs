@@ -22,8 +22,8 @@ pub mod error;
 pub use crate::{
     client::{Client, Team},
     config::{
-        AddQuicSyncConfig, AddTeamConfig, AddTeamConfigBuilder, CreateQuicSyncConfig,
-        CreateTeamConfig, CreateTeamConfigBuilder, QuicSyncConfig, QuicSyncConfigBuilder,
+        AddTeamConfig, AddTeamConfigBuilder, AddTeamQuicSyncConfig, CreateTeamConfig,
+        CreateTeamConfigBuilder, CreateTeamQuicSyncConfig, QuicSyncConfig, QuicSyncConfigBuilder,
         SyncPeerConfig, SyncPeerConfigBuilder,
     },
     error::{ConfigError, Error, Result},

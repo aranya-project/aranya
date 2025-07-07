@@ -17,7 +17,7 @@ use crate::{error::InvalidArg, ConfigError, Result};
 
 pub mod quic_sync;
 pub use quic_sync::{
-    AddQuicSyncConfig, CreateQuicSyncConfig, QuicSyncConfig, QuicSyncConfigBuilder,
+    AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, QuicSyncConfig, QuicSyncConfigBuilder,
 };
 
 /// Data required to join an existing team.
@@ -111,7 +111,7 @@ impl AddTeamConfigBuilder {
     ///
     /// This is an optional field that configures how the team
     /// synchronizes data over QUIC connections.
-    pub fn quic_sync(mut self, cfg: AddQuicSyncConfig) -> Self {
+    pub fn quic_sync(mut self, cfg: AddTeamQuicSyncConfig) -> Self {
         self.0.quic_sync = Some(cfg);
         self
     }
@@ -137,7 +137,7 @@ impl CreateTeamConfigBuilder {
     ///
     /// This is an optional field that configures how the team
     /// synchronizes data over QUIC connections.
-    pub fn quic_sync(mut self, cfg: CreateQuicSyncConfig) -> Self {
+    pub fn quic_sync(mut self, cfg: CreateTeamQuicSyncConfig) -> Self {
         self.0.quic_sync = Some(cfg);
         self
     }

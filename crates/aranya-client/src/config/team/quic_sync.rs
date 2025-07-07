@@ -60,21 +60,21 @@ pub struct QuicSyncConfig<T> {
 }
 
 /// Configuration for creating a new team with QUIC synchronization.
-pub type CreateQuicSyncConfig = QuicSyncConfig<CreateTeamData>;
+pub type CreateTeamQuicSyncConfig = QuicSyncConfig<CreateTeamData>;
 
 /// Configuration for adding members to an existing team with QUIC synchronization.
-pub type AddQuicSyncConfig = QuicSyncConfig<AddMemberData>;
+pub type AddTeamQuicSyncConfig = QuicSyncConfig<AddMemberData>;
 
-impl CreateQuicSyncConfig {
+impl CreateTeamQuicSyncConfig {
     /// Creates a new builder for team creation configuration.
-    pub fn builder() -> CreateQuicSyncConfigBuilder {
+    pub fn builder() -> CreateTeamQuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }
 }
 
-impl AddQuicSyncConfig {
+impl AddTeamQuicSyncConfig {
     /// Creates a new builder for team member addition configuration.
-    pub fn builder() -> AddQuicSyncConfigBuilder {
+    pub fn builder() -> AddTeamQuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }
 }
@@ -87,10 +87,10 @@ pub struct QuicSyncConfigBuilder<T> {
     data: T,
 }
 
-type CreateQuicSyncConfigBuilder = QuicSyncConfigBuilder<CreateBuild>;
-type AddQuicSyncConfigBuilder = QuicSyncConfigBuilder<AddBuild>;
+type CreateTeamQuicSyncConfigBuilder = QuicSyncConfigBuilder<CreateBuild>;
+type AddTeamQuicSyncConfigBuilder = QuicSyncConfigBuilder<AddBuild>;
 
-impl CreateQuicSyncConfigBuilder {
+impl CreateTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
     pub fn mode(mut self, mode: CreateSeedMode) -> Self {
@@ -122,7 +122,7 @@ impl CreateQuicSyncConfigBuilder {
     }
 }
 
-impl AddQuicSyncConfigBuilder {
+impl AddTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
     pub fn mode(mut self, mode: AddSeedMode) -> Self {
@@ -166,17 +166,17 @@ impl AddQuicSyncConfigBuilder {
     }
 }
 
-impl From<CreateQuicSyncConfig> for aranya_daemon_api::CreateQuicSyncConfig {
-    fn from(value: CreateQuicSyncConfig) -> Self {
-        aranya_daemon_api::CreateQuicSyncConfig {
+impl From<CreateTeamQuicSyncConfig> for aranya_daemon_api::CreateTeamQuicSyncConfig {
+    fn from(value: CreateTeamQuicSyncConfig) -> Self {
+        aranya_daemon_api::CreateTeamQuicSyncConfig {
             seed_mode: value.data.mode,
         }
     }
 }
 
-impl From<AddQuicSyncConfig> for aranya_daemon_api::AddQuicSyncConfig {
-    fn from(value: AddQuicSyncConfig) -> Self {
-        aranya_daemon_api::AddQuicSyncConfig {
+impl From<AddTeamQuicSyncConfig> for aranya_daemon_api::AddTeamQuicSyncConfig {
+    fn from(value: AddTeamQuicSyncConfig) -> Self {
+        aranya_daemon_api::AddTeamQuicSyncConfig {
             seed_mode: value.data.mode,
         }
     }

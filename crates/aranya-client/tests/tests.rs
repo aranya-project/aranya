@@ -13,7 +13,7 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use aranya_client::{
-    config::CreateTeamConfig, AddQuicSyncConfig, AddTeamConfig, CreateQuicSyncConfig,
+    config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
 use aranya_daemon_api::Role;
 use test_log::test;
@@ -171,7 +171,7 @@ async fn test_add_team() -> Result<()> {
         .client
         .create_team({
             CreateTeamConfig::builder()
-                .quic_sync(CreateQuicSyncConfig::builder().build()?)
+                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
                 .build()?
         })
         .await
@@ -213,7 +213,7 @@ async fn test_add_team() -> Result<()> {
             AddTeamConfig::builder()
                 .team_id(team_id)
                 .quic_sync(
-                    AddQuicSyncConfig::builder()
+                    AddTeamQuicSyncConfig::builder()
                         .wrapped_seed(&admin_seed)?
                         .build()?,
                 )
@@ -347,7 +347,7 @@ async fn test_multi_team_sync() -> Result<()> {
             .add_team({
                 AddTeamConfig::builder()
                     .quic_sync(
-                        AddQuicSyncConfig::builder()
+                        AddTeamQuicSyncConfig::builder()
                             .wrapped_seed(&admin_seed)?
                             .build()?,
                     )

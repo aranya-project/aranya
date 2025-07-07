@@ -184,7 +184,7 @@ impl Builder for AddTeamQuicSyncConfigBuilder {
     }
 }
 
-impl From<AddTeamQuicSyncConfig> for aranya_client::AddQuicSyncConfig {
+impl From<AddTeamQuicSyncConfig> for aranya_client::AddTeamQuicSyncConfig {
     fn from(value: AddTeamQuicSyncConfig) -> Self {
         Self::builder()
             .mode(value.data.mode)
@@ -193,7 +193,7 @@ impl From<AddTeamQuicSyncConfig> for aranya_client::AddQuicSyncConfig {
     }
 }
 
-impl From<CreateTeamQuicSyncConfig> for aranya_client::CreateQuicSyncConfig {
+impl From<CreateTeamQuicSyncConfig> for aranya_client::CreateTeamQuicSyncConfig {
     fn from(value: CreateTeamQuicSyncConfig) -> Self {
         Self::builder()
             .mode(value.data.mode)

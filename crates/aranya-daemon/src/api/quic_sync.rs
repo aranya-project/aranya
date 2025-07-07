@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use aranya_daemon_api::{AddSeedMode, CreateQuicSyncConfig, CreateSeedMode};
+use aranya_daemon_api::{AddSeedMode, CreateSeedMode, CreateTeamQuicSyncConfig};
 
 use super::*;
 use crate::sync::task::quic::PskStore;
@@ -15,7 +15,7 @@ impl Api {
     pub(super) async fn create_team_quic_sync(
         &mut self,
         team_id: api::TeamId,
-        qs_cfg: CreateQuicSyncConfig,
+        qs_cfg: CreateTeamQuicSyncConfig,
     ) -> api::Result<()> {
         let psk_store = self
             .quic
@@ -44,7 +44,7 @@ impl Api {
     pub(super) async fn add_team_quic_sync(
         &mut self,
         team: api::TeamId,
-        cfg: api::AddQuicSyncConfig,
+        cfg: api::AddTeamQuicSyncConfig,
     ) -> api::Result<()> {
         let psk_store = self
             .quic
