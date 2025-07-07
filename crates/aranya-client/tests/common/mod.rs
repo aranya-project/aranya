@@ -61,6 +61,7 @@ impl TeamCtx {
         ]
     }
 
+    #[instrument(skip(self))]
     pub async fn add_all_sync_peers(&mut self, team_id: TeamId) -> Result<()> {
         let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
         let mut devices = self.devices();
@@ -81,6 +82,25 @@ impl TeamCtx {
         Ok(())
     }
 
+    #[instrument(skip(self))]
+    pub async fn setup_default_roles(&mut self, team_id: TeamId) -> Result<DefaultRoles> {
+        let owner_role_id = self
+            .owner
+            .client
+            .team(team_id)
+            .roles()
+            .await?
+            .try_into_owner_role()?
+            .id;
+        self.owner
+            .client
+            .team(team_id)
+            .setup_default_roles(owner_role_id)
+            .await?
+            .try_into_default_roles()
+    }
+
+    #[instrument(skip(self))]
     pub async fn add_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
         // Shorthand for the teams we need to operate on.
         let mut owner_team = self.owner.client.team(team_id);
@@ -261,21 +281,33 @@ impl DeviceCtx {
     }
 }
 
-/// Converts [`Roles`] into [`DefaultRoles`].
-pub trait IntoDefaultRoles {
+/// Converts operations on [`Roles`].
+pub trait RolesExt {
     /// Converts [`Roles`] into [`DefaultRoles`].
     fn try_into_default_roles(self) -> Result<DefaultRoles>;
+    // Retrieves the owner role.
+    fn try_into_owner_role(self) -> Result<Role>;
 }
 
-impl IntoDefaultRoles for Roles {
+impl RolesExt for Roles {
     fn try_into_default_roles(self) -> Result<DefaultRoles> {
         DefaultRoles::try_from(self)
+    }
+
+    fn try_into_owner_role(self) -> Result<Role> {
+        println!("roles = {}", self.clone().into_iter().count());
+        self.into_iter()
+            .find(|role| {
+                println!("role = {role:?}");
+                let ok = role.name == "owner" && role.default;
+                println!("ok = {ok}");
+                ok
+            })
+            .context("unable to find owner role")
     }
 }
 
 /// The default roles for a team.
-///
-/// Created by [`TeamCtx::add_all_device_roles`].
 // NB: This assumes users cannot delete roles yet, which is true
 // as of MVP.
 #[derive(Clone, Debug)]

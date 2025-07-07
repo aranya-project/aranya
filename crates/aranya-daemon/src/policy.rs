@@ -280,7 +280,7 @@ pub trait ActorExt {
     fn query_device_roles(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn update_operation(&mut self, op: Text, role_id: Id) -> Result<(), ClientError>;
-    fn setup_default_roles(&mut self) -> Result<(), ClientError>;
+    fn setup_default_roles(&mut self, managing_role_id: Id) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn query_team_roles(&mut self) -> Result<(), ClientError>;

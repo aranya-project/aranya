@@ -17,7 +17,7 @@ use test_log::test;
 use tracing::{debug, info};
 
 mod common;
-use common::{sleep, IntoDefaultRoles, TeamCtx, SLEEP_INTERVAL};
+use common::{sleep, RolesExt, TeamCtx, SLEEP_INTERVAL};
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -31,12 +31,9 @@ async fn test_sync_now() -> Result<()> {
     info!(?team_id);
 
     let roles = team
-        .owner
-        .client
-        .team(team_id)
-        .setup_default_roles()
-        .await?
-        .try_into_default_roles()?;
+        .setup_default_roles(team_id)
+        .await
+        .context("unable to setup default roles")?;
     team.add_all_device_roles(team_id).await?;
 
     // Grab the shorthand for our address.
@@ -97,11 +94,19 @@ async fn test_remove_devices() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
+    let owner_role_id = team
+        .owner
+        .client
+        .team(team_id)
+        .roles()
+        .await?
+        .try_into_owner_role()?
+        .id;
     let roles = team
         .owner
         .client
         .team(team_id)
-        .setup_default_roles()
+        .setup_default_roles(owner_role_id)
         .await?
         .try_into_default_roles()?;
 
@@ -150,11 +155,19 @@ async fn test_query_roles() -> Result<()> {
     team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
+    let owner_role_id = team
+        .owner
+        .client
+        .team(team_id)
+        .roles()
+        .await?
+        .try_into_owner_role()?
+        .id;
     let roles = team
         .owner
         .client
         .team(team_id)
-        .setup_default_roles()
+        .setup_default_roles(owner_role_id)
         .await?
         .try_into_default_roles()?;
 
@@ -211,8 +224,9 @@ async fn test_add_team() -> Result<()> {
     let team_id = owner.team_id();
     info!(?team_id);
 
+    let owner_role_id = owner.roles().await?.try_into_owner_role()?.id;
     let roles = owner
-        .setup_default_roles()
+        .setup_default_roles(owner_role_id)
         .await?
         .try_into_default_roles()?;
 
@@ -298,8 +312,9 @@ async fn test_remove_team() -> Result<()> {
         let mut owner = team.owner.client.team(team_id);
         let mut admin = team.admin.client.team(team_id);
 
+        let owner_role_id = owner.roles().await?.try_into_owner_role()?.id;
         let roles = owner
-            .setup_default_roles()
+            .setup_default_roles(owner_role_id)
             .await?
             .try_into_default_roles()?;
 
@@ -334,8 +349,9 @@ async fn test_remove_team() -> Result<()> {
         let mut admin = team.admin.client.team(team_id);
 
         // Role assignment should fail
+        let owner_role_id = admin.roles().await?.try_into_owner_role()?.id;
         let roles = admin
-            .setup_default_roles()
+            .setup_default_roles(owner_role_id)
             .await?
             .try_into_default_roles()?;
         match admin.assign_role(team.operator.id, roles.member().id).await {
@@ -382,8 +398,9 @@ async fn test_multi_team_sync() -> Result<()> {
         let owner1_addr = team1.owner.aranya_local_addr().await?;
         let mut owner1 = team1.owner.client.team(team_id_1);
 
+        let owner_role_id = owner1.roles().await?.try_into_owner_role()?.id;
         let roles = owner1
-            .setup_default_roles()
+            .setup_default_roles(owner_role_id)
             .await?
             .try_into_default_roles()?;
 
@@ -435,8 +452,9 @@ async fn test_multi_team_sync() -> Result<()> {
         let owner2_addr = team2.owner.aranya_local_addr().await?;
         let mut admin2 = team2.admin.client.team(team_id_2);
 
+        let owner_role_id = admin2.roles().await?.try_into_owner_role()?.id;
         let roles = admin2
-            .setup_default_roles()
+            .setup_default_roles(owner_role_id)
             .await?
             .try_into_default_roles()?;
 

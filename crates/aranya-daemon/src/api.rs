@@ -561,11 +561,12 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
+        managing_role_id: api::RoleId,
     ) -> api::Result<Box<[api::Role]>> {
         let roles = self
             .client
             .actions(&team.into_id().into())
-            .setup_default_roles()
+            .setup_default_roles(managing_role_id.into_id().into())
             .await
             .context("unable to setup default roles")?
             .into_iter()

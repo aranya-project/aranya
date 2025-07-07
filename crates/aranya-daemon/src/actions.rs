@@ -205,10 +205,13 @@ where
     }
 
     /// Sets up the default team roles.
-    #[instrument(skip(self))]
-    fn setup_default_roles(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    #[instrument(skip(self), fields(%managing_role_id))]
+    fn setup_default_roles(
+        &self,
+        managing_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.setup_default_roles()?;
+            actor.setup_default_roles(managing_role_id.into())?;
             Ok(())
         })
         .in_current_span()

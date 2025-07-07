@@ -667,11 +667,11 @@ impl Team<'_> {
     /// Sets up the default team roles.
     ///
     /// It returns the newly created roles.
-    pub async fn setup_default_roles(&mut self) -> Result<Roles> {
+    pub async fn setup_default_roles(&mut self, managing_role_id: RoleId) -> Result<Roles> {
         let roles = self
             .client
             .daemon
-            .setup_default_roles(context::current(), self.id)
+            .setup_default_roles(context::current(), self.id, managing_role_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?

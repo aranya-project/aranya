@@ -565,14 +565,117 @@ revoking roles from themselves.
 // or revoke the role from themselves.
 fact CanManageRole[target_role_id id]=>{managing_role_id id}
 
-// Reports whether the device can manage the specified role.
-function can_manage_role(device_id id, target_role_id id) bool {
-    let managing_role = query CanManageRole[target_role_id: target_role_id]
-    if managing_role is None {
-        return false
+// Returns `Some(managing_role_id)` if the device can manage
+// `target_role_id`, or `None` otherwise.
+// TODO(eric): I'm not a huge fan of this name.
+function get_managing_role_id(device_id id, target_role_id id) optional id {
+    let record = query CanManageRole[target_role_id: target_role_id]
+    if record is None {
+        return None
     }
-    let role_id = (unwrap managing_role).managing_role_id
-    return exists AssignedRole[device_id: device_id, role_id: role_id]
+    let role_id = (unwrap record).managing_role_id
+
+    let is_assigned_role = exists AssignedRole[device_id: device_id, role_id: role_id]
+    if !is_assigned_role {
+        return None
+    }
+    return Some(role_id)
+}
+
+// Reports whether the device can manage the specified role.
+//
+// If you need to get the managing role ID, use
+// `get_managing_role_id` instead.
+function can_manage_role(device_id id, target_role_id id) bool {
+    return get_managing_role_id(device_id, target_role_id) is Some
+}
+
+// Changes the role required to manage the specified role.
+//
+// Devices with the managing role are allowed to assign the role
+// to any *other* device. Devices cannot assign the role to
+// or revoke the role from themselves.
+//
+// TODO(eric): Should we also take the old managing role as an
+// argument?
+action change_role_managing_role(
+    target_role_id id,
+    new_managing_role_id id,
+) {
+    publish ChangeRoleManagingRole {
+        target_role_id: target_role_id,
+        new_managing_role_id: managing_role_id,
+    }
+}
+
+// Emitted when the `ChangeRoleManagingRole` command is
+// successfully processed.
+effect RoleManagingRoleChanged {
+    // The ID of the role whose managing role was changed.
+    target_role_id id,
+    // The ID of the old managing role.
+    old_managing_role_id id,
+    // The ID of the new managing role.
+    new_managing_role_id id,
+    // The ID of the device that changed the managing role.
+    author_id id,
+}
+
+command ChangeRoleManagingRole {
+    fields {
+        // The ID of the role whose managing role is being
+        // changed.
+        target_role_id id,
+        // The ID of the new managing role.
+        new_managing_role_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        // Devices are authorized to change a role's managing role
+        // iff they have been assigned the managing role for the
+        // role whose managing role is being changed (send help).
+        // This negates the need for a "ChangeRoleManagingRole"
+        // operation. In fact, a "ChangeRoleManagingRole"
+        // operation would break role managing since each
+        // operation requires exactly one role.
+        //
+        // TODO(eric): Is this analysis correct?
+        let author = get_possibly_unauthorized_device(envelope)
+
+        // The target role must exist.
+        let target_role = check_unwrap query Role[role_id: this.target_role_id]
+
+        // The new managing role must exist.
+        let managing_role = check_unwrap query Role[role_id: this.managing_role_id]
+        let new_managing_role_id = managing_role.role_id
+
+        // The author must have permission to change the managing
+        // role (which implies the old managing role must exist).
+        let old_managing_role_id = check_unwrap get_managing_role_id(
+            author.device_id,
+            this.target_role_id,
+        )
+
+        finish {
+            update CanManageRole[target_role_id: target_role.role_id]=>{
+                managing_role_id: old_managing_role_id
+            } to {
+                managing_role_id: new_managing_role_id,
+            }
+
+            emit RoleManagingRoleChanged {
+                target_role_id: target_role.role_id,
+                old_managing_role_id: old_managing_role_id,
+                new_managing_role_id: new_managing_role_id,
+                author_id: author.device_id,
+            }
+        }
+    }
 }
 ```
 
@@ -586,6 +689,35 @@ Devices are notified about new roles via the `RoleCreated`
 effect.
 
 ```policy
+// The input to `create_default_role` since the policy language
+// has neither named args nor good IDE support.
+struct DefaultRole {
+    // The ID of the role.
+    role_id id,
+    // The name of the role.
+    name string,
+    // The ID of the device that created the role.
+    author_id id,
+    // The ID of the role that manages this role.
+    managing_role_id id,
+}
+
+// Creates the `Role` and `CanManageRole` facts for a default
+// role.
+finish function create_default_role(role struct DefaultRole) {
+    // TODO(eric): check invariants like `managing_role_id` must
+    // exist, author must exist, etc?
+
+    create Role[role_id: role.role_id]=>{
+        name: role.name,
+        author_id: role.author_id,
+        default: true,
+    }
+    create CanManageRole[target_role_id: role.role_id]=>{
+        managing_role_id: role.managing_role_id,
+    }
+}
+
 // Emitted when a role is created.
 effect RoleCreated {
     // ID of the role.
@@ -620,25 +752,31 @@ roles:
 - `member`
     - Can create and delete AQC channels (for labels they have
       been granted permission to use).
+    - TODO
 
 ```policy
 // Setup default roles on a team.
-action setup_default_roles() {
+action setup_default_roles(managing_role_id id) {
     publish SetupDefaultRole {
         name: "admin",
+        managing_role_id: managing_role_id,
     }
     publish SetupDefaultRole {
         name: "operator",
+        managing_role_id: managing_role_id,
     }
     publish SetupDefaultRole {
         name: "member",
+        managing_role_id: managing_role_id,
     }
 }
 
 command SetupDefaultRole {
     fields {
         // The name of the default role.
-        name string
+        name string,
+        // The ID of the role that manages this role.
+        managing_role_id id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -653,54 +791,73 @@ command SetupDefaultRole {
         match this.name {
             "admin" => {
                 finish {
-                    create Role[role_id: role_id]=>{
+                    create_default_role(DefaultRole {
+                        role_id: role_id,
                         name: this.name,
                         author_id: author.device_id,
-                        default: true,
-                    }
+                        managing_role_id: this.managing_role_id,
+                    })
 
-                    // TODO: operations
+                    create OpRequiresRole[op: "CreateLabel"]=>{role_id: role_id}
+                    create OpRequiresRole[op: "DeleteLabel"]=>{role_id: role_id}
+                    create OpRequiresRole[op: "ChangeLabelManagingRole"]=>{role_id: role_id}
+
+                    create OpRequiresRole[op: "UnsetAqcNetworkName"]=>{role_id: role_id}
+
+                    // TODO(eric): Should this be limited to the
+                    // owner?
+                    create OpRequiresRole[op: "UpdateOperation"]=>{role_id: role_id}
 
                     emit RoleCreated {
                         role_id: role_id,
                         name: this.name,
                         author_id: author.device_id,
+                        managing_role_id: this.managing_role_id,
                         default: true,
                     }
                 }
             }
             "operator" => {
                 finish {
-                    create Role[role_id: role_id]=>{
+                    create_default_role(DefaultRole {
+                        role_id: role_id,
                         name: this.name,
                         author_id: author.device_id,
-                        default: true,
-                    }
+                        managing_role_id: this.managing_role_id,
+                    })
 
-                    // TODO: operations
+                    create OpRequiresRole[op: "AssignLabel"]=>{role_id: role_id}
+                    create OpRequiresRole[op: "RevokeLabel"]=>{role_id: role_id}
+
+                    create OpRequiresRole[op: "SetAqcNetworkName"]=>{role_id: role_id}
+                    create OpRequiresRole[op: "UnsetAqcNetworkName"]=>{role_id: role_id}
 
                     emit RoleCreated {
                         role_id: role_id,
                         name: this.name,
                         author_id: author.device_id,
+                        managing_role_id: this.managing_role_id,
                         default: true,
                     }
                 }
             }
             "member" => {
                 finish {
-                    create Role[role_id: role_id]=>{
+                    create_default_role(DefaultRole {
+                        role_id: role_id,
                         name: this.name,
                         author_id: author.device_id,
-                        default: true,
-                    }
+                        managing_role_id: this.managing_role_id,
+                    })
 
-                    // TODO: operations
+                    create OpRequiresRole[op: "AqcCreateBidiChannel"]=>{role_id: role_id}
+                    create OpRequiresRole[op: "AqcCreateUniChannel"]=>{role_id: role_id}
 
                     emit RoleCreated {
                         role_id: role_id,
                         name: this.name,
                         author_id: author.device_id,
+                        managing_role_id: this.managing_role_id,
                         default: true,
                     }
                 }
@@ -767,7 +924,12 @@ command AssignRole {
         // operation. In fact, an "AssignRole" operation would
         // break role assignment since each operation requires
         // exactly one role.
+        //
+        // TODO(eric): Is this analysis correct?
         let author = get_possibly_unauthorized_device(envelope)
+
+        // Devices cannot assign roles to themselves.
+        check author.device_id != this.device_id
 
         // The author must have permission to assign the role.
         check can_manage_role(author.device_id, this.role_id)
@@ -825,7 +987,15 @@ command RevokeRole {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "RevokeRole")
+        // Devices are authorized to revoke roles iff they have
+        // been assigned the managing role for the role being
+        // revoked. This negates the need for a "RevokeRole"
+        // operation. In fact, a "RevokeRole" operation would
+        // break role revocation since each operation requires
+        // exactly one role.
+        //
+        // TODO(eric): Is this analysis correct?
+        let author = get_possibly_unauthorized_device(envelope)
 
         // The author must have permission to revoke the role.
         check can_manage_role(author.device_id, this.role_id)
@@ -997,6 +1167,12 @@ command CreateTeam {
         // invert this condition.
         check !team_exists()
 
+        // TODO(eric): check that `this.nonce` length is like
+        // 32 bytes or something? It *should* be cryptographically
+        // secure, but we don't really have a way to check that
+        // yet. And I'm not sure we want to have policy generate
+        // the nonce for CreateTeam.
+
         let author_id = envelope::author_id(envelope)
 
         let owner_key_ids = derive_device_key_ids(this.owner_keys)
@@ -1017,26 +1193,69 @@ command CreateTeam {
 
             add_new_device(this.owner_keys, owner_key_ids)
 
-            create AssignedRole[
-                device_id: author_id,
+            create_default_role(DefaultRole {
                 role_id: owner_role_id,
-            ]=>{}
+                name: "owner",
+                author_id: author_id,
+                // Initially, only the owner role can manage the
+                // owner role.
+                managing_role_id: owner_role_id,
+            })
 
             // Assign all the default operations to the owner
             // role.
             create OpRequiresRole[op: "AddDevice"]=>{role_id: owner_role_id}
             create OpRequiresRole[op: "RemoveDevice"]=>{role_id: owner_role_id}
 
-            create OpRequiresRole[op: "AssignRole"]=>{role_id: owner_role_id}
-            create OpRequiresRole[op: "RevokeRole"]=>{role_id: owner_role_id}
+            create OpRequiresRole[op: "CreateLabel"]=>{role_id: owner_role_id}
+            create OpRequiresRole[op: "DeleteLabel"]=>{role_id: owner_role_id}
+
+            create OpRequiresRole[op: "AssignLabel"]=>{role_id: owner_role_id}
+            create OpRequiresRole[op: "RevokeLabel"]=>{role_id: owner_role_id}
+
+            create OpRequiresRole[op: "SetAqcNetworkName"]=>{role_id: owner_role_id}
+            create OpRequiresRole[op: "UnsetAqcNetworkName"]=>{role_id: owner_role_id}
+
+            create OpRequiresRole[op: "AqcCreateBidiChannel"]=>{role_id: owner_role_id}
+            create OpRequiresRole[op: "AqcCreateUniChannel"]=>{role_id: owner_role_id}
+
             create OpRequiresRole[op: "SetupDefaultRole"]=>{role_id: owner_role_id}
+            create OpRequiresRole[op: "ChangeLabelManagingRole"]=>{role_id: owner_role_id}
+
+            create OpRequiresRole[op: "UpdateOperation"]=>{role_id: owner_role_id}
 
             create OpRequiresRole[op: "TerminateTeam"]=>{role_id: owner_role_id}
 
+            // And now make sure that the owner has the owner
+            // role, of course.
+            create AssignedRole[
+                device_id: author_id,
+                role_id: owner_role_id,
+            ]=>{}
+
+            // We don't have to emit the effects in a particular
+            // order, but try to make it intuitive.
             emit TeamCreated {
                 team_id: team_id,
                 owner_id: author_id,
             }
+            emit DeviceAdded {
+                device_id: owner_key_ids.device_id,
+                device_keys: this.owner_keys,
+            }
+            emit RoleCreated {
+                role_id: owner_role_id,
+                name: "owner",
+                author_id: author_id,
+                managing_role_id: owner_role_id,
+                default: true,
+            }
+            emit RoleAssigned {
+                device_id: author_id,
+                role_id: owner_role_id,
+                author_id: author_id,
+            }
+            // TODO(eric): emit OperationUpdated..?
         }
     }
 }
@@ -1205,6 +1424,12 @@ finish function remove_device(device_id id) {
     delete DeviceIdentKey[device_id: device_id]
     delete DeviceSignKey[device_id: device_id]
     delete DeviceEncKey[device_id: device_id]
+
+    // TODO(eric): what if any of these facts don't exist? It is
+    // an error to delete non-existent facts.
+    delete AssignedRole[device_id: device_id, role_id: ?]
+    delete AssignedLabel[device_id: device_id, label_id: ?]
+    delete AqcNetId[device_id: device_id]
 }
 ```
 
@@ -1374,6 +1599,10 @@ command ChangeLabelManagingRole {
 
         // Only the author of the label is allowed to change the
         // managing role.
+        //
+        // TODO(eric): Or how about just if you have the managing
+        // role then you can change the managing role for the
+        // label?
         check author.device_id == label.author_id
 
         let ctx = check_unwrap query CanManageLabel[label_id: label.label_id]
@@ -1384,7 +1613,11 @@ command ChangeLabelManagingRole {
         let new_managing_role_id = this.managing_role_id
 
         finish {
-            update CanManageLabel[label_id: label.label_id]=>{managing_role_id: old_managing_role_id} to {managing_role_id: new_managing_role_id}
+            update CanManageLabel[label_id: label.label_id]=>{
+                managing_role_id: old_managing_role_id,
+            } to {
+                managing_role_id: new_managing_role_id,
+            }
             emit LabelUpdated {
                 label_id: label.label_id,
                 label_name: label.name,
@@ -2087,6 +2320,8 @@ function can_create_aqc_bidi_channel(device1 id, device2 id, label_id id) bool {
     if device2_op != ChanOp::SendRecv {
         return false
     }
+
+    // TODO(eric): Check that both devices have network IDs.
 
     return true
 }

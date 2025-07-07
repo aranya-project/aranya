@@ -8,7 +8,7 @@ use aranya_client::{aqc::AqcPeerChannel, text, ChanOp};
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
-use common::{sleep, DefaultRoles, TeamCtx};
+use common::{sleep, RolesExt, TeamCtx};
 use futures_util::future::try_join;
 use tempfile::tempdir;
 
@@ -27,13 +27,21 @@ async fn test_aqc_chans() -> Result<()> {
     let mut team = TeamCtx::new("test_aqc_chans", work_dir).await?;
 
     let team_id = team.create_and_add_team().await?;
-    let roles: DefaultRoles = team
+    let owner_role_id = team
         .owner
         .client
         .team(team_id)
-        .setup_default_roles()
+        .roles()
         .await?
-        .try_into()?;
+        .try_into_owner_role()?
+        .id;
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles(owner_role_id)
+        .await?
+        .try_into_default_roles()?;
     let admin_role_id = roles.admin().id;
 
     sleep(sleep_interval).await;
@@ -260,13 +268,21 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_sender", work_dir).await?;
     // create team.
     let team_id = team.create_and_add_team().await?;
-    let roles: DefaultRoles = team
+    let owner_role_id = team
         .owner
         .client
         .team(team_id)
-        .setup_default_roles()
+        .roles()
         .await?
-        .try_into()?;
+        .try_into_owner_role()?
+        .id;
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles(owner_role_id)
+        .await?
+        .try_into_default_roles()?;
     let admin_role_id = roles.admin().id;
 
     // Tell all peers to sync with one another, and assign their roles.
@@ -353,13 +369,21 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     // create team.
     let team_id = team.create_and_add_team().await?;
-    let roles: DefaultRoles = team
+    let owner_role_id = team
         .owner
         .client
         .team(team_id)
-        .setup_default_roles()
+        .roles()
         .await?
-        .try_into()?;
+        .try_into_owner_role()?
+        .id;
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles(owner_role_id)
+        .await?
+        .try_into_default_roles()?;
     let admin_role_id = roles.admin().id;
 
     // Tell all peers to sync with one another, and assign their roles.
@@ -446,13 +470,21 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     // create team.
     let team_id = team.create_and_add_team().await?;
-    let roles: DefaultRoles = team
+    let owner_role_id = team
         .owner
         .client
         .team(team_id)
-        .setup_default_roles()
+        .roles()
         .await?
-        .try_into()?;
+        .try_into_owner_role()?
+        .id;
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles(owner_role_id)
+        .await?
+        .try_into_default_roles()?;
     let admin_role_id = roles.admin().id;
 
     // Tell all peers to sync with one another, and assign their roles.
@@ -591,13 +623,21 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     // create team.
     let team_id = team.create_and_add_team().await?;
-    let roles: DefaultRoles = team
+    let owner_role_id = team
         .owner
         .client
         .team(team_id)
-        .setup_default_roles()
+        .roles()
         .await?
-        .try_into()?;
+        .try_into_owner_role()?
+        .id;
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles(owner_role_id)
+        .await?
+        .try_into_default_roles()?;
     let admin_role_id = roles.admin().id;
 
     // Tell all peers to sync with one another, and assign their roles.
