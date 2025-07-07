@@ -651,50 +651,50 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
 
 /// QUIC syncer configuration.
 ///
-/// Use a [`CreateQuicSyncConfigBuilder`] to construct this object.
+/// Use a [`CreateTeamQuicSyncConfigBuilder`] to construct this object.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type CreateQuicSyncConfig = Safe<imp::CreateQuicSyncConfig>;
+pub type CreateTeamQuicSyncConfig = Safe<imp::CreateTeamQuicSyncConfig>;
 
 /// QUIC syncer configuration.
 ///
-/// Use a [`AddQuicSyncConfigBuilder`] to construct this object.
+/// Use a [`AddTeamQuicSyncConfigBuilder`] to construct this object.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type AddQuicSyncConfig = Safe<imp::AddQuicSyncConfig>;
+pub type AddTeamQuicSyncConfig = Safe<imp::AddTeamQuicSyncConfig>;
 
-/// A builder for initializing an [`AddQuicSyncConfig`].
+/// A builder for initializing an [`AddTeamQuicSyncConfig`].
 ///
 /// The [`QuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`] or a [`CreateTeamConfig`].
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type AddQuicSyncConfigBuilder = Safe<imp::AddQuicSyncConfigBuilder>;
+pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
 
 /// A builder for initializing a [`CreateQuicSyncConfig`].
 ///
 /// The [`QuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`] or a [`CreateTeamConfig`].
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 288, align = 8)]
-pub type CreateQuicSyncConfigBuilder = Safe<imp::CreateQuicSyncConfigBuilder>;
+pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBuilder>;
 
-/// Attempts to set PSK seed generation mode value on [`CreateQuicSyncConfigBuilder`].
+/// Attempts to set PSK seed generation mode value on [`CreateTeamQuicSyncConfigBuilder`].
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 ///
-/// @relates AranyaCreateQuicSyncConfigBuilder.
-pub fn create_quic_sync_config_generate(
-    cfg: &mut CreateQuicSyncConfigBuilder,
+/// @relates AranyaCreateTeamQuicSyncConfigBuilder.
+pub fn create_team_quic_sync_config_generate(
+    cfg: &mut CreateTeamQuicSyncConfigBuilder,
 ) -> Result<(), imp::Error> {
     cfg.generate();
     Ok(())
 }
 
-/// Attempts to set wrapped PSK seed value on [`AddQuicSyncConfigBuilder`].
+/// Attempts to set wrapped PSK seed value on [`AddTeamQuicSyncConfigBuilder`].
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] encap_seed a pointer the encapsulated PSK seed
 ///
-/// @relates AranyaAddQuicSyncConfigBuilder.
-pub fn add_quic_sync_config_wrapped_seed(
-    cfg: &mut AddQuicSyncConfigBuilder,
+/// @relates AranyaAddTeamQuicSyncConfigBuilder.
+pub fn add_team_quic_sync_config_wrapped_seed(
+    cfg: &mut AddTeamQuicSyncConfigBuilder,
     encap_seed: &[u8],
 ) -> Result<(), imp::Error> {
     cfg.wrapped_seed(encap_seed)?;
@@ -708,28 +708,28 @@ pub struct SeedIkm {
     bytes: [u8; ARANYA_SEED_IKM_LEN],
 }
 
-/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`CreateQuicSyncConfigBuilder`].
+/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`CreateTeamQuicSyncConfigBuilder`].
 ///
-/// @param[in,out] cfg a pointer to the quic sync config builder [`CreateQuicSyncConfigBuilder`]
+/// @param[in,out] cfg a pointer to the quic sync config builder [`CreateTeamQuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
 ///
-/// @relates AranyaCreateQuicSyncConfigBuilder.
-pub fn create_quic_sync_config_raw_seed_ikm(
-    cfg: &mut CreateQuicSyncConfigBuilder,
+/// @relates AranyaCreateTeamQuicSyncConfigBuilder.
+pub fn create_team_quic_sync_config_raw_seed_ikm(
+    cfg: &mut CreateTeamQuicSyncConfigBuilder,
     ikm: &SeedIkm,
 ) -> Result<(), imp::Error> {
     cfg.raw_seed_ikm(ikm.bytes);
     Ok(())
 }
 
-/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`AddQuicSyncConfigBuilder`].
+/// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`AddTeamQuicSyncConfigBuilder`].
 ///
-/// @param[in,out] cfg a pointer to the quic sync config builder [`AddQuicSyncConfigBuilder`]
+/// @param[in,out] cfg a pointer to the quic sync config builder [`AddTeamQuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
 ///
-/// @relates AranyaAddQuicSyncConfigBuilder.
-pub fn add_quic_sync_config_raw_seed_ikm(
-    cfg: &mut AddQuicSyncConfigBuilder,
+/// @relates AranyaAddTeamQuicSyncConfigBuilder.
+pub fn add_team_quic_sync_config_raw_seed_ikm(
+    cfg: &mut AddTeamQuicSyncConfigBuilder,
     ikm: &SeedIkm,
 ) -> Result<(), imp::Error> {
     cfg.raw_seed_ikm(ikm.bytes);
@@ -741,31 +741,31 @@ pub fn add_quic_sync_config_raw_seed_ikm(
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param[in] cfg a pointer to the QUIC sync config builder [`CreateQuicSyncConfigBuilder`]
+/// @param[in] cfg a pointer to the QUIC sync config builder [`CreateTeamQuicSyncConfigBuilder`]
 /// @param[out] out a pointer to write the QUIC sync config to [`CreateQuicSyncConfig`]
 ///
-/// @relates AranyaCreateQuicSyncConfigBuilder.
-pub fn create_quic_sync_config_build(
-    cfg: OwnedPtr<CreateQuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<CreateQuicSyncConfig>,
+/// @relates AranyaCreateTeamQuicSyncConfigBuilder.
+pub fn create_team_quic_sync_config_build(
+    cfg: OwnedPtr<CreateTeamQuicSyncConfigBuilder>,
+    out: &mut MaybeUninit<CreateTeamQuicSyncConfig>,
 ) -> Result<(), imp::Error> {
     // SAFETY: No special considerations.
     unsafe { cfg.build(out)? }
     Ok(())
 }
 
-/// Attempts to construct an [`AddQuicSyncConfig`].
+/// Attempts to construct an [`AddTeamQuicSyncConfig`].
 ///
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param[in] cfg a pointer to the QUIC sync config builder [`AddQuicSyncConfigBuilder`]
-/// @param[out] out a pointer to write the QUIC sync config to [`AddQuicSyncConfig`]
+/// @param[in] cfg a pointer to the QUIC sync config builder [`AddTeamQuicSyncConfigBuilder`]
+/// @param[out] out a pointer to write the QUIC sync config to [`AddTeamQuicSyncConfig`]
 ///
-/// @relates AranyaAddQuicSyncConfigBuilder.
-pub fn add_quic_sync_config_build(
-    cfg: OwnedPtr<AddQuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<AddQuicSyncConfig>,
+/// @relates AranyaAddTeamQuicSyncConfigBuilder.
+pub fn add_team_quic_sync_config_build(
+    cfg: OwnedPtr<AddTeamQuicSyncConfigBuilder>,
+    out: &mut MaybeUninit<AddTeamQuicSyncConfig>,
 ) -> Result<(), imp::Error> {
     // SAFETY: No special considerations.
     unsafe { cfg.build(out)? }
@@ -804,7 +804,7 @@ pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 /// @relates AranyaAddTeamConfigBuilder.
 pub fn add_team_config_builder_set_quic_syncer(
     cfg: &mut AddTeamConfigBuilder,
-    quic: OwnedPtr<AddQuicSyncConfig>,
+    quic: OwnedPtr<AddTeamQuicSyncConfig>,
 ) {
     // SAFETY: the user is responsible for passing in a valid QuicSyncConfig pointer.
     let quic = unsafe { quic.read() };
@@ -851,7 +851,7 @@ pub fn add_team_config_build(
 /// @relates AranyaCreateTeamConfigBuilder.
 pub fn create_team_config_builder_set_quic_syncer(
     cfg: &mut CreateTeamConfigBuilder,
-    quic: OwnedPtr<CreateQuicSyncConfig>,
+    quic: OwnedPtr<CreateTeamQuicSyncConfig>,
 ) {
     // SAFETY: the user is responsible for passing in a valid QuicSyncConfig pointer.
     let quic = unsafe { quic.read() };

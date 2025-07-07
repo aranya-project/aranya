@@ -54,31 +54,31 @@ impl<T: Clone> QuicSyncConfig<T> {
 }
 
 /// QUIC syncer configuration for CreateTeam() operation.
-pub type CreateQuicSyncConfig = QuicSyncConfig<Create>;
+pub type CreateTeamQuicSyncConfig = QuicSyncConfig<Create>;
 
-impl CreateQuicSyncConfig {
+impl CreateTeamQuicSyncConfig {
     fn new(mode: CreateSeedMode) -> Self {
         Self {
             data: Create::new(mode),
         }
     }
 
-    pub fn builder() -> CreateQuicSyncConfigBuilder {
+    pub fn builder() -> CreateTeamQuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }
 }
 
 /// QUIC syncer configuration for AddTeam() operation.
-pub type AddQuicSyncConfig = QuicSyncConfig<Add>;
+pub type AddTeamQuicSyncConfig = QuicSyncConfig<Add>;
 
-impl AddQuicSyncConfig {
+impl AddTeamQuicSyncConfig {
     fn new(mode: AddSeedMode) -> Self {
         Self {
             data: Add::new(mode),
         }
     }
 
-    pub fn builder() -> AddQuicSyncConfigBuilder {
+    pub fn builder() -> AddTeamQuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }
 }
@@ -88,9 +88,9 @@ pub struct QuicSyncConfigBuilder<T> {
     data: T,
 }
 
-pub(crate) type CreateQuicSyncConfigBuilder = QuicSyncConfigBuilder<CreateBuild>;
+pub(crate) type CreateTeamQuicSyncConfigBuilder = QuicSyncConfigBuilder<CreateBuild>;
 
-impl CreateQuicSyncConfigBuilder {
+impl CreateTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
     pub fn mode(&mut self, mode: CreateSeedMode) {
@@ -112,9 +112,9 @@ impl CreateQuicSyncConfigBuilder {
     }
 }
 
-pub(crate) type AddQuicSyncConfigBuilder = QuicSyncConfigBuilder<AddBuild>;
+pub(crate) type AddTeamQuicSyncConfigBuilder = QuicSyncConfigBuilder<AddBuild>;
 
-impl AddQuicSyncConfigBuilder {
+impl AddTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
     pub fn mode(&mut self, mode: AddSeedMode) {
@@ -138,37 +138,37 @@ impl AddQuicSyncConfigBuilder {
     }
 }
 
-impl Typed for AddQuicSyncConfig {
+impl Typed for AddTeamQuicSyncConfig {
     const TYPE_ID: TypeId = TypeId::new(0xADF0F970);
 }
 
-impl Typed for CreateQuicSyncConfig {
+impl Typed for CreateTeamQuicSyncConfig {
     const TYPE_ID: TypeId = TypeId::new(0xADF0F971);
 }
 
-impl Typed for CreateQuicSyncConfigBuilder {
+impl Typed for CreateTeamQuicSyncConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0xEEC2FA47);
 }
 
-impl Typed for AddQuicSyncConfigBuilder {
+impl Typed for AddTeamQuicSyncConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0xEEC2FA48);
 }
 
-impl Builder for CreateQuicSyncConfigBuilder {
-    type Output = defs::CreateQuicSyncConfig;
+impl Builder for CreateTeamQuicSyncConfigBuilder {
+    type Output = defs::CreateTeamQuicSyncConfig;
     type Error = Error;
 
     /// # Safety
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Self::Output::init(out, CreateQuicSyncConfig::new(self.data.mode));
+        Self::Output::init(out, CreateTeamQuicSyncConfig::new(self.data.mode));
         Ok(())
     }
 }
 
-impl Builder for AddQuicSyncConfigBuilder {
-    type Output = defs::AddQuicSyncConfig;
+impl Builder for AddTeamQuicSyncConfigBuilder {
+    type Output = defs::AddTeamQuicSyncConfig;
     type Error = Error;
 
     /// # Safety
@@ -179,13 +179,13 @@ impl Builder for AddQuicSyncConfigBuilder {
             return Err(InvalidArg::new("mode", "field not set").into());
         };
 
-        Self::Output::init(out, AddQuicSyncConfig::new(mode));
+        Self::Output::init(out, AddTeamQuicSyncConfig::new(mode));
         Ok(())
     }
 }
 
-impl From<AddQuicSyncConfig> for aranya_client::AddQuicSyncConfig {
-    fn from(value: AddQuicSyncConfig) -> Self {
+impl From<AddTeamQuicSyncConfig> for aranya_client::AddQuicSyncConfig {
+    fn from(value: AddTeamQuicSyncConfig) -> Self {
         Self::builder()
             .mode(value.data.mode)
             .build()
@@ -193,8 +193,8 @@ impl From<AddQuicSyncConfig> for aranya_client::AddQuicSyncConfig {
     }
 }
 
-impl From<CreateQuicSyncConfig> for aranya_client::CreateQuicSyncConfig {
-    fn from(value: CreateQuicSyncConfig) -> Self {
+impl From<CreateTeamQuicSyncConfig> for aranya_client::CreateQuicSyncConfig {
+    fn from(value: CreateTeamQuicSyncConfig) -> Self {
         Self::builder()
             .mode(value.data.mode)
             .build()

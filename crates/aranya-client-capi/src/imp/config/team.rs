@@ -10,7 +10,7 @@ use crate::api::defs::{self, TeamId};
 
 pub(crate) mod quic_sync;
 pub(crate) use quic_sync::{
-    AddQuicSyncConfig, AddQuicSyncConfigBuilder, CreateQuicSyncConfig, CreateQuicSyncConfigBuilder,
+    AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
     QuicSyncConfig,
 };
 
@@ -63,7 +63,7 @@ pub struct TeamConfig<T, U> {
 pub type CreateTeamConfig = TeamConfig<Create, quic_sync::Create>;
 
 impl CreateTeamConfig {
-    fn new(quic_sync: Option<CreateQuicSyncConfig>) -> Self {
+    fn new(quic_sync: Option<CreateTeamQuicSyncConfig>) -> Self {
         Self {
             data: Create,
             quic_sync,
@@ -88,7 +88,7 @@ impl CreateTeamConfigBuilder {
     ///
     /// This is an optional field that configures how the team
     /// synchronizes data over QUIC connections.
-    pub fn quic(&mut self, cfg: CreateQuicSyncConfig) {
+    pub fn quic(&mut self, cfg: CreateTeamQuicSyncConfig) {
         self.quic_sync = Some(cfg);
     }
 }
@@ -130,7 +130,7 @@ impl From<&CreateTeamConfig> for aranya_client::CreateTeamConfig {
 pub type AddTeamConfig = TeamConfig<Add, quic_sync::Add>;
 
 impl AddTeamConfig {
-    fn new(id: TeamId, quic_sync: Option<AddQuicSyncConfig>) -> Self {
+    fn new(id: TeamId, quic_sync: Option<AddTeamQuicSyncConfig>) -> Self {
         Self {
             data: Add::new(id),
             quic_sync,
@@ -159,7 +159,7 @@ impl AddTeamConfigBuilder {
     ///
     /// This is an optional field that configures how the team
     /// synchronizes data over QUIC connections.
-    pub fn quic(&mut self, cfg: AddQuicSyncConfig) {
+    pub fn quic(&mut self, cfg: AddTeamQuicSyncConfig) {
         self.quic_sync = Some(cfg);
     }
 }
