@@ -3,8 +3,8 @@
 //! # Overview
 //!
 //! There are two main configuration types:
-//! - [`CreateQuicSyncConfig`] - For creating new teams
-//! - [`AddQuicSyncConfig`] - For adding members to existing teams
+//! - [`CreateTeamQuicSyncConfig`] - For creating new teams
+//! - [`AddTeamQuicSyncConfig`] - For adding members to existing teams
 
 use aranya_daemon_api::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
 use tracing::error;
