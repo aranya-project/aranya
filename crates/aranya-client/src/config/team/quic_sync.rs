@@ -11,16 +11,16 @@ use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
 
-#[derive(Clone)]
 /// Configuration data for adding members to an existing team.
 /// See [`QuicSyncConfig`].
+#[derive(Clone)]
 pub struct AddMemberData {
     pub(super) mode: AddSeedMode,
 }
 
-#[derive(Clone)]
 /// Configuration data for creating a new team.
 /// See [`QuicSyncConfig`].
+#[derive(Clone)]
 pub struct CreateTeamData {
     pub(super) mode: CreateSeedMode,
 }
@@ -37,25 +37,24 @@ impl AddMemberData {
     }
 }
 
-#[derive(Clone, Default)]
 /// Configuration data for adding members to an existing team.
 /// See [`QuicSyncConfigBuilder`].
+#[derive(Clone, Default)]
 pub struct AddBuild {
     pub(super) mode: Option<AddSeedMode>,
 }
 
-#[derive(Clone, Default)]
 /// Configuration data for creating a new team.
 /// See [`QuicSyncConfigBuilder`].
+#[derive(Clone, Default)]
 pub struct CreateBuild {
     pub(super) mode: CreateSeedMode,
 }
 
-#[derive(Clone)]
-
 /// Configuration for QUIC-based team synchronization.
 ///
 /// This wraps either [`CreateTeamData`] or [`AddMemberData`] configuration data.
+#[derive(Clone)]
 pub struct QuicSyncConfig<T> {
     pub(super) data: T,
 }
@@ -80,10 +79,10 @@ impl AddQuicSyncConfig {
     }
 }
 
-#[derive(Clone, Default)]
 /// Configuration for syncing over QUIC.
 ///
 /// This wraps either [`CreateBuild`] or [`AddBuild`] configuration data.
+#[derive(Clone, Default)]
 pub struct QuicSyncConfigBuilder<T> {
     data: T,
 }

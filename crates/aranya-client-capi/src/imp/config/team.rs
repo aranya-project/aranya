@@ -36,8 +36,8 @@ pub struct AddBuild {
 #[derive(Default)]
 pub struct CreateBuild;
 
-#[derive(Clone)]
 /// Builder for a [`TeamConfig`].
+#[derive(Clone)]
 pub struct TeamConfigBuilder<T, U> {
     data: T,
     quic_sync: Option<QuicSyncConfig<U>>,
@@ -52,8 +52,8 @@ impl<T: Default, U> Default for TeamConfigBuilder<T, U> {
     }
 }
 
-#[derive(Clone)]
 /// Configuration info for creating or adding teams.
+#[derive(Clone)]
 pub struct TeamConfig<T, U> {
     data: T,
     quic_sync: Option<QuicSyncConfig<U>>,

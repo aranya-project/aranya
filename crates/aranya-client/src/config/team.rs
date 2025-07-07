@@ -20,14 +20,14 @@ pub use quic_sync::{
     AddQuicSyncConfig, CreateQuicSyncConfig, QuicSyncConfig, QuicSyncConfigBuilder,
 };
 
-#[derive(Clone)]
 /// Data required to join an existing team.
+#[derive(Clone)]
 struct AddMemberData {
     pub(super) id: TeamId,
 }
 
-#[derive(Clone, Default)]
 /// Marker type for creating a new team.
+#[derive(Clone, Default)]
 pub struct CreateTeamData;
 
 impl AddMemberData {
@@ -36,19 +36,19 @@ impl AddMemberData {
     }
 }
 
-#[derive(Default)]
 /// Configuration for joining an existing team.
 /// See [`TeamConfigBuilder`]
+#[derive(Default)]
 struct AddMemberDataBuild {
     pub(super) id: Option<TeamId>,
 }
 
-#[derive(Clone)]
 /// Generic builder for team configuration.
 ///
 /// This builder supports both team creation and joining operations,
 /// with optional transport configuration.
 /// See [`TeamConfig`].
+#[derive(Clone)]
 struct TeamConfigBuilder<T, U> {
     data: T,
     quic_sync: Option<QuicSyncConfig<U>>,
@@ -63,27 +63,27 @@ impl<T: Default, U> Default for TeamConfigBuilder<T, U> {
     }
 }
 
-#[derive(Default)]
 /// Builder for creating a new team configuration.
+#[derive(Default)]
 pub struct CreateTeamConfigBuilder(TeamConfigBuilder<CreateTeamData, quic_sync::CreateTeamData>);
 
-#[derive(Default)]
 /// Builder for joining an existing team configuration.
+#[derive(Default)]
 pub struct AddTeamConfigBuilder(TeamConfigBuilder<AddMemberDataBuild, quic_sync::AddMemberData>);
 
-#[derive(Clone)]
 /// Generic team configuration.
+#[derive(Clone)]
 struct TeamConfig<T, U> {
     data: T,
     quic_sync: Option<QuicSyncConfig<U>>,
 }
 
-#[derive(Clone)]
 /// Configuration for creating a new team.
+#[derive(Clone)]
 pub struct CreateTeamConfig(TeamConfig<CreateTeamData, quic_sync::CreateTeamData>);
 
-#[derive(Clone)]
 /// Configuration for joining an existing team.
+#[derive(Clone)]
 pub struct AddTeamConfig(TeamConfig<AddMemberData, quic_sync::AddMemberData>);
 
 impl AddTeamConfig {
