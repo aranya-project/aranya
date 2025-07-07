@@ -52,9 +52,6 @@ impl<T: Default, U> Default for TeamConfigBuilder<T, U> {
     }
 }
 
-pub type CreateTeamConfigBuilder = TeamConfigBuilder<CreateBuild, quic_sync::Create>;
-pub type AddTeamConfigBuilder = TeamConfigBuilder<AddBuild, quic_sync::Add>;
-
 #[derive(Clone)]
 /// Configuration info for creating or adding teams.
 pub struct TeamConfig<T, U> {
@@ -62,22 +59,8 @@ pub struct TeamConfig<T, U> {
     quic_sync: Option<QuicSyncConfig<U>>,
 }
 
+/// A team config required to create a new Aranya team.
 pub type CreateTeamConfig = TeamConfig<Create, quic_sync::Create>;
-pub type AddTeamConfig = TeamConfig<Add, quic_sync::Add>;
-
-impl AddTeamConfig {
-    fn new(id: TeamId, quic_sync: Option<AddQuicSyncConfig>) -> Self {
-        Self {
-            data: Add::new(id),
-            quic_sync,
-        }
-    }
-
-    /// Creates a default [`AddTeamConfigBuilder`].
-    pub fn builder() -> AddTeamConfigBuilder {
-        TeamConfigBuilder::default()
-    }
-}
 
 impl CreateTeamConfig {
     fn new(quic_sync: Option<CreateQuicSyncConfig>) -> Self {
@@ -93,20 +76,12 @@ impl CreateTeamConfig {
     }
 }
 
-impl AddTeamConfigBuilder {
-    /// Sets the ID of the team to add.
-    pub fn id(&mut self, id: TeamId) {
-        self.data.id = Some(id);
-    }
-
-    /// Configures the quic_sync config..
-    ///
-    /// This is an optional field that configures how the team
-    /// synchronizes data over QUIC connections.
-    pub fn quic(&mut self, cfg: AddQuicSyncConfig) {
-        self.quic_sync = Some(cfg);
-    }
+impl Typed for CreateTeamConfig {
+    const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
 }
+
+/// A team config required to add an existing Aranya team to a device.
+pub type CreateTeamConfigBuilder = TeamConfigBuilder<CreateBuild, quic_sync::Create>;
 
 impl CreateTeamConfigBuilder {
     /// Configures the quic_sync config..
@@ -115,6 +90,23 @@ impl CreateTeamConfigBuilder {
     /// synchronizes data over QUIC connections.
     pub fn quic(&mut self, cfg: CreateQuicSyncConfig) {
         self.quic_sync = Some(cfg);
+    }
+}
+
+impl Typed for CreateTeamConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0x69F54A43);
+}
+
+impl Builder for CreateTeamConfigBuilder {
+    type Output = defs::CreateTeamConfig;
+    type Error = Error;
+
+    /// # Safety
+    ///
+    /// No special considerations.
+    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
+        Self::Output::init(out, CreateTeamConfig::new(self.quic_sync));
+        Ok(())
     }
 }
 
@@ -135,46 +127,41 @@ impl From<&CreateTeamConfig> for aranya_client::CreateTeamConfig {
     }
 }
 
-impl Typed for CreateTeamConfig {
-    const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
-}
+pub type AddTeamConfig = TeamConfig<Add, quic_sync::Add>;
 
-impl Typed for CreateTeamConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0x69F54A43);
-}
-
-impl Builder for CreateTeamConfigBuilder {
-    type Output = defs::CreateTeamConfig;
-    type Error = Error;
-
-    /// # Safety
-    ///
-    /// No special considerations.
-    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Self::Output::init(out, CreateTeamConfig::new(self.quic_sync));
-        Ok(())
-    }
-}
-
-impl From<AddTeamConfig> for aranya_client::AddTeamConfig {
-    fn from(value: AddTeamConfig) -> Self {
-        let mut builder = Self::builder();
-        if let Some(cfg) = value.quic_sync {
-            builder = builder.quic_sync(cfg.into()).id((&value.data.id).into());
+impl AddTeamConfig {
+    fn new(id: TeamId, quic_sync: Option<AddQuicSyncConfig>) -> Self {
+        Self {
+            data: Add::new(id),
+            quic_sync,
         }
-
-        builder.build().expect("All fields set")
     }
-}
 
-impl From<&AddTeamConfig> for aranya_client::AddTeamConfig {
-    fn from(value: &AddTeamConfig) -> Self {
-        Self::from(value.to_owned())
+    /// Creates a default [`AddTeamConfigBuilder`].
+    pub fn builder() -> AddTeamConfigBuilder {
+        TeamConfigBuilder::default()
     }
 }
 
 impl Typed for AddTeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7519);
+}
+
+pub type AddTeamConfigBuilder = TeamConfigBuilder<AddBuild, quic_sync::Add>;
+
+impl AddTeamConfigBuilder {
+    /// Sets the ID of the team to add.
+    pub fn id(&mut self, id: TeamId) {
+        self.data.id = Some(id);
+    }
+
+    /// Configures the quic_sync config..
+    ///
+    /// This is an optional field that configures how the team
+    /// synchronizes data over QUIC connections.
+    pub fn quic(&mut self, cfg: AddQuicSyncConfig) {
+        self.quic_sync = Some(cfg);
+    }
 }
 
 impl Typed for AddTeamConfigBuilder {
@@ -195,5 +182,24 @@ impl Builder for AddTeamConfigBuilder {
 
         Self::Output::init(out, AddTeamConfig::new(id, self.quic_sync));
         Ok(())
+    }
+}
+
+impl From<AddTeamConfig> for aranya_client::AddTeamConfig {
+    fn from(value: AddTeamConfig) -> Self {
+        let mut builder = Self::builder();
+        if let Some(cfg) = value.quic_sync {
+            builder = builder
+                .quic_sync(cfg.into())
+                .team_id((&value.data.id).into());
+        }
+
+        builder.build().expect("All fields set")
+    }
+}
+
+impl From<&AddTeamConfig> for aranya_client::AddTeamConfig {
+    fn from(value: &AddTeamConfig) -> Self {
+        Self::from(value.to_owned())
     }
 }

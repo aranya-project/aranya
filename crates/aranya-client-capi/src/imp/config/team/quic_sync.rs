@@ -53,8 +53,8 @@ impl<T: Clone> QuicSyncConfig<T> {
     }
 }
 
+/// QUIC syncer configuration for CreateTeam() operation.
 pub type CreateQuicSyncConfig = QuicSyncConfig<Create>;
-pub type AddQuicSyncConfig = QuicSyncConfig<Add>;
 
 impl CreateQuicSyncConfig {
     fn new(mode: CreateSeedMode) -> Self {
@@ -67,6 +67,9 @@ impl CreateQuicSyncConfig {
         QuicSyncConfigBuilder::default()
     }
 }
+
+/// QUIC syncer configuration for AddTeam() operation.
+pub type AddQuicSyncConfig = QuicSyncConfig<Add>;
 
 impl AddQuicSyncConfig {
     fn new(mode: AddSeedMode) -> Self {
@@ -86,7 +89,6 @@ pub struct QuicSyncConfigBuilder<T> {
 }
 
 pub(crate) type CreateQuicSyncConfigBuilder = QuicSyncConfigBuilder<CreateBuild>;
-pub(crate) type AddQuicSyncConfigBuilder = QuicSyncConfigBuilder<AddBuild>;
 
 impl CreateQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
@@ -109,6 +111,8 @@ impl CreateQuicSyncConfigBuilder {
         self.data.mode = CreateSeedMode::IKM(ikm.into());
     }
 }
+
+pub(crate) type AddQuicSyncConfigBuilder = QuicSyncConfigBuilder<AddBuild>;
 
 impl AddQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
@@ -140,24 +144,6 @@ impl Typed for AddQuicSyncConfig {
 
 impl Typed for CreateQuicSyncConfig {
     const TYPE_ID: TypeId = TypeId::new(0xADF0F971);
-}
-
-impl From<AddQuicSyncConfig> for aranya_client::AddQuicSyncConfig {
-    fn from(value: AddQuicSyncConfig) -> Self {
-        Self::builder()
-            .mode(value.data.mode)
-            .build()
-            .expect("All fields are set")
-    }
-}
-
-impl From<CreateQuicSyncConfig> for aranya_client::CreateQuicSyncConfig {
-    fn from(value: CreateQuicSyncConfig) -> Self {
-        Self::builder()
-            .mode(value.data.mode)
-            .build()
-            .expect("All fields are set")
-    }
 }
 
 impl Typed for CreateQuicSyncConfigBuilder {
@@ -195,5 +181,23 @@ impl Builder for AddQuicSyncConfigBuilder {
 
         Self::Output::init(out, AddQuicSyncConfig::new(mode));
         Ok(())
+    }
+}
+
+impl From<AddQuicSyncConfig> for aranya_client::AddQuicSyncConfig {
+    fn from(value: AddQuicSyncConfig) -> Self {
+        Self::builder()
+            .mode(value.data.mode)
+            .build()
+            .expect("All fields are set")
+    }
+}
+
+impl From<CreateQuicSyncConfig> for aranya_client::CreateQuicSyncConfig {
+    fn from(value: CreateQuicSyncConfig) -> Self {
+        Self::builder()
+            .mode(value.data.mode)
+            .build()
+            .expect("All fields are set")
     }
 }

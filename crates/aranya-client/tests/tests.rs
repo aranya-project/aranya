@@ -211,7 +211,7 @@ async fn test_add_team() -> Result<()> {
         .client
         .add_team({
             AddTeamConfig::builder()
-                .id(team_id)
+                .team_id(team_id)
                 .quic_sync(
                     AddQuicSyncConfig::builder()
                         .wrapped_seed(&admin_seed)?
@@ -351,7 +351,7 @@ async fn test_multi_team_sync() -> Result<()> {
                             .wrapped_seed(&admin_seed)?
                             .build()?,
                     )
-                    .id(team_id_1)
+                    .team_id(team_id_1)
                     .build()?
             })
             .await?;

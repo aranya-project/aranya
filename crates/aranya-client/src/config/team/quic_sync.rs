@@ -1,6 +1,5 @@
 //! Configuration for team synchronization over QUIC connections.
 //!
-//!
 //! # Overview
 //!
 //! There are two main configuration types:

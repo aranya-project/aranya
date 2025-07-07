@@ -102,7 +102,7 @@ impl CreateTeamConfig {
 
 impl AddTeamConfigBuilder {
     /// Sets the ID of the team to add.
-    pub fn id(mut self, id: TeamId) -> Self {
+    pub fn team_id(mut self, id: TeamId) -> Self {
         self.0.data.id = Some(id);
         self
     }

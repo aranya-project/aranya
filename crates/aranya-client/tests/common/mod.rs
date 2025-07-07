@@ -158,7 +158,7 @@ impl TeamCtx {
         let cfg = {
             let qs_cfg = AddQuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
             AddTeamConfig::builder()
-                .id(team_id)
+                .team_id(team_id)
                 .quic_sync(qs_cfg)
                 .build()?
         };

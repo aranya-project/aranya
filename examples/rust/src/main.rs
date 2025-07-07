@@ -214,7 +214,7 @@ async fn main() -> Result<()> {
         owner.client.rand(&mut buf).await;
         buf
     };
-    let create_team_cfg = {
+    let owner_cfg = {
         let qs_cfg = CreateQuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
         CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
     };
@@ -233,7 +233,7 @@ async fn main() -> Result<()> {
     info!("creating team");
     let mut owner_team = owner
         .client
-        .create_team(create_team_cfg)
+        .create_team(owner_cfg)
         .await
         .context("expected to create team")?;
     let team_id = owner_team.team_id();
@@ -243,7 +243,7 @@ async fn main() -> Result<()> {
         let qs_cfg = AddQuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
         AddTeamConfig::builder()
             .quic_sync(qs_cfg)
-            .id(team_id)
+            .team_id(team_id)
             .build()?
     };
 
