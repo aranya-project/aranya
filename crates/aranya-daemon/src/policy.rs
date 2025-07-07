@@ -127,6 +127,7 @@ pub struct TeamTerminated {
 /// DeviceAdded policy effect.
 #[effect]
 pub struct DeviceAdded {
+    pub device_id: Id,
     pub device_keys: KeyBundle,
 }
 /// DeviceRemoved policy effect.
@@ -200,7 +201,7 @@ pub struct QueriedLabelAssignment {
 #[effect]
 pub struct AqcNetworkNameSet {
     pub device_id: Id,
-    pub net_identifier: Text,
+    pub net_id: Text,
 }
 /// AqcNetworkNameUnset policy effect.
 #[effect]
@@ -210,7 +211,7 @@ pub struct AqcNetworkNameUnset {
 /// QueryAqcNetworkNamesOutput policy effect.
 #[effect]
 pub struct QueryAqcNetworkNamesOutput {
-    pub net_identifier: Text,
+    pub net_id: Text,
     pub device_id: Id,
 }
 /// AqcBidiChannelCreated policy effect.
@@ -270,7 +271,7 @@ pub struct AqcUniChannelReceived {
 /// QueryAqcNetIdentifierResult policy effect.
 #[effect]
 pub struct QueryAqcNetIdentifierResult {
-    pub net_identifier: Text,
+    pub net_id: Option<Text>,
 }
 /// Implements all supported policy actions.
 #[actions]
@@ -289,11 +290,7 @@ pub trait ActorExt {
         nonce: Vec<u8>,
     ) -> Result<(), ClientError>;
     fn terminate_team(&mut self) -> Result<(), ClientError>;
-    fn add_device(
-        &mut self,
-        device_keys: KeyBundle,
-        role_id: Option<Id>,
-    ) -> Result<(), ClientError>;
+    fn add_device(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
     fn remove_device(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn change_label_managing_role(
         &mut self,
@@ -319,7 +316,7 @@ pub trait ActorExt {
     fn set_aqc_network_name(
         &mut self,
         device_id: Id,
-        net_identifier: Text,
+        net_id: Text,
     ) -> Result<(), ClientError>;
     fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
@@ -334,5 +331,5 @@ pub trait ActorExt {
         receiver_id: Id,
         label_id: Id,
     ) -> Result<(), ClientError>;
-    fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_aqc_net_id(&mut self, device_id: Id) -> Result<(), ClientError>;
 }

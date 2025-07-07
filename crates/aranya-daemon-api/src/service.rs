@@ -728,11 +728,11 @@ pub trait DaemonApi {
         peer_enc_pk: EncryptionPublicKey<CS>,
     ) -> Result<WrappedSeed>;
 
-    /// Add device to the team.
+    /// Adds a device to the team with optional initial roles.
     async fn add_device_to_team(
         team: TeamId,
         keys: KeyBundle,
-        role_id: Option<RoleId>,
+        initial_roles: Box<[RoleId]>,
     ) -> Result<()>;
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;

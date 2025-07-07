@@ -21,10 +21,9 @@ use tracing::{error, instrument, trace};
 
 use super::Result as SyncResult;
 use crate::{
-    daemon::{Client, EF},
+    daemon::{Client, InvalidGraphs, EF, EN},
     sync::error::SyncError,
     vm_policy::VecSink,
-    InvalidGraphs,
 };
 
 pub mod quic;
@@ -180,7 +179,7 @@ pub trait SyncState: Sized {
         peer: &Addr,
     ) -> impl Future<Output = SyncResult<()>> + Send
     where
-        S: Sink<<crate::EN as Engine>::Effect> + Send;
+        S: Sink<<EN as Engine>::Effect> + Send;
 }
 
 impl<ST> Syncer<ST> {

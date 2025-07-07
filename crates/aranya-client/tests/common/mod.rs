@@ -6,13 +6,10 @@ use std::{
 
 use anyhow::{anyhow, Context, Result};
 use aranya_client::{
-    client::Client, DeviceId, NetIdentifier, QuicSyncConfig, Role, RoleId, Roles, SyncPeerConfig,
-    TeamConfig, TeamId, Text,
+    client::Client, DeviceId, NetIdentifier, QuicSyncConfig, Role, Roles, SyncPeerConfig,
+    TeamConfig, TeamId,
 };
-use aranya_daemon::{
-    config::{self as daemon_cfg, Config},
-    Daemon, DaemonHandle,
-};
+use aranya_daemon::{Config, Daemon, DaemonHandle};
 use aranya_daemon_api::{KeyBundle, SEED_IKM_SIZE};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
@@ -35,7 +32,6 @@ pub struct TeamCtx {
     pub operator: DeviceCtx,
     pub membera: DeviceCtx,
     pub memberb: DeviceCtx,
-    pub roles: Option<DefaultRoles>,
 }
 
 impl TeamCtx {
@@ -52,7 +48,6 @@ impl TeamCtx {
             operator,
             membera,
             memberb,
-            roles: None,
         })
     }
 
@@ -121,7 +116,7 @@ impl TeamCtx {
 
         // Assign the operator its role.
         admin_team
-            .assign_role(self.operator.id, roles.operator.id)
+            .assign_role(self.operator.id, roles.operator().id)
             .await?;
 
         // Make sure it sees the configuration change.
@@ -190,7 +185,7 @@ impl DeviceCtx {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // Setup daemon config.
-        let quic_sync = Some(daemon_cfg::QuicSyncConfig {});
+        let quic_sync = Some(aranya_daemon::QuicSyncConfig {});
 
         let cfg = Config {
             name: name.into(),

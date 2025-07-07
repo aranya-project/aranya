@@ -4,7 +4,10 @@ use std::{fmt, marker::PhantomData, str::FromStr};
 
 use anyhow::{anyhow, Context, Result};
 use aranya_aqc_util::Ffi as AqcFfi;
-use aranya_crypto::{keystore::fs_keystore::Store, DeviceId};
+use aranya_crypto::{
+    keystore::{fs_keystore::Store, KeyStore},
+    DeviceId,
+};
 use aranya_crypto_ffi::Ffi as CryptoFfi;
 use aranya_device_ffi::FfiDevice as DeviceFfi;
 use aranya_envelope_ffi::Ffi as EnvelopeFfi;
@@ -19,10 +22,10 @@ use aranya_runtime::{
 };
 use tracing::instrument;
 
-use crate::{keystore::AranyaStore, policy::ChanOp};
+use crate::{keystore::AranyaStore, policy::ChanOp, util::TryClone};
 
 /// Policy loaded from policy.md file.
-pub const TEST_POLICY_1: &str = include_str!("./policy.md");
+pub(crate) const POLICY_SOURCE: &str = include_str!("./policy.md");
 
 /// Converts [`ChanOp`] to string.
 impl FromStr for ChanOp {
@@ -45,22 +48,23 @@ impl fmt::Display for ChanOp {
 }
 
 /// Engine using policy from [`policy.md`].
-pub struct PolicyEngine<E, KS> {
+pub(crate) struct PolicyEngine<E, KS> {
     /// The underlying policy.
     pub(crate) policy: VmPolicy<E>,
     _eng: PhantomData<E>,
     _ks: PhantomData<KS>,
 }
 
-impl<E> PolicyEngine<E, Store>
+impl<E, KS> PolicyEngine<E, KS>
 where
     E: aranya_crypto::Engine,
+    KS: KeyStore + TryClone + Send + 'static,
 {
     /// Creates a `PolicyEngine` from a policy document.
     pub fn new(
         policy_doc: &str,
         eng: E,
-        store: AranyaStore<Store>,
+        store: AranyaStore<KS>,
         device_id: DeviceId,
     ) -> Result<Self> {
         // compile the policy.
@@ -129,7 +133,7 @@ where
 
 /// Sink for effects.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct VecSink<E> {
+pub(crate) struct VecSink<E> {
     /// Effects from executing a policy action.
     pub(crate) effects: Vec<E>,
 }
@@ -200,4 +204,34 @@ impl Sink<&[u8]> for MsgSink {
 
     #[instrument(skip_all)]
     fn commit(&mut self) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use core::convert::Infallible;
+
+    use aranya_crypto::{
+        default::{DefaultCipherSuite, DefaultEngine},
+        keystore::memstore::MemStore,
+        Rng,
+    };
+
+    use super::*;
+
+    impl TryClone for MemStore {
+        type Error = Infallible;
+
+        fn try_clone(&self) -> Result<Self, Self::Error> {
+            Ok(self.clone())
+        }
+    }
+
+    /// Tests that we can compile and build [`POLICY_SOURCE`].
+    #[test]
+    fn test_policy_compile() {
+        let (eng, _) = DefaultEngine::<_, DefaultCipherSuite>::from_entropy(Rng);
+        let store = AranyaStore::new(MemStore::new());
+        let device_id = DeviceId::default();
+        PolicyEngine::<_, _>::new(POLICY_SOURCE, eng, store, device_id).unwrap();
+    }
 }

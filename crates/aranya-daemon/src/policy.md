@@ -184,7 +184,7 @@ function must_find_device(device_id id) struct Device {
     return device
 }
 
-// Collection of public Device Keys for A device.
+// Collection of public Device Keys for a device.
 struct KeyBundle {
     ident_key bytes,
     sign_key bytes,
@@ -204,21 +204,23 @@ function must_find_device_keybundle(device_id id) struct KeyBundle {
     }
 }
 
-// The set of key IDs derived from each Device Key.
-// NB: Key ID of the Identity Key is the device ID.
-struct KeyIds {
+// The unique IDs for each Device Key.
+struct DevKeyIds {
+    // Uniquely identifies the Device Identity Key.
     device_id id,
+    // Uniquely identifies the Device Signing Key.
     sign_key_id id,
+    // Uniquely identifies the Device Encryption Key.
     enc_key_id id,
 }
 
 // Derives the unique ID for each Device Key in the bundle.
-function derive_device_key_ids(device_keys struct KeyBundle) struct KeyIds {
+function derive_device_key_ids(device_keys struct KeyBundle) struct DevKeyIds {
     let device_id = idam::derive_device_id(device_keys.ident_key)
     let sign_key_id = idam::derive_sign_key_id(device_keys.sign_key)
     let enc_key_id = idam::derive_enc_key_id(device_keys.enc_key)
 
-    return KeyIds {
+    return DevKeyIds {
         device_id: device_id,
         sign_key_id: sign_key_id,
         enc_key_id: enc_key_id,
@@ -435,14 +437,27 @@ _operations_, and each _operation_ is associated with a role.
 // to perform the operation.
 fact OpRequiresRole[op string]=>{role_id id}
 
+// Returns the device corresponding with the author of the
+// envelope without checking whether it is authorized to perform
+// any operations.
+//
+// In general, you should use `get_authorized_device` instead.
+function get_possibly_unauthorized_device(evp struct Envelope) struct Device {
+    let device = must_find_device(envelope::author_id(evp))
+    return device
+}
+
 // Reports whether a device has permission to perform an
 // operation.
+//
+// In most cases you should not need to use this function
+// directly. Use `get_authorized_device` instead.
 function can_perform_op(device_id id, op string) bool {
-    let op = query OpRequiresRole[op: op]
-    if op is None {
+    let req = query OpRequiresRole[op: op]
+    if req is None {
         return false
     }
-    let role_id = (unwrap op).role_id
+    let role_id = (unwrap req).role_id
     if !exists Role[role_id: role_id] {
         return false
     }
@@ -454,7 +469,7 @@ function can_perform_op(device_id id, op string) bool {
 //
 // Otherwise, it raises a check error.
 function get_authorized_device(evp struct Envelope, op string) struct Device {
-    let device = must_find_device(envelope::author_id(evp))
+    let device = get_possibly_unauthorized_device(evp)
     check can_perform_op(device.device_id, op)
     return device
 }
@@ -622,6 +637,7 @@ action setup_default_roles() {
 
 command SetupDefaultRole {
     fields {
+        // The name of the default role.
         name string
     }
 
@@ -745,7 +761,13 @@ command AssignRole {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "AssignRole")
+        // Devices are authorized to assign roles iff they have
+        // been assigned the managing role for the role being
+        // assigned. This negates the need for an "AssignRole"
+        // operation. In fact, an "AssignRole" operation would
+        // break role assignment since each operation requires
+        // exactly one role.
+        let author = get_possibly_unauthorized_device(envelope)
 
         // The author must have permission to assign the role.
         check can_manage_role(author.device_id, this.role_id)
@@ -793,6 +815,8 @@ command RevokeRole {
     fields {
         // The ID of the device having its role revoked.
         device_id id,
+        // The ID of the role being revoked.
+        role_id id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -897,6 +921,12 @@ function team_exists() bool {
     // Check to see if team is active.
     return exists TeamStart[]=>{team_id: ?}
 }
+
+// Returns the current team ID.
+function team_id() id {
+    let f = check_unwrap query TeamStart[]=>{team_id: ?}
+    return f.team_id
+}
 ```
 
 The initial command in the graph is the `CreateTeam` command,
@@ -963,6 +993,8 @@ command CreateTeam {
     }
 
     policy {
+        // NB: This is the only place in the policy file where we
+        // invert this condition.
         check !team_exists()
 
         let author_id = envelope::author_id(envelope)
@@ -983,7 +1015,12 @@ command CreateTeam {
         finish {
             create TeamStart[]=>{team_id: team_id}
 
-            add_new_device(this.owner_keys, owner_key_ids, owner_role_id)
+            add_new_device(this.owner_keys, owner_key_ids)
+
+            create AssignedRole[
+                device_id: author_id,
+                role_id: owner_role_id,
+            ]=>{}
 
             // Assign all the default operations to the owner
             // role.
@@ -1004,14 +1041,17 @@ command CreateTeam {
     }
 }
 
-// Adds the device to the Team.
-// TODO: use `role_id`
-finish function add_new_device(kb struct KeyBundle, keys struct KeyIds, role_id optional id) {
+// Adds the device to the team.
+finish function add_new_device(
+    kb struct KeyBundle,
+    keys struct DevKeyIds,
+) {
+    // TODO: check that `kb` matches `keys`.
+
     create Device[device_id: keys.device_id]=>{
         sign_key_id: keys.sign_key_id,
         enc_key_id: keys.enc_key_id,
     }
-
     create DeviceIdentKey[device_id: keys.device_id]=>{
         key: kb.ident_key,
     }
@@ -1053,7 +1093,7 @@ command TerminateTeam {
         check team_exists()
 
         let author = get_authorized_device(envelope, "TerminateTeam")
-        let team_id = check_unwrap query TeamStart[]=>{team_id: ?}
+        let team_id = team_id()
 
         finish {
             delete TeamStart[]=>{team_id: team_id}
@@ -1070,21 +1110,17 @@ command TerminateTeam {
 ### Adding Devices
 
 ```policy
-// Adds a device  to the Team.
-action add_device(device_keys struct KeyBundle, role_id optional id) {
+// Adds a device to the Team.
+action add_device(device_keys struct KeyBundle) {
     publish AddDevice {
         device_keys: device_keys,
-    }
-    if role_id is Some {
-        publish AssignRole {
-            device_id: device_keys.device_id,
-            role_id: unwrap role_id,
-        }
     }
 }
 
 // Emitted when a device is added to the team.
 effect DeviceAdded {
+    // Uniquely identifies the device.
+    device_id id,
     // The device's set of public Device Keys.
     device_keys struct KeyBundle,
 }
@@ -1103,16 +1139,16 @@ command AddDevice {
 
         let author = get_authorized_device(envelope, "AddDevice")
 
-        // Derive the key IDs from the provided KeyBundle.
-        let device_key_ids = derive_device_key_ids(this.device_keys)
+        let dev_key_ids = derive_device_key_ids(this.device_keys)
 
         // The device must not already exist.
-        check try_find_device(device_key_ids.device_id) is None
+        check try_find_device(dev_key_ids.device_id) is None
 
         finish {
-            add_new_device(this.device_keys, device_key_ids, None)
+            add_new_device(this.device_keys, dev_key_ids)
 
             emit DeviceAdded {
+                device_id: dev_key_ids.device_id,
                 device_keys: this.device_keys,
             }
         }
@@ -1845,27 +1881,38 @@ Each device that wants to participate in an AQC channel must have
 a _network identifier_.
 
 ```policy
-// Stores a Member's associated network identifier for AQC.
-fact AqcMemberNetworkId[device_id id]=>{net_identifier string}
-```
+// Stores a device's associated network identifier for AQC.
+fact AqcNetId[device_id id]=>{net_id string}
 
-```policy
-action set_aqc_network_name(device_id id, net_identifier string) {
+// Returns the device's AQC network identifier, if it exists.
+function aqc_net_id(device_id id) optional string {
+    let f = query AqcNetId[device_id: device_id]
+    if f is Some {
+        return Some((unwrap f).net_id)
+    }
+    return None
+}
+
+// TODO(eric): Why do we call it both a "network ID" and
+// "network name"?
+
+action set_aqc_network_name(device_id id, net_id string) {
     publish SetAqcNetworkName {
         device_id: device_id,
-        net_identifier: net_identifier,
+        net_id: net_id,
     }
 }
 
 effect AqcNetworkNameSet {
     device_id id,
-    net_identifier string,
+    net_id string,
 }
 
+// TODO(eric): rename this to update/upsert/something?
 command SetAqcNetworkName {
     fields {
         device_id id,
-        net_identifier string,
+        net_id string,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -1877,27 +1924,27 @@ command SetAqcNetworkName {
         let author = get_authorized_device(envelope, "SetAqcNetworkName")
         let device = must_find_device(this.device_id)
 
-        let net_id = query AqcMemberNetworkId[device_id: this.device_id]
+        let opt_net_id = aqc_net_id(this.device_id)
 
-        if net_id is Some {
-            let net_id = unwrap net_id
+        if opt_net_id is Some {
+            let net_id = unwrap opt_net_id
             finish {
-                update AqcMemberNetworkId[device_id: this.device_id]=>{net_identifier: net_id.net_identifier} to {
-                    net_identifier: this.net_identifier
+                update AqcNetId[device_id: this.device_id]=>{net_id: net_id} to {
+                    net_id: this.net_id
                 }
 
                 emit AqcNetworkNameSet {
                     device_id: device.device_id,
-                    net_identifier: this.net_identifier,
+                    net_id: this.net_id,
                 }
             }
         } else {
             finish {
-                create AqcMemberNetworkId[device_id: this.device_id]=>{net_identifier: this.net_identifier}
+                create AqcNetId[device_id: this.device_id]=>{net_id: this.net_id}
 
                 emit AqcNetworkNameSet {
                     device_id: device.device_id,
-                    net_identifier: this.net_identifier,
+                    net_id: this.net_id,
                 }
             }
         }
@@ -1934,10 +1981,10 @@ command UnsetAqcNetworkName {
         let author = get_authorized_device(envelope, "UnsetAqcNetworkName")
         let device = must_find_device(this.device_id)
 
-        check exists AqcMemberNetworkId[device_id: this.device_id]
+        check exists AqcNetId[device_id: this.device_id]
 
         finish {
-            delete AqcMemberNetworkId[device_id: this.device_id]
+            delete AqcNetId[device_id: this.device_id]
 
             emit AqcNetworkNameUnset {
                 device_id: device.device_id,
@@ -1953,22 +2000,22 @@ Queries all associated AQC network IDs from the fact database.
 
 ```policy
 action query_aqc_network_names() {
-    map AqcMemberNetworkId[device_id: ?] as f {
+    map AqcNetId[device_id: ?] as f {
         publish QueryAqcNetworkNamesCommand {
-            net_identifier: f.net_identifier,
+            net_id: f.net_id,
             device_id: f.device_id,
         }
     }
 }
 
 effect QueryAqcNetworkNamesOutput {
-    net_identifier string,
+    net_id string,
     device_id id,
 }
 
 command QueryAqcNetworkNamesCommand {
     fields {
-        net_identifier string,
+        net_id string,
         device_id id,
     }
     seal { return seal_command(serialize(this)) }
@@ -1976,7 +2023,7 @@ command QueryAqcNetworkNamesCommand {
     policy {
         finish {
             emit QueryAqcNetworkNamesOutput {
-                net_identifier: this.net_identifier,
+                net_id: this.net_id,
                 device_id: this.device_id,
             }
         }
@@ -2014,6 +2061,12 @@ action create_aqc_bidi_channel(peer_id id, label_id id) {
     }
 }
 
+// Returns the channel operation for a particular label.
+function get_allowed_chan_op_for_label(device_id id, label_id id) enum ChanOp {
+    let assigned_label = check_unwrap query AssignedLabel[label_id: label_id, device_id: device_id]
+    return assigned_label.op
+}
+
 // Reports whether the devices have permission to create
 // a bidirectional AQC channel with each other.
 function can_create_aqc_bidi_channel(device1 id, device2 id, label_id id) bool {
@@ -2025,23 +2078,17 @@ function can_create_aqc_bidi_channel(device1 id, device2 id, label_id id) bool {
 
     // Both devices must have permissions to read (recv) and
     // write (send) data.
-    let device1_op = get_allowed_op(device1, label_id)
+    let device1_op = get_allowed_chan_op_for_label(device1, label_id)
     if device1_op != ChanOp::SendRecv {
         return false
     }
 
-    let device2_op = get_allowed_op(device2, label_id)
+    let device2_op = get_allowed_chan_op_for_label(device2, label_id)
     if device2_op != ChanOp::SendRecv {
         return false
     }
 
     return true
-}
-
-// Returns the channel operation for a particular label.
-function get_allowed_op(device_id id, label_id id) enum ChanOp {
-    let assigned_label = check_unwrap query AssignedLabel[label_id: label_id, device_id: device_id]
-    return assigned_label.op
 }
 
 // Emitted when the author of a bidirectional AQC channel
@@ -2392,7 +2439,7 @@ function can_create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) b
     check sender_id != receiver_id
 
     // The writer must have permissions to write (send) data.
-    let writer_op = get_allowed_op(sender_id, label_id)
+    let writer_op = get_allowed_chan_op_for_label(sender_id, label_id)
     match writer_op {
         ChanOp::RecvOnly => { return false }
         ChanOp::SendOnly => {}
@@ -2400,7 +2447,7 @@ function can_create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) b
     }
 
     // The reader must have permission to read (receive) data.
-    let reader_op = get_allowed_op(receiver_id, label_id)
+    let reader_op = get_allowed_chan_op_for_label(receiver_id, label_id)
     match reader_op {
         ChanOp::RecvOnly => {}
         ChanOp::SendOnly => { return false }
@@ -2429,22 +2476,14 @@ function select_peer_id(device_id id, id_a id, id_b id) id {
 Queries AQC network identifier.
 
 ```policy
-
-// Returns the device's AQC network identifier.
-function get_aqc_net_identifier(device_id id) string {
-    let net_identifier = check_unwrap query AqcMemberNetworkId[device_id: device_id]
-
-    return net_identifier.net_identifier
-}
-
-action query_aqc_net_identifier(device_id id) {
+action query_aqc_net_id(device_id id) {
     publish QueryAqcNetIdentifier {
         device_id: device_id,
     }
 }
 
 effect QueryAqcNetIdentifierResult {
-    net_identifier string,
+    net_id optional string,
 }
 
 command QueryAqcNetIdentifier {
@@ -2458,13 +2497,14 @@ command QueryAqcNetIdentifier {
     policy {
         check team_exists()
 
-        // Check that the team is active and return the author's info if they exist in the team.
+        // Check that the team is active and return the author's
+        // info if they exist in the team.
         let author = must_find_device(this.device_id)
-        let net_identifier = get_aqc_net_identifier(author.device_id)
+        let net_id = aqc_net_id(author.device_id)
 
         finish {
             emit QueryAqcNetIdentifierResult {
-                net_identifier: net_identifier,
+                net_id: net_id,
             }
         }
     }

@@ -8,7 +8,7 @@ use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_aqc_util::LabelId;
-use aranya_crypto::{Csprng, DeviceId, Id, Rng};
+use aranya_crypto::{policy::RoleId, Csprng, DeviceId, Rng};
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
@@ -162,8 +162,8 @@ where
     where
         F: FnOnce(&mut ActorImpl<'_, EN, SP, CE, VecSink<EN::Effect>>) -> Result<()> + Send;
 
-    #[allow(clippy::type_complexity)]
     /// Performs a session action.
+    #[allow(clippy::type_complexity)]
     fn session_action<'a, F>(
         &self,
         f: F,
@@ -181,15 +181,11 @@ where
         .in_current_span()
     }
 
-    /// Adds a Member instance to the team.
-    #[instrument(skip_all, fields(?role_id))]
-    fn add_device(
-        &self,
-        keys: KeyBundle,
-        role_id: Option<Id>,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    /// Invokes the `add_device` action.
+    #[instrument(skip_all)]
+    fn add_device(&self, keys: KeyBundle) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.add_device(keys, role_id)?;
+            actor.add_device(keys)?;
             Ok(())
         })
         .in_current_span()
@@ -223,10 +219,10 @@ where
     fn assign_role(
         &self,
         device_id: DeviceId,
-        role_id: Id,
+        role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_role(device_id.into(), role_id)?;
+            actor.assign_role(device_id.into(), role_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -237,10 +233,10 @@ where
     fn revoke_role(
         &self,
         device_id: DeviceId,
-        role_id: Id,
+        role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.revoke_role(device_id.into(), role_id)?;
+            actor.revoke_role(device_id.into(), role_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -263,10 +259,10 @@ where
     fn create_label(
         &self,
         name: Text,
-        managing_role_id: Id,
+        managing_role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_label(name, managing_role_id)?;
+            actor.create_label(name, managing_role_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -358,10 +354,7 @@ where
                         let Effect::QueryAqcNetworkNamesOutput(eff) = eff else {
                             anyhow::bail!("bad effect in query_network_names");
                         };
-                        Ok((
-                            NetIdentifier(eff.net_identifier),
-                            DeviceId::from(eff.device_id),
-                        ))
+                        Ok((NetIdentifier(eff.net_id), DeviceId::from(eff.device_id)))
                     })
                     .collect(),
             )

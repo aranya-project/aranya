@@ -45,6 +45,7 @@ ciborium = { workspace = true }
 clap = { workspace = true }
 deser-hjson = { version = "2" }
 futures-util = { workspace = true }
+itertools = { version = "0.14" }
 postcard = { workspace = true }
 s2n-quic = { workspace = true }
 serde = { workspace = true }
@@ -64,6 +65,8 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
+aranya-crypto = { workspace = true, features = ["memstore"] }
+
 pretty_assertions = { workspace = true }
 serde_json = { version = "1" }
 serial_test = { workspace = true }

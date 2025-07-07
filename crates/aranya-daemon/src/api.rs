@@ -6,7 +6,7 @@
 use core::{future, net::SocketAddr, ops::Deref, pin::pin};
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context as _};
+use anyhow::{anyhow, bail, Context as _};
 use aranya_crypto::{
     default::WrappedKey, policy::GroupId, Csprng, DeviceId, EncryptionKey, EncryptionPublicKey,
     Engine as _, KeyStore as _, KeyStoreExt as _, Rng,
@@ -21,6 +21,7 @@ use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::{task::scope, Addr};
 use futures_util::{StreamExt, TryStreamExt};
+use itertools::Itertools;
 pub(crate) use quic_sync::Data as QSData;
 use tarpc::{
     context,
@@ -35,12 +36,11 @@ use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 use crate::{
     actions::Actions,
     aqc::Aqc,
-    daemon::{CE, CS, KS},
-    keystore::LocalStore,
+    daemon::{Client, InvalidGraphs, CE, CS, EF, KS},
+    keystore::{AranyaStore, LocalStore},
     policy::{ChanOp, Effect, KeyBundle, RoleCreated},
     sync::task::{quic as qs, SyncPeers},
     util::SeedDir,
-    AranyaStore, Client, InvalidGraphs, EF,
 };
 
 mod quic_sync;
@@ -198,7 +198,7 @@ impl EffectHandler {
                     self.aqc
                         .add_peer(
                             graph,
-                            api::NetIdentifier(e.net_identifier.clone()),
+                            api::NetIdentifier(e.net_id.clone()),
                             e.device_id.into(),
                         )
                         .await;
@@ -504,15 +504,38 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         keys: api::KeyBundle,
-        role_id: Option<api::RoleId>,
+        initial_roles: Box<[api::RoleId]>,
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        self.client
-            .actions(&team.into_id().into())
-            .add_device(keys.into(), role_id.map(|r| r.into_id()))
+        // Ideally this would be a single action, but policy
+        // language v2 does not have any way to pass
+        // a list/vector/etc into an action.
+
+        let actions = self.client.actions(&team.into_id().into());
+
+        let device_id = actions
+            .add_device(keys.into())
             .await
-            .context("unable to add device to team")?;
+            .context("unable to add device to team")?
+            .into_iter()
+            .exactly_one()
+            .map_err(anyhow::Error::from)
+            .and_then(|e| {
+                if let Effect::DeviceAdded(e) = e {
+                    Ok(e.device_id)
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    bail!("unexpected effect: {}", e.name())
+                }
+            })?;
+
+        for role_id in initial_roles {
+            actions
+                .assign_role(device_id.into(), role_id.into_id().into())
+                .await
+                .context("unable to assign initial role")?;
+        }
         Ok(())
     }
 
@@ -575,7 +598,7 @@ impl DaemonApi for Api {
 
         self.client
             .actions(&team.into_id().into())
-            .assign_role(device.into_id().into(), role.into())
+            .assign_role(device.into_id().into(), role.into_id().into())
             .await
             .context("unable to assign role")?;
         Ok(())
@@ -593,7 +616,7 @@ impl DaemonApi for Api {
 
         self.client
             .actions(&team.into_id().into())
-            .revoke_role(device.into_id().into(), role.into())
+            .revoke_role(device.into_id().into(), role.into_id().into())
             .await
             .context("unable to revoke device role")?;
         Ok(())
@@ -830,7 +853,7 @@ impl DaemonApi for Api {
         let effects = self
             .client
             .actions(&team.into_id().into())
-            .create_label(label_name, managing_role_id.into_id())
+            .create_label(label_name, managing_role_id.into_id().into())
             .await
             .context("unable to create AQC label")?;
         if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
@@ -1047,7 +1070,7 @@ impl DaemonApi for Api {
             if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
                 find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
             {
-                return Ok(Some(api::NetIdentifier(e.net_identifier)));
+                return Ok(e.net_id.map(api::NetIdentifier));
             }
         }
         Ok(None)

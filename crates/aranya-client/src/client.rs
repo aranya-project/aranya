@@ -634,19 +634,20 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
-    /// Add a device to the team with the default `Member` role.
-    pub async fn add_device_to_team(
-        &mut self,
-        keys: KeyBundle,
-        role_id: Option<RoleId>,
-    ) -> Result<()> {
+    /// Add a device to the team with optional initial roles.
+    // TODO(eric): why does this have a "_to_team" suffix when
+    // it's a method on `Team`?
+    pub async fn add_device_to_team<I>(&mut self, keys: KeyBundle, initial_roles: I) -> Result<()>
+    where
+        I: IntoIterator<Item = RoleId>,
+    {
         self.client
             .daemon
             .add_device_to_team(
                 context::current(),
                 self.id,
                 keys,
-                role_id.map(|id| id.into_api()),
+                initial_roles.into_iter().map(|id| id.into_api()).collect(),
             )
             .await
             .map_err(IpcError::new)?
@@ -924,7 +925,11 @@ impl Queries<'_> {
         Ok(Labels { data })
     }
 
-    /// Returns the AQC network identifier assigned to the current device.
+    /// Returns the AQC network identifier assigned to the
+    /// current device, if any.
+    // TODO(eric): documented whether this returns `None` if the
+    // device does not exist or if the device exists but does not
+    // have a net ID.
     pub async fn aqc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
         let id = self
             .client

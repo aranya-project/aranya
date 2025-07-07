@@ -48,6 +48,7 @@ use tracing::{debug, error, info, instrument};
 use super::SyncResponse;
 use crate::{
     aranya::Client as AranyaClient,
+    daemon::EN,
     sync::{
         task::{SyncState, Syncer},
         Result as SyncResult, SyncError,
@@ -108,7 +109,7 @@ impl SyncState for State {
         peer: &Addr,
     ) -> impl Future<Output = SyncResult<()>> + Send
     where
-        S: Sink<<crate::EN as Engine>::Effect> + Send,
+        S: Sink<<EN as Engine>::Effect> + Send,
     {
         async move {
             // Sets the active team before starting a QUIC connection
@@ -281,7 +282,7 @@ impl Syncer<State> {
         peer: &Addr,
     ) -> SyncResult<()>
     where
-        S: Sink<<crate::EN as Engine>::Effect>,
+        S: Sink<<EN as Engine>::Effect>,
         A: Serialize + DeserializeOwned + Clone,
     {
         info!("client receiving sync response from QUIC sync server");
