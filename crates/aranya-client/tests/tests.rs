@@ -18,7 +18,7 @@ use test_log::test;
 use tracing::{debug, info};
 
 mod common;
-use common::{sleep, TeamCtx, SLEEP_INTERVAL};
+use common::{sleep, IntoDefaultRoles, TeamCtx, SLEEP_INTERVAL};
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -29,8 +29,16 @@ async fn test_sync_now() -> Result<()> {
 
     // Create the initial team, and get our TeamId and seed.
     let team_id = team.create_and_add_team().await?;
-    let roles = team.owner.client.team(team_id).setup_default_roles()?;
-    let roles = team.add_all_device_roles(team_id).await?;
+    info!(?team_id);
+
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles()
+        .await?
+        .try_into_default_roles()?;
+    team.add_all_device_roles(team_id).await?;
 
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
@@ -52,10 +60,13 @@ async fn test_sync_now() -> Result<()> {
         .await?;
 
     // Finally, let's give the admin its role, but don't sync with peers.
-    owner.assign_role(team.admin.id, roles.admin.id).await?;
+    owner.assign_role(team.admin.id, roles.admin().id).await?;
 
     // Now, we try to assign a role using the admin, which is expected to fail.
-    match admin.assign_role(team.operator.id, roles.operator.id).await {
+    match admin
+        .assign_role(team.operator.id, roles.operator().id)
+        .await
+    {
         Ok(_) => bail!("Expected role assignment to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
         Err(_) => bail!("Unexpected error"),
@@ -67,7 +78,7 @@ async fn test_sync_now() -> Result<()> {
 
     // Now we should be able to successfully assign a role.
     admin
-        .assign_role(team.operator.id, roles.operator.id)
+        .assign_role(team.operator.id, roles.operator().id)
         .await?;
 
     Ok(())
@@ -87,9 +98,17 @@ async fn test_remove_devices() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles()
+        .await?
+        .try_into_default_roles()?;
+
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
-    let roles = team.add_all_device_roles(team_id).await?;
+    team.add_all_device_roles(team_id).await?;
 
     // Remove devices from the team while checking that the device count decreases each time a device is removed.
     let mut owner = team.owner.client.team(team_id);
@@ -103,16 +122,16 @@ async fn test_remove_devices() -> Result<()> {
     assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 3);
 
     owner
-        .revoke_role(team.operator.id, roles.operator.id)
+        .revoke_role(team.operator.id, roles.operator().id)
         .await?;
     owner.remove_device_from_team(team.operator.id).await?;
     assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 2);
 
-    owner.revoke_role(team.admin.id, roles.admin.id).await?;
+    owner.revoke_role(team.admin.id, roles.admin().id).await?;
     owner.remove_device_from_team(team.admin.id).await?;
     assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 1);
 
-    owner.revoke_role(team.owner.id, roles.owner.id).await?;
+    owner.revoke_role(team.owner.id, roles.owner().id).await?;
     owner
         .remove_device_from_team(team.owner.id)
         .await

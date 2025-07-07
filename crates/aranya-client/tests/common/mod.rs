@@ -35,7 +35,6 @@ pub struct TeamCtx {
     pub operator: DeviceCtx,
     pub membera: DeviceCtx,
     pub memberb: DeviceCtx,
-    /// Set by [`TeamCtx::add_all_device_roles`].
     pub roles: Option<DefaultRoles>,
 }
 
@@ -93,7 +92,12 @@ impl TeamCtx {
         let mut admin_team = self.admin.client.team(team_id);
         let mut operator_team = self.operator.client.team(team_id);
 
-        let roles = self.roles.as_ref().unwrap();
+        let roles = owner_team
+            .roles()
+            .await
+            .context("failed to get roles")?
+            .try_into_default_roles()
+            .context("failed to convert roles")?;
 
         // Add the admin as a new device and assign its role in
         // one step.
@@ -262,9 +266,23 @@ impl DeviceCtx {
     }
 }
 
+/// Converts [`Roles`] into [`DefaultRoles`].
+pub trait IntoDefaultRoles {
+    /// Converts [`Roles`] into [`DefaultRoles`].
+    fn try_into_default_roles(self) -> Result<DefaultRoles>;
+}
+
+impl IntoDefaultRoles for Roles {
+    fn try_into_default_roles(self) -> Result<DefaultRoles> {
+        DefaultRoles::try_from(self)
+    }
+}
+
 /// The default roles for a team.
 ///
 /// Created by [`TeamCtx::add_all_device_roles`].
+// NB: This assumes users cannot delete roles yet, which is true
+// as of MVP.
 #[derive(Clone, Debug)]
 pub struct DefaultRoles {
     owner: Role,
@@ -300,13 +318,13 @@ impl TryFrom<Roles> for DefaultRoles {
 
     fn try_from(roles: Roles) -> Result<Self> {
         #[derive(Clone, Default, Debug)]
-        struct Tmp {
+        struct S {
             owner: Option<Role>,
             admin: Option<Role>,
             operator: Option<Role>,
             member: Option<Role>,
         }
-        let Tmp {
+        let S {
             owner,
             admin,
             operator,
@@ -314,7 +332,7 @@ impl TryFrom<Roles> for DefaultRoles {
         } = roles
             .iter()
             .cloned()
-            .try_fold(Tmp::default(), |mut acc, role| {
+            .try_fold(S::default(), |mut acc, role| {
                 let name = role.name.as_str();
                 let dst = match name {
                     "owner" => &mut acc.owner,

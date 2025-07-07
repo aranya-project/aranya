@@ -5,7 +5,9 @@ use std::{
     fmt, io,
     net::SocketAddr,
     path::Path,
+    slice,
     str::{FromStr, Utf8Error},
+    vec,
 };
 
 use anyhow::Context as _;
@@ -31,7 +33,7 @@ use crate::{
     aqc::{AqcChannels, AqcClient},
     config::{SyncPeerConfig, TeamConfig},
     error::{self, aranya_error, Error, InvalidArg, IpcError, Result},
-    util::custom_id,
+    util::{custom_id, impl_slice_iter_wrapper, impl_vec_into_iter_wrapper},
 };
 
 custom_id! {
@@ -120,6 +122,8 @@ pub struct Role {
     pub name: Text,
     /// The unique ID of the author of the role.
     pub author_id: DeviceId,
+    /// Is this a default role?
+    pub default: bool,
 }
 
 impl Role {
@@ -128,6 +132,7 @@ impl Role {
             id: RoleId::from_api(v.id),
             name: v.name,
             author_id: DeviceId::from_api(v.author_id),
+            default: v.default,
         }
     }
 }
@@ -140,8 +145,8 @@ pub struct Roles {
 
 impl Roles {
     /// Returns an iterator over the roles.
-    pub fn iter(&self) -> impl Iterator<Item = &Role> {
-        self.roles.iter()
+    pub fn iter(&self) -> IterRoles<'_> {
+        IterRoles(self.roles.iter())
     }
 
     #[doc(hidden)]
@@ -149,6 +154,27 @@ impl Roles {
         self.roles
     }
 }
+
+impl IntoIterator for Roles {
+    type Item = Role;
+    type IntoIter = IntoIterRoles;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIterRoles(self.roles.into_vec().into_iter())
+    }
+}
+
+/// An iterator over [`Role`]s.
+#[derive(Clone, Debug)]
+pub struct IterRoles<'a>(slice::Iter<'a, Role>);
+
+impl_slice_iter_wrapper!(IterRoles<'a> for Role);
+
+/// An owning iterator over [`Role`]s.
+#[derive(Clone, Debug)]
+pub struct IntoIterRoles(vec::IntoIter<Role>);
+
+impl_vec_into_iter_wrapper!(IntoIterRoles for Role);
 
 /// List of operations.
 #[derive(Clone, Debug)]
