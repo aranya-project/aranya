@@ -410,7 +410,7 @@ impl Builder for AddQuicSyncConfigBuilder {
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
         let Some(mode) = self.data.mode else {
-            todo!("Don't panic. Return invalid arg error.")
+            return Err(InvalidArg::new("mode", "field not set").into());
         };
 
         Self::Output::init(out, AddQuicSyncConfig::new(mode));

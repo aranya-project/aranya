@@ -679,7 +679,7 @@ pub type CreateQuicSyncConfigBuilder = Safe<imp::CreateQuicSyncConfigBuilder>;
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 ///
-/// @relates AranyaQuicSyncConfigBuilder.
+/// @relates AranyaCreateQuicSyncConfigBuilder.
 pub fn create_quic_sync_config_generate(
     cfg: &mut CreateQuicSyncConfigBuilder,
 ) -> Result<(), imp::Error> {
@@ -692,7 +692,7 @@ pub fn create_quic_sync_config_generate(
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] encap_seed a pointer the encapsulated PSK seed
 ///
-/// @relates AranyaQuicSyncConfigBuilder.
+/// @relates AranyaAddQuicSyncConfigBuilder.
 pub fn add_quic_sync_config_wrapped_seed(
     cfg: &mut AddQuicSyncConfigBuilder,
     encap_seed: &[u8],
@@ -713,7 +713,7 @@ pub struct SeedIkm {
 /// @param[in,out] cfg a pointer to the quic sync config builder [`CreateQuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
 ///
-/// @relates AranyaQuicSyncConfigBuilder.
+/// @relates AranyaCreateQuicSyncConfigBuilder.
 pub fn create_quic_sync_config_raw_seed_ikm(
     cfg: &mut CreateQuicSyncConfigBuilder,
     ikm: &SeedIkm,
@@ -727,7 +727,7 @@ pub fn create_quic_sync_config_raw_seed_ikm(
 /// @param[in,out] cfg a pointer to the quic sync config builder [`AddQuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
 ///
-/// @relates AranyaQuicSyncConfigBuilder.
+/// @relates AranyaAddQuicSyncConfigBuilder.
 pub fn add_quic_sync_config_raw_seed_ikm(
     cfg: &mut AddQuicSyncConfigBuilder,
     ikm: &SeedIkm,
@@ -744,7 +744,7 @@ pub fn add_quic_sync_config_raw_seed_ikm(
 /// @param[in] cfg a pointer to the QUIC sync config builder [`CreateQuicSyncConfigBuilder`]
 /// @param[out] out a pointer to write the QUIC sync config to [`CreateQuicSyncConfig`]
 ///
-/// @relates AranyaQuicSyncConfigBuilder.
+/// @relates AranyaCreateQuicSyncConfigBuilder.
 pub fn create_quic_sync_config_build(
     cfg: OwnedPtr<CreateQuicSyncConfigBuilder>,
     out: &mut MaybeUninit<CreateQuicSyncConfig>,
@@ -762,7 +762,7 @@ pub fn create_quic_sync_config_build(
 /// @param[in] cfg a pointer to the QUIC sync config builder [`AddQuicSyncConfigBuilder`]
 /// @param[out] out a pointer to write the QUIC sync config to [`AddQuicSyncConfig`]
 ///
-/// @relates AranyaQuicSyncConfigBuilder.
+/// @relates AranyaAddQuicSyncConfigBuilder.
 pub fn add_quic_sync_config_build(
     cfg: OwnedPtr<AddQuicSyncConfigBuilder>,
     out: &mut MaybeUninit<AddQuicSyncConfig>,
