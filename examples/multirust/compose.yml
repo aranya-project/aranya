@@ -1,33 +1,35 @@
 services:
-  owner:
-    image: aranya-example-multirust
-    command: ["owner"]
-    volumes:
-      - shared:/app/shared/
-
-  admin:
-    image: aranya-example-multirust
-    command: ["admin"]
-    volumes:
-      - shared:/app/shared/
-
   operator:
-    image: aranya-example-multirust
-    command: ["operator"]
-    volumes:
-      - shared:/app/shared/
+    image: aranya-multirust-operator
+    build:
+      context: ../../
+      dockerfile: examples/multirust/Dockerfile
+      target: operator
+    init: true
+    environment:
+      - ARANYA_SYNC_ADDR=0.0.0.0:1111
+      - ARANYA_MEMBER_A_NET_ID=member-a:2222
+      - ARANYA_MEMBER_B_NET_ID=member-b:2222
 
-  member_a:
-    image: aranya-example-multirust
-    command: ["member_a"]
-    volumes:
-      - shared:/app/shared/
+  member-a:
+    image: aranya-multirust-member-a
+    build:
+      context: ../../
+      dockerfile: examples/multirust/Dockerfile
+      target: member-a
+    init: true
+    environment:
+      - ARANYA_AQC_ADDR=0.0.0.0:2222
+      - ARANYA_OPERATOR_SYNC_ADDR=operator:1111
+      - ARANYA_MEMBER_B_NET_ID=member-b:2222
 
-  member_b:
-    image: aranya-example-multirust
-    command: ["member_b"]
-    volumes:
-      - shared:/app/shared/
-
-volumes:
-  shared:
+  member-b:
+    image: aranya-multirust-member-b
+    build:
+      context: ../../
+      dockerfile: examples/multirust/Dockerfile
+      target: member-b
+    init: true
+    environment:
+      - ARANYA_AQC_ADDR=0.0.0.0:2222
+      - ARANYA_OPERATOR_SYNC_ADDR=operator:1111
