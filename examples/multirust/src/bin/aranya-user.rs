@@ -9,7 +9,7 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{aqc::AqcPeerChannel, Client, SyncPeerConfig};
-use aranya_daemon_api::{DeviceId, NetIdentifier, TeamId, Text};
+use aranya_daemon_api::{DeviceId, NetIdentifier, TeamId};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use bytes::Bytes;
@@ -55,6 +55,19 @@ impl Daemon {
         let proc = cmd.spawn().context("unable to spawn daemon")?;
         Ok(Daemon { proc })
     }
+
+    async fn get_api_pk(path: &DaemonPath, cfg_path: &Path) -> Result<Vec<u8>> {
+        let cfg_path = cfg_path.as_os_str().to_str().context("should be UTF-8")?;
+        let mut cmd = Command::new(&path.0);
+        cmd.kill_on_drop(true)
+            .args(["--config", cfg_path])
+            .arg("--print-api-pk");
+        debug!(?cmd, "running daemon");
+        let output = cmd.output().await.context("unable to run daemon")?;
+        let pk_hex = String::from_utf8(output.stdout)?;
+        let pk = hex::decode(pk_hex.trim())?;
+        Ok(pk)
+    }
 }
 
 /// An Aranya device.
@@ -68,44 +81,36 @@ impl ClientCtx {
     pub async fn new(daemon_dir: &Path, user_name: &str, daemon_path: &DaemonPath) -> Result<Self> {
         info!(user_name, "creating `ClientCtx`");
 
-        let runtime_dir = Path::new("/var/run/aranya/");
+        let work_dir = daemon_dir.join("state");
+        let uds_api_path = work_dir.join("uds.sock");
 
         let addr_any = Addr::from((Ipv4Addr::UNSPECIFIED, 0));
 
+        let api_pk;
         let daemon = {
-            let state_dir = daemon_dir.join("state");
-            let cache_dir = Path::new("/var/cache/aranya/");
-            let logs_dir = Path::new("/var/log/aranya/");
-            let config_dir = daemon_dir.join("config");
-            let cfg_path = config_dir.join("config.json");
-
-            for dir in &[runtime_dir, cache_dir, logs_dir, &config_dir] {
-                fs::create_dir_all(dir)
-                    .await
-                    .with_context(|| format!("unable to create directory: {}", dir.display()))?;
-            }
+            let cfg_path = work_dir.join("config.json");
+            let pid_file = work_dir.join("daemon.pid");
 
             let sync_addr = var_or("ARANYA_SYNC_ADDR", addr_any)?;
 
             let buf = format!(
                 r#"
                 name: {user_name:?}
-                runtime_dir: {runtime_dir:?}
-                state_dir: {state_dir:?}
-                cache_dir: {cache_dir:?}
-                logs_dir: {logs_dir:?}
-                config_dir: {config_dir:?}
+                work_dir: {work_dir:?}
+                uds_api_path: {uds_api_path:?}
+                pid_file: {pid_file:?}
                 sync_addr: "{sync_addr}"
-                quic_sync: {{ }}
                 "#
             );
             fs::write(&cfg_path, buf).await?;
+
+            api_pk = Daemon::get_api_pk(daemon_path, &cfg_path).await?;
 
             Daemon::spawn(daemon_path, daemon_dir, &cfg_path).await?
         };
 
         // The path that the daemon will listen on.
-        let uds_sock = runtime_dir.join("uds.sock");
+        let uds_sock = uds_api_path;
 
         // Give the daemon time to start up and write its public key.
         sleep(Duration::from_millis(100)).await;
@@ -116,6 +121,7 @@ impl ClientCtx {
             Client::builder()
                 .with_daemon_uds_path(&uds_sock)
                 .with_daemon_aqc_addr(&aqc_addr)
+                .with_daemon_api_pk(&api_pk)
                 .connect()
         })
         .retry(ExponentialBuilder::default())
@@ -191,8 +197,8 @@ async fn main() -> Result<()> {
 
     let team_id = read::<TeamId>("team.id").await?;
     let operator_sync_addr = var::<Addr>("ARANYA_OPERATOR_SYNC_ADDR");
-    let member_a_net_id = var::<Text>("ARANYA_MEMBER_A_NET_ID").map(NetIdentifier);
-    let member_b_net_id = var::<Text>("ARANYA_MEMBER_B_NET_ID").map(NetIdentifier);
+    let member_a_net_id = var::<String>("ARANYA_MEMBER_A_NET_ID").map(NetIdentifier);
+    let member_b_net_id = var::<String>("ARANYA_MEMBER_B_NET_ID").map(NetIdentifier);
     let member_a_device_id = read::<DeviceId>("member-a.id");
     let member_b_device_id = read::<DeviceId>("member-b.id");
 
@@ -219,8 +225,9 @@ async fn main() -> Result<()> {
             // membera creates a bidirectional channel.
             info!("membera creating acq bidi channel");
 
-            let label = team
-                .queries()
+            let label = ctx
+                .client
+                .queries(team_id)
                 .labels()
                 .await
                 .context("failed to get labels")?

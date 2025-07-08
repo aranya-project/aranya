@@ -14,7 +14,7 @@ aranya-crypto = { workspace = true, features = ["alloc", "fs-keystore", "std"] }
 aranya-runtime = { workspace = true }
 aranya-util = { workspace = true }
 
-aranya-daemon = { workspace = true }
+aranya-daemon = { path = "../" }
 aranya-keygen = { workspace = true }
 
 anyhow = { workspace = true }
