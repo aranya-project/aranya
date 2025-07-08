@@ -11,68 +11,23 @@ use crate::api::defs::{self, TeamId};
 pub(crate) mod quic_sync;
 pub(crate) use quic_sync::{
     AddTeamQuicSyncConfig, AddTeamQuicSyncConfigBuilder, CreateTeamQuicSyncConfig,
-    CreateTeamQuicSyncConfigBuilder, QuicSyncConfig,
+    CreateTeamQuicSyncConfigBuilder,
 };
 
-#[derive(Clone)]
-pub struct Add {
-    pub(super) id: TeamId,
-}
-
-#[derive(Clone)]
-pub struct Create;
-
-impl Add {
-    pub(super) fn new(id: TeamId) -> Self {
-        Self { id }
-    }
-}
-
-#[derive(Default)]
-pub struct AddBuild {
-    pub(super) id: Option<TeamId>,
-}
-
-#[derive(Default)]
-pub struct CreateBuild;
-
-/// Builder for a [`TeamConfig`].
-#[derive(Clone)]
-pub struct TeamConfigBuilder<T, U> {
-    data: T,
-    quic_sync: Option<QuicSyncConfig<U>>,
-}
-
-impl<T: Default, U> Default for TeamConfigBuilder<T, U> {
-    fn default() -> Self {
-        Self {
-            data: T::default(),
-            quic_sync: None,
-        }
-    }
-}
-
-/// Configuration info for creating or adding teams.
-#[derive(Clone)]
-pub struct TeamConfig<T, U> {
-    data: T,
-    quic_sync: Option<QuicSyncConfig<U>>,
-}
-
 /// A team config required to create a new Aranya team.
-pub type CreateTeamConfig = TeamConfig<Create, quic_sync::Create>;
+#[derive(Clone)]
+pub struct CreateTeamConfig {
+    quic_sync: Option<CreateTeamQuicSyncConfig>,
+}
 
 impl CreateTeamConfig {
     fn new(quic_sync: Option<CreateTeamQuicSyncConfig>) -> Self {
-        Self {
-            data: Create,
-            quic_sync,
-        }
+        Self { quic_sync }
     }
 
     /// Creates a default [`CreateTeamConfigBuilder`].
     pub fn builder() -> CreateTeamConfigBuilder {
-        TeamConfigBuilder::default()
+        CreateTeamConfigBuilder::default()
     }
 }
 
@@ -81,7 +36,10 @@ impl Typed for CreateTeamConfig {
 }
 
 /// A team config required to add an existing Aranya team to a device.
-pub type CreateTeamConfigBuilder = TeamConfigBuilder<CreateBuild, quic_sync::Create>;
+#[derive(Default)]
+pub struct CreateTeamConfigBuilder {
+    quic_sync: Option<CreateTeamQuicSyncConfig>,
+}
 
 impl CreateTeamConfigBuilder {
     /// Configures the quic_sync config..
@@ -127,19 +85,20 @@ impl From<&CreateTeamConfig> for aranya_client::CreateTeamConfig {
     }
 }
 
-pub type AddTeamConfig = TeamConfig<Add, quic_sync::Add>;
+#[derive(Clone)]
+pub struct AddTeamConfig {
+    team_id: TeamId,
+    quic_sync: Option<AddTeamQuicSyncConfig>,
+}
 
 impl AddTeamConfig {
-    fn new(id: TeamId, quic_sync: Option<AddTeamQuicSyncConfig>) -> Self {
-        Self {
-            data: Add::new(id),
-            quic_sync,
-        }
+    fn new(team_id: TeamId, quic_sync: Option<AddTeamQuicSyncConfig>) -> Self {
+        Self { team_id, quic_sync }
     }
 
     /// Creates a default [`AddTeamConfigBuilder`].
     pub fn builder() -> AddTeamConfigBuilder {
-        TeamConfigBuilder::default()
+        AddTeamConfigBuilder::default()
     }
 }
 
@@ -147,12 +106,16 @@ impl Typed for AddTeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7519);
 }
 
-pub type AddTeamConfigBuilder = TeamConfigBuilder<AddBuild, quic_sync::Add>;
+#[derive(Default)]
+pub struct AddTeamConfigBuilder {
+    team_id: Option<TeamId>,
+    quic_sync: Option<AddTeamQuicSyncConfig>,
+}
 
 impl AddTeamConfigBuilder {
     /// Sets the ID of the team to add.
     pub fn id(&mut self, id: TeamId) {
-        self.data.id = Some(id);
+        self.team_id = Some(id);
     }
 
     /// Configures the quic_sync config..
@@ -176,7 +139,7 @@ impl Builder for AddTeamConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        let Some(id) = self.data.id else {
+        let Some(id) = self.team_id else {
             return Err(InvalidArg::new("id", "field not set").into());
         };
 
@@ -191,7 +154,7 @@ impl From<AddTeamConfig> for aranya_client::AddTeamConfig {
         if let Some(cfg) = value.quic_sync {
             builder = builder
                 .quic_sync(cfg.into())
-                .team_id((&value.data.id).into());
+                .team_id((&value.team_id).into());
         }
 
         builder.build().expect("All fields set")

@@ -10,120 +10,90 @@ use tracing::error;
 use super::Error;
 use crate::api::defs::{self};
 
-#[derive(Clone)]
-pub struct Add {
-    pub(super) mode: AddSeedMode,
+/// QUIC syncer configuration for CreateTeam() operation.
+#[derive(Clone, Default)]
+pub struct CreateTeamQuicSyncConfig {
+    mode: CreateSeedMode,
 }
 
-#[derive(Clone)]
-pub struct Create {
-    pub(super) mode: CreateSeedMode,
-}
-
-impl Create {
-    pub(super) fn new(mode: CreateSeedMode) -> Self {
+impl CreateTeamQuicSyncConfig {
+    fn new(mode: CreateSeedMode) -> Self {
         Self { mode }
     }
-}
 
-impl Add {
-    pub(super) fn new(mode: AddSeedMode) -> Self {
-        Self { mode }
+    pub fn builder() -> CreateTeamQuicSyncConfigBuilder {
+        CreateTeamQuicSyncConfigBuilder::default()
     }
-}
 
-#[derive(Clone, Default)]
-pub struct AddBuild {
-    pub(super) mode: Option<AddSeedMode>,
-}
-
-#[derive(Clone, Default)]
-pub struct CreateBuild {
-    pub(super) mode: CreateSeedMode,
-}
-#[derive(Clone)]
-pub struct QuicSyncConfig<T> {
-    data: T,
-}
-
-impl<T: Clone> QuicSyncConfig<T> {
     /// Useful for deref coercion.
     pub(crate) fn imp(&self) -> Self {
         self.clone()
     }
 }
 
-/// QUIC syncer configuration for CreateTeam() operation.
-pub type CreateTeamQuicSyncConfig = QuicSyncConfig<Create>;
-
-impl CreateTeamQuicSyncConfig {
-    fn new(mode: CreateSeedMode) -> Self {
-        Self {
-            data: Create::new(mode),
-        }
-    }
-
-    pub fn builder() -> CreateTeamQuicSyncConfigBuilder {
-        QuicSyncConfigBuilder::default()
-    }
-}
-
 /// QUIC syncer configuration for AddTeam() operation.
-pub type AddTeamQuicSyncConfig = QuicSyncConfig<Add>;
+#[derive(Clone)]
+pub struct AddTeamQuicSyncConfig {
+    mode: AddSeedMode,
+}
 
 impl AddTeamQuicSyncConfig {
     fn new(mode: AddSeedMode) -> Self {
-        Self {
-            data: Add::new(mode),
-        }
+        Self { mode }
     }
 
     pub fn builder() -> AddTeamQuicSyncConfigBuilder {
-        QuicSyncConfigBuilder::default()
+        AddTeamQuicSyncConfigBuilder::default()
+    }
+
+    /// Useful for deref coercion.
+    pub(crate) fn imp(&self) -> Self {
+        self.clone()
     }
 }
 
-#[derive(Clone, Default)]
-pub struct QuicSyncConfigBuilder<T> {
-    data: T,
+#[derive(Default)]
+pub struct CreateTeamQuicSyncConfigBuilder {
+    mode: CreateSeedMode,
 }
-
-pub(crate) type CreateTeamQuicSyncConfigBuilder = QuicSyncConfigBuilder<CreateBuild>;
 
 impl CreateTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
     pub fn mode(&mut self, mode: CreateSeedMode) {
-        self.data.mode = mode;
+        self.mode = mode;
     }
 
     /// Sets the seed to be generated.
     ///
     /// Overwrites [`Self::seed_ikm`].
     pub fn generate(&mut self) {
-        self.data.mode = CreateSeedMode::Generate;
+        self.mode = CreateSeedMode::Generate;
     }
 
     /// Sets the seed mode to 'IKM'.
     ///
     /// Overwrites [`Self::gen_seed`].
     pub fn raw_seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) {
-        self.data.mode = CreateSeedMode::IKM(ikm.into());
+        self.mode = CreateSeedMode::IKM(ikm.into());
     }
 }
 
-pub(crate) type AddTeamQuicSyncConfigBuilder = QuicSyncConfigBuilder<AddBuild>;
+#[derive(Default)]
+pub struct AddTeamQuicSyncConfigBuilder {
+    mode: Option<AddSeedMode>,
+}
 
 impl AddTeamQuicSyncConfigBuilder {
     /// Sets the PSK seed mode.
     #[doc(hidden)]
     pub fn mode(&mut self, mode: AddSeedMode) {
-        self.data.mode = Some(mode);
+        self.mode = Some(mode);
     }
 
     /// Sets raw PSK seed IKM.
     pub fn raw_seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) {
-        self.data.mode = Some(AddSeedMode::IKM(ikm.into()));
+        self.mode = Some(AddSeedMode::IKM(ikm.into()));
     }
 
     /// Sets wrapped PSK seed.
@@ -132,7 +102,7 @@ impl AddTeamQuicSyncConfigBuilder {
             error!(?err);
             InvalidArg::new("wrapped_seed", "could not deserialize")
         })?;
-        self.data.mode = Some(AddSeedMode::Wrapped(wrapped));
+        self.mode = Some(AddSeedMode::Wrapped(wrapped));
 
         Ok(())
     }
@@ -162,7 +132,7 @@ impl Builder for CreateTeamQuicSyncConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Self::Output::init(out, CreateTeamQuicSyncConfig::new(self.data.mode));
+        Self::Output::init(out, CreateTeamQuicSyncConfig::new(self.mode));
         Ok(())
     }
 }
@@ -175,7 +145,7 @@ impl Builder for AddTeamQuicSyncConfigBuilder {
     ///
     /// No special considerations.
     unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        let Some(mode) = self.data.mode else {
+        let Some(mode) = self.mode else {
             return Err(InvalidArg::new("mode", "field not set").into());
         };
 
@@ -187,7 +157,7 @@ impl Builder for AddTeamQuicSyncConfigBuilder {
 impl From<AddTeamQuicSyncConfig> for aranya_client::AddTeamQuicSyncConfig {
     fn from(value: AddTeamQuicSyncConfig) -> Self {
         Self::builder()
-            .mode(value.data.mode)
+            .mode(value.mode)
             .build()
             .expect("All fields are set")
     }
@@ -196,7 +166,7 @@ impl From<AddTeamQuicSyncConfig> for aranya_client::AddTeamQuicSyncConfig {
 impl From<CreateTeamQuicSyncConfig> for aranya_client::CreateTeamQuicSyncConfig {
     fn from(value: CreateTeamQuicSyncConfig) -> Self {
         Self::builder()
-            .mode(value.data.mode)
+            .mode(value.mode)
             .build()
             .expect("All fields are set")
     }
