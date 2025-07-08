@@ -40,7 +40,7 @@ impl CreateTeamConfig {
 #[obake(derive(Clone, Debug, Serialize, Deserialize))]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct AddTeamConfigInternal {
-    id: TeamId,
+    team_id: TeamId,
     #[obake(inherit)]
     quic_sync: quic_sync::MaybeAddTeamQuicSyncConfig,
 }
@@ -110,7 +110,7 @@ impl AddTeamConfigBuilder {
         })?;
 
         Ok(AddTeamConfigInternal {
-            id,
+            team_id: id,
             quic_sync: self.quic_sync.into(),
         })
     }
@@ -139,7 +139,7 @@ impl AddTeamConfigBuilder {
                 builder = builder.quic_sync(quic_sync);
             }
 
-            builder.team_id(latest.id)
+            builder.team_id(latest.team_id)
         };
 
         Ok(builder)
@@ -174,7 +174,7 @@ impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
     fn from(value: AddTeamConfig) -> Self {
         let quic_sync: Option<AddTeamQuicSyncConfig> = value.0.quic_sync.into();
         Self {
-            id: value.0.id,
+            team_id: value.0.team_id,
             quic_sync: quic_sync.map(Into::into),
         }
     }

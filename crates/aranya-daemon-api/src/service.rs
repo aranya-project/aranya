@@ -137,7 +137,7 @@ pub enum Role {
 /// A configuration for adding a team in the daemon.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AddTeamConfig {
-    pub id: TeamId,
+    pub team_id: TeamId,
     pub quic_sync: Option<AddTeamQuicSyncConfig>,
 }
 

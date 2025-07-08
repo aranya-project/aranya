@@ -265,7 +265,7 @@ impl Client {
     /// Add a team to local device storage.
     pub async fn add_team(&mut self, cfg: AddTeamConfig) -> Result<Team<'_>> {
         let cfg = aranya_daemon_api::AddTeamConfig::from(cfg);
-        let team_id = cfg.id;
+        let team_id = cfg.team_id;
 
         self.daemon
             .add_team(context::current(), cfg)
