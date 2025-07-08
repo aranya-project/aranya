@@ -12,6 +12,7 @@
 //! Both operations support optional transport configuration.
 
 use aranya_daemon_api::TeamId;
+use serde::{Deserialize, Serialize};
 
 use crate::{error::InvalidArg, ConfigError, Result};
 
@@ -40,13 +41,25 @@ pub struct CreateTeamConfig {
 }
 
 /// Configuration for joining an existing team.
-#[derive(Clone)]
-pub struct AddTeamConfig {
+#[obake::versioned]
+#[obake(version("0.1.0"))]
+#[obake(derive(Clone, Serialize, Deserialize))]
+#[derive(Clone, Serialize, Deserialize)]
+struct AddTeamConfigInternal {
     id: TeamId,
-    quic_sync: Option<AddTeamQuicSyncConfig>,
+    #[obake(inherit)]
+    quic_sync: quic_sync::MaybeAddTeamQuicSyncConfig,
 }
 
+/// Configuration for joining an existing team.
+#[derive(Clone)]
+pub struct AddTeamConfig(AddTeamConfigInternal);
+
 impl AddTeamConfig {
+    fn new(id: TeamId, quic_sync: quic_sync::MaybeAddTeamQuicSyncConfig) -> Self {
+        Self(AddTeamConfigInternal { id, quic_sync })
+    }
+
     /// Creates a default [`AddTeamConfigBuilder`].
     pub fn builder() -> AddTeamConfigBuilder {
         AddTeamConfigBuilder::default()
@@ -85,10 +98,7 @@ impl AddTeamConfigBuilder {
             ))
         })?;
 
-        Ok(AddTeamConfig {
-            id,
-            quic_sync: self.quic_sync,
-        })
+        Ok(AddTeamConfig::new(id, self.quic_sync.into()))
     }
 }
 
@@ -112,9 +122,10 @@ impl CreateTeamConfigBuilder {
 
 impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
     fn from(value: AddTeamConfig) -> Self {
+        let quic_sync: Option<AddTeamQuicSyncConfig> = value.0.quic_sync.into();
         Self {
-            id: value.id,
-            quic_sync: value.quic_sync.map(Into::into),
+            id: value.0.id,
+            quic_sync: quic_sync.map(Into::into),
         }
     }
 }
