@@ -163,7 +163,6 @@ impl QuicSyncConfigBuilder {
 
 /// Configuration info for adding and creating teams.
 ///
-/// This config is unstable.
 #[derive(Clone)]
 pub struct TeamConfig {
     quic_sync: Option<QuicSyncConfig>,
