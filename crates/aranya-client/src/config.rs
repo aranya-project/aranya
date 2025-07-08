@@ -161,7 +161,6 @@ impl QuicSyncConfigBuilder {
 }
 
 /// Configuration info for adding and creating teams.
-///
 #[derive(Clone)]
 pub struct TeamConfig {
     quic_sync: Option<QuicSyncConfig>,
