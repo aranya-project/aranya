@@ -474,10 +474,12 @@ dependencies = [
  "backon",
  "buggy",
  "bytes",
+ "deser-hjson",
  "libc",
  "metrics",
  "metrics-exporter-prometheus",
  "metrics-util",
+ "serde",
  "sysinfo",
  "tempfile",
  "tokio",
@@ -3519,6 +3521,7 @@ dependencies = [
  "ntapi",
  "objc2-core-foundation",
  "objc2-io-kit",
+ "serde",
  "windows",
 ]
 

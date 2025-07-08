@@ -1,6 +1,7 @@
 use std::{
     env, io, mem,
     net::{Ipv4Addr, SocketAddr},
+    num::NonZeroU32,
     path::{Path, PathBuf},
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -17,6 +18,7 @@ use bytes::Bytes;
 use metrics::{counter, describe_counter, describe_gauge, describe_histogram, gauge, histogram};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
+use serde::Deserialize;
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 use tempfile::TempDir;
 use tokio::{
@@ -32,33 +34,113 @@ use tracing_subscriber::{
 };
 use url::Url;
 
+#[derive(Debug, Clone, Deserialize)]
+enum PrometheusMode {
+    /// Creates an HTTP listener using an HTTP address to scrape from.
+    HttpListener { addr: SocketAddr },
+    /// Creates an HTTP listener using a UDS address to scrape from.
+    UdsListener { addr: PathBuf },
+    /// Tells the exporter to periodically push data to a push gateway.
+    PushGateway {
+        endpoint: String,
+        username: Option<String>,
+        password: Option<String>,
+        use_http_post_method: bool,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+enum MetricsKindMask {
+    None = 0,
+    Counter = 1,
+    Gauge = 2,
+    Histogram = 4,
+    All = 7,
+}
+
+impl From<MetricsKindMask> for MetricKindMask {
+    fn from(value: MetricsKindMask) -> Self {
+        match value {
+            MetricsKindMask::None => MetricKindMask::NONE,
+            MetricsKindMask::Counter => MetricKindMask::COUNTER,
+            MetricsKindMask::Gauge => MetricKindMask::GAUGE,
+            MetricsKindMask::Histogram => MetricKindMask::HISTOGRAM,
+            MetricsKindMask::All => MetricKindMask::ALL,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct PrometheusConfig {
+    /// The current mode that the Prometheus exporter is operating as.
+    mode: PrometheusMode,
+
+    /// Allows only certain addresses to access the scrape endpoint.
+    allowed_addresses: Option<Vec<String>>,
+    /// Sets the number of quantiles when rendering histograms.
+    quantiles: Option<Vec<f64>>,
+    /// Sets the buckets to use when rendering histograms.
+    buckets: Option<Vec<f64>>,
+    /// Sets the "width" of each bucket when using summaries.
+    bucket_duration: Option<Duration>,
+    /// Sets the number of buckets kept in memory at one time.
+    bucket_count: Option<NonZeroU32>,
+    /// Sets whether a unit suffix is added to metric names.
+    enable_unit_suffix: bool,
+    /// Sets the idle timeout for metrics.
+    idle_timeout: (MetricsKindMask, Option<Duration>),
+    /// Sets the interval that the upkeep task runs at.
+    upkeep_timeout: Option<Duration>,
+    /// Sets global labels that are applied to all metrics.
+    global_labels: Option<Vec<(String, String)>>,
+}
+
+impl Default for PrometheusConfig {
+    fn default() -> Self {
+        Self {
+            mode: PrometheusMode::PushGateway {
+                endpoint: "http://localhost:9091".to_string(),
+                username: None,
+                password: None,
+                use_http_post_method: false,
+            },
+            allowed_addresses: None,
+            quantiles: None,
+            buckets: None,
+            bucket_duration: None,
+            bucket_count: None,
+            enable_unit_suffix: false,
+            idle_timeout: (MetricsKindMask::All, Some(Duration::from_secs(1))),
+            upkeep_timeout: None,
+            global_labels: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+enum MetricsMode {
+    Prometheus(PrometheusConfig),
+}
+
+impl Default for MetricsMode {
+    fn default() -> Self {
+        Self::Prometheus(PrometheusConfig::default())
+    }
+}
+
 /// Configuration for metrics collection and exporting
-#[derive(Debug)]
+#[derive(Debug, Clone, Deserialize)]
 struct MetricsConfig {
-    /// How often to poll for metrics
-    pub collection_interval: Duration,
-
-    /// Prometheus push gateway URL (if we're using a push gateway)
-    pub push_gateway_url: Option<String>,
-    /// How often to push data to the push gateway
-    pub push_interval: Duration,
-    /// Job name for the current push gateway
+    mode: MetricsMode,
+    pub interval: Duration,
     pub job_name: String,
-
-    /// HTTP address to listen to (if we're using a scrape endpoint)
-    pub http_listen_addr: Option<SocketAddr>,
-    /// How long for a metric to go without an update before it's set idle
-    pub idle_timeout: Option<Duration>,
 }
 
 impl Default for MetricsConfig {
     fn default() -> Self {
         Self {
-            // poll 4 times a second
-            collection_interval: Duration::from_millis(100),
-
-            push_gateway_url: Some("http://localhost:9091".to_string()),
-            push_interval: Duration::from_secs(1),
+            mode: MetricsMode::default(),
+            interval: Duration::from_millis(100),
             job_name: format!(
                 "aranya_demo_{}",
                 SystemTime::now()
@@ -66,9 +148,6 @@ impl Default for MetricsConfig {
                     .expect("We're past the Unix Epoch")
                     .as_secs()
             ),
-
-            http_listen_addr: None,
-            idle_timeout: None,
         }
     }
 }
@@ -392,7 +471,7 @@ impl ProcessMetricsCollector {
 
     // TODO(nikki): inline as a closure?
     async fn start_collection_loop(&mut self) -> Result<()> {
-        let mut interval = tokio::time::interval(self.config.collection_interval);
+        let mut interval = tokio::time::interval(self.config.interval);
 
         loop {
             interval.tick().await;
@@ -418,33 +497,80 @@ fn format_push_gateway_url(base_url: &str, job_name: &str) -> String {
     }
 }
 
-fn setup_prometheus_exporter(config: &MetricsConfig) -> Result<()> {
-    let mut builder = PrometheusBuilder::new();
+fn setup_exporter(config: &MetricsConfig) -> Result<()> {
+    match &config.mode {
+        MetricsMode::Prometheus(prometheus) => {
+            let mut builder = PrometheusBuilder::new();
 
-    match (&config.push_gateway_url, &config.http_listen_addr) {
-        (Some(base_url), _) => {
-            let push_url = format_push_gateway_url(base_url, &config.job_name);
-            info!("Setting up Prometheus push gateway node: {push_url}");
-            builder =
-                builder.with_push_gateway(push_url, config.push_interval, None, None, false)?;
-        }
-        (None, Some(listen_addr)) => {
-            info!("Setting up Prometheus HTTP endpoint mode: {listen_addr}");
-            builder = builder.with_http_listener(*listen_addr);
-        }
-        (None, None) => {
-            return Err(anyhow!(
-                "Must specify either push gateway URL or HTTP listen address"
-            ));
+            match &prometheus.mode {
+                PrometheusMode::HttpListener { addr } => {
+                    info!("Setting up Prometheus HTTP listener: {addr}");
+                    builder = builder.with_http_listener(*addr);
+                }
+                PrometheusMode::UdsListener { addr } => {
+                    info!("Setting up Prometheus UDS listener: {addr:?}");
+                    builder = builder.with_http_uds_listener(addr)
+                }
+                PrometheusMode::PushGateway {
+                    endpoint,
+                    username,
+                    password,
+                    use_http_post_method,
+                } => {
+                    let push_url = format_push_gateway_url(endpoint.as_ref(), &config.job_name);
+                    info!("Setting up Prometheus push gateway: {push_url}");
+                    builder = builder.with_push_gateway(
+                        endpoint,
+                        config.interval,
+                        username.clone(),
+                        password.clone(),
+                        *use_http_post_method,
+                    )?
+                }
+            }
+
+            if let Some(addresses) = &prometheus.allowed_addresses {
+                for address in addresses {
+                    builder = builder.add_allowed_address(address)?;
+                }
+            }
+
+            if let Some(quantiles) = &prometheus.quantiles {
+                builder = builder.set_quantiles(quantiles)?;
+            }
+
+            if let Some(values) = &prometheus.buckets {
+                builder = builder.set_buckets(values)?;
+            }
+
+            if let Some(value) = prometheus.bucket_duration {
+                builder = builder.set_bucket_duration(value)?;
+            }
+
+            if let Some(count) = prometheus.bucket_count {
+                builder = builder.set_bucket_count(count);
+            }
+
+            builder = builder.set_enable_unit_suffix(prometheus.enable_unit_suffix);
+
+            let (mask, timeout) = &prometheus.idle_timeout;
+            builder = builder.idle_timeout(MetricKindMask::from(mask.clone()), *timeout);
+
+            if let Some(timeout) = prometheus.upkeep_timeout {
+                builder = builder.upkeep_timeout(timeout);
+            }
+
+            if let Some(labels) = &prometheus.global_labels {
+                for (key, value) in labels {
+                    builder = builder.add_global_label(key, value);
+                }
+            }
+
+            builder
+                .install()
+                .context("Failed to install Prometheus exporter")?;
         }
     }
-
-    let timeout = config.idle_timeout.unwrap_or(Duration::from_secs(1));
-    builder = builder.idle_timeout(MetricKindMask::ALL, Some(timeout));
-    
-    builder
-        .install()
-        .context("Failed to install Prometheus exporter")?;
 
     describe_gauge!(
         "cpu_user_time_microseconds_total",
@@ -507,7 +633,7 @@ fn setup_prometheus_exporter(config: &MetricsConfig) -> Result<()> {
         "Total number of demo operations completed"
     );
 
-    info!("Prometheus exporter configured successfully!");
+    info!("Exporter configured successfully!");
 
     Ok(())
 }
@@ -676,34 +802,18 @@ async fn main() -> Result<()> {
         )
         .init();
 
+    // First, let's make sure we have the proper config data to even start before we log about setting up.
+    let Ok(config_path) = env::var("CONFIG_PATH") else {
+        bail!("No config path defined, please provide the path to a (h)json file in `CONFIG_PATH=`.");
+    };
+
+    let buffer = fs::read(config_path).await?;
+    let metrics_config: MetricsConfig = deser_hjson::from_slice(&buffer)?;
+
     info!("Starting Aranya Example with Metrics Collection");
 
-    let mut metrics_config = MetricsConfig::default();
-
-    if let Ok(push_gateway) = env::var("PROMETHEUS_PUSH_GATEAWAY") {
-        metrics_config.push_gateway_url = Some(push_gateway);
-        metrics_config.http_listen_addr = None;
-    } else if let Ok(listen_addr) = env::var("PROMETHEUS_LISTEN_ADDR") {
-        metrics_config.push_gateway_url = None;
-        metrics_config.http_listen_addr = Some(
-            listen_addr
-                .parse()
-                .context("unable to convert `PROMETHEUS_LISTEN_ADDR`")?,
-        );
-    }
-
-    if let Ok(job_name) = env::var("PROMETHEUS_JOB_NAME") {
-        metrics_config.job_name = job_name;
-    }
-
-    if let Ok(collection_interval) = env::var("COLLECTION_INTERVAL") {
-        if let Ok(collection_interval) = collection_interval.parse::<u64>() {
-            metrics_config.collection_interval = Duration::from_millis(collection_interval);
-        }
-    }
-
     let job_name = metrics_config.job_name.clone();
-    setup_prometheus_exporter(&metrics_config)?;
+    setup_exporter(&metrics_config)?;
 
     info!("Phase 1: Setting up daemons");
     let (daemon_pids, demo_context) = setup_demo().await?;

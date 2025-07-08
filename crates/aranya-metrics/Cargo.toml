@@ -22,11 +22,13 @@ buggy = { workspace = true }
 anyhow = { workspace = true }
 backon = { workspace = true }
 bytes = { workspace = true }
+deser-hjson = { version = "2" }
 libc = { workspace = true }
 metrics = { workspace = true }
-metrics-exporter-prometheus = { version = "0.17" }
+metrics-exporter-prometheus = { version = "0.17", features = ["uds-listener"] }
 metrics-util = { workspace = true }
-sysinfo = { workspace = true }
+serde = { workspace = true }
+sysinfo = { workspace = true, features = ["serde"] }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["process"] }
 tracing = { workspace = true }
