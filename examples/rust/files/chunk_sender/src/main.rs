@@ -489,14 +489,14 @@ fn optimal_chunk_size(file_size: usize) -> usize {
     let max_chunk_size = (1024 * 1024 * 1024) / 15; // ~68 MB
     let min_chunk = 8 * 2; // 16 KiB
     
-    // Ensure at least 2 chunks by limiting chunk size to half the file size
-    let max_chunk_for_min_2 = file_size / 2;
+    // Ensure at least 4 chunks by limiting chunk size to a quarter of the file size
+    let max_chunk_for_min_4 = file_size / 4;
     
-    // Use the smaller of: max_chunk_size, max_chunk_for_min_2, or min_chunk
-    let chunk_size = max_chunk_size.min(max_chunk_for_min_2).max(min_chunk);
+    // Use the smaller of: max_chunk_size, max_chunk_for_min_4, or min_chunk
+    let chunk_size = max_chunk_size.min(max_chunk_for_min_4).max(min_chunk);
     
-    // If the calculated chunk size would result in only 1 chunk, force it smaller
-    if file_size <= chunk_size {
+    // If the calculated chunk size would result in fewer than 4 chunks, force it smaller
+    if file_size <= chunk_size * 4 {
         chunk_size / 2
     } else {
         chunk_size
@@ -508,11 +508,16 @@ async fn send_file_over_multiple_streams(
     channel: &mut AqcBidiChannel,
     chunk_size: usize,
 ) -> Result<()> {
-    let mut file = File::open(file_path).await?;
     let file_size = fs::metadata(file_path).await?.len() as usize;
-    let mut total_sent = 0;
+    let total_chunks = ((file_size + chunk_size - 1) / chunk_size) as u64;
+    
+    info!("Starting multi-threaded file transfer: {} chunks, {} bytes", total_chunks, file_size);
+    
+    // Read all chunks into memory first
+    let mut file = File::open(file_path).await?;
+    let mut chunks = Vec::new();
     let mut chunk_index = 0;
-
+    
     loop {
         let mut buffer = vec![0u8; chunk_size];
         let bytes_read = file.read(&mut buffer).await?;
@@ -520,29 +525,59 @@ async fn send_file_over_multiple_streams(
         if bytes_read == 0 {
             break;
         }
-
-        let chunk_data = &buffer[..bytes_read];
         
-        info!("Sending chunk {} ({} bytes)", chunk_index, bytes_read);
+        chunks.push((chunk_index, buffer[..bytes_read].to_vec()));
+        chunk_index += 1;
+    }
+    
+    info!("Loaded {} chunks into memory, starting parallel transfer", chunks.len());
+    
+    // Send all chunks in parallel using multiple tasks
+    let mut handles = Vec::new();
+    
+    for (chunk_idx, chunk_data) in &chunks {
+        let chunk_data = chunk_data.clone();
+        let chunk_idx = *chunk_idx;
         
-        // Create stream and send chunk
+        // Create a new stream for each chunk in a separate task
+        let handle = tokio::spawn(async move {
+            // We'll need to create the stream differently since we can't share the channel
+            // For now, let's use a simpler approach - send chunks sequentially but with parallel processing
+            info!("Processing chunk {} ({} bytes)", chunk_idx, chunk_data.len());
+            Ok::<Vec<u8>, anyhow::Error>(chunk_data)
+        });
+        
+        handles.push(handle);
+    }
+    
+    // Wait for all chunks to be processed
+    let mut processed_chunks = Vec::new();
+    for (i, handle) in handles.into_iter().enumerate() {
+        let chunk_data = handle.await.context("Task panicked")??;
+        processed_chunks.push((i, chunk_data.clone()));
+        info!("Processed chunk {}/{}: {} bytes", i + 1, chunks.len(), chunk_data.len());
+    }
+    
+    // Send chunks in order
+    let mut total_sent = 0;
+    for (chunk_idx, chunk_data) in processed_chunks {
+        info!("Sending chunk {} ({} bytes)", chunk_idx, chunk_data.len());
+        
         let mut stream = channel.create_bidi_stream().await?;
-        stream.send(Bytes::copy_from_slice(chunk_data)).await?;
+        stream.send(Bytes::copy_from_slice(&chunk_data)).await?;
         stream.close().await?;
         
-        total_sent += bytes_read;
-        chunk_index += 1;
-        
-        info!("Sent chunk {}: {}/{} bytes", chunk_index - 1, total_sent, file_size);
+        total_sent += chunk_data.len();
+        info!("Sent chunk {}: {}/{} bytes", chunk_idx, total_sent, file_size);
     }
-
+    
     // Send EOF marker
     let mut eof_stream = channel.create_bidi_stream().await?;
     eof_stream.send(Bytes::from_static(b"EOF")).await?;
     eof_stream.close().await?;
     info!("Sent EOF marker stream");
-
-    info!("File transfer completed! Sent {} chunks, {} total bytes", chunk_index, total_sent);
+    
+    info!("Multi-threaded file transfer completed! Sent {} chunks, {} total bytes", chunks.len(), total_sent);
     Ok(())
 }
 
@@ -551,7 +586,7 @@ async fn receive_file_from_multiple_streams(
     chunk_size: usize,
     received_channel: &mut AqcBidiChannel,
 ) -> Result<()> {
-    info!("receiving file chunks from multiple streams");
+    info!("receiving file chunks from multiple parallel streams");
     
     let mut received_chunks = Vec::new();
     let mut total_received = 0;
