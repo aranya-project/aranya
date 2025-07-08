@@ -6,6 +6,8 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
     time::Duration,
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
 };
 
 use anyhow::{bail, Context as _, Result};
@@ -15,14 +17,13 @@ use aranya_client::{
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
-use buggy::BugExt;
 use bytes::Bytes;
 use tempfile::TempDir;
 use tokio::{
     fs,
     process::{Child, Command},
     time::sleep,
-    io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
+    io::{AsyncReadExt, AsyncWriteExt, AsyncSeekExt},
 };
 use tokio::fs::File;
 use tracing::{debug, info, Metadata};
@@ -37,12 +38,21 @@ use serde_cbor;
 
 #[derive(Serialize, Deserialize, Debug)]
 struct FileChunk {
-    filename: String,
+    file_id: u64,
     chunk_index: u64,
     chunk_size: usize,
     total_chunks: u64,
     file_size: u64,
     data: Vec<u8>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct FileHeader {
+    file_id: u64,
+    filename: String,
+    total_chunks: u64,
+    file_size: u64,
+    file_hash: u64,
 }
 
 #[derive(Clone, Debug)]
@@ -416,14 +426,7 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // Read the file to transfer
-    info!("reading file to transfer: {:?}", file_path);
-    let file_size = fs::metadata(&file_path).await?.len() as usize;
-    let chunk_size = optimal_chunk_size(file_size);
-    let total_chunks = ((file_size + chunk_size - 1) / chunk_size) as u64;
-    let filename_str = file_path.file_name().unwrap().to_string_lossy().to_string();
-
-    info!("starting file transfer");
+    // --- MOVE: Establish AQC channel before file transfer logic ---
     info!("sender creating aqc bidi channel");
     let receiver_net_identifier = receiver.aqc_net_id();
     let create_handle = tokio::spawn(async move {
@@ -448,7 +451,16 @@ async fn main() -> Result<()> {
     sender = sender_returned;
     let mut created_aqc_chan =
         created_aqc_chan_result.context("Sender failed to create bidi channel")?;
+    // --- END MOVE ---
 
+    // Read the file to transfer
+    info!("reading file to transfer: {:?}", file_path);
+    let file_size = fs::metadata(&file_path).await?.len() as usize;
+    let chunk_size = optimal_chunk_size(file_size);
+    let _total_chunks = ((file_size + chunk_size - 1) / chunk_size) as u64;
+    let _filename_str = file_path.file_name().unwrap().to_string_lossy().to_string();
+
+    info!("starting file transfer");
     // Use the new multi-stream approach
     info!("sender sending file over multiple streams");
     send_file_over_multiple_streams(&file_path, &mut created_aqc_chan, chunk_size).await?;
@@ -484,6 +496,22 @@ async fn main() -> Result<()> {
 
 
 
+async fn calculate_file_hash(file_path: &Path) -> Result<u64> {
+    let mut file = File::open(file_path).await?;
+    let mut hasher = DefaultHasher::new();
+    let mut buffer = vec![0u8; 8192]; // 8KB buffer for hashing
+    
+    loop {
+        let bytes_read = file.read(&mut buffer).await?;
+        if bytes_read == 0 {
+            break;
+        }
+        hasher.write(&buffer[..bytes_read]);
+    }
+    
+    Ok(hasher.finish())
+}
+
 fn optimal_chunk_size(file_size: usize) -> usize {
     // Maximum available memory is 1GB, so max chunk size is 1/15 of 1GB to leave room for system and other services
     let max_chunk_size = (1024 * 1024 * 1024) / 15; // ~68 MB
@@ -510,91 +538,90 @@ async fn send_file_over_multiple_streams(
 ) -> Result<()> {
     let file_size = fs::metadata(file_path).await?.len() as usize;
     let total_chunks = ((file_size + chunk_size - 1) / chunk_size) as u64;
+    let file_id = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos() as u64;
     
-    info!("Starting multi-threaded file transfer: {} chunks, {} bytes", total_chunks, file_size);
+    info!("Starting streaming file transfer: file_id={}, {} chunks, {} bytes", file_id, total_chunks, file_size);
     
-    // Read all chunks into memory first
-    let mut file = File::open(file_path).await?;
-    let mut chunks = Vec::new();
+    // Calculate file hash
+    let file_hash = calculate_file_hash(file_path).await?;
+    info!("File hash: {:x}", file_hash);
+    
+    // Send file header first
+    let header = FileHeader {
+        file_id,
+        filename: file_path.file_name().unwrap().to_string_lossy().to_string(),
+        total_chunks,
+        file_size: file_size as u64,
+        file_hash,
+    };
+    let mut header_stream = channel.create_bidi_stream().await?;
+    let header_serialized = serde_cbor::to_vec(&header)?;
+    header_stream.send(Bytes::copy_from_slice(&header_serialized)).await?;
+    header_stream.close().await?;
+    info!("Sent file header: {}", header.filename);
+    
+    // Open file for streaming with buffered reader
+    let file = File::open(file_path).await?;
+    let mut reader = tokio::io::BufReader::new(file);
     let mut chunk_index = 0;
+    let mut total_sent = 0;
     
+    // Stream chunks directly from file
     loop {
         let mut buffer = vec![0u8; chunk_size];
-        let bytes_read = file.read(&mut buffer).await?;
+        let bytes_read = reader.read(&mut buffer).await?;
         
         if bytes_read == 0 {
             break;
         }
         
-        chunks.push((chunk_index, buffer[..bytes_read].to_vec()));
+        let chunk_data = &buffer[..bytes_read];
+        info!("Sending chunk {} ({} bytes)", chunk_index, bytes_read);
+        
+        // Create stream and send chunk with file_id
+        let mut stream = channel.create_bidi_stream().await?;
+        let chunk_with_index = FileChunk {
+            file_id,
+            chunk_index,
+            chunk_size: bytes_read,
+            total_chunks: total_chunks,
+            file_size: file_size as u64,
+            data: chunk_data.to_vec(),
+        };
+        let serialized = serde_cbor::to_vec(&chunk_with_index)?;
+        stream.send(Bytes::copy_from_slice(&serialized)).await?;
+        stream.close().await?;
+        
+        total_sent += bytes_read;
+        info!("Sent chunk {}: {}/{} bytes", chunk_index, total_sent, file_size);
         chunk_index += 1;
     }
     
-    info!("Loaded {} chunks into memory, starting parallel transfer", chunks.len());
-    
-    // Send all chunks in parallel using multiple tasks
-    let mut handles = Vec::new();
-    
-    for (chunk_idx, chunk_data) in &chunks {
-        let chunk_data = chunk_data.clone();
-        let chunk_idx = *chunk_idx;
-        
-        // Create a new stream for each chunk in a separate task
-        let handle = tokio::spawn(async move {
-            // We'll need to create the stream differently since we can't share the channel
-            // For now, let's use a simpler approach - send chunks sequentially but with parallel processing
-            info!("Processing chunk {} ({} bytes)", chunk_idx, chunk_data.len());
-            Ok::<Vec<u8>, anyhow::Error>(chunk_data)
-        });
-        
-        handles.push(handle);
-    }
-    
-    // Wait for all chunks to be processed
-    let mut processed_chunks = Vec::new();
-    for (i, handle) in handles.into_iter().enumerate() {
-        let chunk_data = handle.await.context("Task panicked")??;
-        processed_chunks.push((i, chunk_data.clone()));
-        info!("Processed chunk {}/{}: {} bytes", i + 1, chunks.len(), chunk_data.len());
-    }
-    
-    // Send chunks in order
-    let mut total_sent = 0;
-    for (chunk_idx, chunk_data) in processed_chunks {
-        info!("Sending chunk {} ({} bytes)", chunk_idx, chunk_data.len());
-        
-        let mut stream = channel.create_bidi_stream().await?;
-        stream.send(Bytes::copy_from_slice(&chunk_data)).await?;
-        stream.close().await?;
-        
-        total_sent += chunk_data.len();
-        info!("Sent chunk {}: {}/{} bytes", chunk_idx, total_sent, file_size);
-    }
-    
-    // Send EOF marker
-    let mut eof_stream = channel.create_bidi_stream().await?;
-    eof_stream.send(Bytes::from_static(b"EOF")).await?;
-    eof_stream.close().await?;
-    info!("Sent EOF marker stream");
-    
-    info!("Multi-threaded file transfer completed! Sent {} chunks, {} total bytes", chunks.len(), total_sent);
+    info!("Streaming file transfer completed! Sent {} chunks, {} total bytes", chunk_index, total_sent);
     Ok(())
 }
 
 async fn receive_file_from_multiple_streams(
-    output_path: &Path,
+    _output_path: &Path,
     chunk_size: usize,
     received_channel: &mut AqcBidiChannel,
 ) -> Result<()> {
     info!("receiving file chunks from multiple parallel streams");
     
-    let mut received_chunks = Vec::new();
+    // Track files by ID
+    let mut file_info: Option<(u64, String, u64, u64, u64)> = None; // (file_id, filename, total_chunks, file_size, file_hash)
+    let mut output_file: Option<File> = None;
+    let mut output_path: Option<PathBuf> = None;
+    let mut expected_hash: Option<u64> = None;
+    let mut chunks_written = 0;
     let mut total_received = 0;
-    let mut chunk_index = 0;
     
     // Keep receiving streams until we get all chunks
     loop {
-        info!("receiving stream {}", chunk_index);
+        info!("receiving stream");
         
         // Receive stream with timeout
         let stream_result = tokio::time::timeout(
@@ -606,7 +633,7 @@ async fn receive_file_from_multiple_streams(
             Ok(Ok(stream)) => stream,
             Ok(Err(e)) => return Err(anyhow::anyhow!("Failed to receive stream: {}", e)),
             Err(_) => {
-                info!("timeout waiting for stream {}, assuming transfer complete", chunk_index);
+                info!("timeout waiting for stream, assuming transfer complete");
                 break;
             }
         };
@@ -620,54 +647,95 @@ async fn receive_file_from_multiple_streams(
             ).await {
                 Ok(Ok(Some(bytes))) => {
                     stream_data.extend_from_slice(&bytes);
-                    info!("stream {}: accumulated {} bytes", chunk_index, stream_data.len());
                 }
                 Ok(Ok(None)) => {
-                    info!("stream {}: closed, total {} bytes", chunk_index, stream_data.len());
                     break;
                 }
                 Ok(Err(e)) => {
                     return Err(anyhow::anyhow!("Stream error: {}", e));
                 }
                 Err(_) => {
-                    info!("stream {}: timeout waiting for data", chunk_index);
+                    info!("timeout waiting for data");
                     break;
                 }
             }
         }
         
-        // Check for EOF marker
-        if stream_data == b"EOF" {
-            info!("Received EOF marker, ending receive loop");
-            break;
-        }
-        
         if stream_data.is_empty() {
-            info!("stream {}: no data received, assuming end of transfer", chunk_index);
+            info!("no data received, assuming end of transfer");
             break;
         }
         
-        total_received += stream_data.len();
-        received_chunks.push(stream_data);
-        info!("received chunk {}: {} bytes", chunk_index, received_chunks.last().unwrap().len());
+        // Try to deserialize as header first, then as chunk
+        if let Ok(header) = serde_cbor::from_slice::<FileHeader>(&stream_data) {
+            info!("received file header: file_id={}, filename={}, {} chunks, {} bytes, hash={:x}", 
+                  header.file_id, header.filename, header.total_chunks, header.file_size, header.file_hash);
+            file_info = Some((header.file_id, header.filename, header.total_chunks, header.file_size, header.file_hash));
+            expected_hash = Some(header.file_hash);
+            continue;
+        }
         
-        chunk_index += 1;
+        // Deserialize as chunk
+        let chunk: FileChunk = serde_cbor::from_slice(&stream_data)?;
+        let chunk_data_len = chunk.data.len();
+        info!("received chunk {} (file_id={}): {} bytes", chunk.chunk_index, chunk.file_id, chunk_data_len);
+        
+        // Get file info
+        let (file_id, filename, total_chunks, _file_size, _file_hash) = file_info
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Received chunk before file header"))?;
+        
+        // Verify file_id matches
+        if chunk.file_id != *file_id {
+            return Err(anyhow::anyhow!("Chunk file_id {} doesn't match header file_id {}", chunk.file_id, file_id));
+        }
+        
+        // Create output file if this is the first chunk
+        if output_file.is_none() {
+            let final_output_path = Path::new("received_").join(filename);
+            if let Some(parent) = final_output_path.parent() {
+                fs::create_dir_all(parent).await
+                    .with_context(|| format!("failed to create directory: {:?}", parent))?;
+            }
+            let file = File::create(&final_output_path).await
+                .with_context(|| format!("failed to create output file: {:?}", final_output_path))?;
+            output_file = Some(file);
+            output_path = Some(final_output_path.clone());
+            info!("created output file: {:?}", final_output_path);
+        }
+        
+        // Write chunk directly to file at the correct position
+        let mut file = output_file.as_mut().unwrap();
+        let chunk_offset = (chunk.chunk_index as u64) * (chunk_size as u64);
+        file.seek(tokio::io::SeekFrom::Start(chunk_offset)).await
+            .with_context(|| format!("failed to seek to position {} for chunk {}", chunk_offset, chunk.chunk_index))?;
+        file.write_all(&chunk.data).await
+            .with_context(|| format!("failed to write chunk {} to file", chunk.chunk_index))?;
+        
+        total_received += chunk_data_len;
+        chunks_written += 1;
+        info!("wrote chunk {}: {} bytes (total: {}/{})", chunk.chunk_index, chunk_data_len, chunks_written, total_chunks);
+        
+        // Check if this was the last chunk
+        if chunk.chunk_index == total_chunks - 1 {
+            info!("Received last chunk ({}), ending receive loop", chunk.chunk_index);
+            break;
+        }
     }
     
-    // Reassemble file from chunks
-    info!("reassembling file from {} chunks", received_chunks.len());
-    let mut reassembled_file = Vec::new();
-    for chunk in &received_chunks {
-        reassembled_file.extend_from_slice(chunk);
+    // Verify file integrity with hash
+    if let Some(path) = output_path {
+        if let Some(expected) = expected_hash {
+            let actual_hash = calculate_file_hash(&path).await?;
+            if actual_hash == expected {
+                info!("File integrity verified! Hash: {:x}", actual_hash);
+            } else {
+                return Err(anyhow::anyhow!("File integrity check failed! Expected: {:x}, Got: {:x}", expected, actual_hash));
+            }
+        }
     }
     
-    // Write reassembled file
-    fs::write(output_path, &reassembled_file).await
-        .with_context(|| format!("failed to write reassembled file: {:?}", output_path))?;
-    
-    info!("file reassembled successfully: {} bytes", reassembled_file.len());
+    info!("file streaming completed successfully: {} bytes", total_received);
     Ok(())
 }
-
-
 

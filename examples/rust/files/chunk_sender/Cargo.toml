@@ -1,6 +1,6 @@
 [package]
-name = "sender"
-description = "Example Rust program which sends a file to a receiver using the Aranya client library"
+name = "chunk-sender"
+description = "Example Rust program which sends a file to a receiver using AQC"
 version = "0.1.0"
 authors = ["SpiderOak, Inc."]
 edition = "2021"
