@@ -804,7 +804,9 @@ async fn main() -> Result<()> {
 
     // First, let's make sure we have the proper config data to even start before we log about setting up.
     let Ok(config_path) = env::var("CONFIG_PATH") else {
-        bail!("No config path defined, please provide the path to a (h)json file in `CONFIG_PATH=`.");
+        bail!(
+            "No config path defined, please provide the path to a (h)json file in `CONFIG_PATH=`."
+        );
     };
 
     let buffer = fs::read(config_path).await?;
