@@ -21,6 +21,7 @@ impl CreateTeamQuicSyncConfig {
         Self { mode }
     }
 
+    /// Creates a new [`CreateTeamQuicSyncConfigBuilder`].
     pub fn builder() -> CreateTeamQuicSyncConfigBuilder {
         CreateTeamQuicSyncConfigBuilder::default()
     }
@@ -42,6 +43,7 @@ impl AddTeamQuicSyncConfig {
         Self { mode }
     }
 
+    /// Creates a new [`AddTeamQuicSyncConfigBuilder`].
     pub fn builder() -> AddTeamQuicSyncConfigBuilder {
         AddTeamQuicSyncConfigBuilder::default()
     }
@@ -52,6 +54,7 @@ impl AddTeamQuicSyncConfig {
     }
 }
 
+/// Builder for constructing a [`CreateTeamQuicSyncConfig`].
 #[derive(Default)]
 pub struct CreateTeamQuicSyncConfigBuilder {
     mode: CreateSeedMode,
@@ -79,6 +82,7 @@ impl CreateTeamQuicSyncConfigBuilder {
     }
 }
 
+/// Builder for constructing an [`AddTeamQuicSyncConfig`].
 #[derive(Default)]
 pub struct AddTeamQuicSyncConfigBuilder {
     mode: Option<AddSeedMode>,

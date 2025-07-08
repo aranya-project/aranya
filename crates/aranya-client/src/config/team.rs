@@ -113,7 +113,7 @@ impl CreateTeamConfigBuilder {
 impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
     fn from(value: AddTeamConfig) -> Self {
         Self {
-            id: value.id,
+            team_id: value.id,
             quic_sync: value.quic_sync.map(Into::into),
         }
     }

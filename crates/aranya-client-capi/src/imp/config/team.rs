@@ -25,7 +25,7 @@ impl CreateTeamConfig {
         Self { quic_sync }
     }
 
-    /// Creates a default [`CreateTeamConfigBuilder`].
+    /// Creates a new [`CreateTeamConfigBuilder`].
     pub fn builder() -> CreateTeamConfigBuilder {
         CreateTeamConfigBuilder::default()
     }
@@ -35,7 +35,7 @@ impl Typed for CreateTeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7518);
 }
 
-/// A team config required to add an existing Aranya team to a device.
+/// Builder for constructing a [`CreateTeamConfig`].
 #[derive(Default)]
 pub struct CreateTeamConfigBuilder {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
@@ -68,23 +68,7 @@ impl Builder for CreateTeamConfigBuilder {
     }
 }
 
-impl From<CreateTeamConfig> for aranya_client::CreateTeamConfig {
-    fn from(value: CreateTeamConfig) -> Self {
-        let mut builder = Self::builder();
-        if let Some(cfg) = value.quic_sync {
-            builder = builder.quic_sync(cfg.into());
-        }
-
-        builder.build().expect("All fields set")
-    }
-}
-
-impl From<&CreateTeamConfig> for aranya_client::CreateTeamConfig {
-    fn from(value: &CreateTeamConfig) -> Self {
-        Self::from(value.to_owned())
-    }
-}
-
+/// Configuration for adding an existing Aranya team to a device.
 #[derive(Clone)]
 pub struct AddTeamConfig {
     team_id: TeamId,
@@ -96,7 +80,7 @@ impl AddTeamConfig {
         Self { team_id, quic_sync }
     }
 
-    /// Creates a default [`AddTeamConfigBuilder`].
+    /// Creates a new [`AddTeamConfigBuilder`].
     pub fn builder() -> AddTeamConfigBuilder {
         AddTeamConfigBuilder::default()
     }
@@ -106,6 +90,7 @@ impl Typed for AddTeamConfig {
     const TYPE_ID: TypeId = TypeId::new(0xA05F7519);
 }
 
+/// Builder for constructing an [`AddTeamConfig`].
 #[derive(Default)]
 pub struct AddTeamConfigBuilder {
     team_id: Option<TeamId>,
@@ -163,6 +148,23 @@ impl From<AddTeamConfig> for aranya_client::AddTeamConfig {
 
 impl From<&AddTeamConfig> for aranya_client::AddTeamConfig {
     fn from(value: &AddTeamConfig) -> Self {
+        Self::from(value.to_owned())
+    }
+}
+
+impl From<CreateTeamConfig> for aranya_client::CreateTeamConfig {
+    fn from(value: CreateTeamConfig) -> Self {
+        let mut builder = Self::builder();
+        if let Some(cfg) = value.quic_sync {
+            builder = builder.quic_sync(cfg.into());
+        }
+
+        builder.build().expect("All fields set")
+    }
+}
+
+impl From<&CreateTeamConfig> for aranya_client::CreateTeamConfig {
+    fn from(value: &CreateTeamConfig) -> Self {
         Self::from(value.to_owned())
     }
 }
