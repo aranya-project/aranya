@@ -245,6 +245,20 @@ where
         .in_current_span()
     }
 
+    /// Invokes `change_role_managing_role`.
+    #[instrument(skip(self))]
+    fn change_role_managing_role(
+        &self,
+        target_role_id: RoleId,
+        managing_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.change_role_managing_role(target_role_id.into(), managing_role_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
     /// Invokes `query_team_roles` to return all roles in the
     /// team.
     #[instrument(skip(self))]

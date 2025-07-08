@@ -26,15 +26,18 @@ use idam
 use perspective
 ```
 
-- `aqc`: AQC functionality, such as creating channels.
-- `crypto`: core cryptographic functionality, like command
-  signing and verification.
-- `device`: provides information about the current device.
-- `envelope`: provides access to the special
+- [`aqc`][aqc-ffi]: [AQC][aqc] functionality, such as creating
+  channels.
+- [`crypto`][crypto-ffi]: core cryptographic functionality, like
+  command signing and verification.
+- [`device`][device-ffi]: provides information about the current
+  device.
+- [`envelope`][evp-ffi]: provides access to the special
   [`Envelope`][envelope] type.
-- `idam`: IDAM functionality, such access to device keys.
-- `perspective`: provides information about the current
-  perspective.
+- [`idam`][idam-ffi]: IDAM functionality, such access to device
+  keys.
+- [`perspective`][perspective-ffi]: provides information about
+  the current perspective.
 
 ## Policy Basics
 
@@ -111,7 +114,48 @@ An identity in Aranya is called a _device_. Each device has
 a globally unique ID, called the _device ID_.
 
 ```policy
+// Records the existence of a device.
+// TODO(eric): We store the key IDs in the key facts themselves,
+// do we want to continue storing key IDs here?
 fact Device[device_id id]=>{sign_key_id id, enc_key_id id}
+
+// Reports whether the invariants for the device are being upheld.
+function valid_device_invariants(device_id id) bool {
+    let device = query Device[device_id: device_id]
+    if device is None {
+        // The device does not exist, so there should not be any
+        // signing keys for it either.
+        check !exists DeviceIdentKey[device_id: device_id]
+        check !exists DeviceSignKey[device_id: device_id]
+        check !exists DeviceEncKey[device_id: device_id]
+    } else {
+        // The device DOES exist, so the device keys MUST also
+        // exist and match the key IDs in `Device`.
+        let dev = unwrap device
+
+        let ident_key_fact = unwrap query DeviceIdentKey[device_id: device_id]
+        check device_id == idam::derive_device_id(ident_key_fact.key)
+
+        let sign_key_fact = unwrap query DeviceSignKey[device_id: device_id]
+        check dev.sign_key_id == idam::derive_sign_key_id(sign_key_fact.key)
+        check sign_key_fact.key_id == dev.sign_key_id
+
+        let enc_key_fact = unwrap query DeviceEncKey[device_id: device_id]
+        check dev.enc_key_id == idam::derive_enc_key_id(enc_key_fact.key)
+        check enc_key_fact.key_id == dev.enc_key_id
+    }
+
+    // NB: Since this function uses `check` internally, it
+    // doesn't need a return type. But policy v2 `function`s
+    // *must* have a return type, so we return `true` here.
+    //
+    // We could use early returns to make this function have
+    // a meaningful result, but that would obscure which
+    // invariant was violated. We would only know that
+    // `valid_device_invariants` failed, not that (for example)
+    // `check ident_key_id == device_id` failed.
+    return true
+}
 ```
 
 ### Device Keys
@@ -160,25 +204,24 @@ fact DeviceEncKey[device_id id]=>{key_id id, key bytes}
 ```policy
 // Returns a device if one exists, or `None` otherwise.
 function try_find_device(device_id id) optional struct Device {
-    let device = query Device[device_id: device_id]
-    let has_ident = exists DeviceIdentKey[device_id: device_id]
-    let has_sign = exists DeviceSignKey[device_id: device_id]
-    let has_enc = exists DeviceEncKey[device_id: device_id]
+    // This function is a little too expensive to call every
+    // time we need to get a device, so only uncomment this when
+    // debugging/developing.
+    //
+    // In the future we'll be able to catch these invariant
+    // violations in a more efficient manner. For example, the
+    // policy compiler will be able to check for invariants like
+    // "If fact A exists then so should fact B", internal
+    // consistency checks (at the storage layer?) will be able
+    // to check for corrupted records, etc.
+    //
+    // check valid_device_invariants(device_id)
 
-    if device is Some {
-        check has_ident
-        check has_sign
-        check has_enc
-    } else {
-        check !has_ident
-        check !has_sign
-        check !has_enc
-    }
-    return device
+    return query Device[device_id: device_id]
 }
 
-// Returns a valid Device after performing sanity checks per the
-// stated invariants.
+// Returns a device if it exist, or raises a check error
+// otherwise.
 function must_find_device(device_id id) struct Device {
     let device = check_unwrap try_find_device(device_id)
     return device
@@ -230,26 +273,41 @@ function derive_device_key_ids(device_keys struct KeyBundle) struct DevKeyIds {
 
 ### Device Queries
 
+Device queries retrieve information about devices on the team.
+
+See [Query APIs][query-apis] for more information about the query
+APIs.
+
 #### Query Devices On Team
 
 Queries for a list devices on the team.
 
 ```policy
+// Emits `QueryDevicesOnTeamResult` for each device on the team.
 action query_devices_on_team() {
-    map Device[device_id:?] as f {
-        publish QueryDevicesOnTeam { device_id: f.device_id }
+    // Publishing `QueryDevicesOnTeam` emits
+    // `QueryDevicesOnTeamResult`.
+    map Device[device_id: ?] as f {
+        publish QueryDevicesOnTeam {
+            device_id: f.device_id
+        }
     }
 }
 
+// Emitted when a device is queried by `query_devices_on_team`.
 effect QueryDevicesOnTeamResult {
+    // The ID of a device on the team.
     device_id id,
 }
 
+// A trampoline that forwards `device_id` to the effect.
 command QueryDevicesOnTeam {
     fields {
         device_id id,
     }
 
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is an local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
@@ -270,6 +328,8 @@ command QueryDevicesOnTeam {
 Queries the roles assigned to a device.
 
 ```policy
+// Emits `QueryDeviceRolesResult` for each role assigned to the
+// device.
 action query_device_roles(device_id id) {
     map AssignedRole[device_id: device_id, role_id: ?] as f {
         publish QueryDeviceRoles {
@@ -279,6 +339,8 @@ action query_device_roles(device_id id) {
     }
 }
 
+// Emitted when a device's roles are queried by
+// `query_device_roles`.
 effect QueryDeviceRolesResult {
     // The role's ID.
     role_id id,
@@ -290,12 +352,16 @@ effect QueryDeviceRolesResult {
     default bool,
 }
 
+// A trampoline that forwards `device_id` and `role_id` to the
+// effect.
 command QueryDeviceRoles {
     fields {
         device_id id,
         role_id id,
     }
 
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is an local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
@@ -322,30 +388,40 @@ command QueryDeviceRoles {
 Queries device's `KeyBundle`.
 
 ```policy
+// Emits `QueryDeviceKeyBundleResult` with the device's key
+// bundle.
 action query_device_keybundle(device_id id) {
     publish QueryDeviceKeyBundle {
         device_id: device_id,
     }
 }
 
+// Emitted when a device's key bundle is queried by
+// `query_device_keybundle`.
 effect QueryDeviceKeyBundleResult {
+    // NB: We don't include the device ID here since the caller
+    // of the action should already know it.
     device_keys struct KeyBundle,
 }
 
 command QueryDeviceKeyBundle {
     fields {
+        // The device whose key bundle is being queried.
         device_id id,
     }
 
+    // TODO(eric): We don't really need to call `seal_command`
+    // or `open_envelope` here since this is an local query API.
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
 
     policy {
         check team_exists()
 
-        // Check that the team is active and return the author's info if they exist in the team.
-        let author = must_find_device(this.device_id)
-        let device_keys = must_find_device_keybundle(author.device_id)
+        // NB: A device's keys exist iff `fact Device` exists, so
+        // we don't need to use `must_find_device` or anything
+        // like that.
+        let device_keys = must_find_device_keybundle(this.device_id)
 
         finish {
             emit QueryDeviceKeyBundleResult {
@@ -475,19 +551,19 @@ function get_authorized_device(evp struct Envelope, op string) struct Device {
 }
 ```
 
-Devices cannot change which operation that a command requires,
-but they _can_ change which role is associated with the
-operation.
+Devices cannot change which operation a command requires, but
+they _can_ change which role is associated with the operation.
 
 ```policy
 // Updates (or creates) an operation -> role mapping.
 action update_operation(op string, role_id id) {
     publish UpdateOperation {
         op: op,
-        role_id: role_id,
+        new_role_id: role_id,
     }
 }
 
+// Emitted when `UpdateOperation` is successfully processed.
 effect OperationUpdated {
     // The operation that was updated.
     op string,
@@ -504,7 +580,7 @@ command UpdateOperation {
         op string,
         // The ID of the role that is now required to perform the
         // operation.
-        role_id id,
+        new_role_id id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -513,32 +589,46 @@ command UpdateOperation {
     policy {
         check team_exists()
 
+        // TODO(eric): I'm not entirely sure we want anybody
+        // with the requisite role for "UpdateOperation" to be
+        // able to change *every* op -> role mapping. This is
+        // a very powerful operation: for example, a device with
+        // the requisite role for "UpdateOperation" could
+        // "downgrade" the role required to perform other
+        // operations.
+        //
+        // Should we hide this API for MVP?
         let author = get_authorized_device(envelope, "UpdateOperation")
 
-        // The role must exist.
-        let role = check_unwrap query Role[role_id: this.role_id]
+        // The new role must already exist.
+        let role = check_unwrap query Role[role_id: this.new_role_id]
+        let new_role_id = role.role_id
 
-        if exists OpRequiresRole[op: this.op] {
+        let req = query OpRequiresRole[op: this.op]
+        if req is Some {
             // The operation already exists, so update the role.
+            let old_role_id = (unwrap req).role_id
             finish {
-                update OpRequiresRole[op: this.op]=>{role_id: role.role_id} to {
-                    role_id: role.role_id,
+                update OpRequiresRole[op: this.op]=>{
+                    role_id: old_role_id,
+                } to {
+                    role_id: new_role_id,
                 }
 
                 emit OperationUpdated {
                     op: this.op,
-                    role_id: role.role_id,
+                    role_id: new_role_id,
                     author_id: author.device_id,
                 }
             }
         } else {
             // Create a new operation -> role mapping.
             finish {
-                create OpRequiresRole[op: this.op]=>{role_id: role.role_id}
+                create OpRequiresRole[op: this.op]=>{role_id: new_role_id}
 
                 emit OperationUpdated {
                     op: this.op,
-                    role_id: role.role_id,
+                    role_id: new_role_id,
                     author_id: author.device_id,
                 }
             }
@@ -604,7 +694,7 @@ action change_role_managing_role(
 ) {
     publish ChangeRoleManagingRole {
         target_role_id: target_role_id,
-        new_managing_role_id: managing_role_id,
+        new_managing_role_id: new_managing_role_id,
     }
 }
 
@@ -651,7 +741,7 @@ command ChangeRoleManagingRole {
         let target_role = check_unwrap query Role[role_id: this.target_role_id]
 
         // The new managing role must exist.
-        let managing_role = check_unwrap query Role[role_id: this.managing_role_id]
+        let managing_role = check_unwrap query Role[role_id: this.new_managing_role_id]
         let new_managing_role_id = managing_role.role_id
 
         // The author must have permission to change the managing
@@ -803,10 +893,6 @@ command SetupDefaultRole {
                     create OpRequiresRole[op: "ChangeLabelManagingRole"]=>{role_id: role_id}
 
                     create OpRequiresRole[op: "UnsetAqcNetworkName"]=>{role_id: role_id}
-
-                    // TODO(eric): Should this be limited to the
-                    // owner?
-                    create OpRequiresRole[op: "UpdateOperation"]=>{role_id: role_id}
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -1387,7 +1473,10 @@ action remove_device(device_id id) {
 
 // Emitted when a device is removed from the team.
 effect DeviceRemoved {
+    // The ID of the device that was removed from the team.
     device_id id,
+    // The ID of the device that removed `device_id`.
+    author_id id,
 }
 
 command RemoveDevice {
@@ -1403,33 +1492,68 @@ command RemoveDevice {
         check team_exists()
 
         let author = get_authorized_device(envelope, "RemoveDevice")
+        let device_id = must_find_device(this.device_id).device_id
 
-        let target = must_find_device(this.device_id)
-
-        // TODO: author dominates target?
+        // TODO(eric): check that author dominates target?
 
         finish {
-            remove_device(this.device_id)
+            delete Device[device_id: device_id]
+            delete DeviceIdentKey[device_id: device_id]
+            delete DeviceSignKey[device_id: device_id]
+            delete DeviceEncKey[device_id: device_id]
+
+            // TODO(eric): We can't delete these yet because the
+            // storage layer does not yet support prefix deletion.
+            // See https://github.com/aranya-project/aranya-core/issues/229
+            //
+            // delete AssignedRole[device_id: device_id, role_id: ?]
+            // delete AssignedLabel[label_id: ?, device_id: device_id]
+
+            // TODO(eric): We *should* be deleting this, but we
+            // don'y really have a good way to do that yet.
+            //
+            // It is a runtime error to delete a non-existent
+            // fact and a device might not have this fact if it
+            // doesn't use AQC, so we have to conditionally
+            // delete `AqcNetId`.
+            //
+            // Policy v2 does not have a conditional version of
+            // `delete`, so we can't use that.
+            //
+            // `finish` blocks can only contain CRUD and `emit`
+            // statements, so we can't use conditionals here.
+            //
+            // As of policy v2, the only way to do this is to
+            // duplicate the entire `finish` block:
+            //
+            // ```policy
+            // let has_net_id = exists AqcNetId[device_id: device_id]
+            // if has_net_id {
+            //     finish {
+            //         // Delete all the device facts.
+            //         delete AqcNetId[device_id: device_id]
+            //     }
+            // } else {
+            //     finish {
+            //         // Delete all the device facts.
+            //     }
+            // }
+            // ```
+            //
+            // But this generates a combinatorial explosion if
+            // we start adding more optional facts that we need
+            // to delete.
+            //
+            // So, we resign ourselves to leaving this stale
+            // fact around.
+            //
+            // delete AqcNetId[device_id: device_id]
 
             emit DeviceRemoved {
                 device_id: this.device_id,
             }
         }
     }
-}
-
-// Removes the device from the Team.
-finish function remove_device(device_id id) {
-    delete Device[device_id: device_id]
-    delete DeviceIdentKey[device_id: device_id]
-    delete DeviceSignKey[device_id: device_id]
-    delete DeviceEncKey[device_id: device_id]
-
-    // TODO(eric): what if any of these facts don't exist? It is
-    // an error to delete non-existent facts.
-    delete AssignedRole[device_id: device_id, role_id: ?]
-    delete AssignedLabel[device_id: device_id, label_id: ?]
-    delete AqcNetId[device_id: device_id]
 }
 ```
 
@@ -2746,13 +2870,48 @@ command QueryAqcNetIdentifier {
 }
 ```
 
-[envelope]: https://aranya-project.github.io/policy-language-v1/#envelope-type
-[lp]: https://en.wikipedia.org/wiki/Literate_programming
-[policy-lang]: https://aranya-project.github.io/policy-language-v2/
+## Query APIs
+
+Policy language v2 does not support defining queries against the
+internal fact database, so the implementation of the query APIs
+defined in this document are a little peculiar.
+
+As background, Aranya supports ephemeral "off graph" commands.
+These commands generally function the same as regular "on graph"
+commands, except that they are not persisted (added to the graph)
+after being evaluated.
+
+The query APIs defined in this document use ephemeral commands
+that read data from the fact database and emit effects with the
+results. Query APIs that need to logically return lists use
+`map` in the `action` to publish an ephemeral command per list
+item.
+
+Query APIs must still call `check team_exists()` to ensure that
+data for closed teams is not returned.
+
+## Known Bugs
+
+- `AssignedRole` and `AssignedLabel` cannot be deleted without
+  prefix deletion. See [aranya-core/229][issue #229] for more
+  details.
+- `AqcNetId` cannot reasonably be deleted without conditional
+  deletion or a combinatorial explosion of `finish` blocks.
+
 [actions]: https://aranya-project.github.io/policy-language-v1/#actions
-[effects]: https://aranya-project.github.io/policy-language-v1/#effects
-[commands]: https://aranya-project.github.io/policy-language-v1/#commands
-[facts]: https://aranya-project.github.io/policy-language-v1/#facts
-[rbac]: https://csrc.nist.gov/glossary/term/rbac
+[aqc-ffi]: https://crates.io/crates/aranya-aqc-util
 [aqc-label-design]: https://aranya-project.github.io/aranya-quic-channels/#label-design
 [aqc]: https://aranya-project.github.io/aranya-quic-channels/
+[aranya-core/229]: https://github.com/aranya-project/aranya-core/issues/229
+[commands]: https://aranya-project.github.io/policy-language-v1/#commands
+[crypto-ffi]: https://crates.io/crates/aranya-crypto-ffi
+[device-ffi]: https://crates.io/crates/aranya-device-ffi
+[effects]: https://aranya-project.github.io/policy-language-v1/#effects
+[envelope]: https://aranya-project.github.io/policy-language-v1/#envelope-type
+[evp-ffi]: https://crates.io/crates/aranya-envelope-ffi
+[facts]: https://aranya-project.github.io/policy-language-v1/#facts
+[idam-ffi]: https://crates.io/crates/aranya-idam-ffi
+[lp]: https://en.wikipedia.org/wiki/Literate_programming
+[perspective-ffi]: https://crates.io/crates/aranya-perspective-ffi
+[policy-lang]: https://aranya-project.github.io/policy-language-v2/
+[rbac]: https://csrc.nist.gov/glossary/term/rbac

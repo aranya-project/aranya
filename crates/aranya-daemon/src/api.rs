@@ -186,8 +186,8 @@ impl EffectHandler {
         for effect in effects {
             trace!(?effect, "handling effect");
             match effect {
-                TeamCreated(_team_created) => {}
-                TeamTerminated(_team_terminated) => {}
+                TeamCreated(_) => {}
+                TeamTerminated(_) => {}
                 DeviceAdded(_) => {}
                 DeviceRemoved(_) => {}
                 LabelCreated(_) => {}
@@ -222,6 +222,7 @@ impl EffectHandler {
                 QueriedTeamRole(_) => {}
                 OperationUpdated(_) => {}
                 LabelUpdated(_) => {}
+                RoleManagingRoleChanged(_) => {}
             }
         }
         Ok(())
@@ -469,6 +470,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer_enc_pk: EncryptionPublicKey<CS>,
     ) -> aranya_daemon_api::Result<WrappedSeed> {
+        self.check_team_valid(team).await?;
+
         let enc_pk = self.pk.lock().expect("poisoned").enc_pk.clone();
 
         let (seed, enc_sk) = {
@@ -529,6 +532,7 @@ impl DaemonApi for Api {
                     bail!("unexpected effect: {}", e.name())
                 }
             })?;
+        debug!(%device_id, "added device to team");
 
         for role_id in initial_roles {
             actions
@@ -563,6 +567,8 @@ impl DaemonApi for Api {
         team: api::TeamId,
         managing_role_id: api::RoleId,
     ) -> api::Result<Box<[api::Role]>> {
+        self.check_team_valid(team).await?;
+
         let roles = self
             .client
             .actions(&team.into_id().into())
@@ -620,6 +626,24 @@ impl DaemonApi for Api {
             .revoke_role(device.into_id().into(), role.into_id().into())
             .await
             .context("unable to revoke device role")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn change_role_managing_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        managing_role: api::RoleId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.client
+            .actions(&team.into_id().into())
+            .change_role_managing_role(role.into_id().into(), managing_role.into_id().into())
+            .await
+            .context("unable to change role managing role")?;
         Ok(())
     }
 

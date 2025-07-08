@@ -16,6 +16,7 @@ pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
     aqc::{BidiPskId, UniPskId},
     custom_id,
+    dangerous::spideroak_crypto::hex::Hex,
     default::DefaultEngine,
     id::IdError,
     subtle::{Choice, ConstantTimeEq},
@@ -127,11 +128,21 @@ pub struct Role {
 }
 
 /// A device's public key bundle.
-#[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct KeyBundle {
     pub identity: Vec<u8>,
     pub signing: Vec<u8>,
     pub encoding: Vec<u8>,
+}
+
+impl fmt::Debug for KeyBundle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("KeyBundle")
+            .field("identity", &Hex::new(&*self.identity))
+            .field("signing", &Hex::new(&*self.signing))
+            .field("encoding", &Hex::new(&*self.encoding))
+            .finish()
+    }
 }
 
 // Note: any fields added to this type should be public
@@ -743,6 +754,12 @@ pub trait DaemonApi {
     async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
+    /// Changes the role that manages the role.
+    async fn change_role_managing_role(
+        team: TeamId,
+        role_id: RoleId,
+        managing_role_id: RoleId,
+    ) -> Result<()>;
     /// Returns the current team roles.
     async fn query_team_roles(team: TeamId) -> Result<Box<[Role]>>;
 

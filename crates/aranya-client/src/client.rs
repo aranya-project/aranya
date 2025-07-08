@@ -576,6 +576,7 @@ impl Team<'_> {
     /// Encrypt PSK seed for peer.
     /// `peer_enc_pk` is the public encryption key of the peer device.
     /// See [`KeyBundle::encoding`].
+    #[instrument(skip(self))]
     pub async fn encrypt_psk_seed_for_peer(&mut self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
             .context("bad peer_enc_pk")
@@ -592,6 +593,7 @@ impl Team<'_> {
     }
 
     /// Adds a peer for automatic periodic Aranya state syncing.
+    #[instrument(skip(self))]
     pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
             .daemon
@@ -605,6 +607,7 @@ impl Team<'_> {
     ///
     /// If `config` is `None`, default values (including those from the daemon) will
     /// be used.
+    #[instrument(skip(self))]
     pub async fn sync_now(&mut self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
         self.client
             .daemon
@@ -615,6 +618,7 @@ impl Team<'_> {
     }
 
     /// Removes a peer from automatic Aranya state syncing.
+    #[instrument(skip(self))]
     pub async fn remove_sync_peer(&mut self, addr: Addr) -> Result<()> {
         self.client
             .daemon
@@ -625,6 +629,7 @@ impl Team<'_> {
     }
 
     /// Close the team and stop all operations on the graph.
+    #[instrument(skip(self))]
     pub async fn close_team(&mut self) -> Result<()> {
         self.client
             .daemon
@@ -637,6 +642,7 @@ impl Team<'_> {
     /// Add a device to the team with optional initial roles.
     // TODO(eric): why does this have a "_to_team" suffix when
     // it's a method on `Team`?
+    #[instrument(skip(self, initial_roles))]
     pub async fn add_device_to_team<I>(&mut self, keys: KeyBundle, initial_roles: I) -> Result<()>
     where
         I: IntoIterator<Item = RoleId>,
@@ -655,6 +661,7 @@ impl Team<'_> {
     }
 
     /// Remove a device from the team.
+    #[instrument(skip(self))]
     pub async fn remove_device_from_team(&mut self, device: DeviceId) -> Result<()> {
         self.client
             .daemon
@@ -666,7 +673,11 @@ impl Team<'_> {
 
     /// Sets up the default team roles.
     ///
+    /// The `managing_role_id` is the role that is required to
+    /// manage all of the default roles.
+    ///
     /// It returns the newly created roles.
+    #[instrument(skip(self))]
     pub async fn setup_default_roles(&mut self, managing_role_id: RoleId) -> Result<Roles> {
         let roles = self
             .client
@@ -685,30 +696,52 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
-    /// Assign a role to a device.
-    pub async fn assign_role(&mut self, device: DeviceId, role_id: RoleId) -> Result<()> {
+    /// Assigns a role to a device.
+    #[instrument(skip(self))]
+    pub async fn assign_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
             .daemon
             .assign_role(
                 context::current(),
                 self.id,
                 device.into_api(),
-                role_id.into_api(),
+                role.into_api(),
             )
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
     }
 
-    /// Revoke a role from a device. This sets the device's role back to the default `Member` role.
-    pub async fn revoke_role(&mut self, device: DeviceId, role_id: RoleId) -> Result<()> {
+    /// Revoke a role from a device.
+    #[instrument(skip(self))]
+    pub async fn revoke_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
             .daemon
             .revoke_role(
                 context::current(),
                 self.id,
                 device.into_api(),
-                role_id.into_api(),
+                role.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Changes the role that is required to manage `role`.
+    #[instrument(skip(self))]
+    pub async fn change_role_managing_role(
+        &mut self,
+        role: RoleId,
+        managing_role_id: RoleId,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .change_role_managing_role(
+                context::current(),
+                self.id,
+                role.into_api(),
+                managing_role_id.into_api(),
             )
             .await
             .map_err(IpcError::new)?
@@ -716,6 +749,7 @@ impl Team<'_> {
     }
 
     /// Returns an iterator over the roles in the team.
+    #[instrument(skip(self))]
     pub async fn roles(&mut self) -> Result<Roles> {
         let roles = self
             .client
@@ -734,23 +768,12 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
-    /// Looks up a role given its ID.
-    pub async fn role(&mut self, _id: RoleId) -> Result<Option<Role>> {
-        // self.client
-        //     .daemon
-        //     .query_role(context::current(), self.id, id.into_api())
-        //     .await
-        //     .map_err(IpcError::new)?
-        //     .map_err(aranya_error)
-        //     .map(|role| role.map(Role::from_api))
-        todo!()
-    }
-
     /// Associate a network identifier to a device for use with AQC.
     ///
     /// If the address already exists for this device, it is replaced with the new address. Capable
     /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
+    #[instrument(skip(self, net_identifier))]
     pub async fn assign_aqc_net_identifier<I>(
         &mut self,
         device: DeviceId,
@@ -776,6 +799,7 @@ impl Team<'_> {
     }
 
     /// Disassociate an AQC network identifier from a device.
+    #[instrument(skip(self, net_identifier))]
     pub async fn remove_aqc_net_identifier<I>(
         &mut self,
         device: DeviceId,
@@ -801,20 +825,24 @@ impl Team<'_> {
     }
 
     /// Create a label.
+    #[instrument(skip(self, label_name))]
     pub async fn create_label<T>(
         &mut self,
         label_name: T,
         managing_role_id: RoleId,
     ) -> Result<LabelId>
     where
-        T: TryInto<Text, Error: Into<Error>>,
+        T: TryInto<Text>,
     {
         self.client
             .daemon
             .create_label(
                 context::current(),
                 self.id,
-                label_name.try_into().map_err(Into::into)?,
+                label_name
+                    .try_into()
+                    // TODO(eric): Use a different error.
+                    .map_err(|_| InvalidNetIdentifier(()))?,
                 managing_role_id.into_api(),
             )
             .await
@@ -824,6 +852,7 @@ impl Team<'_> {
     }
 
     /// Delete a label.
+    #[instrument(skip(self))]
     pub async fn delete_label(&mut self, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
@@ -834,6 +863,7 @@ impl Team<'_> {
     }
 
     /// Assign a label to a device.
+    #[instrument(skip(self))]
     pub async fn assign_label(
         &mut self,
         device: DeviceId,
@@ -855,6 +885,7 @@ impl Team<'_> {
     }
 
     /// Revoke a label from a device.
+    #[instrument(skip(self))]
     pub async fn revoke_label(&mut self, device: DeviceId, label_id: LabelId) -> Result<()> {
         self.client
             .daemon

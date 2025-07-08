@@ -22,11 +22,9 @@ use common::{sleep, RolesExt, TeamCtx, SLEEP_INTERVAL};
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_sync_now() -> Result<()> {
-    // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_sync_now", work_dir).await?;
 
-    // Create the initial team, and get our TeamId and seed.
     let team_id = team.create_and_add_team().await?;
     info!(?team_id);
 
@@ -34,29 +32,29 @@ async fn test_sync_now() -> Result<()> {
         .setup_default_roles(team_id)
         .await
         .context("unable to setup default roles")?;
-    team.add_all_device_roles(team_id).await?;
 
-    // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
 
-    // Grab the shorthand for the teams we need to operate on.
     let mut owner = team.owner.client.team(team_id);
     let mut admin = team.admin.client.team(team_id);
 
     // Add the admin as a new device, but don't give it a role.
-    info!("adding admin to team");
     owner
         .add_device_to_team(team.admin.pk.clone(), None)
-        .await?;
+        .await
+        .context("owner unable to add admin to team")?;
 
     // Add the operator as a new device, but don't give it a role.
-    info!("adding operator to team");
     owner
         .add_device_to_team(team.operator.pk.clone(), None)
-        .await?;
+        .await
+        .context("owner unable to add operator to team")?;
 
     // Finally, let's give the admin its role, but don't sync with peers.
-    owner.assign_role(team.admin.id, roles.admin().id).await?;
+    owner
+        .assign_role(team.admin.id, roles.admin().id)
+        .await
+        .context("owner unable to assign admin role")?;
 
     // Now, we try to assign a role using the admin, which is expected to fail.
     match admin
@@ -65,17 +63,22 @@ async fn test_sync_now() -> Result<()> {
     {
         Ok(_) => bail!("Expected role assignment to fail"),
         Err(aranya_client::Error::Aranya(_)) => {}
-        Err(_) => bail!("Unexpected error"),
+        Err(err) => bail!("Unexpected error: {err}"),
     }
 
     // Let's sync immediately, which will propagate the role change.
-    admin.sync_now(owner_addr.into(), None).await?;
+    admin
+        .sync_now(owner_addr.into(), None)
+        .await
+        .context("admin unable to sync with owner")?;
+
     sleep(SLEEP_INTERVAL).await;
 
     // Now we should be able to successfully assign a role.
     admin
         .assign_role(team.operator.id, roles.operator().id)
-        .await?;
+        .await
+        .context("admin unable to assign role to operator")?;
 
     Ok(())
 }
@@ -83,34 +86,20 @@ async fn test_sync_now() -> Result<()> {
 /// Tests that devices can be removed from the team.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_remove_devices() -> Result<()> {
-    // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
 
-    // Create the initial team, and get our TeamId.
     let team_id = team
         .create_and_add_team()
         .await
         .expect("expected to create team");
     info!(?team_id);
 
-    let owner_role_id = team
-        .owner
-        .client
-        .team(team_id)
-        .roles()
-        .await?
-        .try_into_owner_role()?
-        .id;
     let roles = team
-        .owner
-        .client
-        .team(team_id)
-        .setup_default_roles(owner_role_id)
-        .await?
-        .try_into_default_roles()?;
+        .setup_default_roles(team_id)
+        .await
+        .context("unable to setup default roles")?;
 
-    // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
