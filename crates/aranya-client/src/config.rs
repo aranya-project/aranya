@@ -89,7 +89,6 @@ impl Default for SyncPeerConfigBuilder {
 
 /// QUIC syncer configuration.
 ///
-/// This config is unstable.
 #[derive(Clone)]
 pub struct QuicSyncConfig {
     seed_mode: SeedMode,
