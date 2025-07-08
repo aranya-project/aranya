@@ -88,8 +88,6 @@ impl Default for SyncPeerConfigBuilder {
 }
 
 /// QUIC syncer configuration.
-///
-/// This config is unstable.
 #[derive(Clone)]
 pub struct QuicSyncConfig {
     seed_mode: SeedMode,
@@ -162,8 +160,6 @@ impl QuicSyncConfigBuilder {
 }
 
 /// Configuration info for adding and creating teams.
-///
-/// This config is unstable.
 #[derive(Clone)]
 pub struct TeamConfig {
     quic_sync: Option<QuicSyncConfig>,
