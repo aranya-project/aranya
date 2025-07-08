@@ -1,0 +1,33 @@
+services:
+  owner:
+    image: aranya-example-multirust
+    command: ["owner"]
+    volumes:
+      - shared:/app/shared/
+
+  admin:
+    image: aranya-example-multirust
+    command: ["admin"]
+    volumes:
+      - shared:/app/shared/
+
+  operator:
+    image: aranya-example-multirust
+    command: ["operator"]
+    volumes:
+      - shared:/app/shared/
+
+  member_a:
+    image: aranya-example-multirust
+    command: ["member_a"]
+    volumes:
+      - shared:/app/shared/
+
+  member_b:
+    image: aranya-example-multirust
+    command: ["member_b"]
+    volumes:
+      - shared:/app/shared/
+
+volumes:
+  shared:
