@@ -23,11 +23,10 @@ for i in {1..24}; do
 done
 
 cleanup() {
-    echo "Cleaning up..."
-    kill $PUSHGATEWAY_PID 2>/dev/null
-    wait $PUSHGATEWAY_PID 2>/dev/null
+    jobs -p | xargs -I{} kill {} || true
 }
-trap cleanup EXIT
+trap 'cleanup' EXIT
+trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
 
 echo "Running metrics collection..."
 cargo run --release --bin aranya-metrics -- $(pwd)/target/release/aranya-daemon
