@@ -204,6 +204,7 @@ dependencies = [
  "obake",
  "postcard",
  "serde",
+ "serde_json",
  "serial_test",
  "tarpc",
  "tempfile",

@@ -21,8 +21,8 @@ pub struct CreateTeamQuicSyncConfig {
 /// Configuration for adding members to an existing team with QUIC synchronization.
 #[obake::versioned]
 #[obake(version("0.1.0"))]
-#[obake(derive(Clone, Serialize, Deserialize))]
-#[derive(Clone, Serialize, Deserialize)]
+#[obake(derive(Clone, Debug, Serialize, Deserialize))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AddTeamQuicSyncConfig {
     mode: AddSeedMode,
 }
@@ -141,8 +141,8 @@ impl From<AddTeamQuicSyncConfig> for aranya_daemon_api::AddTeamQuicSyncConfig {
 
 #[obake::versioned]
 #[obake(version("0.1.0"))]
-#[obake(derive(Clone, Serialize, Deserialize))]
-#[derive(Clone, Serialize, Deserialize)]
+#[obake(derive(Clone, Debug, Serialize, Deserialize))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(super) enum MaybeAddTeamQuicSyncConfig {
     None,
     Some {
