@@ -103,8 +103,6 @@ impl QuicSyncConfig {
 }
 
 /// QUIC syncer configuration builder.
-///
-/// This builder is unstable because [`QuicSyncConfig`] is unstable.
 #[derive(Clone, Default)]
 pub struct QuicSyncConfigBuilder {
     seed_mode: SeedMode,
@@ -122,6 +120,8 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is only valid when used in [`super::Client::create_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`].
+    ///
+    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     pub fn gen_seed(mut self) -> Self {
         self.seed_mode = SeedMode::Generate;
         self
@@ -131,6 +131,8 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is valid in both [`super::Client::create_team`] and [`super::Client::add_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
+    ///
+    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
         self.seed_mode = SeedMode::IKM(ikm.into());
         self
@@ -140,6 +142,8 @@ impl QuicSyncConfigBuilder {
     ///
     /// This option is only valid in [`super::Client::add_team`].
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
+    ///
+    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
         let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
             error!(?err);
