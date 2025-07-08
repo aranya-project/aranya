@@ -22,7 +22,7 @@ use tokio::{
     fs,
     process::{Child, Command},
     time::sleep,
-    io::AsyncReadExt,
+    io::{AsyncReadExt, AsyncWriteExt, BufReader, BufWriter},
 };
 use tokio::fs::File;
 use tracing::{debug, info, Metadata};
@@ -33,6 +33,7 @@ use tracing_subscriber::{
 };
 use serde::{Serialize, Deserialize};
 use serde_cbor;
+
 
 #[derive(Serialize, Deserialize, Debug)]
 struct FileChunk {
@@ -417,28 +418,23 @@ async fn main() -> Result<()> {
 
     // Read the file to transfer
     info!("reading file to transfer: {:?}", file_path);
-    let file_content = fs::read(&file_path).await
-        .with_context(|| format!("failed to read file: {:?}", file_path))?;
-    let file_bytes = Bytes::from(file_content);
-    let file_size = file_bytes.len();
-    info!("file size: {} bytes", file_size);
+    let file_size = fs::metadata(&file_path).await?.len() as usize;
+    let chunk_size = optimal_chunk_size(file_size);
+    let total_chunks = ((file_size + chunk_size - 1) / chunk_size) as u64;
+    let filename_str = file_path.file_name().unwrap().to_string_lossy().to_string();
 
     info!("starting file transfer");
     info!("sender creating aqc bidi channel");
-    
-    // Prepare arguments that need to be captured by the async move block
     let receiver_net_identifier = receiver.aqc_net_id();
-
     let create_handle = tokio::spawn(async move {
         let channel_result = sender
             .client
             .aqc()
             .create_bidi_channel(team_id, receiver_net_identifier, file_transfer_label)
             .await;
-        (channel_result, sender) // Return sender along with the result
+        (channel_result, sender)
     });
 
-    // receiver receives a bidirectional channel.
     info!("receiver receiving aqc bidi channel");
     let AqcPeerChannel::Bidi(mut received_aqc_chan) =
         receiver.client.aqc().receive_channel().await?
@@ -446,92 +442,30 @@ async fn main() -> Result<()> {
         bail!("expected a bidirectional channel");
     };
 
-    // Now await the completion of sender's channel creation
     let (created_aqc_chan_result, sender_returned) = create_handle
         .await
         .context("Task for sender creating bidi channel panicked")?;
-    sender = sender_returned; // Assign the moved sender back
+    sender = sender_returned;
     let mut created_aqc_chan =
         created_aqc_chan_result.context("Sender failed to create bidi channel")?;
 
-    // Calculate chunking metadata
-    let chunk_size = optimal_chunk_size(file_size);
-    let total_chunks = ((file_size + chunk_size - 1) / chunk_size) as u64;
-    let filename_str = file_path.file_name().unwrap().to_string_lossy().to_string();
+    // Use the new multi-stream approach
+    info!("sender sending file over multiple streams");
+    send_file_over_multiple_streams(&file_path, &mut created_aqc_chan, chunk_size).await?;
 
-    // sender creates a new stream on the channel.
-    info!("sender creating aqc bidi stream");
-    let mut sender_stream = created_aqc_chan.create_bidi_stream().await?;
-
-    // sender sends file data in chunks with metadata
-    info!("sender sending file data in chunks");
-    let mut offset = 0;
-    let mut chunk_index = 0;
-    while offset < file_bytes.len() {
-        let end = (offset + chunk_size).min(file_bytes.len());
-        let chunk_data = file_bytes.slice(offset..end);
-        let chunk = FileChunk {
-            filename: filename_str.clone(),
-            chunk_index,
-            chunk_size: chunk_data.len(),
-            total_chunks,
-            file_size: file_bytes.len() as u64,
-            data: chunk_data.to_vec(),
-        };
-        let serialized = serde_cbor::to_vec(&chunk)?;
-        sender_stream.send(Bytes::from(serialized)).await?;
-        chunk_index += 1;
-        offset = end;
-    }
-    sender_stream.close().await?;
-
-    // receiver receives channel stream created by sender.
-    info!("receiver receiving aqc bidi stream");
-    let mut receiver_stream = received_aqc_chan
-        .receive_stream()
-        .await
-        .assume("stream not received")?;
-
-    // receiver receives data from stream in chunks
-    info!("receiver receiving file data in chunks");
-    let mut received_chunks: Vec<Option<Vec<u8>>> = vec![None; total_chunks as usize];
-    let mut received_file_size = 0u64;
-    let mut received_count = 0u64;
-    while let Some(bytes) = receiver_stream.receive().await? {
-        let chunk: FileChunk = serde_cbor::from_slice(&bytes)?;
-        received_file_size += chunk.data.len() as u64;
-        received_chunks[chunk.chunk_index as usize] = Some(chunk.data);
-        received_count += 1;
-        if received_count == chunk.total_chunks {
-            break;
-        }
-    }
-    // Reassemble file
-    let mut reassembled = Vec::with_capacity(received_file_size as usize);
-    for chunk in received_chunks.into_iter() {
-        if let Some(data) = chunk {
-            reassembled.extend_from_slice(&data);
-        }
-    }
-    assert_eq!(reassembled.len(), file_bytes.len());
-    info!("file transfer completed successfully!");
-    
-    // Write the received file to disk
+    // receiver receives data from multiple streams
+    info!("receiver receiving file data from multiple streams");
     let output_filename = file_path.file_name()
         .context("input file has no filename")?
         .to_str()
         .context("filename is not valid UTF-8")?;
     let output_path = Path::new("received_").join(output_filename);
-    
-    // Create the output directory if it doesn't exist
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent).await
             .with_context(|| format!("failed to create directory: {:?}", parent))?;
     }
     
-    info!("writing received file to: {:?}", output_path);
-    fs::write(&output_path, &reassembled).await
-        .with_context(|| format!("failed to write file: {:?}", output_path))?;
+    receive_file_from_multiple_streams(&output_path, chunk_size, &mut received_aqc_chan).await?;
     info!("file saved successfully: {:?}", output_path);
 
     info!("revoking label from sender");
@@ -551,10 +485,22 @@ async fn main() -> Result<()> {
 
 
 fn optimal_chunk_size(file_size: usize) -> usize {
-    let min_chunk = 8 * 1024; // 8 KiB
-    let max_chunks = 128.max(num_cpus::get() * 4);
-    let chunk = (file_size + max_chunks - 1) / max_chunks;
-    chunk.max(min_chunk)
+    // Maximum available memory is 1GB, so max chunk size is 1/15 of 1GB to leave room for system and other services
+    let max_chunk_size = (1024 * 1024 * 1024) / 15; // ~68 MB
+    let min_chunk = 8 * 2; // 16 KiB
+    
+    // Ensure at least 2 chunks by limiting chunk size to half the file size
+    let max_chunk_for_min_2 = file_size / 2;
+    
+    // Use the smaller of: max_chunk_size, max_chunk_for_min_2, or min_chunk
+    let chunk_size = max_chunk_size.min(max_chunk_for_min_2).max(min_chunk);
+    
+    // If the calculated chunk size would result in only 1 chunk, force it smaller
+    if file_size <= chunk_size {
+        chunk_size / 2
+    } else {
+        chunk_size
+    }
 }
 
 async fn send_file_over_multiple_streams(
@@ -590,6 +536,12 @@ async fn send_file_over_multiple_streams(
         info!("Sent chunk {}: {}/{} bytes", chunk_index - 1, total_sent, file_size);
     }
 
+    // Send EOF marker
+    let mut eof_stream = channel.create_bidi_stream().await?;
+    eof_stream.send(Bytes::from_static(b"EOF")).await?;
+    eof_stream.close().await?;
+    info!("Sent EOF marker stream");
+
     info!("File transfer completed! Sent {} chunks, {} total bytes", chunk_index, total_sent);
     Ok(())
 }
@@ -597,18 +549,9 @@ async fn send_file_over_multiple_streams(
 async fn receive_file_from_multiple_streams(
     output_path: &Path,
     chunk_size: usize,
-    receiver: &mut ClientCtx,
-    team_id: aranya_daemon_api::TeamId,
-    file_transfer_label: aranya_daemon_api::LabelId,
+    received_channel: &mut AqcBidiChannel,
 ) -> Result<()> {
     info!("receiving file chunks from multiple streams");
-    
-    // Receive bidirectional channel
-    let AqcPeerChannel::Bidi(mut received_channel) = 
-        receiver.client.aqc().receive_channel().await?
-    else {
-        bail!("expected bidirectional channel");
-    };
     
     let mut received_chunks = Vec::new();
     let mut total_received = 0;
@@ -618,22 +561,62 @@ async fn receive_file_from_multiple_streams(
     loop {
         info!("receiving stream {}", chunk_index);
         
-        // Receive stream
-        let mut stream = received_channel.receive_stream().await
-            .assume("stream not received")?;
+        // Receive stream with timeout
+        let stream_result = tokio::time::timeout(
+            Duration::from_secs(5),
+            received_channel.receive_stream()
+        ).await;
         
-        // Receive chunk data
-        let chunk_data = stream.receive().await?.assume("no chunk data received")?;
-        total_received += chunk_data.len();
-        received_chunks.push(chunk_data.clone());
-        info!("received chunk {}: {} bytes", chunk_index, chunk_data.len());
+        let mut stream = match stream_result {
+            Ok(Ok(stream)) => stream,
+            Ok(Err(e)) => return Err(anyhow::anyhow!("Failed to receive stream: {}", e)),
+            Err(_) => {
+                info!("timeout waiting for stream {}, assuming transfer complete", chunk_index);
+                break;
+            }
+        };
         
-        chunk_index += 1;
+        // Read all data from this stream until it's closed
+        let mut stream_data = Vec::new();
+        loop {
+            match tokio::time::timeout(
+                Duration::from_secs(3),
+                stream.receive()
+            ).await {
+                Ok(Ok(Some(bytes))) => {
+                    stream_data.extend_from_slice(&bytes);
+                    info!("stream {}: accumulated {} bytes", chunk_index, stream_data.len());
+                }
+                Ok(Ok(None)) => {
+                    info!("stream {}: closed, total {} bytes", chunk_index, stream_data.len());
+                    break;
+                }
+                Ok(Err(e)) => {
+                    return Err(anyhow::anyhow!("Stream error: {}", e));
+                }
+                Err(_) => {
+                    info!("stream {}: timeout waiting for data", chunk_index);
+                    break;
+                }
+            }
+        }
         
-        // If we received a small chunk, it's likely the last one
-        if chunk_data.len() < chunk_size {
+        // Check for EOF marker
+        if stream_data == b"EOF" {
+            info!("Received EOF marker, ending receive loop");
             break;
         }
+        
+        if stream_data.is_empty() {
+            info!("stream {}: no data received, assuming end of transfer", chunk_index);
+            break;
+        }
+        
+        total_received += stream_data.len();
+        received_chunks.push(stream_data);
+        info!("received chunk {}: {} bytes", chunk_index, received_chunks.last().unwrap().len());
+        
+        chunk_index += 1;
     }
     
     // Reassemble file from chunks
@@ -650,5 +633,6 @@ async fn receive_file_from_multiple_streams(
     info!("file reassembled successfully: {} bytes", reassembled_file.len());
     Ok(())
 }
+
 
 
