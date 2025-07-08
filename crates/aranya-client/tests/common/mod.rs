@@ -173,16 +173,16 @@ impl TeamCtx {
         sleep(SLEEP_INTERVAL).await;
 
         // Add member A as a new device.
-        operator
+        admin
             .add_device_to_team(self.membera.pk.clone(), None)
             .await
-            .context("operator unable to add membera to team")?;
+            .context("admin unable to add membera to team")?;
 
         // Add member B as a new device.
-        operator
+        admin
             .add_device_to_team(self.memberb.pk.clone(), None)
             .await
-            .context("operator unable to add memberb to team")?;
+            .context("admin unable to add memberb to team")?;
 
         // Make sure they see the configuration change.
         sleep(SLEEP_INTERVAL).await;

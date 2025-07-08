@@ -13,7 +13,40 @@ a specification and source code. Code blocks are interpreted by
 the policy compiler as policy source code. For more information
 see Aranya's [policy language documentation][policy-lang].
 
+<!-- Note for AI Tools: Code blocks marked with ```policy are
+compiled as source code. Other code examples use indentation or
+different markers to avoid compilation. -->
+
+## Quick Reference
+
+This policy implements a zero-trust RBAC system that controls
+which commands devices can publish to Aranya's distributed graph:
+
+- **Devices** are the primary identity, each with three
+  cryptographic key pairs.
+- **Teams** provide the organizational boundary, with exactly one
+  team per graph.
+- **Roles** control command publishing permissions: `owner`
+  (emergency access), `admin` (system administration), `operator`
+  (user management), and `member` (basic usage).
+- **Authorization** uses two patterns: operation-based for most
+  commands, and managing-role-based for role/label assignment.
+- **Key Principle**: Devices cannot assign roles or labels to
+  themselves, enforcing separation of duties.
+
 # Policy
+
+## What This Policy Controls
+
+This policy defines:
+- Which commands each device is authorized to publish to the graph
+- How those commands transform into facts in the local database
+- Validation rules that commands must pass before acceptance
+
+This policy does NOT control:
+- Network access or transport layer security
+- How devices synchronize the graph (handled by Aranya core)
+- Query authorization (queries read local derived state)
 
 ## Imports
 
@@ -53,16 +86,34 @@ _output_ of an action.
 
 A [_fact_][facts] is structured data derived from a _command_.
 Facts are stored in a _fact database_, which the policy consults
-when making enforcement decisions.
+when making enforcement decisions. Since the graph is a CRDT, all
+devices eventually have identical fact databases.
 
 A [_command_][commands] is a signed data structure that devices
 publish to the graph. Commands are signed with the device's
-Signing Key.
+Signing Key. The policy controls which commands each device is
+authorized to publish.
 
 ### API Stability and Backward Compatibility
 
 Actions and effects are part of a policy's public API.
 Facts and commands are *not* part of a policy's public API.
+
+### Fact Schema Constraints
+
+Fact definitions enforce uniqueness constraints through their key
+structure:
+
+- **Single-key facts** (e.g., `Device[device_id id]`) allow
+  exactly one fact per key value.
+- **Composite-key facts** (e.g., `AssignedRole[device_id id,
+  role_id id]`) allow exactly one fact per key combination.
+- **Empty-key facts** (e.g., `TeamStart[]`) allow exactly one
+  instance, implementing a singleton pattern.
+
+These constraints are enforced at the storage layer - `create`
+operations fail if a fact already exists with the same key, and
+`delete` operations fail if the fact doesn't exist.
 
 ## Base Cryptography
 
@@ -109,6 +160,7 @@ function open_envelope(sealed_envelope struct Envelope) bytes {
 ```
 
 ## Devices and Identity
+<!-- Section contains: Device facts, key management, device queries -->
 
 An identity in Aranya is called a _device_. Each device has
 a globally unique ID, called the _device ID_.
@@ -117,6 +169,7 @@ a globally unique ID, called the _device ID_.
 // Records the existence of a device.
 // TODO(eric): We store the key IDs in the key facts themselves,
 // do we want to continue storing key IDs here?
+// Fact type: Single-key (one per device)
 fact Device[device_id id]=>{sign_key_id id, enc_key_id id}
 
 // Reports whether the invariants for the device are being upheld.
@@ -433,6 +486,7 @@ command QueryDeviceKeyBundle {
 ```
 
 ## Roles and Permissions
+<!-- Section contains: Role facts, operations, assignment/revocation, default roles -->
 
 ### Overview
 
@@ -469,6 +523,7 @@ about a similar situation.
 // Returns the globally unique ID for a role created by the
 // command in `evp`.
 //
+// SECURITY INVARIANT: Prevents cross-branch permission confusion.
 // NB: This function is deterministic and injective for the
 // current policy. Calling it multiple times for the same
 // envelope will always return the same ID.
@@ -511,6 +566,9 @@ _operations_, and each _operation_ is associated with a role.
 ```policy
 // Records that a certain role is required to authorize a device
 // to perform the operation.
+//
+// INVARIANT: Each operation maps to exactly one role at a time.
+// The single-key structure ensures one-to-one mapping.
 fact OpRequiresRole[op string]=>{role_id id}
 
 // Returns the device corresponding with the author of the
@@ -769,6 +827,41 @@ command ChangeRoleManagingRole {
 }
 ```
 
+### Authorization Patterns
+
+This policy uses two distinct authorization patterns that serve
+different purposes:
+
+#### Operation-Based Authorization
+
+Most commands use operation-based authorization, where the author
+must have a role that has been granted permission to perform
+a specific operation:
+
+    let author = get_authorized_device(envelope, "OperationName")
+
+This pattern provides flexibility - the owner can reassign
+operations to different roles as organizational needs change.
+
+#### Managing-Role-Based Authorization
+
+Role and label assignment commands use a different pattern based
+on the managing role relationship:
+
+    // For role assignment
+    check can_manage_role(author.device_id, target_role_id)
+
+    // For label assignment
+    check can_manage_label(author.device_id, label_id)
+
+This pattern avoids circular dependencies that would arise with
+operation-based auth. Without it, you would need a role to assign
+that same role, creating an impossible bootstrap scenario.
+
+**Note**: Devices are always prohibited from assigning roles or
+labels to themselves, regardless of their permissions. This
+prevents privilege escalation attacks.
+
 ### Role Creation
 
 Upon creation, a team only has one role: the `owner` role,
@@ -830,19 +923,28 @@ effect RoleCreated {
 
 #### Default Roles
 
-The `setup_default_roles` action creates the following 'default'
-roles:
+The `setup_default_roles` action creates exactly three default
+roles with fixed names. These names are enforced by the policy -
+any attempt to create a default role with a different name will
+fail.
 
 - `admin`
-    - Can assign and revoke the `operator` role.
-    - Can define and undefine AQC labels.
-    - TODO
+    - Can create and delete AQC labels
+    - Can change label managing roles
+    - Can unset AQC network names
+    - Typically manages the `operator` role
 - `operator`
-    - TODO
+    - Can assign and revoke AQC labels
+    - Can set and unset AQC network names
+    - Typically manages the `member` role
 - `member`
     - Can create and delete AQC channels (for labels they have
-      been granted permission to use).
-    - TODO
+      been granted permission to use)
+
+**Important**: The owner role (created during team creation) should
+be used sparingly. After setting up default roles, the owner
+credentials should be stored securely (e.g., in an HSM) and only
+used for emergency "break glass" scenarios.
 
 ```policy
 // Setup default roles on a team.
@@ -965,6 +1067,9 @@ A device can be assigned zero or more roles.
 
 ```policy
 // Records that a device has been assigned a role.
+//
+// INVARIANT: Composite key ensures each device-role pair is unique.
+// A device cannot be assigned the same role multiple times.
 fact AssignedRole[device_id id, role_id id]=>{}
 
 // Reports whether the device has been assigned the role.
@@ -1152,11 +1257,12 @@ command QueryTeamRoles {
 ```
 
 ## Teams
+<!-- Section contains: Team creation/termination, device management -->
 
 ### Team Creation
 
 Teams are the primary organizational unit in Aranya. Each graph
-is associated with one team at a time.
+is associated with exactly one team.
 
 ```policy
 // Indicates that `CreateTeam` has been published.
@@ -1167,6 +1273,13 @@ is associated with one team at a time.
 //
 // However, this fact is required to ensure that we reject all
 // subsequent `CreateTeam` commands.
+//
+// INVARIANT: Empty key makes this a singleton - only one instance
+// can exist. This enforces:
+// - Only one team per graph
+// - Team creation fails if a team already exists
+// - Team termination is irreversible within the same graph
+// Fact type: Singleton (empty key)
 fact TeamStart[]=>{team_id id}
 
 // Reports whether the team exists.
@@ -1557,7 +1670,28 @@ command RemoveDevice {
 }
 ```
 
+#### Technical Limitations
+
+Due to current storage layer limitations (see [issue
+#229](https://github.com/aranya-project/aranya-core/issues/229)),
+device removal cannot cascade delete the following facts:
+
+- `AssignedRole` facts (role assignments)
+- `AssignedLabel` facts (label assignments)
+- `AqcNetId` facts (network identifiers)
+
+These orphaned facts remain in the database but reference
+non-existent devices. This is a known limitation that will be
+addressed when the storage layer supports prefix deletion.
+
+**CRITICAL**: Until this is resolved, orphaned assignments remain
+in the database. When querying role or label assignments, you MUST
+first verify the device exists using `try_find_device()` or
+`must_find_device()`. Failing to do so could lead to security
+vulnerabilities by treating removed devices as active.
+
 ## AQC
+<!-- Section contains: Channel types, labels, network IDs, channel creation -->
 
 ### Overview
 
@@ -1566,6 +1700,25 @@ topic-segmented communication between two devices in a team.
 
 Channels are secured with TLS 1.3 using pre-shared keys (PSK)
 derived from the participants' Device Encryption Keys using HPKE.
+
+#### Channel Security Constraints
+
+AQC channels enforce several critical security invariants:
+
+- **No Self-Channels**: Devices cannot create channels with
+  themselves. This is enforced by explicit checks in channel
+  creation functions.
+- **Author Must Be Participant**: The device creating a channel
+  must be one of the two participants. You cannot create channels
+  on behalf of other devices.
+- **Label Permission Requirements**: Both devices must have
+  appropriate permissions for the label (SendRecv for
+  bidirectional, or appropriate Send/Recv for unidirectional).
+- **Ephemeral Command Processing**: Channel creation commands are
+  ephemeral and only processed by the two participating devices.
+  Other devices will fail with `check false`.
+- **Network ID Requirements**: Both devices should have network
+  IDs set (currently not enforced - see TODO).
 
 ```policy
 // Reports whether `size` is a valid PSK length (in bytes).
@@ -1905,6 +2058,10 @@ A device can be assigned zero or more labels.
 ```policy
 // Records that a device was granted permission to use a label
 // for certain channel operations.
+//
+// INVARIANT: Composite key ensures each label-device pair is unique.
+// A device can have only one permission type (SendOnly, RecvOnly,
+// or SendRecv) per label.
 fact AssignedLabel[label_id id, device_id id]=>{op enum ChanOp}
 ```
 
