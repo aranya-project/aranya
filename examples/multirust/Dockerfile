@@ -1,5 +1,17 @@
-FROM rust:1.88-bookworm AS build
+FROM ubuntu:18.04 AS base
 
+
+FROM base AS build
+
+# Update and install base dependencies
+RUN apt-get -y update && apt-get -y upgrade
+RUN apt-get -y install build-essential curl
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs >rustup.sh && sh rustup.sh -y --profile minimal
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Common Aranya build setup
 WORKDIR /app/
 
 COPY crates/aranya-daemon-api/ crates/aranya-daemon-api
@@ -50,7 +62,7 @@ RUN --mount=type=cache,sharing=locked,target=/usr/local/cargo/registry \
     && cp target/${CARGO_BUILD_TARGET}/release/aranya-user /app/bin/
 
 
-FROM debian:bookworm AS runner
+FROM base AS runner
 
 WORKDIR /app/
 
