@@ -30,6 +30,7 @@ pub struct Devices {
 }
 
 impl Devices {
+    /// Return iterator for list of devices.
     pub fn iter(&self) -> impl Iterator<Item = &DeviceId> {
         self.data.iter()
     }
@@ -46,6 +47,7 @@ pub struct Labels {
 }
 
 impl Labels {
+    /// Return iterator for list of labels.
     pub fn iter(&self) -> impl Iterator<Item = &Label> {
         self.data.iter()
     }
@@ -66,6 +68,7 @@ pub struct ClientBuilder<'a> {
 }
 
 impl ClientBuilder<'_> {
+    /// Allocates a default [`ClientBuilder`].
     pub fn new() -> Self {
         Self {
             uds_path: None,
@@ -502,6 +505,7 @@ impl Team<'_> {
     }
 }
 
+/// Facilitates fact database queries.
 pub struct Queries<'a> {
     client: &'a mut Client,
     team_id: TeamId,

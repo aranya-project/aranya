@@ -1,3 +1,7 @@
+#![warn(missing_docs)]
+
+//! Client configurations.
+
 use core::time::Duration;
 
 use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
@@ -92,6 +96,7 @@ pub struct QuicSyncConfig {
 }
 
 impl QuicSyncConfig {
+    /// Creates a default [`QuicSyncConfigBuilder`].
     pub fn builder() -> QuicSyncConfigBuilder {
         QuicSyncConfigBuilder::default()
     }

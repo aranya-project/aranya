@@ -1,8 +1,11 @@
+//! Client API errors.
+
 use std::{convert::Infallible, io};
 
 use aranya_daemon_api as api;
 use tarpc::client::RpcError;
 
+/// Error alias.
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 /// Possible errors that could happen in the Aranya client.
