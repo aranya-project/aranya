@@ -229,6 +229,7 @@ impl Default for SyncPeerConfigBuilder {
     }
 }
 
+/// QUIC syncer configuation.
 #[derive(Clone, Debug)]
 pub struct QuicSyncConfig {
     mode: SeedMode,
@@ -258,6 +259,7 @@ impl From<QuicSyncConfig> for aranya_client::QuicSyncConfig {
     }
 }
 
+/// Builder for a [`QuicSyncConfig`].
 #[derive(Default)]
 pub struct QuicSyncConfigBuilder {
     mode: SeedMode,
