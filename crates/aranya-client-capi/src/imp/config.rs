@@ -1,3 +1,5 @@
+//! Client configuration for C API.
+
 use core::{ffi::c_char, mem::MaybeUninit, ptr};
 
 use aranya_capi_core::{

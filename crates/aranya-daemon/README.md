@@ -33,10 +33,10 @@ Note: The Aranya Daemon supports a single device.
 ## Configuration
 
 Create a config file for the daemon before running it. Refer to
-this documentation on the JSON config file parameters:
+this documentation on the TOML config file parameters:
 [config](src/config.rs).
 
-An example daemon configuration file can be found [here](example.json).
+An example daemon configuration file can be found [here](example.toml).
 
 ## Running the daemon
 

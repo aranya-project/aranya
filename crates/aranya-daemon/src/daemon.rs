@@ -30,7 +30,7 @@ use crate::{
     api::{ApiKey, DaemonApiServer, QSData},
     aqc::Aqc,
     aranya,
-    config::Config,
+    config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
@@ -135,8 +135,15 @@ impl Daemon {
 
         async move {
             // TODO: Fix this when other syncer types are supported
-            let Some(_qs_config) = &cfg.quic_sync else {
+            let Toggle::Enabled(qs_config) = &cfg.sync.quic else {
                 anyhow::bail!("Supply a valid QUIC sync config")
+            };
+
+            // TODO: Make aqc optional.
+            let Toggle::Enabled(_) = &cfg.aqc else {
+                anyhow::bail!(
+                    "AQC is currently required, set `aqc.enable = true` in daemon config."
+                )
             };
 
             Self::setup_env(&cfg).await?;
@@ -168,7 +175,7 @@ impl Daemon {
                     .try_clone()
                     .context("unable to clone keystore")?,
                 &pks,
-                cfg.sync_addr,
+                qs_config.addr,
                 Arc::clone(&psk_store),
                 active_team_rx,
             )
@@ -464,7 +471,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::{AfcConfig, QuicSyncConfig};
+    use crate::config::{AqcConfig, QuicSyncConfig, SyncConfig, Toggle};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -474,22 +481,16 @@ mod tests {
 
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
-            name: "name".to_string(),
+            name: "test-daemon-run".into(),
             runtime_dir: work_dir.join("run"),
             state_dir: work_dir.join("state"),
             cache_dir: work_dir.join("cache"),
             logs_dir: work_dir.join("logs"),
             config_dir: work_dir.join("config"),
-            sync_addr: any,
-            quic_sync: Some(QuicSyncConfig {}),
-            afc: Some(AfcConfig {
-                shm_path: "/test_daemon1".to_owned(),
-                unlink_on_startup: true,
-                unlink_at_exit: true,
-                create: true,
-                max_chans: 100,
-            }),
-            aqc: None,
+            sync: SyncConfig {
+                quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
+            },
+            aqc: Toggle::Enabled(AqcConfig {}),
         };
         for dir in [
             &cfg.runtime_dir,

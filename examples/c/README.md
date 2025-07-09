@@ -13,7 +13,7 @@ between two of the team members.
 
 `cmake` is used to build the program and link to the `aranya-client-capi` shared library.
 
-A `config.json` file is provided for configuring the `aranya-daemon` when it starts up.
+A `config.toml` file is provided for configuring the `aranya-daemon` when it starts up.
 
 # Dependencies
 
