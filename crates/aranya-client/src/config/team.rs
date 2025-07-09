@@ -26,38 +26,29 @@ pub struct CreateTeamConfigBuilder {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
 
+impl CreateTeamConfigBuilder {
+    /// Configures the quic_sync config..
+    ///
+    /// This is an optional field that configures how the team
+    /// synchronizes data over QUIC connections.
+    pub fn quic_sync(mut self, cfg: CreateTeamQuicSyncConfig) -> Self {
+        self.quic_sync = Some(cfg);
+        self
+    }
+
+    /// Builds the configuration for creating a new team.
+    pub fn build(self) -> Result<CreateTeamConfig> {
+        Ok(CreateTeamConfig {
+            quic_sync: self.quic_sync,
+        })
+    }
+}
+
 /// Builder for [`AddTeamConfig`].
 #[derive(Default)]
 pub struct AddTeamConfigBuilder {
     id: Option<TeamId>,
     quic_sync: Option<AddTeamQuicSyncConfig>,
-}
-
-/// Configuration for creating a new team.
-#[derive(Clone)]
-pub struct CreateTeamConfig {
-    quic_sync: Option<CreateTeamQuicSyncConfig>,
-}
-
-/// Configuration for joining an existing team.
-#[derive(Clone)]
-pub struct AddTeamConfig {
-    id: TeamId,
-    quic_sync: Option<AddTeamQuicSyncConfig>,
-}
-
-impl AddTeamConfig {
-    /// Creates a default [`AddTeamConfigBuilder`].
-    pub fn builder() -> AddTeamConfigBuilder {
-        AddTeamConfigBuilder::default()
-    }
-}
-
-impl CreateTeamConfig {
-    /// Creates a default [`CreateTeamConfigBuilder`].
-    pub fn builder() -> CreateTeamConfigBuilder {
-        CreateTeamConfigBuilder::default()
-    }
 }
 
 impl AddTeamConfigBuilder {
@@ -92,21 +83,38 @@ impl AddTeamConfigBuilder {
     }
 }
 
-impl CreateTeamConfigBuilder {
-    /// Configures the quic_sync config..
-    ///
-    /// This is an optional field that configures how the team
-    /// synchronizes data over QUIC connections.
-    pub fn quic_sync(mut self, cfg: CreateTeamQuicSyncConfig) -> Self {
-        self.quic_sync = Some(cfg);
-        self
-    }
+/// Configuration for creating a new team.
+#[derive(Clone)]
+pub struct CreateTeamConfig {
+    quic_sync: Option<CreateTeamQuicSyncConfig>,
+}
 
-    /// Builds the configuration for creating a new team.
-    pub fn build(self) -> Result<CreateTeamConfig> {
-        Ok(CreateTeamConfig {
-            quic_sync: self.quic_sync,
-        })
+impl CreateTeamConfig {
+    /// Creates a default [`CreateTeamConfigBuilder`].
+    pub fn builder() -> CreateTeamConfigBuilder {
+        CreateTeamConfigBuilder::default()
+    }
+}
+
+impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
+    fn from(value: CreateTeamConfig) -> Self {
+        Self {
+            quic_sync: value.quic_sync.map(Into::into),
+        }
+    }
+}
+
+/// Configuration for joining an existing team.
+#[derive(Clone)]
+pub struct AddTeamConfig {
+    id: TeamId,
+    quic_sync: Option<AddTeamQuicSyncConfig>,
+}
+
+impl AddTeamConfig {
+    /// Creates a default [`AddTeamConfigBuilder`].
+    pub fn builder() -> AddTeamConfigBuilder {
+        AddTeamConfigBuilder::default()
     }
 }
 
@@ -114,14 +122,6 @@ impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
     fn from(value: AddTeamConfig) -> Self {
         Self {
             team_id: value.id,
-            quic_sync: value.quic_sync.map(Into::into),
-        }
-    }
-}
-
-impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
-    fn from(value: CreateTeamConfig) -> Self {
-        Self {
             quic_sync: value.quic_sync.map(Into::into),
         }
     }

@@ -32,6 +32,19 @@ impl CreateTeamQuicSyncConfig {
     }
 }
 
+impl Typed for CreateTeamQuicSyncConfig {
+    const TYPE_ID: TypeId = TypeId::new(0xADF0F971);
+}
+
+impl From<CreateTeamQuicSyncConfig> for aranya_client::CreateTeamQuicSyncConfig {
+    fn from(value: CreateTeamQuicSyncConfig) -> Self {
+        Self::builder()
+            .mode(value.mode)
+            .build()
+            .expect("All fields are set")
+    }
+}
+
 /// QUIC syncer configuration for AddTeam() operation.
 #[derive(Clone)]
 pub struct AddTeamQuicSyncConfig {
@@ -51,6 +64,19 @@ impl AddTeamQuicSyncConfig {
     /// Useful for deref coercion.
     pub(crate) fn imp(&self) -> Self {
         self.clone()
+    }
+}
+
+impl Typed for AddTeamQuicSyncConfig {
+    const TYPE_ID: TypeId = TypeId::new(0xADF0F970);
+}
+
+impl From<AddTeamQuicSyncConfig> for aranya_client::AddTeamQuicSyncConfig {
+    fn from(value: AddTeamQuicSyncConfig) -> Self {
+        Self::builder()
+            .mode(value.mode)
+            .build()
+            .expect("All fields are set")
     }
 }
 
@@ -80,6 +106,23 @@ impl CreateTeamQuicSyncConfigBuilder {
     pub fn raw_seed_ikm(&mut self, ikm: [u8; SEED_IKM_SIZE]) {
         self.mode = CreateSeedMode::IKM(ikm.into());
     }
+}
+
+impl Builder for CreateTeamQuicSyncConfigBuilder {
+    type Output = defs::CreateTeamQuicSyncConfig;
+    type Error = Error;
+
+    /// # Safety
+    ///
+    /// No special considerations.
+    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
+        Self::Output::init(out, CreateTeamQuicSyncConfig::new(self.mode));
+        Ok(())
+    }
+}
+
+impl Typed for CreateTeamQuicSyncConfigBuilder {
+    const TYPE_ID: TypeId = TypeId::new(0xEEC2FA47);
 }
 
 /// Builder for constructing an [`AddTeamQuicSyncConfig`].
@@ -112,33 +155,8 @@ impl AddTeamQuicSyncConfigBuilder {
     }
 }
 
-impl Typed for AddTeamQuicSyncConfig {
-    const TYPE_ID: TypeId = TypeId::new(0xADF0F970);
-}
-
-impl Typed for CreateTeamQuicSyncConfig {
-    const TYPE_ID: TypeId = TypeId::new(0xADF0F971);
-}
-
-impl Typed for CreateTeamQuicSyncConfigBuilder {
-    const TYPE_ID: TypeId = TypeId::new(0xEEC2FA47);
-}
-
 impl Typed for AddTeamQuicSyncConfigBuilder {
     const TYPE_ID: TypeId = TypeId::new(0xEEC2FA48);
-}
-
-impl Builder for CreateTeamQuicSyncConfigBuilder {
-    type Output = defs::CreateTeamQuicSyncConfig;
-    type Error = Error;
-
-    /// # Safety
-    ///
-    /// No special considerations.
-    unsafe fn build(self, out: &mut MaybeUninit<Self::Output>) -> Result<(), Self::Error> {
-        Self::Output::init(out, CreateTeamQuicSyncConfig::new(self.mode));
-        Ok(())
-    }
 }
 
 impl Builder for AddTeamQuicSyncConfigBuilder {
@@ -155,23 +173,5 @@ impl Builder for AddTeamQuicSyncConfigBuilder {
 
         Self::Output::init(out, AddTeamQuicSyncConfig::new(mode));
         Ok(())
-    }
-}
-
-impl From<AddTeamQuicSyncConfig> for aranya_client::AddTeamQuicSyncConfig {
-    fn from(value: AddTeamQuicSyncConfig) -> Self {
-        Self::builder()
-            .mode(value.mode)
-            .build()
-            .expect("All fields are set")
-    }
-}
-
-impl From<CreateTeamQuicSyncConfig> for aranya_client::CreateTeamQuicSyncConfig {
-    fn from(value: CreateTeamQuicSyncConfig) -> Self {
-        Self::builder()
-            .mode(value.mode)
-            .build()
-            .expect("All fields are set")
     }
 }
