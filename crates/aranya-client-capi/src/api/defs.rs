@@ -216,8 +216,8 @@ pub unsafe fn client_init(
     let aqc_addr = aranya_util::Addr::from_str(aqc_str)?;
     let inner = rt.block_on({
         aranya_client::Client::builder()
-            .with_daemon_uds_path(daemon_socket)
-            .with_daemon_aqc_addr(&aqc_addr)
+            .daemon_uds_path(daemon_socket)
+            .aqc_server_addr(&aqc_addr)
             .connect()
     })?;
 

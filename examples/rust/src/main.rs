@@ -118,8 +118,8 @@ impl ClientCtx {
 
         let client = (|| {
             Client::builder()
-                .with_daemon_uds_path(&uds_sock)
-                .with_daemon_aqc_addr(&any_addr)
+                .daemon_uds_path(&uds_sock)
+                .aqc_server_addr(&any_addr)
                 .connect()
         })
         .retry(ExponentialBuilder::default())

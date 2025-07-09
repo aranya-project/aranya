@@ -213,8 +213,8 @@ impl DeviceCtx {
         // Initialize the user library - the client will automatically load the daemon's public key.
         let client = (|| {
             Client::builder()
-                .with_daemon_uds_path(&uds_path)
-                .with_daemon_aqc_addr(&addr_any)
+                .daemon_uds_path(&uds_path)
+                .aqc_server_addr(&addr_any)
                 .connect()
         })
         .retry(ExponentialBuilder::default())
