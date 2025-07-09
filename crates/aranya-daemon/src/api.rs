@@ -15,7 +15,7 @@ pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, SeedMode, Text, WrappedSeed,
+    DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
@@ -373,13 +373,9 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[instrument(skip(self), err)]
-    async fn add_team(
-        mut self,
-        _: context::Context,
-        team: api::TeamId,
-        cfg: api::TeamConfig,
-    ) -> api::Result<()> {
+    #[instrument(skip(self))]
+    async fn add_team(mut self, _: context::Context, cfg: api::AddTeamConfig) -> api::Result<()> {
+        let team = cfg.team_id;
         self.check_team_valid(team).await?;
 
         match cfg.quic_sync {
@@ -410,7 +406,7 @@ impl DaemonApi for Api {
     async fn create_team(
         mut self,
         _: context::Context,
-        cfg: api::TeamConfig,
+        cfg: api::CreateTeamConfig,
     ) -> api::Result<api::TeamId> {
         info!("create_team");
 
