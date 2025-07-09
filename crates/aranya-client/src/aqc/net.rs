@@ -463,14 +463,14 @@ pub enum TryReceiveError<E = AqcError> {
     Closed,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 struct AqcChannelInfo {
     label_id: LabelId,
     channel_id: AqcChannelId,
 }
 
 /// An AQC Channel ID.
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 enum AqcChannelId {
     Bidi(BidiChannelId),
     Uni(UniChannelId),

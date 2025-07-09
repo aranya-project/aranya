@@ -25,7 +25,7 @@ use crate::{
 };
 
 /// List of device IDs.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Devices {
     data: Vec<DeviceId>,
 }
@@ -43,7 +43,7 @@ impl Devices {
 }
 
 /// List of labels.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Labels {
     data: Vec<Label>,
 }
@@ -300,7 +300,7 @@ impl Client {
 /// - creating/assigning/deleting labels.
 /// - creating/deleting fast channels.
 /// - assigning network identifiers to devices.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Team<'a> {
     client: &'a Client,
     team_id: TeamId,
@@ -505,7 +505,7 @@ impl Team<'_> {
 /// Queries the Aranya fact database.
 ///
 /// The fact database is updated when actions/effects are processed for a team.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Queries<'a> {
     client: &'a Client,
     team_id: TeamId,

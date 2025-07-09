@@ -21,7 +21,7 @@ pub use quic_sync::{
 };
 
 /// Builder for [`CreateTeamConfig`].
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct CreateTeamConfigBuilder {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
@@ -45,7 +45,7 @@ impl CreateTeamConfigBuilder {
 }
 
 /// Builder for [`AddTeamConfig`].
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct AddTeamConfigBuilder {
     id: Option<TeamId>,
     quic_sync: Option<AddTeamQuicSyncConfig>,

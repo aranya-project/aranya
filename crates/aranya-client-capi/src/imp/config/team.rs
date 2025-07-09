@@ -36,7 +36,7 @@ impl Typed for CreateTeamConfig {
 }
 
 /// Builder for constructing a [`CreateTeamConfig`].
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default)]
 pub struct CreateTeamConfigBuilder {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }

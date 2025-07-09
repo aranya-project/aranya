@@ -65,7 +65,7 @@ pub(crate) fn aranya_error(err: api::Error) -> Error {
 }
 
 /// Possible errors that could happen when creating configuration info.
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
 pub enum ConfigError {
     /// An invalid argument was provided.
@@ -74,7 +74,7 @@ pub enum ConfigError {
 }
 
 /// An invalid argument.
-#[derive(Debug, Clone, thiserror::Error)]
+#[derive(Debug, thiserror::Error)]
 #[error("invalid argument `{arg}`: {reason}")]
 pub struct InvalidArg {
     arg: &'static str,
