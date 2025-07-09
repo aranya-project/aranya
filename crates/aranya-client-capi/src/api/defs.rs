@@ -657,7 +657,7 @@ pub type CreateTeamQuicSyncConfig = Safe<imp::CreateTeamQuicSyncConfig>;
 
 /// QUIC syncer configuration.
 ///
-/// Use a [`AddTeamQuicSyncConfigBuilder`] to construct this object.
+/// Use an [`AddTeamQuicSyncConfigBuilder`] to construct this object.
 #[aranya_capi_core::opaque(size = 288, align = 8)]
 pub type AddTeamQuicSyncConfig = Safe<imp::AddTeamQuicSyncConfig>;
 
