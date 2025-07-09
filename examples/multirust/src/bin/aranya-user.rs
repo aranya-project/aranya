@@ -1,5 +1,5 @@
 use std::{
-    env::VarError,
+    env::{self, VarError},
     future::pending,
     net::Ipv4Addr,
     path::{Path, PathBuf},
@@ -46,10 +46,9 @@ struct Daemon {
 }
 
 impl Daemon {
-    async fn spawn(path: &DaemonPath, work_dir: &Path, cfg_path: &Path) -> Result<Self> {
+    async fn spawn(path: &DaemonPath, cfg_path: &Path) -> Result<Self> {
         let mut cmd = Command::new(&path.0);
         cmd.kill_on_drop(true)
-            .current_dir(work_dir)
             .args(["--config".as_ref(), cfg_path.as_os_str()]);
         debug!(?cmd, "spawning daemon");
         let proc = cmd.spawn().context("unable to spawn daemon")?;
@@ -78,7 +77,9 @@ struct ClientCtx {
 }
 
 impl ClientCtx {
-    pub async fn new(daemon_dir: &Path, user_name: &str, daemon_path: &DaemonPath) -> Result<Self> {
+    pub async fn new(user_name: &str, daemon_path: &DaemonPath) -> Result<Self> {
+        let daemon_dir = env::current_dir()?;
+
         info!(user_name, "creating `ClientCtx`");
 
         let work_dir = daemon_dir.join("state");
@@ -107,7 +108,7 @@ impl ClientCtx {
 
             api_pk = Daemon::get_api_pk(daemon_path, &cfg_path).await?;
 
-            Daemon::spawn(daemon_path, daemon_dir, &cfg_path).await?
+            Daemon::spawn(daemon_path, &cfg_path).await?
         };
 
         // The path that the daemon will listen on.
@@ -135,13 +136,13 @@ impl ClientCtx {
 }
 
 fn var<T: FromStr<Err: Into<anyhow::Error>>>(name: &str) -> Result<T> {
-    (|| std::env::var(name)?.parse().map_err(Into::into))()
+    (|| env::var(name)?.parse().map_err(Into::into))()
         .with_context(|| format!("could not get env var {name}"))
 }
 
 fn var_or<T: FromStr<Err: Into<anyhow::Error>>>(name: &str, default: T) -> Result<T> {
     (|| {
-        match std::env::var(name) {
+        match env::var(name) {
             Ok(s) => s,
             Err(VarError::NotPresent) => return Ok(default),
             Err(e) => return Err(e.into()),
@@ -154,7 +155,7 @@ fn var_or<T: FromStr<Err: Into<anyhow::Error>>>(name: &str, default: T) -> Resul
 
 async fn read<T: FromStr<Err: Into<anyhow::Error>>>(filename: &str) -> Result<T> {
     async {
-        fs::read_to_string(Path::new("/app/state/").join(filename))
+        fs::read_to_string(Path::new("./state/").join(filename))
             .await?
             .parse()
             .map_err(Into::into)
@@ -182,7 +183,7 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let exe = std::env::current_exe()?;
+    let exe = env::current_exe()?;
     let user = exe
         .file_name()
         .context("has filename")?
@@ -190,7 +191,7 @@ async fn main() -> Result<()> {
         .context("valid string")?
         .to_owned();
     let daemon_path = {
-        let mut args = std::env::args_os();
+        let mut args = env::args_os();
         args.next(); // skip executable name
         DaemonPath(PathBuf::from(
             args.next().context("missing `daemon` executable path")?,
@@ -205,7 +206,7 @@ async fn main() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
-    let mut ctx = ClientCtx::new(Path::new("/app/"), &user, &daemon_path).await?;
+    let mut ctx = ClientCtx::new(&user, &daemon_path).await?;
 
     match user.as_str() {
         "operator" => {
