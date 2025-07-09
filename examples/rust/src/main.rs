@@ -252,10 +252,10 @@ async fn main() -> Result<()> {
             .build()?
     };
 
-    let mut admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
-    let mut operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
-    let mut membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
-    let mut memberb_team = memberb.client.add_team(add_team_cfg).await?;
+    let admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
+    let operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
+    let membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
+    let memberb_team = memberb.client.add_team(add_team_cfg).await?;
 
     // setup sync peers.
     info!("adding admin to team");
