@@ -72,26 +72,6 @@ criteria = "safe-to-deploy"
 version = "1.1.3"
 criteria = "safe-to-deploy"
 
-[[exemptions.anstream]]
-version = "0.6.18"
-criteria = "safe-to-deploy"
-
-[[exemptions.anstyle]]
-version = "1.0.10"
-criteria = "safe-to-deploy"
-
-[[exemptions.anstyle-parse]]
-version = "0.2.6"
-criteria = "safe-to-deploy"
-
-[[exemptions.anstyle-query]]
-version = "1.1.2"
-criteria = "safe-to-deploy"
-
-[[exemptions.anstyle-wincon]]
-version = "3.0.6"
-criteria = "safe-to-deploy"
-
 [[exemptions.async-trait]]
 version = "0.1.83"
 criteria = "safe-to-deploy"
@@ -156,20 +136,8 @@ criteria = "safe-to-deploy"
 version = "4.5.23"
 criteria = "safe-to-deploy"
 
-[[exemptions.clap_builder]]
-version = "4.5.23"
-criteria = "safe-to-deploy"
-
 [[exemptions.clap_derive]]
 version = "4.5.18"
-criteria = "safe-to-deploy"
-
-[[exemptions.clap_lex]]
-version = "0.7.4"
-criteria = "safe-to-deploy"
-
-[[exemptions.colorchoice]]
-version = "1.0.3"
 criteria = "safe-to-deploy"
 
 [[exemptions.const-default]]
@@ -222,10 +190,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.der]]
 version = "0.7.9"
-criteria = "safe-to-deploy"
-
-[[exemptions.deser-hjson]]
-version = "2.2.4"
 criteria = "safe-to-deploy"
 
 [[exemptions.diff]]
@@ -342,10 +306,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.humantime]]
 version = "2.1.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.is_terminal_polyfill]]
-version = "1.70.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.itertools]]
