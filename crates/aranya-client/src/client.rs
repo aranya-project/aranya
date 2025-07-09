@@ -30,6 +30,7 @@ pub struct Devices {
 }
 
 impl Devices {
+    /// Return iterator for list of devices.
     pub fn iter(&self) -> impl Iterator<Item = &DeviceId> {
         self.data.iter()
     }
@@ -46,6 +47,7 @@ pub struct Labels {
 }
 
 impl Labels {
+    /// Return iterator for list of labels.
     pub fn iter(&self) -> impl Iterator<Item = &Label> {
         self.data.iter()
     }
@@ -66,6 +68,7 @@ pub struct ClientBuilder<'a> {
 }
 
 impl ClientBuilder<'_> {
+    /// Returns a default [`ClientBuilder`].
     pub fn new() -> Self {
         Self {
             uds_path: None,
@@ -316,6 +319,9 @@ impl Team<'_> {
 
     /// Encrypt PSK seed for peer.
     /// `peer_enc_pk` is the public encryption key of the peer device.
+    ///
+    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
+    ///
     /// See [`KeyBundle::encoding`].
     pub async fn encrypt_psk_seed_for_peer(&self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
@@ -501,6 +507,7 @@ impl Team<'_> {
     }
 }
 
+/// Facilitates fact database queries.
 pub struct Queries<'a> {
     client: &'a Client,
     team_id: TeamId,
