@@ -554,7 +554,7 @@ impl Client {
 /// - assigning network identifiers to devices.
 #[derive(Debug)]
 pub struct Team<'a> {
-    client: &'a mut Client,
+    client: &'a Client,
     id: api::TeamId,
 }
 
@@ -565,7 +565,7 @@ impl Team<'_> {
     }
 
     /// Returns the [`Device`] corresponding with `id`.
-    pub fn device(&mut self, id: DeviceId) -> Device<'_> {
+    pub fn device(&self, id: DeviceId) -> Device<'_> {
         Device {
             client: self.client,
             team_id: self.id,
