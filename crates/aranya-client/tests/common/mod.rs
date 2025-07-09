@@ -6,7 +6,10 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use aranya_client::{client::Client, QuicSyncConfig, SyncPeerConfig, TeamConfig};
+use aranya_client::{
+    client::Client, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
+    CreateTeamQuicSyncConfig, SyncPeerConfig,
+};
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
@@ -135,26 +138,38 @@ impl TeamCtx {
             self.owner.client.rand(&mut buf).await;
             buf
         };
-        let cfg = {
-            let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
-            TeamConfig::builder().quic_sync(qs_cfg).build()?
+        let owner_cfg = {
+            let qs_cfg = CreateTeamQuicSyncConfig::builder()
+                .seed_ikm(seed_ikm)
+                .build()?;
+            CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
         };
 
         let team = {
             self.owner
                 .client
-                .create_team(cfg.clone())
+                .create_team(owner_cfg)
                 .await
                 .expect("expected to create team")
         };
         let team_id = team.team_id();
         info!(?team_id);
 
+        let cfg = {
+            let qs_cfg = AddTeamQuicSyncConfig::builder()
+                .seed_ikm(seed_ikm)
+                .build()?;
+            AddTeamConfig::builder()
+                .team_id(team_id)
+                .quic_sync(qs_cfg)
+                .build()?
+        };
+
         // Owner has the team added due to calling `create_team`, now we assign it to all other peers
-        self.admin.client.add_team(team_id, cfg.clone()).await?;
-        self.operator.client.add_team(team_id, cfg.clone()).await?;
-        self.membera.client.add_team(team_id, cfg.clone()).await?;
-        self.memberb.client.add_team(team_id, cfg).await?;
+        self.admin.client.add_team(cfg.clone()).await?;
+        self.operator.client.add_team(cfg.clone()).await?;
+        self.membera.client.add_team(cfg.clone()).await?;
+        self.memberb.client.add_team(cfg).await?;
 
         Ok(team_id)
     }

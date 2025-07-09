@@ -7,7 +7,8 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    aqc::AqcPeerChannel, client::Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
+    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
+    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
 };
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
@@ -218,9 +219,11 @@ async fn main() -> Result<()> {
         owner.client.rand(&mut buf).await;
         buf
     };
-    let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
+    let owner_cfg = {
+        let qs_cfg = CreateTeamQuicSyncConfig::builder()
+            .seed_ikm(seed_ikm)
+            .build()?;
+        CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
     };
 
     // get sync addresses.
@@ -237,16 +240,26 @@ async fn main() -> Result<()> {
     info!("creating team");
     let owner_team = owner
         .client
-        .create_team(cfg.clone())
+        .create_team(owner_cfg)
         .await
         .context("expected to create team")?;
     let team_id = owner_team.team_id();
     info!(%team_id);
 
-    let admin_team = admin.client.add_team(team_id, cfg.clone()).await?;
-    let operator_team = operator.client.add_team(team_id, cfg.clone()).await?;
-    let membera_team = membera.client.add_team(team_id, cfg.clone()).await?;
-    let memberb_team = memberb.client.add_team(team_id, cfg.clone()).await?;
+    let add_team_cfg = {
+        let qs_cfg = AddTeamQuicSyncConfig::builder()
+            .seed_ikm(seed_ikm)
+            .build()?;
+        AddTeamConfig::builder()
+            .quic_sync(qs_cfg)
+            .team_id(team_id)
+            .build()?
+    };
+
+    let admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
+    let operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
+    let membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
+    let memberb_team = memberb.client.add_team(add_team_cfg).await?;
 
     // setup sync peers.
     info!("adding admin to team");
