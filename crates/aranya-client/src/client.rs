@@ -20,7 +20,7 @@ use tracing::{debug, error, info, instrument};
 
 use crate::{
     aqc::{AqcChannels, AqcClient},
-    config::{SyncPeerConfig, TeamConfig},
+    config::{AddTeamConfig, CreateTeamConfig, SyncPeerConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
 };
 
@@ -30,6 +30,7 @@ pub struct Devices {
 }
 
 impl Devices {
+    /// Return iterator for list of devices.
     pub fn iter(&self) -> impl Iterator<Item = &DeviceId> {
         self.data.iter()
     }
@@ -46,6 +47,7 @@ pub struct Labels {
 }
 
 impl Labels {
+    /// Return iterator for list of labels.
     pub fn iter(&self) -> impl Iterator<Item = &Label> {
         self.data.iter()
     }
@@ -66,6 +68,7 @@ pub struct ClientBuilder<'a> {
 }
 
 impl ClientBuilder<'_> {
+    /// Returns a default [`ClientBuilder`].
     pub fn new() -> Self {
         Self {
             daemon_uds_path: None,
@@ -235,7 +238,7 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&self, cfg: TeamConfig) -> Result<Team<'_>> {
+    pub async fn create_team(&self, cfg: CreateTeamConfig) -> Result<Team<'_>> {
         let team_id = self
             .daemon
             .create_team(context::current(), cfg.into())
@@ -263,9 +266,12 @@ impl Client {
     }
 
     /// Add a team to local device storage.
-    pub async fn add_team(&self, team_id: TeamId, cfg: TeamConfig) -> Result<Team<'_>> {
+    pub async fn add_team(&self, cfg: AddTeamConfig) -> Result<Team<'_>> {
+        let cfg = aranya_daemon_api::AddTeamConfig::from(cfg);
+        let team_id = cfg.team_id;
+
         self.daemon
-            .add_team(context::current(), team_id, cfg.into())
+            .add_team(context::current(), cfg)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -313,6 +319,9 @@ impl Team<'_> {
 
     /// Encrypt PSK seed for peer.
     /// `peer_enc_pk` is the public encryption key of the peer device.
+    ///
+    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
+    ///
     /// See [`KeyBundle::encoding`].
     pub async fn encrypt_psk_seed_for_peer(&self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
@@ -498,6 +507,7 @@ impl Team<'_> {
     }
 }
 
+/// Facilitates fact database queries.
 pub struct Queries<'a> {
     client: &'a Client,
     team_id: TeamId,

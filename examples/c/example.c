@@ -282,10 +282,10 @@ AranyaError init_team(Team *t) {
     }
 
     // Setup team config for owner device.
-    AranyaQuicSyncConfigBuilder owner_quic_build;
-    err = aranya_quic_sync_config_builder_init(&owner_quic_build);
+    AranyaCreateTeamQuicSyncConfigBuilder owner_quic_build;
+    err = aranya_create_team_quic_sync_config_builder_init(&owner_quic_build);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
+        fprintf(stderr, "unable to init `AranyaCreateTeamQuicSyncConfigBuilder`\n");
         return err;
     }
 
@@ -297,52 +297,52 @@ AranyaError init_team(Team *t) {
             fprintf(stderr, "unable to generate random bytes\n");
             return err;
         }
-        err = aranya_quic_sync_config_raw_seed_ikm(&owner_quic_build, &ikm);
+        err = aranya_create_team_quic_sync_config_raw_seed_ikm(&owner_quic_build, &ikm);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr,
-                    "unable to set `AranyaQuicSyncConfigBuilder` raw IKM seed"
+                    "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` raw IKM seed"
                     "mode\n");
             return err;
         }
     } else {
-        err = aranya_quic_sync_config_generate(&owner_quic_build);
+        err = aranya_create_team_quic_sync_config_generate(&owner_quic_build);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr,
-                    "unable to set `AranyaQuicSyncConfigBuilder` generate"
+                    "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` generate"
                     "mode\n");
             return err;
         }
     }
 
-    AranyaQuicSyncConfig owner_quic_cfg;
-    err = aranya_quic_sync_config_build(&owner_quic_build, &owner_quic_cfg);
+    AranyaCreateTeamQuicSyncConfig owner_quic_cfg;
+    err = aranya_create_team_quic_sync_config_build(&owner_quic_build, &owner_quic_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaQuicSyncConfig`\n");
+        fprintf(stderr, "unable to init `AranyaCreateTeamQuicSyncConfig`\n");
         return err;
     }
 
-    AranyaTeamConfigBuilder owner_build;
-    err = aranya_team_config_builder_init(&owner_build);
+    AranyaCreateTeamConfigBuilder owner_build;
+    err = aranya_create_team_config_builder_init(&owner_build);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
+        fprintf(stderr, "unable to init `AranyaCreateTeamConfigBuilder`\n");
         return err;
     }
 
-    err = aranya_team_config_builder_set_quic_syncer(&owner_build,
+    err = aranya_create_team_config_builder_set_quic_syncer(&owner_build,
                                                      &owner_quic_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr,
-                "unable to set `QuicSyncConfig` for "
+                "unable to set `CreateQuicSyncConfig` for "
                 "`AranyaTeamConfigBuilder`\n");
         return err;
     }
 
     // NB: A builder's "_build" method consumes the builder, so
     // do _not_ call "_cleanup" afterward.
-    AranyaTeamConfig owner_cfg;
-    err = aranya_team_config_build(&owner_build, &owner_cfg);
+    AranyaCreateTeamConfig owner_cfg;
+    err = aranya_create_team_config_build(&owner_build, &owner_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaTeamConfig`\n");
+        fprintf(stderr, "unable to init `AranyaCreateTeamConfig`\n");
         return err;
     }
 
@@ -421,19 +421,19 @@ AranyaError init_team(Team *t) {
 
         // Setup team config for non-owner devices.
         // QUIC syncer PSK must be set.
-        AranyaQuicSyncConfigBuilder quic_build;
-        err = aranya_quic_sync_config_builder_init(&quic_build);
+        AranyaAddTeamQuicSyncConfigBuilder quic_build;
+        err = aranya_add_team_quic_sync_config_builder_init(&quic_build);
         if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaQuicSyncConfigBuilder`\n");
+            fprintf(stderr, "unable to init `AranyaAddTeamQuicSyncConfigBuilder`\n");
             return err;
         }
 
         AranyaTeamId team_id_from_peer = t->id;
         if (t->seed_mode == RAW_IKM) {
-            err = aranya_quic_sync_config_raw_seed_ikm(&quic_build, &ikm);
+            err = aranya_add_team_quic_sync_config_raw_seed_ikm(&quic_build, &ikm);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
-                        "unable to set `AranyaQuicSyncConfigBuilder` raw IKM "
+                        "unable to set `AranyaAddTeamQuicSyncConfigBuilder` raw IKM "
                         "seed\n");
                 return err;
             }
@@ -461,48 +461,57 @@ AranyaError init_team(Team *t) {
             // Note: this is where the team owner will send the encrypted PSK
             // seed to the peer.
 
-            err = aranya_quic_sync_config_wrapped_seed(
+            err = aranya_add_team_quic_sync_config_wrapped_seed(
                 &quic_build, wrapped_seed, wrapped_seed_len);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
-                        "unable to set `AranyaQuicSyncConfigBuilder` wrapped "
+                        "unable to set `AranyaAddTeamQuicSyncConfigBuilder` wrapped "
                         "seed\n");
                 return err;
             }
         }
 
-        AranyaQuicSyncConfig quic_cfg;
-        err = aranya_quic_sync_config_build(&quic_build, &quic_cfg);
+        AranyaAddTeamQuicSyncConfig quic_cfg;
+        err = aranya_add_team_quic_sync_config_build(&quic_build, &quic_cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaQuicSyncConfig`\n");
+            fprintf(stderr, "unable to init `AranyaAddTeamQuicSyncConfig`\n");
             return err;
         }
 
-        AranyaTeamConfigBuilder build;
-        err = aranya_team_config_builder_init(&build);
+        AranyaAddTeamConfigBuilder build;
+        err = aranya_add_team_config_builder_init(&build);
         if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaTeamConfigBuilder`\n");
+            fprintf(stderr, "unable to init `AranyaAddTeamConfigBuilder`\n");
             return err;
         }
 
-        err = aranya_team_config_builder_set_quic_syncer(&build, &quic_cfg);
+        err = aranya_add_team_config_builder_set_quic_syncer(&build, &quic_cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr,
                     "unable to set `QuicSyncConfig` for "
-                    "`AranyaTeamConfigBuilder`\n");
+                    "`AranyaAddTeamConfigBuilder`\n");
             return err;
         }
+
+        err = aranya_add_team_config_builder_set_id(&build, &team_id_from_peer);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr,
+                    "unable to set `Id` for "
+                    "`AranyaAddTeamConfigBuilder`\n");
+            return err;
+        }
+
         // NB: A builder's "_build" method consumes the builder, so
         // do _not_ call "_cleanup" afterward.
-        AranyaTeamConfig cfg;
-        err = aranya_team_config_build(&build, &cfg);
+        AranyaAddTeamConfig cfg;
+        err = aranya_add_team_config_build(&build, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaTeamConfig`\n");
+            fprintf(stderr, "unable to init `AranyaAddTeamConfig`\n");
             return err;
         }
 
         Client *client = &t->clients_arr[i];
-        err = aranya_add_team(&client->client, &team_id_from_peer, &cfg);
+        err = aranya_add_team(&client->client, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to add_team() for client: %s\n",
                     client_names[i]);
