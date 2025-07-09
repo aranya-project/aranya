@@ -652,7 +652,7 @@ pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_c
 /// QUIC syncer configuration.
 ///
 /// Use a [`CreateTeamQuicSyncConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 288, align = 8)]
+#[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamQuicSyncConfig = Safe<imp::CreateTeamQuicSyncConfig>;
 
 /// QUIC syncer configuration.
@@ -672,7 +672,7 @@ pub type AddTeamQuicSyncConfigBuilder = Safe<imp::AddTeamQuicSyncConfigBuilder>;
 ///
 /// The [`QuicSyncConfig`] is an optional part of initializing an [`AddTeamConfig`] or a [`CreateTeamConfig`].
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 288, align = 8)]
+#[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBuilder>;
 
 /// Attempts to set PSK seed generation mode value on [`CreateTeamQuicSyncConfigBuilder`].
@@ -786,12 +786,12 @@ pub type AddTeamConfigBuilder = Safe<imp::AddTeamConfigBuilder>;
 /// Team configuration used when creating a team.
 ///
 /// Use a [`CreateTeamConfigBuilder`] to construct this object.
-#[aranya_capi_core::opaque(size = 288, align = 8)]
+#[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamConfig = Safe<imp::CreateTeamConfig>;
 
 /// A builder for initializing a [`CreateTeamConfig`].
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 288, align = 8)]
+#[aranya_capi_core::opaque(size = 56, align = 8)]
 pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 
 /// Configures QUIC syncer for [`AddTeamConfigBuilder`].

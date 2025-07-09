@@ -362,7 +362,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfigBuilder {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[288];
+    uint8_t __for_size_only[56];
 } AranyaCreateTeamQuicSyncConfigBuilder;
 
 /**
@@ -383,7 +383,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfig {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[288];
+    uint8_t __for_size_only[56];
 } AranyaCreateTeamQuicSyncConfig;
 
 /**
@@ -421,7 +421,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamConfigBuilder {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[288];
+    uint8_t __for_size_only[56];
 } AranyaCreateTeamConfigBuilder;
 
 /**
@@ -456,7 +456,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamConfig {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[288];
+    uint8_t __for_size_only[56];
 } AranyaCreateTeamConfig;
 
 /**
