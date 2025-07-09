@@ -65,7 +65,7 @@ pub(crate) struct AqcClient {
     daemon: DaemonApiClient,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct ClientState {
     /// Quic client used to create channels with peers.
     quic_client: Client,
@@ -463,14 +463,14 @@ pub enum TryReceiveError<E = AqcError> {
     Closed,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 struct AqcChannelInfo {
     label_id: LabelId,
     channel_id: AqcChannelId,
 }
 
 /// An AQC Channel ID.
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone)]
 enum AqcChannelId {
     Bidi(BidiChannelId),
     Uni(UniChannelId),

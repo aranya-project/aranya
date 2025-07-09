@@ -14,6 +14,7 @@ use aranya_daemon_api::{
 };
 use aranya_util::Addr;
 use buggy::BugExt as _;
+use serde::{Deserialize, Serialize};
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
@@ -25,6 +26,7 @@ use crate::{
 };
 
 /// List of device IDs.
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize)]
 pub struct Devices {
     data: Vec<DeviceId>,
 }
@@ -42,6 +44,7 @@ impl Devices {
 }
 
 /// List of labels.
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize)]
 pub struct Labels {
     data: Vec<Label>,
 }
@@ -59,6 +62,7 @@ impl Labels {
 }
 
 /// Builds a [`Client`].
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
 pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]
@@ -70,10 +74,7 @@ pub struct ClientBuilder<'a> {
 impl ClientBuilder<'_> {
     /// Returns a default [`ClientBuilder`].
     pub fn new() -> Self {
-        Self {
-            uds_path: None,
-            aqc_addr: None,
-        }
+        Self::default()
     }
 
     /// Connects to the daemon.
@@ -96,12 +97,6 @@ impl ClientBuilder<'_> {
         Client::connect(sock, aqc_addr)
             .await
             .inspect_err(|err| error!(?err, "unable to connect to daemon"))
-    }
-}
-
-impl Default for ClientBuilder<'_> {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -306,6 +301,7 @@ impl Client {
 /// - creating/assigning/deleting labels.
 /// - creating/deleting fast channels.
 /// - assigning network identifiers to devices.
+#[derive(Debug, Clone)]
 pub struct Team<'a> {
     client: &'a Client,
     team_id: TeamId,
@@ -507,7 +503,10 @@ impl Team<'_> {
     }
 }
 
-/// Facilitates fact database queries.
+/// Queries the Aranya fact database.
+///
+/// The fact database is updated when actions/effects are processed for a team.
+#[derive(Debug, Clone)]
 pub struct Queries<'a> {
     client: &'a Client,
     team_id: TeamId,

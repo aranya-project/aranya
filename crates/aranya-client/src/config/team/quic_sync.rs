@@ -12,7 +12,7 @@ use tracing::error;
 use crate::{error::InvalidArg, ConfigError, Result};
 
 /// Configuration for creating a new team with QUIC synchronization.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CreateTeamQuicSyncConfig {
     mode: CreateSeedMode,
 }
@@ -25,7 +25,7 @@ impl CreateTeamQuicSyncConfig {
 }
 
 /// Configuration for adding members to an existing team with QUIC synchronization.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AddTeamQuicSyncConfig {
     mode: AddSeedMode,
 }
@@ -38,7 +38,7 @@ impl AddTeamQuicSyncConfig {
 }
 
 /// Builder for [`CreateTeamQuicSyncConfig`]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct CreateTeamQuicSyncConfigBuilder {
     mode: CreateSeedMode,
 }
@@ -74,7 +74,7 @@ impl CreateTeamQuicSyncConfigBuilder {
 }
 
 /// Builder for [`AddTeamQuicSyncConfig`]
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct AddTeamQuicSyncConfigBuilder {
     mode: Option<AddSeedMode>,
 }

@@ -33,6 +33,7 @@ impl From<SyncPeerConfig> for aranya_daemon_api::SyncPeerConfig {
 }
 
 /// Builder for a [`SyncPeerConfig`]
+#[derive(Debug, Clone)]
 pub struct SyncPeerConfigBuilder {
     interval: Option<Duration>,
     sync_now: bool,

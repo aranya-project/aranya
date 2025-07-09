@@ -38,6 +38,7 @@ mod imp {
 
     use super::Toggle;
 
+    #[derive(Debug, Clone)]
     pub struct True;
     impl<'de> Deserialize<'de> for True {
         fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -57,7 +58,7 @@ mod imp {
         }
     }
 
-    #[derive(Default)]
+    #[derive(Debug, Clone, Default)]
     pub struct False;
     impl<'de> Deserialize<'de> for False {
         fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -77,7 +78,7 @@ mod imp {
         }
     }
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     #[serde(untagged)]
     pub enum E<T> {
         Enabled {

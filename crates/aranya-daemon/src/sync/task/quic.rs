@@ -86,6 +86,7 @@ pub enum Error {
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
+#[derive(Debug)]
 pub struct State {
     /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: QuicClient,
@@ -329,6 +330,7 @@ impl Syncer<State> {
 
 /// The Aranya QUIC sync server.
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
+#[derive(Debug)]
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
     aranya: AranyaClient<EN, SP>,

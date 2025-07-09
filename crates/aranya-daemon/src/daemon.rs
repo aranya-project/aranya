@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, io, path::Path, sync::Arc};
+use std::{collections::BTreeMap, fmt::Debug, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{
@@ -96,6 +96,8 @@ pub(crate) use invalid_graphs::InvalidGraphs;
 ///
 /// Dropping this will abort the daemon's tasks.
 #[clippy::has_significant_drop]
+#[derive(Debug)]
+
 pub struct DaemonHandle {
     set: JoinSet<()>,
 }
@@ -410,6 +412,15 @@ impl Daemon {
             }
         };
         bundle.public_keys(eng, store)
+    }
+}
+
+impl Debug for Daemon {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Daemon")
+            .field("api", &self.api)
+            .field("span", &self.span)
+            .finish_non_exhaustive()
     }
 }
 

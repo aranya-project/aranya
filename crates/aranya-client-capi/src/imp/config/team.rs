@@ -15,7 +15,7 @@ pub(crate) use quic_sync::{
 };
 
 /// A team config required to create a new Aranya team.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CreateTeamConfig {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
@@ -36,7 +36,7 @@ impl Typed for CreateTeamConfig {
 }
 
 /// Builder for constructing a [`CreateTeamConfig`].
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct CreateTeamConfigBuilder {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
@@ -69,7 +69,7 @@ impl Builder for CreateTeamConfigBuilder {
 }
 
 /// Configuration for adding an existing Aranya team to a device.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AddTeamConfig {
     team_id: TeamId,
     quic_sync: Option<AddTeamQuicSyncConfig>,
@@ -91,7 +91,7 @@ impl Typed for AddTeamConfig {
 }
 
 /// Builder for constructing an [`AddTeamConfig`].
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct AddTeamConfigBuilder {
     team_id: Option<TeamId>,
     quic_sync: Option<AddTeamQuicSyncConfig>,
