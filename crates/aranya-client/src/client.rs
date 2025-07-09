@@ -14,7 +14,6 @@ use aranya_daemon_api::{
 };
 use aranya_util::Addr;
 use buggy::BugExt as _;
-use serde::{Deserialize, Serialize};
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
 use tracing::{debug, error, info, instrument};
@@ -26,7 +25,7 @@ use crate::{
 };
 
 /// List of device IDs.
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Devices {
     data: Vec<DeviceId>,
 }
@@ -44,7 +43,7 @@ impl Devices {
 }
 
 /// List of labels.
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Labels {
     data: Vec<Label>,
 }
@@ -62,7 +61,7 @@ impl Labels {
 }
 
 /// Builds a [`Client`].
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Default)]
+#[derive(Debug, Default)]
 pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]

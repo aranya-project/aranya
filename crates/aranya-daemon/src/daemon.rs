@@ -121,6 +121,7 @@ impl DaemonHandle {
 }
 
 /// The daemon itself.
+// TODO: #[derive(Debug)] once `LinearStorageProvider` and `DefaultEngine` implement it.
 pub struct Daemon {
     sync_server: SyncServer,
     syncer: Syncer<QuicSyncState>,

@@ -69,7 +69,7 @@ where
 
 type Panic = Box<dyn Any + Send>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Scope {
     tracker: TaskTracker,
     tx: mpsc::Sender<Panic>,

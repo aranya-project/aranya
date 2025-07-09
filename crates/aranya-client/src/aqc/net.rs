@@ -65,7 +65,7 @@ pub(crate) struct AqcClient {
     daemon: DaemonApiClient,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 struct ClientState {
     /// Quic client used to create channels with peers.
     quic_client: Client,
