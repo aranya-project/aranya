@@ -234,7 +234,7 @@ mod tests {
         let path = Path::new(DIR).join("example.toml");
         let got = Config::load(path)?;
         let want = Config {
-            name: "name".to_string(),
+            name: "my-aranya-daemon".into(),
             runtime_dir: "/var/run/aranya".parse()?,
             state_dir: "/var/lib/aranya".parse()?,
             cache_dir: "/var/cache/aranya".parse()?,

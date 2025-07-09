@@ -474,7 +474,7 @@ mod tests {
 
         let any = Addr::new("localhost", 0).expect("should be able to create new Addr");
         let cfg = Config {
-            name: "name".to_string(),
+            name: "test-daemon-run".into(),
             runtime_dir: work_dir.join("run"),
             state_dir: work_dir.join("state"),
             cache_dir: work_dir.join("cache"),
