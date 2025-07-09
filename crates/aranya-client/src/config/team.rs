@@ -84,7 +84,7 @@ impl AddTeamConfigBuilder {
 }
 
 /// Configuration for creating a new team.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct CreateTeamConfig {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
@@ -105,7 +105,7 @@ impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
 }
 
 /// Configuration for joining an existing team.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct AddTeamConfig {
     id: TeamId,
     quic_sync: Option<AddTeamQuicSyncConfig>,

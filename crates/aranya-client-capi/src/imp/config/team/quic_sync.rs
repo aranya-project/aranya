@@ -11,7 +11,7 @@ use super::Error;
 use crate::api::defs::{self};
 
 /// QUIC syncer configuration for CreateTeam() operation.
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct CreateTeamQuicSyncConfig {
     mode: CreateSeedMode,
 }
@@ -46,7 +46,7 @@ impl From<CreateTeamQuicSyncConfig> for aranya_client::CreateTeamQuicSyncConfig 
 }
 
 /// QUIC syncer configuration for AddTeam() operation.
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct AddTeamQuicSyncConfig {
     mode: AddSeedMode,
 }

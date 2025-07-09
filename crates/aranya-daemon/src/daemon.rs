@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, fmt::Debug, io, path::Path, sync::Arc};
+use std::{collections::BTreeMap, io, path::Path, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_crypto::{

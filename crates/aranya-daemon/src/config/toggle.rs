@@ -34,11 +34,12 @@ impl<T: Serialize> Serialize for Toggle<T> {
 }
 
 mod imp {
+    #![allow(missing_debug_implementations)]
+
     use serde::{de, ser, Deserialize, Serialize};
 
     use super::Toggle;
 
-    #[derive(Debug)]
     pub struct True;
     impl<'de> Deserialize<'de> for True {
         fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -58,7 +59,7 @@ mod imp {
         }
     }
 
-    #[derive(Debug, Default)]
+    #[derive(Default)]
     pub struct False;
     impl<'de> Deserialize<'de> for False {
         fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -78,7 +79,7 @@ mod imp {
         }
     }
 
-    #[derive(Debug, Serialize, Deserialize)]
+    #[derive(Serialize, Deserialize)]
     #[serde(untagged)]
     pub enum E<T> {
         Enabled {
