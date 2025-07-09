@@ -62,33 +62,33 @@ impl Labels {
 pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]
-    uds_path: Option<&'a Path>,
+    daemon_uds_path: Option<&'a Path>,
     // AQC address.
-    aqc_addr: Option<&'a Addr>,
+    aqc_server_addr: Option<&'a Addr>,
 }
 
 impl ClientBuilder<'_> {
     /// Returns a default [`ClientBuilder`].
     pub fn new() -> Self {
         Self {
-            uds_path: None,
-            aqc_addr: None,
+            daemon_uds_path: None,
+            aqc_server_addr: None,
         }
     }
 
     /// Connects to the daemon.
     pub async fn connect(self) -> Result<Client> {
-        let Some(sock) = self.uds_path else {
+        let Some(sock) = self.daemon_uds_path else {
             return Err(IpcError::new(InvalidArg::new(
-                "with_daemon_uds_path",
+                "daemon_uds_path",
                 "must specify the daemon's UDS path",
             ))
             .into());
         };
 
-        let Some(aqc_addr) = &self.aqc_addr else {
+        let Some(aqc_addr) = &self.aqc_server_addr else {
             return Err(IpcError::new(InvalidArg::new(
-                "with_daemon_aqc_addr",
+                "aqc_server_addr",
                 "must specify the AQC server address",
             ))
             .into());
@@ -109,14 +109,14 @@ impl<'a> ClientBuilder<'a> {
     /// Specifies the UDS socket path the daemon is listening on.
     #[cfg(unix)]
     #[cfg_attr(docsrs, doc(cfg(unix)))]
-    pub fn with_daemon_uds_path(mut self, sock: &'a Path) -> Self {
-        self.uds_path = Some(sock);
+    pub fn daemon_uds_path(mut self, sock: &'a Path) -> Self {
+        self.daemon_uds_path = Some(sock);
         self
     }
 
     /// Specifies the AQC server address.
-    pub fn with_daemon_aqc_addr(mut self, addr: &'a Addr) -> Self {
-        self.aqc_addr = Some(addr);
+    pub fn aqc_server_addr(mut self, addr: &'a Addr) -> Self {
+        self.aqc_server_addr = Some(addr);
         self
     }
 }
