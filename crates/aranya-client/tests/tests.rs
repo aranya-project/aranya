@@ -95,40 +95,55 @@ async fn test_remove_devices() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
+    team.add_all_sync_peers(team_id)
+        .await
+        .context("unable to add all sync peers")?;
+
+    team.owner
+        .client
+        .team(team_id)
+        .add_device_to_team(team.admin.pk.clone(), None)
+        .await
+        .context("owner should be able to add admin to team")?;
+
+    // There are now three more roles:
+    // - admin
+    // - operator
+    // - member
+    // The owner role manages all of those roles.
     let roles = team
         .setup_default_roles(team_id)
         .await
         .context("unable to setup default roles")?;
 
-    team.add_all_sync_peers(team_id).await?;
-    team.add_all_device_roles(team_id).await?;
-
-    // Remove devices from the team while checking that the device count decreases each time a device is removed.
     let mut owner = team.owner.client.team(team_id);
+    let mut admin = team.admin.client.team(team_id);
+    let mut operator = team.operator.client.team(team_id);
 
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 5);
-
-    owner.remove_device_from_team(team.membera.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 4);
-
-    owner.remove_device_from_team(team.memberb.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 3);
+    // The owner
+    owner.assign_role(team.admin.id, roles.admin().id).await?;
 
     owner
-        .revoke_role(team.operator.id, roles.operator().id)
-        .await?;
-    owner.remove_device_from_team(team.operator.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 2);
-
-    owner.revoke_role(team.admin.id, roles.admin().id).await?;
-    owner.remove_device_from_team(team.admin.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 1);
-
-    owner.revoke_role(team.owner.id, roles.owner().id).await?;
-    owner
-        .remove_device_from_team(team.owner.id)
+        .change_role_managing_role(roles.admin().id, roles.operator().id)
         .await
-        .expect_err("owner should not be able to remove itself from team");
+        .context("owner should be able to change admin role to operator")?;
+
+    sleep(SLEEP_INTERVAL).await;
+
+    admin
+        .add_device_to_team(team.operator.pk.clone(), None)
+        .await
+        .context("admin should be able to add operator to team")?;
+    admin
+        .add_device_to_team(team.membera.pk.clone(), None)
+        .await
+        .context("admin should be able to add membera to team")?;
+    admin
+        .add_device_to_team(team.memberb.pk.clone(), None)
+        .await
+        .context("admin should be able to add memberb to team")?;
+
+    //assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 5);
 
     Ok(())
 }

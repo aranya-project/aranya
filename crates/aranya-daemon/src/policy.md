@@ -571,6 +571,19 @@ _operations_, and each _operation_ is associated with a role.
 // The single-key structure ensures one-to-one mapping.
 fact OpRequiresRole[op string]=>{role_id id}
 
+// Shorthand for `update OpRequiresRole`.`
+finish function update_op_requires_role(
+    op string,
+    old_role_id id,
+    new_role_id id,
+) {
+    update OpRequiresRole[op: op]=>{
+        role_id: old_role_id,
+    } to {
+        role_id: new_role_id,
+    }
+}
+
 // Returns the device corresponding with the author of the
 // envelope without checking whether it is authorized to perform
 // any operations.
@@ -980,6 +993,25 @@ command SetupDefaultRole {
         let author = get_authorized_device(envelope, "SetupDefaultRole")
         let role_id = derive_role_id(envelope)
 
+        // For "admin"
+        let update_op_role_id = (check_unwrap query OpRequiresRole[op: "UpdateOperation"]).role_id
+        let create_label_role_id = (check_unwrap query OpRequiresRole[op: "CreateLabel"]).role_id
+        let delete_label_role_id = (check_unwrap query OpRequiresRole[op: "DeleteLabel"]).role_id
+        let change_label_managing_role_id = (check_unwrap query OpRequiresRole[op: "ChangeLabelManagingRole"]).role_id
+
+        // For "admin" and "operator"
+        let set_aqc_network_name_id = (check_unwrap query OpRequiresRole[op: "SetAqcNetworkName"]).role_id
+        let unset_aqc_network_name_id = (check_unwrap query OpRequiresRole[op: "UnsetAqcNetworkName"]).role_id
+
+        // For "operator"
+        let assign_label_role_id = (check_unwrap query OpRequiresRole[op: "AssignLabel"]).role_id
+        let revoke_label_role_id = (check_unwrap query OpRequiresRole[op: "RevokeLabel"]).role_id
+
+
+        // For "member"
+        let aqc_create_uni_channel_role_id = (check_unwrap query OpRequiresRole[op: "AqcCreateUniChannel"]).role_id
+        let aqc_create_bidi_channel_role_id = (check_unwrap query OpRequiresRole[op: "AqcCreateBidiChannel"]).role_id
+
         match this.name {
             "admin" => {
                 finish {
@@ -990,11 +1022,12 @@ command SetupDefaultRole {
                         managing_role_id: this.managing_role_id,
                     })
 
-                    create OpRequiresRole[op: "CreateLabel"]=>{role_id: role_id}
-                    create OpRequiresRole[op: "DeleteLabel"]=>{role_id: role_id}
-                    create OpRequiresRole[op: "ChangeLabelManagingRole"]=>{role_id: role_id}
-
-                    create OpRequiresRole[op: "UnsetAqcNetworkName"]=>{role_id: role_id}
+                    update_op_requires_role("AddDevice", update_op_role_id, role_id)
+                    update_op_requires_role("CreateLabel", create_label_role_id, role_id)
+                    update_op_requires_role("DeleteLabel", delete_label_role_id, role_id)
+                    update_op_requires_role("ChangeLabelManagingRole", change_label_managing_role_id, role_id)
+                    update_op_requires_role("SetAqcNetworkName", set_aqc_network_name_id, role_id)
+                    update_op_requires_role("UnsetAqcNetworkName", unset_aqc_network_name_id, role_id)
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -1014,11 +1047,10 @@ command SetupDefaultRole {
                         managing_role_id: this.managing_role_id,
                     })
 
-                    create OpRequiresRole[op: "AssignLabel"]=>{role_id: role_id}
-                    create OpRequiresRole[op: "RevokeLabel"]=>{role_id: role_id}
-
-                    create OpRequiresRole[op: "SetAqcNetworkName"]=>{role_id: role_id}
-                    create OpRequiresRole[op: "UnsetAqcNetworkName"]=>{role_id: role_id}
+                    update_op_requires_role("AssignLabel", assign_label_role_id, role_id)
+                    update_op_requires_role("RevokeLabel", revoke_label_role_id, role_id)
+                    update_op_requires_role("SetAqcNetworkName", set_aqc_network_name_id, role_id)
+                    update_op_requires_role("UnsetAqcNetworkName", unset_aqc_network_name_id, role_id)
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -1038,8 +1070,8 @@ command SetupDefaultRole {
                         managing_role_id: this.managing_role_id,
                     })
 
-                    create OpRequiresRole[op: "AqcCreateBidiChannel"]=>{role_id: role_id}
-                    create OpRequiresRole[op: "AqcCreateUniChannel"]=>{role_id: role_id}
+                    update_op_requires_role("AqcCreateUniChannel", aqc_create_uni_channel_role_id, role_id)
+                    update_op_requires_role("AqcCreateBidiChannel", aqc_create_bidi_channel_role_id, role_id)
 
                     emit RoleCreated {
                         role_id: role_id,
