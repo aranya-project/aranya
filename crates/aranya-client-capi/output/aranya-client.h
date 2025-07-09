@@ -721,7 +721,7 @@ AranyaError aranya_init_logging_ext(struct AranyaExtError *__ext_err);
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_get_key_bundle(struct AranyaClient *client,
+AranyaError aranya_get_key_bundle(const struct AranyaClient *client,
                                   uint8_t *keybundle,
                                   size_t *keybundle_len);
 
@@ -734,7 +734,7 @@ AranyaError aranya_get_key_bundle(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_get_key_bundle_ext(struct AranyaClient *client,
+AranyaError aranya_get_key_bundle_ext(const struct AranyaClient *client,
                                       uint8_t *keybundle,
                                       size_t *keybundle_len,
                                       struct AranyaExtError *__ext_err);
@@ -771,7 +771,7 @@ AranyaError aranya_id_from_str(const char *str, struct AranyaId *__output);
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_get_device_id(struct AranyaClient *client,
+AranyaError aranya_get_device_id(const struct AranyaClient *client,
                                  struct AranyaDeviceId *__output);
 
 /**
@@ -782,7 +782,7 @@ AranyaError aranya_get_device_id(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_get_device_id_ext(struct AranyaClient *client,
+AranyaError aranya_get_device_id_ext(const struct AranyaClient *client,
                                      struct AranyaDeviceId *__output,
                                      struct AranyaExtError *__ext_err);
 
@@ -1409,7 +1409,7 @@ AranyaError aranya_sync_peer_config_builder_set_sync_later_ext(struct AranyaSync
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_role(struct AranyaClient *client,
+AranyaError aranya_assign_role(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                const struct AranyaDeviceId *device,
                                AranyaRole role);
@@ -1428,7 +1428,7 @@ AranyaError aranya_assign_role(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_role_ext(struct AranyaClient *client,
+AranyaError aranya_assign_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    const struct AranyaDeviceId *device,
                                    AranyaRole role,
@@ -1446,7 +1446,7 @@ AranyaError aranya_assign_role_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_revoke_role(struct AranyaClient *client,
+AranyaError aranya_revoke_role(const struct AranyaClient *client,
                                const struct AranyaTeamId *team,
                                const struct AranyaDeviceId *device,
                                AranyaRole role);
@@ -1463,7 +1463,7 @@ AranyaError aranya_revoke_role(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_revoke_role_ext(struct AranyaClient *client,
+AranyaError aranya_revoke_role_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    const struct AranyaDeviceId *device,
                                    AranyaRole role,
@@ -1480,7 +1480,7 @@ AranyaError aranya_revoke_role_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_create_label(struct AranyaClient *client,
+AranyaError aranya_create_label(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaLabelName name,
                                 struct AranyaLabelId *__output);
@@ -1496,7 +1496,7 @@ AranyaError aranya_create_label(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_create_label_ext(struct AranyaClient *client,
+AranyaError aranya_create_label_ext(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     AranyaLabelName name,
                                     struct AranyaLabelId *__output,
@@ -1513,7 +1513,7 @@ AranyaError aranya_create_label_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_delete_label(struct AranyaClient *client,
+AranyaError aranya_delete_label(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 const struct AranyaLabelId *label_id);
 
@@ -1528,7 +1528,7 @@ AranyaError aranya_delete_label(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_delete_label_ext(struct AranyaClient *client,
+AranyaError aranya_delete_label_ext(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     const struct AranyaLabelId *label_id,
                                     struct AranyaExtError *__ext_err);
@@ -1545,7 +1545,7 @@ AranyaError aranya_delete_label_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_label(struct AranyaClient *client,
+AranyaError aranya_assign_label(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 const struct AranyaDeviceId *device,
                                 const struct AranyaLabelId *label_id,
@@ -1563,7 +1563,7 @@ AranyaError aranya_assign_label(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_assign_label_ext(struct AranyaClient *client,
+AranyaError aranya_assign_label_ext(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     const struct AranyaDeviceId *device,
                                     const struct AranyaLabelId *label_id,
@@ -1582,7 +1582,7 @@ AranyaError aranya_assign_label_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_revoke_label(struct AranyaClient *client,
+AranyaError aranya_revoke_label(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 const struct AranyaDeviceId *device,
                                 const struct AranyaLabelId *label_id);
@@ -1599,7 +1599,7 @@ AranyaError aranya_revoke_label(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
+AranyaError aranya_revoke_label_ext(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     const struct AranyaDeviceId *device,
                                     const struct AranyaLabelId *label_id,
@@ -1614,7 +1614,7 @@ AranyaError aranya_revoke_label_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_create_team(struct AranyaClient *client,
+AranyaError aranya_create_team(const struct AranyaClient *client,
                                const struct AranyaTeamConfig *cfg,
                                struct AranyaTeamId *__output);
 
@@ -1627,7 +1627,7 @@ AranyaError aranya_create_team(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_create_team_ext(struct AranyaClient *client,
+AranyaError aranya_create_team_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamConfig *cfg,
                                    struct AranyaTeamId *__output,
                                    struct AranyaExtError *__ext_err);
@@ -1641,7 +1641,7 @@ AranyaError aranya_create_team_ext(struct AranyaClient *client,
  * @param[out] buf buffer where random bytes are written to.
  * @param[in] buf_len the size of the buffer.
  */
-AranyaError aranya_rand(struct AranyaClient *client,
+AranyaError aranya_rand(const struct AranyaClient *client,
                         uint8_t *buf,
                         size_t buf_len);
 
@@ -1654,7 +1654,7 @@ AranyaError aranya_rand(struct AranyaClient *client,
  * @param[out] buf buffer where random bytes are written to.
  * @param[in] buf_len the size of the buffer.
  */
-AranyaError aranya_rand_ext(struct AranyaClient *client,
+AranyaError aranya_rand_ext(const struct AranyaClient *client,
                             uint8_t *buf,
                             size_t buf_len,
                             struct AranyaExtError *__ext_err);
@@ -1677,7 +1677,7 @@ AranyaError aranya_rand_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_encrypt_psk_seed_for_peer(struct AranyaClient *client,
+AranyaError aranya_encrypt_psk_seed_for_peer(const struct AranyaClient *client,
                                              const struct AranyaTeamId *team_id,
                                              const uint8_t *keybundle,
                                              size_t keybundle_len,
@@ -1702,7 +1702,7 @@ AranyaError aranya_encrypt_psk_seed_for_peer(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_encrypt_psk_seed_for_peer_ext(struct AranyaClient *client,
+AranyaError aranya_encrypt_psk_seed_for_peer_ext(const struct AranyaClient *client,
                                                  const struct AranyaTeamId *team_id,
                                                  const uint8_t *keybundle,
                                                  size_t keybundle_len,
@@ -1719,7 +1719,7 @@ AranyaError aranya_encrypt_psk_seed_for_peer_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_add_team(struct AranyaClient *client,
+AranyaError aranya_add_team(const struct AranyaClient *client,
                             const struct AranyaTeamId *team,
                             const struct AranyaTeamConfig *cfg);
 
@@ -1732,7 +1732,7 @@ AranyaError aranya_add_team(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_add_team_ext(struct AranyaClient *client,
+AranyaError aranya_add_team_ext(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 const struct AranyaTeamConfig *cfg,
                                 struct AranyaExtError *__ext_err);
@@ -1745,7 +1745,7 @@ AranyaError aranya_add_team_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_team(struct AranyaClient *client,
+AranyaError aranya_remove_team(const struct AranyaClient *client,
                                const struct AranyaTeamId *team);
 
 /**
@@ -1756,7 +1756,7 @@ AranyaError aranya_remove_team(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_team_ext(struct AranyaClient *client,
+AranyaError aranya_remove_team_ext(const struct AranyaClient *client,
                                    const struct AranyaTeamId *team,
                                    struct AranyaExtError *__ext_err);
 
@@ -1768,7 +1768,7 @@ AranyaError aranya_remove_team_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_close_team(struct AranyaClient *client,
+AranyaError aranya_close_team(const struct AranyaClient *client,
                               const struct AranyaTeamId *team);
 
 /**
@@ -1779,7 +1779,7 @@ AranyaError aranya_close_team(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_close_team_ext(struct AranyaClient *client,
+AranyaError aranya_close_team_ext(const struct AranyaClient *client,
                                   const struct AranyaTeamId *team,
                                   struct AranyaExtError *__ext_err);
 
@@ -1795,7 +1795,7 @@ AranyaError aranya_close_team_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_add_device_to_team(struct AranyaClient *client,
+AranyaError aranya_add_device_to_team(const struct AranyaClient *client,
                                       const struct AranyaTeamId *team,
                                       const uint8_t *keybundle,
                                       size_t keybundle_len);
@@ -1812,7 +1812,7 @@ AranyaError aranya_add_device_to_team(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_add_device_to_team_ext(struct AranyaClient *client,
+AranyaError aranya_add_device_to_team_ext(const struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
                                           const uint8_t *keybundle,
                                           size_t keybundle_len,
@@ -1829,7 +1829,7 @@ AranyaError aranya_add_device_to_team_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_device_from_team(struct AranyaClient *client,
+AranyaError aranya_remove_device_from_team(const struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
                                            const struct AranyaDeviceId *device);
 
@@ -1844,7 +1844,7 @@ AranyaError aranya_remove_device_from_team(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_device_from_team_ext(struct AranyaClient *client,
+AranyaError aranya_remove_device_from_team_ext(const struct AranyaClient *client,
                                                const struct AranyaTeamId *team,
                                                const struct AranyaDeviceId *device,
                                                struct AranyaExtError *__ext_err);
@@ -1863,7 +1863,7 @@ AranyaError aranya_remove_device_from_team_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_add_sync_peer(struct AranyaClient *client,
+AranyaError aranya_add_sync_peer(const struct AranyaClient *client,
                                  const struct AranyaTeamId *team,
                                  AranyaAddr addr,
                                  const struct AranyaSyncPeerConfig *config);
@@ -1882,7 +1882,7 @@ AranyaError aranya_add_sync_peer(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_add_sync_peer_ext(struct AranyaClient *client,
+AranyaError aranya_add_sync_peer_ext(const struct AranyaClient *client,
                                      const struct AranyaTeamId *team,
                                      AranyaAddr addr,
                                      const struct AranyaSyncPeerConfig *config,
@@ -1897,7 +1897,7 @@ AranyaError aranya_add_sync_peer_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_sync_peer(struct AranyaClient *client,
+AranyaError aranya_remove_sync_peer(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     AranyaAddr addr);
 
@@ -1910,7 +1910,7 @@ AranyaError aranya_remove_sync_peer(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_remove_sync_peer_ext(struct AranyaClient *client,
+AranyaError aranya_remove_sync_peer_ext(const struct AranyaClient *client,
                                         const struct AranyaTeamId *team,
                                         AranyaAddr addr,
                                         struct AranyaExtError *__ext_err);
@@ -1935,7 +1935,7 @@ AranyaError aranya_remove_sync_peer_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_sync_now(struct AranyaClient *client,
+AranyaError aranya_sync_now(const struct AranyaClient *client,
                             const struct AranyaTeamId *team,
                             AranyaAddr addr,
                             const struct AranyaSyncPeerConfig *config);
@@ -1960,7 +1960,7 @@ AranyaError aranya_sync_now(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_sync_now_ext(struct AranyaClient *client,
+AranyaError aranya_sync_now_ext(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 AranyaAddr addr,
                                 const struct AranyaSyncPeerConfig *config,
@@ -1976,7 +1976,7 @@ AranyaError aranya_sync_now_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_devices_on_team(struct AranyaClient *client,
+AranyaError aranya_query_devices_on_team(const struct AranyaClient *client,
                                          const struct AranyaTeamId *team,
                                          struct AranyaDeviceId *devices,
                                          size_t *devices_len);
@@ -1991,7 +1991,7 @@ AranyaError aranya_query_devices_on_team(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
+AranyaError aranya_query_devices_on_team_ext(const struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              struct AranyaDeviceId *devices,
                                              size_t *devices_len,
@@ -2008,7 +2008,7 @@ AranyaError aranya_query_devices_on_team_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_device_keybundle(struct AranyaClient *client,
+AranyaError aranya_query_device_keybundle(const struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
                                           const struct AranyaDeviceId *device,
                                           uint8_t *keybundle,
@@ -2025,7 +2025,7 @@ AranyaError aranya_query_device_keybundle(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
+AranyaError aranya_query_device_keybundle_ext(const struct AranyaClient *client,
                                               const struct AranyaTeamId *team,
                                               const struct AranyaDeviceId *device,
                                               uint8_t *keybundle,
@@ -2047,7 +2047,7 @@ AranyaError aranya_query_device_keybundle_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
+AranyaError aranya_query_device_label_assignments(const struct AranyaClient *client,
                                                   const struct AranyaTeamId *team,
                                                   const struct AranyaDeviceId *device,
                                                   struct AranyaLabelId *labels,
@@ -2068,7 +2068,7 @@ AranyaError aranya_query_device_label_assignments(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_device_label_assignments_ext(struct AranyaClient *client,
+AranyaError aranya_query_device_label_assignments_ext(const struct AranyaClient *client,
                                                       const struct AranyaTeamId *team,
                                                       const struct AranyaDeviceId *device,
                                                       struct AranyaLabelId *labels,
@@ -2089,7 +2089,7 @@ AranyaError aranya_query_device_label_assignments_ext(struct AranyaClient *clien
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_labels(struct AranyaClient *client,
+AranyaError aranya_query_labels(const struct AranyaClient *client,
                                 const struct AranyaTeamId *team,
                                 struct AranyaLabelId *labels,
                                 size_t *labels_len);
@@ -2108,7 +2108,7 @@ AranyaError aranya_query_labels(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_labels_ext(struct AranyaClient *client,
+AranyaError aranya_query_labels_ext(const struct AranyaClient *client,
                                     const struct AranyaTeamId *team,
                                     struct AranyaLabelId *labels,
                                     size_t *labels_len,
@@ -2125,7 +2125,7 @@ AranyaError aranya_query_labels_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_label_exists(struct AranyaClient *client,
+AranyaError aranya_query_label_exists(const struct AranyaClient *client,
                                       const struct AranyaTeamId *team,
                                       const struct AranyaLabelId *label,
                                       bool *__output);
@@ -2141,7 +2141,7 @@ AranyaError aranya_query_label_exists(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_label_exists_ext(struct AranyaClient *client,
+AranyaError aranya_query_label_exists_ext(const struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
                                           const struct AranyaLabelId *label,
                                           bool *__output,
@@ -2158,7 +2158,7 @@ AranyaError aranya_query_label_exists_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_aqc_net_identifier(struct AranyaClient *client,
+AranyaError aranya_query_aqc_net_identifier(const struct AranyaClient *client,
                                             const struct AranyaTeamId *team,
                                             const struct AranyaDeviceId *device,
                                             char *ident,
@@ -2176,7 +2176,7 @@ AranyaError aranya_query_aqc_net_identifier(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_query_aqc_net_identifier_ext(struct AranyaClient *client,
+AranyaError aranya_query_aqc_net_identifier_ext(const struct AranyaClient *client,
                                                 const struct AranyaTeamId *team,
                                                 const struct AranyaDeviceId *device,
                                                 char *ident,
@@ -2200,7 +2200,7 @@ AranyaError aranya_query_aqc_net_identifier_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_assign_net_identifier(struct AranyaClient *client,
+AranyaError aranya_aqc_assign_net_identifier(const struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              const struct AranyaDeviceId *device,
                                              AranyaNetIdentifier net_identifier);
@@ -2221,7 +2221,7 @@ AranyaError aranya_aqc_assign_net_identifier(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_assign_net_identifier_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_assign_net_identifier_ext(const struct AranyaClient *client,
                                                  const struct AranyaTeamId *team,
                                                  const struct AranyaDeviceId *device,
                                                  AranyaNetIdentifier net_identifier,
@@ -2239,7 +2239,7 @@ AranyaError aranya_aqc_assign_net_identifier_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_remove_net_identifier(struct AranyaClient *client,
+AranyaError aranya_aqc_remove_net_identifier(const struct AranyaClient *client,
                                              const struct AranyaTeamId *team,
                                              const struct AranyaDeviceId *device,
                                              AranyaNetIdentifier net_identifier);
@@ -2256,7 +2256,7 @@ AranyaError aranya_aqc_remove_net_identifier(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_remove_net_identifier_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_remove_net_identifier_ext(const struct AranyaClient *client,
                                                  const struct AranyaTeamId *team,
                                                  const struct AranyaDeviceId *device,
                                                  AranyaNetIdentifier net_identifier,
@@ -2408,7 +2408,7 @@ AranyaError aranya_aqc_receive_stream_cleanup_ext(struct AranyaAqcReceiveStream 
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_create_bidi_channel(struct AranyaClient *client,
+AranyaError aranya_aqc_create_bidi_channel(const struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
                                            AranyaNetIdentifier peer,
                                            const struct AranyaLabelId *label_id,
@@ -2427,7 +2427,7 @@ AranyaError aranya_aqc_create_bidi_channel(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_create_bidi_channel_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_create_bidi_channel_ext(const struct AranyaClient *client,
                                                const struct AranyaTeamId *team,
                                                AranyaNetIdentifier peer,
                                                const struct AranyaLabelId *label_id,
@@ -2447,7 +2447,7 @@ AranyaError aranya_aqc_create_bidi_channel_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_create_uni_channel(struct AranyaClient *client,
+AranyaError aranya_aqc_create_uni_channel(const struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
                                           AranyaNetIdentifier peer,
                                           const struct AranyaLabelId *label_id,
@@ -2466,7 +2466,7 @@ AranyaError aranya_aqc_create_uni_channel(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_create_uni_channel_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_create_uni_channel_ext(const struct AranyaClient *client,
                                               const struct AranyaTeamId *team,
                                               AranyaNetIdentifier peer,
                                               const struct AranyaLabelId *label_id,
@@ -2483,7 +2483,7 @@ AranyaError aranya_aqc_create_uni_channel_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_bidi_channel(struct AranyaClient *client,
+AranyaError aranya_aqc_delete_bidi_channel(const struct AranyaClient *client,
                                            struct AranyaAqcBidiChannel *channel);
 
 /**
@@ -2496,7 +2496,7 @@ AranyaError aranya_aqc_delete_bidi_channel(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_delete_bidi_channel_ext(const struct AranyaClient *client,
                                                struct AranyaAqcBidiChannel *channel,
                                                struct AranyaExtError *__ext_err);
 
@@ -2510,7 +2510,7 @@ AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_uni_channel(struct AranyaClient *client,
+AranyaError aranya_aqc_delete_uni_channel(const struct AranyaClient *client,
                                           struct AranyaAqcSendChannel *channel);
 
 /**
@@ -2523,7 +2523,7 @@ AranyaError aranya_aqc_delete_uni_channel(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_delete_uni_channel_ext(const struct AranyaClient *client,
                                               struct AranyaAqcSendChannel *channel,
                                               struct AranyaExtError *__ext_err);
 
@@ -2557,7 +2557,7 @@ AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_try_receive_channel(struct AranyaClient *client,
+AranyaError aranya_aqc_try_receive_channel(const struct AranyaClient *client,
                                            struct AranyaAqcPeerChannel *channel,
                                            AranyaAqcChannelType *__output);
 
@@ -2591,7 +2591,7 @@ AranyaError aranya_aqc_try_receive_channel(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_try_receive_channel_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_try_receive_channel_ext(const struct AranyaClient *client,
                                                struct AranyaAqcPeerChannel *channel,
                                                AranyaAqcChannelType *__output,
                                                struct AranyaExtError *__ext_err);
@@ -2670,7 +2670,7 @@ AranyaError aranya_aqc_get_receive_channel_ext(struct AranyaAqcPeerChannel *chan
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_bidi_create_bidi_stream(struct AranyaClient *client,
+AranyaError aranya_aqc_bidi_create_bidi_stream(const struct AranyaClient *client,
                                                struct AranyaAqcBidiChannel *channel,
                                                struct AranyaAqcBidiStream *stream);
 
@@ -2686,7 +2686,7 @@ AranyaError aranya_aqc_bidi_create_bidi_stream(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_bidi_create_bidi_stream_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_bidi_create_bidi_stream_ext(const struct AranyaClient *client,
                                                    struct AranyaAqcBidiChannel *channel,
                                                    struct AranyaAqcBidiStream *stream,
                                                    struct AranyaExtError *__ext_err);
@@ -2701,7 +2701,7 @@ AranyaError aranya_aqc_bidi_create_bidi_stream_ext(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_bidi_stream_send(struct AranyaClient *client,
+AranyaError aranya_aqc_bidi_stream_send(const struct AranyaClient *client,
                                         struct AranyaAqcBidiStream *stream,
                                         const uint8_t *data,
                                         size_t data_len);
@@ -2716,7 +2716,7 @@ AranyaError aranya_aqc_bidi_stream_send(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_bidi_stream_send_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_bidi_stream_send_ext(const struct AranyaClient *client,
                                             struct AranyaAqcBidiStream *stream,
                                             const uint8_t *data,
                                             size_t data_len,
@@ -2767,7 +2767,7 @@ AranyaError aranya_aqc_bidi_stream_try_recv_ext(struct AranyaAqcBidiStream *stre
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_bidi_create_uni_stream(struct AranyaClient *client,
+AranyaError aranya_aqc_bidi_create_uni_stream(const struct AranyaClient *client,
                                               struct AranyaAqcBidiChannel *channel,
                                               struct AranyaAqcSendStream *stream);
 
@@ -2783,7 +2783,7 @@ AranyaError aranya_aqc_bidi_create_uni_stream(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_bidi_create_uni_stream_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_bidi_create_uni_stream_ext(const struct AranyaClient *client,
                                                   struct AranyaAqcBidiChannel *channel,
                                                   struct AranyaAqcSendStream *stream,
                                                   struct AranyaExtError *__ext_err);
@@ -2847,7 +2847,7 @@ AranyaError aranya_aqc_bidi_try_receive_stream_ext(struct AranyaAqcBidiChannel *
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_send_create_uni_stream(struct AranyaClient *client,
+AranyaError aranya_aqc_send_create_uni_stream(const struct AranyaClient *client,
                                               struct AranyaAqcSendChannel *channel,
                                               struct AranyaAqcSendStream *stream);
 
@@ -2863,7 +2863,7 @@ AranyaError aranya_aqc_send_create_uni_stream(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_send_create_uni_stream_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_send_create_uni_stream_ext(const struct AranyaClient *client,
                                                   struct AranyaAqcSendChannel *channel,
                                                   struct AranyaAqcSendStream *stream,
                                                   struct AranyaExtError *__ext_err);
@@ -2913,7 +2913,7 @@ AranyaError aranya_aqc_recv_try_receive_uni_stream_ext(struct AranyaAqcReceiveCh
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_send_stream_send(struct AranyaClient *client,
+AranyaError aranya_aqc_send_stream_send(const struct AranyaClient *client,
                                         struct AranyaAqcSendStream *stream,
                                         const uint8_t *data,
                                         size_t data_len);
@@ -2928,7 +2928,7 @@ AranyaError aranya_aqc_send_stream_send(struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_send_stream_send_ext(struct AranyaClient *client,
+AranyaError aranya_aqc_send_stream_send_ext(const struct AranyaClient *client,
                                             struct AranyaAqcSendStream *stream,
                                             const uint8_t *data,
                                             size_t data_len,
