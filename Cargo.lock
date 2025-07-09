@@ -297,6 +297,7 @@ dependencies = [
  "bytes",
  "ciborium",
  "clap",
+ "derive-where",
  "futures-util",
  "postcard",
  "pretty_assertions",

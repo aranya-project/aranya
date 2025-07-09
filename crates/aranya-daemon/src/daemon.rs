@@ -120,7 +120,7 @@ impl DaemonHandle {
 }
 
 /// The daemon itself.
-// TODO: #[derive(Debug)] once `LinearStorageProvider` and `DefaultEngine` implement it.
+#[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
     syncer: Syncer<QuicSyncState>,
@@ -412,15 +412,6 @@ impl Daemon {
             }
         };
         bundle.public_keys(eng, store)
-    }
-}
-
-impl Debug for Daemon {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Daemon")
-            .field("api", &self.api)
-            .field("span", &self.span)
-            .finish_non_exhaustive()
     }
 }
 
