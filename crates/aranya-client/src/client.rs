@@ -68,7 +68,7 @@ pub struct ClientBuilder<'a> {
 }
 
 impl ClientBuilder<'_> {
-    /// Allocates a default [`ClientBuilder`].
+    /// Returns a default [`ClientBuilder`].
     pub fn new() -> Self {
         Self {
             uds_path: None,
