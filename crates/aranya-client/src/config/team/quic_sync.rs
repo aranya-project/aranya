@@ -37,6 +37,7 @@ impl AddTeamQuicSyncConfig {
     }
 }
 
+/// Builder for [`CreateTeamQuicSyncConfig`]
 #[derive(Default)]
 pub struct CreateTeamQuicSyncConfigBuilder {
     mode: CreateSeedMode,
@@ -72,7 +73,7 @@ impl CreateTeamQuicSyncConfigBuilder {
     }
 }
 
-///
+/// Builder for [`AddTeamQuicSyncConfig`]
 #[derive(Default)]
 pub struct AddTeamQuicSyncConfigBuilder {
     mode: Option<AddSeedMode>,
