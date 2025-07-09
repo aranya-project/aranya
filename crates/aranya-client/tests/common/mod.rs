@@ -180,7 +180,7 @@ impl DeviceCtx {
             cache_dir: work_dir.join("cache"),
             logs_dir: work_dir.join("log"),
             config_dir: work_dir.join("config"),
-            aqc: daemon_cfg::AqcConfig {},
+            aqc: Toggle::Enabled(daemon_cfg::AqcConfig {}),
             sync: daemon_cfg::SyncConfig {
                 quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig { addr: addr_any }),
             },

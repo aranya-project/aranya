@@ -139,6 +139,13 @@ impl Daemon {
                 anyhow::bail!("Supply a valid QUIC sync config")
             };
 
+            // TODO: Make aqc optional.
+            let Toggle::Enabled(_) = &cfg.aqc else {
+                anyhow::bail!(
+                    "AQC is currently required, set `aqc.enable = true` in daemon config."
+                )
+            };
+
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
             let mut eng = Self::load_crypto_engine(&cfg).await?;
@@ -483,7 +490,7 @@ mod tests {
             sync: SyncConfig {
                 quic: Toggle::Enabled(QuicSyncConfig { addr: any }),
             },
-            aqc: AqcConfig {},
+            aqc: Toggle::Enabled(AqcConfig {}),
         };
         for dir in [
             &cfg.runtime_dir,

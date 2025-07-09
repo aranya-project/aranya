@@ -53,6 +53,8 @@ cache_dir = "${out}/${device}/cache"
 logs_dir = "${out}/${device}/log"
 config_dir = "${out}/${device}/config"
 
+aqc.enable = true
+
 [sync.quic]
 enable = true
 addr = "127.0.0.1:${port}"

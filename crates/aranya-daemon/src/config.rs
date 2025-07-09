@@ -104,7 +104,7 @@ pub struct Config {
 
     /// AQC configuration.
     #[serde(default)]
-    pub aqc: AqcConfig,
+    pub aqc: Toggle<AqcConfig>,
 
     /// QUIC syncer config
     #[serde(default)]
@@ -245,7 +245,7 @@ mod tests {
                     addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
                 }),
             },
-            aqc: AqcConfig {},
+            aqc: Toggle::Enabled(AqcConfig {}),
         };
         assert_eq!(got, want);
 

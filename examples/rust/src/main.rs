@@ -100,6 +100,8 @@ impl ClientCtx {
                 logs_dir = {logs_dir:?}
                 config_dir = {config_dir:?}
 
+                aqc.enable = true
+
                 [sync.quic]
                 enable = true
                 addr = "127.0.0.1:0"
