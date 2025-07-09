@@ -8,7 +8,7 @@ use std::{
 };
 
 use anyhow::{bail, Context as _, Result};
-use aranya_client::{aqc::AqcPeerChannel, Client, SyncPeerConfig};
+use aranya_client::{aqc::AqcPeerChannel, client::Queries, Client, SyncPeerConfig};
 use aranya_daemon_api::{DeviceId, NetIdentifier, TeamId, Text};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
@@ -70,8 +70,6 @@ impl ClientCtx {
 
         let runtime_dir = Path::new("/var/run/aranya/");
 
-        let addr_any = Addr::from((Ipv4Addr::UNSPECIFIED, 0));
-
         let daemon = {
             let state_dir = daemon_dir.join("state");
             let cache_dir = Path::new("/var/cache/aranya/");
@@ -85,7 +83,10 @@ impl ClientCtx {
                     .with_context(|| format!("unable to create directory: {}", dir.display()))?;
             }
 
-            let sync_addr = var_or("ARANYA_SYNC_ADDR", addr_any)?;
+            let sync_addr = var_or(
+                "ARANYA_SYNC_ADDR",
+                Addr::from((Ipv4Addr::UNSPECIFIED, 1111)),
+            )?;
 
             let buf = format!(
                 r#"
@@ -107,10 +108,11 @@ impl ClientCtx {
         // The path that the daemon will listen on.
         let uds_sock = runtime_dir.join("uds.sock");
 
-        // Give the daemon time to start up and write its public key.
-        sleep(Duration::from_millis(100)).await;
+        let aqc_addr =
+            var_or::<Addr>("ARANYA_AQC_ADDR", Addr::from((Ipv4Addr::UNSPECIFIED, 2222)))?;
 
-        let aqc_addr = var_or::<Addr>("ARANYA_AQC_ADDR", addr_any)?;
+        // Give the daemon time to start up and write its public key.
+        sleep(Duration::from_secs(1)).await;
 
         let client = (|| {
             Client::builder()
@@ -191,30 +193,28 @@ async fn main() -> Result<()> {
 
     let team_id = read::<TeamId>("team.id").await?;
     let operator_sync_addr = var::<Addr>("ARANYA_OPERATOR_SYNC_ADDR");
-    let member_a_net_id = var::<Text>("ARANYA_MEMBER_A_NET_ID").map(NetIdentifier);
-    let member_b_net_id = var::<Text>("ARANYA_MEMBER_B_NET_ID").map(NetIdentifier);
     let member_a_device_id = read::<DeviceId>("member-a.id");
     let member_b_device_id = read::<DeviceId>("member-b.id");
 
     let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 10;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
     let mut ctx = ClientCtx::new(Path::new("/app/"), &user, &daemon_path).await?;
 
     match user.as_str() {
         "operator" => {
+            let member_a_net_id = NetIdentifier(var::<Text>("ARANYA_MEMBER_A_NET_ID")?);
+            let member_b_net_id = NetIdentifier(var::<Text>("ARANYA_MEMBER_B_NET_ID")?);
             let mut team = ctx.client.team(team_id);
-            team.assign_aqc_net_identifier(member_a_device_id.await?, member_a_net_id?)
+            team.assign_aqc_net_identifier(member_a_device_id.await?, member_a_net_id)
                 .await?;
-            team.assign_aqc_net_identifier(member_b_device_id.await?, member_b_net_id?)
+            team.assign_aqc_net_identifier(member_b_device_id.await?, member_b_net_id)
                 .await?;
             pending::<()>().await;
         }
         "member-a" => {
             let mut team = ctx.client.team(team_id);
             team.add_sync_peer(operator_sync_addr?, sync_cfg).await?;
-            sleep(sleep_interval).await;
 
             // membera creates a bidirectional channel.
             info!("membera creating acq bidi channel");
@@ -228,13 +228,19 @@ async fn main() -> Result<()> {
                 .next()
                 .context("missing label")?
                 .clone();
-
             debug!(?label.name);
+
+            let member_b_net_id = get_net_id(
+                ctx.client.team(team_id).queries(),
+                member_b_device_id.await?,
+            )
+            .await?;
+            debug!(?member_b_net_id);
 
             let mut aqc_chan = ctx
                 .client
                 .aqc()
-                .create_bidi_channel(team_id, member_b_net_id?, label.id)
+                .create_bidi_channel(team_id, member_b_net_id, label.id)
                 .await
                 .context("Membera failed to create bidi channel")?;
 
@@ -243,8 +249,8 @@ async fn main() -> Result<()> {
             let mut bidi1 = aqc_chan.create_bidi_stream().await?;
 
             // membera sends data via the aqc stream.
-            info!("membera sending aqc data");
             let msg = Bytes::from_static(b"hello");
+            info!(?msg, "membera sending aqc data");
             bidi1.send(msg.clone()).await?;
 
             pending::<()>().await;
@@ -252,7 +258,13 @@ async fn main() -> Result<()> {
         "member-b" => {
             let mut team = ctx.client.team(team_id);
             team.add_sync_peer(operator_sync_addr?, sync_cfg).await?;
-            sleep(sleep_interval).await;
+
+            let member_a_net_id = get_net_id(
+                ctx.client.team(team_id).queries(),
+                member_a_device_id.await?,
+            )
+            .await?;
+            debug!(?member_a_net_id);
 
             // memberb receives a bidirectional channel.
             info!("memberb receiving acq bidi channel");
@@ -271,13 +283,27 @@ async fn main() -> Result<()> {
 
             // memberb receives data from stream.
             info!("memberb receiving acq data");
-            let bytes = peer2.receive().await?.context("no data received")?;
-            assert_eq!(bytes.as_ref(), b"hello");
+            let msg = peer2.receive().await?.context("no data received")?;
+            assert_eq!(msg.as_ref(), b"hello");
 
-            info!("received message from member a");
+            info!(?msg, "received message from member a");
         }
         _ => bail!("unknown user {user:?}"),
     }
 
     Ok(())
+}
+
+async fn get_net_id(mut q: Queries<'_>, peer: DeviceId) -> Result<NetIdentifier> {
+    loop {
+        if let Some(net_id) = q
+            .aqc_net_identifier(peer)
+            .await
+            .context("failed to get net ID")?
+        {
+            return Ok(net_id);
+        }
+        info!("waiting for net ID to be available...");
+        sleep(Duration::from_secs(1)).await;
+    }
 }

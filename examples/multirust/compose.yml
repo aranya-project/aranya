@@ -7,7 +7,6 @@ services:
       target: operator
     init: true
     environment:
-      - ARANYA_SYNC_ADDR=0.0.0.0:1111
       - ARANYA_MEMBER_A_NET_ID=member-a:2222
       - ARANYA_MEMBER_B_NET_ID=member-b:2222
 
@@ -19,9 +18,7 @@ services:
       target: member-a
     init: true
     environment:
-      - ARANYA_AQC_ADDR=0.0.0.0:2222
       - ARANYA_OPERATOR_SYNC_ADDR=operator:1111
-      - ARANYA_MEMBER_B_NET_ID=member-b:2222
 
   member-b:
     image: aranya-multirust-member-b
@@ -31,5 +28,4 @@ services:
       target: member-b
     init: true
     environment:
-      - ARANYA_AQC_ADDR=0.0.0.0:2222
       - ARANYA_OPERATOR_SYNC_ADDR=operator:1111

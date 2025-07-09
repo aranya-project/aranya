@@ -173,6 +173,9 @@ async fn main() -> Result<()> {
     operator.write("member-a.id", membera.id).await?;
     operator.write("member-b.id", memberb.id).await?;
 
+    membera.write("member-b.id", memberb.id).await?;
+    memberb.write("member-a.id", membera.id).await?;
+
     // Create the team config
     let seed_ikm = {
         let mut buf = [0; 32];
