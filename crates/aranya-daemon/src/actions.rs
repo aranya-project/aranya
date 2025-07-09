@@ -1,15 +1,19 @@
 //! Aranya graph actions/effects API.
 
-use core::{future::Future, marker::PhantomData};
+use core::{
+    future::{self, Future},
+    marker::PhantomData,
+};
 use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_aqc_util::LabelId;
-use aranya_crypto::{Csprng, DeviceId, Rng};
+use aranya_crypto::{policy::RoleId, Csprng, DeviceId, Rng};
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
-use aranya_policy_vm::{ident, Text, Value};
+use aranya_policy_text::Text;
+use aranya_policy_vm::{ident, Value};
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
     VmPolicy,
@@ -20,7 +24,7 @@ use tracing::{debug, info, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
-    policy::{ActorExt, ChanOp, Effect, KeyBundle, Role},
+    policy::{ActorExt, ChanOp, Effect, KeyBundle},
     vm_policy::{MsgSink, VecSink},
 };
 
@@ -158,8 +162,8 @@ where
     where
         F: FnOnce(&mut ActorImpl<'_, EN, SP, CE, VecSink<EN::Effect>>) -> Result<()> + Send;
 
-    #[allow(clippy::type_complexity)]
     /// Performs a session action.
+    #[allow(clippy::type_complexity)]
     fn session_action<'a, F>(
         &self,
         f: F,
@@ -177,62 +181,105 @@ where
         .in_current_span()
     }
 
-    /// Adds a Member instance to the team.
+    /// Invokes the `add_device` action.
     #[instrument(skip_all)]
-    fn add_member(&self, keys: KeyBundle) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    fn add_device(&self, keys: KeyBundle) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.add_member(keys)?;
+            actor.add_device(keys)?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Remove a Member instance from the team.
+    /// Remove a device from the team.
     #[instrument(skip(self), fields(device_id = %device_id))]
-    fn remove_member(
+    fn remove_device(
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.remove_member(device_id.into())?;
+            actor.remove_device(device_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Sets up the default team roles.
+    #[instrument(skip(self), fields(%managing_role_id))]
+    fn setup_default_roles(
+        &self,
+        managing_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.setup_default_roles(managing_role_id.into())?;
             Ok(())
         })
         .in_current_span()
     }
 
     /// Assigns role to a team member.
-    #[instrument(skip_all)]
+    #[instrument(skip(self), fields(%device_id, %role_id))]
     fn assign_role(
         &self,
         device_id: DeviceId,
-        role: Role,
+        role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_role(device_id.into(), role)?;
+            actor.assign_role(device_id.into(), role_id.into())?;
             Ok(())
         })
         .in_current_span()
     }
 
     /// Revokes role from a team member.
-    #[instrument(skip_all)]
+    #[instrument(skip(self), fields(%device_id, %role_id))]
     fn revoke_role(
         &self,
         device_id: DeviceId,
-        role: Role,
+        role_id: RoleId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.revoke_role(device_id.into(), role)?;
+            actor.revoke_role(device_id.into(), role_id.into())?;
             Ok(())
         })
         .in_current_span()
     }
 
-    /// Create a label.
-    #[instrument(skip(self), fields(name = %name))]
-    fn create_label(&self, name: Text) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+    /// Invokes `change_role_managing_role`.
+    #[instrument(skip(self))]
+    fn change_role_managing_role(
+        &self,
+        target_role_id: RoleId,
+        managing_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.create_label(name)?;
+            actor.change_role_managing_role(target_role_id.into(), managing_role_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Invokes `query_team_roles` to return all roles in the
+    /// team.
+    #[instrument(skip(self))]
+    fn query_team_roles_off_graph(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("query_team_roles"),
+            args: Cow::Owned(vec![]),
+        })
+        .map_ok(|(_, effects)| effects)
+        .in_current_span()
+    }
+
+    /// Create a label.
+    #[instrument(skip(self), fields(%name, %managing_role_id))]
+    fn create_label(
+        &self,
+        name: Text,
+        managing_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.create_label(name, managing_role_id.into())?;
             Ok(())
         })
         .in_current_span()
@@ -317,17 +364,14 @@ where
             args: Cow::Owned(vec![]),
         })
         .and_then(|(_, effects)| {
-            std::future::ready(
+            future::ready(
                 effects
                     .into_iter()
                     .map(|eff| {
                         let Effect::QueryAqcNetworkNamesOutput(eff) = eff else {
                             anyhow::bail!("bad effect in query_network_names");
                         };
-                        Ok((
-                            NetIdentifier(eff.net_identifier),
-                            DeviceId::from(eff.device_id),
-                        ))
+                        Ok((NetIdentifier(eff.net_id), DeviceId::from(eff.device_id)))
                     })
                     .collect(),
             )
@@ -412,17 +456,18 @@ where
         .in_current_span()
     }
 
-    /// Query device role off-graph.
+    /// Invokes `query_device_roles`.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
-    fn query_device_role_off_graph(
+    fn query_device_roles_off_graph(
         &self,
         device_id: DeviceId,
-    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.session_action(move || VmAction {
-            name: ident!("query_device_role"),
+            name: ident!("query_device_roles"),
             args: Cow::Owned(vec![Value::from(device_id)]),
         })
+        .map_ok(|(_, effects)| effects)
         .in_current_span()
     }
 

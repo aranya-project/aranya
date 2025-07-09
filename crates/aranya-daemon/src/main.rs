@@ -10,7 +10,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use aranya_daemon::{config::Config, Daemon};
+use aranya_daemon::{Config, Daemon};
 use clap::Parser;
 use tokio::runtime::Runtime;
 use tracing::{error, info};

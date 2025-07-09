@@ -12,16 +12,17 @@ pub struct QuicSyncConfig {
     pub seed_mode: SeedMode,
 }
 
-#[allow(clippy::large_enum_variant)]
-#[derive(Clone, Debug, Serialize, Deserialize)]
 /// Specifies how PSK seeds are provided when creating or joining teams.
 ///
 /// Teams share a single PSK seed that is used to derive Pre-Shared Keys (PSKs)
 /// for QUIC connections between team members.
+#[derive(Clone, Default, Debug, Serialize, Deserialize)]
+#[allow(clippy::large_enum_variant)]
 pub enum SeedMode {
     /// Generates a new random seed.
     ///
     /// Used by team owners in the `create_team` API when establishing a new team.
+    #[default]
     Generate,
 
     /// Provides raw input key material to derive a seed.
@@ -37,12 +38,6 @@ pub enum SeedMode {
     /// Seeds are wrapped (encrypted) to prevent plaintext exposure during
     /// the join process.
     Wrapped(WrappedSeed),
-}
-
-impl Default for SeedMode {
-    fn default() -> Self {
-        Self::Generate
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

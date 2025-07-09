@@ -30,19 +30,21 @@
     unused_qualifications
 )]
 
-pub mod actions;
-pub mod aranya;
-pub mod config;
+mod actions;
+mod aranya;
+mod config;
 #[rustfmt::skip]
-pub mod policy;
-pub mod sync;
-pub mod vm_policy;
-
+#[allow(dead_code, reason = "`ActorExt` is unused")]
+mod policy;
 mod api;
 mod aqc;
 mod daemon;
 mod keystore;
+mod sync;
 mod util;
+mod vm_policy;
 
-pub use daemon::*;
-pub use keystore::AranyaStore;
+pub use crate::{
+    config::{AfcConfig, AqcConfig, Config, QuicSyncConfig},
+    daemon::{Daemon, DaemonHandle},
+};

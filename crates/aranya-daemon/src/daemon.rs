@@ -38,7 +38,7 @@ use crate::{
         Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
-    vm_policy::{PolicyEngine, TEST_POLICY_1},
+    vm_policy::{PolicyEngine, POLICY_SOURCE},
 };
 
 // Use short names so that we can more easily add generics.
@@ -327,7 +327,7 @@ impl Daemon {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
-            EN::new(TEST_POLICY_1, eng, store, device_id)?,
+            EN::new(POLICY_SOURCE, eng, store, device_id)?,
             SP::new(
                 FileManager::new(cfg.storage_path()).context("unable to create `FileManager`")?,
             ),

@@ -4,12 +4,11 @@ use std::time::Duration;
 
 mod common;
 use anyhow::Result;
-use aranya_client::aqc::AqcPeerChannel;
+use aranya_client::{aqc::AqcPeerChannel, text, ChanOp};
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
-use aranya_daemon_api::{text, ChanOp};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
-use common::{sleep, TeamCtx};
+use common::{sleep, RolesExt, TeamCtx};
 use futures_util::future::try_join;
 use tempfile::tempdir;
 
@@ -27,8 +26,23 @@ async fn test_aqc_chans() -> Result<()> {
 
     let mut team = TeamCtx::new("test_aqc_chans", work_dir).await?;
 
-    // create team.
     let team_id = team.create_and_add_team().await?;
+    let owner_role_id = team
+        .owner
+        .client
+        .team(team_id)
+        .roles()
+        .await?
+        .try_into_owner_role()?
+        .id;
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles(owner_role_id)
+        .await?
+        .try_into_default_roles()?;
+    let admin_role_id = roles.admin().id;
 
     sleep(sleep_interval).await;
 
@@ -53,7 +67,9 @@ async fn test_aqc_chans() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team.create_label(text!("label1")).await?;
+    let label1 = operator_team
+        .create_label(text!("label1"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label1, op)
@@ -62,7 +78,9 @@ async fn test_aqc_chans() -> Result<()> {
         .assign_label(team.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    let label2 = operator_team
+        .create_label(text!("label2"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label2, op)
@@ -250,6 +268,22 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_sender", work_dir).await?;
     // create team.
     let team_id = team.create_and_add_team().await?;
+    let owner_role_id = team
+        .owner
+        .client
+        .team(team_id)
+        .roles()
+        .await?
+        .try_into_owner_role()?
+        .id;
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles(owner_role_id)
+        .await?
+        .try_into_default_roles()?;
+    let admin_role_id = roles.admin().id;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -272,7 +306,9 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team.create_label(text!("label1")).await?;
+    let label1 = operator_team
+        .create_label(text!("label1"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label1, op)
@@ -281,7 +317,9 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .assign_label(team.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    let label2 = operator_team
+        .create_label(text!("label2"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label2, op)
@@ -290,7 +328,9 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .assign_label(team.memberb.id, label2, op)
         .await?;
 
-    let label3 = operator_team.create_label(text!("label3")).await?;
+    let label3 = operator_team
+        .create_label(text!("label3"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     // assign label 3 to only the receiver, we are testing if the sender can create
     // a channel without the label assignment
@@ -329,6 +369,22 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     // create team.
     let team_id = team.create_and_add_team().await?;
+    let owner_role_id = team
+        .owner
+        .client
+        .team(team_id)
+        .roles()
+        .await?
+        .try_into_owner_role()?
+        .id;
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles(owner_role_id)
+        .await?
+        .try_into_default_roles()?;
+    let admin_role_id = roles.admin().id;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -351,7 +407,9 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team.create_label(text!("label1")).await?;
+    let label1 = operator_team
+        .create_label(text!("label1"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label1, op)
@@ -360,7 +418,9 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .assign_label(team.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    let label2 = operator_team
+        .create_label(text!("label2"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label2, op)
@@ -369,7 +429,9 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .assign_label(team.memberb.id, label2, op)
         .await?;
 
-    let label3 = operator_team.create_label(text!("label3")).await?;
+    let label3 = operator_team
+        .create_label(text!("label3"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     // assign label 3 to only the sender, we are testing if the receiver can receive
     // a channel without the label assignment
@@ -408,6 +470,22 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     // create team.
     let team_id = team.create_and_add_team().await?;
+    let owner_role_id = team
+        .owner
+        .client
+        .team(team_id)
+        .roles()
+        .await?
+        .try_into_owner_role()?
+        .id;
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles(owner_role_id)
+        .await?
+        .try_into_default_roles()?;
+    let admin_role_id = roles.admin().id;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -430,7 +508,9 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team.create_label(text!("label1")).await?;
+    let label1 = operator_team
+        .create_label(text!("label1"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label1, op)
@@ -439,7 +519,9 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         .assign_label(team.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    let label2 = operator_team
+        .create_label(text!("label2"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label2, op)
@@ -541,6 +623,22 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     // create team.
     let team_id = team.create_and_add_team().await?;
+    let owner_role_id = team
+        .owner
+        .client
+        .team(team_id)
+        .roles()
+        .await?
+        .try_into_owner_role()?
+        .id;
+    let roles = team
+        .owner
+        .client
+        .team(team_id)
+        .setup_default_roles(owner_role_id)
+        .await?
+        .try_into_default_roles()?;
+    let admin_role_id = roles.admin().id;
 
     // Tell all peers to sync with one another, and assign their roles.
     team.add_all_sync_peers(team_id).await?;
@@ -563,7 +661,9 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team.create_label(text!("label1")).await?;
+    let label1 = operator_team
+        .create_label(text!("label1"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label1, op)
@@ -572,7 +672,9 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         .assign_label(team.memberb.id, label1, op)
         .await?;
 
-    let label2 = operator_team.create_label(text!("label2")).await?;
+    let label2 = operator_team
+        .create_label(text!("label2"), admin_role_id)
+        .await?;
     let op = ChanOp::SendRecv;
     operator_team
         .assign_label(team.membera.id, label2, op)

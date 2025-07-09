@@ -17,10 +17,17 @@ pub mod aqc;
 pub mod client;
 pub mod config;
 pub mod error;
+pub mod sync;
+mod util;
+
+pub use aranya_policy_text::{text, Text};
 
 #[doc(inline)]
 pub use crate::{
-    client::{Client, Team},
+    client::{
+        ChanOp, Client, DeviceId, InvalidNetIdentifier, KeyBundle, Label, LabelId, Labels,
+        NetIdentifier, Op, Role, RoleId, Roles, Team, TeamId,
+    },
     config::{
         QuicSyncConfig, QuicSyncConfigBuilder, SyncPeerConfig, SyncPeerConfigBuilder, TeamConfig,
         TeamConfigBuilder,

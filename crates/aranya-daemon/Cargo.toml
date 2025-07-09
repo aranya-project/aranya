@@ -31,6 +31,7 @@ aranya-perspective-ffi = { workspace = true }
 aranya-policy-compiler = { workspace = true }
 aranya-policy-ifgen = { workspace = true }
 aranya-policy-lang = { workspace = true }
+aranya-policy-text = { workspace = true }
 aranya-policy-vm = { workspace = true }
 aranya-runtime = { workspace = true }
 aranya-util = { workspace = true }
@@ -44,6 +45,7 @@ ciborium = { workspace = true }
 clap = { workspace = true }
 deser-hjson = { version = "2" }
 futures-util = { workspace = true }
+itertools = { version = "0.14" }
 postcard = { workspace = true }
 s2n-quic = { workspace = true }
 serde = { workspace = true }
@@ -63,6 +65,8 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
+aranya-crypto = { workspace = true, features = ["memstore"] }
+
 pretty_assertions = { workspace = true }
 serde_json = { version = "1" }
 serial_test = { workspace = true }
