@@ -340,7 +340,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcConfig {
 /**
  * A builder for initializing an [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig).
  *
- * The [`QuicSyncConfig`] is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig) or a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
+ * The [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig) is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig).
  */
 typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfigBuilder {
     /**
@@ -352,9 +352,9 @@ typedef struct ARANYA_ALIGNED(8) AranyaAddTeamQuicSyncConfigBuilder {
 } AranyaAddTeamQuicSyncConfigBuilder;
 
 /**
- * A builder for initializing a [`CreateQuicSyncConfig`].
+ * A builder for initializing a [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig).
  *
- * The [`QuicSyncConfig`] is an optional part of initializing an [`AranyaAddTeamConfig`](@ref AranyaAddTeamConfig) or a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
+ * The [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig) is an optional part of initializing a [`AranyaCreateTeamConfig`](@ref AranyaCreateTeamConfig).
  */
 typedef struct ARANYA_ALIGNED(8) AranyaCreateTeamQuicSyncConfigBuilder {
     /**
@@ -1220,13 +1220,13 @@ AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaAddTe
                                                               struct AranyaExtError *__ext_err);
 
 /**
- * Attempts to construct a [`CreateQuicSyncConfig`].
+ * Attempts to construct a [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
  * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder)
- * @param[out] out a pointer to write the QUIC sync config to [`CreateQuicSyncConfig`]
+ * @param[out] out a pointer to write the QUIC sync config to [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig)
  *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
@@ -1234,13 +1234,13 @@ AranyaError aranya_create_team_quic_sync_config_build(struct AranyaCreateTeamQui
                                                       struct AranyaCreateTeamQuicSyncConfig *out);
 
 /**
- * Attempts to construct a [`CreateQuicSyncConfig`].
+ * Attempts to construct a [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig).
  *
  * This function consumes and releases any resources associated
  * with the memory pointed to by `cfg`.
  *
  * @param[in] cfg a pointer to the QUIC sync config builder [`AranyaCreateTeamQuicSyncConfigBuilder`](@ref AranyaCreateTeamQuicSyncConfigBuilder)
- * @param[out] out a pointer to write the QUIC sync config to [`CreateQuicSyncConfig`]
+ * @param[out] out a pointer to write the QUIC sync config to [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig)
  *
  * @relates AranyaCreateTeamQuicSyncConfigBuilder.
  */
@@ -1363,7 +1363,7 @@ AranyaError aranya_create_team_config_builder_cleanup_ext(struct AranyaCreateTea
  * By default, the QUIC syncer config is not set.
  *
  * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
+ * @param[in] quic set the QUIC syncer config [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig)
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1376,7 +1376,7 @@ AranyaError aranya_add_team_config_builder_set_quic_syncer(struct AranyaAddTeamC
  * By default, the QUIC syncer config is not set.
  *
  * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
+ * @param[in] quic set the QUIC syncer config [`AranyaAddTeamQuicSyncConfig`](@ref AranyaAddTeamQuicSyncConfig)
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
@@ -1446,7 +1446,7 @@ AranyaError aranya_add_team_config_build_ext(struct AranyaAddTeamConfigBuilder *
  * By default, the QUIC syncer config is not set.
  *
  * @param[in,out] cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
+ * @param[in] quic set the QUIC syncer config [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig)
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
@@ -1459,7 +1459,7 @@ AranyaError aranya_create_team_config_builder_set_quic_syncer(struct AranyaCreat
  * By default, the QUIC syncer config is not set.
  *
  * @param[in,out] cfg a pointer to the builder for a team config [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder)
- * @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
+ * @param[in] quic set the QUIC syncer config [`AranyaCreateTeamQuicSyncConfig`](@ref AranyaCreateTeamQuicSyncConfig)
  *
  * @relates AranyaCreateTeamConfigBuilder.
  */
