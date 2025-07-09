@@ -47,8 +47,6 @@ impl ClientConfigBuilder {
     }
 
     /// Set the config to be used for AQC
-    ///
-    /// This method is unstable because [`AqcConfig`] is unstable.
     pub fn aqc(&mut self, cfg: AqcConfig) {
         self.aqc = Some(cfg);
     }
@@ -93,8 +91,6 @@ impl Default for ClientConfigBuilder {
 }
 
 /// AQC configuration.
-///
-/// This config is unstable.
 #[derive(Clone, Debug)]
 pub struct AqcConfig {
     /// Address to bind AQC server to.
