@@ -34,6 +34,8 @@ impl<T: Serialize> Serialize for Toggle<T> {
 }
 
 mod imp {
+    #![allow(missing_debug_implementations)]
+
     use serde::{de, ser, Deserialize, Serialize};
 
     use super::Toggle;

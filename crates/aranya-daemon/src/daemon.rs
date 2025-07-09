@@ -96,6 +96,7 @@ pub(crate) use invalid_graphs::InvalidGraphs;
 ///
 /// Dropping this will abort the daemon's tasks.
 #[clippy::has_significant_drop]
+#[derive(Debug)]
 pub struct DaemonHandle {
     set: JoinSet<()>,
 }
@@ -119,6 +120,7 @@ impl DaemonHandle {
 }
 
 /// The daemon itself.
+#[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
     syncer: Syncer<QuicSyncState>,
