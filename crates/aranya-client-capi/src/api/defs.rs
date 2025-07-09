@@ -679,6 +679,8 @@ pub type CreateTeamQuicSyncConfigBuilder = Safe<imp::CreateTeamQuicSyncConfigBui
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 ///
+/// This method will be removed soon since certificates will be used instead of PSKs in the future.
+///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
 pub fn create_team_quic_sync_config_generate(
     cfg: &mut CreateTeamQuicSyncConfigBuilder,
@@ -691,6 +693,8 @@ pub fn create_team_quic_sync_config_generate(
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder
 /// @param[in] encap_seed a pointer the encapsulated PSK seed
+///
+/// This method will be removed soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
 pub fn add_team_quic_sync_config_wrapped_seed(
@@ -713,6 +717,8 @@ pub struct SeedIkm {
 /// @param[in,out] cfg a pointer to the quic sync config builder [`CreateTeamQuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
 ///
+/// This method will be removed soon since certificates will be used instead of PSKs in the future.
+///
 /// @relates AranyaCreateTeamQuicSyncConfigBuilder.
 pub fn create_team_quic_sync_config_raw_seed_ikm(
     cfg: &mut CreateTeamQuicSyncConfigBuilder,
@@ -726,6 +732,8 @@ pub fn create_team_quic_sync_config_raw_seed_ikm(
 ///
 /// @param[in,out] cfg a pointer to the quic sync config builder [`AddTeamQuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
+///
+/// This method will be removed soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
 pub fn add_team_quic_sync_config_raw_seed_ikm(
@@ -1143,6 +1151,8 @@ pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
 /// @param[in] keybundle_len the length of the keybundle
 /// @param[out] seed the serialized, encrypted PSK seed.
 /// @param[in,out] seed_len the number of bytes written to the seed buffer.
+///
+/// This method will be removed soon since certificates will be used instead of PSKs in the future.
 ///
 /// @relates AranyaClient.
 pub unsafe fn encrypt_psk_seed_for_peer(
