@@ -84,7 +84,7 @@ impl From<WriteCStrError> for Error {
 }
 
 /// Underlying type for [`ExtError`][crate::api::ExtError].
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct ExtError {
     err: Option<Error>,
 }

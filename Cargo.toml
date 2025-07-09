@@ -17,6 +17,7 @@ rust-version = "1.85"
 
 [workspace.lints.rust]
 # missing_docs = "warn"
+missing_debug_implementations = "warn"
 rust_2018_idioms = { level = "warn", priority = -1 }
 unsafe_op_in_unsafe_fn = "warn"
 unused_lifetimes = "warn"
@@ -64,6 +65,7 @@ backon = { version = "1.2.0" }
 bytes = { version = "1.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
+derive-where = { version = "1" }
 futures-lite = { version = "2.6.0" }
 futures-util = { version = "0.3.30" }
 heapless = { version = "0.8", default-features = false }
