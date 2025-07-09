@@ -1,4 +1,4 @@
-//! Team configuration for creating new teams or joining existing ones.
+//! Team configuration for creating new teams or adding existing ones.
 //!
 //! This module provides builders for configuring team operations with support
 //! for multiple transport mechanisms.
@@ -7,7 +7,7 @@
 //!
 //! There are two primary operations:
 //! - **Create Team**: Establish a new team with [`CreateTeamConfig`]
-//! - **Join Team**: Join an existing team with [`AddTeamConfig`]
+//! - **Add Team**: Add an existing team with [`AddTeamConfig`]
 //!
 //! Both operations support optional transport configuration.
 
@@ -20,13 +20,13 @@ pub use quic_sync::{
     AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
 };
 
-/// Builder for creating a new team configuration.
+/// Builder for [`CreateTeamConfig`].
 #[derive(Default)]
 pub struct CreateTeamConfigBuilder {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
 
-/// Builder for joining an existing team configuration.
+/// Builder for [`AddTeamConfig`].
 #[derive(Default)]
 pub struct AddTeamConfigBuilder {
     id: Option<TeamId>,
