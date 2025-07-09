@@ -1675,6 +1675,8 @@ AranyaError aranya_rand_ext(const struct AranyaClient *client,
  * @param[out] seed the serialized, encrypted PSK seed.
  * @param[in,out] seed_len the number of bytes written to the seed buffer.
  *
+ * This method will be removed soon since certificates will be used instead of PSKs in the future.
+ *
  * @relates AranyaClient.
  */
 AranyaError aranya_encrypt_psk_seed_for_peer(const struct AranyaClient *client,
@@ -1699,6 +1701,8 @@ AranyaError aranya_encrypt_psk_seed_for_peer(const struct AranyaClient *client,
  * @param[in] keybundle_len the length of the keybundle
  * @param[out] seed the serialized, encrypted PSK seed.
  * @param[in,out] seed_len the number of bytes written to the seed buffer.
+ *
+ * This method will be removed soon since certificates will be used instead of PSKs in the future.
  *
  * @relates AranyaClient.
  */
