@@ -475,6 +475,7 @@ dependencies = [
  "buggy",
  "bytes",
  "deser-hjson",
+ "futures-util",
  "libc",
  "metrics",
  "metrics-exporter-prometheus",

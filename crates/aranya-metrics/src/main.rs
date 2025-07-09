@@ -14,6 +14,7 @@ use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use buggy::BugExt as _;
 use bytes::Bytes;
+use futures_util::future::try_join;
 use metrics::{counter, describe_counter, describe_gauge};
 use tempfile::TempDir;
 use tokio::{
@@ -223,7 +224,7 @@ impl ClientCtx {
 
         let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
-        let mut client = (|| {
+        let client = (|| {
             Client::builder()
                 .with_daemon_uds_path(&uds_sock)
                 .with_daemon_aqc_addr(&any_addr)
@@ -233,7 +234,7 @@ impl ClientCtx {
         .await
         .context("unable to initialize client")?;
 
-        let aqc_server_addr = client.aqc().server_addr().context("exepcted server addr")?;
+        let aqc_server_addr = client.aqc().server_addr();
         let pk = client
             .get_key_bundle()
             .await
@@ -315,7 +316,7 @@ async fn setup_demo() -> Result<(Vec<u32>, DemoContext)> {
     ))
 }
 
-async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
+async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
@@ -343,7 +344,7 @@ async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
 
     // Create a team.
     info!("creating team");
-    let mut owner_team = ctx
+    let owner_team = ctx
         .owner
         .client
         .create_team(cfg.clone())
@@ -352,10 +353,10 @@ async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
     let team_id = owner_team.team_id();
     info!(%team_id);
 
-    let mut admin_team = ctx.admin.client.add_team(team_id, cfg.clone()).await?;
-    let mut operator_team = ctx.operator.client.add_team(team_id, cfg.clone()).await?;
-    let mut membera_team = ctx.membera.client.add_team(team_id, cfg.clone()).await?;
-    let mut memberb_team = ctx.memberb.client.add_team(team_id, cfg.clone()).await?;
+    let admin_team = ctx.admin.client.add_team(team_id, cfg.clone()).await?;
+    let operator_team = ctx.operator.client.add_team(team_id, cfg.clone()).await?;
+    let membera_team = ctx.membera.client.add_team(team_id, cfg.clone()).await?;
+    let memberb_team = ctx.memberb.client.add_team(team_id, cfg.clone()).await?;
 
     // setup sync peers.
     info!("adding admin to team");
@@ -477,8 +478,7 @@ async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
     sleep(sleep_interval).await;
 
     // fact database queries
-    let mut queries_team = ctx.membera.client.team(team_id);
-    let mut queries = queries_team.queries();
+    let queries = membera_team.queries();
     let devices = queries.devices_on_team().await?;
     info!("membera devices on team: {:?}", devices.iter().count());
     let role = queries.device_role(ctx.membera.id).await?;
@@ -515,36 +515,31 @@ async fn run_demo_body(mut ctx: DemoContext) -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // membera creates a bidirectional channel.
-    info!("membera creating acq bidi channel");
-    // Prepare arguments that need to be captured by the async move block
-    let memberb_net_identifier = ctx.memberb.aqc_net_id();
-
-    let create_handle = tokio::spawn(async move {
-        let channel_result = ctx
-            .membera
-            .client
-            .aqc()
-            .create_bidi_channel(team_id, memberb_net_identifier, label3)
-            .await;
-        (channel_result, ctx.membera) // Return membera along with the result
-    });
-
-    // memberb receives a bidirectional channel.
-    info!("memberb receiving acq bidi channel");
-    let AqcPeerChannel::Bidi(mut received_aqc_chan) =
-        ctx.memberb.client.aqc().receive_channel().await?
-    else {
-        bail!("expected a bidirectional channel");
-    };
-
-    // Now await the completion of membera's channel creation
-    let (created_aqc_chan_result, membera_returned) = create_handle
-        .await
-        .context("Task for membera creating bidi channel panicked")?;
-    ctx.membera = membera_returned; // Assign the moved membera back
-    let mut created_aqc_chan =
-        created_aqc_chan_result.context("Membera failed to create bidi channel")?;
+    // Creating and receiving a channel "blocks" until both sides have
+    // joined the channel, so we do them concurrently with `try_join`.
+    let (mut created_aqc_chan, mut received_aqc_chan) = try_join(
+        async {
+            // membera creates a bidirectional channel.
+            info!("membera creating acq bidi channel");
+            let chan = ctx
+                .membera
+                .client
+                .aqc()
+                .create_bidi_channel(team_id, ctx.memberb.aqc_net_id(), label3)
+                .await?;
+            Ok(chan)
+        },
+        async {
+            // memberb receives a bidirectional channel.
+            info!("memberb receiving acq bidi channel");
+            let AqcPeerChannel::Bidi(chan) = ctx.memberb.client.aqc().receive_channel().await?
+            else {
+                bail!("expected a bidirectional channel");
+            };
+            Ok(chan)
+        },
+    )
+    .await?;
 
     // membera creates a new stream on the channel.
     info!("membera creating aqc bidi stream");

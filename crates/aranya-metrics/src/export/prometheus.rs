@@ -1,11 +1,11 @@
 use std::{net::SocketAddr, num::NonZeroU32, path::PathBuf, time::Duration};
 
+use anyhow::{Context as _, Result};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use serde::Deserialize;
 use tracing::{info, warn};
 use url::Url;
-use anyhow::{Context as _, Result};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct PrometheusConfig {

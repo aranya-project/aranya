@@ -1,12 +1,11 @@
-use crate::MetricsConfig;
-use anyhow::anyhow;
-use anyhow::Result;
-use metrics::describe_gauge;
-use metrics::describe_histogram;
-use metrics::{gauge, histogram};
 use std::{io, mem, time::Instant};
+
+use anyhow::{anyhow, Result};
+use metrics::{describe_gauge, describe_histogram, gauge, histogram};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 use tracing::warn;
+
+use crate::MetricsConfig;
 
 /// Collector for process metrics, uses native APIs when possible.
 #[derive(Debug)]

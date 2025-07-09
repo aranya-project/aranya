@@ -1,7 +1,7 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use serde::Deserialize;
 use anyhow::Result;
+use serde::Deserialize;
 
 mod prometheus;
 
@@ -14,7 +14,7 @@ pub struct MetricsConfig {
 }
 
 impl MetricsConfig {
-    pub fn install (&self) -> Result<()> {
+    pub fn install(&self) -> Result<()> {
         match &self.mode {
             MetricsMode::Prometheus(prometheus) => {
                 prometheus.install(self)?;

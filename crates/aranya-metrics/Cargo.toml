@@ -23,6 +23,7 @@ anyhow = { workspace = true }
 backon = { workspace = true }
 bytes = { workspace = true }
 deser-hjson = { version = "2" }
+futures-util = { workspace = true }
 libc = { workspace = true }
 metrics = { workspace = true }
 metrics-exporter-prometheus = { version = "0.17", features = ["uds-listener"] }
