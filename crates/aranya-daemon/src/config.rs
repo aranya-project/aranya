@@ -12,6 +12,9 @@ use serde::{
     Deserialize, Serialize,
 };
 
+mod toggle;
+pub use toggle::Toggle;
+
 /// Options for configuring the daemon.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -99,19 +102,13 @@ pub struct Config {
     #[serde(deserialize_with = "non_empty_path")]
     pub config_dir: PathBuf,
 
-    /// Network address of Aranya sync server.
-    pub sync_addr: Addr,
-
-    /// AFC configuration.
-    #[serde(default)]
-    pub afc: Option<AfcConfig>,
-
     /// AQC configuration.
     #[serde(default)]
-    pub aqc: Option<AqcConfig>,
+    pub aqc: Toggle<AqcConfig>,
 
     /// QUIC syncer config
-    pub quic_sync: Option<QuicSyncConfig>,
+    #[serde(default)]
+    pub sync: SyncConfig,
 }
 
 impl Config {
@@ -120,7 +117,7 @@ impl Config {
     where
         P: AsRef<Path>,
     {
-        let cfg: Self = read_json(path.as_ref())
+        let cfg: Self = read_toml(path.as_ref())
             .with_context(|| format!("unable to parse config: {}", path.as_ref().display()))?;
         Ok(cfg)
     }
@@ -181,46 +178,33 @@ impl Config {
     }
 }
 
-/// Reads JSON from `path`.
-fn read_json<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T> {
-    let buf = fs::read(path.as_ref())?;
-    Ok(deser_hjson::from_slice(&buf)?)
+/// Reads TOML from `path`.
+fn read_toml<T: DeserializeOwned>(path: impl AsRef<Path>) -> Result<T> {
+    let buf = fs::read_to_string(path.as_ref())?;
+    Ok(toml::from_str(&buf)?)
 }
 
-/// AFC configuration.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+/// Sync configuration
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct AfcConfig {
-    /// Shared memory path.
-    pub shm_path: String,
-
-    /// Unlink `shm_path` before creating the shared memory?
-    ///
-    /// Ignored if `create` is false.
-    pub unlink_on_startup: bool,
-
-    /// Unlink `shm_path` before on exit?
-    ///
-    /// If false, the shared memory will persist across daemon
-    /// restarts.
-    pub unlink_at_exit: bool,
-
-    /// Create the shared memory?
-    pub create: bool,
-
-    /// Maximum number of channels AFC should support.
-    pub max_chans: usize,
+pub struct SyncConfig {
+    /// QUIC syncer config
+    #[serde(default)]
+    pub quic: Toggle<QuicSyncConfig>,
 }
 
 /// AQC configuration.
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AqcConfig {}
 
 /// QUIC syncer configuration.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct QuicSyncConfig {}
+pub struct QuicSyncConfig {
+    /// Network address of Aranya sync server.
+    pub addr: Addr,
+}
 
 fn non_empty_path<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
 where
@@ -240,26 +224,28 @@ mod tests {
     use std::net::Ipv4Addr;
 
     use pretty_assertions::assert_eq;
-    use serde_json::json;
+    use toml::toml;
 
     use super::*;
 
     #[test]
     fn test_example_config() -> Result<()> {
         const DIR: &str = env!("CARGO_MANIFEST_DIR");
-        let path = Path::new(DIR).join("example.json");
+        let path = Path::new(DIR).join("example.toml");
         let got = Config::load(path)?;
         let want = Config {
-            name: "name".to_string(),
+            name: "my-aranya-daemon".into(),
             runtime_dir: "/var/run/aranya".parse()?,
             state_dir: "/var/lib/aranya".parse()?,
             cache_dir: "/var/cache/aranya".parse()?,
             logs_dir: "/var/log/aranya".parse()?,
             config_dir: "/etc/aranya".parse()?,
-            sync_addr: Addr::new(Ipv4Addr::UNSPECIFIED.to_string(), 4321)?,
-            quic_sync: Some(QuicSyncConfig {}),
-            afc: None,
-            aqc: None,
+            sync: SyncConfig {
+                quic: Toggle::Enabled(QuicSyncConfig {
+                    addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
+                }),
+            },
+            aqc: Toggle::Enabled(AqcConfig {}),
         };
         assert_eq!(got, want);
 
@@ -268,27 +254,29 @@ mod tests {
 
     #[test]
     fn test_config() {
+        #![allow(clippy::disallowed_macros, reason = "toml! uses unreachable!")]
+
         // Missing a required field.
-        let data = json!({
-            "name": "aranya",
-            "runtime_dir": "/var/run/aranya",
-            "state_dir": "/var/lib/aranya",
-            "logs_dir": "/var/log/aranya",
-            "config_dir": "/etc/aranya",
-            "sync_addr": "127.0.0.1:4321",
-        });
-        serde_json::from_value::<Config>(data).expect_err("missing `cache_dir` should be rejected");
+        let data = toml! {
+            name = "aranya"
+            runtime_dir = "/var/run/aranya"
+            state_dir = "/var/lib/aranya"
+            logs_dir = "/var/log/aranya"
+            config_dir = "/etc/aranya"
+        };
+        data.try_into::<Config>()
+            .expect_err("missing `cache_dir` should be rejected");
 
         // A required field is empty.
-        let data = json!({
-            "name": "aranya",
-            "runtime_dir": "/var/run/aranya",
-            "state_dir": "/var/lib/aranya",
-            "cache_dir": "",
-            "logs_dir": "/var/log/aranya",
-            "config_dir": "/etc/aranya",
-            "sync_addr": "127.0.0.1:4321",
-        });
-        serde_json::from_value::<Config>(data).expect_err("empty `cache_dir` should be rejected");
+        let data = toml! {
+            name = "aranya"
+            runtime_dir = "/var/run/aranya"
+            state_dir = "/var/lib/aranya"
+            cache_dir = ""
+            logs_dir = "/var/log/aranya"
+            config_dir = "/etc/aranya"
+        };
+        data.try_into::<Config>()
+            .expect_err("empty `cache_dir` should be rejected");
     }
 }
