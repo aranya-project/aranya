@@ -2,17 +2,29 @@
 
 ## Running the example
 
-From `examples/multirust` directory:
+From `examples/multirust` directory.
+
+Build images:
 
 ```sh
-docker buildx bake --allow=fs.read="$(realpath ../../)" && docker compose up --abort-on-container-exit
+docker buildx bake --allow=fs.read="$(realpath ../../)"
 ```
 
-## Saving containers for sharing
+Run the containers:
+
+```sh
+docker compose up --abort-on-container-exit
+```
+
+## Saving images for sharing
+
+Save the three images into one tarball:
 
 ```sh
 docker save aranya-multirust-{operator,member-a,member-b} | gzip > aranya-multirust-images.tar.gz
 ```
+
+Load the three images into your docker context:
 
 ```sh
 docker load -i aranya-multirust-images.tar.gz
