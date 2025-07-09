@@ -1,6 +1,6 @@
 # The name of the daemon used for logging and debugging
 # purposes.
-name = "name"
+name = "my-aranya-daemon"
 
 
 # The directory where the daemon stores non-essential
