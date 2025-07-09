@@ -1,3 +1,7 @@
+#![warn(missing_docs)]
+
+//! Client configurations.
+
 use core::time::Duration;
 
 use crate::{error::InvalidArg, ConfigError, Result};

@@ -12,6 +12,15 @@
 //! [walkthrough]: https://github.com/aranya-project/aranya/tree/main/docs/walkthrough.md
 
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![warn(
+    clippy::alloc_instead_of_core,
+    clippy::implicit_saturating_sub,
+    clippy::missing_panics_doc,
+    clippy::ptr_as_ptr,
+    clippy::string_slice,
+    clippy::unimplemented,
+    missing_docs
+)]
 
 pub mod aqc;
 pub mod client;
