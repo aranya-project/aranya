@@ -175,6 +175,9 @@ async fn main() -> Result<()> {
     operator.write("member-a.id", membera.id).await?;
     operator.write("member-b.id", memberb.id).await?;
 
+    membera.write("member-b.id", memberb.id).await?;
+    memberb.write("member-a.id", membera.id).await?;
+
     // get sync addresses.
     let owner_addr = owner.aranya_local_addr().await?;
     let admin_addr = admin.aranya_local_addr().await?;
