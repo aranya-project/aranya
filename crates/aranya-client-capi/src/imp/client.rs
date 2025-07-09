@@ -13,7 +13,7 @@ pub struct Client {
 
 impl Client {
     /// Useful for deref coercion.
-    pub(crate) fn imp(&mut self) -> &mut Self {
+    pub(crate) fn imp(&self) -> &Self {
         self
     }
 }

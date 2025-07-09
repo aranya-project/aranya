@@ -53,7 +53,7 @@ async fn test_aqc_chans() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    let mut operator_team = team.operator.client.team(team_id);
+    let operator_team = team.operator.client.team(team_id);
     operator_team
         .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
         .await?;
@@ -292,7 +292,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    let mut operator_team = team.operator.client.team(team_id);
+    let operator_team = team.operator.client.team(team_id);
     operator_team
         .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
         .await?;
@@ -393,7 +393,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    let mut operator_team = team.operator.client.team(team_id);
+    let operator_team = team.operator.client.team(team_id);
     operator_team
         .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
         .await?;
@@ -494,7 +494,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    let mut operator_team = team.operator.client.team(team_id);
+    let operator_team = team.operator.client.team(team_id);
     operator_team
         .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
         .await?;
@@ -647,7 +647,7 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    let mut operator_team = team.operator.client.team(team_id);
+    let operator_team = team.operator.client.team(team_id);
     operator_team
         .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
         .await?;

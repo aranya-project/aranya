@@ -209,13 +209,13 @@ async fn test_add_team() -> Result<()> {
 
     // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
-    let mut team = TeamCtx::new("test_add_team", work_dir).await?;
+    let team = TeamCtx::new("test_add_team", work_dir).await?;
 
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
 
     // Create the initial team, and get our TeamId.
-    let mut owner = team
+    let owner = team
         .owner
         .client
         .create_team({
@@ -251,7 +251,7 @@ async fn test_add_team() -> Result<()> {
 
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
-        let mut admin = team.admin.client.team(team_id);
+        let admin = team.admin.client.team(team_id);
         admin.sync_now(owner_addr.into(), None).await?;
         sleep(TLS_HANDSHAKE_DURATION).await;
 
@@ -282,7 +282,7 @@ async fn test_add_team() -> Result<()> {
         })
         .await?;
     {
-        let mut admin = team.admin.client.team(team_id);
+        let admin = team.admin.client.team(team_id);
         admin.sync_now(owner_addr.into(), None).await?;
         sleep(SLEEP_INTERVAL).await;
 
@@ -313,8 +313,8 @@ async fn test_remove_team() -> Result<()> {
     team.add_all_sync_peers(team_id).await?;
 
     {
-        let mut owner = team.owner.client.team(team_id);
-        let mut admin = team.admin.client.team(team_id);
+        let owner = team.owner.client.team(team_id);
+        let admin = team.admin.client.team(team_id);
 
         let owner_role_id = owner.roles().await?.try_into_owner_role()?.id;
         let roles = owner
@@ -350,7 +350,7 @@ async fn test_remove_team() -> Result<()> {
     sleep(SLEEP_INTERVAL).await;
 
     {
-        let mut admin = team.admin.client.team(team_id);
+        let admin = team.admin.client.team(team_id);
 
         // Role assignment should fail
         let owner_role_id = admin.roles().await?.try_into_owner_role()?.id;
@@ -400,7 +400,7 @@ async fn test_multi_team_sync() -> Result<()> {
     // Admin2 syncs on team 1
     {
         let owner1_addr = team1.owner.aranya_local_addr().await?;
-        let mut owner1 = team1.owner.client.team(team_id_1);
+        let owner1 = team1.owner.client.team(team_id_1);
 
         let owner_role_id = owner1.roles().await?.try_into_owner_role()?.id;
         let roles = owner1
@@ -441,7 +441,7 @@ async fn test_multi_team_sync() -> Result<()> {
             })
             .await?;
         {
-            let mut admin2 = team2.admin.client.team(team_id_1);
+            let admin2 = team2.admin.client.team(team_id_1);
             admin2.sync_now(owner1_addr.into(), None).await?;
 
             sleep(SLEEP_INTERVAL).await;
@@ -454,7 +454,7 @@ async fn test_multi_team_sync() -> Result<()> {
     // Admin2 syncs on team 2
     {
         let owner2_addr = team2.owner.aranya_local_addr().await?;
-        let mut admin2 = team2.admin.client.team(team_id_2);
+        let admin2 = team2.admin.client.team(team_id_2);
 
         let owner_role_id = admin2.roles().await?.try_into_owner_role()?.id;
         let roles = admin2

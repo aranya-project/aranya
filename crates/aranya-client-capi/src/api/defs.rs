@@ -134,7 +134,7 @@ impl From<&InvalidArg<'static>> for Error {
 ///
 /// The resulting pointer must NOT be freed.
 ///
-/// @param err `u32` error code from `AranyaError`.
+/// @param[in] err `u32` error code from `AranyaError`.
 ///
 /// @relates AranyaError.
 #[aranya_capi_core::no_ext_error]
@@ -162,14 +162,14 @@ pub type ExtError = Safe<imp::ExtError>;
 /// updates `msg_len` with the length of the message and
 /// returns `::ARANYA_ERROR_BUFFER_TOO_SMALL`.
 ///
-/// @param err the error to get a message for [`ExtError`].
-/// @param msg buffer to copy error message into.
-/// @param msg_len length of the message buffer.
+/// @param[in] err the error to get a message for [`ExtError`].
+/// @param[out] msg buffer to copy error message into.
+/// @param[in,out] msg_len length of the message buffer.
 ///
 /// @relates AranyaExtError.
-pub fn ext_error_msg(
+pub unsafe fn ext_error_msg(
     err: &ExtError,
-    msg: &mut MaybeUninit<c_char>,
+    msg: *mut MaybeUninit<c_char>,
     msg_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let msg = aranya_capi_core::try_as_mut_slice!(msg, *msg_len);
@@ -196,8 +196,8 @@ impl From<Duration> for std::time::Duration {
 
 /// Initializes a new client instance.
 ///
-/// @param client the uninitialized Aranya Client [`Client`].
-/// @param config the client's configuration [`ClientConfig`].
+/// @param[out] client the uninitialized Aranya Client [`Client`].
+/// @param[in] config the client's configuration [`ClientConfig`].
 ///
 /// @relates AranyaClient.
 pub unsafe fn client_init(
@@ -522,30 +522,15 @@ pub fn init_logging() -> Result<(), imp::Error> {
     Ok(())
 }
 
-/// Decodes the hexadecimal string `src` into `dst` and returns
-/// the number of bytes written to `dst`.
-///
-/// If `src` is a valid hexadecimal string, the number of bytes
-/// written to `dst` will be exactly half the length of `src`.
-/// Therefore, `dst` must be at least half as long as `src`.
-///
-/// @param dst the output buffer
-/// @param src the input hexadecimal string
-pub fn decode_hex(dst: &mut [u8], src: &[u8]) -> Result<usize, imp::Error> {
-    hex::ct_decode(dst, src).map_err(|_| {
-        imp::Error::InvalidArg(InvalidArg::new("src", "not a valid hexadecimal string"))
-    })
-}
-
 /// Gets the public key bundle for this device.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param keybundle keybundle byte buffer `KeyBundle`.
-/// @param keybundle_len returns the length of the serialized keybundle.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[out] keybundle keybundle byte buffer `KeyBundle`.
+/// @param[in,out] keybundle_len returns the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.
 pub unsafe fn get_key_bundle(
-    client: &mut Client,
+    client: &Client,
     keybundle: *mut MaybeUninit<u8>,
     keybundle_len: &mut usize,
 ) -> Result<(), imp::Error> {
@@ -564,15 +549,15 @@ pub const ARANYA_ID_STR_LEN: usize = (ARANYA_ID_LEN * 1375) / 1000 + 1;
 ///
 /// To always succeed, `str` must be at least `ARANYA_ID_STR_LEN` bytes long.
 ///
-/// @param device ID [`Id`].
-/// @param str ID string [`Id`].
-/// @param str_len returns the length of `str`
+/// @param[in] device ID [`Id`].
+/// @param[out] str ID string [`Id`].
+/// @param[in,out] str_len returns the length of `str`
 ///
 /// @relates AranyaId.
 #[aranya_capi_core::no_ext_error]
-pub fn id_to_str(
+pub unsafe fn id_to_str(
     id: &Id,
-    str: &mut MaybeUninit<c_char>,
+    str: *mut MaybeUninit<c_char>,
     str_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let str = aranya_capi_core::try_as_mut_slice!(str, *str_len);
@@ -582,7 +567,7 @@ pub fn id_to_str(
 
 /// Decodes `str` into an [`Id`].
 ///
-/// @param str pointer to a null-terminated string.
+/// @param[in] str pointer to a null-terminated string.
 ///
 /// @relates AranyaId.
 #[aranya_capi_core::no_ext_error]
@@ -597,11 +582,11 @@ pub unsafe fn id_from_str(str: *const c_char) -> Result<Id, imp::Error> {
 
 /// Gets the public device ID.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param __output the client's device ID [`DeviceId`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[out] __output the client's device ID [`DeviceId`].
 ///
 /// @relates AranyaClient.
-pub fn get_device_id(client: &mut Client) -> Result<DeviceId, imp::Error> {
+pub fn get_device_id(client: &Client) -> Result<DeviceId, imp::Error> {
     let client = client.imp();
     let id = client.rt.block_on(client.inner.get_device_id())?;
     Ok(id.into())
@@ -623,8 +608,8 @@ pub type ClientConfigBuilder = Safe<imp::ClientConfigBuilder>;
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param cfg a pointer to the client config builder
-/// @param out a pointer to write the client config to
+/// @param[in] cfg a pointer to the client config builder
+/// @param[out] out a pointer to write the client config to
 ///
 /// @relates AranyaClientConfigBuilder.
 pub fn client_config_build(
@@ -638,8 +623,8 @@ pub fn client_config_build(
 
 /// Sets Unix Domain Socket path that the daemon is listening on.
 ///
-/// @param cfg a pointer to the client config builder
-/// @param address a string containing the address
+/// @param[in,out] cfg a pointer to the client config builder
+/// @param[in] address a string containing the address
 ///
 /// @relates AranyaClientConfigBuilder.
 pub fn client_config_builder_set_daemon_uds_path(
@@ -665,8 +650,8 @@ pub type AqcConfigBuilder = Safe<imp::AqcConfigBuilder>;
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param cfg a pointer to the aqc config builder
-/// @param out a pointer to write the aqc config to
+/// @param[in] cfg a pointer to the aqc config builder
+/// @param[out] out a pointer to write the aqc config to
 ///
 /// @relates AranyaAqcConfigBuilder.
 pub fn aqc_config_build(
@@ -681,8 +666,8 @@ pub fn aqc_config_build(
 /// Sets the network address that the AQC server should listen
 /// on.
 ///
-/// @param cfg a pointer to the aqc config builder
-/// @param address a string with the address to bind to
+/// @param[in,out] cfg a pointer to the aqc config builder
+/// @param[in] address a string with the address to bind to
 ///
 /// @relates AranyaAqcConfigBuilder.
 pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *const c_char) {
@@ -691,8 +676,8 @@ pub fn aqc_config_builder_set_address(cfg: &mut AqcConfigBuilder, address: *cons
 
 /// Sets the configuration for Aranya QUIC Channels.
 ///
-/// @param cfg a pointer to the client config builder
-/// @param aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
+/// @param[in,out] cfg a pointer to the client config builder
+/// @param[in] aqc_config a pointer to a valid AQC config (see [`AqcConfigBuilder`])
 ///
 /// @relates AranyaAqcConfigBuilder.
 pub fn client_config_builder_set_aqc_config(cfg: &mut ClientConfigBuilder, aqc_config: &AqcConfig) {
@@ -714,7 +699,7 @@ pub type QuicSyncConfigBuilder = Safe<imp::QuicSyncConfigBuilder>;
 
 /// Attempts to set PSK seed generation mode value on [`QuicSyncConfigBuilder`].
 ///
-/// @param cfg a pointer to the quic sync config builder
+/// @param[in,out] cfg a pointer to the quic sync config builder
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
 pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), imp::Error> {
@@ -724,8 +709,8 @@ pub fn quic_sync_config_generate(cfg: &mut QuicSyncConfigBuilder) -> Result<(), 
 
 /// Attempts to set wrapped PSK seed value on [`QuicSyncConfigBuilder`].
 ///
-/// @param cfg a pointer to the quic sync config builder
-/// @param encap_seed a pointer the encapsulated PSK seed
+/// @param[in,out] cfg a pointer to the quic sync config builder
+/// @param[in] encap_seed a pointer the encapsulated PSK seed
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
 pub fn quic_sync_config_wrapped_seed(
@@ -745,8 +730,8 @@ pub struct SeedIkm {
 
 /// Attempts to set raw PSK seed IKM value [`SeedIkm`] on [`QuicSyncConfigBuilder`].
 ///
-/// @param cfg a pointer to the quic sync config builder [`QuicSyncConfigBuilder`]
-/// @param ikm a pointer the raw PSK seed IKM [`SeedIkm`]
+/// @param[in,out] cfg a pointer to the quic sync config builder [`QuicSyncConfigBuilder`]
+/// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
 pub fn quic_sync_config_raw_seed_ikm(
@@ -762,8 +747,8 @@ pub fn quic_sync_config_raw_seed_ikm(
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param cfg a pointer to the QUIC sync config builder [`QuicSyncConfigBuilder`]
-/// @param out a pointer to write the QUIC sync config to [`QuicSyncConfig`]
+/// @param[in] cfg a pointer to the QUIC sync config builder [`QuicSyncConfigBuilder`]
+/// @param[out] out a pointer to write the QUIC sync config to [`QuicSyncConfig`]
 ///
 /// @relates AranyaQuicSyncConfigBuilder.
 pub fn quic_sync_config_build(
@@ -792,8 +777,8 @@ pub type TeamConfigBuilder = Safe<imp::TeamConfigBuilder>;
 /// [`team_config_build`] before setting the interval with
 /// this function
 ///
-/// @param cfg a pointer to the builder for a team config [`TeamConfigBuilder`]
-/// @param quic set the QUIC syncer config [`QuicSyncConfig`]
+/// @param[in,out] cfg a pointer to the builder for a team config [`TeamConfigBuilder`]
+/// @param[in] quic set the QUIC syncer config [`QuicSyncConfig`]
 ///
 /// @relates AranyaTeamConfigBuilder.
 pub fn team_config_builder_set_quic_syncer(
@@ -810,8 +795,8 @@ pub fn team_config_builder_set_quic_syncer(
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param cfg a pointer to the team config builder [`TeamConfigBuilder`]
-/// @param out a pointer to write the team config to [`TeamConfig`]
+/// @param[in] cfg a pointer to the team config builder [`TeamConfigBuilder`]
+/// @param[out] out a pointer to write the team config to [`TeamConfig`]
 ///
 /// @relates AranyaTeamConfigBuilder.
 pub fn team_config_build(
@@ -839,8 +824,8 @@ pub type SyncPeerConfigBuilder = Safe<imp::SyncPeerConfigBuilder>;
 /// This function consumes and releases any resources associated
 /// with the memory pointed to by `cfg`.
 ///
-/// @param cfg a pointer to the builder for a sync config [`SyncPeerConfigBuilder`]
-/// @param out a pointer to write the sync config to [`SyncPeerConfig`]
+/// @param[in] cfg a pointer to the builder for a sync config [`SyncPeerConfigBuilder`]
+/// @param[out] out a pointer to write the sync config to [`SyncPeerConfig`]
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
 pub fn sync_peer_config_build(
@@ -858,8 +843,8 @@ pub fn sync_peer_config_build(
 /// [`sync_peer_config_build`] before setting the interval with
 /// this function
 ///
-/// @param cfg a pointer to the builder for a sync config
-/// @param interval Set the interval at which syncing occurs
+/// @param[in,out] cfg a pointer to the builder for a sync config
+/// @param[in] interval Set the interval at which syncing occurs
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
 pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, interval: Duration) {
@@ -872,7 +857,7 @@ pub fn sync_peer_config_builder_set_interval(cfg: &mut SyncPeerConfigBuilder, in
 ///
 /// By default, the peer is synced with immediately.
 ///
-/// @param cfg a pointer to the builder for a sync config
+/// @param[in,out] cfg a pointer to the builder for a sync config
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
 // TODO: aranya-core#129
@@ -885,7 +870,7 @@ pub fn sync_peer_config_builder_set_sync_now(cfg: &mut SyncPeerConfigBuilder) {
 /// Overrides [`sync_peer_config_builder_set_sync_now`] if invoked afterward.
 ///
 /// By default, the peer is synced with immediately.
-/// @param cfg a pointer to the builder for a sync config
+/// @param[in,out] cfg a pointer to the builder for a sync config
 ///
 /// @relates AranyaSyncPeerConfigBuilder.
 // TODO: aranya-core#129
@@ -926,7 +911,7 @@ pub fn setup_default_riles(client: &mut Client, team: &TeamId) -> Result<(), imp
 ///
 /// @relates AranyaClient.
 pub fn assign_role(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     role_id: &RoleId,
@@ -952,7 +937,7 @@ pub fn assign_role(
 ///
 /// @relates AranyaClient.
 pub fn revoke_role(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     role_id: &RoleId,
@@ -979,7 +964,7 @@ pub fn revoke_role(
 ///
 /// @relates AranyaClient.
 pub fn create_label(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     name: LabelName,
     managing_role_id: &RoleId,
@@ -1000,16 +985,12 @@ pub fn create_label(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param label_id the channel label ID [`LabelId`] to delete.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] label_id the channel label ID [`LabelId`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn delete_label(
-    client: &mut Client,
-    team: &TeamId,
-    label_id: &LabelId,
-) -> Result<(), imp::Error> {
+pub fn delete_label(client: &Client, team: &TeamId, label_id: &LabelId) -> Result<(), imp::Error> {
     let client = client.imp();
     client
         .rt
@@ -1021,14 +1002,14 @@ pub fn delete_label(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to assign the label to.
-/// @param label_id the AQC channel label ID [`LabelId`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device ID [`DeviceId`] of the device to assign the label to.
+/// @param[in] label_id the AQC channel label ID [`LabelId`].
 ///
 /// @relates AranyaClient.
 pub fn assign_label(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     label_id: &LabelId,
@@ -1049,14 +1030,14 @@ pub fn assign_label(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device ID [`DeviceId`] of the device to revoke the label from.
-/// @param label_id the AQC channel label ID [`LabelId`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device ID [`DeviceId`] of the device to revoke the label from.
+/// @param[in] label_id the AQC channel label ID [`LabelId`].
 ///
 /// @relates AranyaClient.
 pub fn revoke_label(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     label_id: &LabelId,
@@ -1073,13 +1054,13 @@ pub fn revoke_label(
 
 /// Create a new graph/team with the current device as the owner.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param cfg the Team Configuration [`TeamConfig`].
-/// @param __output the team's ID [`TeamId`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] cfg the Team Configuration [`TeamConfig`].
+/// @param[out] __output the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
+pub fn create_team(client: &Client, cfg: &TeamConfig) -> Result<TeamId, imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
     let team_id = client
@@ -1097,7 +1078,7 @@ pub fn create_team(client: &mut Client, cfg: &TeamConfig) -> Result<TeamId, imp:
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[out] buf buffer where random bytes are written to.
 /// @param[in] buf_len the size of the buffer.
-pub unsafe fn rand(client: &mut Client, buf: &mut [MaybeUninit<u8>]) {
+pub unsafe fn rand(client: &Client, buf: &mut [MaybeUninit<u8>]) {
     let client = client.imp();
 
     buf.fill(MaybeUninit::new(0));
@@ -1118,12 +1099,13 @@ pub unsafe fn rand(client: &mut Client, buf: &mut [MaybeUninit<u8>]) {
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team_id the team's ID [`TeamId`].
 /// @param[in] keybundle serialized keybundle byte buffer `KeyBundle`.
+/// @param[in] keybundle_len the length of the keybundle
 /// @param[out] seed the serialized, encrypted PSK seed.
-/// @param[out] seed_len the number of bytes written to the seed buffer.
+/// @param[in,out] seed_len the number of bytes written to the seed buffer.
 ///
 /// @relates AranyaClient.
 pub unsafe fn encrypt_psk_seed_for_peer(
-    client: &mut Client,
+    client: &Client,
     team_id: &TeamId,
     keybundle: &[u8],
     seed: *mut MaybeUninit<u8>,
@@ -1154,13 +1136,13 @@ pub unsafe fn encrypt_psk_seed_for_peer(
 
 /// Add a team to the local device store.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param cfg the Team Configuration [`TeamConfig`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] cfg the Team Configuration [`TeamConfig`].
 ///
 /// @relates AranyaClient.
 #[allow(unused_variables)] // TODO(nikki): once we have fields on TeamConfig, remove this for cfg
-pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
+pub fn add_team(client: &Client, team: &TeamId, cfg: &TeamConfig) -> Result<(), imp::Error> {
     let client = client.imp();
     let cfg: &imp::TeamConfig = cfg.deref();
     client
@@ -1171,11 +1153,11 @@ pub fn add_team(client: &mut Client, team: &TeamId, cfg: &TeamConfig) -> Result<
 
 /// Remove a team from local device storage.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+pub fn remove_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.imp();
     client.rt.block_on(client.inner.remove_team(team.into()))?;
     Ok(())
@@ -1183,11 +1165,11 @@ pub fn remove_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error>
 
 /// Close the team and stop all operations on the graph.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
-pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> {
+pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.imp();
     client
         .rt
@@ -1207,7 +1189,7 @@ pub fn close_team(client: &mut Client, team: &TeamId) -> Result<(), imp::Error> 
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_device_to_team(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     keybundle: &[u8],
     role_id: Option<&RoleId>,
@@ -1228,13 +1210,13 @@ pub unsafe fn add_device_to_team(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device's ID [`DeviceId`].
 ///
 /// @relates AranyaClient.
 pub fn remove_device_from_team(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
 ) -> Result<(), imp::Error> {
@@ -1254,14 +1236,14 @@ pub fn remove_device_from_team(
 /// will appear in the tracing logs and
 /// Aranya will be unable to sync state with that peer.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param addr the peer's Aranya network address [`Addr`].
-/// @param config configuration values for syncing with a peer.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] addr the peer's Aranya network address [`Addr`].
+/// @param[in] config configuration values for syncing with a peer.
 ///
 /// @relates AranyaClient.
 pub unsafe fn add_sync_peer(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     addr: Addr,
     config: &SyncPeerConfig,
@@ -1280,13 +1262,13 @@ pub unsafe fn add_sync_peer(
 
 /// Remove the peer from automatic Aranya state syncing.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param addr the peer's Aranya network address [`Addr`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] addr the peer's Aranya network address [`Addr`].
 ///
 /// @relates AranyaClient.
 pub unsafe fn remove_sync_peer(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     addr: Addr,
 ) -> Result<(), imp::Error> {
@@ -1309,14 +1291,16 @@ pub unsafe fn remove_sync_peer(
 /// This function ignores [`sync_peer_config_builder_set_interval`] and
 /// [`sync_peer_config_builder_set_sync_later`], if set.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param addr the peer's Aranya network address [`Addr`].
-/// @param config configuration values for syncing with a peer.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] addr the peer's Aranya network address [`Addr`].
+/// @param[in] config configuration values for syncing with a peer.
+///
 /// Default values for a sync config will be used if `config` is `NULL`
+///
 /// @relates AranyaClient.
 pub unsafe fn sync_now(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     addr: Addr,
     config: Option<&SyncPeerConfig>,
@@ -1335,16 +1319,16 @@ pub unsafe fn sync_now(
 
 /// Query devices on team.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param devices returns a list of device IDs on the team [`DeviceId`].
-/// @param devices_len returns the length of the devices list [`DeviceId`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[out] devices returns a list of device IDs on the team [`DeviceId`].
+/// @param[in,out] devices_len returns the length of the devices list [`DeviceId`].
 ///
 /// @relates AranyaClient.
-pub fn query_devices_on_team(
-    client: &mut Client,
+pub unsafe fn query_devices_on_team(
+    client: &Client,
     team: &TeamId,
-    devices: Option<&mut MaybeUninit<DeviceId>>,
+    devices: *mut MaybeUninit<DeviceId>,
     devices_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
@@ -1352,10 +1336,6 @@ pub fn query_devices_on_team(
         .rt
         .block_on(client.inner.team(team.into()).queries().devices_on_team())?;
     let data = data.__data();
-    let Some(devices) = devices else {
-        *devices_len = data.len();
-        return Err(imp::Error::BufferTooSmall);
-    };
     let out = aranya_capi_core::try_as_mut_slice!(devices, *devices_len);
     if *devices_len < data.len() {
         *devices_len = data.len();
@@ -1372,15 +1352,15 @@ pub fn query_devices_on_team(
 
 /// Query device's keybundle.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param keybundle keybundle byte buffer `KeyBundle`.
-/// @param keybundle_len returns the length of the serialized keybundle.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device's ID [`DeviceId`].
+/// @param[out] keybundle keybundle byte buffer `KeyBundle`.
+/// @param[in,out] keybundle_len returns the length of the serialized keybundle.
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_device_keybundle(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     keybundle: *mut MaybeUninit<u8>,
@@ -1405,20 +1385,18 @@ pub unsafe fn query_device_keybundle(
 /// Writes the number of labels that would have been returned to `labels_len`.
 /// The application can use `labels_len` to allocate a larger buffer.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-///
-/// Output params:
-/// @param labels returns a list of labels assigned to the device [`LabelId`].
-/// @param labels_len returns the length of the labels list [`LabelId`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device's ID [`DeviceId`].
+/// @param[out] labels returns a list of labels assigned to the device [`LabelId`].
+/// @param[in,out] labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn query_device_label_assignments(
-    client: &mut Client,
+pub unsafe fn query_device_label_assignments(
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
-    labels: Option<&mut MaybeUninit<LabelId>>,
+    labels: *mut MaybeUninit<LabelId>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
@@ -1430,10 +1408,6 @@ pub fn query_device_label_assignments(
             .device_label_assignments(device.into()),
     )?;
     let data = data.__data();
-    let Some(labels) = labels else {
-        *labels_len = data.len();
-        return Err(imp::Error::BufferTooSmall);
-    };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     if *labels_len < data.len() {
         *labels_len = data.len();
@@ -1452,18 +1426,16 @@ pub fn query_device_label_assignments(
 /// Writes the number of labels that would have been returned to `labels_len`.
 /// The application can use `labels_len` to allocate a larger buffer.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-///
-/// Output params:
-/// @param labels returns a list of labels [`LabelId`].
-/// @param labels_len returns the length of the labels list [`LabelId`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[out] labels returns a list of labels [`LabelId`].
+/// @param[in,out] labels_len returns the length of the labels list [`LabelId`].
 ///
 /// @relates AranyaClient.
-pub fn query_labels(
-    client: &mut Client,
+pub unsafe fn query_labels(
+    client: &Client,
     team: &TeamId,
-    labels: Option<&mut MaybeUninit<LabelId>>,
+    labels: *mut MaybeUninit<LabelId>,
     labels_len: &mut usize,
 ) -> Result<(), imp::Error> {
     let client = client.imp();
@@ -1471,10 +1443,6 @@ pub fn query_labels(
         .rt
         .block_on(client.inner.team(team.into()).queries().labels())?;
     let data = data.__data();
-    let Some(labels) = labels else {
-        *labels_len = data.len();
-        return Err(imp::Error::BufferTooSmall);
-    };
     let out = aranya_capi_core::try_as_mut_slice!(labels, *labels_len);
     for (dst, src) in out.iter_mut().zip(data) {
         dst.write(src.id.into());
@@ -1489,15 +1457,15 @@ pub fn query_labels(
 
 /// Query if a label exists.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param label the label [`LabelId`].
-/// @param __output boolean indicating whether the label exists.
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device's ID [`DeviceId`].
+/// @param[in] label the label [`LabelId`].
+/// @param[out] __output boolean indicating whether the label exists.
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_label_exists(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     label: &LabelId,
 ) -> Result<bool, imp::Error> {
@@ -1514,17 +1482,18 @@ pub unsafe fn query_label_exists(
 
 /// Query device's AQC network identifier.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param network identifier string [`NetIdentifier`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device's ID [`DeviceId`].
+/// @param[out] ident network identifier string [`NetIdentifier`].
+/// @param[in,out] length of ident
 ///
 /// @relates AranyaClient.
 pub unsafe fn query_aqc_net_identifier(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
-    ident: &mut MaybeUninit<c_char>,
+    ident: *mut MaybeUninit<c_char>,
     ident_len: &mut usize,
 ) -> Result<bool, imp::Error> {
     let client = client.imp();
@@ -1551,14 +1520,14 @@ pub unsafe fn query_aqc_net_identifier(
 /// of resolving addresses via DNS, required to be statically mapped to IPV4. For use with
 /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device's ID [`DeviceId`].
+/// @param[in] net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_assign_net_identifier(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     net_identifier: NetIdentifier,
@@ -1577,14 +1546,14 @@ pub unsafe fn aqc_assign_net_identifier(
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
 ///
-/// @param client the Aranya Client [`Client`].
-/// @param team the team's ID [`TeamId`].
-/// @param device the device's ID [`DeviceId`].
-/// @param net_identifier the device's network identifier [`NetIdentifier`].
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+/// @param[in] device the device's ID [`DeviceId`].
+/// @param[in] net_identifier the device's network identifier [`NetIdentifier`].
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_remove_net_identifier(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     device: &DeviceId,
     net_identifier: NetIdentifier,
@@ -1658,7 +1627,7 @@ pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_bidi_channel(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
@@ -1687,7 +1656,7 @@ pub unsafe fn aqc_create_bidi_channel(
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_uni_channel(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
@@ -1713,7 +1682,7 @@ pub unsafe fn aqc_create_uni_channel(
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_bidi_channel(
-    client: &mut Client,
+    client: &Client,
     channel: OwnedPtr<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid AqcBidiChannel pointer.
@@ -1735,7 +1704,7 @@ pub fn aqc_delete_bidi_channel(
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_uni_channel(
-    client: &mut Client,
+    client: &Client,
     channel: OwnedPtr<AqcSendChannel>,
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid AqcSendChannel pointer.
@@ -1777,7 +1746,7 @@ pub fn aqc_delete_uni_channel(
 ///
 /// @relates AranyaClient.
 pub fn aqc_try_receive_channel(
-    client: &mut Client,
+    client: &Client,
     channel: &mut MaybeUninit<AqcPeerChannel>,
 ) -> Result<AqcChannelType, imp::Error> {
     let chan = client.inner.aqc().try_receive_channel()?;
@@ -1861,7 +1830,7 @@ pub fn aqc_get_receive_channel(
 ///
 /// @relates AranyaClient.
 pub fn aqc_bidi_create_bidi_stream(
-    client: &mut Client,
+    client: &Client,
     channel: &mut AqcBidiChannel,
     stream: &mut MaybeUninit<AqcBidiStream>,
 ) -> Result<(), imp::Error> {
@@ -1880,7 +1849,7 @@ pub fn aqc_bidi_create_bidi_stream(
 ///
 /// @relates AranyaClient.
 pub fn aqc_bidi_stream_send(
-    client: &mut Client,
+    client: &Client,
     stream: &mut AqcBidiStream,
     data: &[u8],
 ) -> Result<(), imp::Error> {
@@ -1895,24 +1864,34 @@ pub fn aqc_bidi_stream_send(
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcBidiStream`].
 /// @param[out] buffer pointer to the target buffer.
-/// @param[in] buffer_len length of the target buffer.
-/// @param[out] __output the number of bytes written to the buffer.
+/// @param[in,out] buffer_len length of the target buffer.
 ///
 /// @relates AranyaClient.
-pub fn aqc_bidi_stream_try_recv(
+pub unsafe fn aqc_bidi_stream_try_recv(
     stream: &mut AqcBidiStream,
-    mut buffer: &mut [MaybeUninit<u8>],
-) -> Result<usize, imp::Error> {
+    buffer: *mut MaybeUninit<u8>,
+    buffer_len: &mut usize,
+) -> Result<(), imp::Error> {
+    if buffer.is_null() || *buffer_len == 0 {
+        return Err(InvalidArg::new(
+            "buffer",
+            "Tried to call aqc_bidi_stream_try_recv with an empty buffer",
+        )
+        .into());
+    }
+
     let mut written = 0;
-    while !buffer.is_empty() {
-        written += consume_bytes(&mut buffer, &mut stream.data);
+    let mut buf = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
+    while !buf.is_empty() {
+        written += consume_bytes(&mut buf, &mut stream.data);
         match stream.inner.try_receive() {
             Ok(data) => stream.data = data,
             Err(_) if written > 0 => break,
             Err(e) => return Err(e.into()),
         }
     }
-    Ok(written)
+    *buffer_len = written;
+    Ok(())
 }
 
 /// Create a unidirectional stream from an [`AqcBidiChannel`].
@@ -1926,7 +1905,7 @@ pub fn aqc_bidi_stream_try_recv(
 ///
 /// @relates AranyaClient.
 pub fn aqc_bidi_create_uni_stream(
-    client: &mut Client,
+    client: &Client,
     channel: &mut AqcBidiChannel,
     stream: &mut MaybeUninit<AqcSendStream>,
 ) -> Result<(), imp::Error> {
@@ -1985,7 +1964,7 @@ pub fn aqc_bidi_try_receive_stream(
 ///
 /// @relates AranyaClient.
 pub fn aqc_send_create_uni_stream(
-    client: &mut Client,
+    client: &Client,
     channel: &mut AqcSendChannel,
     stream: &mut MaybeUninit<AqcSendStream>,
 ) -> Result<(), imp::Error> {
@@ -2026,7 +2005,7 @@ pub fn aqc_recv_try_receive_uni_stream(
 ///
 /// @relates AranyaClient.
 pub fn aqc_send_stream_send(
-    client: &mut Client,
+    client: &Client,
     stream: &mut AqcSendStream,
     data: &[u8],
 ) -> Result<(), imp::Error> {
@@ -2041,22 +2020,32 @@ pub fn aqc_send_stream_send(
 ///
 /// @param[in]  stream the receiving side of a stream [`AqcReceiveStream`].
 /// @param[out] buffer pointer to the target buffer.
-/// @param[in] buffer_len length of the target buffer.
-/// @param[out] __output the number of bytes written to the buffer.
+/// @param[in,out] buffer_len length of the target buffer.
 ///
 /// @relates AranyaClient.
-pub fn aqc_recv_stream_try_recv(
+pub unsafe fn aqc_recv_stream_try_recv(
     stream: &mut AqcReceiveStream,
-    mut buffer: &mut [MaybeUninit<u8>],
-) -> Result<usize, imp::Error> {
+    buffer: *mut MaybeUninit<u8>,
+    buffer_len: &mut usize,
+) -> Result<(), imp::Error> {
+    if buffer.is_null() || *buffer_len == 0 {
+        return Err(InvalidArg::new(
+            "buffer",
+            "Tried to call aqc_recv_stream_try_recv with an empty buffer",
+        )
+        .into());
+    }
+
     let mut written = 0;
-    while !buffer.is_empty() {
-        written += consume_bytes(&mut buffer, &mut stream.data);
+    let mut buf = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
+    while !buf.is_empty() {
+        written += consume_bytes(&mut buf, &mut stream.data);
         match stream.inner.try_receive() {
             Ok(data) => stream.data = data,
             Err(_) if written > 0 => break,
             Err(e) => return Err(e.into()),
         }
     }
-    Ok(written)
+    *buffer_len = written;
+    Ok(())
 }

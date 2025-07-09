@@ -3,6 +3,7 @@ use std::{
     iter,
     net::{Ipv4Addr, SocketAddr},
     path::PathBuf,
+    ptr,
     time::Duration,
 };
 
@@ -55,11 +56,11 @@ impl TeamCtx {
 
     pub(super) fn devices_mut(&mut self) -> [&mut DeviceCtx; 5] {
         [
-            &mut self.owner,
-            &mut self.admin,
-            &mut self.operator,
-            &mut self.membera,
-            &mut self.memberb,
+            &self.owner,
+            &self.admin,
+            &self.operator,
+            &self.membera,
+            &self.memberb,
         ]
     }
 
@@ -74,10 +75,6 @@ impl TeamCtx {
                     .client
                     .team(team_id)
                     .add_sync_peer(peer.aranya_local_addr().await?.into(), config.clone())
-                    .await?;
-                peer.client
-                    .team(team_id)
-                    .add_sync_peer(device.aranya_local_addr().await?.into(), config.clone())
                     .await?;
             }
         }
@@ -273,7 +270,7 @@ impl DeviceCtx {
         sleep(SLEEP_INTERVAL).await;
 
         // Initialize the user library - the client will automatically load the daemon's public key.
-        let mut client = (|| {
+        let client = (|| {
             Client::builder()
                 .with_daemon_uds_path(&uds_path)
                 .with_daemon_aqc_addr(&addr_any)

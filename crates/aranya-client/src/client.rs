@@ -460,11 +460,11 @@ impl Client {
 
     /// Returns the address that the AQC client is bound to.
     pub async fn aqc_client_addr(&self) -> Result<SocketAddr> {
-        Ok(self.aqc.client_addr()?)
+        Ok(self.aqc.client_addr()) // TODO: Remove error?
     }
 
     /// Gets the public key bundle for this device.
-    pub async fn get_key_bundle(&mut self) -> Result<KeyBundle> {
+    pub async fn get_key_bundle(&self) -> Result<KeyBundle> {
         self.daemon
             .get_key_bundle(context::current())
             .await
@@ -473,7 +473,7 @@ impl Client {
     }
 
     /// Gets the public device ID for this device.
-    pub async fn get_device_id(&mut self) -> Result<DeviceId> {
+    pub async fn get_device_id(&self) -> Result<DeviceId> {
         self.daemon
             .get_device_id(context::current())
             .await
@@ -483,7 +483,7 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&mut self, cfg: TeamConfig) -> Result<Team<'_>> {
+    pub async fn create_team(&self, cfg: TeamConfig) -> Result<Team<'_>> {
         let team_id = self
             .daemon
             .create_team(context::current(), cfg.into())
@@ -529,7 +529,7 @@ impl Client {
     }
 
     /// Get access to Aranya QUIC Channels.
-    pub fn aqc(&mut self) -> AqcChannels<'_> {
+    pub fn aqc(&self) -> AqcChannels<'_> {
         AqcChannels::new(self)
     }
 
@@ -865,7 +865,7 @@ impl Team<'_> {
     /// Assign a label to a device.
     #[instrument(skip(self))]
     pub async fn assign_label(
-        &mut self,
+        &self,
         device: DeviceId,
         label_id: LabelId,
         op: ChanOp,
@@ -901,7 +901,7 @@ impl Team<'_> {
     }
 
     /// Get access to fact database queries.
-    pub fn queries(&mut self) -> Queries<'_> {
+    pub fn queries(&self) -> Queries<'_> {
         Queries {
             client: self.client,
             id: self.id,
@@ -917,7 +917,7 @@ pub struct Queries<'a> {
 
 impl Queries<'_> {
     /// Returns the list of devices on the current team.
-    pub async fn devices_on_team(&mut self) -> Result<Devices> {
+    pub async fn devices_on_team(&self) -> Result<Devices> {
         let data = self
             .client
             .daemon
@@ -932,7 +932,7 @@ impl Queries<'_> {
     }
 
     /// Returns the keybundle of the current device.
-    pub async fn device_keybundle(&mut self, device: DeviceId) -> Result<KeyBundle> {
+    pub async fn device_keybundle(&self, device: DeviceId) -> Result<KeyBundle> {
         self.client
             .daemon
             .query_device_keybundle(context::current(), self.id, device.into_api())
@@ -942,7 +942,7 @@ impl Queries<'_> {
     }
 
     /// Returns a list of labels assiged to the current device.
-    pub async fn device_label_assignments(&mut self, device: DeviceId) -> Result<Labels> {
+    pub async fn device_label_assignments(&self, device: DeviceId) -> Result<Labels> {
         let data = self
             .client
             .daemon
@@ -974,7 +974,7 @@ impl Queries<'_> {
     }
 
     /// Returns whether a label exists.
-    pub async fn label_exists(&mut self, label_id: LabelId) -> Result<bool> {
+    pub async fn label_exists(&self, label_id: LabelId) -> Result<bool> {
         self.client
             .daemon
             .query_label_exists(context::current(), self.id, label_id.into_api())
@@ -984,7 +984,7 @@ impl Queries<'_> {
     }
 
     /// Returns a list of labels on the team.
-    pub async fn labels(&mut self) -> Result<Labels> {
+    pub async fn labels(&self) -> Result<Labels> {
         let data = self
             .client
             .daemon

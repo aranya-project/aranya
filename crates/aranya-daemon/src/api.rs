@@ -27,10 +27,7 @@ use tarpc::{
     context,
     server::{incoming::Incoming, BaseChannel, Channel},
 };
-use tokio::{
-    net::UnixListener,
-    sync::{mpsc, Mutex},
-};
+use tokio::{net::UnixListener, sync::mpsc};
 use tracing::{debug, error, info, instrument, trace, warn, Instrument};
 
 use crate::{
@@ -101,11 +98,11 @@ impl DaemonApiServer {
             client,
             local_addr,
             pk: std::sync::Mutex::new(pk),
-            peers: Mutex::new(peers),
+            peers,
             effect_handler,
             invalid,
             aqc,
-            crypto: Mutex::new(crypto),
+            crypto: tokio::sync::Mutex::new(crypto),
             seed_id_dir,
             quic,
         }));
@@ -240,13 +237,13 @@ struct ApiInner {
     /// Public keys of current device.
     pk: std::sync::Mutex<PublicKeys<CS>>,
     /// Aranya sync peers,
-    peers: Mutex<SyncPeers>,
+    peers: SyncPeers,
     /// Handles graph effects from the syncer.
     effect_handler: EffectHandler,
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,
     aqc: Arc<Aqc<CE, KS>>,
-    crypto: Mutex<Crypto>,
+    crypto: tokio::sync::Mutex<Crypto>,
     seed_id_dir: SeedDir,
     quic: Option<quic_sync::Data>,
 }
@@ -307,17 +304,17 @@ impl Api {
 }
 
 impl DaemonApi for Api {
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn version(self, context: context::Context) -> api::Result<api::Version> {
         api::Version::parse(env!("CARGO_PKG_VERSION")).map_err(Into::into)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn aranya_local_addr(self, context: context::Context) -> api::Result<SocketAddr> {
         Ok(self.local_addr)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn get_key_bundle(self, _: context::Context) -> api::Result<api::KeyBundle> {
         Ok(self
             .get_pk()
@@ -325,12 +322,12 @@ impl DaemonApi for Api {
             .into())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn get_device_id(self, _: context::Context) -> api::Result<api::DeviceId> {
         self.device_id().map(|id| id.into_id().into())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn add_sync_peer(
         self,
         _: context::Context,
@@ -341,14 +338,12 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.peers
-            .lock()
-            .await
             .add_peer(peer, team.into_id().into(), cfg)
             .await?;
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn sync_now(
         self,
         _: context::Context,
@@ -359,14 +354,12 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.peers
-            .lock()
-            .await
             .sync_now(peer, team.into_id().into(), cfg)
             .await?;
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn remove_sync_peer(
         self,
         _: context::Context,
@@ -376,15 +369,13 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         self.peers
-            .lock()
-            .await
             .remove_peer(peer, team.into_id().into())
             .await
             .context("unable to remove sync peer")?;
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn add_team(
         mut self,
         _: context::Context,
@@ -399,30 +390,25 @@ impl DaemonApi for Api {
         }
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
         if let Some(data) = &self.quic {
-            self.remove_team_quic_sync(team, data)
-                .inspect_err(|err| warn!(%err))?;
+            self.remove_team_quic_sync(team, data)?;
         }
 
-        self.seed_id_dir
-            .remove(&team)
-            .await
-            .inspect_err(|err| warn!(%err))?;
+        self.seed_id_dir.remove(&team).await?;
 
         self.client
             .aranya
             .lock()
             .await
             .remove_graph(team.into_id().into())
-            .context("unable to remove graph from storage")
-            .inspect_err(|err| warn!(%err))?;
+            .context("unable to remove graph from storage")?;
 
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn create_team(
         mut self,
         _: context::Context,
@@ -456,14 +442,14 @@ impl DaemonApi for Api {
         Ok(team_id)
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn close_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
         todo!();
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn encrypt_psk_seed_for_peer(
         self,
         _: context::Context,
@@ -501,7 +487,7 @@ impl DaemonApi for Api {
         })
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn add_device_to_team(
         self,
         _: context::Context,
@@ -543,7 +529,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn remove_device_from_team(
         self,
         _: context::Context,
@@ -611,7 +597,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn revoke_role(
         self,
         _: context::Context,
@@ -701,7 +687,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn remove_aqc_net_identifier(
         self,
         _: context::Context,
@@ -719,7 +705,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn create_aqc_bidi_channel(
         self,
         _: context::Context,
@@ -760,7 +746,7 @@ impl DaemonApi for Api {
         Ok((ctrl, psks))
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn create_aqc_uni_channel(
         self,
         _: context::Context,
@@ -801,7 +787,7 @@ impl DaemonApi for Api {
         Ok((ctrl, psks))
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn delete_aqc_bidi_channel(
         self,
         _: context::Context,
@@ -811,7 +797,7 @@ impl DaemonApi for Api {
         todo!();
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn delete_aqc_uni_channel(
         self,
         _: context::Context,
@@ -821,7 +807,7 @@ impl DaemonApi for Api {
         todo!();
     }
 
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn receive_aqc_ctrl(
         self,
         _: context::Context,
@@ -865,7 +851,7 @@ impl DaemonApi for Api {
     }
 
     /// Create a label.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn create_label(
         self,
         _: context::Context,
@@ -889,7 +875,7 @@ impl DaemonApi for Api {
     }
 
     /// Delete a label.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn delete_label(
         self,
         _: context::Context,
@@ -912,7 +898,7 @@ impl DaemonApi for Api {
     }
 
     /// Assign a label.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn assign_label(
         self,
         _: context::Context,
@@ -941,7 +927,7 @@ impl DaemonApi for Api {
     }
 
     /// Revoke a label.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn revoke_label(
         self,
         _: context::Context,
@@ -965,7 +951,7 @@ impl DaemonApi for Api {
     }
 
     /// Query devices on team.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn query_devices_on_team(
         self,
         _: context::Context,
@@ -1023,7 +1009,7 @@ impl DaemonApi for Api {
     }
 
     /// Query device keybundle.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn query_device_keybundle(
         self,
         _: context::Context,
@@ -1048,7 +1034,7 @@ impl DaemonApi for Api {
     }
 
     /// Query device label assignments.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn query_device_label_assignments(
         self,
         _: context::Context,
@@ -1077,7 +1063,7 @@ impl DaemonApi for Api {
     }
 
     /// Query AQC network ID.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn query_aqc_net_identifier(
         self,
         _: context::Context,
@@ -1102,7 +1088,7 @@ impl DaemonApi for Api {
     }
 
     /// Query label exists.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn query_label_exists(
         self,
         _: context::Context,
@@ -1127,7 +1113,7 @@ impl DaemonApi for Api {
     }
 
     /// Query list of labels.
-    #[instrument(skip(self))]
+    #[instrument(skip(self), err)]
     async fn query_labels(
         self,
         _: context::Context,
@@ -1159,7 +1145,7 @@ impl Api {
     async fn add_seed(&mut self, team: api::TeamId, seed: qs::PskSeed) -> anyhow::Result<()> {
         let crypto = &mut *self.crypto.lock().await;
 
-        let id = seed.id().context("getting seed id")?.into_id();
+        let id = seed.id().context("getting seed id")?;
 
         let wrapped_key = crypto
             .engine
@@ -1167,21 +1153,23 @@ impl Api {
             .context("wrapping seed")?;
         crypto
             .local_store
-            .try_insert(id, wrapped_key)
+            .try_insert(id.into_id(), wrapped_key)
             .context("inserting seed")?;
 
         if let Err(e) = self
             .seed_id_dir
-            .append(&team, &seed.id()?)
+            .append(&team, &id)
             .await
             .context("could not write seed id to file")
         {
-            error!(%e);
-            crypto
+            match crypto
                 .local_store
-                .remove::<WrappedKey<CS>>(id)
-                .context("could not remove seed from keystore")?;
-            return Err(e);
+                .remove::<WrappedKey<CS>>(id.into_id())
+                .context("could not remove seed from keystore")
+            {
+                Ok(_) => return Err(e),
+                Err(inner) => return Err(e).context(inner),
+            }
         };
 
         Ok(())

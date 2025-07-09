@@ -27,24 +27,24 @@ custom_id! {
 /// receiving data with peers.
 #[derive(Debug)]
 pub struct AqcChannels<'a> {
-    client: &'a mut Client,
+    client: &'a Client,
 }
 
 impl<'a> AqcChannels<'a> {
-    pub(crate) fn new(client: &'a mut Client) -> Self {
+    pub(crate) fn new(client: &'a Client) -> Self {
         Self { client }
     }
 
     /// Returns the address that the AQC client is bound to. This address is used to
     /// make connections to other peers.
-    pub fn client_addr(&self) -> Result<SocketAddr, AqcError> {
-        Ok(self.client.aqc.client_addr()?)
+    pub fn client_addr(&self) -> SocketAddr {
+        self.client.aqc.client_addr()
     }
 
     /// Returns the address that the AQC server is bound to. This address is used by
     /// peers to connect to this instance.
-    pub fn server_addr(&self) -> Result<SocketAddr, AqcError> {
-        Ok(self.client.aqc.server_addr()?)
+    pub fn server_addr(&self) -> SocketAddr {
+        self.client.aqc.server_addr()
     }
 
     /// Creates a bidirectional AQC channel with a peer.

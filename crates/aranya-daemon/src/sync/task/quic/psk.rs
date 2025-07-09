@@ -10,7 +10,7 @@ use aranya_crypto::{
     id::IdError, policy::GroupId, tls::PskSeedId, Csprng, Identified as _, KeyStoreExt as _,
     PolicyId,
 };
-use aranya_daemon_api::{CipherSuiteId, TeamId, SEED_IKM_SIZE};
+use aranya_daemon_api::{CipherSuiteId, Ikm, TeamId};
 use buggy::BugExt as _;
 use s2n_quic::provider::tls::rustls::rustls::{
     client,
@@ -39,9 +39,12 @@ impl PskSeed {
         Self(aranya_crypto::tls::PskSeed::new(rng, &group))
     }
 
-    pub(crate) fn import_from_ikm(ikm: &[u8; SEED_IKM_SIZE], team: TeamId) -> Self {
+    pub(crate) fn import_from_ikm(ikm: &Ikm, team: TeamId) -> Self {
         let group = GroupId::from(team.into_id());
-        Self(aranya_crypto::tls::PskSeed::import_from_ikm(ikm, &group))
+        Self(aranya_crypto::tls::PskSeed::import_from_ikm(
+            ikm.raw_ikm_bytes(),
+            &group,
+        ))
     }
 
     pub(crate) fn load(
