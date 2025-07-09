@@ -27,7 +27,7 @@ use tarpc::{
     server::{incoming::Incoming, BaseChannel, Channel},
 };
 use tokio::{net::UnixListener, sync::mpsc};
-use tracing::{debug, error, info, instrument, trace, warn, Instrument};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
     actions::Actions,
@@ -128,7 +128,6 @@ impl DaemonApiServer {
                     }
                     info!("effect handler exiting");
                 }
-                .in_current_span()
             });
 
             let server = {
