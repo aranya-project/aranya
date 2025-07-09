@@ -3521,7 +3521,6 @@ dependencies = [
  "ntapi",
  "objc2-core-foundation",
  "objc2-io-kit",
- "serde",
  "windows",
 ]
 

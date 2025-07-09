@@ -1,12 +1,11 @@
 use std::{
-    env, io, mem,
+    env,
     net::{Ipv4Addr, SocketAddr},
-    num::NonZeroU32,
     path::{Path, PathBuf},
-    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+    time::Duration,
 };
 
-use anyhow::{anyhow, bail, Context as _, Result};
+use anyhow::{bail, Context as _, Result};
 use aranya_client::{
     aqc::AqcPeerChannel, Client, Error, QuicSyncConfig, SyncPeerConfig, TeamConfig,
 };
@@ -15,11 +14,7 @@ use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use buggy::BugExt as _;
 use bytes::Bytes;
-use metrics::{counter, describe_counter, describe_gauge, describe_histogram, gauge, histogram};
-use metrics_exporter_prometheus::PrometheusBuilder;
-use metrics_util::MetricKindMask;
-use serde::Deserialize;
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
+use metrics::{counter, describe_counter, describe_gauge};
 use tempfile::TempDir;
 use tokio::{
     fs,
@@ -32,602 +27,100 @@ use tracing_subscriber::{
     prelude::*,
     EnvFilter,
 };
-use url::Url;
 
-#[derive(Debug, Clone, Deserialize)]
-enum PrometheusMode {
-    /// Creates an HTTP listener using an HTTP address to scrape from.
-    HttpListener { addr: SocketAddr },
-    /// Creates an HTTP listener using a UDS address to scrape from.
-    UdsListener { addr: PathBuf },
-    /// Tells the exporter to periodically push data to a push gateway.
-    PushGateway {
-        endpoint: String,
-        username: Option<String>,
-        password: Option<String>,
-        use_http_post_method: bool,
-    },
+use crate::{export::MetricsConfig, harness::ProcessMetricsCollector};
+mod export;
+mod harness;
+
+struct DemoFilter {
+    env_filter: EnvFilter,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-enum MetricsKindMask {
-    None = 0,
-    Counter = 1,
-    Gauge = 2,
-    Histogram = 4,
-    All = 7,
-}
-
-impl From<MetricsKindMask> for MetricKindMask {
-    fn from(value: MetricsKindMask) -> Self {
-        match value {
-            MetricsKindMask::None => MetricKindMask::NONE,
-            MetricsKindMask::Counter => MetricKindMask::COUNTER,
-            MetricsKindMask::Gauge => MetricKindMask::GAUGE,
-            MetricsKindMask::Histogram => MetricKindMask::HISTOGRAM,
-            MetricsKindMask::All => MetricKindMask::ALL,
+impl<S> Filter<S> for DemoFilter {
+    fn enabled(&self, metadata: &Metadata<'_>, context: &Context<'_, S>) -> bool {
+        if metadata.target().starts_with(module_path!()) {
+            true
+        } else {
+            self.env_filter.enabled(metadata, context.clone())
         }
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
-struct PrometheusConfig {
-    /// The current mode that the Prometheus exporter is operating as.
-    mode: PrometheusMode,
+#[tokio::main]
+async fn main() -> Result<()> {
+    let filter = DemoFilter {
+        env_filter: EnvFilter::try_from_env("ARANYA_EXAMPLE")
+            .unwrap_or_else(|_| EnvFilter::new("off")),
+    };
 
-    /// Allows only certain addresses to access the scrape endpoint.
-    allowed_addresses: Option<Vec<String>>,
-    /// Sets the number of quantiles when rendering histograms.
-    quantiles: Option<Vec<f64>>,
-    /// Sets the buckets to use when rendering histograms.
-    buckets: Option<Vec<f64>>,
-    /// Sets the "width" of each bucket when using summaries.
-    bucket_duration: Option<Duration>,
-    /// Sets the number of buckets kept in memory at one time.
-    bucket_count: Option<NonZeroU32>,
-    /// Sets whether a unit suffix is added to metric names.
-    enable_unit_suffix: bool,
-    /// Sets the idle timeout for metrics.
-    idle_timeout: (MetricsKindMask, Option<Duration>),
-    /// Sets the interval that the upkeep task runs at.
-    upkeep_timeout: Option<Duration>,
-    /// Sets global labels that are applied to all metrics.
-    global_labels: Option<Vec<(String, String)>>,
-}
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_file(false)
+                .with_target(false)
+                .compact()
+                .with_filter(filter),
+        )
+        .init();
 
-impl Default for PrometheusConfig {
-    fn default() -> Self {
-        Self {
-            mode: PrometheusMode::PushGateway {
-                endpoint: "http://localhost:9091".to_string(),
-                username: None,
-                password: None,
-                use_http_post_method: false,
-            },
-            allowed_addresses: None,
-            quantiles: None,
-            buckets: None,
-            bucket_duration: None,
-            bucket_count: None,
-            enable_unit_suffix: false,
-            idle_timeout: (MetricsKindMask::All, Some(Duration::from_secs(1))),
-            upkeep_timeout: None,
-            global_labels: None,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-enum MetricsMode {
-    Prometheus(PrometheusConfig),
-}
-
-impl Default for MetricsMode {
-    fn default() -> Self {
-        Self::Prometheus(PrometheusConfig::default())
-    }
-}
-
-/// Configuration for metrics collection and exporting
-#[derive(Debug, Clone, Deserialize)]
-struct MetricsConfig {
-    mode: MetricsMode,
-    pub interval: Duration,
-    pub job_name: String,
-}
-
-impl Default for MetricsConfig {
-    fn default() -> Self {
-        Self {
-            mode: MetricsMode::default(),
-            interval: Duration::from_millis(100),
-            job_name: format!(
-                "aranya_demo_{}",
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
-                    .expect("We're past the Unix Epoch")
-                    .as_secs()
-            ),
-        }
-    }
-}
-
-/// Collector for process metrics, uses native APIs when possible.
-#[derive(Debug)]
-struct ProcessMetricsCollector {
-    /// Config options for the current run
-    config: MetricsConfig,
-    /// System handle for fallback metrics
-    system: System,
-    /// All child process PIDs for tracking
-    child_pids: Vec<u32>,
-    /// Collection start time for rate calculations
-    _start_time: Instant,
-    /// Previous metrics for rate calculations
-    previous_metrics: Option<AggregatedMetrics>,
-    /// Total cumulative metrics for this run
-    total_metrics: AggregatedMetrics,
-}
-
-#[derive(Debug)]
-struct AggregatedMetrics {
-    /// ~The moment we measured these metrics
-    timestamp: Instant,
-    total_cpu_user_time_us: u64,
-    total_cpu_system_time_us: u64,
-    total_memory_bytes: u64,
-    total_disk_read_bytes: u64,
-    total_disk_write_bytes: u64,
-    // TODO(nikki): hook the TCP/QUIC syncer with a metrics macro.
-    //total_network_rx_bytes: u64,
-    //total_network_tx_bytes: u64,
-    process_count: usize,
-}
-
-impl Default for AggregatedMetrics {
-    fn default() -> Self {
-        Self {
-            timestamp: Instant::now(),
-            total_cpu_user_time_us: 0,
-            total_cpu_system_time_us: 0,
-            total_memory_bytes: 0,
-            total_disk_read_bytes: 0,
-            total_disk_write_bytes: 0,
-            process_count: 0,
-        }
-    }
-}
-
-#[derive(Debug, Default)]
-struct SingleProcessMetrics {
-    cpu_user_time_us: u64,
-    cpu_system_time_us: u64,
-    memory_bytes: u64,
-    disk_read_bytes: u64,
-    disk_write_bytes: u64,
-}
-
-impl ProcessMetricsCollector {
-    /// Create a new instance to collect process metrics.
-    fn new(config: MetricsConfig, child_pids: Vec<u32>) -> Self {
-        let system = System::new_with_specifics(
-            RefreshKind::nothing().with_processes(ProcessRefreshKind::nothing().with_disk_usage()),
+    // First, let's make sure we have the proper config data to even start before we log about setting up.
+    let Ok(config_path) = env::var("CONFIG_PATH") else {
+        bail!(
+            "No config path defined, please provide the path to a (h)json file in `CONFIG_PATH=`."
         );
+    };
 
-        Self {
-            config,
-            system,
-            child_pids,
-            _start_time: Instant::now(),
-            previous_metrics: None,
-            total_metrics: AggregatedMetrics::default(),
+    let buffer = fs::read(config_path).await?;
+    let metrics_config: MetricsConfig = deser_hjson::from_slice(&buffer)?;
+
+    info!("Starting Aranya Example with Metrics Collection");
+
+    let job_name = metrics_config.job_name.clone();
+    setup_exporter(&metrics_config)?;
+
+    info!("Phase 1: Setting up daemons");
+    let (daemon_pids, demo_context) = setup_demo().await?;
+
+    // TODO(nikki): sleep a tiny bit so the daemons can spin up?
+
+    info!(
+        "Phase 2: Starting metrics collection for PIDs: {:?}",
+        daemon_pids.clone().push(std::process::id())
+    );
+    let mut metrics_collector = ProcessMetricsCollector::new(metrics_config, daemon_pids);
+
+    info!("Phase 3: Running demo with real-time metrics collection");
+    let metrics_handle =
+        tokio::spawn(async move { metrics_collector.start_collection_loop().await });
+
+    let demo_result = run_demo_body(demo_context).await;
+
+    // Wait a moment so we can make sure we capture all metrics state
+    sleep(Duration::from_millis(500)).await;
+
+    metrics_handle.abort();
+
+    match demo_result {
+        Ok(()) => {
+            info!("Demo completed successfully, job {job_name}");
+            counter!("demo_operations_total", "operation" => "success").increment(1);
+        }
+        Err(ref e) => {
+            warn!("Demo failed with error: {e}");
+            counter!("demo_operations_total", "operation" => "failure").increment(1);
         }
     }
 
-    fn collect_metrics(&mut self) -> Result<()> {
-        let collection_start = Instant::now();
-
-        // Collect metrics for the current moment
-        let current = self.collect_aggregated_metrics()?;
-
-        // Calculate our totals
-        self.total_metrics = AggregatedMetrics {
-            timestamp: current.timestamp,
-            process_count: current.process_count,
-            total_cpu_user_time_us: current.total_cpu_user_time_us,
-            total_cpu_system_time_us: current.total_cpu_system_time_us,
-            total_memory_bytes: current.total_memory_bytes,
-            // These need to be cumulative since sysinfo only returns bytes since last refresh.
-            total_disk_read_bytes: self.total_metrics.total_disk_read_bytes
-                + current.total_disk_read_bytes,
-            total_disk_write_bytes: self.total_metrics.total_disk_write_bytes
-                + current.total_disk_write_bytes,
-        };
-
-        // Push those values to our backend
-        self.update_prometheus_metrics(&current)?;
-
-        // Save those metrics so we have that delta for the next tick
-        self.previous_metrics = Some(current);
-
-        // Record how long it took us to actually collect those metrics
-        #[allow(clippy::cast_precision_loss)]
-        histogram!("metrics_collection_duration_microseconds")
-            .record(collection_start.elapsed().as_micros() as f64);
-
-        Ok(())
-    }
-
-    fn collect_aggregated_metrics(&mut self) -> Result<AggregatedMetrics> {
-        let mut metrics = AggregatedMetrics {
-            timestamp: Instant::now(),
-            total_cpu_user_time_us: 0,
-            total_cpu_system_time_us: 0,
-            total_memory_bytes: 0,
-            total_disk_read_bytes: 0,
-            total_disk_write_bytes: 0,
-            //total_network_rx_bytes: 0,
-            //total_network_tx_bytes: 0,
-            process_count: 0,
-        };
-
-        // Collect metrics for the current process
-        self.collect_process_metrics(std::process::id(), &mut metrics)?;
-
-        for &pid in self.child_pids.clone().iter() {
-            if let Err(e) = self.collect_process_metrics(pid, &mut metrics) {
-                warn!("Failed to collect metrics for child PID {pid}: {e}");
-            }
-        }
-
-        metrics.process_count = 1 + self.child_pids.len();
-
-        Ok(metrics)
-    }
-
-    #[cfg(target_os = "macos")]
-    fn collect_process_metrics(&mut self, pid: u32, metrics: &mut AggregatedMetrics) -> Result<()> {
-        // First, let's collect metrics for the individual process.
-        let mut process_metrics = SingleProcessMetrics::default();
-
-        if self
-            .collect_native_macos_metrics(pid, &mut process_metrics)
-            .is_err()
-        {
-            // If we're trying to track our own process, we can fallback to rusage.
-            if pid == std::process::id() {
-                self.collect_rusage_metrics(&mut process_metrics)?;
-            }
-        }
-
-        // Always fallback to sysinfo for disk metrics.
-        self.collect_sysinfo_disk_metrics(pid, &mut process_metrics)?;
-
-        // Aggregate this process's metrics towards the total.
-        metrics.total_cpu_user_time_us += process_metrics.cpu_user_time_us;
-        metrics.total_cpu_system_time_us += process_metrics.cpu_system_time_us;
-        metrics.total_memory_bytes += process_metrics.memory_bytes;
-        metrics.total_disk_read_bytes += process_metrics.disk_read_bytes;
-        metrics.total_disk_write_bytes += process_metrics.disk_write_bytes;
-
-        Ok(())
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    #[allow(dead_code)]
-    fn collect_process_metrics(&self, _pid: u32, _metrics: &mut AggregatedMetrics) -> Result<()> {
-        Err(anyhow!("Unsupported target_os!"))
-    }
-
-    #[cfg(target_os = "macos")]
-    fn collect_native_macos_metrics(
-        &self,
-        pid: u32,
-        process_metrics: &mut SingleProcessMetrics,
-    ) -> Result<()> {
-        // SAFETY: This has no alignment requirements, so mem::zeroed is safe.
-        let mut task_info = unsafe { mem::zeroed::<libc::proc_taskinfo>() };
-
-        #[allow(clippy::cast_possible_wrap)]
-        let pid = pid as libc::pid_t;
-
-        #[allow(clippy::cast_possible_wrap)]
-        // SAFETY: We should have a valid PID, as well as buffer.
-        let result = unsafe {
-            libc::proc_pidinfo(
-                pid,
-                libc::PROC_PIDTASKINFO,
-                0,
-                &raw mut task_info as *mut libc::c_void,
-                size_of::<libc::proc_taskinfo>() as libc::c_int,
-            )
-        };
-
-        // NOTE: -1 means error, otherwise it returns the number of bytes obtained.
-        if result < 0 {
-            return Err(io::Error::from_raw_os_error(result).into());
-        }
-
-        #[allow(clippy::cast_sign_loss)]
-        if result as usize != size_of::<libc::proc_taskinfo>() {
-            return Err(anyhow!("Unable to obtain `proc_taskinfo` for PID {pid}!"));
-        }
-
-        // These are in nanoseconds, convert to microseconds. TODO(nikki): more precision?
-        process_metrics.cpu_user_time_us = task_info.pti_total_user / 1000;
-        process_metrics.cpu_system_time_us = task_info.pti_total_system / 1000;
-
-        process_metrics.memory_bytes = task_info.pti_resident_size;
-        // TODO(nikki): collect more fields? We can get page faults, syscall counts, and more.
-        Ok(())
-    }
-
-    #[allow(clippy::cast_sign_loss)]
-    #[allow(dead_code)]
-    fn collect_rusage_metrics(&self, process_metrics: &mut SingleProcessMetrics) -> Result<()> {
-        // SAFETY: This has no alignment requirements so mem::zeroed is safe for all variants.
-        let mut usage = unsafe { mem::zeroed::<libc::rusage>() };
-        // SAFETY: The above is safe and we're passing a valid pointer.
-        let result = unsafe { libc::getrusage(libc::RUSAGE_SELF, &raw mut usage) };
-
-        if result < 0 {
-            return Err(io::Error::from_raw_os_error(result))?;
-        }
-
-        process_metrics.cpu_user_time_us =
-            (usage.ru_utime.tv_sec as u64 * 1_000_000) + usage.ru_utime.tv_usec as u64;
-        process_metrics.cpu_system_time_us =
-            (usage.ru_stime.tv_sec as u64 * 1_000_000) + usage.ru_stime.tv_usec as u64;
-
-        // The max resident set size is bytes on MacOS and kilobytes on Linux/BSD. POSIX only really
-        // guarantees the above two fields, so anything else is platform-dependent.
-        process_metrics.memory_bytes = match cfg!(target_os = "macos") {
-            true => usage.ru_maxrss as u64,
-            false => usage.ru_maxrss as u64 * 1024,
-        };
-
-        // TODO(nikki): collect more metrics? There aren't guarantees here on most fields, but we
-        // can get page faults and filesystem I/O count.
-        Ok(())
-    }
-
-    #[allow(dead_code)]
-    fn collect_sysinfo_disk_metrics(
-        &mut self,
-        pid: u32,
-        process_metrics: &mut SingleProcessMetrics,
-    ) -> Result<()> {
-        let pid = Pid::from_u32(pid);
-        self.system.refresh_processes_specifics(
-            ProcessesToUpdate::Some(&[pid]),
-            false,
-            ProcessRefreshKind::nothing().with_disk_usage(),
-        );
-
-        // Note that this disk usage is "since last refresh", which in our case is last tick.
-        if let Some(process) = self.system.process(pid) {
-            let disk_usage = process.disk_usage();
-            process_metrics.disk_read_bytes = disk_usage.read_bytes;
-            process_metrics.disk_write_bytes = disk_usage.written_bytes;
-        }
-
-        Ok(())
-    }
-
-    fn update_prometheus_metrics(&self, current: &AggregatedMetrics) -> Result<()> {
-        // Update all absolute metrics.
-        // TODO(nikki): add tags for individual PIDs so we can track each daemon?
-        let total = &self.total_metrics;
-
-        #[allow(clippy::cast_precision_loss)]
-        {
-            gauge!("cpu_user_time_microseconds_total").set(total.total_cpu_user_time_us as f64);
-            gauge!("cpu_system_time_microseconds_total").set(total.total_cpu_system_time_us as f64);
-            gauge!("memory_total_bytes").set(total.total_memory_bytes as f64);
-            gauge!("disk_read_bytes_total").set(total.total_disk_read_bytes as f64);
-            gauge!("disk_write_bytes_total").set(total.total_disk_write_bytes as f64);
-            // TODO(nikki): not sure if we should report these here/in each process at the syncer site.
-            //gauge!("network_rx_bytes_total").set(total.total_network_rx_bytes as f64);
-            //gauge!("network_tx_bytes_total").set(total.total_network_tx_bytes as f64);
-            gauge!("monitored_processes_count").set(total.process_count as f64);
-        }
-
-        // Update rate metrics if we have a previous timestep.
-        if let Some(previous) = &self.previous_metrics {
-            let time_delta = current
-                .timestamp
-                .duration_since(previous.timestamp)
-                .as_secs_f64();
-
-            #[allow(clippy::cast_precision_loss)]
-            if time_delta > 0.0 {
-                // proc_pidinfo returns cpu time since spinup, as well as "current" memory usage so
-                // we need to get the delta since the previous tick.
-                let cpu_user_rate = ((current.total_cpu_user_time_us as f64)
-                    - (previous.total_cpu_user_time_us as f64))
-                    / time_delta;
-                let cpu_system_rate = ((current.total_cpu_system_time_us as f64)
-                    - (previous.total_cpu_system_time_us as f64))
-                    / time_delta;
-                let memory_alloc_rate = ((current.total_memory_bytes as f64)
-                    - (previous.total_memory_bytes as f64))
-                    / time_delta;
-
-                // sysinfo already gives us the bytes "since last refresh", so this is fine.
-                let disk_read_rate = (current.total_disk_read_bytes as f64) / time_delta;
-                let disk_write_rate = (current.total_disk_write_bytes as f64) / time_delta;
-
-                gauge!("cpu_user_utilization_rate").set(cpu_user_rate);
-                gauge!("cpu_system_utilization_rate").set(cpu_system_rate);
-                gauge!("cpu_total_utilization_rate").set(cpu_user_rate + cpu_system_rate);
-                gauge!("memory_allocation_rate").set(memory_alloc_rate);
-                // TODO(nikki): standardize this on "per second", even if we tick more/less frequently?
-                gauge!("disk_read_bytes_rate").set(disk_read_rate);
-                gauge!("disk_write_bytes_rate").set(disk_write_rate);
-            }
-        }
-        Ok(())
-    }
-
-    // TODO(nikki): inline as a closure?
-    async fn start_collection_loop(&mut self) -> Result<()> {
-        let mut interval = tokio::time::interval(self.config.interval);
-
-        loop {
-            interval.tick().await;
-            if let Err(e) = self.collect_metrics() {
-                warn!("Failed to collect metrics: {e}");
-            }
-        }
-    }
-}
-
-fn format_push_gateway_url(base_url: &str, job_name: &str) -> String {
-    match Url::parse(base_url) {
-        Ok(mut url) => {
-            url.set_path(&format!("/metrics/job/{job_name}"));
-            url.set_query(None);
-            url.set_fragment(None);
-            url.to_string()
-        }
-        Err(_) => {
-            warn!("Failed to parse push gateway URL `{base_url}`");
-            format!("http://localhost:9091/metrics/job/{job_name}")
-        }
-    }
+    demo_result
 }
 
 fn setup_exporter(config: &MetricsConfig) -> Result<()> {
-    match &config.mode {
-        MetricsMode::Prometheus(prometheus) => {
-            let mut builder = PrometheusBuilder::new();
+    config.install()?;
 
-            match &prometheus.mode {
-                PrometheusMode::HttpListener { addr } => {
-                    info!("Setting up Prometheus HTTP listener: {addr}");
-                    builder = builder.with_http_listener(*addr);
-                }
-                PrometheusMode::UdsListener { addr } => {
-                    info!("Setting up Prometheus UDS listener: {addr:?}");
-                    builder = builder.with_http_uds_listener(addr)
-                }
-                PrometheusMode::PushGateway {
-                    endpoint,
-                    username,
-                    password,
-                    use_http_post_method,
-                } => {
-                    let push_url = format_push_gateway_url(endpoint.as_ref(), &config.job_name);
-                    info!("Setting up Prometheus push gateway: {push_url}");
-                    builder = builder.with_push_gateway(
-                        endpoint,
-                        config.interval,
-                        username.clone(),
-                        password.clone(),
-                        *use_http_post_method,
-                    )?
-                }
-            }
-
-            if let Some(addresses) = &prometheus.allowed_addresses {
-                for address in addresses {
-                    builder = builder.add_allowed_address(address)?;
-                }
-            }
-
-            if let Some(quantiles) = &prometheus.quantiles {
-                builder = builder.set_quantiles(quantiles)?;
-            }
-
-            if let Some(values) = &prometheus.buckets {
-                builder = builder.set_buckets(values)?;
-            }
-
-            if let Some(value) = prometheus.bucket_duration {
-                builder = builder.set_bucket_duration(value)?;
-            }
-
-            if let Some(count) = prometheus.bucket_count {
-                builder = builder.set_bucket_count(count);
-            }
-
-            builder = builder.set_enable_unit_suffix(prometheus.enable_unit_suffix);
-
-            let (mask, timeout) = &prometheus.idle_timeout;
-            builder = builder.idle_timeout(MetricKindMask::from(mask.clone()), *timeout);
-
-            if let Some(timeout) = prometheus.upkeep_timeout {
-                builder = builder.upkeep_timeout(timeout);
-            }
-
-            if let Some(labels) = &prometheus.global_labels {
-                for (key, value) in labels {
-                    builder = builder.add_global_label(key, value);
-                }
-            }
-
-            builder
-                .install()
-                .context("Failed to install Prometheus exporter")?;
-        }
-    }
-
-    describe_gauge!(
-        "cpu_user_time_microseconds_total",
-        "Total User CPU time consumed by all monitored processes in microseconds"
-    );
-    describe_gauge!(
-        "cpu_system_time_microseconds_total",
-        "Total System CPU time consumed by all monitored processes in microseconds"
-    );
-    describe_gauge!(
-        "memory_total_bytes",
-        "Total memory usage across all monitored processes"
-    );
-    describe_gauge!(
-        "disk_read_bytes_total",
-        "Total bytes read from disk by all monitored processes"
-    );
-    describe_gauge!(
-        "disk_write_bytes_total",
-        "Total bytes written to disk by all monitored processes"
-    );
+    // TODO(nikki): these need to be migrated to inside the daemon
     describe_gauge!("network_rx_bytes_total", "Total network bytes received");
     describe_gauge!("network_tx_bytes_total", "Total network bytes transmitted");
-    describe_gauge!(
-        "monitored_processes_count",
-        "Number of processes being monitored"
-    );
 
-    describe_gauge!(
-        "cpu_user_utilization_rate",
-        "User CPU utilization since last tick"
-    );
-    describe_gauge!(
-        "cpu_system_utilization_rate",
-        "System CPU utilization since last tick"
-    );
-    describe_gauge!(
-        "cpu_total_utilization_rate",
-        "Total CPU utilization since last tick"
-    );
-    describe_gauge!(
-        "memory_allocation_rate",
-        "Amount of allocated memory since last tick"
-    );
-    describe_gauge!(
-        "disk_read_bytes_rate",
-        "Number of bytes read since last tick"
-    );
-    describe_gauge!(
-        "disk_write_bytes_rate",
-        "Number of bytes written since last tick"
-    );
-
-    describe_histogram!(
-        "metrics_collection_duration_microseconds",
-        "Time spent collecting metrics in microseconds"
-    );
     describe_counter!(
         "demo_operations_total",
         "Total number of demo operations completed"
@@ -769,88 +262,6 @@ impl ClientCtx {
                 .expect("addr is valid text"),
         )
     }
-}
-
-struct DemoFilter {
-    env_filter: EnvFilter,
-}
-
-impl<S> Filter<S> for DemoFilter {
-    fn enabled(&self, metadata: &Metadata<'_>, context: &Context<'_, S>) -> bool {
-        if metadata.target().starts_with(module_path!()) {
-            true
-        } else {
-            self.env_filter.enabled(metadata, context.clone())
-        }
-    }
-}
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    let filter = DemoFilter {
-        env_filter: EnvFilter::try_from_env("ARANYA_EXAMPLE")
-            .unwrap_or_else(|_| EnvFilter::new("off")),
-    };
-
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_file(false)
-                .with_target(false)
-                .compact()
-                .with_filter(filter),
-        )
-        .init();
-
-    // First, let's make sure we have the proper config data to even start before we log about setting up.
-    let Ok(config_path) = env::var("CONFIG_PATH") else {
-        bail!(
-            "No config path defined, please provide the path to a (h)json file in `CONFIG_PATH=`."
-        );
-    };
-
-    let buffer = fs::read(config_path).await?;
-    let metrics_config: MetricsConfig = deser_hjson::from_slice(&buffer)?;
-
-    info!("Starting Aranya Example with Metrics Collection");
-
-    let job_name = metrics_config.job_name.clone();
-    setup_exporter(&metrics_config)?;
-
-    info!("Phase 1: Setting up daemons");
-    let (daemon_pids, demo_context) = setup_demo().await?;
-
-    // TODO(nikki): sleep a tiny bit so the daemons can spin up?
-
-    info!(
-        "Phase 2: Starting metrics collection for PIDs: {:?}",
-        daemon_pids.clone().push(std::process::id())
-    );
-    let mut metrics_collector = ProcessMetricsCollector::new(metrics_config, daemon_pids);
-
-    info!("Phase 3: Running demo with real-time metrics collection");
-    let metrics_handle =
-        tokio::spawn(async move { metrics_collector.start_collection_loop().await });
-
-    let demo_result = run_demo_body(demo_context).await;
-
-    // Wait a moment so we can make sure we capture all metrics state
-    sleep(Duration::from_millis(500)).await;
-
-    metrics_handle.abort();
-
-    match demo_result {
-        Ok(()) => {
-            info!("Demo completed successfully, job {job_name}");
-            counter!("demo_operations_total", "operation" => "success").increment(1);
-        }
-        Err(ref e) => {
-            warn!("Demo failed with error: {e}");
-            counter!("demo_operations_total", "operation" => "failure").increment(1);
-        }
-    }
-
-    demo_result
 }
 
 struct DemoContext {
