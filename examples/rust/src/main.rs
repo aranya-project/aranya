@@ -15,6 +15,7 @@ use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
 use bytes::Bytes;
+use futures_util::future::try_join;
 use tempfile::TempDir;
 use tokio::{
     fs,
@@ -116,7 +117,7 @@ impl ClientCtx {
 
         let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
-        let mut client = (|| {
+        let client = (|| {
             Client::builder()
                 .with_daemon_uds_path(&uds_sock)
                 .with_daemon_aqc_addr(&any_addr)
@@ -126,7 +127,7 @@ impl ClientCtx {
         .await
         .context("unable to initialize client")?;
 
-        let aqc_server_addr = client.aqc().server_addr().context("exepcted server addr")?;
+        let aqc_server_addr = client.aqc().server_addr();
         let pk = client
             .get_key_bundle()
             .await
@@ -202,11 +203,11 @@ async fn main() -> Result<()> {
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
     let team_name = "rust_example";
-    let mut owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
-    let mut admin = ClientCtx::new(team_name, "admin", &daemon_path).await?;
-    let mut operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
-    let mut membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
-    let mut memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
+    let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
+    let admin = ClientCtx::new(team_name, "admin", &daemon_path).await?;
+    let operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
+    let membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
+    let memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
 
     // Create the team config
     let seed_ikm = {
@@ -233,7 +234,7 @@ async fn main() -> Result<()> {
 
     // Create a team.
     info!("creating team");
-    let mut owner_team = owner
+    let owner_team = owner
         .client
         .create_team(owner_cfg)
         .await
@@ -367,8 +368,7 @@ async fn main() -> Result<()> {
     sleep(sleep_interval).await;
 
     // fact database queries
-    let mut queries_team = membera.client.team(team_id);
-    let mut queries = queries_team.queries();
+    let queries = membera_team.queries();
     let devices = queries.devices_on_team().await?;
     info!("membera devices on team: {:?}", devices.iter().count());
     let role = queries.device_role(membera.id).await?;
@@ -401,35 +401,29 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // membera creates a bidirectional channel.
-    info!("membera creating acq bidi channel");
-    // Prepare arguments that need to be captured by the async move block
-    let memberb_net_identifier = memberb.aqc_net_id();
-
-    let create_handle = tokio::spawn(async move {
-        let channel_result = membera
-            .client
-            .aqc()
-            .create_bidi_channel(team_id, memberb_net_identifier, label3)
-            .await;
-        (channel_result, membera) // Return membera along with the result
-    });
-
-    // memberb receives a bidirectional channel.
-    info!("memberb receiving acq bidi channel");
-    let AqcPeerChannel::Bidi(mut received_aqc_chan) =
-        memberb.client.aqc().receive_channel().await?
-    else {
-        bail!("expected a bidirectional channel");
-    };
-
-    // Now await the completion of membera's channel creation
-    let (created_aqc_chan_result, membera_returned) = create_handle
-        .await
-        .context("Task for membera creating bidi channel panicked")?;
-    membera = membera_returned; // Assign the moved membera back
-    let mut created_aqc_chan =
-        created_aqc_chan_result.context("Membera failed to create bidi channel")?;
+    // Creating and receiving a channel "blocks" until both sides have
+    // joined the channel, so we do them concurrently with `try_join`.
+    let (mut created_aqc_chan, mut received_aqc_chan) = try_join(
+        async {
+            // membera creates a bidirectional channel.
+            info!("membera creating acq bidi channel");
+            let chan = membera
+                .client
+                .aqc()
+                .create_bidi_channel(team_id, memberb.aqc_net_id(), label3)
+                .await?;
+            Ok(chan)
+        },
+        async {
+            // memberb receives a bidirectional channel.
+            info!("memberb receiving acq bidi channel");
+            let AqcPeerChannel::Bidi(chan) = memberb.client.aqc().receive_channel().await? else {
+                bail!("expected a bidirectional channel");
+            };
+            Ok(chan)
+        },
+    )
+    .await?;
 
     // membera creates a new stream on the channel.
     info!("membera creating aqc bidi stream");
