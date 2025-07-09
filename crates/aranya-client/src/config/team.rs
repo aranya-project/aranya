@@ -1,4 +1,4 @@
-//! Team configuration for creating new teams or joining existing ones.
+//! Team configuration for creating new teams or adding existing ones.
 //!
 //! This module provides builders for configuring team operations with support
 //! for multiple transport mechanisms.
@@ -7,7 +7,7 @@
 //!
 //! There are two primary operations:
 //! - **Create Team**: Establish a new team with [`CreateTeamConfig`]
-//! - **Join Team**: Join an existing team with [`AddTeamConfig`]
+//! - **Add Team**: Add an existing team with [`AddTeamConfig`]
 //!
 //! Both operations support optional transport configuration.
 
@@ -31,6 +31,14 @@ impl CreateTeamConfig {
     /// Creates a default [`CreateTeamConfigBuilder`].
     pub fn builder() -> CreateTeamConfigBuilder {
         CreateTeamConfigBuilder::default()
+    }
+}
+
+impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
+    fn from(value: CreateTeamConfig) -> Self {
+        Self {
+            quic_sync: value.quic_sync.map(Into::into),
+        }
     }
 }
 
@@ -65,6 +73,16 @@ impl AddTeamConfig {
     /// Creates a default [`AddTeamConfigBuilder`].
     pub fn builder() -> AddTeamConfigBuilder {
         AddTeamConfigBuilder::default()
+    }
+}
+
+impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
+    fn from(value: AddTeamConfig) -> Self {
+        let quic_sync: Option<AddTeamQuicSyncConfig> = value.0.quic_sync.into();
+        Self {
+            team_id: value.0.team_id,
+            quic_sync: quic_sync.map(Into::into),
+        }
     }
 }
 
@@ -161,30 +179,11 @@ impl CreateTeamConfigBuilder {
         self.quic_sync = Some(cfg);
         self
     }
-
     /// Builds the configuration for creating a new team.
     pub fn build(self) -> Result<CreateTeamConfig> {
         Ok(CreateTeamConfig {
             quic_sync: self.quic_sync,
         })
-    }
-}
-
-impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
-    fn from(value: AddTeamConfig) -> Self {
-        let quic_sync: Option<AddTeamQuicSyncConfig> = value.0.quic_sync.into();
-        Self {
-            team_id: value.0.team_id,
-            quic_sync: quic_sync.map(Into::into),
-        }
-    }
-}
-
-impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
-    fn from(value: CreateTeamConfig) -> Self {
-        Self {
-            quic_sync: value.quic_sync.map(Into::into),
-        }
     }
 }
 

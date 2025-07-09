@@ -18,6 +18,13 @@ pub struct CreateTeamQuicSyncConfig {
     mode: CreateSeedMode,
 }
 
+impl CreateTeamQuicSyncConfig {
+    /// Creates a new builder for team creation configuration.
+    pub fn builder() -> CreateTeamQuicSyncConfigBuilder {
+        CreateTeamQuicSyncConfigBuilder::default()
+    }
+}
+
 /// Configuration for adding members to an existing team with QUIC synchronization.
 #[obake::versioned]
 #[obake(version("0.1.0"))]
@@ -27,13 +34,6 @@ pub struct AddTeamQuicSyncConfig {
     mode: AddSeedMode,
 }
 
-impl CreateTeamQuicSyncConfig {
-    /// Creates a new builder for team creation configuration.
-    pub fn builder() -> CreateTeamQuicSyncConfigBuilder {
-        CreateTeamQuicSyncConfigBuilder::default()
-    }
-}
-
 impl AddTeamQuicSyncConfig {
     /// Creates a new builder for team member addition configuration.
     pub fn builder() -> AddTeamQuicSyncConfigBuilder {
@@ -41,14 +41,10 @@ impl AddTeamQuicSyncConfig {
     }
 }
 
+/// Builder for [`CreateTeamQuicSyncConfig`]
 #[derive(Default)]
 pub struct CreateTeamQuicSyncConfigBuilder {
     mode: CreateSeedMode,
-}
-
-#[derive(Default)]
-pub struct AddTeamQuicSyncConfigBuilder {
-    mode: Option<AddSeedMode>,
 }
 
 impl CreateTeamQuicSyncConfigBuilder {
@@ -79,6 +75,12 @@ impl CreateTeamQuicSyncConfigBuilder {
     pub fn build(self) -> Result<CreateTeamQuicSyncConfig> {
         Ok(CreateTeamQuicSyncConfig { mode: self.mode })
     }
+}
+
+/// Builder for [`AddTeamQuicSyncConfig`]
+#[derive(Default)]
+pub struct AddTeamQuicSyncConfigBuilder {
+    mode: Option<AddSeedMode>,
 }
 
 impl AddTeamQuicSyncConfigBuilder {
