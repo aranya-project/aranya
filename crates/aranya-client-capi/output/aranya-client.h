@@ -1214,6 +1214,8 @@ AranyaError aranya_create_team_quic_sync_config_raw_seed_ikm_ext(struct AranyaCr
  * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder)
  * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
  *
+ * This method will be removed soon since certificates will be used instead of PSKs in the future.
+ *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */
 AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm(struct AranyaAddTeamQuicSyncConfigBuilder *cfg,
@@ -1224,6 +1226,8 @@ AranyaError aranya_add_team_quic_sync_config_raw_seed_ikm(struct AranyaAddTeamQu
  *
  * @param[in,out] cfg a pointer to the quic sync config builder [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder)
  * @param[in] ikm a pointer the raw PSK seed IKM [`AranyaSeedIkm`](@ref AranyaSeedIkm)
+ *
+ * This method will be removed soon since certificates will be used instead of PSKs in the future.
  *
  * @relates AranyaAddTeamQuicSyncConfigBuilder.
  */

@@ -733,6 +733,8 @@ pub fn create_team_quic_sync_config_raw_seed_ikm(
 /// @param[in,out] cfg a pointer to the quic sync config builder [`AddTeamQuicSyncConfigBuilder`]
 /// @param[in] ikm a pointer the raw PSK seed IKM [`SeedIkm`]
 ///
+/// This method will be removed soon since certificates will be used instead of PSKs in the future.
+///
 /// @relates AranyaAddTeamQuicSyncConfigBuilder.
 pub fn add_team_quic_sync_config_raw_seed_ikm(
     cfg: &mut AddTeamQuicSyncConfigBuilder,
