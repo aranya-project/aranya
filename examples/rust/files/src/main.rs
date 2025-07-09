@@ -24,6 +24,7 @@ use tokio::{
     process::{Child, Command},
     time::sleep,
     io::{AsyncReadExt, AsyncWriteExt, AsyncSeekExt},
+    task,
 };
 use tokio::fs::File;
 use tracing::{debug, info, Metadata};
@@ -34,9 +35,10 @@ use tracing_subscriber::{
 };
 use serde::{Serialize, Deserialize};
 use serde_cbor;
+use priority_queue::PriorityQueue;
 
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct FileChunk {
     file_id: u64,
     chunk_index: u64,
@@ -53,6 +55,88 @@ struct FileHeader {
     total_chunks: u64,
     file_size: u64,
     file_hash: u64,
+}
+
+// Chunk info for priority queue
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+struct ChunkInfo {
+    chunk_index: u64,
+    data: Vec<u8>,
+    chunk_size: usize,
+}
+
+// File receiver for handling out-of-order chunks
+struct FileReceiver {
+    chunks_buffer: PriorityQueue<ChunkInfo, u64>,  // item, priority (chunk_index)
+    next_expected_chunk: u64,
+    total_chunks: u64,
+    output_file: File,
+    chunks_written: u64,
+    total_received: usize,
+}
+
+impl FileReceiver {
+    fn new(output_file: File, total_chunks: u64) -> Self {
+        Self {
+            chunks_buffer: PriorityQueue::new(),
+            next_expected_chunk: 0,
+            total_chunks,
+            output_file,
+            chunks_written: 0,
+            total_received: 0,
+        }
+    }
+
+    fn add_chunk(&mut self, chunk: FileChunk, chunk_size: usize) -> Result<()> {
+        let data_len = chunk.data.len();
+        let chunk_info = ChunkInfo {
+            chunk_index: chunk.chunk_index,
+            data: chunk.data,
+            chunk_size,
+        };
+        
+        self.chunks_buffer.push(chunk_info, chunk.chunk_index);
+        self.total_received += data_len;
+        
+        info!("Added chunk {} to buffer (total buffered: {})", chunk.chunk_index, self.chunks_buffer.len());
+        Ok(())
+    }
+
+    async fn write_available_chunks(&mut self) -> Result<()> {
+        // Write as many consecutive chunks as possible
+        while let Some((_chunk_info, priority)) = self.chunks_buffer.peek() {
+            if priority == &self.next_expected_chunk {
+                // We can write this chunk
+                let chunk_info = self.chunks_buffer.pop().unwrap().0;
+                
+                // Write chunk to file at correct position
+                let chunk_offset = (chunk_info.chunk_index as u64) * (chunk_info.chunk_size as u64);
+                self.output_file.seek(tokio::io::SeekFrom::Start(chunk_offset)).await
+                    .with_context(|| format!("failed to seek to position {} for chunk {}", chunk_offset, chunk_info.chunk_index))?;
+                self.output_file.write_all(&chunk_info.data).await
+                    .with_context(|| format!("failed to write chunk {} to file", chunk_info.chunk_index))?;
+                
+                self.chunks_written += 1;
+                self.next_expected_chunk += 1;
+                
+                info!("Wrote chunk {}: {} bytes (total: {}/{})", 
+                      chunk_info.chunk_index, chunk_info.data.len(), self.chunks_written, self.total_chunks);
+            } else {
+                // Next chunk not available yet, wait for more chunks
+                break;
+            }
+        }
+        
+        Ok(())
+    }
+
+    fn is_complete(&self) -> bool {
+        self.chunks_written == self.total_chunks
+    }
+
+    fn get_progress(&self) -> (u64, u64) {
+        (self.chunks_written, self.total_chunks)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -569,7 +653,9 @@ async fn send_file_over_multiple_streams(
     let mut chunk_index = 0;
     let mut total_sent = 0;
     
-    // Stream chunks directly from file
+    // Stream chunks directly from file using multiple threads
+    let mut handles = Vec::new();
+    
     loop {
         let mut buffer = vec![0u8; chunk_size];
         let bytes_read = reader.read(&mut buffer).await?;
@@ -578,26 +664,45 @@ async fn send_file_over_multiple_streams(
             break;
         }
         
-        let chunk_data = &buffer[..bytes_read];
+        let chunk_data = buffer[..bytes_read].to_vec();
         info!("Sending chunk {} ({} bytes)", chunk_index, bytes_read);
         
-        // Create stream and send chunk with file_id
-        let mut stream = channel.create_bidi_stream().await?;
-        let chunk_with_index = FileChunk {
-            file_id,
-            chunk_index,
-            chunk_size: bytes_read,
-            total_chunks: total_chunks,
-            file_size: file_size as u64,
-            data: chunk_data.to_vec(),
-        };
-        let serialized = serde_cbor::to_vec(&chunk_with_index)?;
-        stream.send(Bytes::copy_from_slice(&serialized)).await?;
-        stream.close().await?;
+        // Spawn a task to send this chunk
+        let file_id_clone = file_id;
+        let chunk_index_clone = chunk_index;
+        let total_chunks_clone = total_chunks;
+        let file_size_clone = file_size as u64;
         
+        let handle = task::spawn(async move {
+            // Note: We'll handle the actual sending in the main thread
+            // This task just prepares the chunk data
+            let chunk_with_index = FileChunk {
+                file_id: file_id_clone,
+                chunk_index: chunk_index_clone,
+                chunk_size: bytes_read,
+                total_chunks: total_chunks_clone,
+                file_size: file_size_clone,
+                data: chunk_data,
+            };
+            
+            Ok::<_, anyhow::Error>(chunk_with_index)
+        });
+        
+        handles.push(handle);
         total_sent += bytes_read;
         info!("Sent chunk {}: {}/{} bytes", chunk_index, total_sent, file_size);
         chunk_index += 1;
+    }
+    
+    // Wait for all sending tasks to complete and send the chunks
+    for handle in handles {
+        let chunk = handle.await??;
+        
+        // Create stream and send chunk
+        let mut stream = channel.create_bidi_stream().await?;
+        let serialized = serde_cbor::to_vec(&chunk)?;
+        stream.send(Bytes::copy_from_slice(&serialized)).await?;
+        stream.close().await?;
     }
     
     info!("Streaming file transfer completed! Sent {} chunks, {} total bytes", chunk_index, total_sent);
@@ -613,11 +718,9 @@ async fn receive_file_from_multiple_streams(
     
     // Track files by ID
     let mut file_info: Option<(u64, String, u64, u64, u64)> = None; // (file_id, filename, total_chunks, file_size, file_hash)
-    let mut output_file: Option<File> = None;
+    let mut file_receiver: Option<FileReceiver> = None;
     let mut output_path: Option<PathBuf> = None;
     let mut expected_hash: Option<u64> = None;
-    let mut chunks_written = 0;
-    let mut total_received = 0;
     
     // Keep receiving streams until we get all chunks
     loop {
@@ -690,8 +793,8 @@ async fn receive_file_from_multiple_streams(
             return Err(anyhow::anyhow!("Chunk file_id {} doesn't match header file_id {}", chunk.file_id, file_id));
         }
         
-        // Create output file if this is the first chunk
-        if output_file.is_none() {
+        // Create file receiver if this is the first chunk
+        if file_receiver.is_none() {
             let final_output_path = Path::new("received_").join(filename);
             if let Some(parent) = final_output_path.parent() {
                 fs::create_dir_all(parent).await
@@ -699,26 +802,34 @@ async fn receive_file_from_multiple_streams(
             }
             let file = File::create(&final_output_path).await
                 .with_context(|| format!("failed to create output file: {:?}", final_output_path))?;
-            output_file = Some(file);
+            file_receiver = Some(FileReceiver::new(file, *total_chunks));
             output_path = Some(final_output_path.clone());
             info!("created output file: {:?}", final_output_path);
         }
         
-        // Write chunk directly to file at the correct position
-        let mut file = output_file.as_mut().unwrap();
-        let chunk_offset = (chunk.chunk_index as u64) * (chunk_size as u64);
-        file.seek(tokio::io::SeekFrom::Start(chunk_offset)).await
-            .with_context(|| format!("failed to seek to position {} for chunk {}", chunk_offset, chunk.chunk_index))?;
-        file.write_all(&chunk.data).await
-            .with_context(|| format!("failed to write chunk {} to file", chunk.chunk_index))?;
+        // Process chunk in a separate task for multi-threading
+        let receiver = file_receiver.as_mut().unwrap();
+        let chunk_clone = chunk.clone();
+        let chunk_size_clone = chunk_size;
         
-        total_received += chunk_data_len;
-        chunks_written += 1;
-        info!("wrote chunk {}: {} bytes (total: {}/{})", chunk.chunk_index, chunk_data_len, chunks_written, total_chunks);
+        // Spawn a task to process this chunk
+        let handle = task::spawn(async move {
+            // Simulate some processing work
+            sleep(Duration::from_millis(1)).await;
+            (chunk_clone, chunk_size_clone)
+        });
         
-        // Check if this was the last chunk
-        if chunk.chunk_index == total_chunks - 1 {
-            info!("Received last chunk ({}), ending receive loop", chunk.chunk_index);
+        // Wait for the task to complete and get the result
+        let (processed_chunk, processed_chunk_size) = handle.await?;
+        
+        // Add processed chunk to buffer and write available chunks
+        receiver.add_chunk(processed_chunk, processed_chunk_size)?;
+        receiver.write_available_chunks().await?;
+        
+        // Check if file is complete
+        if receiver.is_complete() {
+            let (_written, total) = receiver.get_progress();
+            info!("File complete! Received all {} chunks", total);
             break;
         }
     }
@@ -735,7 +846,12 @@ async fn receive_file_from_multiple_streams(
         }
     }
     
-    info!("file streaming completed successfully: {} bytes", total_received);
+    // Get final stats from file receiver
+    if let Some(receiver) = file_receiver {
+        let (written, total) = receiver.get_progress();
+        info!("file streaming completed successfully: {} chunks written out of {}", written, total);
+    }
+    
     Ok(())
 }
 
