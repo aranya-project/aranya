@@ -12,9 +12,7 @@
 use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
-use aranya_client::{
-    config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
-};
+use aranya_client::{config::CreateTeamConfig, AddTeamConfig, CreateTeamQuicSyncConfig};
 use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
@@ -208,19 +206,15 @@ async fn test_add_team() -> Result<()> {
     let admin_seed = owner
         .encrypt_psk_seed_for_peer(&team.admin.pk.encoding)
         .await?;
-    team.admin
-        .client
-        .add_team({
-            AddTeamConfig::builder()
-                .team_id(team_id)
-                .quic_sync(
-                    AddTeamQuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed)?
-                        .build()?,
-                )
-                .build()?
-        })
-        .await?;
+
+    let admin_cfg = {
+        let mut team_cfg_builder = AddTeamConfig::builder();
+        team_cfg_builder.quic_sync().wrapped_seed(&admin_seed)?;
+
+        team_cfg_builder.build()?
+    };
+
+    team.admin.client.add_team(admin_cfg).await?;
     {
         let admin = team.admin.client.team(team_id);
         admin.sync_now(owner_addr.into(), None).await?;
@@ -342,20 +336,14 @@ async fn test_multi_team_sync() -> Result<()> {
         };
 
         // Admin2 adds team1 to it's local storage using the wrapped seed
-        team2
-            .admin
-            .client
-            .add_team({
-                AddTeamConfig::builder()
-                    .quic_sync(
-                        AddTeamQuicSyncConfig::builder()
-                            .wrapped_seed(&admin_seed)?
-                            .build()?,
-                    )
-                    .team_id(team_id_1)
-                    .build()?
-            })
-            .await?;
+        let admin_cfg = {
+            let mut team_cfg_builder = AddTeamConfig::builder();
+            team_cfg_builder.quic_sync().wrapped_seed(&admin_seed)?;
+
+            team_cfg_builder.build()?
+        };
+
+        team2.admin.client.add_team(admin_cfg).await?;
         {
             let admin2 = team2.admin.client.team(team_id_1);
             admin2.sync_now(owner1_addr.into(), None).await?;
