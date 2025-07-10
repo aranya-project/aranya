@@ -628,6 +628,18 @@ user-id = 293722 # aranya-project-bot
 start = "2024-10-16"
 end = "2025-12-19"
 
+[[trusted.aranya-policy-text]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2025-06-13"
+end = "2026-06-23"
+
+[[trusted.aranya-policy-text-macro]]
+criteria = "safe-to-deploy"
+user-id = 293722 # aranya-project-bot
+start = "2025-06-13"
+end = "2026-06-23"
+
 [[trusted.aranya-policy-vm]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot

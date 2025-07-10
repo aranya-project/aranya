@@ -5,10 +5,10 @@
 #![allow(non_snake_case)]
 #![allow(unused_imports)]
 extern crate alloc;
-use alloc::{string::String, vec::Vec};
+use alloc::vec::Vec;
 use aranya_policy_ifgen::{
     macros::{actions, effect, effects, value},
-    ClientError, Id, Value,
+    ClientError, Id, Value, Text,
 };
 /// KeyBundle policy struct.
 #[value]
@@ -119,7 +119,7 @@ pub struct OperatorRevoked {
 #[effect]
 pub struct AqcNetworkNameSet {
     pub device_id: Id,
-    pub net_identifier: String,
+    pub net_identifier: Text,
 }
 /// AqcNetworkNameUnset policy effect.
 #[effect]
@@ -184,13 +184,13 @@ pub struct AqcUniChannelReceived {
 #[effect]
 pub struct LabelCreated {
     pub label_id: Id,
-    pub label_name: String,
+    pub label_name: Text,
     pub label_author_id: Id,
 }
 /// LabelDeleted policy effect.
 #[effect]
 pub struct LabelDeleted {
-    pub label_name: String,
+    pub label_name: Text,
     pub label_author_id: Id,
     pub label_id: Id,
     pub author_id: Id,
@@ -199,7 +199,7 @@ pub struct LabelDeleted {
 #[effect]
 pub struct LabelAssigned {
     pub label_id: Id,
-    pub label_name: String,
+    pub label_name: Text,
     pub label_author_id: Id,
     pub author_id: Id,
 }
@@ -207,7 +207,7 @@ pub struct LabelAssigned {
 #[effect]
 pub struct LabelRevoked {
     pub label_id: Id,
-    pub label_name: String,
+    pub label_name: Text,
     pub label_author_id: Id,
     pub author_id: Id,
 }
@@ -215,14 +215,14 @@ pub struct LabelRevoked {
 #[effect]
 pub struct QueryLabelExistsResult {
     pub label_id: Id,
-    pub label_name: String,
+    pub label_name: Text,
     pub label_author_id: Id,
 }
 /// QueriedLabel policy effect.
 #[effect]
 pub struct QueriedLabel {
     pub label_id: Id,
-    pub label_name: String,
+    pub label_name: Text,
     pub label_author_id: Id,
 }
 /// QueriedLabelAssignment policy effect.
@@ -230,7 +230,7 @@ pub struct QueriedLabel {
 pub struct QueriedLabelAssignment {
     pub device_id: Id,
     pub label_id: Id,
-    pub label_name: String,
+    pub label_name: Text,
     pub label_author_id: Id,
 }
 /// QueryDevicesOnTeamResult policy effect.
@@ -251,12 +251,12 @@ pub struct QueryDeviceKeyBundleResult {
 /// QueryAqcNetIdentifierResult policy effect.
 #[effect]
 pub struct QueryAqcNetIdentifierResult {
-    pub net_identifier: String,
+    pub net_identifier: Text,
 }
 /// QueryAqcNetworkNamesOutput policy effect.
 #[effect]
 pub struct QueryAqcNetworkNamesOutput {
-    pub net_identifier: String,
+    pub net_identifier: Text,
     pub device_id: Id,
 }
 /// Implements all supported policy actions.
@@ -275,7 +275,7 @@ pub trait ActorExt {
     fn set_aqc_network_name(
         &mut self,
         device_id: Id,
-        net_identifier: String,
+        net_identifier: Text,
     ) -> Result<(), ClientError>;
     fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn create_aqc_bidi_channel(
@@ -289,7 +289,7 @@ pub trait ActorExt {
         receiver_id: Id,
         label_id: Id,
     ) -> Result<(), ClientError>;
-    fn create_label(&mut self, name: String) -> Result<(), ClientError>;
+    fn create_label(&mut self, name: Text) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: Id) -> Result<(), ClientError>;
     fn assign_label(
         &mut self,

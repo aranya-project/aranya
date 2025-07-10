@@ -34,8 +34,8 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{PeerCacheMap, PskStore, State as QuicSyncState},
-        Syncer,
+        quic::{PskStore, State as QuicSyncState},
+        PeerCacheMap, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
@@ -63,6 +63,7 @@ struct SyncParams {
     psk_store: Arc<PskStore>,
     active_team_rx: Receiver<TeamId>,
     caches: PeerCacheMap,
+    external_sync_addr: Addr,
 }
 
 mod invalid_graphs {
@@ -143,6 +144,10 @@ impl Daemon {
         async move {
             // Create a shared PeerCacheMap
             let caches = Arc::new(Mutex::new(BTreeMap::new()));
+            // TODO: Fix this when other syncer types are supported
+            let Some(_qs_config) = &cfg.quic_sync else {
+                anyhow::bail!("Supply a valid QUIC sync config")
+            };
 
             Self::setup_env(&cfg).await?;
             let mut aranya_store = Self::load_aranya_keystore(&cfg).await?;
@@ -173,11 +178,11 @@ impl Daemon {
                     .try_clone()
                     .context("unable to clone keystore")?,
                 &pks,
-                cfg.sync_addr,
                 SyncParams {
                     psk_store: Arc::clone(&psk_store),
                     active_team_rx,
                     caches: caches.clone(),
+                    external_sync_addr: cfg.sync_addr,
                 },
             )
             .await?;
@@ -220,15 +225,23 @@ impl Daemon {
                     }
                     peers
                 };
-                Aqc::new(eng.clone(), pks.ident_pk.id()?, aranya_store, peers)
-            };
-
-            // TODO: Fix this when other syncer types are supported
-            let Some(_qs_config) = &cfg.quic_sync else {
-                anyhow::bail!("Supply a valid QUIC sync config")
+                Aqc::new(
+                    eng.clone(),
+                    pks.ident_pk.id()?,
+                    aranya_store
+                        .try_clone()
+                        .context("unable to clone keystore")?,
+                    peers,
+                )
             };
 
             let data = QSData { psk_store };
+
+            let crypto = crate::api::Crypto {
+                engine: eng,
+                local_store,
+                aranya_store,
+            };
 
             let api = DaemonApiServer::new(
                 client,
@@ -240,8 +253,7 @@ impl Daemon {
                 recv_effects,
                 invalid_graphs,
                 aqc,
-                local_store,
-                eng,
+                crypto,
                 seed_id_dir,
                 Some(data),
             )?;
@@ -327,7 +339,6 @@ impl Daemon {
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
-        external_sync_addr: Addr,
         sync_params: SyncParams,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
@@ -341,15 +352,10 @@ impl Daemon {
 
         let client = Client::new(Arc::clone(&aranya));
 
-        // TODO: Fix this when other syncer types are supported
-        let Some(_qs_config) = &cfg.quic_sync else {
-            anyhow::bail!("Supply a valid QUIC sync config")
-        };
-
-        info!(addr = %external_sync_addr, "starting QUIC sync server");
+        info!(addr = %sync_params.external_sync_addr, "starting QUIC sync server");
         let server = SyncServer::new(
             client.clone(),
-            &external_sync_addr,
+            &sync_params.external_sync_addr,
             sync_params.psk_store,
             sync_params.active_team_rx,
             sync_params.caches,
@@ -476,7 +482,7 @@ mod tests {
     use tokio::time;
 
     use super::*;
-    use crate::config::{AfcConfig, QSConfig};
+    use crate::config::{AfcConfig, QuicSyncConfig};
 
     /// Tests running the daemon.
     #[test(tokio::test)]
@@ -493,7 +499,7 @@ mod tests {
             logs_dir: work_dir.join("logs"),
             config_dir: work_dir.join("config"),
             sync_addr: any,
-            quic_sync: Some(QSConfig {}),
+            quic_sync: Some(QuicSyncConfig {}),
             afc: Some(AfcConfig {
                 shm_path: "/test_daemon1".to_owned(),
                 unlink_on_startup: true,

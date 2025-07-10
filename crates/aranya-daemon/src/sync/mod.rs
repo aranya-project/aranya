@@ -1,5 +1,4 @@
 //! Aranya syncer for syncing Aranya graph commands.
-pub mod prot;
 pub mod task;
 
 use error::SyncError;
@@ -15,12 +14,6 @@ mod error {
     #[derive(Error, Debug)]
     #[non_exhaustive]
     pub enum SyncError {
-        #[error("Protocol mismatch error")]
-        _Protocol,
-        #[error("Version mismatch error")]
-        Version,
-        #[error("Unknown Version")]
-        UnknownVersion,
         #[error(transparent)]
         QuicSync(#[from] QSError),
         #[error(transparent)]

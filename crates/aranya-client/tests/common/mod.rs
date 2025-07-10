@@ -7,10 +7,10 @@ use std::{
 use anyhow::{Context, Result};
 use aranya_client::{client::Client, QuicSyncConfig, SyncPeerConfig, TeamConfig};
 use aranya_daemon::{
-    config::{Config, QSConfig},
+    config::{self as daemon_cfg, Config},
     Daemon, DaemonHandle,
 };
-use aranya_daemon_api::{DeviceId, KeyBundle, Role, TeamId};
+use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId, SEED_IKM_SIZE};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use tokio::{fs, time};
@@ -132,37 +132,31 @@ impl TeamCtx {
 
     pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
-        let seed_ikm = [0; 32]; // TODO: Randomize this
+        let seed_ikm = {
+            let mut buf = [0; SEED_IKM_SIZE];
+            self.owner.client.rand(&mut buf).await;
+            buf
+        };
         let cfg = {
             let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
             TeamConfig::builder().quic_sync(qs_cfg).build()?
         };
 
-        let team_id = {
+        let team = {
             self.owner
                 .client
                 .create_team(cfg.clone())
                 .await
                 .expect("expected to create team")
         };
+        let team_id = team.team_id();
         info!(?team_id);
 
-        self.admin
-            .client
-            .team(team_id)
-            .add_team(cfg.clone())
-            .await?;
-        self.operator
-            .client
-            .team(team_id)
-            .add_team(cfg.clone())
-            .await?;
-        self.membera
-            .client
-            .team(team_id)
-            .add_team(cfg.clone())
-            .await?;
-        self.memberb.client.team(team_id).add_team(cfg).await?;
+        // Owner has the team added due to calling `create_team`, now we assign it to all other peers
+        self.admin.client.add_team(team_id, cfg.clone()).await?;
+        self.operator.client.add_team(team_id, cfg.clone()).await?;
+        self.membera.client.add_team(team_id, cfg.clone()).await?;
+        self.memberb.client.add_team(team_id, cfg).await?;
 
         Ok(team_id)
     }
@@ -181,7 +175,7 @@ impl DeviceCtx {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // Setup daemon config.
-        let quic_sync = Some(QSConfig {});
+        let quic_sync = Some(daemon_cfg::QuicSyncConfig {});
 
         let cfg = Config {
             name: name.into(),
@@ -243,5 +237,18 @@ impl DeviceCtx {
 
     pub async fn aranya_local_addr(&self) -> Result<SocketAddr> {
         Ok(self.client.local_addr().await?)
+    }
+
+    #[allow(unused, reason = "module compiled for each test file")]
+    pub fn aqc_net_id(&mut self) -> NetIdentifier {
+        NetIdentifier(
+            self.client
+                .aqc()
+                .server_addr()
+                .expect("can get server addr")
+                .to_string()
+                .try_into()
+                .expect("socket addr is valid text"),
+        )
     }
 }

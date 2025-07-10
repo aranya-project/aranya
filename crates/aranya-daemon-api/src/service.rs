@@ -19,8 +19,9 @@ use aranya_crypto::{
     id::IdError,
     subtle::{Choice, ConstantTimeEq},
     zeroize::{Zeroize, ZeroizeOnDrop},
-    Engine, Id,
+    EncryptionPublicKey, Engine, Id,
 };
+pub use aranya_policy_text::{text, Text};
 use aranya_util::Addr;
 use buggy::Bug;
 pub use semver::Version;
@@ -41,6 +42,11 @@ pub type CS = <DefaultEngine as Engine>::CS;
 pub struct Error(String);
 
 impl Error {
+    pub fn from_msg(err: &str) -> Self {
+        error!(?err);
+        Self(err.into())
+    }
+
     pub fn from_err<E: error::Error>(err: E) -> Self {
         error!(?err);
         Self(format!("{err:?}"))
@@ -129,14 +135,14 @@ pub enum Role {
 
 // Note: any fields added to this type should be public
 /// A configuration for creating or adding a team to a daemon.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TeamConfig {
     pub quic_sync: Option<QuicSyncConfig>,
 }
 
 /// A device's network identifier.
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, Ord, PartialEq, PartialOrd)]
-pub struct NetIdentifier(pub String);
+pub struct NetIdentifier(pub Text);
 
 impl Borrow<str> for NetIdentifier {
     #[inline]
@@ -174,8 +180,45 @@ impl fmt::Display for NetIdentifier {
 /// A serialized command for AQC.
 pub type AqcCtrl = Vec<Box<[u8]>>;
 
+/// A PSK IKM.
+#[derive(Clone, Serialize, Deserialize)]
+pub struct Ikm([u8; SEED_IKM_SIZE]);
+
+impl Ikm {
+    /// Provides access to the raw IKM bytes.
+    #[inline]
+    pub fn raw_ikm_bytes(&self) -> &[u8; SEED_IKM_SIZE] {
+        &self.0
+    }
+}
+
+impl From<[u8; SEED_IKM_SIZE]> for Ikm {
+    fn from(value: [u8; SEED_IKM_SIZE]) -> Self {
+        Self(value)
+    }
+}
+
+impl ConstantTimeEq for Ikm {
+    fn ct_eq(&self, other: &Self) -> Choice {
+        self.0.ct_eq(&other.0)
+    }
+}
+
+impl ZeroizeOnDrop for Ikm {}
+impl Drop for Ikm {
+    fn drop(&mut self) {
+        self.0.zeroize()
+    }
+}
+
+impl fmt::Debug for Ikm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Ikm").finish_non_exhaustive()
+    }
+}
+
 /// A secret.
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct Secret(Box<[u8]>);
 
 impl Secret {
@@ -205,6 +248,12 @@ impl ZeroizeOnDrop for Secret {}
 impl Drop for Secret {
     fn drop(&mut self) {
         self.0.zeroize()
+    }
+}
+
+impl fmt::Debug for Secret {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Secret").finish_non_exhaustive()
     }
 }
 
@@ -577,7 +626,7 @@ pub enum ChanOp {
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
 pub struct Label {
     pub id: LabelId,
-    pub name: String,
+    pub name: Text,
 }
 
 #[tarpc::service]
@@ -606,13 +655,18 @@ pub trait DaemonApi {
     /// add a team to the local device store that was created by someone else. Not an aranya action/command.
     async fn add_team(team: TeamId, cfg: TeamConfig) -> Result<()>;
 
-    /// remove a team from the local device store.
+    /// Remove a team from local device storage.
     async fn remove_team(team: TeamId) -> Result<()>;
 
     /// Create a new graph/team with the current device as the owner.
     async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
+
+    async fn encrypt_psk_seed_for_peer(
+        team: TeamId,
+        peer_enc_pk: EncryptionPublicKey<CS>,
+    ) -> Result<WrappedSeed>;
 
     /// Add device to the team.
     async fn add_device_to_team(team: TeamId, keys: KeyBundle) -> Result<()>;
@@ -638,7 +692,7 @@ pub trait DaemonApi {
     ) -> Result<()>;
 
     // Create a label.
-    async fn create_label(team: TeamId, name: String) -> Result<LabelId>;
+    async fn create_label(team: TeamId, name: Text) -> Result<LabelId>;
     // Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
     // Assign a label to a device.

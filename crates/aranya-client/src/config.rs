@@ -1,6 +1,7 @@
 use core::time::Duration;
 
-use aranya_daemon_api::GenSeedMode;
+use aranya_daemon_api::{SeedMode, SEED_IKM_SIZE};
+use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
 
@@ -84,7 +85,7 @@ impl Default for SyncPeerConfigBuilder {
 
 #[derive(Clone)]
 pub struct QuicSyncConfig {
-    seed_mode: GenSeedMode,
+    seed_mode: SeedMode,
 }
 
 impl QuicSyncConfig {
@@ -93,40 +94,48 @@ impl QuicSyncConfig {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct QuicSyncConfigBuilder {
-    seed_mode: GenSeedMode,
+    seed_mode: SeedMode,
 }
 
 impl QuicSyncConfigBuilder {
+    /// Sets the PSK seed mode.
+    #[doc(hidden)]
+    pub fn mode(mut self, mode: SeedMode) -> Self {
+        self.seed_mode = mode;
+        self
+    }
+
     /// Sets the seed to be generated.
-    /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`]
+    ///
+    /// This option is only valid when used in [`super::Client::create_team`].
+    /// Overwrites [`Self::wrapped_seed`] and [`Self::seed_ikm`].
     pub fn gen_seed(mut self) -> Self {
-        self.seed_mode = GenSeedMode::Generate;
+        self.seed_mode = SeedMode::Generate;
         self
     }
 
-    /// Sets the seed IKM.
+    /// Sets the seed mode to 'IKM'.
+    ///
+    /// This option is valid in both [`super::Client::create_team`] and [`super::Client::add_team`].
     /// Overwrites [`Self::wrapped_seed`] and [`Self::gen_seed`]
-    pub fn seed_ikm(mut self, ikm: [u8; 32]) -> Self {
-        self.seed_mode = GenSeedMode::IKM(ikm);
+    pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
+        self.seed_mode = SeedMode::IKM(ikm.into());
         self
     }
 
-    /// Sets the wrapped seed.
+    /// Sets the seed mode to 'Wrapped'.
+    ///
+    /// This option is only valid in [`super::Client::add_team`].
     /// Overwrites [`Self::seed_ikm`] and [`Self::gen_seed`]
-    pub fn wrapped_seed(
-        mut self,
-        sender_pk: Box<[u8]>,
-        encap_key: Box<[u8]>,
-        encrypted_seed: Box<[u8]>,
-    ) -> Self {
-        self.seed_mode = GenSeedMode::Wrapped {
-            sender_pk,
-            encap_key,
-            encrypted_seed,
-        };
-        self
+    pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
+        let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
+            error!(?err);
+            ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
+        })?;
+        self.seed_mode = SeedMode::Wrapped(wrapped);
+        Ok(self)
     }
 
     /// Builds the config.
@@ -152,10 +161,9 @@ impl TeamConfig {
 
 impl From<QuicSyncConfig> for aranya_daemon_api::QuicSyncConfig {
     fn from(value: QuicSyncConfig) -> Self {
-        Self::builder()
-            .seed(value.seed_mode)
-            .build()
-            .expect("All fields are set")
+        aranya_daemon_api::QuicSyncConfig {
+            seed_mode: value.seed_mode,
+        }
     }
 }
 

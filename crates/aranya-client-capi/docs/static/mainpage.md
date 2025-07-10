@@ -32,6 +32,10 @@ Objects for creating an Aranya client and Aranya team:
 - `AranyaClientConfig`
 - `AranyaTeamConfig`
 - `AranyaTeamConfigBuilder`
+- `AranyaQuicSyncConfig`
+- `AranyaQuicSyncConfigBuilder`
+- `AranyaSyncPeerConfig`
+- `AranyaSyncPeerConfigBuilder`
 
 Objects for creating AQC (Aranya QUIC) channels and sending/receiving data:
 - `AranyaAqcConfig`
