@@ -50,7 +50,7 @@ pub mod versioned {
 pub use versioned::{TeamInfo, VersionedTeamInfo};
 
 /// Configuration for creating a new team.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct CreateTeamConfig {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }
@@ -95,7 +95,7 @@ impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
 }
 
 /// Builder for joining an existing team configuration.
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct AddTeamConfigBuilder {
     team_id: Option<TeamId>,
     quic_sync: Option<AddTeamQuicSyncConfigBuilder>,
@@ -176,7 +176,7 @@ impl AddTeamConfigBuilder {
 }
 
 /// Builder for creating a new team configuration.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct CreateTeamConfigBuilder {
     quic_sync: Option<CreateTeamQuicSyncConfig>,
 }

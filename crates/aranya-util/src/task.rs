@@ -69,10 +69,12 @@ where
 
 type Panic = Box<dyn Any + Send>;
 
+#[derive(Debug)]
 pub struct Scope {
     tracker: TaskTracker,
     tx: mpsc::Sender<Panic>,
 }
+
 impl Scope {
     fn new() -> (Self, mpsc::Receiver<Panic>) {
         let (tx, rx) = mpsc::channel(1);

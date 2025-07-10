@@ -42,6 +42,7 @@ bimap = "0.6"
 bytes = { workspace = true }
 ciborium = { workspace = true }
 clap = { workspace = true }
+derive-where = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
 s2n-quic = { workspace = true }

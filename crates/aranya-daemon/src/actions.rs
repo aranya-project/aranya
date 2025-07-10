@@ -499,6 +499,7 @@ where
 /// An implementation of [`Actor`].
 /// Simplifies the process of calling an action on the Aranya graph.
 /// Enables more consistency and less repeated code for each action.
+#[derive(Debug)]
 pub struct ActorImpl<'a, EN, SP, CE, S> {
     client: &'a mut ClientState<EN, SP>,
     sink: &'a mut S,
