@@ -7,7 +7,6 @@
 //! - [`AddTeamQuicSyncConfig`] - For adding members to existing teams
 
 use aranya_daemon_api::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
-use serde::{Deserialize, Serialize};
 use tracing::error;
 
 use crate::{error::InvalidArg, ConfigError, Result};
@@ -26,10 +25,7 @@ impl CreateTeamQuicSyncConfig {
 }
 
 /// Configuration for adding members to an existing team with QUIC synchronization.
-#[obake::versioned]
-#[obake(version("0.1.0"))]
-#[obake(derive(Clone, Debug, Serialize, Deserialize))]
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct AddTeamQuicSyncConfig {
     mode: AddSeedMode,
 }
@@ -141,34 +137,59 @@ impl From<AddTeamQuicSyncConfig> for aranya_daemon_api::AddTeamQuicSyncConfig {
     }
 }
 
-#[obake::versioned]
-#[obake(version("0.1.0"))]
-#[obake(derive(Clone, Debug, Serialize, Deserialize))]
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub(super) enum MaybeAddTeamQuicSyncConfig {
-    None,
-    Some {
-        #[obake(inherit)]
-        cfg: AddTeamQuicSyncConfig,
-    },
-}
+pub(crate) mod versioned {
+    use serde::{Deserialize, Serialize};
 
-#[doc(hidden)]
-impl From<Option<AddTeamQuicSyncConfig>> for MaybeAddTeamQuicSyncConfig {
-    fn from(value: Option<AddTeamQuicSyncConfig>) -> Self {
-        match value {
-            None => Self::None,
-            Some(cfg) => Self::Some { cfg },
+    use super::AddSeedMode;
+
+    #[obake::versioned]
+    #[obake(version("0.1.0"))]
+    #[obake(derive(Clone, Debug, Serialize, Deserialize))]
+    #[derive(Clone, Debug, Serialize, Deserialize)]
+    pub struct AddTeamQuicSyncConfig {
+        mode: AddSeedMode,
+    }
+
+    #[obake::versioned]
+    #[obake(version("0.1.0"))]
+    #[obake(derive(Clone, Debug, Serialize, Deserialize))]
+    #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+    pub(crate) enum MaybeAddTeamQuicSyncConfig {
+        Some {
+            #[obake(inherit)]
+            inner: AddTeamQuicSyncConfig,
+        },
+        #[default]
+        None,
+    }
+
+    impl From<super::AddTeamQuicSyncConfig> for AddTeamQuicSyncConfig {
+        fn from(value: super::AddTeamQuicSyncConfig) -> Self {
+            Self { mode: value.mode }
         }
     }
-}
 
-#[doc(hidden)]
-impl From<MaybeAddTeamQuicSyncConfig> for Option<AddTeamQuicSyncConfig> {
-    fn from(value: MaybeAddTeamQuicSyncConfig) -> Self {
-        match value {
-            MaybeAddTeamQuicSyncConfig::None => None,
-            MaybeAddTeamQuicSyncConfig::Some { cfg } => Some(cfg),
+    impl From<AddTeamQuicSyncConfig> for super::AddTeamQuicSyncConfig {
+        fn from(value: AddTeamQuicSyncConfig) -> Self {
+            Self { mode: value.mode }
+        }
+    }
+
+    impl From<Option<super::AddTeamQuicSyncConfig>> for MaybeAddTeamQuicSyncConfig {
+        fn from(value: Option<super::AddTeamQuicSyncConfig>) -> Self {
+            match value {
+                Some(cfg) => Self::Some { inner: cfg.into() },
+                None => Self::None,
+            }
+        }
+    }
+
+    impl From<MaybeAddTeamQuicSyncConfig> for Option<super::AddTeamQuicSyncConfig> {
+        fn from(value: MaybeAddTeamQuicSyncConfig) -> Self {
+            match value {
+                MaybeAddTeamQuicSyncConfig::Some { inner } => Self::Some(inner.into()),
+                MaybeAddTeamQuicSyncConfig::None => Self::None,
+            }
         }
     }
 }
