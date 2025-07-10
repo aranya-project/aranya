@@ -7,6 +7,7 @@ mod prometheus;
 
 /// Configuration for metrics collection and exporting
 #[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
 pub struct MetricsConfig {
     pub mode: MetricsMode,
     pub interval: Duration,
@@ -19,21 +20,10 @@ impl MetricsConfig {
             MetricsMode::Prometheus(prometheus) => {
                 prometheus.install(self)?;
             }
+            MetricsMode::Tracing => {}
         }
 
         Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub enum MetricsMode {
-    Prometheus(prometheus::PrometheusConfig),
-    //DataDog(DataDogConfig),
-}
-
-impl Default for MetricsMode {
-    fn default() -> Self {
-        Self::Prometheus(prometheus::PrometheusConfig::default())
     }
 }
 
@@ -51,4 +41,12 @@ impl Default for MetricsConfig {
             ),
         }
     }
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
+pub enum MetricsMode {
+    Prometheus(prometheus::PrometheusConfig),
+    //DataDog(DataDogConfig),
+    #[default]
+    Tracing,
 }

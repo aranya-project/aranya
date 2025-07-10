@@ -27,6 +27,7 @@ futures-util = { workspace = true }
 libc = { workspace = true }
 metrics = { workspace = true }
 metrics-exporter-prometheus = { version = "0.17", features = ["uds-listener"] }
+metrics-tracing-context = { version = "0.18" }
 metrics-util = { workspace = true }
 serde = { workspace = true }
 sysinfo = { workspace = true }

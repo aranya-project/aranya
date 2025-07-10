@@ -29,7 +29,10 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
-use crate::{export::MetricsConfig, harness::ProcessMetricsCollector};
+use crate::{
+    export::{MetricsConfig, MetricsMode},
+    harness::ProcessMetricsCollector,
+};
 mod export;
 mod harness;
 
@@ -49,21 +52,6 @@ impl<S> Filter<S> for DemoFilter {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let filter = DemoFilter {
-        env_filter: EnvFilter::try_from_env("ARANYA_EXAMPLE")
-            .unwrap_or_else(|_| EnvFilter::new("off")),
-    };
-
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_file(false)
-                .with_target(false)
-                .compact()
-                .with_filter(filter),
-        )
-        .init();
-
     // First, let's make sure we have the proper config data to even start before we log about setting up.
     let Ok(config_path) = env::var("CONFIG_PATH") else {
         bail!(
@@ -73,6 +61,23 @@ async fn main() -> Result<()> {
 
     let buffer = fs::read(config_path).await?;
     let metrics_config: MetricsConfig = deser_hjson::from_slice(&buffer)?;
+
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_file(false)
+                .with_target(false)
+                .compact()
+                .with_filter(DemoFilter {
+                    env_filter: EnvFilter::try_from_env("ARANYA_EXAMPLE")
+                        .unwrap_or_else(|_| EnvFilter::new("off")),
+                }),
+        )
+        .with(
+            matches!(metrics_config.mode, MetricsMode::Tracing)
+                .then_some(metrics_tracing_context::MetricsLayer::new()),
+        )
+        .init();
 
     info!("Starting Aranya Example with Metrics Collection");
 
