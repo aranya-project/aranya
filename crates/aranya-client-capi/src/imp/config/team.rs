@@ -137,10 +137,10 @@ impl From<AddTeamConfig> for aranya_client::AddTeamConfig {
     fn from(value: AddTeamConfig) -> Self {
         let mut builder = Self::builder();
         if let Some(cfg) = value.quic_sync {
-            builder = builder
-                .quic_sync(cfg.into())
-                .team_id((&value.team_id).into());
+            builder.quic_sync().set_from_cfg(cfg.into());
         }
+
+        builder = builder.team_id((&value.team_id).into());
 
         builder.build().expect("All fields set")
     }

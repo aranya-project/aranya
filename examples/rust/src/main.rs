@@ -7,8 +7,8 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamConfigBuilder,
-    AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
+    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamConfigBuilder, CreateTeamConfig,
+    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
 };
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
@@ -247,12 +247,14 @@ async fn main() -> Result<()> {
     info!(%team_id);
 
     let (add_team_cfg, owner_team_cfg_builder) = {
-        let qs_cfg = AddTeamQuicSyncConfig::builder()
-            .seed_ikm(seed_ikm)
-            .build()?;
-        let builder = AddTeamConfig::builder().quic_sync(qs_cfg).team_id(team_id);
-        let builder_clone = builder.clone();
-        (builder.build()?, builder_clone)
+        let mut team_cfg_builder = AddTeamConfig::builder();
+
+        team_cfg_builder.quic_sync().seed_ikm(seed_ikm);
+        team_cfg_builder = team_cfg_builder.team_id(team_id);
+
+        let builder_clone = team_cfg_builder.clone();
+
+        (team_cfg_builder.build()?, builder_clone)
     };
 
     let admin_team = {
