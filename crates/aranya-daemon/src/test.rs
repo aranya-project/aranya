@@ -137,22 +137,6 @@ impl TestDevice {
         bail!("Channel closed or nothing to receive")
     }
 
-    /// Syncs with a device twice.
-    ///
-    /// First sync should receive `must_receive` commands.
-    /// Second sync should receive 0 commands. This is to check if the cache is being updated.
-    ///
-    /// Returns the effects that were received.
-    pub async fn sync_check_cache(
-        &mut self,
-        device: &TestDevice,
-        must_receive: Option<usize>,
-    ) -> Result<Vec<Effect>> {
-        let effects = self.sync_expect(device, must_receive).await?;
-        self.sync_expect(device, Some(0)).await?;
-        Ok(effects)
-    }
-
     pub fn actions(
         &self,
     ) -> impl Actions<
@@ -358,7 +342,7 @@ impl TestCtx {
             .assign_role(admin.pk.ident_pk.id()?, Role::Admin)
             .await
             .context("unable to elevate admin role")?;
-        admin.sync_check_cache(owner, Some(3)).await?;
+        admin.sync_expect(owner, Some(3)).await?;
 
         let admin_caches = admin.syncer.get_peer_caches();
         let owner_key = PeerCacheKey {
@@ -384,7 +368,7 @@ impl TestCtx {
             .assign_role(operator.pk.ident_pk.id()?, Role::Operator)
             .await
             .context("unable to elevate operator role")?;
-        operator.sync_check_cache(owner, Some(5)).await?;
+        operator.sync_expect(owner, Some(5)).await?;
 
         let operator_caches = operator.syncer.get_peer_caches();
         let operator_cache_size = operator_caches
@@ -401,18 +385,18 @@ impl TestCtx {
             .add_member(DeviceKeyBundle::try_from(&membera.pk)?)
             .await
             .context("unable to add membera member")?;
-        membera.sync_check_cache(admin, Some(3)).await?;
+        membera.sync_expect(admin, Some(3)).await?;
         operator
             .actions()
             .add_member(DeviceKeyBundle::try_from(&memberb.pk)?)
             .await
             .context("unable to add memberb member")?;
-        memberb.sync_check_cache(admin, Some(3)).await?;
+        memberb.sync_expect(admin, Some(3)).await?;
 
-        owner.sync_check_cache(operator, Some(2)).await?;
-        admin.sync_check_cache(operator, Some(5)).await?;
-        membera.sync_check_cache(operator, Some(5)).await?;
-        memberb.sync_check_cache(operator, Some(5)).await?;
+        owner.sync_expect(operator, Some(2)).await?;
+        admin.sync_expect(operator, Some(5)).await?;
+        membera.sync_expect(operator, Some(5)).await?;
+        memberb.sync_expect(operator, Some(5)).await?;
 
         Ok(clients)
     }
