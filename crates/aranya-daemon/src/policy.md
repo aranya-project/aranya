@@ -29,7 +29,7 @@ which commands devices can publish to Aranya's distributed graph:
 - **Roles** control command publishing permissions: `owner`
   (emergency access), `admin` (system administration), `operator`
   (user management), and `member` (basic usage).
-- **Authorization** uses two patterns: operation-based for most
+- **Authorization** uses two patterns: permission-based for most
   commands, and managing-role-based for role/label assignment.
 - **Key Principle**: Devices cannot assign roles or labels to
   themselves, enforcing separation of duties.
@@ -47,6 +47,12 @@ This policy does NOT control:
 - Network access or transport layer security
 - How devices synchronize the graph (handled by Aranya core)
 - Query authorization (queries read local derived state)
+
+## Conventions
+
+TODO: talk about why we try to avoid using `this.foo`.
+TODO: talk about how `fields` are untrusted, attacker-controlled
+inputs
 
 ## Imports
 
@@ -104,10 +110,10 @@ Facts and commands are *not* part of a policy's public API.
 Fact definitions enforce uniqueness constraints through their key
 structure:
 
-- **Single-key facts** (e.g., `Device[device_id id]`) allow
+- **Single-key facts** (e.g., `Fact[a id]`) allow
   exactly one fact per key value.
-- **Composite-key facts** (e.g., `AssignedRole[device_id id,
-  role_id id]`) allow exactly one fact per key combination.
+- **Composite-key facts** (e.g., `Fact[a id, b id]`)
+  allow exactly one fact per key combination.
 - **Empty-key facts** (e.g., `TeamStart[]`) allow exactly one
   instance, implementing a singleton pattern.
 
@@ -275,9 +281,14 @@ function try_find_device(device_id id) optional struct Device {
 
 // Returns a device if it exist, or raises a check error
 // otherwise.
-function must_find_device(device_id id) struct Device {
-    let device = check_unwrap try_find_device(device_id)
-    return device
+function get_device(device_id id) struct Device {
+    return check_unwrap try_find_device(device_id)
+}
+
+// Returns the device corresponding with the author of the
+// envelope.
+function get_author(evp struct Envelope) struct Device {
+    return get_device(envelope::author_id(evp))
 }
 
 // Collection of public Device Keys for a device.
@@ -288,7 +299,22 @@ struct KeyBundle {
 }
 
 // Returns the device's key bundle.
-function must_find_device_keybundle(device_id id) struct KeyBundle {
+//
+// # Caveats
+//
+// This function does not directly check whether the device
+// exists. However, it would be a very significant invariant
+// violation if a device's key existed without the device also
+// existing. See `valid_device_invariants`.
+function get_device_keybundle(device_id id) struct KeyBundle {
+    // This function is a little too expensive to call every
+    // time we need to get a device, so only uncomment this when
+    // debugging/developing.
+    //
+    // See the comment in `try_find_device`.
+    //
+    // check valid_device_invariants(device_id)
+
     let ident_key = check_unwrap query DeviceIdentKey[device_id: device_id]
     let sign_key = check_unwrap query DeviceSignKey[device_id: device_id]
     let enc_key = check_unwrap query DeviceEncKey[device_id: device_id]
@@ -376,25 +402,22 @@ command QueryDevicesOnTeam {
 }
 ```
 
-#### Query Device Roles
+#### Query Device Role
 
-Queries the roles assigned to a device.
+Queries the role assigned to a device.
 
 ```policy
-// Emits `QueryDeviceRolesResult` for each role assigned to the
+// Emits `QueryDeviceRoleResult` for each role assigned to the
 // device.
-action query_device_roles(device_id id) {
-    map AssignedRole[device_id: device_id, role_id: ?] as f {
-        publish QueryDeviceRoles {
-            device_id: f.device_id,
-            role_id: f.role_id,
-        }
+action query_device_role(device_id id) {
+    publish QueryDeviceRole {
+        device_id: device_id,
     }
 }
 
 // Emitted when a device's roles are queried by
 // `query_device_roles`.
-effect QueryDeviceRolesResult {
+effect QueryDeviceRoleResult {
     // The role's ID.
     role_id id,
     // The role's name.
@@ -405,12 +428,9 @@ effect QueryDeviceRolesResult {
     default bool,
 }
 
-// A trampoline that forwards `device_id` and `role_id` to the
-// effect.
-command QueryDeviceRoles {
+command QueryDeviceRole {
     fields {
         device_id id,
-        role_id id,
     }
 
     // TODO(eric): We don't really need to call `seal_command`
@@ -421,8 +441,8 @@ command QueryDeviceRoles {
     policy {
         check team_exists()
 
-        let author = must_find_device(this.device_id)
-        let role = check_unwrap query Role[role_id: this.role_id]
+        let device = get_device(this.device_id)
+        let assigned_role = get_assigned_role(device.device_id)
 
         finish {
             emit QueryDeviceRolesResult {
@@ -472,9 +492,9 @@ command QueryDeviceKeyBundle {
         check team_exists()
 
         // NB: A device's keys exist iff `fact Device` exists, so
-        // we don't need to use `must_find_device` or anything
+        // we don't need to use `get_device` or anything
         // like that.
-        let device_keys = must_find_device_keybundle(this.device_id)
+        let device_keys = get_device_keybundle(this.device_id)
 
         finish {
             emit QueryDeviceKeyBundleResult {
@@ -486,7 +506,7 @@ command QueryDeviceKeyBundle {
 ```
 
 ## Roles and Permissions
-<!-- Section contains: Role facts, operations, assignment/revocation, default roles -->
+<!-- Section contains: Role facts, permissions, assignment/revocation, default roles -->
 
 ### Overview
 
@@ -524,6 +544,7 @@ about a similar situation.
 // command in `evp`.
 //
 // SECURITY INVARIANT: Prevents cross-branch permission confusion.
+//
 // NB: This function is deterministic and injective for the
 // current policy. Calling it multiple times for the same
 // envelope will always return the same ID.
@@ -552,106 +573,106 @@ instance, each AQC label is associated with a "manager" role that
 other devices. Devices with sufficient permissions can change
 a role's scope; how this works depends on the resource.
 
-#### Commands and Operations
+### Role Permissions
 
-Commands are a resource, but they are also an implementation
-detail and not part of the policy's public API. Naively, this
-would prevent devices from being able to change the role required
-to publish a command.
-
-To work around this, commands are not directly associated with
-a role. Instead, commands are associated with one or more
-_operations_, and each _operation_ is associated with a role.
+TODO: prose
 
 ```policy
-// Records that a certain role is required to authorize a device
-// to perform the operation.
+// Records a permission granted by the role.
 //
-// INVARIANT: Each operation maps to exactly one role at a time.
-// The single-key structure ensures one-to-one mapping.
-fact OpRequiresRole[op string]=>{role_id id}
+// # Caveats
+//
+// We do not yet support prefix deletion, so this fact is NOT
+// deleted when a role is deleted. Use `role_has_perm` to verify
+// whether a role grants a permission and use `device_has_perm`
+// to verify whether a device has a permission.
+fact RoleHasPerm[role_id id, perm string]=>{}
 
-// Shorthand for `update OpRequiresRole`.`
-finish function update_op_requires_role(
-    op string,
-    old_role_id id,
-    new_role_id id,
-) {
-    update OpRequiresRole[op: op]=>{
-        role_id: old_role_id,
-    } to {
-        role_id: new_role_id,
+// Reports whether the role has the specified permission.
+//
+// # Errors
+//
+// It raises a check failure if the role does not exist or if the
+// permission is invalid.
+function role_has_perm(role_id id, perm string) bool {
+    check exists Role[role_id: role_id]
+    check is_valid_perm(perm)
+
+    return exists RoleHasPerm[role_id: role_id, perm: perm]
+}
+
+// Reports whether the permission is valid.
+function is_valid_perm(perm string) {
+    match perm {
+        "AddDevice" => { return true }
+        "RemoveDevice" => { return true }
+
+        "AssignRole" => { return true }
+        "RevokeRole" => { return true }
+
+        "CreateLabel" => { return true }
+        "DeleteLabel" => { return true }
+        "ChangeLabelManagingRole" => { return true }
+
+        "AssignLabel" => { return true }
+        "RevokeLabel" => { return true }
+
+        "SetAqcNetworkName" => { return true }
+        "UnsetAqcNetworkName" => { return true }
+
+        "CreateAqcUniChannel" => { return true }
+        "CreateAqcBidiChannel" => { return true }
+
+        "TerminateTeam" => { return true }
+
+        _ => { return false }
     }
 }
 
-// Returns the device corresponding with the author of the
-// envelope without checking whether it is authorized to perform
-// any operations.
+// Reports whether the device has the specified permission.
 //
-// In general, you should use `get_authorized_device` instead.
-function get_possibly_unauthorized_device(evp struct Envelope) struct Device {
-    let device = must_find_device(envelope::author_id(evp))
-    return device
+// # Errors
+//
+// It raises a check failure if the permission is invalid.
+//
+// # Caveats
+//
+// This function does NOT check whether the device exists.
+function device_has_perm(device_id id, perm string) bool {
+    // TODO(eric): Decide whether to keep this.
+    check exists Device[device_id: device_id]
+
+    check is_valid_perm(perm)
+
+    let role = check_unwrap query AssignedRole[device_id: device_id]
+    return role_has_perm(f.role_id, perm)
 }
 
-// Reports whether a device has permission to perform an
-// operation.
-//
-// In most cases you should not need to use this function
-// directly. Use `get_authorized_device` instead.
-function can_perform_op(device_id id, op string) bool {
-    let req = query OpRequiresRole[op: op]
-    if req is None {
-        return false
-    }
-    let role_id = (unwrap req).role_id
-    if !exists Role[role_id: role_id] {
-        return false
-    }
-    return exists AssignedRole[device_id: device_id, role_id: role_id]
-}
-
-// Returns the `Device` corresponding with the author of the
-// envelope iff the author is authorized to perform the operation.
-//
-// Otherwise, it raises a check error.
-function get_authorized_device(evp struct Envelope, op string) struct Device {
-    let device = get_possibly_unauthorized_device(evp)
-    check can_perform_op(device.device_id, op)
-    return device
-}
-```
-
-Devices cannot change which operation a command requires, but
-they _can_ change which role is associated with the operation.
-
-```policy
-// Updates (or creates) an operation -> role mapping.
-action update_operation(op string, role_id id) {
-    publish UpdateOperation {
-        op: op,
-        new_role_id: role_id,
+// Adds a permission to the role.
+action add_perm_to_role(role_id id, perm string) {
+    publish AddPermToRole {
+        role_id: role_id,
+        perm: perm,
     }
 }
 
-// Emitted when `UpdateOperation` is successfully processed.
-effect OperationUpdated {
-    // The operation that was updated.
-    op string,
-    // The ID of the role that is now required to perform the
-    // operation.
+// Emitted when a permission is added to a role.
+effect PermAddedToRole {
+    // The role that was updated.
     role_id id,
-    // The ID of the device that updated the operation.
+    // The permission that was added to the role.
+    perm string,
+    // The device that added the permission to the role.
     author_id id,
 }
 
-command UpdateOperation {
+command AddPermToRole {
     fields {
-        // The operation that is being updated.
-        op string,
-        // The ID of the role that is now required to perform the
-        // operation.
-        new_role_id id,
+        // The ID of the role to which the permission is being
+        // added.
+        role_id id,
+        // The permission being added.
+        perm string,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -660,48 +681,85 @@ command UpdateOperation {
     policy {
         check team_exists()
 
-        // TODO(eric): I'm not entirely sure we want anybody
-        // with the requisite role for "UpdateOperation" to be
-        // able to change *every* op -> role mapping. This is
-        // a very powerful operation: for example, a device with
-        // the requisite role for "UpdateOperation" could
-        // "downgrade" the role required to perform other
-        // operations.
+        // TODO(eric): We have to make sure that the author is
+        // allowed to
+        // 1. update this role
+        // 2. add this *permission* to this role
+        let author = get_author(envelope)
+
+        // The permission must be valid.
+        check is_valid_perm(this.perm)
+
+        // The role must not already have the permission.
         //
-        // Should we hide this API for MVP?
-        let author = get_authorized_device(envelope, "UpdateOperation")
+        // TODO(eric): Should this case be a no-op or an error?
+        check !role_has_perm(role.role_id, this.perm)
 
-        // The new role must already exist.
-        let role = check_unwrap query Role[role_id: this.new_role_id]
-        let new_role_id = role.role_id
+        finish {
+            create RoleHasPerm[role_id: this.role_id, perm: this.perm]=>{}
 
-        let req = query OpRequiresRole[op: this.op]
-        if req is Some {
-            // The operation already exists, so update the role.
-            let old_role_id = (unwrap req).role_id
-            finish {
-                update OpRequiresRole[op: this.op]=>{
-                    role_id: old_role_id,
-                } to {
-                    role_id: new_role_id,
-                }
-
-                emit OperationUpdated {
-                    op: this.op,
-                    role_id: new_role_id,
-                    author_id: author.device_id,
-                }
+            emit PermAddedToRole {
+                role_id: this.role_id,
+                perm: this.perm,
+                author_id: author.device_id,
             }
-        } else {
-            // Create a new operation -> role mapping.
-            finish {
-                create OpRequiresRole[op: this.op]=>{role_id: new_role_id}
+        }
+    }
+}
 
-                emit OperationUpdated {
-                    op: this.op,
-                    role_id: new_role_id,
-                    author_id: author.device_id,
-                }
+// Removes the permission from the role.
+action remove_perm_from_role(role_id id, perm string) {
+    publish RemovePermFromRole {
+        role_id: role_id,
+        perm: perm,
+    }
+}
+
+// Emitted when a permission is removed from a role.
+effect PermRemovedFromRole {
+    // The role from which the permission was removed.
+    role_id id,
+    // The permission that was removed from the role.
+    perm string,
+    // The device that removed the permission from the role.
+    author_id id,
+}
+
+command RemovePermFromRole {
+    fields {
+        // The ID of the role from which the permission is being
+        // removed.
+        role_id id,
+        // The permission being removed.
+        perm string,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_author(envelope)
+
+        // The permission must be valid.
+        check is_valid_perm(this.perm)
+
+        // Removing a permission does not *escalate* privilege,
+        // so unlike `AddPermToRole` we only need to check that
+        // the author is allowed to update the role.
+        check can_manage_role(author.device_id, this.role_id)
+
+        // TODO(eric): Should this case be a no-op or an error?
+        check role_has_perm(role.role_id, this.perm)
+
+        finish {
+            delete RoleHasPerm[role_id: this.role_id, perm: this.perm]
+
+            effect PermRemovedFromRole {
+                role_id: this.role_id,
+                perm: this.perm,
+                author_id: author.device_id,
             }
         }
     }
@@ -710,45 +768,51 @@ command UpdateOperation {
 
 ### Role Management
 
-As previously mentioned, each role is managed by another role,
-called the _managing role_. Devices that have been assigned the
-managing role are allowed to assign the managed role to *any*
-other device as well as revoke the managed role from *any* other
-device. Devices are prohibited from assigning roles to or
-revoking roles from themselves.
+As previously mentioned, each role is "managed" by zero or more
+other roles, called the _managing roles_. A device that has been
+assigned one of the managing roles is allowed to do some or all
+of the following:
+
+- Assign the role to *any* device, except itself
+- Revoke the role from *any* device
+- Add a permission to the role (so long as the device is allowed
+  to add that permission)
+- Remove *any* permission from the role
 
 ```policy
-// Records that a particular role is required in order to assign
-// the role to or revoke the role from *other* devices.
+// Grants devices who have been assigned the managing role
+// permission to "manage" the target role.
+fact CanManageRole[target_role_id id, managing_role_id id]=>{}
+
+// Reports whether the device is allowed to manage the role.
 //
-// Devices with the managing role are allowed to assign the role
-// to any *other* device. Devices cannot assign the role to
-// or revoke the role from themselves.
-fact CanManageRole[target_role_id id]=>{managing_role_id id}
-
-// Returns `Some(managing_role_id)` if the device can manage
-// `target_role_id`, or `None` otherwise.
-// TODO(eric): I'm not a huge fan of this name.
-function get_managing_role_id(device_id id, target_role_id id) optional id {
-    let record = query CanManageRole[target_role_id: target_role_id]
-    if record is None {
-        return None
-    }
-    let role_id = (unwrap record).managing_role_id
-
-    let is_assigned_role = exists AssignedRole[device_id: device_id, role_id: role_id]
-    if !is_assigned_role {
-        return None
-    }
-    return Some(role_id)
-}
-
-// Reports whether the device can manage the specified role.
+// # Errors
 //
-// If you need to get the managing role ID, use
-// `get_managing_role_id` instead.
-function can_manage_role(device_id id, target_role_id id) bool {
-    return get_managing_role_id(device_id, target_role_id) is Some
+// This function raises a check error if the device has not been
+// assigned a role.
+//
+// # Caveats
+//
+// - This function does NOT check whether the device exists.
+// - This function does NOT check whether the role exists.
+function can_manage_role(device_id id, role_id id) bool {
+    let device_role_id = check_unwrap get_assigned_role_id(device_id)
+
+    // At this point we believe the following to be true:
+    //
+    // - `device_role_id` refers to a role that exists
+    // - `device_role_id` refers to the role assigned to
+    //   `device_id`
+    //
+    // We do NOT know whether `device_id` refers to a device
+    // that exists.
+    //
+    // We do NOT know whether `role_id` refers to a role that
+    // exists.
+    return exists CanManageRole[
+        target_role_id: target_role_id,
+        managing_role_id: device_role_id,
+    ]
 }
 
 // Changes the role required to manage the specified role.
@@ -801,12 +865,10 @@ command ChangeRoleManagingRole {
         // iff they have been assigned the managing role for the
         // role whose managing role is being changed (send help).
         // This negates the need for a "ChangeRoleManagingRole"
-        // operation. In fact, a "ChangeRoleManagingRole"
-        // operation would break role managing since each
-        // operation requires exactly one role.
+        // permission.
         //
         // TODO(eric): Is this analysis correct?
-        let author = get_possibly_unauthorized_device(envelope)
+        let author = get_author(envelope)
 
         // The target role must exist.
         let target_role = check_unwrap query Role[role_id: this.target_role_id]
@@ -839,41 +901,6 @@ command ChangeRoleManagingRole {
     }
 }
 ```
-
-### Authorization Patterns
-
-This policy uses two distinct authorization patterns that serve
-different purposes:
-
-#### Operation-Based Authorization
-
-Most commands use operation-based authorization, where the author
-must have a role that has been granted permission to perform
-a specific operation:
-
-    let author = get_authorized_device(envelope, "OperationName")
-
-This pattern provides flexibility - the owner can reassign
-operations to different roles as organizational needs change.
-
-#### Managing-Role-Based Authorization
-
-Role and label assignment commands use a different pattern based
-on the managing role relationship:
-
-    // For role assignment
-    check can_manage_role(author.device_id, target_role_id)
-
-    // For label assignment
-    check can_manage_label(author.device_id, label_id)
-
-This pattern avoids circular dependencies that would arise with
-operation-based auth. Without it, you would need a role to assign
-that same role, creating an impossible bootstrap scenario.
-
-**Note**: Devices are always prohibited from assigning roles or
-labels to themselves, regardless of their permissions. This
-prevents privilege escalation attacks.
 
 ### Role Creation
 
@@ -960,6 +987,12 @@ credentials should be stored securely (e.g., in an HSM) and only
 used for emergency "break glass" scenarios.
 
 ```policy
+// TODO: create these?
+fact RoleOwner[role_id id]=>{author_id id}
+fact RoleAdmin[role_id id]=>{author_id id}
+fact RoleOperator[role_id id]=>{author_id id}
+fact RoleMember[role_id id]=>{author_id id}
+
 // Setup default roles on a team.
 action setup_default_roles(managing_role_id id) {
     publish SetupDefaultRole {
@@ -990,27 +1023,10 @@ command SetupDefaultRole {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "SetupDefaultRole")
+        let author = get_author(envelope)
+        check device_has_perm(author.device_id, "SetupDefaultRole")
+
         let role_id = derive_role_id(envelope)
-
-        // For "admin"
-        let update_op_role_id = (check_unwrap query OpRequiresRole[op: "UpdateOperation"]).role_id
-        let create_label_role_id = (check_unwrap query OpRequiresRole[op: "CreateLabel"]).role_id
-        let delete_label_role_id = (check_unwrap query OpRequiresRole[op: "DeleteLabel"]).role_id
-        let change_label_managing_role_id = (check_unwrap query OpRequiresRole[op: "ChangeLabelManagingRole"]).role_id
-
-        // For "admin" and "operator"
-        let set_aqc_network_name_id = (check_unwrap query OpRequiresRole[op: "SetAqcNetworkName"]).role_id
-        let unset_aqc_network_name_id = (check_unwrap query OpRequiresRole[op: "UnsetAqcNetworkName"]).role_id
-
-        // For "operator"
-        let assign_label_role_id = (check_unwrap query OpRequiresRole[op: "AssignLabel"]).role_id
-        let revoke_label_role_id = (check_unwrap query OpRequiresRole[op: "RevokeLabel"]).role_id
-
-
-        // For "member"
-        let aqc_create_uni_channel_role_id = (check_unwrap query OpRequiresRole[op: "AqcCreateUniChannel"]).role_id
-        let aqc_create_bidi_channel_role_id = (check_unwrap query OpRequiresRole[op: "AqcCreateBidiChannel"]).role_id
 
         match this.name {
             "admin" => {
@@ -1022,12 +1038,11 @@ command SetupDefaultRole {
                         managing_role_id: this.managing_role_id,
                     })
 
-                    update_op_requires_role("AddDevice", update_op_role_id, role_id)
-                    update_op_requires_role("CreateLabel", create_label_role_id, role_id)
-                    update_op_requires_role("DeleteLabel", delete_label_role_id, role_id)
-                    update_op_requires_role("ChangeLabelManagingRole", change_label_managing_role_id, role_id)
-                    update_op_requires_role("SetAqcNetworkName", set_aqc_network_name_id, role_id)
-                    update_op_requires_role("UnsetAqcNetworkName", unset_aqc_network_name_id, role_id)
+                    create RoleHasPerm[role_id: role_id, perm: "AddDevice"]=>{}
+                    create RoleHasPerm[role_id: role_id, perm: "RemoveDevice"]=>{}
+                    create RoleHasPerm[role_id: role_id, perm: "CreateLabel"]=>{}
+                    create RoleHasPerm[role_id: role_id, perm: "DeleteLabel"]=>{}
+                    create RoleHasPerm[role_id: role_id, perm: "ChangeLabelManagingRole"]=>{}
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -1047,10 +1062,10 @@ command SetupDefaultRole {
                         managing_role_id: this.managing_role_id,
                     })
 
-                    update_op_requires_role("AssignLabel", assign_label_role_id, role_id)
-                    update_op_requires_role("RevokeLabel", revoke_label_role_id, role_id)
-                    update_op_requires_role("SetAqcNetworkName", set_aqc_network_name_id, role_id)
-                    update_op_requires_role("UnsetAqcNetworkName", unset_aqc_network_name_id, role_id)
+                    create RoleHasPerm[role_id: role_id, perm: "AssignLabel"]=>{}
+                    create RoleHasPerm[role_id: role_id, perm: "RevokeLabel"]=>{}
+                    create RoleHasPerm[role_id: role_id, perm: "SetAqcNetworkName"]=>{}
+                    create RoleHasPerm[role_id: role_id, perm: "UnsetAqcNetworkName"]=>{}
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -1070,8 +1085,8 @@ command SetupDefaultRole {
                         managing_role_id: this.managing_role_id,
                     })
 
-                    update_op_requires_role("AqcCreateUniChannel", aqc_create_uni_channel_role_id, role_id)
-                    update_op_requires_role("AqcCreateBidiChannel", aqc_create_bidi_channel_role_id, role_id)
+                    create RoleHasPerm[role_id: role_id, perm: "CreateAqcUniChannel"]=>{}
+                    create RoleHasPerm[role_id: role_id, perm: "CreateAqcBidiChannel"]=>{}
 
                     emit RoleCreated {
                         role_id: role_id,
@@ -1095,21 +1110,51 @@ TODO
 
 ### Role Assignment
 
-A device can be assigned zero or more roles.
+A device can be assigned zero or one roles.
 
 ```policy
 // Records that a device has been assigned a role.
 //
-// INVARIANT: Composite key ensures each device-role pair is unique.
-// A device cannot be assigned the same role multiple times.
-fact AssignedRole[device_id id, role_id id]=>{}
+// TODO(eric): talk about how you also need to verify that the
+// role exists!
+fact AssignedRole[device_id id]=>{role_id id}
 
-// Reports whether the device has been assigned the role.
-function has_role(device_id id, role_id id) bool {
-    return exists AssignedRole[device_id: device_id, role_id: role_id]
+// Returns the role assigned to the device.
+//
+// # Errors
+//
+// This function raises a check error if the device has not been
+// assigned a role.
+//
+// # Caveats
+//
+// - It does NOT check whether the device exists.
+function get_assigned_role(device_id id) struct Role {
+    let assigned_role = check_unwrap query AssignedRole[device_id: device_id]
+    // Verify that the role exists.
+    check exists Role[role_id: assigned_role.role_id]
+    return assigned_role
+}
+
+// Returns the ID of the role assigned to the device.
+//
+// # Errors
+//
+// This function raises a check error if the device has not been
+// assigned a role.
+//
+// # Caveats
+//
+// - It does NOT check whether the device exists.
+function get_assigned_role_id(device_id id) id {
+    return get_assigned_role(device_id).role_id
 }
 
 // Assigns the specified role to the device.
+//
+// # Required Permissions
+//
+// - `AssignRole`
 action assign_role(device_id id, role_id id) {
     publish AssignRole {
         device_id: device_id,
@@ -1141,33 +1186,130 @@ command AssignRole {
     policy {
         check team_exists()
 
-        // Devices are authorized to assign roles iff they have
-        // been assigned the managing role for the role being
-        // assigned. This negates the need for an "AssignRole"
-        // operation. In fact, an "AssignRole" operation would
-        // break role assignment since each operation requires
-        // exactly one role.
-        //
-        // TODO(eric): Is this analysis correct?
-        let author = get_possibly_unauthorized_device(envelope)
+        let author = get_author(envelope)
 
         // Devices cannot assign roles to themselves.
         check author.device_id != this.device_id
 
         // The author must have permission to assign the role.
+        check device_has_perm(author.device_id, "AssignRole")
         check can_manage_role(author.device_id, this.role_id)
 
-        let target = must_find_device(this.device_id)
+        // The target device must exist.
+        check exists Device[device_id: this.device_id]
 
-        // The role must exist.
-        let role = check_unwrap query Role[role_id: this.role_id]
-
+        // At this point we believe the following to be true:
+        //
+        // - `this.device_id` refers to a device that exists
+        // - `this.role_id` refers to a role that exists
+        // - `author` is not assigning the role to itself
+        // - `author` has the `AssignRole` permission
+        // - `author` is allowed to manage `this.role_id`
         finish {
-            create AssignedRole[device_id: target.device_id, role_id: role.role_id]=>{}
+            create AssignedRole[device_id: this.device_id]=>{role_id: this.role_id}
 
             emit RoleAssigned {
-                device_id: target.device_id,
-                role_id: role.role_id,
+                device_id: this.device_id,
+                role_id: this.role_id,
+                author_id: author.device_id,
+            }
+        }
+    }
+}
+```
+
+### Role Changing
+
+```policy
+// Changes a device's role.
+//
+// # Required Permissions
+//
+// - `RevokeRole` for the old role
+// - `AssignRole` for the new role
+action change_role(
+    device_id id,
+    old_role_id id,
+    new_role_id id,
+) {
+    publish ChangeRole {
+        device_id: device_id,
+        old_role_id: old_role_id,
+        new_role_id: new_role_id,
+    }
+}
+
+// Emitted when a device's role is changed.
+effect RoleChanged {
+    // The ID of the device whose role is being changed.
+    device_id id,
+    // The ID of the device's old role.
+    old_role_id id,
+    // The ID of the device's new role.
+    new_role_id id,
+    // The ID of the device that changed the device's role.
+    author_id id,
+}
+
+command ChangeRole {
+    fields {
+        // The ID of the device being assigned the role.
+        device_id id,
+        // The ID of the device's old role.
+        old_role_id id,
+        // The new role being assigned to the device.
+        new_role_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_author(envelope)
+
+        // Devices cannot assign roles to themselves.
+        check author.device_id != this.device_id
+
+        // TODO(eric): Should this just be a no-op?
+        check this.old_role_id != this.new_role_id
+
+        // The author must have permission to revoke the old role.
+        check exists Role[role_id: this.old_role_id]
+        check can_manage_role(author.device_id, this.old_role_id)
+        check device_has_perm(author.device_id, "RevokeRole")
+
+        // The author must have permission to revoke the old role.
+        check exists Role[role_id: this.new_role_id]
+        check can_manage_role(author.device_id, this.new_role_id)
+        check device_has_perm(author.device_id, "AssignRole")
+
+        // The target device must exist.
+        check exists Device[device_id: this.device_id]
+
+        // At this point we believe the following invariants to
+        // be true:
+        //
+        // - `this.old_role_id` and `this.new_role_id` are
+        //   different
+        // - `this.old_role_id` refers to a role that exists
+        // - `author` is allowed to manage `this.old_role_id`
+        // - `author` has the `RevokeRole` permission
+        // - `this.new_role_id` refers to a role that exists
+        // - `author` is allowed to manage `this.new_role_id`
+        // - `author` has the `AddRole` permission
+        finish {
+            update AssignedRole[device_id: this.device_id]=>{
+                role_id: this.old_role_id,
+            } to {
+                role_id: this.new_role_id,
+            }
+
+            emit RoleChange {
+                device_id: this.device_id,
+                new_role_id: this.new_role_id,
+                old_role_id: this.old_role_id,
                 author_id: author.device_id,
             }
         }
@@ -1179,6 +1321,10 @@ command AssignRole {
 
 ```policy
 // Revokes the specified role from the device.
+//
+// # Required Permissions
+//
+// - `RevokeRole`
 action revoke_role(device_id id, role_id id) {
     publish RevokeRole {
         device_id: device_id,
@@ -1210,24 +1356,21 @@ command RevokeRole {
     policy {
         check team_exists()
 
-        // Devices are authorized to revoke roles iff they have
-        // been assigned the managing role for the role being
-        // revoked. This negates the need for a "RevokeRole"
-        // operation. In fact, a "RevokeRole" operation would
-        // break role revocation since each operation requires
-        // exactly one role.
-        //
-        // TODO(eric): Is this analysis correct?
-        let author = get_possibly_unauthorized_device(envelope)
+        let author = get_author(envelope)
 
         // The author must have permission to revoke the role.
+        check device_has_perm(author.device_id, "RevokeRole")
         check can_manage_role(author.device_id, this.role_id)
 
-        let target = must_find_device(this.device_id)
+        // The target device must exist.
+        check exists Device[device_id: this.device_id]
 
-        // The role must exist.
-        let role = check_unwrap query Role[role_id: this.role_id]
-
+        // At this point we believe the following to be true:
+        //
+        // - `this.device_id` refers to a device that exists
+        // - `this.role_id` refers to a role that exists
+        // - `author` has the `RevokeRole` permission
+        // - `author` is allowed to manage `this.role_id`
         finish {
             delete AssignedRole[device_id: target.device_id, role_id: role.role_id]
 
@@ -1244,15 +1387,20 @@ command RevokeRole {
 ### Role Queries
 
 ```policy
-// Emits `QueryTeamRoles` for each role on the team.
+// Emits `QueryTreamRolesResult` for each role on the team.
 action query_team_roles() {
     map Role[role_id: ?] as f {
-        publish QueryTeamRoles { role_id: f.role_id }
+        publish QueryTeamRoles {
+            role_id: f.role_id,
+            name: f.name,
+            author_id: f.author_id,
+            default: f.default,
+        }
     }
 }
 
 // Emitted when a role is queried by `query_team_roles`.
-effect QueriedTeamRole {
+effect QueryTreamRolesResult {
     // The ID of the role.
     role_id id,
     // The name of the role.
@@ -1263,9 +1411,13 @@ effect QueriedTeamRole {
     default bool,
 }
 
+// A trampoline command to forward data to `QueryTreamRolesResult`.
 command QueryTeamRoles {
     fields {
         role_id id,
+        name string,
+        author_id id,
+        default bool,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -1274,10 +1426,8 @@ command QueryTeamRoles {
     policy {
         check team_exists()
 
-        let role = check_unwrap query Role[role_id: this.role_id]
-
         finish {
-            emit QueriedTeamRole {
+            emit QueryTreamRolesResult {
                 role_id: role.role_id,
                 name: role.name,
                 author_id: role.author_id,
@@ -1297,7 +1447,8 @@ Teams are the primary organizational unit in Aranya. Each graph
 is associated with exactly one team.
 
 ```policy
-// Indicates that `CreateTeam` has been published.
+// A singleton fact that indicates that `CreateTeam` has been
+// published.
 //
 // At first glance this fact is seemingly redundant, since the ID
 // of the `CreateTeam` command is the "graph ID," meaning without
@@ -1305,13 +1456,6 @@ is associated with exactly one team.
 //
 // However, this fact is required to ensure that we reject all
 // subsequent `CreateTeam` commands.
-//
-// INVARIANT: Empty key makes this a singleton - only one instance
-// can exist. This enforces:
-// - Only one team per graph
-// - Team creation fails if a team already exists
-// - Team termination is irreversible within the same graph
-// Fact type: Singleton (empty key)
 fact TeamStart[]=>{team_id id}
 
 // Reports whether the team exists.
@@ -1324,6 +1468,10 @@ function team_exists() bool {
 }
 
 // Returns the current team ID.
+//
+// # Errors
+//
+// This function raises a check error if the team does not exist.
 function team_id() id {
     let f = check_unwrap query TeamStart[]=>{team_id: ?}
     return f.team_id
@@ -1433,36 +1581,28 @@ command CreateTeam {
                 managing_role_id: owner_role_id,
             })
 
-            // Assign all the default operations to the owner
-            // role.
-            create OpRequiresRole[op: "AddDevice"]=>{role_id: owner_role_id}
-            create OpRequiresRole[op: "RemoveDevice"]=>{role_id: owner_role_id}
+            // Assign all of the administrative permissions to
+            // the owner role.
+            create RoleHasPerm[role_id: owner_role_id, perm: "AddDevice"]=>{}
+            create RoleHasPerm[role_id: owner_role_id, perm: "RemoveDevice"]=>{}
 
-            create OpRequiresRole[op: "CreateLabel"]=>{role_id: owner_role_id}
-            create OpRequiresRole[op: "DeleteLabel"]=>{role_id: owner_role_id}
+            create RoleHasPerm[role_id: owner_role_id, perm: "CreateLabel"]=>{}
+            create RoleHasPerm[role_id: owner_role_id, perm: "DeleteLabel"]=>{}
 
-            create OpRequiresRole[op: "AssignLabel"]=>{role_id: owner_role_id}
-            create OpRequiresRole[op: "RevokeLabel"]=>{role_id: owner_role_id}
+            create RoleHasPerm[role_id: owner_role_id, perm: "AssignLabel"]=>{}
+            create RoleHasPerm[role_id: owner_role_id, perm: "RevokeLabel"]=>{}
 
-            create OpRequiresRole[op: "SetAqcNetworkName"]=>{role_id: owner_role_id}
-            create OpRequiresRole[op: "UnsetAqcNetworkName"]=>{role_id: owner_role_id}
+            create RoleHasPerm[role_id: owner_role_id, perm: "SetAqcNetworkName"]=>{}
+            create RoleHasPerm[role_id: owner_role_id, perm: "UnsetAqcNetworkName"]=>{}
 
-            create OpRequiresRole[op: "AqcCreateBidiChannel"]=>{role_id: owner_role_id}
-            create OpRequiresRole[op: "AqcCreateUniChannel"]=>{role_id: owner_role_id}
-
-            create OpRequiresRole[op: "SetupDefaultRole"]=>{role_id: owner_role_id}
-            create OpRequiresRole[op: "ChangeLabelManagingRole"]=>{role_id: owner_role_id}
-
-            create OpRequiresRole[op: "UpdateOperation"]=>{role_id: owner_role_id}
-
-            create OpRequiresRole[op: "TerminateTeam"]=>{role_id: owner_role_id}
+            create RoleHasPerm[role_id: owner_role_id, perm: "SetupDefaultRole"]=>{}
+            create RoleHasPerm[role_id: owner_role_id, perm: "ChangeRoleManagingRole"]=>{}
+            create RoleHasPerm[role_id: owner_role_id, perm: "ChangeLabelManagingRole"]=>{}
+            create RoleHasPerm[role_id: owner_role_id, perm: "TerminateTeam"]=>{}
 
             // And now make sure that the owner has the owner
             // role, of course.
-            create AssignedRole[
-                device_id: author_id,
-                role_id: owner_role_id,
-            ]=>{}
+            create AssignedRole[device_id: author_id]=>{role_id: owner_role_id}
 
             // We don't have to emit the effects in a particular
             // order, but try to make it intuitive.
@@ -1486,7 +1626,6 @@ command CreateTeam {
                 role_id: owner_role_id,
                 author_id: author_id,
             }
-            // TODO(eric): emit OperationUpdated..?
         }
     }
 }
@@ -1496,7 +1635,7 @@ finish function add_new_device(
     kb struct KeyBundle,
     keys struct DevKeyIds,
 ) {
-    // TODO: check that `kb` matches `keys`.
+    // TODO(eric): check that `kb` matches `keys`.
 
     create Device[device_id: keys.device_id]=>{
         sign_key_id: keys.sign_key_id,
@@ -1522,8 +1661,14 @@ Teams can also be terminated with the `TerminateTeam` command.
 
 ```policy
 // Terminates a Team.
-action terminate_team() {
-    publish TerminateTeam {}
+//
+// # Required Permissions
+//
+// - `TerminateTeam`
+action terminate_team(team_id id) {
+    publish TerminateTeam {
+        team_id: team_id,
+    }
 }
 
 effect TeamTerminated {
@@ -1534,7 +1679,10 @@ effect TeamTerminated {
 }
 
 command TerminateTeam {
-    fields {}
+    fields {
+        // The ID of the team being terminated.
+        team_id id,
+    }
 
     seal { return seal_command(serialize(this)) }
     open { return deserialize(open_envelope(envelope)) }
@@ -1542,14 +1690,17 @@ command TerminateTeam {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "TerminateTeam")
-        let team_id = team_id()
+        let author = get_author(envelope)
+        check device_has_perm(author.device_id, "TerminateTeam")
 
+        // At this point we believe the following to be true:
+        //
+        // - `author` has the `TerminateTeam` permission
         finish {
             delete TeamStart[]=>{team_id: team_id}
 
             emit TeamTerminated {
-                team_id: team_id,
+                team_id: this.team_id,
                 owner_id: author.device_id,
             }
         }
@@ -1560,7 +1711,11 @@ command TerminateTeam {
 ### Adding Devices
 
 ```policy
-// Adds a device to the Team.
+// Adds a device to the team.
+//
+// # Required Permissions
+//
+// - `AddDevice`
 action add_device(device_keys struct KeyBundle) {
     publish AddDevice {
         device_keys: device_keys,
@@ -1587,13 +1742,14 @@ command AddDevice {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "AddDevice")
+        let author = get_author(envelope)
+        check device_has_perm(author.device_id, "AddDevice")
 
         let dev_key_ids = derive_device_key_ids(this.device_keys)
 
-        // The device must not already exist.
-        check try_find_device(dev_key_ids.device_id) is None
-
+        // At this point we believe the following to be true:
+        //
+        // - `author` has the `AddDevice` permission
         finish {
             add_new_device(this.device_keys, dev_key_ids)
 
@@ -1636,31 +1792,34 @@ command RemoveDevice {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "RemoveDevice")
-        let device_id = must_find_device(this.device_id).device_id
+        let author = get_author(envelope)
+        check device_has_perm(author.device_id, "RemoveDevice")
 
         // TODO(eric): check that author dominates target?
 
+        // At this point we believe the following to be true:
+        //
+        // - `author` has the `RemoveDevice` permission
+        // - `device_id` refers to a device that exists
         finish {
-            delete Device[device_id: device_id]
-            delete DeviceIdentKey[device_id: device_id]
-            delete DeviceSignKey[device_id: device_id]
-            delete DeviceEncKey[device_id: device_id]
+            delete Device[device_id: this.device_id]
+            delete DeviceIdentKey[device_id: this.device_id]
+            delete DeviceSignKey[device_id: this.device_id]
+            delete DeviceEncKey[device_id: this.device_id]
 
-            // TODO(eric): We can't delete these yet because the
+            // TODO(eric): We can't delete this yet because the
             // storage layer does not yet support prefix deletion.
             // See https://github.com/aranya-project/aranya-core/issues/229
             //
-            // delete AssignedRole[device_id: device_id, role_id: ?]
-            // delete AssignedLabel[label_id: ?, device_id: device_id]
+            // delete AssignedLabel[label_id: ?, device_id: this.device_id]
 
-            // TODO(eric): We *should* be deleting this, but we
-            // don'y really have a good way to do that yet.
+            // TODO(eric): We *should* be deleting these, but we
+            // don't really have a good way to delete "optional"
+            // facts yet.
             //
             // It is a runtime error to delete a non-existent
-            // fact and a device might not have this fact if it
-            // doesn't use AQC, so we have to conditionally
-            // delete `AqcNetId`.
+            // fact and a device might not have either of these
+            // facts, so we have to conditionally delete them.
             //
             // Policy v2 does not have a conditional version of
             // `delete`, so we can't use that.
@@ -1672,16 +1831,16 @@ command RemoveDevice {
             // duplicate the entire `finish` block:
             //
             // ```policy
-            // let has_net_id = exists AqcNetId[device_id: device_id]
-            // if has_net_id {
-            //     finish {
-            //         // Delete all the device facts.
-            //         delete AqcNetId[device_id: device_id]
-            //     }
+            // let has_role = exists AssignedRole[device_id: this.device_id]
+            // let has_net_id = exists AqcNetId[device_id: this.device_id]
+            // if has_role && has_net_id {
+            //     finish { ... }
+            // } else if has_role {
+            //     finish { ... }
+            // } else if has_net_id {
+            //     finish { ... }
             // } else {
-            //     finish {
-            //         // Delete all the device facts.
-            //     }
+            //     finish { ... }
             // }
             // ```
             //
@@ -1692,7 +1851,8 @@ command RemoveDevice {
             // So, we resign ourselves to leaving this stale
             // fact around.
             //
-            // delete AqcNetId[device_id: device_id]
+            // delete AssignedRole[device_id: this.device_id]
+            // delete AqcNetId[device_id: this.device_id]
 
             emit DeviceRemoved {
                 device_id: this.device_id,
@@ -1701,26 +1861,6 @@ command RemoveDevice {
     }
 }
 ```
-
-#### Technical Limitations
-
-Due to current storage layer limitations (see [issue
-#229](https://github.com/aranya-project/aranya-core/issues/229)),
-device removal cannot cascade delete the following facts:
-
-- `AssignedRole` facts (role assignments)
-- `AssignedLabel` facts (label assignments)
-- `AqcNetId` facts (network identifiers)
-
-These orphaned facts remain in the database but reference
-non-existent devices. This is a known limitation that will be
-addressed when the storage layer supports prefix deletion.
-
-**CRITICAL**: Until this is resolved, orphaned assignments remain
-in the database. When querying role or label assignments, you MUST
-first verify the device exists using `try_find_device()` or
-`must_find_device()`. Failing to do so could lead to security
-vulnerabilities by treating removed devices as active.
 
 ## AQC
 <!-- Section contains: Channel types, labels, network IDs, channel creation -->
@@ -1761,7 +1901,22 @@ function is_valid_psk_length(size int) bool {
 }
 
 // Returns the device's encoded public Encryption Key.
+//
+// # Caveats
+//
+// This function does not directly check whether the device
+// exists. However, it would be a very significant invariant
+// violation if a device's key existed without the device also
+// existing. See `valid_device_invariants`.
 function get_enc_pk(device_id id) bytes {
+    // This function is a little too expensive to call every
+    // time we need to get a device, so only uncomment this when
+    // debugging/developing.
+    //
+    // See the comment in `try_find_device`.
+    //
+    // check valid_device_invariants(device_id)
+
     let device_enc_pk = check_unwrap query DeviceEncKey[device_id: device_id]
     return device_enc_pk.key
 }
@@ -1831,68 +1986,74 @@ revoke the label from **other** devices.
 
 #### Label Management
 
-As previously mentioned, each label is managed by a role, called
-the label's _managing role_. Devices that have been assigned the
-managing role are allowed to assign the label to *any* other
-device as well as revoke the label from *any* other device.
-Devices are prohibited from assigning labels to or revoking
-labels from themselves.
+As previously mentioned, each label is managed by zero or more
+roles, called the label's _managing roles_. A device that has
+been assigned one of the managing roles is allowed to do some or
+all of the following:
+
+- Assign the label to *any* device that is allowed to use AQC,
+  except itself
+- Revoke the label from *any* device
 
 ```policy
+// Grants devices who have been assigned the managing role
+// permission to "manage" the target label.
+fact CanManageLabel[label_id id, managing_role_id id]=>{}
 
-// Records that a particular role is required in order to grant
-// *other* devices permission to use the label.
+// Reports whether the device is allowed to manage the label.
 //
-// Devices with the role are allowed to grant any *other* device
-// permission to use the label. Devices cannot grant themselves
-// permission to use the label, even if they have the requisite
-// role.
-fact CanManageLabel[label_id id]=>{managing_role_id id}
-
-// Reports whether the device can assign the label.
+// # Errors
+//
+// # Caveats
+//
+// - This function does NOT check whether the device exists.
+// - This function does NOT check whether the label exists.
 function can_manage_label(device_id id, label_id id) bool {
-    let managing_role = query CanManageLabel[label_id: label_id]
-    if managing_role is None {
-        return false
-    }
-    let role_id = (unwrap managing_role).managing_role_id
-    return exists AssignedRole[device_id: device_id, role_id: role_id]
+    let device_role_id = check_unwrap get_assigned_role_id(device_id)
+
+    // At this point we believe the following to be true:
+    //
+    // - `device_role_id` refers to a role that exists
+    // - `device_role_id` refers to the role assigned to
+    //   `device_id`
+    //
+    // We do NOT know whether `device_id` refers to a device
+    // that exists.
+    //
+    // We do NOT know whether `label_id` refers to a label that
+    // exists.
+    return exists CanManageLabel[
+        label_id: label_id,
+        managing_role_id: device_role_id,
+    ]
 }
 
-// Changes the role required to grant *other* devices permission
-// to use the label.
+// Adds a new role that can manage the label.
 //
-// Devices with the role are allowed to grant any *other* device
-// permission to use the label. Devices cannot grant themselves
-// permission to use the label, even if they have the requisite
-// role.
-action change_label_managing_role(label_id id, managing_role_id id) {
-    publish ChangeLabelManagingRole {
+// # Required Permissions
+//
+// - `CanManageLabel`
+action add_label_managing_role(label_id id, managing_role_id id) {
+    publish AddLabelManagingRole {
         label_id: label_id,
         managing_role_id: managing_role_id,
     }
 }
 
-// Emitted when the `ChangeLabelManagingRole` command is
-// successfully processed.
-effect LabelUpdated {
-    // Uniquely identifies the label.
+effect LabelManagingRoleAdded {
+    // The ID of the label that was updated.
     label_id id,
-    // The label name.
-    label_name string,
-    // The ID of the device that created the label.
-    label_author_id id,
-    // The ID of the role required to grant *other* devices
-    // permission to use the label.
+    // The ID of the role that can manage the label.
     managing_role_id id,
+    // The ID of the device that added the managing role.
+    author_id id,
 }
 
-command ChangeLabelManagingRole {
+command AddLabelManagingRole {
     fields {
         // The label to update.
         label_id id,
-        // The ID of the role required to grant *other* devices
-        // permission to use the label.
+        // The ID of the role that can manage the label.
         managing_role_id id,
     }
 
@@ -1902,36 +2063,87 @@ command ChangeLabelManagingRole {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "ChangeLabelManagingRole")
+        let author = get_author(envelope)
+        check can_manage_label(author.device_id, this.label_id)
+        check device_has_perm(author.device_id, "AddLabelManagingRole")
 
-        let label = check_unwrap query Label[label_id: this.label_id]
+        // The label must exist, otherwise we might create
+        // `CanManageLabel` for a non-existent label.
+        check exists Label[label_id: this.label_id]
 
-        // Only the author of the label is allowed to change the
-        // managing role.
+        // At this point we believe the following to be true:
         //
-        // TODO(eric): Or how about just if you have the managing
-        // role then you can change the managing role for the
-        // label?
-        check author.device_id == label.author_id
-
-        let ctx = check_unwrap query CanManageLabel[label_id: label.label_id]
-        let old_managing_role_id = ctx.managing_role_id
-
-        // Make sure the role exists.
-        let role = check_unwrap query Role[role_id: this.managing_role_id]
-        let new_managing_role_id = this.managing_role_id
-
+        // - `author` has the `AddLabelManagingRole` permission
+        // - `author` is allowed to manage `this.label_id`
+        // - `this.label_id` refers to a label that exists
         finish {
-            update CanManageLabel[label_id: label.label_id]=>{
-                managing_role_id: old_managing_role_id,
-            } to {
-                managing_role_id: new_managing_role_id,
-            }
-            emit LabelUpdated {
+            create CanManageLabel
                 label_id: label.label_id,
-                label_name: label.name,
-                label_author_id: label.author_id,
                 managing_role_id: new_managing_role_id,
+            ]=>{}
+            emit LabelManagingRoleAdded {
+                label_id: this.label_id,
+                managing_role_id: this.managing_role_id,
+                author_id: author.device_id,
+            }
+        }
+    }
+}
+
+// Revokes a label's managing role.
+//
+// # Required Permissions
+//
+// - `RevokeLabelManagingRole`
+action revoke_label_managing_role(label_id id, managing_role_id id) {
+    publish RevokeLabelManagingRole {
+        label_id: label_id,
+        managing_role_id: managing_role_id,
+    }
+}
+
+// Emitted when a label's managing role is revoked.
+effect LabelManagingRoleRevoked {
+    // The ID of the label that was updated.
+    label_id id,
+    // The ID of the role that was revoked.
+    managing_role_id id,
+    // The ID of the device that revoked the managing role.
+    author_id id,
+}
+
+command RevokeLabelManagingRole {
+    fields {
+        // The label to update.
+        label_id id,
+        // The ID of the role being revoked.
+        managing_role_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_author(envelope)
+        check can_manage_label(author.device_id, this.label_id)
+        check device_has_perm(author.device_id, "RevokeLabelManagingRole")
+
+        // At this point we believe the following to be true:
+        //
+        // - `author` has the `RevokeLabelManagingRole` permission
+        // - `author` is allowed to manage `this.label_id`
+        finish {
+            delete CanManageLabel[
+                label_id: this.label_id,
+                managing_role_id: this.managing_role_id,
+            ]
+
+            emit LabelManagingRoleRevoked {
+                label_id: this.label_id,
+                managing_role_id: this.managing_role_id,
+                author_id: author.device_id,
             }
         }
     }
@@ -1948,6 +2160,10 @@ command ChangeLabelManagingRole {
 // - `managing_role_id` specifies the ID of the role required to
 //    grant other devices permission to use the label. Devices
 //    are never allowed to assign labels to themselves.
+//
+// # Required Permissions
+//
+// - `CreateLabel`
 action create_label(name string, managing_role_id id) {
     publish CreateLabel {
         label_name: name,
@@ -1964,8 +2180,7 @@ effect LabelCreated {
     label_name string,
     // The ID of the device that created the label.
     label_author_id id,
-    // The ID of the role required to grant *other* devices
-    // permission to use the label.
+    // The ID of the role required to manage the label.
     managing_role_id id,
 }
 
@@ -1973,8 +2188,7 @@ command CreateLabel {
     fields {
         // The label name.
         label_name string,
-        // The ID of the role required to grant *other* devices
-        // permission to use the label.
+        // The ID of the role required to manage the label.
         managing_role_id id,
     }
 
@@ -1984,23 +2198,27 @@ command CreateLabel {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "CreateLabel")
+        let author = get_author(envelope)
+        check device_has_perm(author.device_id, "CreateLabel")
 
         // A label's ID is the ID of the command that created it.
         let label_id = derive_label_id(envelope)
 
-        let role = check_unwrap query Role[role_id: this.managing_role_id]
+        check exists Role[role_id: this.managing_role_id]
 
-        // Verify that the label does not already exist.
+        // At this point we believe the following to be true:
         //
-        // This will happen in the `finish` block if we try to
-        // create an already true label, but checking first
-        // results in a nicer error (I think?).
-        check !exists Label[label_id: label_id]
-
+        // - `author` has the `CreateLabel` permission
+        // - `this.role_id` refers to a role that exists
         finish {
-            create Label[label_id: label_id]=>{name: this.label_name, author_id: author.device_id}
-            create CanManageLabel[label_id: label_id]=>{managing_role_id: role.role_id}
+            create Label[label_id: label_id]=>{
+                name: this.label_name,
+                author_id: author.device_id,
+            }
+            create CanManageLabel[
+                label_id: label_id,
+                managing_role_id: this.role_id,
+            ]=>{}
 
             emit LabelCreated {
                 label_id: label_id,
@@ -2020,6 +2238,10 @@ granted permission to use it.
 
 ```policy
 // Deletes a label.
+//
+// # Required Permissions
+//
+// - `DeleteLabel`
 action delete_label(label_id id) {
     publish DeleteLabel {
         label_id: label_id,
@@ -2051,24 +2273,21 @@ command DeleteLabel {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "DeleteLabel")
-
-        // Verify that the label exists.
-        //
-        // This will happen in the `finish` block if we try to
-        // create an already true label, but checking first
-        // results in a nicer error (I think?).
-        let label = check_unwrap query Label[label_id: this.label_id]
-
-        // The author must have been granted permission to manage
-        // this label.
+        let author = get_author(envelope)
+        check device_has_perm(author.device_id, "DeleteLabel")
         check can_manage_label(author.device_id, label.label_id)
 
+        // At this point we believe the following to be true:
+        //
+        // - `author` has the `DeleteLabel` permission
+        // - `author` is allowed to manage `this.label_id`
         finish {
-            // Cascade deleting the label assignments.
-            delete AssignedLabel[label_id: label.label_id, device_id: ?]
-
-            delete CanManageLabel[label_id: label.label_id]
+            // TODO(eric): We can't delete these yet because the
+            // storage layer does not yet support prefix deletion.
+            // See https://github.com/aranya-project/aranya-core/issues/229
+            //
+            // delete AssignedLabel[label_id: label.label_id, device_id: ?]
+            // delete CanManageLabel[label_id: label.label_id, managing_role_id: ?]
 
             delete Label[label_id: label.label_id]
 
@@ -2090,10 +2309,6 @@ A device can be assigned zero or more labels.
 ```policy
 // Records that a device was granted permission to use a label
 // for certain channel operations.
-//
-// INVARIANT: Composite key ensures each label-device pair is unique.
-// A device can have only one permission type (SendOnly, RecvOnly,
-// or SendRecv) per label.
 fact AssignedLabel[label_id id, device_id id]=>{op enum ChanOp}
 ```
 
@@ -2108,6 +2323,10 @@ fact AssignedLabel[label_id id, device_id id]=>{op enum ChanOp}
 // - It is an error if the label does not exist.
 // - It is an error if the device has already been granted
 //   permission to use this label.
+//
+// # Required Permissions
+//
+// - `AssignLabel`
 action assign_label(device_id id, label_id id, op enum ChanOp) {
     publish AssignLabel {
         device_id: device_id,
@@ -2146,31 +2365,31 @@ command AssignLabel {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "AssignLabel")
-        let target = must_find_device(this.device_id)
+        let author = get_author(envelope)
 
         // Devices are never allowed to assign labels to
         // themselves.
         //
         // Perform this check before we make more fact database
         // queries.
-        check target.device_id != author.device_id
+        check author.device_id != this.device_id
 
-        // The label must exist.
-        let label = check_unwrap query Label[label_id: this.label_id]
+        check device_has_perm(author.device_id, "AssignLabel")
+        check can_manage_label(author.device_id, this.label_id)
 
-        // The author must have been granted permission to manage
-        // this label.
-        check can_manage_label(author.device_id, label.label_id)
+        // The target device must exist, otherwise we'll create
+        // an `AssignedLabel` fact for a device that that does
+        // not exist.
+        check exists Device[device_id: this.device_id]
+        // Ditto for the label.
+        check exists Label[label_id: this.label_id]
 
-        // Verify that the device has not already been granted
-        // permission to use the label.
+        // At this point we believe the following to be true:
         //
-        // This will happen in the `finish` block if we try to
-        // create an already true label, but checking first
-        // results in a nicer error (I think?).
-        check !exists AssignedLabel[label_id: label.label_id, device_id: target.device_id]
-
+        // - `author` has the `AssignLabel` permission
+        // - `author` is allowed to manage `this.label_id`
+        // - `this.device_id` refers to a device that exists
+        // - `this.label_id` refers to a label that exists
         finish {
             create AssignedLabel[label_id: label.label_id, device_id: target.device_id]=>{op: this.op}
 
@@ -2194,6 +2413,10 @@ command AssignLabel {
 // - It is an error if the label does not exist.
 // - It is an error if the device has not been granted permission
 //   to use this label.
+//
+// # Required Permissions
+//
+// - `RevokeLabel`
 action revoke_label(device_id id, label_id id) {
     publish RevokeLabel {
         device_id: device_id,
@@ -2228,24 +2451,14 @@ command RevokeLabel {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "RevokeLabel")
-        let target = must_find_device(this.device_id)
+        let author = get_author(envelope)
+        check can_manage_label(author.device_id, this.label_id)
+        check device_has_perm(author.device_id, "RevokeLabel")
 
-        // The label must exist.
-        let label = check_unwrap query Label[label_id: this.label_id]
-
-        // The author must have been granted permission to manage
-        // this label.
-        check can_manage_label(author.device_id, label.label_id)
-
-        // Verify that the device has been granted permission to
-        // use the label.
+        // At this point we believe the following to be true:
         //
-        // This will happen in the `finish` block if we try to
-        // create an already true label, but checking first
-        // results in a nicer error (I think?).
-        check exists AssignedLabel[label_id: label.label_id, device_id: target.device_id]
-
+        // - `author` has the `RevokeLabel` permission
+        // - `author` is allowed to manage `this.label_id`
         finish {
             delete AssignedLabel[label_id: label.label_id, device_id: target.device_id]
 
@@ -2262,20 +2475,30 @@ command RevokeLabel {
 
 #### Label Queries
 
-These queries publish ephemeral commands whose sole purpose is to
-emit effects. It's a hack around defining a real query API in
-policy, which is a post-MVP feature.
+Label queries retrieve information about labels on the team.
+
+See [Query APIs][query-apis] for more information about the query
+APIs.
 
 ##### Query Label Exists
 
 Queries whether a label exists.
 
 ```policy
-// Emits `LabelExistsResult` for label if it exists.
+// Emits `QueryLabelExistsResult` for the label.
 action query_label_exists(label_id id) {
     publish QueryLabelExists {
         label_id: label_id,
     }
+}
+
+effect QueryLabelExistsResult {
+    // The label's unique ID.
+    label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
 }
 
 command QueryLabelExists {
@@ -2289,7 +2512,6 @@ command QueryLabelExists {
     policy {
         check team_exists()
 
-        // Get label if it exists
         let label = check_unwrap query Label[label_id: this.label_id]
 
         finish {
@@ -2300,15 +2522,6 @@ command QueryLabelExists {
             }
         }
     }
-}
-
-effect QueryLabelExistsResult {
-    // The label's unique ID.
-    label_id id,
-    // The label name.
-    label_name string,
-    // The ID of the device that created the label.
-    label_author_id id,
 }
 ```
 
@@ -2328,6 +2541,16 @@ action query_labels() {
     }
 }
 
+effect QueriedLabel {
+    // The label's unique ID.
+    label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
+}
+
+// Trampoline to forward info to `QueriedLabel`
 command QueryLabel {
     fields {
         label_id id,
@@ -2350,15 +2573,6 @@ command QueryLabel {
         }
     }
 }
-
-effect QueriedLabel {
-    // The label's unique ID.
-    label_id id,
-    // The label name.
-    label_name string,
-    // The ID of the device that created the label.
-    label_author_id id,
-}
 ```
 
 ##### Query Label Assignments
@@ -2366,11 +2580,11 @@ effect QueriedLabel {
 Queries for a list labels assigned to a device.
 
 ```policy
-// Emits `QueriedLabelAssignment` for all labels the device has
-// been granted permission to use.
+// Emits `QueryLabelAssignmentsResult` for all labels the device
+// has been granted permission to use.
 action query_label_assignments(device_id id) {
-    // TODO: make this query more efficient when policy supports it.
-    // The key order is optimized for `delete AssignedLabel`.
+    // TODO: make this query more efficient when policy supports
+    // it. The key order is optimized for `delete AssignedLabel`.
     map AssignedLabel[label_id: ?, device_id: ?] as f {
         if f.device_id == device_id {
             let label = check_unwrap query Label[label_id: f.label_id]
@@ -2382,6 +2596,17 @@ action query_label_assignments(device_id id) {
             }
         }
     }
+}
+
+effect QueryLabelAssignmentsResult {
+    // The device's unique ID.
+    device_id id,
+    // The label's unique ID.
+    label_id id,
+    // The label name.
+    label_name string,
+    // The ID of the device that created the label.
+    label_author_id id,
 }
 
 command QueryLabelAssignment {
@@ -2399,7 +2624,7 @@ command QueryLabelAssignment {
         check team_exists()
 
         finish {
-            emit QueriedLabelAssignment {
+            emit QueryLabelAssignmentsResult {
                 device_id: this.device_id,
                 label_id: this.label_id,
                 label_name: this.label_name,
@@ -2407,17 +2632,6 @@ command QueryLabelAssignment {
             }
         }
     }
-}
-
-effect QueriedLabelAssignment {
-    // The device's unique ID.
-    device_id id,
-    // The label's unique ID.
-    label_id id,
-    // The label name.
-    label_name string,
-    // The ID of the device that created the label.
-    label_author_id id,
 }
 ```
 
@@ -2431,6 +2645,10 @@ a _network identifier_.
 fact AqcNetId[device_id id]=>{net_id string}
 
 // Returns the device's AQC network identifier, if it exists.
+//
+// # Caveats
+//
+// This function does NOT check whether the device exists.
 function aqc_net_id(device_id id) optional string {
     let f = query AqcNetId[device_id: device_id]
     if f is Some {
@@ -2442,6 +2660,11 @@ function aqc_net_id(device_id id) optional string {
 // TODO(eric): Why do we call it both a "network ID" and
 // "network name"?
 
+// Sets the device's AQC network name.
+//
+// # Required Permissions
+//
+// - `SetAqcNetworkName`
 action set_aqc_network_name(device_id id, net_id string) {
     publish SetAqcNetworkName {
         device_id: device_id,
@@ -2449,8 +2672,11 @@ action set_aqc_network_name(device_id id, net_id string) {
     }
 }
 
+// Emitted when a device's AQC network name is set.
 effect AqcNetworkNameSet {
+    // The ID of the device whose network name was set.
     device_id id,
+    // The network name that was set.
     net_id string,
 }
 
@@ -2467,8 +2693,8 @@ command SetAqcNetworkName {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "SetAqcNetworkName")
-        let device = must_find_device(this.device_id)
+        let author = get_author(envelope)
+        let device = get_device(this.device_id)
 
         let opt_net_id = aqc_net_id(this.device_id)
 
@@ -2524,8 +2750,8 @@ command UnsetAqcNetworkName {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "UnsetAqcNetworkName")
-        let device = must_find_device(this.device_id)
+        let author = get_author(envelope)
+        let device = get_device(this.device_id)
 
         check exists AqcNetId[device_id: this.device_id]
 
@@ -2585,7 +2811,7 @@ Creates a bidirectional AQC channel for off-graph messaging.
 action create_aqc_bidi_channel(peer_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
     let author_id = device::current_device_id()
-    let author = must_find_device(author_id)
+    let author = get_device(author_id)
     let peer_enc_pk = get_enc_pk(peer_id)
 
     let ch = aqc::create_bidi_channel(
@@ -2724,8 +2950,8 @@ command AqcCreateBidiChannel {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "AqcCreateBidiChannel")
-        let peer = must_find_device(this.peer_id)
+        let author = get_author(envelope)
+        let peer = get_device(this.peer_id)
 
         check is_valid_psk_length(this.psk_length_in_bytes)
 
@@ -2789,7 +3015,7 @@ Creates a unidirectional AQC channel for off-graph messaging.
 ```policy
 action create_aqc_uni_channel(sender_id id, receiver_id id, label_id id) {
     let parent_cmd_id = perspective::head_id()
-    let author = must_find_device(device::current_device_id())
+    let author = get_device(device::current_device_id())
     let peer_id = select_peer_id(author.device_id, sender_id, receiver_id)
     let peer_enc_pk = get_enc_pk(peer_id)
 
@@ -2905,7 +3131,7 @@ command AqcCreateUniChannel {
     policy {
         check team_exists()
 
-        let author = get_authorized_device(envelope, "AqcCreateUniChannel")
+        let author = get_author(envelope)
 
         // Ensure that the author is one of the channel
         // participants.
@@ -3047,7 +3273,7 @@ command QueryAqcNetIdentifier {
 
         // Check that the team is active and return the author's
         // info if they exist in the team.
-        let author = must_find_device(this.device_id)
+        let author = get_device(this.device_id)
         let net_id = aqc_net_id(author.device_id)
 
         finish {

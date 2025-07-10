@@ -496,8 +496,22 @@ impl Client {
         })
     }
 
+    /// Generate random bytes from a CSPRNG.
+    /// Can be used to generate IKM for a generating a PSK seed.
+    pub async fn rand(&self, buf: &mut [u8]) {
+        <Rng as Csprng>::fill_bytes(&mut Rng, buf);
+    }
+
+    /// Get an existing team.
+    pub fn team(&self, team_id: TeamId) -> Team<'_> {
+        Team {
+            client: self,
+            id: team_id.into_api(),
+        }
+    }
+
     /// Add a team to the local device store.
-    pub async fn add_team(&mut self, team: TeamId, cfg: TeamConfig) -> Result<()> {
+    pub async fn add_team(&self, team: TeamId, cfg: TeamConfig) -> Result<()> {
         self.daemon
             .add_team(context::current(), team.into_api(), cfg.into())
             .await
@@ -506,26 +520,12 @@ impl Client {
     }
 
     /// Remove a team from local device storage.
-    pub async fn remove_team(&mut self, team_id: TeamId) -> Result<()> {
+    pub async fn remove_team(&self, team_id: TeamId) -> Result<()> {
         self.daemon
             .remove_team(context::current(), team_id.into_api())
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)
-    }
-
-    /// Get an existing team.
-    pub fn team(&mut self, id: TeamId) -> Team<'_> {
-        Team {
-            client: self,
-            id: id.into_api(),
-        }
-    }
-
-    /// Generate random bytes from a CSPRNG.
-    /// Can be used to generate IKM for a generating a PSK seed.
-    pub async fn rand(&self, buf: &mut [u8]) {
-        <Rng as Csprng>::fill_bytes(&mut Rng, buf);
     }
 
     /// Get access to Aranya QUIC Channels.
@@ -534,7 +534,7 @@ impl Client {
     }
 
     /// Get access to fact database queries.
-    pub fn queries(&mut self, id: TeamId) -> Queries<'_> {
+    pub fn queries(&self, id: TeamId) -> Queries<'_> {
         Queries {
             client: self,
             id: id.into_api(),
@@ -577,7 +577,7 @@ impl Team<'_> {
     /// `peer_enc_pk` is the public encryption key of the peer device.
     /// See [`KeyBundle::encoding`].
     #[instrument(skip(self))]
-    pub async fn encrypt_psk_seed_for_peer(&mut self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
+    pub async fn encrypt_psk_seed_for_peer(&self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
             .context("bad peer_enc_pk")
             .map_err(error::other)?;
@@ -594,7 +594,7 @@ impl Team<'_> {
 
     /// Adds a peer for automatic periodic Aranya state syncing.
     #[instrument(skip(self))]
-    pub async fn add_sync_peer(&mut self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
+    pub async fn add_sync_peer(&self, addr: Addr, config: SyncPeerConfig) -> Result<()> {
         self.client
             .daemon
             .add_sync_peer(context::current(), addr, self.id, config.into())
@@ -608,7 +608,7 @@ impl Team<'_> {
     /// If `config` is `None`, default values (including those from the daemon) will
     /// be used.
     #[instrument(skip(self))]
-    pub async fn sync_now(&mut self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
+    pub async fn sync_now(&self, addr: Addr, cfg: Option<SyncPeerConfig>) -> Result<()> {
         self.client
             .daemon
             .sync_now(context::current(), addr, self.id, cfg.map(Into::into))
@@ -619,7 +619,7 @@ impl Team<'_> {
 
     /// Removes a peer from automatic Aranya state syncing.
     #[instrument(skip(self))]
-    pub async fn remove_sync_peer(&mut self, addr: Addr) -> Result<()> {
+    pub async fn remove_sync_peer(&self, addr: Addr) -> Result<()> {
         self.client
             .daemon
             .remove_sync_peer(context::current(), addr, self.id)
@@ -630,7 +630,7 @@ impl Team<'_> {
 
     /// Close the team and stop all operations on the graph.
     #[instrument(skip(self))]
-    pub async fn close_team(&mut self) -> Result<()> {
+    pub async fn close_team(&self) -> Result<()> {
         self.client
             .daemon
             .close_team(context::current(), self.id)
@@ -643,7 +643,7 @@ impl Team<'_> {
     // TODO(eric): why does this have a "_to_team" suffix when
     // it's a method on `Team`?
     #[instrument(skip(self, initial_roles))]
-    pub async fn add_device_to_team<I>(&mut self, keys: KeyBundle, initial_roles: I) -> Result<()>
+    pub async fn add_device_to_team<I>(&self, keys: KeyBundle, initial_roles: I) -> Result<()>
     where
         I: IntoIterator<Item = RoleId>,
     {
@@ -662,7 +662,7 @@ impl Team<'_> {
 
     /// Remove a device from the team.
     #[instrument(skip(self))]
-    pub async fn remove_device_from_team(&mut self, device: DeviceId) -> Result<()> {
+    pub async fn remove_device_from_team(&self, device: DeviceId) -> Result<()> {
         self.client
             .daemon
             .remove_device_from_team(context::current(), self.id, device.into_api())
@@ -678,7 +678,7 @@ impl Team<'_> {
     ///
     /// It returns the newly created roles.
     #[instrument(skip(self))]
-    pub async fn setup_default_roles(&mut self, managing_role_id: RoleId) -> Result<Roles> {
+    pub async fn setup_default_roles(&self, managing_role_id: RoleId) -> Result<Roles> {
         let roles = self
             .client
             .daemon
@@ -698,7 +698,7 @@ impl Team<'_> {
 
     /// Assigns a role to a device.
     #[instrument(skip(self))]
-    pub async fn assign_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
+    pub async fn assign_role(&self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
             .daemon
             .assign_role(
@@ -714,7 +714,7 @@ impl Team<'_> {
 
     /// Revoke a role from a device.
     #[instrument(skip(self))]
-    pub async fn revoke_role(&mut self, device: DeviceId, role: RoleId) -> Result<()> {
+    pub async fn revoke_role(&self, device: DeviceId, role: RoleId) -> Result<()> {
         self.client
             .daemon
             .revoke_role(
@@ -731,7 +731,7 @@ impl Team<'_> {
     /// Changes the role that is required to manage `role`.
     #[instrument(skip(self))]
     pub async fn change_role_managing_role(
-        &mut self,
+        &self,
         role: RoleId,
         managing_role_id: RoleId,
     ) -> Result<()> {
@@ -750,7 +750,7 @@ impl Team<'_> {
 
     /// Returns an iterator over the roles in the team.
     #[instrument(skip(self))]
-    pub async fn roles(&mut self) -> Result<Roles> {
+    pub async fn roles(&self) -> Result<Roles> {
         let roles = self
             .client
             .daemon
@@ -775,7 +775,7 @@ impl Team<'_> {
     /// OpenChannel and receiving messages. Can take either DNS name or IPV4.
     #[instrument(skip(self, net_identifier))]
     pub async fn assign_aqc_net_identifier<I>(
-        &mut self,
+        &self,
         device: DeviceId,
         net_identifier: I,
     ) -> Result<()>
@@ -801,7 +801,7 @@ impl Team<'_> {
     /// Disassociate an AQC network identifier from a device.
     #[instrument(skip(self, net_identifier))]
     pub async fn remove_aqc_net_identifier<I>(
-        &mut self,
+        &self,
         device: DeviceId,
         net_identifier: I,
     ) -> Result<()>
@@ -826,11 +826,7 @@ impl Team<'_> {
 
     /// Create a label.
     #[instrument(skip(self, label_name))]
-    pub async fn create_label<T>(
-        &mut self,
-        label_name: T,
-        managing_role_id: RoleId,
-    ) -> Result<LabelId>
+    pub async fn create_label<T>(&self, label_name: T, managing_role_id: RoleId) -> Result<LabelId>
     where
         T: TryInto<Text>,
     {
@@ -853,7 +849,7 @@ impl Team<'_> {
 
     /// Delete a label.
     #[instrument(skip(self))]
-    pub async fn delete_label(&mut self, label_id: LabelId) -> Result<()> {
+    pub async fn delete_label(&self, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
             .delete_label(context::current(), self.id, label_id.into_api())
@@ -886,7 +882,7 @@ impl Team<'_> {
 
     /// Revoke a label from a device.
     #[instrument(skip(self))]
-    pub async fn revoke_label(&mut self, device: DeviceId, label_id: LabelId) -> Result<()> {
+    pub async fn revoke_label(&self, device: DeviceId, label_id: LabelId) -> Result<()> {
         self.client
             .daemon
             .revoke_label(
@@ -911,7 +907,7 @@ impl Team<'_> {
 
 #[derive(Debug)]
 pub struct Queries<'a> {
-    client: &'a mut Client,
+    client: &'a Client,
     id: api::TeamId,
 }
 
@@ -961,7 +957,7 @@ impl Queries<'_> {
     // TODO(eric): documented whether this returns `None` if the
     // device does not exist or if the device exists but does not
     // have a net ID.
-    pub async fn aqc_net_identifier(&mut self, device: DeviceId) -> Result<Option<NetIdentifier>> {
+    pub async fn aqc_net_identifier(&self, device: DeviceId) -> Result<Option<NetIdentifier>> {
         let id = self
             .client
             .daemon
@@ -1002,7 +998,7 @@ impl Queries<'_> {
 /// Represents an Aranya device
 #[derive(Debug)]
 pub struct Device<'a> {
-    client: &'a mut Client,
+    client: &'a Client,
     id: api::DeviceId,
     team_id: api::TeamId,
 }
@@ -1014,7 +1010,7 @@ impl Device<'_> {
     }
 
     /// Returns all roles assigned to the device.
-    pub async fn roles(&mut self) -> Result<Roles> {
+    pub async fn roles(&self) -> Result<Roles> {
         let roles = self
             .client
             .daemon

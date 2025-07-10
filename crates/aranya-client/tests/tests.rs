@@ -87,7 +87,7 @@ async fn test_sync_now() -> Result<()> {
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_remove_devices() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
-    let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
+    let team = TeamCtx::new("test_query_functions", work_dir).await?;
 
     let team_id = team
         .create_and_add_team()
@@ -95,13 +95,20 @@ async fn test_remove_devices() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
+    let owner = team.owner.client.team(team_id);
+    let admin = team.admin.client.team(team_id);
+    let operator = team.operator.client.team(team_id);
+
     team.add_all_sync_peers(team_id)
         .await
         .context("unable to add all sync peers")?;
 
-    team.owner
-        .client
-        .team(team_id)
+    // Add the initial admin.
+    //
+    // We have to do this before we set up the default roles
+    // since `setup_default_roles` removes the owner's ability to
+    // add devices to the team.
+    owner
         .add_device_to_team(team.admin.pk.clone(), None)
         .await
         .context("owner should be able to add admin to team")?;
@@ -116,11 +123,7 @@ async fn test_remove_devices() -> Result<()> {
         .await
         .context("unable to setup default roles")?;
 
-    let mut owner = team.owner.client.team(team_id);
-    let mut admin = team.admin.client.team(team_id);
-    let mut operator = team.operator.client.team(team_id);
-
-    // The owner
+    // The owner assigns the admin role to the admin.
     owner.assign_role(team.admin.id, roles.admin().id).await?;
 
     owner

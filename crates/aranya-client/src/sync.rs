@@ -17,8 +17,8 @@ impl SeedMode {
     }
 
     #[doc(hidden)]
-    pub const fn from_ikm(ikm: [u8; SEED_IKM_SIZE]) -> Self {
-        Self(api::SeedMode::IKM(ikm))
+    pub fn from_ikm(ikm: [u8; SEED_IKM_SIZE]) -> Self {
+        Self(api::SeedMode::IKM(ikm.into()))
     }
 
     #[doc(hidden)]

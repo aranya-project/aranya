@@ -296,6 +296,7 @@ pub trait ActorExt {
         new_managing_role_id: Id,
     ) -> Result<(), ClientError>;
     fn setup_default_roles(&mut self, managing_role_id: Id) -> Result<(), ClientError>;
+    fn setup_default_permissions(&mut self, role_id: Id) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn query_team_roles(&mut self) -> Result<(), ClientError>;

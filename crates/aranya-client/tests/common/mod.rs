@@ -54,7 +54,7 @@ impl TeamCtx {
         })
     }
 
-    pub(super) fn devices_mut(&mut self) -> [&mut DeviceCtx; 5] {
+    fn devices(&self) -> [&DeviceCtx; 5] {
         [
             &self.owner,
             &self.admin,
@@ -65,12 +65,13 @@ impl TeamCtx {
     }
 
     #[instrument(skip(self))]
-    pub async fn add_all_sync_peers(&mut self, team_id: TeamId) -> Result<()> {
+    pub async fn add_all_sync_peers(&self, team_id: TeamId) -> Result<()> {
         let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
-        let mut devices = self.devices_mut();
-        for i in 0..devices.len() {
-            let (device, peers) = devices[i..].split_first_mut().expect("expected device");
-            for peer in peers {
+        for device in self.devices() {
+            for peer in self.devices() {
+                if ptr::eq(device, peer) {
+                    continue;
+                }
                 device
                     .client
                     .team(team_id)
@@ -84,7 +85,7 @@ impl TeamCtx {
     /// NB: This includes the owner role, which is not returned
     /// by [`Client::setup_default_roles`].
     #[instrument(skip(self))]
-    pub async fn setup_default_roles(&mut self, team_id: TeamId) -> Result<DefaultRoles> {
+    pub async fn setup_default_roles(&self, team_id: TeamId) -> Result<DefaultRoles> {
         let owner_role = self
             .owner
             .client
@@ -127,11 +128,11 @@ impl TeamCtx {
     }
 
     #[instrument(skip(self))]
-    pub async fn add_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
+    pub async fn add_all_device_roles(&self, team_id: TeamId) -> Result<()> {
         // Shorthand for the teams we need to operate on.
-        let mut owner = self.owner.client.team(team_id);
-        let mut admin = self.admin.client.team(team_id);
-        let mut operator = self.operator.client.team(team_id);
+        let owner = self.owner.client.team(team_id);
+        let admin = self.admin.client.team(team_id);
+        let operator = self.operator.client.team(team_id);
 
         let roles = owner
             .roles()
@@ -187,7 +188,7 @@ impl TeamCtx {
         Ok(())
     }
 
-    pub async fn create_and_add_team(&mut self) -> Result<TeamId> {
+    pub async fn create_and_add_team(&self) -> Result<TeamId> {
         // Create the initial team, and get our TeamId.
         let seed_ikm = {
             let mut buf = [0; SEED_IKM_SIZE];
@@ -301,7 +302,6 @@ impl DeviceCtx {
         self.client
             .aqc()
             .server_addr()
-            .expect("can get server addr")
             .to_string()
             .try_into()
             .expect("`SocketAddr` is a valid `NetIdentifier`")
