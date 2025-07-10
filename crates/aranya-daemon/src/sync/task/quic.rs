@@ -17,7 +17,7 @@ use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequestMessage, SyncRequester,
+    Command, Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequestMessage, SyncRequester,
     SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
@@ -360,13 +360,13 @@ impl Syncer<State> {
                     .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
                 aranya.commit(&mut trx, sink).context("commit failed")?;
-                // TODO: Update heads
-                // client.update_heads(
-                //     id,
-                //     cmds.iter().filter_map(|cmd| cmd.address().ok()),
-                //     heads,
-                // )?;
                 debug!("committed");
+                let key = PeerCacheKey::new(*peer, *id);
+                let mut caches = self.caches.lock().await;
+                let cache = caches.entry(key).or_default();
+                aranya
+                    .update_heads(*id, cmds.iter().filter_map(|cmd| cmd.address().ok()), cache)
+                    .context("failed to update cache heads")?;
                 return Ok(cmds.len());
             }
         }
