@@ -19,7 +19,7 @@ use s2n_quic::provider::tls::rustls::rustls::{
     server,
 };
 use tokio::sync::mpsc;
-use tracing::{error, warn};
+use tracing::warn;
 
 use crate::{keystore::LocalStore, CE, CS, KS};
 
@@ -137,32 +137,22 @@ impl PskStore {
         )
     }
 
-    pub(crate) fn insert(&self, team_id: TeamId, psk: Arc<PresharedKey>) -> Result<()> {
-        match self.inner.lock() {
-            Ok(ref mut inner) => {
-                inner
-                    .team_identities
-                    .entry(team_id)
-                    .or_default()
-                    .push(Arc::clone(&psk));
-                inner.identity_team.insert(PskIdAsKey(psk), team_id);
-                Ok(())
-            }
-            Err(e) => bail!(e.to_string()),
-        }
+    pub(crate) fn insert(&self, team_id: TeamId, psk: Arc<PresharedKey>) {
+        #[allow(clippy::expect_used, reason = "poison")]
+        let mut inner = self.inner.lock().expect("poisoned");
+        inner
+            .team_identities
+            .entry(team_id)
+            .or_default()
+            .push(Arc::clone(&psk));
+        inner.identity_team.insert(PskIdAsKey(psk), team_id);
     }
 
-    pub(crate) fn remove(&self, team_id: TeamId) -> Result<()> {
-        match self.inner.lock() {
-            Ok(ref mut inner) => {
-                inner.team_identities.remove(&team_id);
-
-                inner.identity_team.retain(|_, other| *other != team_id);
-
-                Ok(())
-            }
-            Err(e) => bail!(e.to_string()),
-        }
+    pub(crate) fn remove(&self, team_id: TeamId) {
+        #[allow(clippy::expect_used, reason = "poison")]
+        let mut inner = self.inner.lock().expect("poisoned");
+        inner.team_identities.remove(&team_id);
+        inner.identity_team.retain(|_, other| *other != team_id);
     }
 
     #[allow(clippy::expect_used)]
@@ -190,11 +180,7 @@ impl client::PresharedKeyStore for PskStore {
 impl server::SelectsPresharedKeys for PskStore {
     #[allow(clippy::expect_used)]
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
-        let inner = self
-            .inner
-            .lock()
-            .inspect_err(|e| error!("mutex poisoned: {e}"))
-            .ok()?;
+        let inner = self.inner.lock().expect("poison");
 
         let (k, _) = inner.identity_team.get_key_value(identity)?;
         Some(k.0.clone())

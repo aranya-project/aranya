@@ -12,7 +12,7 @@ use aranya_daemon_api::{
     ChanOp, DaemonApiClient, DeviceId, KeyBundle, Label, LabelId, NetIdentifier, Role, TeamId,
     Text, Version, CS,
 };
-use aranya_util::Addr;
+use aranya_util::{error::ReportExt as _, Addr};
 use buggy::BugExt as _;
 use tarpc::context;
 use tokio::{fs, net::UnixStream};
@@ -95,7 +95,7 @@ impl ClientBuilder<'_> {
         };
         Client::connect(sock, aqc_addr)
             .await
-            .inspect_err(|err| error!(?err, "unable to connect to daemon"))
+            .inspect_err(|err| error!(error = %err.report(), "unable to connect to daemon"))
     }
 }
 

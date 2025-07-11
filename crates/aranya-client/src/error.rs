@@ -13,33 +13,33 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 #[non_exhaustive]
 pub enum Error {
     /// Unable to communicate with the daemon.
-    #[error("IPC error: {0}")]
+    #[error("IPC error")]
     Ipc(#[from] IpcError),
 
     /// The daemon returned an error.
-    #[error("daemon error: {0}")]
+    #[error("daemon error")]
     Aranya(#[from] AranyaError),
 
     /// A configuration error happened.
-    #[error("configuration error: {0}")]
+    #[error("configuration error")]
     Config(#[from] ConfigError),
 
     /// An Aranya QUIC Channel error happened.
-    #[error("AQC error: {0}")]
+    #[error("AQC error")]
     Aqc(#[from] AqcError),
 
     /// An unexpected internal error happened.
-    #[error("unexpected internal error: {0}")]
+    #[error(transparent)]
     Bug(#[from] buggy::Bug),
 
     /// Some other error occurred.
-    #[error("{0}")]
+    #[error(transparent)]
     Other(#[from] OtherError),
 }
 
 /// Some other error occurred.
 #[derive(Debug, thiserror::Error)]
-#[error("{err}")]
+#[error(transparent)]
 pub struct OtherError {
     #[from]
     err: anyhow::Error,
@@ -54,7 +54,7 @@ where
 
 /// An Aranya error.
 #[derive(Debug, thiserror::Error)]
-#[error("{err}")]
+#[error(transparent)]
 pub struct AranyaError {
     #[from]
     err: api::Error,
@@ -69,7 +69,7 @@ pub(crate) fn aranya_error(err: api::Error) -> Error {
 #[non_exhaustive]
 pub enum ConfigError {
     /// An invalid argument was provided.
-    #[error("{0}")]
+    #[error(transparent)]
     InvalidArg(#[from] InvalidArg),
 }
 
@@ -89,7 +89,7 @@ impl InvalidArg {
 
 /// An IPC error.
 #[derive(Debug, thiserror::Error)]
-#[error("{0}")]
+#[error(transparent)]
 pub struct IpcError(#[from] pub(crate) IpcRepr);
 
 impl IpcError {
@@ -102,7 +102,7 @@ impl IpcError {
 }
 
 #[derive(Debug, thiserror::Error)]
-#[error("{0}")]
+#[error(transparent)]
 pub(crate) enum IpcRepr {
     InvalidArg(#[from] InvalidArg),
     Io(#[from] io::Error),
@@ -115,7 +115,7 @@ pub(crate) enum IpcRepr {
 #[non_exhaustive]
 pub enum AqcError {
     /// The server connection was terminated.
-    #[error("server connection terminated")]
+    #[error("the server connection was terminated")]
     ServerConnectionTerminated,
 
     /// No channel info found.
@@ -123,35 +123,35 @@ pub enum AqcError {
     NoChannelInfoFound,
 
     /// The connection was closed.
-    #[error("connection closed")]
+    #[error("the connection was closed")]
     ConnectionClosed,
 
-    /// The connection error.
-    #[error("connection error: {0}")]
+    /// A connection error.
+    #[error(transparent)]
     ConnectionError(#[from] s2n_quic::connection::Error),
 
-    /// The stream error.
-    #[error("stream error: {0}")]
+    /// A stream error.
+    #[error(transparent)]
     StreamError(#[from] s2n_quic::stream::Error),
 
     /// Failed to resolve address.
-    #[error("failed to resolve address: {0}")]
+    #[error("failed to resolve address")]
     AddrResolution(io::Error),
 
-    /// Server start error.
-    #[error("Server start error: {0}")]
-    ServerStart(#[from] s2n_quic::provider::StartError),
+    /// Endpoint start error.
+    #[error("failed to start the client or server endpoint")]
+    EndpointStart(#[from] s2n_quic::provider::StartError),
 
-    /// Serde serialization/deserialization error.
-    #[error("serialization/deserialization error: {0}")]
-    Serde(postcard::Error),
+    /// Error parsing control message.
+    #[error("failed to parse control message")]
+    InvalidCtrlMessage(postcard::Error),
 
     /// Peer failed to process control message.
-    #[error("error from peer processing control message: {0}")]
+    #[error("peer could not processing control message: {0}")]
     CtrlFailure(String),
 
     /// An internal bug was discovered.
-    #[error("internal bug: {0}")]
+    #[error(transparent)]
     Bug(#[from] buggy::Bug),
 }
 

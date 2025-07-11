@@ -9,6 +9,7 @@ use anyhow::Context as _;
 use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_daemon_api::Text;
+use aranya_util::error::ReportExt as _;
 use bytes::Bytes;
 use tracing::error;
 
@@ -84,7 +85,7 @@ pub enum Error {
 
 impl From<&imp::Error> for Error {
     fn from(err: &imp::Error) -> Self {
-        error!(?err);
+        error!(error = %err.report(), "Aranya client C API error");
         match err {
             imp::Error::Bug(_) => Self::Bug,
             imp::Error::Timeout(_) => Self::Timeout,

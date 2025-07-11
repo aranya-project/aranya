@@ -13,7 +13,10 @@ use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{
     AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
 };
-use aranya_util::rustls::{NoCertResolver, SkipServerVerification};
+use aranya_util::{
+    error::ReportExt as _,
+    rustls::{NoCertResolver, SkipServerVerification},
+};
 use buggy::BugExt as _;
 use bytes::{Bytes, BytesMut};
 use channels::AqcPeerChannel;
@@ -313,10 +316,7 @@ impl AqcClient {
                     // The original function logged an error and returned ControlFlow::Break
                     // which implies the loop should terminate or an error state.
                     // For try_receive_channel, this might mean the connection is unusable for ctrl messages.
-                    warn!(
-                        "Receiving control message failed: {}, potential issue with connection.",
-                        e
-                    );
+                    warn!(error = %e.report(), "Receiving control message failed, potential issue with connection.");
                     // Depending on desired behavior, you might return an error or continue.
                     // For now, let's assume it's an error if control message processing fails critically.
                     return Err(TryReceiveError::Error(e));
@@ -359,7 +359,8 @@ impl AqcClient {
         stream.finish()?;
 
         let ack_bytes = read_to_end(&mut stream).await?;
-        let ack = postcard::from_bytes::<AqcAckMessage>(&ack_bytes).map_err(AqcError::Serde)?;
+        let ack = postcard::from_bytes::<AqcAckMessage>(&ack_bytes)
+            .map_err(AqcError::InvalidCtrlMessage)?;
         match ack {
             AqcAckMessage::Success => (),
             AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
@@ -392,17 +393,18 @@ impl AqcClient {
                 }
             }
             Err(e) => {
-                error!("Failed to deserialize AqcCtrlMessage: {}", e);
-                let ack_msg =
-                    AqcAckMessage::Failure(format!("Failed to deserialize AqcCtrlMessage: {e}"));
+                let ack_msg = AqcAckMessage::Failure(format!(
+                    "Failed to deserialize AqcCtrlMessage: {}",
+                    e.report()
+                ));
                 let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
                 stream.send(Bytes::from(ack_bytes)).await.ok();
                 if let Err(err) = stream.close().await {
                     if !is_close_error(err) {
-                        error!(%err, "error closing stream after ctrl failure");
+                        error!(error = %err.report(), "error closing stream after ctrl failure");
                     }
                 }
-                return Err(AqcError::Serde(e).into());
+                return Err(AqcError::InvalidCtrlMessage(e).into());
             }
         }
         Ok(())

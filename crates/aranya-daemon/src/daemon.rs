@@ -13,7 +13,7 @@ use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, StorageProvider,
 };
-use aranya_util::Addr;
+use aranya_util::{error::ReportExt as _, Addr};
 use bimap::BiBTreeMap;
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
@@ -110,7 +110,7 @@ impl DaemonHandle {
             Ok(()) => {}
             Err(err) if err.is_panic() => std::panic::resume_unwind(err.into_panic()),
             Err(err) => {
-                error!(%err, "tasks cancelled");
+                error!(error = %err, "tasks unexpectedly cancelled");
                 bug!("tasks cancelled");
             }
         }
@@ -271,7 +271,7 @@ impl Daemon {
             async move {
                 loop {
                     if let Err(err) = self.syncer.next().await {
-                        error!(?err, "unable to sync with peer");
+                        error!(error = %err.report(), "unable to sync with peer");
                     }
                 }
             }

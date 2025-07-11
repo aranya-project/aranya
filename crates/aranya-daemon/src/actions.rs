@@ -337,7 +337,7 @@ where
 
     /// Creates a bidirectional AQC channel off graph.
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(peer_id = %peer_id, label = %label_id))]
+    #[instrument(skip(self), fields(peer_id = %peer_id, label_id = %label_id))]
     fn create_aqc_bidi_channel_off_graph(
         &self,
         peer_id: DeviceId,
@@ -367,19 +367,19 @@ where
 
     /// Creates a unidirectional AQC channel.
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
+    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
     fn create_aqc_uni_channel_off_graph(
         &self,
         seal_id: DeviceId,
         open_id: DeviceId,
-        label: LabelId,
+        label_id: LabelId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
         self.session_action(move || VmAction {
             name: ident!("create_aqc_uni_channel"),
             args: Cow::Owned(vec![
                 Value::from(seal_id),
                 Value::from(open_id),
-                Value::from(label),
+                Value::from(label_id),
             ]),
         })
         .in_current_span()
