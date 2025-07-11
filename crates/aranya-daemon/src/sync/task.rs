@@ -128,7 +128,7 @@ impl SyncPeers {
 type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 
 /// Key for looking up syncer peer cache in map.
-#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
 pub struct PeerCacheKey {
     /// The peer address.
     pub addr: Addr,
@@ -150,6 +150,7 @@ pub type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
+#[derive(Debug)]
 pub struct Syncer<ST> {
     /// Aranya client to allow syncing the Aranya graph with another peer.
     pub client: Client,

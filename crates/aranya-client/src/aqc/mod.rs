@@ -1,3 +1,5 @@
+//! Aranya QUIC Channels (AQC).
+
 mod api;
 mod crypto;
 mod net;

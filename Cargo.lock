@@ -188,7 +188,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-client"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -272,7 +272,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aranya-aqc-util",
@@ -297,12 +297,11 @@ dependencies = [
  "bytes",
  "ciborium",
  "clap",
- "deser-hjson",
+ "derive-where",
  "futures-util",
  "postcard",
  "pretty_assertions",
  "serde",
- "serde_json",
  "serial_test",
  "tarpc",
  "tempfile",
@@ -310,13 +309,14 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tokio-util",
+ "toml",
  "tracing",
  "tracing-subscriber",
 ]
 
 [[package]]
 name = "aranya-daemon-api"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -430,7 +430,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-keygen"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -630,7 +630,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-util"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aranya-internal-s2n-quic",
@@ -1102,15 +1102,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.99",
-]
-
-[[package]]
-name = "deser-hjson"
-version = "2.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d94aac4095c08ded7e4b9ba7fc2b2929f11b94bb96897ca188b0f64e01688e1"
-dependencies = [
- "serde",
 ]
 
 [[package]]
@@ -2632,6 +2623,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_spanned"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "40734c41988f7306bb04f0ecf60ec0f3f1caa34290e4e8ea471dcd3346483b83"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_yaml"
 version = "0.9.34+deprecated"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3093,6 +3093,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "toml"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f271e09bde39ab52250160a67e88577e0559ad77e9085de6e9051a2c4353f8f8"
+dependencies = [
+ "indexmap",
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "toml_parser",
+ "toml_writer",
+ "winnow",
+]
+
+[[package]]
+name = "toml_datetime"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bade1c3e902f58d73d3f294cd7f20391c1cb2fbcb643b73566bc773971df91e3"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "toml_parser"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b5c1c469eda89749d2230d8156a5969a69ffe0d6d01200581cdc6110674d293e"
+dependencies = [
+ "winnow",
+]
+
+[[package]]
+name = "toml_writer"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b679217f2848de74cabd3e8fc5e6d66f40b7da40f8e1954d92054d9010690fd5"
+
+[[package]]
 name = "tracing"
 version = "0.1.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3480,6 +3519,12 @@ name = "windows_x86_64_msvc"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
+
+[[package]]
+name = "winnow"
+version = "0.7.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74c7b26e3480b707944fc872477815d29a8e429d2f93a1ce000f5fa84a15cbcd"
 
 [[package]]
 name = "wit-bindgen-rt"
