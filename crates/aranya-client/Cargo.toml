@@ -33,6 +33,7 @@ serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
+tokio-util = { workspace = true, features = ["time"] }
 tracing = { workspace = true }
 
 [dev-dependencies]

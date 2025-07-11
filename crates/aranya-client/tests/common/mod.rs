@@ -20,7 +20,8 @@ use backon::{ExponentialBuilder, Retryable as _};
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};
 
-const SYNC_INTERVAL: Duration = Duration::from_millis(100);
+// Default sync interval for testing.
+pub const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 

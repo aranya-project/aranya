@@ -17,11 +17,13 @@ use aranya_client::{
 };
 use aranya_daemon_api::{text, ChanOp, Role};
 use test_log::test;
-use tokio::time;
+use tokio_util::time::FutureExt as _;
 use tracing::info;
 
 mod common;
 use common::{sleep, TeamCtx, SLEEP_INTERVAL};
+
+use crate::common::SYNC_INTERVAL;
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -118,6 +120,8 @@ async fn test_remove_devices() -> Result<()> {
 /// Tests functionality to make sure that we can query the fact database for various things.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_query_functions() -> Result<()> {
+    const TIMEOUT: Duration = Duration::from_secs(1);
+
     // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let mut team = TeamCtx::new("test_query_functions", work_dir).await?;
@@ -146,34 +150,38 @@ async fn test_query_functions() -> Result<()> {
     let memberb = team.memberb.client.team(team_id);
     let queries = memberb.queries();
 
+    // TODO: #404 invoke sync_now() before queries when long-polling is supported
+
     // First, let's check how many devices are on the team.
-    time::timeout(Duration::from_secs(1), async {
+    async {
         loop {
             if let Ok(devices) = queries.devices_on_team().await {
                 if devices.iter().count() == 5 {
                     break;
                 }
             }
-            sleep(Duration::from_millis(10)).await;
+            sleep(SYNC_INTERVAL).await;
         }
-    })
+    }
+    .timeout(Duration::from_secs(1))
     .await
     .expect("expected 5 devices on team");
 
     // Check the specific role(s) a device has.
-    time::timeout(Duration::from_secs(1), async {
+    async {
         loop {
             if let Ok(Role::Member) = queries.device_role(membera.id).await {
                 break;
             }
-            sleep(Duration::from_millis(10)).await;
+            sleep(SYNC_INTERVAL).await;
         }
-    })
+    }
+    .timeout(TIMEOUT)
     .await
     .expect("expected membera to have member role");
 
     // Query key bundle.
-    time::timeout(Duration::from_secs(1), async {
+    async {
         let keybundle = membera
             .client
             .get_key_bundle()
@@ -185,64 +193,69 @@ async fn test_query_functions() -> Result<()> {
                     break;
                 }
             }
-            sleep(Duration::from_millis(10)).await;
+            sleep(SYNC_INTERVAL).await;
         }
-    })
+    }
+    .timeout(TIMEOUT)
     .await
     .expect("expected queried keybundle to match device keybundle");
 
     // Query AQC net identifier.
-    time::timeout(Duration::from_secs(1), async {
+    async {
         loop {
             if let Ok(Some(got_net_identifier)) = queries.aqc_net_identifier(membera.id).await {
                 if expected_net_identifier == got_net_identifier {
                     break;
                 }
             }
-            sleep(Duration::from_millis(10)).await;
+            sleep(SYNC_INTERVAL).await;
         }
-    })
+    }
+    .timeout(TIMEOUT)
     .await
     .expect("expected AQC network identifier");
 
     // Query label exists.
-    time::timeout(Duration::from_secs(1), async {
+    async {
         loop {
             if let Ok(true) = queries.label_exists(label1).await {
                 break;
             }
-            sleep(Duration::from_millis(10)).await;
+            sleep(SYNC_INTERVAL).await;
         }
-    })
+    }
+    .timeout(TIMEOUT)
     .await
     .expect("expected label to exist");
     assert!(queries.label_exists(label1).await?);
 
     // Query labels.
-    time::timeout(Duration::from_secs(1), async {
+    async {
         loop {
             if let Ok(labels) = queries.labels().await {
                 if labels.iter().count() == 1 {
                     break;
                 }
             }
-            sleep(Duration::from_millis(10)).await;
+            sleep(SYNC_INTERVAL).await;
         }
-    })
+    }
+    .timeout(TIMEOUT)
     .await
     .expect("expected 1 label");
 
     // Query assigned labels.
-    time::timeout(Duration::from_secs(1), async {
+    async {
         loop {
             if let Ok(labels) = queries.device_label_assignments(membera.id).await {
                 if labels.iter().count() == 1 {
                     break;
                 }
             }
-            sleep(Duration::from_millis(10)).await;
+            sleep(SYNC_INTERVAL).await;
         }
-    })
+    }
+    .timeout(TIMEOUT)
     .await
     .expect("expected 1 assigned label");
 
