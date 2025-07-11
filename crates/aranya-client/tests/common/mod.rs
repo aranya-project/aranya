@@ -21,7 +21,8 @@ use tokio::{fs, time};
 use tracing::{info, instrument, trace};
 
 // Default sync interval for testing.
-pub const SYNC_INTERVAL: Duration = Duration::from_millis(100);
+pub const SYNC_INTERVAL_MS: u64 = 100;
+pub const SYNC_INTERVAL: Duration = Duration::from_millis(SYNC_INTERVAL_MS);
 // Allow for one missed sync and a misaligned sync rate, while keeping run times low.
 pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 

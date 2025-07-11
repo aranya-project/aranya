@@ -23,7 +23,7 @@ use tracing::info;
 mod common;
 use common::{sleep, TeamCtx, SLEEP_INTERVAL};
 
-use crate::common::SYNC_INTERVAL;
+use crate::common::{SYNC_INTERVAL, SYNC_INTERVAL_MS};
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -120,7 +120,7 @@ async fn test_remove_devices() -> Result<()> {
 /// Tests functionality to make sure that we can query the fact database for various things.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_query_functions() -> Result<()> {
-    const TIMEOUT: Duration = Duration::from_secs(1);
+    const TIMEOUT: Duration = Duration::from_millis(SYNC_INTERVAL_MS * 2);
 
     // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
