@@ -208,7 +208,7 @@ async fn test_add_team() -> Result<()> {
         .await?;
 
     let admin_cfg = {
-        let mut team_cfg_builder = AddTeamConfig::builder();
+        let mut team_cfg_builder = AddTeamConfig::builder().team_id(team_id);
         team_cfg_builder.quic_sync().wrapped_seed(&admin_seed)?;
 
         team_cfg_builder.build()?
@@ -337,7 +337,7 @@ async fn test_multi_team_sync() -> Result<()> {
 
         // Admin2 adds team1 to it's local storage using the wrapped seed
         let admin_cfg = {
-            let mut team_cfg_builder = AddTeamConfig::builder();
+            let mut team_cfg_builder = AddTeamConfig::builder().team_id(team_id_1);
             team_cfg_builder.quic_sync().wrapped_seed(&admin_seed)?;
 
             team_cfg_builder.build()?
