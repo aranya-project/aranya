@@ -94,10 +94,10 @@ url = { version = "2" }
 opt-level = 1
 
 [profile.release]
-lto = true
 opt-level = "z"
 strip = true
-
+lto = true
+panic = "abort"
 
 [workspace.metadata.release]
 allow-branch = ["main"]

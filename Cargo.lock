@@ -479,7 +479,6 @@ dependencies = [
  "libc",
  "metrics",
  "metrics-exporter-prometheus",
- "metrics-tracing-context",
  "metrics-util",
  "serde",
  "sysinfo",
@@ -2114,12 +2113,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lockfree-object-pool"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9374ef4228402d4b7e403e5838cb880d9ee663314b0a900d5a6aabf0c213552e"
-
-[[package]]
 name = "log"
 version = "0.4.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2198,23 +2191,6 @@ dependencies = [
  "thiserror 2.0.12",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "metrics-tracing-context"
-version = "0.18.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93551ba7648013c25bece467fa087a54dd8dd50a4515182ecf9efb7630b1ed0d"
-dependencies = [
- "indexmap",
- "itoa",
- "lockfree-object-pool",
- "metrics",
- "metrics-util",
- "once_cell",
- "tracing",
- "tracing-core",
- "tracing-subscriber",
 ]
 
 [[package]]

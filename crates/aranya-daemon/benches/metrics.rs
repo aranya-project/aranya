@@ -1,7 +1,7 @@
 use std::net::Ipv4Addr;
 
 use anyhow::Result;
-use aranya_daemon::{config::Config, Daemon};
+use aranya_daemon::{config::*, Daemon};
 use aranya_util::Addr;
 use divan::AllocProfiler;
 use tokio::runtime::Runtime;
@@ -17,7 +17,6 @@ fn main() {
 #[divan::bench]
 fn daemon_startup() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
-    let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
     let cfg = Config {
         name: "daemon".into(),
@@ -26,10 +25,12 @@ fn daemon_startup() -> Result<()> {
         cache_dir: work_dir.join("cache"),
         logs_dir: work_dir.join("log"),
         config_dir: work_dir.join("config"),
-        sync_addr: addr_any,
-        afc: None,
-        aqc: None,
-        quic_sync: None,
+        sync: SyncConfig {
+            quic: Toggle::Enabled(QuicSyncConfig {
+                addr: Addr::from((Ipv4Addr::UNSPECIFIED, 4321)),
+            }),
+        },
+        aqc: Toggle::Enabled(AqcConfig {}),
     };
 
     let rt = Runtime::new()?;

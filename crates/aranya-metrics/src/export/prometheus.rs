@@ -71,7 +71,7 @@ impl PrometheusConfig {
                 let push_url = Self::format_push_gateway_url(endpoint.as_ref(), &config.job_name);
                 info!("Setting up Prometheus push gateway: {push_url}");
                 builder = builder.with_push_gateway(
-                    endpoint,
+                    push_url,
                     config.interval,
                     username.clone(),
                     password.clone(),
@@ -116,6 +116,8 @@ impl PrometheusConfig {
                 builder = builder.add_global_label(key, value);
             }
         }
+
+        println!("{:?}", builder);
 
         builder
             .install()
