@@ -9,6 +9,7 @@
 use core::net::SocketAddr;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
+    convert::Infallible,
     future::Future,
     net::Ipv4Addr,
     sync::{Arc, Mutex as SyncMutex},
@@ -18,10 +19,11 @@ use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequestMessage, SyncRequester,
-    SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
+    Engine, GraphId, PeerCache, Sink, StorageError, StorageProvider, SyncRequestMessage,
+    SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
+    error::ReportExt as _,
     rustls::{NoCertResolver, SkipServerVerification},
     Addr,
 };
@@ -38,13 +40,14 @@ use s2n_quic::{
     provider::{
         congestion_controller::Bbr,
         tls::rustls::{self as rustls_provider, rustls::server::SelectsPresharedKeys},
+        StartError,
     },
     stream::{BidirectionalStream, ReceiveStream, SendStream},
     Client as QuicClient, Connection, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{io::AsyncReadExt, sync::mpsc, task::JoinSet};
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 
 use super::SyncResponse;
 use crate::{
@@ -67,23 +70,26 @@ const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// QUIC Connection error
-    #[error("QUIC connection error: {0}")]
+    #[error(transparent)]
     QuicConnectionError(#[from] s2n_quic::connection::Error),
     /// QUIC Stream error
-    #[error("QUIC stream error: {0}")]
+    #[error(transparent)]
     QuicStreamError(#[from] s2n_quic::stream::Error),
-    /// QUIC client config error
-    #[error("QUIC client config error: {0}")]
-    ClientConfig(anyhow::Error),
     /// Invalid PSK used for syncing
-    #[error("Invalid PSK used when attempting to sync")]
+    #[error("invalid PSK used when attempting to sync")]
     InvalidPSK,
-    /// QUIC server config error
-    #[error("QUIC server config error: {0}")]
-    ServerConfig(anyhow::Error),
-    /// An unexpected error occured
-    #[error("An unexpected error occured: {0}")]
-    Bug(buggy::Bug),
+    /// QUIC client endpoint start error
+    #[error("could not start QUIC client")]
+    ClientStart(#[source] StartError),
+    /// QUIC server endpoint start error
+    #[error("could not start QUIC server")]
+    ServerStart(#[source] StartError),
+}
+
+impl From<Infallible> for Error {
+    fn from(err: Infallible) -> Self {
+        match err {}
+    }
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
@@ -119,7 +125,7 @@ impl SyncState for State {
             let stream = syncer
                 .connect(peer)
                 .await
-                .inspect_err(|e| error!("Could not create connection: {e}"))?;
+                .inspect_err(|e| error!(error = %e.report(), "Could not create connection"))?;
             // TODO: spawn a task for send/recv?
             let (mut recv, mut send) = stream.split();
 
@@ -161,15 +167,11 @@ where {
         let provider = rustls_provider::Client::new(client_config);
 
         let client = QuicClient::builder()
-            .with_tls(provider)
-            .context("can't set quic client config")
-            .map_err(Error::ClientConfig)?
+            .with_tls(provider)?
             .with_io((Ipv4Addr::UNSPECIFIED, 0))
-            .assume("can set quic client addr")
-            .map_err(Error::Bug)?
+            .assume("can set quic client address")?
             .start()
-            .context("can't start quic client")
-            .map_err(Error::ClientConfig)?;
+            .map_err(Error::ClientStart)?;
 
         Ok(Self {
             client,
@@ -194,23 +196,23 @@ impl Syncer<State> {
                 entry.into_mut()
             }
             Entry::Vacant(entry) => {
-                info!(?peer, "existing QUIC connection not found");
+                info!("existing QUIC connection not found");
 
                 let addr = tokio::net::lookup_host(peer.to_socket_addrs())
                     .await
                     .context("DNS lookup on for peer address")?
                     .next()
-                    .assume("invalid peer address")?;
+                    .context("could not resolve peer address")?;
                 // Note: cert is not used but server name must be set to connect.
-                debug!(?peer, "attempting to create new quic connection");
+                debug!("attempting to create new quic connection");
 
                 let mut conn = client
-                    .connect(Connect::new(addr).with_server_name("127.0.0.1"))
+                    .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
                     .await
                     .map_err(Error::from)?;
 
                 conn.keep_alive(true).map_err(Error::from)?;
-                debug!(?peer, "created new quic connection");
+                debug!("created new quic connection");
                 entry.insert(conn)
             }
         };
@@ -221,7 +223,7 @@ impl Syncer<State> {
             .handle()
             .open_bidirectional_stream()
             .await
-            .inspect_err(|e| error!(?peer, "unable to open bidi stream: {}", e));
+            .inspect_err(|e| error!(error = %e.report(), "unable to open bidi stream"));
         let stream = match open_stream_res {
             Ok(stream) => stream,
             // Retry for these errors?
@@ -237,7 +239,7 @@ impl Syncer<State> {
             }
         };
 
-        info!(?peer, "client opened bidi stream with QUIC sync server");
+        info!("client opened bidi stream with QUIC sync server");
         Ok(stream)
     }
 
@@ -357,6 +359,12 @@ where
     SP: StorageProvider + Send + Sync + 'static,
 {
     /// Creates a new `Server`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if called outside tokio runtime.
+    ///
+    /// Will panic on poisoned internal mutexes.
     #[inline]
     #[allow(deprecated)]
     pub async fn new(
@@ -381,17 +389,12 @@ where
             .assume("invalid server address")?;
         // Use the rustls server provider
         let server = QuicServer::builder()
-            .with_tls(tls_server_provider)
-            .context("can't set sync server tls config")
-            .map_err(Error::ServerConfig)? // Use the wrapped server config
+            .with_tls(tls_server_provider)?
             .with_io(addr)
-            .assume("can set sync server addr")
-            .map_err(Error::Bug)?
-            .with_congestion_controller(Bbr::default())
-            .context("can't set congestion controller config")
-            .map_err(Error::ServerConfig)?
+            .assume("can set sync server addr")?
+            .with_congestion_controller(Bbr::default())?
             .start()
-            .context("can't start QUIC server")?;
+            .map_err(Error::ServerStart)?;
 
         let active_team = Arc::new(SyncMutex::new(None));
         let mut set = JoinSet::new();
@@ -399,12 +402,9 @@ where
             let active_team = Arc::clone(&active_team);
             set.spawn(async move {
                 while let Some(team_id) = active_team_rx.recv().await {
-                    match active_team.lock() {
-                        Ok(ref mut guard) => {
-                            guard.replace(team_id);
-                        }
-                        Err(e) => error!(%e),
-                    }
+                    #[expect(clippy::expect_used, reason = "poison")]
+                    let mut active_team = active_team.lock().expect("poisoned");
+                    *active_team = Some(team_id);
                 }
             });
         }
@@ -428,42 +428,41 @@ where
         // Accept incoming QUIC connections
         while let Some(mut conn) = self.server.accept().await {
             debug!("received incoming QUIC connection");
-            let Ok(peer) = conn.remote_addr() else {
-                error!("unable to get peer address from connection");
+            let Ok(peer) = conn.remote_addr().inspect_err(|err| {
+                error!(error = %err.report(), "unable to get peer address from connection");
+            }) else {
                 continue;
             };
             let client = self.aranya.clone();
             let active_team = {
-                let Ok(guard) = self.active_team.lock().inspect_err(|e| error!(%e)) else {
-                    continue;
-                };
+                #[expect(clippy::expect_used, reason = "poison")]
+                let guard = self.active_team.lock().expect("poisoned");
                 let Some(active_team) = *guard else { continue };
                 active_team
             };
-            self.set.spawn(async move {
-                loop {
+            self.set.spawn(
+                async move {
                     // Accept incoming streams.
-                    match conn.accept_bidirectional_stream().await {
-                        Ok(Some(stream)) => {
-                            debug!(?peer, "received incoming QUIC stream");
-                            if let Err(e) =
-                                Self::sync(client.clone(), peer, stream, &active_team).await
-                            {
-                                error!(?e, ?peer, "server unable to sync with peer");
-                                break;
+                    while let Some(res) = conn.accept_bidirectional_stream().await.transpose() {
+                        let stream = match res {
+                            Ok(stream) => stream,
+                            Err(err) => {
+                                error!(error = %err.report(), "error receiving QUIC stream");
+                                return;
                             }
-                        }
-                        Ok(None) => {
-                            debug!(?peer, "QUIC connection was closed");
-                            return;
-                        }
-                        Err(e) => {
-                            error!(?peer, "error receiving QUIC stream: {}", e);
+                        };
+                        debug!("received incoming QUIC stream");
+                        if let Err(err) =
+                            Self::sync(client.clone(), peer, stream, &active_team).await
+                        {
+                            error!(error = %err.report(), "server unable to sync with peer");
                             return;
                         }
                     }
+                    debug!("QUIC connection was closed");
                 }
-            });
+                .instrument(info_span!("serve_connection", ?peer)),
+            );
         }
 
         error!("server terminated: {:?}", self.local_addr());
@@ -487,13 +486,14 @@ where
         debug!(?peer, n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let sync_response_res = Self::sync_respond(client, &recv_buf, active_team)
-            .await
-            .inspect_err(|e| error!(?e, "error responding to sync request"));
-
+        let sync_response_res = Self::sync_respond(client, &recv_buf, active_team).await;
         let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
-            Err(err) => SyncResponse::Err(format!("{err:?}")),
+            Err(err) => {
+                let error = err.report().to_string();
+                error!(%error, "error responding to sync request");
+                SyncResponse::Err(error)
+            }
         };
         // Serialize the sync response.
         let data =
@@ -542,6 +542,17 @@ where
                 client.lock().await.provider(),
                 &mut PeerCache::new(),
             )
+            .or_else(|err| {
+                if matches!(
+                    err,
+                    aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
+                ) {
+                    warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
+                    Ok(0)
+                } else {
+                    Err(err)
+                }
+            })
             .context("sync resp poll failed")?;
         debug!(len = len, "sync poll finished");
         buf.truncate(len);

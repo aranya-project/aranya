@@ -10,19 +10,18 @@ use std::{collections::HashMap, future::Future};
 
 use anyhow::{Context, Result};
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{storage::GraphId, ClientError, Engine, Sink};
+use aranya_runtime::{storage::GraphId, Engine, Sink};
 use aranya_util::Addr;
 use buggy::{Bug, BugExt};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tokio_util::time::{delay_queue::Key, DelayQueue};
-use tracing::{error, instrument, trace};
+use tracing::{instrument, trace};
 
 use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
-    sync::error::SyncError,
     vm_policy::VecSink,
     InvalidGraphs,
 };
@@ -232,17 +231,12 @@ impl<ST: SyncState> Syncer<ST> {
     #[instrument(skip_all, fields(peer = ?peer))]
     pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<()> {
         trace!("syncing with peer");
-        let effects: Vec<EF> = {
-            let mut sink = VecSink::new();
-            if let Err(e) = <ST as SyncState>::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
-                .await
-                .context("sync_peer error")
-                .inspect_err(|err| error!("{err:?}"))
-            {
+        let mut sink = VecSink::new();
+        ST::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
+            .await
+            .inspect_err(|err| {
                 // If a finalization error has occurred, remove all sync peers for that team.
-                if e.downcast_ref::<ClientError>()
-                    .is_some_and(|err| matches!(err, ClientError::ParallelFinalize))
-                {
+                if err.is_parallel_finalize() {
                     // Remove sync peers for graph that had finalization error.
                     self.peers.retain(|p, (_, key)| {
                         let keep = p.graph_id != peer.graph_id;
@@ -253,11 +247,10 @@ impl<ST: SyncState> Syncer<ST> {
                     });
                     self.invalid.insert(peer.graph_id);
                 }
-                return Err(SyncError::Other(e));
-            }
-            sink.collect()
-                .context("could not collect effects from sync")?
-        };
+            })?;
+        let effects = sink
+            .collect()
+            .context("could not collect effects from sync")?;
         let n = effects.len();
         self.send_effects
             .send((peer.graph_id, effects))
