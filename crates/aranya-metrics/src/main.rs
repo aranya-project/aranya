@@ -29,10 +29,7 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
-use crate::{
-    export::{MetricsConfig, MetricsMode},
-    harness::ProcessMetricsCollector,
-};
+use crate::{export::MetricsConfig, harness::ProcessMetricsCollector};
 mod export;
 mod harness;
 
@@ -72,10 +69,6 @@ async fn main() -> Result<()> {
                     env_filter: EnvFilter::try_from_env("ARANYA_EXAMPLE")
                         .unwrap_or_else(|_| EnvFilter::new("off")),
                 }),
-        )
-        .with(
-            matches!(metrics_config.mode, MetricsMode::Tracing)
-                .then_some(metrics_tracing_context::MetricsLayer::new()),
         )
         .init();
 

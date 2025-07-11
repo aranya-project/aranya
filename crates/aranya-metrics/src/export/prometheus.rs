@@ -8,9 +8,15 @@ use tracing::{info, warn};
 use url::Url;
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
 pub struct PrometheusConfig {
     /// The current mode that the Prometheus exporter is operating as.
     mode: PrometheusMode,
+
+    /// Sets the idle timeout for metrics.
+    idle_timeout: (MetricsKindMask, Option<Duration>),
+    /// Sets whether a unit suffix is added to metric names.
+    enable_unit_suffix: bool,
 
     /// Allows only certain addresses to access the scrape endpoint.
     allowed_addresses: Option<Vec<String>>,
@@ -22,10 +28,6 @@ pub struct PrometheusConfig {
     bucket_duration: Option<Duration>,
     /// Sets the number of buckets kept in memory at one time.
     bucket_count: Option<NonZeroU32>,
-    /// Sets whether a unit suffix is added to metric names.
-    enable_unit_suffix: bool,
-    /// Sets the idle timeout for metrics.
-    idle_timeout: (MetricsKindMask, Option<Duration>),
     /// Sets the interval that the upkeep task runs at.
     upkeep_timeout: Option<Duration>,
     /// Sets global labels that are applied to all metrics.
@@ -78,6 +80,11 @@ impl PrometheusConfig {
             }
         }
 
+        let (mask, timeout) = &self.idle_timeout;
+        builder = builder
+            .idle_timeout(MetricKindMask::from(mask.clone()), *timeout)
+            .set_enable_unit_suffix(self.enable_unit_suffix);
+
         if let Some(addresses) = &self.allowed_addresses {
             for address in addresses {
                 builder = builder.add_allowed_address(address)?;
@@ -99,11 +106,6 @@ impl PrometheusConfig {
         if let Some(count) = self.bucket_count {
             builder = builder.set_bucket_count(count);
         }
-
-        builder = builder.set_enable_unit_suffix(self.enable_unit_suffix);
-
-        let (mask, timeout) = &self.idle_timeout;
-        builder = builder.idle_timeout(MetricKindMask::from(mask.clone()), *timeout);
 
         if let Some(timeout) = self.upkeep_timeout {
             builder = builder.upkeep_timeout(timeout);
@@ -132,13 +134,15 @@ impl Default for PrometheusConfig {
                 password: None,
                 use_http_post_method: false,
             },
+
+            idle_timeout: (MetricsKindMask::All, Some(Duration::from_secs(1))),
+            enable_unit_suffix: false,
+
             allowed_addresses: None,
             quantiles: None,
             buckets: None,
             bucket_duration: None,
             bucket_count: None,
-            enable_unit_suffix: false,
-            idle_timeout: (MetricsKindMask::All, Some(Duration::from_secs(1))),
             upkeep_timeout: None,
             global_labels: None,
         }

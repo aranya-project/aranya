@@ -43,10 +43,15 @@ impl Default for MetricsConfig {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub enum MetricsMode {
     Prometheus(prometheus::PrometheusConfig),
     //DataDog(DataDogConfig),
-    #[default]
     Tracing,
+}
+
+impl Default for MetricsMode {
+    fn default() -> Self {
+        Self::Prometheus(prometheus::PrometheusConfig::default())
+    }
 }

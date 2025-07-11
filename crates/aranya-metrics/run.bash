@@ -31,4 +31,4 @@ trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
 cd crates/aranya-metrics
 
 echo "Running metrics collection..."
-CONFIG_PATH=example.hjson cargo run --release -- $(pwd)/../../target/release/aranya-daemon
+CONFIG_PATH=example.hjson ARANYA_EXAMPLE=TRACE cargo run --release -- $(pwd)/../../target/release/aranya-daemon
