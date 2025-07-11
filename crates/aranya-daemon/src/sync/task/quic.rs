@@ -27,6 +27,7 @@ use aranya_util::{
 };
 use buggy::{bug, BugExt as _};
 use bytes::Bytes;
+use derive_where::derive_where;
 #[allow(deprecated)]
 use s2n_quic::provider::tls::rustls::rustls::{
     server::PresharedKeySelection, ClientConfig, ServerConfig,
@@ -86,6 +87,7 @@ pub enum Error {
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
+#[derive(Debug)]
 pub struct State {
     /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: QuicClient,
@@ -329,6 +331,7 @@ impl Syncer<State> {
 
 /// The Aranya QUIC sync server.
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
+#[derive_where(Debug)]
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
     aranya: AranyaClient<EN, SP>,

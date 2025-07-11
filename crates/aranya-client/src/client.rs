@@ -20,16 +20,18 @@ use tracing::{debug, error, info, instrument};
 
 use crate::{
     aqc::{AqcChannels, AqcClient},
-    config::{SyncPeerConfig, TeamConfig},
+    config::{AddTeamConfig, CreateTeamConfig, SyncPeerConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
 };
 
 /// List of device IDs.
+#[derive(Debug)]
 pub struct Devices {
     data: Vec<DeviceId>,
 }
 
 impl Devices {
+    /// Return iterator for list of devices.
     pub fn iter(&self) -> impl Iterator<Item = &DeviceId> {
         self.data.iter()
     }
@@ -41,11 +43,13 @@ impl Devices {
 }
 
 /// List of labels.
+#[derive(Debug)]
 pub struct Labels {
     data: Vec<Label>,
 }
 
 impl Labels {
+    /// Return iterator for list of labels.
     pub fn iter(&self) -> impl Iterator<Item = &Label> {
         self.data.iter()
     }
@@ -57,35 +61,34 @@ impl Labels {
 }
 
 /// Builds a [`Client`].
+#[derive(Debug, Default)]
 pub struct ClientBuilder<'a> {
     /// The UDS that the daemon is listening on.
     #[cfg(unix)]
-    uds_path: Option<&'a Path>,
+    daemon_uds_path: Option<&'a Path>,
     // AQC address.
-    aqc_addr: Option<&'a Addr>,
+    aqc_server_addr: Option<&'a Addr>,
 }
 
 impl ClientBuilder<'_> {
+    /// Returns a default [`ClientBuilder`].
     pub fn new() -> Self {
-        Self {
-            uds_path: None,
-            aqc_addr: None,
-        }
+        Self::default()
     }
 
     /// Connects to the daemon.
     pub async fn connect(self) -> Result<Client> {
-        let Some(sock) = self.uds_path else {
+        let Some(sock) = self.daemon_uds_path else {
             return Err(IpcError::new(InvalidArg::new(
-                "with_daemon_uds_path",
+                "daemon_uds_path",
                 "must specify the daemon's UDS path",
             ))
             .into());
         };
 
-        let Some(aqc_addr) = &self.aqc_addr else {
+        let Some(aqc_addr) = &self.aqc_server_addr else {
             return Err(IpcError::new(InvalidArg::new(
-                "with_daemon_aqc_addr",
+                "aqc_server_addr",
                 "must specify the AQC server address",
             ))
             .into());
@@ -96,24 +99,18 @@ impl ClientBuilder<'_> {
     }
 }
 
-impl Default for ClientBuilder<'_> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<'a> ClientBuilder<'a> {
     /// Specifies the UDS socket path the daemon is listening on.
     #[cfg(unix)]
     #[cfg_attr(docsrs, doc(cfg(unix)))]
-    pub fn with_daemon_uds_path(mut self, sock: &'a Path) -> Self {
-        self.uds_path = Some(sock);
+    pub fn daemon_uds_path(mut self, sock: &'a Path) -> Self {
+        self.daemon_uds_path = Some(sock);
         self
     }
 
     /// Specifies the AQC server address.
-    pub fn with_daemon_aqc_addr(mut self, addr: &'a Addr) -> Self {
-        self.aqc_addr = Some(addr);
+    pub fn aqc_server_addr(mut self, addr: &'a Addr) -> Self {
+        self.aqc_server_addr = Some(addr);
         self
     }
 }
@@ -235,7 +232,7 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&self, cfg: TeamConfig) -> Result<Team<'_>> {
+    pub async fn create_team(&self, cfg: CreateTeamConfig) -> Result<Team<'_>> {
         let team_id = self
             .daemon
             .create_team(context::current(), cfg.into())
@@ -263,9 +260,12 @@ impl Client {
     }
 
     /// Add a team to local device storage.
-    pub async fn add_team(&self, team_id: TeamId, cfg: TeamConfig) -> Result<Team<'_>> {
+    pub async fn add_team(&self, cfg: AddTeamConfig) -> Result<Team<'_>> {
+        let cfg = aranya_daemon_api::AddTeamConfig::from(cfg);
+        let team_id = cfg.team_id;
+
         self.daemon
-            .add_team(context::current(), team_id, cfg.into())
+            .add_team(context::current(), cfg)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -300,6 +300,7 @@ impl Client {
 /// - creating/assigning/deleting labels.
 /// - creating/deleting fast channels.
 /// - assigning network identifiers to devices.
+#[derive(Debug)]
 pub struct Team<'a> {
     client: &'a Client,
     team_id: TeamId,
@@ -313,6 +314,9 @@ impl Team<'_> {
 
     /// Encrypt PSK seed for peer.
     /// `peer_enc_pk` is the public encryption key of the peer device.
+    ///
+    /// This method will be removed soon since certificates will be used instead of PSKs in the future.
+    ///
     /// See [`KeyBundle::encoding`].
     pub async fn encrypt_psk_seed_for_peer(&self, peer_enc_pk: &[u8]) -> Result<Vec<u8>> {
         let peer_enc_pk: EncryptionPublicKey<CS> = postcard::from_bytes(peer_enc_pk)
@@ -498,6 +502,10 @@ impl Team<'_> {
     }
 }
 
+/// Queries the Aranya fact database.
+///
+/// The fact database is updated when actions/effects are processed for a team.
+#[derive(Debug)]
 pub struct Queries<'a> {
     client: &'a Client,
     team_id: TeamId,
