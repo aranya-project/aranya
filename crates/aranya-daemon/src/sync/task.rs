@@ -228,7 +228,7 @@ impl<ST: SyncState> Syncer<ST> {
     }
 
     /// Sync with a peer.
-    #[instrument(skip_all, fields(peer = ?peer))]
+    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
     pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<()> {
         trace!("syncing with peer");
         let mut sink = VecSink::new();
