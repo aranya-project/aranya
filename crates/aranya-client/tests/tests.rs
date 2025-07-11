@@ -163,7 +163,7 @@ async fn test_query_functions() -> Result<()> {
             sleep(SYNC_INTERVAL).await;
         }
     }
-    .timeout(Duration::from_secs(1))
+    .timeout(TIMEOUT)
     .await
     .expect("expected 5 devices on team");
 
