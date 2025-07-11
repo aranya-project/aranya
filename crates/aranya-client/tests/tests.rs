@@ -149,13 +149,10 @@ async fn test_query_functions() -> Result<()> {
     // First, let's check how many devices are on the team.
     time::timeout(Duration::from_secs(1), async {
         loop {
-            let devices = queries
-                .devices_on_team()
-                .await
-                .expect("expected to query devices on team");
-            let count = devices.iter().count();
-            if count == 5 {
-                break;
+            if let Ok(devices) = queries.devices_on_team().await {
+                if devices.iter().count() == 5 {
+                    break;
+                }
             }
             sleep(Duration::from_millis(10)).await;
         }
@@ -197,11 +194,7 @@ async fn test_query_functions() -> Result<()> {
     // Query AQC net identifier.
     time::timeout(Duration::from_secs(1), async {
         loop {
-            if let Some(got_net_identifier) = queries
-                .aqc_net_identifier(membera.id)
-                .await
-                .expect("expected AQC network identifier")
-            {
+            if let Ok(Some(got_net_identifier)) = queries.aqc_net_identifier(membera.id).await {
                 if expected_net_identifier == got_net_identifier {
                     break;
                 }
