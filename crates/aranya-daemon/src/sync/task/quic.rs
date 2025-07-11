@@ -254,17 +254,20 @@ impl Syncer<State> {
         A: Serialize + DeserializeOwned + Clone,
     {
         info!(?peer, "sending sync request to QUIC sync server");
-        // Must lock aranya then caches to prevent deadlock.
-        let mut aranya = self.client.aranya.lock().await;
-        let key = PeerCacheKey::new(*peer, id);
-        let mut caches = self.caches.lock().await;
-        let cache = caches.entry(key).or_default();
 
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
-        let (len, _) = syncer
-            .poll(&mut send_buf, aranya.provider(), cache)
-            .context("sync poll failed")?;
-        debug!(?len, "sync poll finished");
+        let len = {
+            // Must lock aranya then caches to prevent deadlock.
+            let mut aranya = self.client.aranya.lock().await;
+            let key = PeerCacheKey::new(*peer, id);
+            let mut caches = self.caches.lock().await;
+            let cache = caches.entry(key).or_default();
+            let (len, _) = syncer
+                .poll(&mut send_buf, aranya.provider(), cache)
+                .context("sync poll failed")?;
+            debug!(?len, "sync poll finished");
+            len
+        };
         send_buf.truncate(len);
 
         send.send(Bytes::from(send_buf))

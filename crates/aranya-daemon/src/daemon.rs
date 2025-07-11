@@ -144,8 +144,6 @@ impl Daemon {
         let span_id = span.id();
 
         async move {
-            // Create a shared PeerCacheMap
-            let caches = Arc::new(Mutex::new(BTreeMap::new()));
             // TODO: Fix this when other syncer types are supported
             let Toggle::Enabled(qs_config) = &cfg.sync.quic else {
                 anyhow::bail!("Supply a valid QUIC sync config")
@@ -178,6 +176,9 @@ impl Daemon {
                 load_team_psk_pairs(&mut eng, &mut local_store, &seed_id_dir).await?;
             let (psk_store, active_team_rx) = PskStore::new(initial_keys);
             let psk_store = Arc::new(psk_store);
+
+            // Create a shared PeerCacheMap
+            let caches = Arc::new(Mutex::new(BTreeMap::new()));
 
             // Initialize Aranya client.
             let (client, sync_server) = Self::setup_aranya(
