@@ -465,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-metrics"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aranya-client",
@@ -1179,6 +1179,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.99",
+]
+
+[[package]]
+name = "deser-hjson"
+version = "2.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d94aac4095c08ded7e4b9ba7fc2b2929f11b94bb96897ca188b0f64e01688e1"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
