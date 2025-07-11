@@ -3,7 +3,9 @@ use std::{
     fmt::{self, Display, Write},
 };
 
+/// Extension trait for formatting an error with source chain.
 pub trait ReportExt {
+    /// Display this error with source chain.
     fn report(&self) -> impl Display;
 }
 
@@ -15,6 +17,8 @@ where
         ReportImpl(self)
     }
 }
+
+// Implementation taken from `anyhow`.
 
 struct ReportImpl<E>(E);
 
@@ -31,10 +35,10 @@ impl<E: Error> Display for ReportImpl<E> {
                 writeln!(f)?;
                 let mut indented = Indented {
                     inner: f,
-                    number: if multiple { Some(n) } else { None },
+                    number: multiple.then_some(n),
                     started: false,
                 };
-                write!(indented, "{}", error)?;
+                write!(indented, "{error}")?;
             }
         }
 
@@ -57,7 +61,7 @@ where
             if !self.started {
                 self.started = true;
                 match self.number {
-                    Some(number) => write!(self.inner, "{: >5}: ", number)?,
+                    Some(number) => write!(self.inner, "{number: >5}: ")?,
                     None => self.inner.write_str("    ")?,
                 }
             } else if i > 0 {
