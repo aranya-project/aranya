@@ -73,10 +73,10 @@ impl Typed for AddTeamQuicSyncConfig {
 
 impl From<AddTeamQuicSyncConfig> for aranya_client::AddTeamQuicSyncConfig {
     fn from(value: AddTeamQuicSyncConfig) -> Self {
-        Self::builder()
-            .mode(value.mode)
-            .build()
-            .expect("All fields are set")
+        let mut builder = Self::builder();
+        builder.mode(value.mode);
+
+        builder.build().expect("All fields are set")
     }
 }
 
