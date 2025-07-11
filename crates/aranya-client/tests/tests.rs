@@ -15,9 +15,10 @@ use anyhow::{bail, Context, Result};
 use aranya_client::{
     config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
 };
-use aranya_daemon_api::Role;
+use aranya_daemon_api::{text, ChanOp, Role};
 use test_log::test;
-use tracing::{debug, info};
+use tokio::time;
+use tracing::info;
 
 mod common;
 use common::{sleep, TeamCtx, SLEEP_INTERVAL};
@@ -128,27 +129,129 @@ async fn test_query_functions() -> Result<()> {
     team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
+    // Assign AQC net identifier to membera.
+    let operator_team = team.operator.client.team(team_id);
+    let membera = team.membera;
+    let expected_net_identifier = membera.aqc_net_id();
+    operator_team
+        .assign_aqc_net_identifier(membera.id, expected_net_identifier.clone())
+        .await?;
+
+    // Create label and assign it to membera.
+    let label1 = operator_team.create_label(text!("label1")).await?;
+    let op = ChanOp::SendRecv;
+    operator_team.assign_label(membera.id, label1, op).await?;
+
     // Test all our fact database queries.
-    let memberb = team.membera.client.team(team_id);
+    let memberb = team.memberb.client.team(team_id);
     let queries = memberb.queries();
 
     // First, let's check how many devices are on the team.
-    let devices = queries.devices_on_team().await?;
-    assert_eq!(devices.iter().count(), 5);
-    debug!("membera devices on team: {:?}", devices.iter().count());
+    time::timeout(Duration::from_secs(1), async {
+        loop {
+            let devices = queries
+                .devices_on_team()
+                .await
+                .expect("expected to query devices on team");
+            let count = devices.iter().count();
+            if count == 5 {
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("expected 5 devices on team");
 
     // Check the specific role(s) a device has.
-    let role = queries.device_role(team.membera.id).await?;
-    assert_eq!(role, Role::Member);
-    debug!("membera role: {:?}", role);
+    time::timeout(Duration::from_secs(1), async {
+        loop {
+            if let Ok(Role::Member) = queries.device_role(membera.id).await {
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("expected membera to have member role");
 
-    // Make sure that we have the correct keybundle.
-    let keybundle = queries.device_keybundle(team.membera.id).await?;
-    debug!("membera keybundle: {:?}", keybundle);
+    // Query key bundle.
+    time::timeout(Duration::from_secs(1), async {
+        let keybundle = membera
+            .client
+            .get_key_bundle()
+            .await
+            .expect("expected keybundle");
+        loop {
+            if let Ok(queried_keybundle) = queries.device_keybundle(membera.id).await {
+                if keybundle == queried_keybundle {
+                    break;
+                }
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("expected queried keybundle to match device keybundle");
 
-    // TODO(nikki): device_label_assignments, label_exists, labels
+    // Query AQC net identifier.
+    time::timeout(Duration::from_secs(1), async {
+        loop {
+            if let Some(got_net_identifier) = queries
+                .aqc_net_identifier(membera.id)
+                .await
+                .expect("expected AQC network identifier")
+            {
+                if expected_net_identifier == got_net_identifier {
+                    break;
+                }
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("expected AQC network identifier");
 
-    // TODO(nikki): if cfg!(feature = "aqc") { aqc_net_identifier } and have aqc on by default.
+    // Query label exists.
+    time::timeout(Duration::from_secs(1), async {
+        loop {
+            if let Ok(true) = queries.label_exists(label1).await {
+                break;
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("expected label to exist");
+    assert!(queries.label_exists(label1).await?);
+
+    // Query labels.
+    time::timeout(Duration::from_secs(1), async {
+        loop {
+            if let Ok(labels) = queries.labels().await {
+                if labels.iter().count() == 1 {
+                    break;
+                }
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("expected 1 label");
+
+    // Query assigned labels.
+    time::timeout(Duration::from_secs(1), async {
+        loop {
+            if let Ok(labels) = queries.device_label_assignments(membera.id).await {
+                if labels.iter().count() == 1 {
+                    break;
+                }
+            }
+            sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("expected 1 assigned label");
 
     Ok(())
 }

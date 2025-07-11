@@ -251,7 +251,7 @@ impl DeviceCtx {
     }
 
     #[allow(unused, reason = "module compiled for each test file")]
-    pub fn aqc_net_id(&mut self) -> NetIdentifier {
+    pub fn aqc_net_id(&self) -> NetIdentifier {
         NetIdentifier(
             self.client
                 .aqc()
