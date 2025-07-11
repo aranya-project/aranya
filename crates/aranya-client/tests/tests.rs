@@ -227,7 +227,6 @@ async fn test_query_functions() -> Result<()> {
     .timeout(TIMEOUT)
     .await
     .expect("expected label to exist");
-    assert!(queries.label_exists(label1).await?);
 
     // Query labels.
     async {
