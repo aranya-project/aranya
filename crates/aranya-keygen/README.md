@@ -9,7 +9,7 @@
 [docs-badge]: https://docs.rs/aranya-keygen/badge.svg
 [docs-url]: https://docs.rs/aranya-keygen/latest/aranya_keygen/
 [license-badge]: https://img.shields.io/crates/l/aranya-keygen.svg
-[license-url]: ../../LICENSE.md
+[license-url]: https://github.com/aranya-project/aranya/blob/main/LICENSE.md
 
 A utility crate for generating cryptographic key bundles for Aranya. This crate provides:
 
