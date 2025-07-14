@@ -17,6 +17,13 @@ pub struct KeyBundle {
     pub sign_key: Vec<u8>,
     pub enc_key: Vec<u8>,
 }
+/// RoleManagementPerm policy enum.
+#[value]
+pub enum RoleManagementPerm {
+    CanAssignRole,
+    CanRevokeRole,
+    CanChangeRolePerms,
+}
 /// ChanOp policy enum.
 #[value]
 pub enum ChanOp {
@@ -28,43 +35,52 @@ pub enum ChanOp {
 #[effects]
 pub enum Effect {
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
-    QueryDeviceRolesResult(QueryDeviceRolesResult),
+    QueryDeviceRoleResult(QueryDeviceRoleResult),
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
-    OperationUpdated(OperationUpdated),
-    RoleManagingRoleChanged(RoleManagingRoleChanged),
+    PermAddedToRole(PermAddedToRole),
+    PermRemovedFromRole(PermRemovedFromRole),
+    RoleOwnerAdded(RoleOwnerAdded),
+    RoleOwnerRemoved(RoleOwnerRemoved),
+    RoleManagementPermAssigned(RoleManagementPermAssigned),
+    RoleManagementPermRevoked(RoleManagementPermRevoked),
     RoleCreated(RoleCreated),
     RoleAssigned(RoleAssigned),
+    RoleChanged(RoleChanged),
     RoleRevoked(RoleRevoked),
-    QueriedTeamRole(QueriedTeamRole),
+    QueryTeamRolesResult(QueryTeamRolesResult),
     TeamCreated(TeamCreated),
     TeamTerminated(TeamTerminated),
     DeviceAdded(DeviceAdded),
     DeviceRemoved(DeviceRemoved),
-    LabelUpdated(LabelUpdated),
+    LabelManagingRoleAdded(LabelManagingRoleAdded),
+    LabelManagingRoleRevoked(LabelManagingRoleRevoked),
     LabelCreated(LabelCreated),
     LabelDeleted(LabelDeleted),
-    LabelAssigned(LabelAssigned),
-    LabelRevoked(LabelRevoked),
-    QueryLabelExistsResult(QueryLabelExistsResult),
-    QueriedLabel(QueriedLabel),
-    QueriedLabelAssignment(QueriedLabelAssignment),
+    LabelAssignedToRole(LabelAssignedToRole),
+    LabelAssignedToDevice(LabelAssignedToDevice),
+    LabelRevokedFromRole(LabelRevokedFromRole),
+    LabelRevokedFromDevice(LabelRevokedFromDevice),
+    QueryLabelResult(QueryLabelResult),
+    QueryLabelsResult(QueryLabelsResult),
+    QueryLabelsAssignedToRoleResult(QueryLabelsAssignedToRoleResult),
+    QueryLabelsAssignedToDeviceResult(QueryLabelsAssignedToDeviceResult),
     AqcNetworkNameSet(AqcNetworkNameSet),
     AqcNetworkNameUnset(AqcNetworkNameUnset),
-    QueryAqcNetworkNamesOutput(QueryAqcNetworkNamesOutput),
+    QueryAqcNetIdResult(QueryAqcNetIdResult),
+    QueryAqcNetworkNamesResult(QueryAqcNetworkNamesResult),
     AqcBidiChannelCreated(AqcBidiChannelCreated),
     AqcBidiChannelReceived(AqcBidiChannelReceived),
     AqcUniChannelCreated(AqcUniChannelCreated),
     AqcUniChannelReceived(AqcUniChannelReceived),
-    QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
 }
 /// QueryDevicesOnTeamResult policy effect.
 #[effect]
 pub struct QueryDevicesOnTeamResult {
     pub device_id: Id,
 }
-/// QueryDeviceRolesResult policy effect.
+/// QueryDeviceRoleResult policy effect.
 #[effect]
-pub struct QueryDeviceRolesResult {
+pub struct QueryDeviceRoleResult {
     pub role_id: Id,
     pub name: Text,
     pub author_id: Id,
@@ -75,19 +91,48 @@ pub struct QueryDeviceRolesResult {
 pub struct QueryDeviceKeyBundleResult {
     pub device_keys: KeyBundle,
 }
-/// OperationUpdated policy effect.
+/// PermAddedToRole policy effect.
 #[effect]
-pub struct OperationUpdated {
-    pub op: Text,
+pub struct PermAddedToRole {
     pub role_id: Id,
+    pub perm: Text,
     pub author_id: Id,
 }
-/// RoleManagingRoleChanged policy effect.
+/// PermRemovedFromRole policy effect.
 #[effect]
-pub struct RoleManagingRoleChanged {
+pub struct PermRemovedFromRole {
+    pub role_id: Id,
+    pub perm: Text,
+    pub author_id: Id,
+}
+/// RoleOwnerAdded policy effect.
+#[effect]
+pub struct RoleOwnerAdded {
     pub target_role_id: Id,
-    pub old_managing_role_id: Id,
-    pub new_managing_role_id: Id,
+    pub new_role_owner: Id,
+    pub author_id: Id,
+}
+/// RoleOwnerRemoved policy effect.
+#[effect]
+pub struct RoleOwnerRemoved {
+    pub target_role_id: Id,
+    pub owning_role_id: Id,
+    pub author_id: Id,
+}
+/// RoleManagementPermAssigned policy effect.
+#[effect]
+pub struct RoleManagementPermAssigned {
+    pub target_role_id: Id,
+    pub managing_role_id: Id,
+    pub perm: Text,
+    pub author_id: Id,
+}
+/// RoleManagementPermRevoked policy effect.
+#[effect]
+pub struct RoleManagementPermRevoked {
+    pub target_role_id: Id,
+    pub managing_role_id: Id,
+    pub perm: RoleManagementPerm,
     pub author_id: Id,
 }
 /// RoleCreated policy effect.
@@ -96,7 +141,7 @@ pub struct RoleCreated {
     pub role_id: Id,
     pub name: Text,
     pub author_id: Id,
-    pub managing_role_id: Id,
+    pub owning_role_id: Id,
     pub default: bool,
 }
 /// RoleAssigned policy effect.
@@ -106,6 +151,14 @@ pub struct RoleAssigned {
     pub role_id: Id,
     pub author_id: Id,
 }
+/// RoleChanged policy effect.
+#[effect]
+pub struct RoleChanged {
+    pub device_id: Id,
+    pub old_role_id: Id,
+    pub new_role_id: Id,
+    pub author_id: Id,
+}
 /// RoleRevoked policy effect.
 #[effect]
 pub struct RoleRevoked {
@@ -113,9 +166,9 @@ pub struct RoleRevoked {
     pub role_id: Id,
     pub author_id: Id,
 }
-/// QueriedTeamRole policy effect.
+/// QueryTeamRolesResult policy effect.
 #[effect]
-pub struct QueriedTeamRole {
+pub struct QueryTeamRolesResult {
     pub role_id: Id,
     pub name: Text,
     pub author_id: Id,
@@ -145,13 +198,19 @@ pub struct DeviceRemoved {
     pub device_id: Id,
     pub author_id: Id,
 }
-/// LabelUpdated policy effect.
+/// LabelManagingRoleAdded policy effect.
 #[effect]
-pub struct LabelUpdated {
+pub struct LabelManagingRoleAdded {
     pub label_id: Id,
-    pub label_name: Text,
-    pub label_author_id: Id,
     pub managing_role_id: Id,
+    pub author_id: Id,
+}
+/// LabelManagingRoleRevoked policy effect.
+#[effect]
+pub struct LabelManagingRoleRevoked {
+    pub label_id: Id,
+    pub managing_role_id: Id,
+    pub author_id: Id,
 }
 /// LabelCreated policy effect.
 #[effect]
@@ -169,39 +228,60 @@ pub struct LabelDeleted {
     pub label_id: Id,
     pub author_id: Id,
 }
-/// LabelAssigned policy effect.
+/// LabelAssignedToRole policy effect.
 #[effect]
-pub struct LabelAssigned {
+pub struct LabelAssignedToRole {
+    pub role_id: Id,
+    pub label_id: Id,
+    pub author_id: Id,
+}
+/// LabelAssignedToDevice policy effect.
+#[effect]
+pub struct LabelAssignedToDevice {
+    pub device: Id,
+    pub label_id: Id,
+    pub author_id: Id,
+}
+/// LabelRevokedFromRole policy effect.
+#[effect]
+pub struct LabelRevokedFromRole {
+    pub role_id: Id,
+    pub label_id: Id,
+    pub author_id: Id,
+}
+/// LabelRevokedFromDevice policy effect.
+#[effect]
+pub struct LabelRevokedFromDevice {
     pub label_id: Id,
     pub label_name: Text,
     pub label_author_id: Id,
     pub author_id: Id,
 }
-/// LabelRevoked policy effect.
+/// QueryLabelResult policy effect.
 #[effect]
-pub struct LabelRevoked {
-    pub label_id: Id,
-    pub label_name: Text,
-    pub label_author_id: Id,
-    pub author_id: Id,
-}
-/// QueryLabelExistsResult policy effect.
-#[effect]
-pub struct QueryLabelExistsResult {
+pub struct QueryLabelResult {
     pub label_id: Id,
     pub label_name: Text,
     pub label_author_id: Id,
 }
-/// QueriedLabel policy effect.
+/// QueryLabelsResult policy effect.
 #[effect]
-pub struct QueriedLabel {
+pub struct QueryLabelsResult {
     pub label_id: Id,
     pub label_name: Text,
     pub label_author_id: Id,
 }
-/// QueriedLabelAssignment policy effect.
+/// QueryLabelsAssignedToRoleResult policy effect.
 #[effect]
-pub struct QueriedLabelAssignment {
+pub struct QueryLabelsAssignedToRoleResult {
+    pub role_id: Id,
+    pub label_id: Id,
+    pub label_name: Text,
+    pub label_author_id: Id,
+}
+/// QueryLabelsAssignedToDeviceResult policy effect.
+#[effect]
+pub struct QueryLabelsAssignedToDeviceResult {
     pub device_id: Id,
     pub label_id: Id,
     pub label_name: Text,
@@ -218,9 +298,14 @@ pub struct AqcNetworkNameSet {
 pub struct AqcNetworkNameUnset {
     pub device_id: Id,
 }
-/// QueryAqcNetworkNamesOutput policy effect.
+/// QueryAqcNetIdResult policy effect.
 #[effect]
-pub struct QueryAqcNetworkNamesOutput {
+pub struct QueryAqcNetIdResult {
+    pub net_id: Option<Text>,
+}
+/// QueryAqcNetworkNamesResult policy effect.
+#[effect]
+pub struct QueryAqcNetworkNamesResult {
     pub net_id: Text,
     pub device_id: Id,
 }
@@ -278,26 +363,48 @@ pub struct AqcUniChannelReceived {
     pub encap: Vec<u8>,
     pub psk_length_in_bytes: i64,
 }
-/// QueryAqcNetIdentifierResult policy effect.
-#[effect]
-pub struct QueryAqcNetIdentifierResult {
-    pub net_id: Option<Text>,
-}
 /// Implements all supported policy actions.
 #[actions]
 pub trait ActorExt {
     fn query_devices_on_team(&mut self) -> Result<(), ClientError>;
-    fn query_device_roles(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_device_role(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn update_operation(&mut self, op: Text, role_id: Id) -> Result<(), ClientError>;
-    fn change_role_managing_role(
+    fn add_perm_to_role(&mut self, role_id: Id, perm: Text) -> Result<(), ClientError>;
+    fn remove_perm_from_role(
+        &mut self,
+        role_id: Id,
+        perm: Text,
+    ) -> Result<(), ClientError>;
+    fn add_role_owner(
         &mut self,
         target_role_id: Id,
-        new_managing_role_id: Id,
+        new_owning_role: Id,
     ) -> Result<(), ClientError>;
-    fn setup_default_roles(&mut self, managing_role_id: Id) -> Result<(), ClientError>;
-    fn setup_default_permissions(&mut self, role_id: Id) -> Result<(), ClientError>;
+    fn remove_role_owner(
+        &mut self,
+        target_role_id: Id,
+        owning_role_id: Id,
+    ) -> Result<(), ClientError>;
+    fn assign_role_management_perm(
+        &mut self,
+        target_role_id: Id,
+        managing_role_id: Id,
+        perm: Text,
+    ) -> Result<(), ClientError>;
+    fn revoke_role_management_perm(
+        &mut self,
+        target_role_id: Id,
+        managing_role_id: Id,
+        perm: Text,
+    ) -> Result<(), ClientError>;
+    fn setup_default_roles(&mut self, owning_role_id: Id) -> Result<(), ClientError>;
     fn assign_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
+    fn change_role(
+        &mut self,
+        device_id: Id,
+        old_role_id: Id,
+        new_role_id: Id,
+    ) -> Result<(), ClientError>;
     fn revoke_role(&mut self, device_id: Id, role_id: Id) -> Result<(), ClientError>;
     fn query_team_roles(&mut self) -> Result<(), ClientError>;
     fn create_team(
@@ -305,10 +412,15 @@ pub trait ActorExt {
         owner_keys: KeyBundle,
         nonce: Vec<u8>,
     ) -> Result<(), ClientError>;
-    fn terminate_team(&mut self) -> Result<(), ClientError>;
+    fn terminate_team(&mut self, team_id: Id) -> Result<(), ClientError>;
     fn add_device(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
     fn remove_device(&mut self, device_id: Id) -> Result<(), ClientError>;
-    fn change_label_managing_role(
+    fn add_label_managing_role(
+        &mut self,
+        label_id: Id,
+        managing_role_id: Id,
+    ) -> Result<(), ClientError>;
+    fn revoke_label_managing_role(
         &mut self,
         label_id: Id,
         managing_role_id: Id,
@@ -319,22 +431,42 @@ pub trait ActorExt {
         managing_role_id: Id,
     ) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: Id) -> Result<(), ClientError>;
-    fn assign_label(
+    fn assign_label_to_role(
+        &mut self,
+        role_id: Id,
+        label_id: Id,
+        op: ChanOp,
+    ) -> Result<(), ClientError>;
+    fn assign_label_to_device(
         &mut self,
         device_id: Id,
         label_id: Id,
         op: ChanOp,
     ) -> Result<(), ClientError>;
-    fn revoke_label(&mut self, device_id: Id, label_id: Id) -> Result<(), ClientError>;
-    fn query_label_exists(&mut self, label_id: Id) -> Result<(), ClientError>;
+    fn revoke_label_from_role(
+        &mut self,
+        role_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn revoke_label_from_device(
+        &mut self,
+        device_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn query_label(&mut self, label_id: Id) -> Result<(), ClientError>;
     fn query_labels(&mut self) -> Result<(), ClientError>;
-    fn query_label_assignments(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_labels_assigned_to_role(&mut self, role_id: Id) -> Result<(), ClientError>;
+    fn query_labels_assigned_to_device(
+        &mut self,
+        device_id: Id,
+    ) -> Result<(), ClientError>;
     fn set_aqc_network_name(
         &mut self,
         device_id: Id,
         net_id: Text,
     ) -> Result<(), ClientError>;
     fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_aqc_net_id(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
     fn create_aqc_bidi_channel(
         &mut self,
@@ -347,5 +479,4 @@ pub trait ActorExt {
         receiver_id: Id,
         label_id: Id,
     ) -> Result<(), ClientError>;
-    fn query_aqc_net_id(&mut self, device_id: Id) -> Result<(), ClientError>;
 }

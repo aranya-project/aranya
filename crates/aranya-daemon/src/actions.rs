@@ -8,7 +8,7 @@ use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_aqc_util::LabelId;
-use aranya_crypto::{policy::RoleId, Csprng, DeviceId, Rng};
+use aranya_crypto::{policy::RoleId, Csprng, DeviceId, Id, Rng};
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
@@ -20,7 +20,7 @@ use aranya_runtime::{
 };
 use futures_util::TryFutureExt as _;
 use tokio::sync::Mutex;
-use tracing::{debug, info, instrument, warn, Instrument};
+use tracing::{debug, instrument, warn, Instrument};
 
 use crate::{
     aranya::Client,
@@ -172,10 +172,10 @@ where
         F: FnOnce() -> <<EN as Engine>::Policy as Policy>::Action<'a> + Send;
 
     /// Terminates the team.
-    #[instrument(skip_all)]
-    fn terminate_team(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(|actor| {
-            actor.terminate_team()?;
+    #[instrument(skip(self))]
+    fn terminate_team(&self, team_id: Id) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.terminate_team(team_id)?;
             Ok(())
         })
         .in_current_span()
@@ -192,7 +192,7 @@ where
     }
 
     /// Remove a device from the team.
-    #[instrument(skip(self), fields(device_id = %device_id))]
+    #[instrument(skip(self), fields(%device_id))]
     fn remove_device(
         &self,
         device_id: DeviceId,
@@ -212,6 +212,72 @@ where
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
             actor.setup_default_roles(managing_role_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Invokes `add_role_owner`.
+    #[instrument(skip(self), fields(%role_id, %new_owning_role_id))]
+    fn add_role_owner(
+        &self,
+        role_id: RoleId,
+        new_owning_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.add_role_owner(role_id.into(), new_owning_role_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Invokes `remove_role_owner`.
+    #[instrument(skip(self), fields(%role_id, %new_owning_role_id))]
+    fn remove_role_owner(
+        &self,
+        role_id: RoleId,
+        new_owning_role_id: RoleId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.remove_role_owner(role_id.into(), new_owning_role_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Invokes `assign_role_management_perm`.
+    #[instrument(skip(self))]
+    fn assign_role_management_perm(
+        &self,
+        target_role_id: RoleId,
+        managing_role_id: RoleId,
+        perm: Text,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.assign_role_management_perm(
+                target_role_id.into(),
+                managing_role_id.into(),
+                perm,
+            )?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Invokes `revoke_role_management_perm`.
+    #[instrument(skip(self))]
+    fn revoke_role_management_perm(
+        &self,
+        target_role_id: RoleId,
+        managing_role_id: RoleId,
+        perm: Text,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.revoke_role_management_perm(
+                target_role_id.into(),
+                managing_role_id.into(),
+                perm,
+            )?;
             Ok(())
         })
         .in_current_span()
@@ -245,20 +311,6 @@ where
         .in_current_span()
     }
 
-    /// Invokes `change_role_managing_role`.
-    #[instrument(skip(self))]
-    fn change_role_managing_role(
-        &self,
-        target_role_id: RoleId,
-        managing_role_id: RoleId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.change_role_managing_role(target_role_id.into(), managing_role_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
     /// Invokes `query_team_roles` to return all roles in the
     /// team.
     #[instrument(skip(self))]
@@ -286,7 +338,7 @@ where
     }
 
     /// Delete a label.
-    #[instrument(skip(self), fields(label_id = %label_id))]
+    #[instrument(skip(self), fields(%label_id))]
     fn delete_label(&self, label_id: LabelId) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
             actor.delete_label(label_id.into())?;
@@ -295,44 +347,71 @@ where
         .in_current_span()
     }
 
-    /// Assigns a label to a device.
-    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id, op = %op))]
-    fn assign_label(
+    /// Invokes `assign_label_to_role`.
+    #[instrument(skip(self), fields(%role_id, %label_id, %op))]
+    fn assign_label_to_role(
+        &self,
+        role_id: RoleId,
+        label_id: LabelId,
+        op: ChanOp,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.assign_label_to_role(role_id.into(), label_id.into(), op)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Invokes `revoke_label_from_role`.
+    #[instrument(skip(self), fields(%role_id, %label_id))]
+    fn revoke_label_from_role(
+        &self,
+        role_id: RoleId,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        self.with_actor(move |actor| {
+            actor.revoke_label_from_role(role_id.into(), label_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Invokes `assign_label_to_device`.
+    #[instrument(skip(self), fields(%device_id, %label_id, %op))]
+    fn assign_label_to_device(
         &self,
         device_id: DeviceId,
         label_id: LabelId,
         op: ChanOp,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(move |actor| {
-            actor.assign_label(device_id.into(), label_id.into(), op)?;
+            actor.assign_label_to_device(device_id.into(), label_id.into(), op)?;
             Ok(())
         })
         .in_current_span()
     }
 
     /// Revokes a label.
-    #[instrument(skip(self), fields(device_id = %device_id, label_id = %label_id))]
-    fn revoke_label(
+    #[instrument(skip(self), fields(%device_id, %label_id))]
+    fn revoke_label_from_device(
         &self,
         device_id: DeviceId,
         label_id: LabelId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, %label_id, "revoking AQC label");
         self.with_actor(move |actor| {
-            actor.revoke_label(device_id.into(), label_id.into())?;
+            actor.revoke_label_from_device(device_id.into(), label_id.into())?;
             Ok(())
         })
         .in_current_span()
     }
 
     /// Sets an AQC network name.
-    #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
+    #[instrument(skip(self), fields(%device_id, %net_identifier))]
     fn set_aqc_network_name(
         &self,
         device_id: DeviceId,
         net_identifier: Text,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, %net_identifier, "setting AQC network name");
         self.with_actor(move |actor| {
             actor.set_aqc_network_name(device_id.into(), net_identifier)?;
             Ok(())
@@ -341,12 +420,11 @@ where
     }
 
     /// Unsets an AQC network name.
-    #[instrument(skip(self), fields(device_id = %device_id))]
+    #[instrument(skip(self), fields(%device_id))]
     fn unset_aqc_network_name(
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        info!(%device_id, "unsetting AQC network name");
         self.with_actor(move |actor| {
             actor.unset_aqc_network_name(device_id.into())?;
             Ok(())
@@ -381,7 +459,7 @@ where
 
     /// Creates a bidirectional AQC channel off graph.
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(peer_id = %peer_id, label = %label_id))]
+    #[instrument(skip(self), fields(%peer_id, %label_id))]
     fn create_aqc_bidi_channel_off_graph(
         &self,
         peer_id: DeviceId,
@@ -395,7 +473,7 @@ where
     }
 
     /// Creates a unidirectional AQC channel.
-    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
+    #[instrument(skip(self), fields(%seal_id, %open_id, %label_id))]
     fn create_aqc_uni_channel(
         &self,
         seal_id: DeviceId,
@@ -411,7 +489,7 @@ where
 
     /// Creates a unidirectional AQC channel.
     #[allow(clippy::type_complexity)]
-    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label = %label))]
+    #[instrument(skip(self), fields(%seal_id, %open_id, %label))]
     fn create_aqc_uni_channel_off_graph(
         &self,
         seal_id: DeviceId,
@@ -430,7 +508,7 @@ where
     }
 
     /// Creates a bidirectional AQC channel.
-    #[instrument(skip(self), fields(peer_id = %peer_id, label_id = %label_id))]
+    #[instrument(skip(self), fields(%peer_id, %label_id))]
     fn create_aqc_bidi_channel(
         &self,
         peer_id: DeviceId,

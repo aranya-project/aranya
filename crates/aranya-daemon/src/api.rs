@@ -189,8 +189,10 @@ impl EffectHandler {
                 DeviceRemoved(_) => {}
                 LabelCreated(_) => {}
                 LabelDeleted(_) => {}
-                LabelAssigned(_) => {}
-                LabelRevoked(_) => {}
+                LabelAssignedToDevice(_) => {}
+                LabelRevokedFromDevice(_) => {}
+                LabelAssignedToRole(_) => {}
+                LabelRevokedFromRole(_) => {}
                 AqcNetworkNameSet(e) => {
                     self.aqc
                         .add_peer(
@@ -201,25 +203,32 @@ impl EffectHandler {
                         .await;
                 }
                 AqcNetworkNameUnset(e) => self.aqc.remove_peer(graph, e.device_id.into()).await,
-                QueriedLabel(_) => {}
+                QueryLabelResult(_) => {}
                 AqcBidiChannelCreated(_) => {}
                 AqcBidiChannelReceived(_) => {}
                 AqcUniChannelCreated(_) => {}
                 AqcUniChannelReceived(_) => {}
                 QueryDevicesOnTeamResult(_) => {}
-                QueryDeviceRolesResult(_) => {}
+                QueryDeviceRoleResult(_) => {}
                 QueryDeviceKeyBundleResult(_) => {}
-                QueryAqcNetIdentifierResult(_) => {}
-                QueriedLabelAssignment(_) => {}
-                QueryLabelExistsResult(_) => {}
-                QueryAqcNetworkNamesOutput(_) => {}
+                QueryAqcNetworkNamesResult(_) => {}
+                QueryLabelsAssignedToDeviceResult(_) => {}
+                QueryLabelsAssignedToRoleResult(_) => {}
                 RoleCreated(_) => {}
                 RoleAssigned(_) => {}
                 RoleRevoked(_) => {}
-                QueriedTeamRole(_) => {}
-                OperationUpdated(_) => {}
-                LabelUpdated(_) => {}
-                RoleManagingRoleChanged(_) => {}
+                QueryTeamRolesResult(_) => {}
+                LabelManagingRoleAdded(_) => {}
+                LabelManagingRoleRevoked(_) => {}
+                PermAddedToRole(_) => {}
+                PermRemovedFromRole(_) => {}
+                RoleOwnerAdded(_) => {}
+                RoleOwnerRemoved(_) => {}
+                RoleManagementPermAssigned(_) => {}
+                RoleManagementPermRevoked(_) => {}
+                RoleChanged(_) => {}
+                QueryLabelsResult(_) => {}
+                QueryAqcNetIdResult(_) => {}
             }
         }
         Ok(())
@@ -580,6 +589,88 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self))]
+    async fn add_role_owner(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        owning_role: api::RoleId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.client
+            .actions(&team.into_id().into())
+            .add_role_owner(role.into_id().into(), owning_role.into_id().into())
+            .await
+            .context("unable to add role owner")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn remove_role_owner(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        owning_role: api::RoleId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.client
+            .actions(&team.into_id().into())
+            .remove_role_owner(role.into_id().into(), owning_role.into_id().into())
+            .await
+            .context("unable to remove role owner")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn assign_role_management_perm(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        target_role: api::RoleId,
+        managing_role: api::RoleId,
+        perm: Text,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.client
+            .actions(&team.into_id().into())
+            .assign_role_management_perm(
+                target_role.into_id().into(),
+                managing_role.into_id().into(),
+                perm,
+            )
+            .await
+            .context("unable to assign role management permission")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn revoke_role_management_perm(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        target_role: api::RoleId,
+        managing_role: api::RoleId,
+        perm: Text,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.client
+            .actions(&team.into_id().into())
+            .revoke_role_management_perm(
+                target_role.into_id().into(),
+                managing_role.into_id().into(),
+                perm,
+            )
+            .await
+            .context("unable to revoke role management permission")?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
     async fn assign_role(
         self,
         _: context::Context,
@@ -616,24 +707,6 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self))]
-    async fn change_role_managing_role(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        role: api::RoleId,
-        managing_role: api::RoleId,
-    ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
-
-        self.client
-            .actions(&team.into_id().into())
-            .change_role_managing_role(role.into_id().into(), managing_role.into_id().into())
-            .await
-            .context("unable to change role managing role")?;
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
     async fn query_team_roles(
         self,
         _: context::Context,
@@ -649,7 +722,7 @@ impl DaemonApi for Api {
             .context("unable to query team roles")?
             .into_iter()
             .filter_map(|e| {
-                if let Effect::QueriedTeamRole(e) = e {
+                if let Effect::QueryTeamRolesResult(e) = e {
                     Some(api::Role {
                         id: e.role_id.into(),
                         name: e.name,

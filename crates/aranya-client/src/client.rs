@@ -696,6 +696,83 @@ impl Team<'_> {
         Ok(Roles { roles })
     }
 
+    /// Adds `owning_role` as an owner of the target role.
+    #[instrument(skip(self))]
+    pub async fn add_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .add_role_owner(
+                context::current(),
+                self.id,
+                role.into_api(),
+                owning_role.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Removes an owning role as an owner of the target role.
+    #[instrument(skip(self))]
+    pub async fn remove_role_owner(&self, role: RoleId, owning_role: RoleId) -> Result<()> {
+        self.client
+            .daemon
+            .remove_role_owner(
+                context::current(),
+                self.id,
+                role.into_api(),
+                owning_role.into_api(),
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Assigns a role management permission to a managing role.
+    #[instrument(skip(self))]
+    pub async fn assign_role_management_permission(
+        &self,
+        role: RoleId,
+        managing_role: RoleId,
+        perm: Text,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .assign_role_management_perm(
+                context::current(),
+                self.id,
+                role.into_api(),
+                managing_role.into_api(),
+                perm,
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Revokes a role management permission from a managing
+    /// role.
+    #[instrument(skip(self))]
+    pub async fn revoke_role_management_permission(
+        &self,
+        role: RoleId,
+        managing_role: RoleId,
+        perm: Text,
+    ) -> Result<()> {
+        self.client
+            .daemon
+            .assign_role_management_perm(
+                context::current(),
+                self.id,
+                role.into_api(),
+                managing_role.into_api(),
+                perm,
+            )
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Assigns a role to a device.
     #[instrument(skip(self))]
     pub async fn assign_role(&self, device: DeviceId, role: RoleId) -> Result<()> {
@@ -722,26 +799,6 @@ impl Team<'_> {
                 self.id,
                 device.into_api(),
                 role.into_api(),
-            )
-            .await
-            .map_err(IpcError::new)?
-            .map_err(aranya_error)
-    }
-
-    /// Changes the role that is required to manage `role`.
-    #[instrument(skip(self))]
-    pub async fn change_role_managing_role(
-        &self,
-        role: RoleId,
-        managing_role_id: RoleId,
-    ) -> Result<()> {
-        self.client
-            .daemon
-            .change_role_managing_role(
-                context::current(),
-                self.id,
-                role.into_api(),
-                managing_role_id.into_api(),
             )
             .await
             .map_err(IpcError::new)?

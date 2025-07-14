@@ -792,17 +792,29 @@ pub trait DaemonApi {
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
 
     /// Configures the team with default roles from policy.
-    async fn setup_default_roles(team: TeamId, managing_role_id: RoleId) -> Result<Box<[Role]>>;
+    async fn setup_default_roles(team: TeamId, owning_role: RoleId) -> Result<Box<[Role]>>;
+    /// Adds an owning role to the target role.
+    async fn add_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
+    /// Removes an owning role from the target role.
+    async fn remove_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
+    /// Assigns a role management permission to a role.
+    async fn assign_role_management_perm(
+        team: TeamId,
+        role: RoleId,
+        managing_role: RoleId,
+        perm: Text,
+    ) -> Result<()>;
+    /// Revokes a role management permission from a role.
+    async fn revoke_role_management_perm(
+        team: TeamId,
+        role: RoleId,
+        managing_role: RoleId,
+        perm: Text,
+    ) -> Result<()>;
     /// Assign a role to a device.
     async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
-    /// Changes the role that manages the role.
-    async fn change_role_managing_role(
-        team: TeamId,
-        role_id: RoleId,
-        managing_role_id: RoleId,
-    ) -> Result<()>;
     /// Returns the current team roles.
     async fn query_team_roles(team: TeamId) -> Result<Box<[Role]>>;
 
