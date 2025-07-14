@@ -147,7 +147,7 @@ pub enum AqcError {
     InvalidCtrlMessage(postcard::Error),
 
     /// Peer failed to process control message.
-    #[error("peer could not processing control message: {0}")]
+    #[error("peer could not process control message: {0}")]
     CtrlFailure(String),
 
     /// An internal bug was discovered.
