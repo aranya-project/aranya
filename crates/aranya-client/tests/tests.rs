@@ -20,8 +20,6 @@ use tracing::info;
 mod common;
 use common::{sleep, TeamCtx, SLEEP_INTERVAL};
 
-use crate::common::SYNC_INTERVAL;
-
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_sync_now() -> Result<()> {
@@ -145,10 +143,8 @@ async fn test_query_functions() -> Result<()> {
     let memberb = team.memberb.client.team(team_id);
     let queries = memberb.queries();
 
-    // Wait sync interval before having membera sync with owner.
-    sleep(SYNC_INTERVAL).await;
     memberb
-        .sync_now(team.owner.aranya_local_addr().await?.into(), None)
+        .sync_now(team.operator.aranya_local_addr().await?.into(), None)
         .await?;
 
     // First, let's check how many devices are on the team.
