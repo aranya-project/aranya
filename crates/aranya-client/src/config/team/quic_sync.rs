@@ -89,14 +89,14 @@ impl AddTeamQuicSyncConfigBuilder {
         self
     }
 
-    /// set values from a config.
+    /// set values from a [`AddTeamQuicSyncConfig`].
     #[doc(hidden)]
     pub fn set_from_cfg(&mut self, cfg: AddTeamQuicSyncConfig) -> &mut Self {
         self.mode = Some(cfg.mode);
         self
     }
 
-    /// set values from a config.
+    /// set values from a [`versioned::QuicSyncTeamInfo`].
     pub(crate) fn set_from_team_info(&mut self, info: versioned::QuicSyncTeamInfo) -> &mut Self {
         self.mode = info.mode;
         self

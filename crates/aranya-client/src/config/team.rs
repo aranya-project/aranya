@@ -156,15 +156,14 @@ impl AddTeamConfigBuilder {
         // Convert any version of `TeamInfo` into the latest version
         let TeamInfo {
             team_id,
-            quic_sync: maybe_qs_cfg,
+            quic_sync: maybe_qs_team_info,
         } = team_info.into();
 
         let builder = {
             let mut builder = Self::default();
 
-            if let MaybeQuicSyncTeamInfo::Some { inner: qs_cfg } = maybe_qs_cfg {
-                let qs_cfg_builder = builder.quic_sync();
-                let _ = qs_cfg_builder.set_from_team_info(qs_cfg);
+            if let MaybeQuicSyncTeamInfo::Some { inner } = maybe_qs_team_info {
+                builder.quic_sync().set_from_team_info(inner);
             }
 
             if let Some(id) = team_id {
