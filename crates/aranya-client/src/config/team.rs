@@ -12,6 +12,7 @@
 //! Both operations support optional transport configuration.
 
 use aranya_daemon_api::TeamId;
+use serde::{Deserialize, Serialize};
 
 use crate::{error::InvalidArg, ConfigError, Result};
 
@@ -44,17 +45,52 @@ impl CreateTeamConfigBuilder {
     }
 }
 
-/// Builder for [`AddTeamConfig`].
-#[derive(Debug, Default)]
+/// Configuration for joining an existing team.
+#[derive(Clone, Debug)]
+pub struct AddTeamConfig {
+    team_id: TeamId,
+    quic_sync: Option<AddTeamQuicSyncConfig>,
+}
+
+impl AddTeamConfig {
+    /// Creates a default [`AddTeamConfigBuilder`].
+    pub fn builder() -> AddTeamConfigBuilder {
+        AddTeamConfigBuilder::default()
+    }
+}
+
+impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
+    fn from(value: AddTeamConfig) -> Self {
+        let quic_sync: Option<AddTeamQuicSyncConfig> = value.quic_sync;
+        Self {
+            team_id: value.team_id,
+            quic_sync: quic_sync.map(Into::into),
+        }
+    }
+}
+
+/// Team data for initializing an [`AddTeamConfigBuilder`].
+#[obake::versioned]
+#[obake(version("0.1.0"))]
+#[obake(derive(Clone, Debug, Serialize, Deserialize,))]
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct TeamInfo {
+    team_id: Option<TeamId>,
+    #[obake(inherit)]
+    quic_sync: quic_sync::versioned::MaybeAddTeamQuicSyncConfig,
+}
+
+/// Builder for joining an existing team configuration.
+#[derive(Clone, Debug, Default)]
 pub struct AddTeamConfigBuilder {
-    id: Option<TeamId>,
+    team_id: Option<TeamId>,
     quic_sync: Option<AddTeamQuicSyncConfig>,
 }
 
 impl AddTeamConfigBuilder {
     /// Sets the ID of the team to add.
     pub fn team_id(mut self, id: TeamId) -> Self {
-        self.id = Some(id);
+        self.team_id = Some(id);
         self
     }
 
@@ -69,17 +105,49 @@ impl AddTeamConfigBuilder {
 
     /// Attempts to build an [`AddTeamConfig`] using the provided parameters.
     pub fn build(self) -> Result<AddTeamConfig> {
-        let id = self.id.ok_or_else(|| {
-            ConfigError::InvalidArg(InvalidArg::new(
+        let Some(id) = self.team_id else {
+            return Err(ConfigError::InvalidArg(InvalidArg::new(
                 "id",
                 "Missing `id` field when calling `AddTeamConfigBuilder::build`",
             ))
-        })?;
+            .into());
+        };
 
         Ok(AddTeamConfig {
-            id,
+            team_id: id,
             quic_sync: self.quic_sync,
         })
+    }
+
+    /// Build the latest [`VersionedTeamInfo`] using the provided parameters.
+    pub fn to_team_info(self) -> obake::AnyVersion<TeamInfo> {
+        let team_info = TeamInfo {
+            team_id: self.team_id,
+            quic_sync: self.quic_sync.into(),
+        };
+        VersionedTeamInfo::from(team_info)
+    }
+
+    /// Initializes a builder from any version of a [`TeamInfo`]
+    pub fn from_team_info(team_info: obake::AnyVersion<TeamInfo>) -> Result<Self> {
+        // Convert any version of `TeamInfo` into the latest version
+        let TeamInfo { team_id, quic_sync } = team_info.into();
+
+        let builder = {
+            let mut builder = Self::default();
+
+            if let Some(quic_sync) = quic_sync.into() {
+                builder = builder.quic_sync(quic_sync);
+            }
+
+            if let Some(id) = team_id {
+                builder = builder.team_id(id);
+            }
+
+            builder
+        };
+
+        Ok(builder)
     }
 }
 
@@ -104,25 +172,34 @@ impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
     }
 }
 
-/// Configuration for joining an existing team.
-#[derive(Clone, Debug)]
-pub struct AddTeamConfig {
-    id: TeamId,
-    quic_sync: Option<AddTeamQuicSyncConfig>,
-}
+#[cfg(test)]
+mod test {
+    use aranya_daemon_api::SEED_IKM_SIZE;
 
-impl AddTeamConfig {
-    /// Creates a default [`AddTeamConfigBuilder`].
-    pub fn builder() -> AddTeamConfigBuilder {
-        AddTeamConfigBuilder::default()
-    }
-}
+    use super::*;
 
-impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
-    fn from(value: AddTeamConfig) -> Self {
-        Self {
-            team_id: value.id,
-            quic_sync: value.quic_sync.map(Into::into),
-        }
+    #[test]
+    fn test_team_info_roundtrip() {
+        let quic_sync_config = {
+            let builder = AddTeamQuicSyncConfig::builder();
+            builder
+                .seed_ikm([0; SEED_IKM_SIZE])
+                .build()
+                .expect("can build")
+        };
+
+        let team_info = {
+            let builder = AddTeamConfig::builder()
+                .team_id(TeamId::default())
+                .quic_sync(quic_sync_config);
+            builder.to_team_info()
+        };
+
+        let json = serde_json::to_string(&team_info).expect("can serialize to json");
+        let deserialized: VersionedTeamInfo = serde_json::from_str(&json).expect("can deserialize");
+
+        let builder = AddTeamConfigBuilder::from_team_info(deserialized).expect("can initialize");
+        // assert_eq!(team_info, builder.build_team_info().expect("can build"));
+        assert!(builder.build().is_ok());
     }
 }
