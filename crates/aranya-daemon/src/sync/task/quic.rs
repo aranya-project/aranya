@@ -18,8 +18,8 @@ use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequestMessage, SyncRequester,
-    SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
+    Engine, GraphId, PeerCache, Sink, StorageError, StorageProvider, SyncRequestMessage,
+    SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     rustls::{NoCertResolver, SkipServerVerification},
@@ -44,7 +44,7 @@ use s2n_quic::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{io::AsyncReadExt, sync::mpsc, task::JoinSet};
-use tracing::{debug, error, info, instrument};
+use tracing::{debug, error, info, instrument, warn};
 
 use super::SyncResponse;
 use crate::{
@@ -542,6 +542,17 @@ where
                 client.lock().await.provider(),
                 &mut PeerCache::new(),
             )
+            .or_else(|err| {
+                if matches!(
+                    err,
+                    aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
+                ) {
+                    warn!("missing requested graph, we likely have not synced yet");
+                    Ok(0)
+                } else {
+                    Err(err)
+                }
+            })
             .context("sync resp poll failed")?;
         debug!(len = len, "sync poll finished");
         buf.truncate(len);
