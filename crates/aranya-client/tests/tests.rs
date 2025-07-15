@@ -9,8 +9,6 @@
     rust_2018_idioms
 )]
 
-use std::time::Duration;
-
 use anyhow::{bail, Context, Result};
 use aranya_client::{config::CreateTeamConfig, AddTeamConfig, CreateTeamQuicSyncConfig};
 use aranya_daemon_api::Role;
@@ -155,8 +153,6 @@ async fn test_query_functions() -> Result<()> {
 /// a peer calls the add_team() API
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_team() -> Result<()> {
-    const TLS_HANDSHAKE_DURATION: Duration = Duration::from_secs(10);
-
     // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let team = TeamCtx::new("test_add_team", work_dir).await?;
@@ -192,12 +188,17 @@ async fn test_add_team() -> Result<()> {
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
         let admin = team.admin.client.team(team_id);
-        admin.sync_now(owner_addr.into(), None).await?;
-        sleep(TLS_HANDSHAKE_DURATION).await;
+        match admin.sync_now(owner_addr.into(), None).await {
+            Ok(()) => bail!("expected syncing to fail"),
+            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
+            // but currently the handshake timeout races with the tarpc timeout.
+            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
+            Err(err) => return Err(err).context("unexpected error while syncing"),
+        }
 
         // Now, we try to assign a role using the admin, which is expected to fail.
         match admin.assign_role(team.operator.id, Role::Operator).await {
-            Ok(_) => bail!("Expected role assignment to fail"),
+            Ok(()) => bail!("Expected role assignment to fail"),
             Err(aranya_client::Error::Aranya(_)) => {}
             Err(_) => bail!("Unexpected error"),
         }
