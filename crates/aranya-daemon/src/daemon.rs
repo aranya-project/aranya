@@ -259,7 +259,7 @@ impl Daemon {
     }
 
     /// The daemon's entrypoint.
-    pub async fn spawn(mut self) -> Result<DaemonHandle, ready::WaitError> {
+    pub async fn spawn(self) -> Result<DaemonHandle, ready::WaitError> {
         let _guard = self.span.enter();
         let mut set = JoinSet::new();
         let waiter = ready::Waiter::new(3);
@@ -269,16 +269,9 @@ impl Daemon {
                 .instrument(info_span!("sync-server")),
         );
         set.spawn({
-            let notifier = waiter.notifier();
-            async move {
-                notifier.notify();
-                loop {
-                    if let Err(err) = self.syncer.next().await {
-                        error!(?err, "unable to sync with peer");
-                    }
-                }
-            }
-            .instrument(info_span!("syncer"))
+            self.syncer
+                .run(waiter.notifier())
+                .instrument(info_span!("syncer"))
         });
         set.spawn(
             self.api
