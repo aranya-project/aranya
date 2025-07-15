@@ -268,20 +268,18 @@ impl Daemon {
                 .serve(waiter.notifier())
                 .instrument(info_span!("sync-server")),
         );
-        set.spawn(
-            {
-                let notifier = waiter.notifier();
-                async move {
-                    notifier.notify();
-                    loop {
-                        if let Err(err) = self.syncer.next().await {
-                            error!(?err, "unable to sync with peer");
-                        }
+        set.spawn({
+            let notifier = waiter.notifier();
+            async move {
+                notifier.notify();
+                loop {
+                    if let Err(err) = self.syncer.next().await {
+                        error!(?err, "unable to sync with peer");
                     }
                 }
             }
-            .instrument(info_span!("syncer")),
-        );
+            .instrument(info_span!("syncer"))
+        });
         set.spawn(
             self.api
                 .serve(waiter.notifier())
