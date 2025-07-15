@@ -298,10 +298,12 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
 
     let operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .device(team.membera.id)
+        .assign_aqc_net_identifier(team.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .device(team.memberb.id)
+        .assign_aqc_net_identifier(team.memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
@@ -315,10 +317,12 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label1, op)
+        .device(team.membera.id)
+        .assign_label(label1, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label1, op)
+        .device(team.memberb.id)
+        .assign_label(label1, op)
         .await?;
 
     let label2 = operator_team
@@ -326,10 +330,12 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
         .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label2, op)
+        .device(team.membera.id)
+        .assign_label(label2, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label2, op)
+        .device(team.memberb.id)
+        .assign_label(label2, op)
         .await?;
 
     let label3 = operator_team
@@ -339,7 +345,8 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     // assign label 3 to only the receiver, we are testing if the sender can create
     // a channel without the label assignment
     operator_team
-        .assign_label(team.memberb.id, label3, op)
+        .device(team.memberb.id)
+        .assign_label(label3, op)
         .await?;
 
     // wait for syncing.
@@ -399,10 +406,12 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     let operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .device(team.membera.id)
+        .assign_aqc_net_identifier(team.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .device(team.memberb.id)
+        .assign_aqc_net_identifier(team.memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
@@ -416,10 +425,12 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label1, op)
+        .device(team.membera.id)
+        .assign_label(label1, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label1, op)
+        .device(team.memberb.id)
+        .assign_label(label1, op)
         .await?;
 
     let label2 = operator_team
@@ -427,10 +438,12 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
         .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label2, op)
+        .device(team.membera.id)
+        .assign_label(label2, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label2, op)
+        .device(team.memberb.id)
+        .assign_label(label2, op)
         .await?;
 
     let label3 = operator_team
@@ -440,7 +453,8 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     // assign label 3 to only the sender, we are testing if the receiver can receive
     // a channel without the label assignment
     operator_team
-        .assign_label(team.membera.id, label3, op)
+        .device(team.membera.id)
+        .assign_label(label3, op)
         .await?;
 
     // wait for syncing.
@@ -500,10 +514,12 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     let operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .device(team.membera.id)
+        .assign_aqc_net_identifier(team.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .device(team.memberb.id)
+        .assign_aqc_net_identifier(team.memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
@@ -517,10 +533,12 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label1, op)
+        .device(team.membera.id)
+        .assign_label(label1, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label1, op)
+        .device(team.memberb.id)
+        .assign_label(label1, op)
         .await?;
 
     let label2 = operator_team
@@ -528,10 +546,12 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label2, op)
+        .device(team.membera.id)
+        .assign_label(label2, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label2, op)
+        .device(team.memberb.id)
+        .assign_label(label2, op)
         .await?;
 
     // wait for syncing.
@@ -653,10 +673,12 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     let operator_team = team.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .device(team.membera.id)
+        .assign_aqc_net_identifier(team.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .device(team.memberb.id)
+        .assign_aqc_net_identifier(team.memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
@@ -674,7 +696,8 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         .assign_label(label1, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label1, op)
+        .device(team.memberb.id)
+        .assign_label(label1, op)
         .await?;
 
     let label2 = operator_team
@@ -682,10 +705,12 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label2, op)
+        .device(team.membera.id)
+        .assign_label(label2, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label2, op)
+        .device(team.memberb.id)
+        .assign_label(label2, op)
         .await?;
 
     // wait for syncing.

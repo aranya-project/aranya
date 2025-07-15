@@ -119,7 +119,7 @@ impl TeamCtx {
             self.owner
                 .client
                 .team(team_id)
-                .change_role_managing_role(role, manager)
+                .assign_role_management_permission(role, manager, todo!())
                 .await
                 .with_context(|| format!("{name}: unable to change managing role"))?;
         }
@@ -144,7 +144,7 @@ impl TeamCtx {
         // Add the admin as a new device and assign its role in
         // one step.
         owner
-            .add_device_to_team(self.admin.pk.clone(), [roles.admin().id])
+            .add_device(self.admin.pk.clone(), Some(roles.admin().id))
             .await
             .context("owner unable to add admin to team")?;
 
@@ -154,7 +154,7 @@ impl TeamCtx {
         // Add the operator as a new device and then have the
         // admin assign its role.
         owner
-            .add_device_to_team(self.operator.pk.clone(), None)
+            .add_device(self.operator.pk.clone(), None)
             .await
             .context("owner unable to add operator to team")?;
 
@@ -172,13 +172,13 @@ impl TeamCtx {
 
         // Add member A as a new device.
         admin
-            .add_device_to_team(self.membera.pk.clone(), None)
+            .add_device(self.membera.pk.clone(), None)
             .await
             .context("admin unable to add membera to team")?;
 
         // Add member B as a new device.
         admin
-            .add_device_to_team(self.memberb.pk.clone(), None)
+            .add_device(self.memberb.pk.clone(), None)
             .await
             .context("admin unable to add memberb to team")?;
 
