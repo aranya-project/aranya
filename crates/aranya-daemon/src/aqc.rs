@@ -1,4 +1,3 @@
-use core::fmt;
 use std::{collections::BTreeMap, sync::Arc};
 
 use anyhow::Result;
@@ -12,6 +11,7 @@ use aranya_daemon_api::{
 use aranya_runtime::GraphId;
 use bimap::BiBTreeMap;
 use buggy::{bug, BugExt};
+use derive_where::derive_where;
 use tokio::sync::Mutex;
 use tracing::{debug, instrument};
 
@@ -25,12 +25,15 @@ use crate::{
 type PeerMap = BTreeMap<GraphId, Peers>;
 type Peers = BiBTreeMap<NetIdentifier, DeviceId>;
 
+#[derive_where(Debug)]
 pub(crate) struct Aqc<E, KS> {
     /// Our device ID.
     device_id: DeviceId,
     /// All the peers that we have channels with.
     peers: Arc<Mutex<PeerMap>>,
+    #[derive_where(skip(Debug))]
     handler: Mutex<Handler<AranyaStore<KS>>>,
+    #[derive_where(skip(Debug))]
     eng: Mutex<E>,
 }
 
@@ -264,14 +267,5 @@ where
             }
         })?;
         Ok(AqcPsks::Uni(psks))
-    }
-}
-
-impl<E, KS> fmt::Debug for Aqc<E, KS> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Aqc")
-            .field("device_id", &self.device_id)
-            .field("peers", &self.peers)
-            .finish_non_exhaustive()
     }
 }

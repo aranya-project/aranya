@@ -18,8 +18,8 @@ use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequestMessage, SyncRequester,
-    SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
+    Engine, GraphId, PeerCache, Sink, StorageError, StorageProvider, SyncRequestMessage,
+    SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     rustls::{NoCertResolver, SkipServerVerification},
@@ -28,6 +28,7 @@ use aranya_util::{
 };
 use buggy::{bug, BugExt as _};
 use bytes::Bytes;
+use derive_where::derive_where;
 #[allow(deprecated)]
 use s2n_quic::provider::tls::rustls::rustls::{
     server::PresharedKeySelection, ClientConfig, ServerConfig,
@@ -87,6 +88,7 @@ pub enum Error {
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
+#[derive(Debug)]
 pub struct State {
     /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: QuicClient,
@@ -330,6 +332,7 @@ impl Syncer<State> {
 
 /// The Aranya QUIC sync server.
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
+#[derive_where(Debug)]
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
     aranya: AranyaClient<EN, SP>,
@@ -522,6 +525,17 @@ where
                 client.lock().await.provider(),
                 &mut PeerCache::new(),
             )
+            .or_else(|err| {
+                if matches!(
+                    err,
+                    aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
+                ) {
+                    warn!("missing requested graph, we likely have not synced yet");
+                    Ok(0)
+                } else {
+                    Err(err)
+                }
+            })
             .context("sync resp poll failed")?;
         debug!(len = len, "sync poll finished");
         buf.truncate(len);
