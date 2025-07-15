@@ -9,6 +9,8 @@
     rust_2018_idioms
 )]
 
+mod common;
+
 use anyhow::{bail, Context, Result};
 use aranya_client::{
     config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
@@ -17,8 +19,7 @@ use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
 
-mod common;
-use common::TeamCtx;
+use crate::common::TeamCtx;
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]

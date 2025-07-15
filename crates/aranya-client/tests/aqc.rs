@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 mod common;
+
 use anyhow::{Context as _, Result};
 use aranya_client::aqc::AqcPeerChannel;
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
@@ -10,11 +11,10 @@ use aranya_daemon_api::{text, ChanOp};
 use backon::{ConstantBuilder, Retryable as _};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
-use common::TeamCtx;
 use futures_util::{future::try_join, FutureExt};
 use tempfile::tempdir;
 
-use crate::common::sleep;
+use crate::common::{sleep, TeamCtx};
 
 /// Demonstrate nominal usage of AQC channels.
 /// 1. Create bidirectional and unidirectional AQC channels.
