@@ -1,5 +1,4 @@
 use core::mem::MaybeUninit;
-use std::ptr;
 
 use aranya_capi_core::{
     safe::{TypeId, Typed},
@@ -105,12 +104,12 @@ impl AddTeamConfigBuilder {
         self.team_id = Some(id);
     }
 
-    /// Returns a mutable pointer to a builder for an [`AddTeamQuicSyncConfig`].
+    /// Returns a mutable reference to a builder for an [`AddTeamQuicSyncConfig`].
     ///
     /// This function must be called in order to initialize an [`AddTeamQuicSyncConfigBuilder`]
     /// with default values.
-    pub fn quic_sync(&mut self) -> *mut defs::AddTeamQuicSyncConfigBuilder {
-        ptr::from_mut(self.quic_sync.get_or_insert_with(|| {
+    pub fn quic_sync(&mut self) -> &mut defs::AddTeamQuicSyncConfigBuilder {
+        self.quic_sync.get_or_insert_with(|| {
             let mut ret = MaybeUninit::uninit();
             defs::AddTeamQuicSyncConfigBuilder::init(
                 &mut ret,
@@ -119,7 +118,7 @@ impl AddTeamConfigBuilder {
 
             // SAFETY: Initialized in the call above.
             unsafe { ret.assume_init() }
-        }))
+        })
     }
 }
 
@@ -207,6 +206,26 @@ impl From<AddTeamConfigBuilder> for aranya_client::AddTeamConfigBuilder {
 
             if let Some(mode) = qs_cfg_builder.mode {
                 builder.quic_sync().mode(mode);
+            }
+        }
+
+        builder
+    }
+}
+
+impl From<aranya_client::AddTeamConfigBuilder> for AddTeamConfigBuilder {
+    fn from(mut value: aranya_client::AddTeamConfigBuilder) -> Self {
+        let mut builder = Self::default();
+
+        if let Some(team_id) = value.get_team_id() {
+            builder.id((*team_id).into());
+        }
+
+        if value.has_quic_sync() {
+            let qs_cfg_builder = value.quic_sync();
+
+            if let Some(mode) = qs_cfg_builder.get_mode() {
+                builder.quic_sync().mode(mode.clone());
             }
         }
 

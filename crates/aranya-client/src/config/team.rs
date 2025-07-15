@@ -105,10 +105,22 @@ pub struct AddTeamConfigBuilder {
 }
 
 impl AddTeamConfigBuilder {
+    /// gets the team ID.
+    #[doc(hidden)]
+    pub fn get_team_id(&self) -> Option<&TeamId> {
+        self.team_id.as_ref()
+    }
+
     /// Sets the ID of the team to add.
     pub fn team_id(mut self, id: TeamId) -> Self {
         self.team_id = Some(id);
         self
+    }
+
+    /// checks if the quic sync config builder is configured.
+    #[doc(hidden)]
+    pub fn has_quic_sync(&self) -> bool {
+        self.quic_sync.is_some()
     }
 
     /// Returns a mutable reference to a builder for an [`AddTeamQuicSyncConfig`].

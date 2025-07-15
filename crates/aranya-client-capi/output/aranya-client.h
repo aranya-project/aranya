@@ -1453,24 +1453,24 @@ AranyaError aranya_add_team_config_builder_to_team_info_ext(struct AranyaAddTeam
 /**
  * Initializes a new team config builder instance [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
  *
- * @param[out] cfg the uninitialized team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
+ * @param[out] out the uninitialized team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
  * @param[in] team_info the serialized team info data.
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
-AranyaError aranya_add_team_config_builder_from_team_info(struct AranyaAddTeamConfigBuilder *_cfg,
+AranyaError aranya_add_team_config_builder_from_team_info(struct AranyaAddTeamConfigBuilder *out,
                                                           const uint8_t *team_info,
                                                           size_t team_info_len);
 
 /**
  * Initializes a new team config builder instance [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
  *
- * @param[out] cfg the uninitialized team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
+ * @param[out] out the uninitialized team config builder [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
  * @param[in] team_info the serialized team info data.
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
-AranyaError aranya_add_team_config_builder_from_team_info_ext(struct AranyaAddTeamConfigBuilder *_cfg,
+AranyaError aranya_add_team_config_builder_from_team_info_ext(struct AranyaAddTeamConfigBuilder *out,
                                                               const uint8_t *team_info,
                                                               size_t team_info_len,
                                                               struct AranyaExtError *__ext_err);

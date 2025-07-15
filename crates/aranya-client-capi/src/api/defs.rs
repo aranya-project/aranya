@@ -875,18 +875,22 @@ pub unsafe fn add_team_config_builder_to_team_info(
 
 /// Initializes a new team config builder instance [`AddTeamConfigBuilder`].
 ///
-/// @param[out] cfg the uninitialized team config builder [`AddTeamConfigBuilder`].
+/// @param[out] out the uninitialized team config builder [`AddTeamConfigBuilder`].
 /// @param[in] team_info the serialized team info data.
 ///
 /// @relates AranyaAddTeamConfigBuilder.
 pub unsafe fn add_team_config_builder_from_team_info(
-    _cfg: &mut MaybeUninit<AddTeamConfigBuilder>,
+    out: &mut MaybeUninit<AddTeamConfigBuilder>,
     team_info: &[u8],
 ) -> Result<(), imp::Error> {
     let team_info = postcard::from_bytes(team_info)?;
-    let _builder = aranya_client::AddTeamConfigBuilder::from_team_info(team_info)?;
+    let builder = aranya_client::AddTeamConfigBuilder::from_team_info(team_info)?;
 
-    todo!("convert into `AddTeamConfigBuilder`")
+    let builder = imp::AddTeamConfigBuilder::from(builder);
+
+    AddTeamConfigBuilder::init(out, builder);
+
+    Ok(())
 }
 
 /// Configures QUIC syncer for [`CreateTeamConfigBuilder`].

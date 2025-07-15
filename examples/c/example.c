@@ -488,10 +488,30 @@ AranyaError init_team(Team *t) {
             return err;
         }
 
+        size_t team_info_len = BUFFER_LEN;
+        uint8_t *team_info   = calloc(team_info_len, 1);
+        err = aranya_add_team_config_builder_to_team_info(&build, team_info, &team_info_len);
+        if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
+            printf("handling buffer too small error\n");
+            team_info = realloc(team_info, team_info_len);
+            err = aranya_add_team_config_builder_to_team_info(&build, team_info, &team_info_len);
+        }
+
+        // Note: this is where the team owner would send the serialized
+        // team info data to the peer.
+
+        AranyaAddTeamConfigBuilder new_build;
+        err = aranya_add_team_config_builder_from_team_info(&new_build, team_info, team_info_len);
+        if (err != ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr, "unable to init `AranyaAddTeamConfigBuilder` from team info data\n");
+            return err;
+        }
+
+
         // NB: A builder's "_build" method consumes the builder, so
         // do _not_ call "_cleanup" afterward.
         AranyaAddTeamConfig cfg;
-        err = aranya_add_team_config_build(&build, &cfg);
+        err = aranya_add_team_config_build(&new_build, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to init `AranyaAddTeamConfig`\n");
             return err;
