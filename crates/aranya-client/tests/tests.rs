@@ -40,13 +40,13 @@ async fn test_sync_now() -> Result<()> {
 
     // Add the admin as a new device, but don't give it a role.
     owner
-        .add_device_to_team(team.admin.pk.clone(), None)
+        .add_device(team.admin.pk.clone(), None)
         .await
         .context("owner unable to add admin to team")?;
 
     // Add the operator as a new device, but don't give it a role.
     owner
-        .add_device_to_team(team.operator.pk.clone(), None)
+        .add_device(team.operator.pk.clone(), None)
         .await
         .context("owner unable to add operator to team")?;
 
@@ -109,7 +109,7 @@ async fn test_remove_devices() -> Result<()> {
     // since `setup_default_roles` removes the owner's ability to
     // add devices to the team.
     owner
-        .add_device_to_team(team.admin.pk.clone(), None)
+        .add_device(team.admin.pk.clone(), None)
         .await
         .context("owner should be able to add admin to team")?;
 
@@ -127,22 +127,22 @@ async fn test_remove_devices() -> Result<()> {
     owner.assign_role(team.admin.id, roles.admin().id).await?;
 
     owner
-        .change_role_managing_role(roles.admin().id, roles.operator().id)
+        .assign_role_management_permission(roles.admin().id, roles.operator().id, todo!())
         .await
         .context("owner should be able to change admin role to operator")?;
 
     sleep(SLEEP_INTERVAL).await;
 
     admin
-        .add_device_to_team(team.operator.pk.clone(), None)
+        .add_device(team.operator.pk.clone(), None)
         .await
         .context("admin should be able to add operator to team")?;
     admin
-        .add_device_to_team(team.membera.pk.clone(), None)
+        .add_device(team.membera.pk.clone(), None)
         .await
         .context("admin should be able to add membera to team")?;
     admin
-        .add_device_to_team(team.memberb.pk.clone(), None)
+        .add_device(team.memberb.pk.clone(), None)
         .await
         .context("admin should be able to add memberb to team")?;
 
@@ -180,25 +180,22 @@ async fn test_query_roles() -> Result<()> {
 
     let mut membera = team.membera.client.team(team_id);
 
-    let devices = membera.queries().devices_on_team().await?;
+    let devices = membera.devices().await?;
     assert_eq!(devices.iter().count(), 5);
     debug!(
         count = %devices.iter().count(),
         "`membera` devices on team",
     );
 
-    // Check the specific role(s) a device has.
-    let dev_roles = membera
+    // Check the specific role a device has.
+    let dev_role = membera
         .device(team.membera.id)
-        .roles()
-        .await?
-        .iter()
-        .map(|r| r.id)
-        .collect::<Vec<_>>();
-    assert_eq!(dev_roles, vec![roles.member().id]);
+        .role()
+        .await?;
+    assert_eq!(dev_role.map(|r| r.id), Some(roles.member().id));
 
     // Make sure that we have the correct keybundle.
-    let keybundle = membera.queries().device_keybundle(team.membera.id).await?;
+    let keybundle = membera.device(team.membera.id).keybundle().await?;
     debug!("membera keybundle: {:?}", keybundle);
 
     Ok(())
@@ -240,13 +237,13 @@ async fn test_add_team() -> Result<()> {
     // Add the admin as a new device.
     info!("adding admin to team");
     owner
-        .add_device_to_team(team.admin.pk.clone(), None)
+        .add_device(team.admin.pk.clone(), None)
         .await?;
 
     // Add the operator as a new device.
     info!("adding operator to team");
     owner
-        .add_device_to_team(team.operator.pk.clone(), None)
+        .add_device(team.operator.pk.clone(), None)
         .await?;
 
     // Give the admin its role.
@@ -328,12 +325,12 @@ async fn test_remove_team() -> Result<()> {
         // Add the operator as a new device.
         info!("adding operator to team");
         owner
-            .add_device_to_team(team.operator.pk.clone(), None)
+            .add_device(team.operator.pk.clone(), None)
             .await?;
 
         // Add the admin as a new device.
         owner
-            .add_device_to_team(team.admin.pk.clone(), None)
+            .add_device(team.admin.pk.clone(), None)
             .await?;
 
         // Give the admin its role.
@@ -415,7 +412,7 @@ async fn test_multi_team_sync() -> Result<()> {
             let admin2_device = &mut team2.admin;
 
             let admin_keys = admin2_device.pk.clone();
-            owner1.add_device_to_team(admin_keys, None).await?;
+            owner1.add_device(admin_keys, None).await?;
 
             // Assign Admin2 the Admin role on team 1.
             owner1
