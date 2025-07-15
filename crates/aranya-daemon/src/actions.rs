@@ -1,15 +1,10 @@
 //! Aranya graph actions/effects API.
 
-use core::{
-    future::{self, Future},
-    marker::PhantomData,
-};
-use std::{borrow::Cow, sync::Arc};
+use std::{borrow::Cow, future::Future, marker::PhantomData, sync::Arc};
 
 use anyhow::{Context, Result};
 use aranya_aqc_util::LabelId;
 use aranya_crypto::{policy::RoleId, Csprng, DeviceId, Id, Rng};
-use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
 use aranya_policy_text::Text;
@@ -171,7 +166,7 @@ where
     where
         F: FnOnce() -> <<EN as Engine>::Policy as Policy>::Action<'a> + Send;
 
-    /// Invokes the `add_device` action.
+    /// Invokes `add_device`.
     #[instrument(skip_all)]
     fn add_device(
         &self,

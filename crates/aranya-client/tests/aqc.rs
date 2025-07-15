@@ -53,12 +53,14 @@ async fn test_aqc_chans() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    let operator_team = team.operator.client.team(team_id);
-    operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+    let operator = team.operator.client.team(team_id);
+    operator
+        .device(team.membera.id)
+        .assign_aqc_net_identifier(team.membera.aqc_net_id())
         .await?;
-    operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+    operator
+        .device(team.memberb.id)
+        .assign_aqc_net_identifier(team.memberb.aqc_net_id())
         .await?;
 
     // wait for syncing.
@@ -67,26 +69,28 @@ async fn test_aqc_chans() -> Result<()> {
     // wait for ctrl message to be sent.
     sleep(Duration::from_millis(100)).await;
 
-    let label1 = operator_team
+    let label1 = operator
         .create_label(text!("label1"), admin_role_id)
         .await?;
-    let op = ChanOp::SendRecv;
-    operator_team
-        .assign_label(team.membera.id, label1, op)
+    operator
+        .device(team.membera.id)
+        .assign_label(label1, ChanOp::SendRecv)
         .await?;
-    operator_team
-        .assign_label(team.memberb.id, label1, op)
+    operator
+        .device(team.memberb.id)
+        .assign_label(label1, ChanOp::SendRecv)
         .await?;
 
-    let label2 = operator_team
+    let label2 = operator
         .create_label(text!("label2"), admin_role_id)
         .await?;
-    let op = ChanOp::SendRecv;
-    operator_team
-        .assign_label(team.membera.id, label2, op)
+    operator
+        .device(team.membera.id)
+        .assign_label(label2, ChanOp::SendRecv)
         .await?;
-    operator_team
-        .assign_label(team.memberb.id, label2, op)
+    operator
+        .device(team.memberb.id)
+        .assign_label(label2, ChanOp::SendRecv)
         .await?;
 
     // wait for syncing.
@@ -666,7 +670,8 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         .await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label1, op)
+        .device(team.membera.id)
+        .assign_label(label1, op)
         .await?;
     operator_team
         .assign_label(team.memberb.id, label1, op)

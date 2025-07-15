@@ -3,10 +3,9 @@
 
 #![allow(clippy::expect_used, clippy::panic, clippy::indexing_slicing)]
 
-use core::{future, net::SocketAddr, ops::Deref, pin::pin};
-use std::{path::PathBuf, sync::Arc};
+use std::{future, net::SocketAddr, ops::Deref, path::PathBuf, pin::pin, sync::Arc};
 
-use anyhow::{anyhow, bail, Context as _};
+use anyhow::{anyhow, Context as _};
 use aranya_crypto::{
     default::WrappedKey, policy::GroupId, Csprng, DeviceId, EncryptionKey, EncryptionPublicKey,
     Engine as _, KeyStore as _, KeyStoreExt as _, Rng,
@@ -51,8 +50,8 @@ macro_rules! find_effect {
     }
 }
 
-/// Evaluates to `Ok(e)` for the first effect
-/// otherwise.
+/// Evaluates to `Ok(e)` if there is exactly one effect and that
+/// one effect matches `$effect`, or `Err` otherwise.
 macro_rules! find_exactly_one {
     ($effects:expr, Effect::$effect:ident) => {
         $effects
@@ -69,7 +68,7 @@ macro_rules! find_exactly_one {
     };
 }
 
-fn unexpected_effect<E>(got: &Effect, want: &'static str) -> E
+pub(crate) fn unexpected_effect<E>(got: &Effect, want: &'static str) -> E
 where
     E: From<anyhow::Error>,
 {
@@ -675,7 +674,7 @@ impl DaemonApi for Api {
         let roles = self
             .client
             .actions(&team.into_id().into())
-            .query_team_roles_off_graph()
+            .query_team_roles()
             .await
             .context("unable to query team roles")?
             .into_iter()
@@ -742,7 +741,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         _role: api::RoleId,
-    ) -> api::Result<Box<[api::RoleId]>> {
+    ) -> api::Result<Box<[api::Role]>> {
         self.check_team_valid(team).await?;
 
         todo!()
@@ -753,7 +752,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        target_role: api::RoleId,
+        role: api::RoleId,
         managing_role: api::RoleId,
         perm: Text,
     ) -> api::Result<()> {
@@ -762,7 +761,7 @@ impl DaemonApi for Api {
         self.client
             .actions(&team.into_id().into())
             .assign_role_management_perm(
-                target_role.into_id().into(),
+                role.into_id().into(),
                 managing_role.into_id().into(),
                 perm,
             )
@@ -776,7 +775,7 @@ impl DaemonApi for Api {
         self,
         _: context::Context,
         team: api::TeamId,
-        target_role: api::RoleId,
+        role: api::RoleId,
         managing_role: api::RoleId,
         perm: Text,
     ) -> api::Result<()> {
@@ -785,7 +784,7 @@ impl DaemonApi for Api {
         self.client
             .actions(&team.into_id().into())
             .revoke_role_management_perm(
-                target_role.into_id().into(),
+                role.into_id().into(),
                 managing_role.into_id().into(),
                 perm,
             )
@@ -835,36 +834,34 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self))]
-    async fn device_roles(
+    async fn device_role(
         self,
         _: context::Context,
         team: api::TeamId,
         device: api::DeviceId,
-    ) -> api::Result<Box<[api::Role]>> {
+    ) -> api::Result<Option<api::Role>> {
         self.check_team_valid(team).await?;
 
-        let roles = self
+        let effects = self
             .client
             .actions(&team.into_id().into())
-            .query_device_roles_off_graph(device.into_id().into())
+            .query_device_role(device.into_id().into())
             .await
-            .context("unable to query device role")?
-            .into_iter()
-            .filter_map(|e| {
-                if let Effect::QueryDeviceRolesResult(e) = e {
+            .context("unable to query device role")?;
+        if effects.is_empty() {
+            Ok(None)
+        } else {
+            find_exactly_one!(effects, Effect::QueryDeviceRoleResult)
+                .map_err(Into::into)
+                .map(|e| {
                     Some(api::Role {
                         id: e.role_id.into(),
                         name: e.name,
                         author_id: e.author_id.into(),
                         default: e.default,
                     })
-                } else {
-                    warn!(name = e.name(), "unexpected effect");
-                    None
-                }
-            })
-            .collect();
-        Ok(roles)
+                })
+        }
     }
 
     //
@@ -886,12 +883,10 @@ impl DaemonApi for Api {
             .actions(&team.into_id().into())
             .create_label(label_name, managing_role_id.into_id().into())
             .await
-            .context("unable to create AQC label")?;
-        if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
-            Ok(e.label_id.into())
-        } else {
-            Err(anyhow!("unable to create AQC label").into())
-        }
+            .context("unable to create label")?;
+        find_exactly_one!(effects, Effect::LabelCreated)
+            .map_err(Into::into)
+            .map(|e| api::LabelId::from(e.label_id))
     }
 
     #[instrument(skip(self), err)]
@@ -908,67 +903,70 @@ impl DaemonApi for Api {
             .actions(&team.into_id().into())
             .delete_label(label_id.into_id().into())
             .await
-            .context("unable to delete AQC label")?;
-        if let Some(Effect::LabelDeleted(_e)) = find_effect!(&effects, Effect::LabelDeleted(_e)) {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to delete AQC label").into())
-        }
+            .context("unable to delete label")?;
+        find_exactly_one!(effects, Effect::LabelDeleted)?;
+        Ok(())
     }
 
-    #[instrument(skip(self), err)]
-    async fn query_label_exists(
+    #[instrument(skip(self))]
+    async fn label(
         self,
         _: context::Context,
         team: api::TeamId,
         label_id: api::LabelId,
-    ) -> api::Result<bool> {
+    ) -> api::Result<Option<api::Label>> {
         self.check_team_valid(team).await?;
 
-        let (_ctrl, effects) = self
+        let effects = self
             .client
             .actions(&team.into_id().into())
-            .query_label_exists_off_graph(label_id.into_id().into())
+            .query_label(label_id.into_id().into())
             .await
             .context("unable to query label")?;
-        if let Some(Effect::QueryLabelExistsResult(_e)) =
-            find_effect!(&effects, Effect::QueryLabelExistsResult(_e))
-        {
-            Ok(true)
+        if effects.is_empty() {
+            Ok(None)
         } else {
-            Err(anyhow!("unable to query whether label exists").into())
+            find_exactly_one!(effects, Effect::QueryLabelResult)
+                .map_err(Into::into)
+                .map(|e| {
+                    Some(api::Label {
+                        id: e.label_id.into(),
+                        name: e.label_name,
+                        author_id: e.label_author_id.into(),
+                    })
+                })
         }
     }
 
     #[instrument(skip(self), err)]
-    async fn query_labels(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-    ) -> api::Result<Vec<api::Label>> {
+    async fn labels(self, _: context::Context, team: api::TeamId) -> api::Result<Vec<api::Label>> {
         self.check_team_valid(team).await?;
 
-        let (_ctrl, effects) = self
+        let labels = self
             .client
             .actions(&team.into_id().into())
-            .query_labels_off_graph()
+            .query_labels()
             .await
-            .context("unable to query labels")?;
-        let mut labels: Vec<api::Label> = Vec::new();
-        for e in effects {
-            if let Effect::QueriedLabel(e) = e {
-                labels.push(api::Label {
-                    id: e.label_id.into(),
-                    name: e.label_name,
-                    author_id: e.label_author_id.into(),
-                });
-            }
-        }
+            .context("unable to query labels")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryLabelsResult(e) = e {
+                    Some(api::Label {
+                        id: e.label_id.into(),
+                        name: e.label_name,
+                        author_id: e.label_author_id.into(),
+                    })
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
+            })
+            .collect();
         Ok(labels)
     }
 
     //
-    // Label assignment
+    // Label assignments
     //
 
     #[instrument(skip(self))]
@@ -1061,13 +1059,8 @@ impl DaemonApi for Api {
             .assign_label_to_device(device.into_id().into(), label.into_id().into(), op.into())
             .await
             .context("unable to assign label to device")?;
-        if let Some(Effect::LabelAssignedToDevice(_e)) =
-            find_effect!(&effects, Effect::LabelAssignedToDevice(_))
-        {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to assign label").into())
-        }
+        find_exactly_one!(effects, Effect::LabelAssignedToDevice)?;
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -1086,13 +1079,8 @@ impl DaemonApi for Api {
             .revoke_label_from_device(device.into_id().into(), label.into_id().into())
             .await
             .context("unable to revoke label from device")?;
-        if let Some(Effect::LabelRevokedFromDevice(_e)) =
-            find_effect!(&effects, Effect::LabelRevokedFromDevice(_))
-        {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to assign label").into())
-        }
+        find_exactly_one!(effects, Effect::LabelRevokedFromDevice)?;
+        Ok(())
     }
 
     #[instrument(skip(self))]
@@ -1132,7 +1120,7 @@ impl DaemonApi for Api {
     //
 
     #[instrument(skip(self))]
-    async fn assign_aqc_net_identifier(
+    async fn assign_aqc_net_id(
         self,
         _: context::Context,
         team: api::TeamId,
@@ -1154,7 +1142,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn remove_aqc_net_identifier(
+    async fn remove_aqc_net_id(
         self,
         _: context::Context,
         team: api::TeamId,
@@ -1172,7 +1160,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
-    async fn aqc_net_identifier(
+    async fn aqc_net_id(
         self,
         _: context::Context,
         team: api::TeamId,
@@ -1180,20 +1168,24 @@ impl DaemonApi for Api {
     ) -> api::Result<Option<api::NetIdentifier>> {
         self.check_team_valid(team).await?;
 
-        if let Ok((_ctrl, effects)) = self
+        let effects = self
             .client
             .actions(&team.into_id().into())
-            .query_aqc_net_identifier_off_graph(device.into_id().into())
+            .query_aqc_net_id(device.into_id().into())
             .await
-        {
-            if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
-                find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
-            {
-                return Ok(e.net_id.map(api::NetIdentifier));
-            }
+            .context("unable to query aqc net identifier")?;
+        if effects.is_empty() {
+            Ok(None)
+        } else {
+            find_exactly_one!(effects, Effect::QueryAqcNetIdResult)
+                .map_err(Into::into)
+                .map(|e| e.net_id.map(api::NetIdentifier))
         }
-        Ok(None)
     }
+
+    //
+    // AQC bidi channels
+    //
 
     #[instrument(skip(self), err)]
     async fn create_aqc_bidi_channel(
@@ -1218,7 +1210,7 @@ impl DaemonApi for Api {
         let (ctrl, effects) = self
             .client
             .actions(&graph)
-            .create_aqc_bidi_channel_off_graph(peer_id, label.into_id().into())
+            .create_aqc_bidi_channel(peer_id, label.into_id().into())
             .await?;
         let id = self.device_id()?;
 
@@ -1235,6 +1227,10 @@ impl DaemonApi for Api {
 
         Ok((ctrl, psks))
     }
+
+    //
+    // AQC uni channels
+    //
 
     #[instrument(skip(self), err)]
     async fn create_aqc_uni_channel(
@@ -1260,7 +1256,7 @@ impl DaemonApi for Api {
         let (ctrl, effects) = self
             .client
             .actions(&graph)
-            .create_aqc_uni_channel_off_graph(id, peer_id, label.into_id().into())
+            .create_aqc_uni_channel(id, peer_id, label.into_id().into())
             .await?;
 
         let Some(Effect::AqcUniChannelCreated(e)) =
@@ -1296,6 +1292,10 @@ impl DaemonApi for Api {
         // TODO: remove AQC uni channel from Aranya.
         todo!();
     }
+
+    //
+    // AQC misc
+    //
 
     #[instrument(skip(self), err)]
     async fn receive_aqc_ctrl(

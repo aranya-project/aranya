@@ -3325,7 +3325,7 @@ Returns a specific label if it exists.
 // Emits `QueryLabelResult` for the label if it exists.
 // If the label does not exist then no effects are emitted.
 action query_label(label_id id) {
-    publish QueryLabelExists {
+    publish QueryLabel {
         label_id: label_id,
     }
 }

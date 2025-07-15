@@ -5,9 +5,9 @@ use aranya_crypto::{
     dangerous::spideroak_crypto::{import::Import, keys::SecretKey},
     default::DefaultEngine,
     keystore::{fs_keystore::Store, KeyStore},
-    Engine, Rng,
+    DeviceId, Engine, Rng,
 };
-use aranya_daemon_api::TeamId;
+use aranya_daemon_api::{NetIdentifier, TeamId};
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
@@ -27,12 +27,12 @@ use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
     actions::Actions,
-    api::{ApiKey, DaemonApiServer, QSData},
+    api::{self, ApiKey, DaemonApiServer, QSData},
     aqc::Aqc,
     aranya,
     config::Config,
     keystore::{AranyaStore, LocalStore},
-    policy,
+    policy::Effect,
     sync::task::{
         quic::{PskStore, State as QuicSyncState},
         Syncer,
@@ -53,7 +53,7 @@ pub(crate) type EN = PolicyEngine<CE, KS>;
 /// SP = Storage Provider
 pub(crate) type SP = LinearStorageProvider<FileManager>;
 /// EF = Policy Effect
-pub(crate) type EF = policy::Effect;
+pub(crate) type EF = Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
@@ -196,12 +196,25 @@ impl Daemon {
                 let peers = {
                     let mut peers = BTreeMap::new();
                     for graph_id in &graph_ids {
-                        let graph_peers = BiBTreeMap::from_iter(
-                            client
-                                .actions(graph_id)
-                                .query_aqc_network_names_off_graph()
-                                .await?,
-                        );
+                        let discovered = client
+                            .actions(graph_id)
+                            .query_aqc_network_names()
+                            .await?
+                            .into_iter()
+                            .map(|e| {
+                                if let Effect::QueryAqcNetworkNamesResult(e) = e {
+                                    let net_id = NetIdentifier(e.net_id);
+                                    let dev_id = DeviceId::from(e.device_id);
+                                    Ok((net_id, dev_id))
+                                } else {
+                                    Err(api::unexpected_effect::<anyhow::Error>(
+                                        &e,
+                                        "QueryAqcNetworkNamesResult",
+                                    ))
+                                }
+                            })
+                            .collect::<Result<Vec<_>>>()?;
+                        let graph_peers = BiBTreeMap::from_iter(discovered);
                         peers.insert(*graph_id, graph_peers);
                     }
                     peers
@@ -218,7 +231,7 @@ impl Daemon {
 
             let data = QSData { psk_store };
 
-            let crypto = crate::api::Crypto {
+            let crypto = api::Crypto {
                 engine: eng,
                 local_store,
                 aranya_store,
