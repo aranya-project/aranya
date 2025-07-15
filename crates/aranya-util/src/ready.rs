@@ -6,7 +6,7 @@ use std::sync::{
 /// All [`Notifier`]s were dropped before notifying.
 #[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, thiserror::Error)]
 #[error("ready notifiers dropped before notifying")]
-pub struct ReadyError;
+pub struct WaitError;
 
 /// Waits for `n` tasks to be ready.
 #[derive(Debug)]
@@ -34,9 +34,9 @@ impl Waiter {
     }
 
     /// Wait for `count` ready notifications.
-    pub async fn wait(mut self) -> Result<(), ReadyError> {
+    pub async fn wait(mut self) -> Result<(), WaitError> {
         drop(self.notifier);
-        self.rx.recv().await.ok_or(ReadyError)
+        self.rx.recv().await.ok_or(WaitError)
     }
 }
 
