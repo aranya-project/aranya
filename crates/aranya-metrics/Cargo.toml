@@ -1,6 +1,6 @@
 [package]
 name = "aranya-metrics"
-version.workspace = true
+publish = false
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
