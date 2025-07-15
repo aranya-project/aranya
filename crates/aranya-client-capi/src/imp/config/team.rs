@@ -193,3 +193,23 @@ impl From<&CreateTeamConfig> for aranya_client::CreateTeamConfig {
         Self::from(value.to_owned())
     }
 }
+
+impl From<AddTeamConfigBuilder> for aranya_client::AddTeamConfigBuilder {
+    fn from(value: AddTeamConfigBuilder) -> Self {
+        let mut builder = Self::default();
+
+        if let Some(team_id) = value.team_id {
+            builder = builder.team_id(team_id.into());
+        }
+
+        if let Some(qs_cfg_builder) = value.quic_sync {
+            let qs_cfg_builder = qs_cfg_builder.into_inner().into_inner();
+
+            if let Some(mode) = qs_cfg_builder.mode {
+                builder.quic_sync().mode(mode);
+            }
+        }
+
+        builder
+    }
+}

@@ -129,7 +129,7 @@ impl Typed for CreateTeamQuicSyncConfigBuilder {
 /// Builder for constructing an [`AddTeamQuicSyncConfig`].
 #[derive(Debug, Default)]
 pub struct AddTeamQuicSyncConfigBuilder {
-    mode: Option<AddSeedMode>,
+    pub(super) mode: Option<AddSeedMode>,
 }
 
 impl AddTeamQuicSyncConfigBuilder {

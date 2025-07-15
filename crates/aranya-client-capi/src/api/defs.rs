@@ -285,6 +285,12 @@ impl From<&TeamId> for aranya_daemon_api::TeamId {
     }
 }
 
+impl From<TeamId> for aranya_daemon_api::TeamId {
+    fn from(value: TeamId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
 /// Device ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -828,6 +834,59 @@ pub fn add_team_config_build(
     // SAFETY: No special considerations.
     unsafe { cfg.build(out)? }
     Ok(())
+}
+
+/// Attempts to write serialized team info data into buffer.
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param[in] cfg a pointer to the team config builder [`AddTeamConfigBuilder`]
+/// @param[out] buffer the serialized team info data.
+/// @param[in,out] buffer_len the number of bytes written to the buffer.
+///
+/// @relates AranyaAddTeamConfigBuilder.
+pub unsafe fn add_team_config_builder_to_team_info(
+    cfg: OwnedPtr<AddTeamConfigBuilder>,
+    buffer: *mut MaybeUninit<u8>,
+    buffer_len: &mut usize,
+) -> Result<(), imp::Error> {
+    // SAFETY: Assumes the caller provided a valid ptr.
+    let cfg = unsafe { cfg.read() };
+    let cfg = cfg.into_inner().into_inner();
+    let cfg = aranya_client::AddTeamConfigBuilder::from(cfg);
+
+    let team_info = cfg.to_team_info();
+    let data = postcard::to_allocvec(&team_info)?;
+
+    let out = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
+    if *buffer_len < data.len() {
+        *buffer_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+
+    *buffer_len = data.len();
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src);
+    }
+
+    Ok(())
+}
+
+/// Initializes a new team config builder instance [`AddTeamConfigBuilder`].
+///
+/// @param[out] cfg the uninitialized team config builder [`AddTeamConfigBuilder`].
+/// @param[in] team_info the serialized team info data.
+///
+/// @relates AranyaAddTeamConfigBuilder.
+pub unsafe fn add_team_config_builder_from_team_info(
+    _cfg: &mut MaybeUninit<AddTeamConfigBuilder>,
+    team_info: &[u8],
+) -> Result<(), imp::Error> {
+    let team_info = postcard::from_bytes(team_info)?;
+    let _builder = aranya_client::AddTeamConfigBuilder::from_team_info(team_info)?;
+
+    todo!("convert into `AddTeamConfigBuilder`")
 }
 
 /// Configures QUIC syncer for [`CreateTeamConfigBuilder`].
