@@ -11,22 +11,24 @@ use std::{
     collections::{btree_map::Entry, BTreeMap},
     future::Future,
     net::Ipv4Addr,
-    sync::{Arc, Mutex as SyncMutex},
+    sync::Arc,
 };
 
 use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Engine, GraphId, PeerCache, Sink, StorageProvider, SyncRequestMessage, SyncRequester,
-    SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
+    Engine, GraphId, PeerCache, Sink, StorageError, StorageProvider, SyncRequestMessage,
+    SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     rustls::{NoCertResolver, SkipServerVerification},
+    task::scope,
     Addr,
 };
 use buggy::{bug, BugExt as _};
 use bytes::Bytes;
+use derive_where::derive_where;
 #[allow(deprecated)]
 use s2n_quic::provider::tls::rustls::rustls::{
     server::PresharedKeySelection, ClientConfig, ServerConfig,
@@ -42,8 +44,8 @@ use s2n_quic::{
     Client as QuicClient, Connection, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{io::AsyncReadExt, sync::mpsc, task::JoinSet};
-use tracing::{debug, error, info, instrument};
+use tokio::{io::AsyncReadExt, sync::mpsc};
+use tracing::{debug, error, info, instrument, warn};
 
 use super::SyncResponse;
 use crate::{
@@ -86,6 +88,7 @@ pub enum Error {
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
+#[derive(Debug)]
 pub struct State {
     /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: QuicClient,
@@ -329,16 +332,15 @@ impl Syncer<State> {
 
 /// The Aranya QUIC sync server.
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
+#[derive_where(Debug)]
 pub struct Server<EN, SP> {
     /// Thread-safe Aranya client reference.
     aranya: AranyaClient<EN, SP>,
     /// QUIC server to handle sync requests and send sync responses.
     server: QuicServer,
-    /// Tracks running tasks.
-    set: JoinSet<()>,
-    /// Indicates the "active team".
+    /// Receives updates for the "active team".
     /// Used to ensure that the chosen PSK corresponds to an incoming sync request.
-    active_team: Arc<SyncMutex<Option<TeamId>>>,
+    active_team_rx: mpsc::Receiver<TeamId>,
 }
 
 impl<EN, SP> Server<EN, SP> {
@@ -360,7 +362,7 @@ where
         aranya: AranyaClient<EN, SP>,
         addr: &Addr,
         server_keys: Arc<dyn SelectsPresharedKeys>,
-        mut active_team_rx: mpsc::Receiver<TeamId>,
+        active_team_rx: mpsc::Receiver<TeamId>,
     ) -> SyncResult<Self> {
         // Create Server Config
         let mut server_config = ServerConfig::builder()
@@ -390,80 +392,64 @@ where
             .start()
             .context("can't start QUIC server")?;
 
-        let active_team = Arc::new(SyncMutex::new(None));
-        let mut set = JoinSet::new();
-        {
-            let active_team = Arc::clone(&active_team);
-            set.spawn(async move {
-                while let Some(team_id) = active_team_rx.recv().await {
-                    match active_team.lock() {
-                        Ok(ref mut guard) => {
-                            guard.replace(team_id);
-                        }
-                        Err(e) => error!(%e),
-                    }
-                }
-            });
-        }
-
         Ok(Self {
             aranya,
             server,
-            set,
-            active_team,
+            active_team_rx,
         })
     }
 
     /// Begins accepting incoming requests.
-    #[instrument(skip_all)]
+    #[instrument(skip_all, fields(addr = ?self.local_addr()))]
     pub async fn serve(mut self) {
-        info!(
-            "QUIC sync server listening for incoming connections: {:?}",
-            self.local_addr()
-        );
+        info!("QUIC sync server listening for incoming connections");
 
-        // Accept incoming QUIC connections
-        while let Some(mut conn) = self.server.accept().await {
-            debug!("received incoming QUIC connection");
-            let Ok(peer) = conn.remote_addr() else {
-                error!("unable to get peer address from connection");
-                continue;
-            };
-            let client = self.aranya.clone();
-            let active_team = {
-                let Ok(guard) = self.active_team.lock().inspect_err(|e| error!(%e)) else {
+        scope(async |s| {
+            // Accept incoming QUIC connections
+            while let Some(mut conn) = self.server.accept().await {
+                debug!("received incoming QUIC connection");
+
+                let Ok(active_team) = self.active_team_rx.try_recv() else {
+                    warn!("no active team for accepted connection");
                     continue;
                 };
-                let Some(active_team) = *guard else { continue };
-                active_team
-            };
-            self.set.spawn(async move {
-                loop {
-                    // Accept incoming streams.
-                    match conn.accept_bidirectional_stream().await {
-                        Ok(Some(stream)) => {
-                            debug!(?peer, "received incoming QUIC stream");
-                            if let Err(e) =
-                                Self::sync(client.clone(), peer, stream, &active_team).await
-                            {
-                                error!(?e, ?peer, "server unable to sync with peer");
-                                break;
+
+                let Ok(peer) = conn.remote_addr() else {
+                    error!("unable to get peer address from connection");
+                    continue;
+                };
+
+                let client = self.aranya.clone();
+
+                s.spawn(async move {
+                    loop {
+                        // Accept incoming streams.
+                        match conn.accept_bidirectional_stream().await {
+                            Ok(Some(stream)) => {
+                                debug!(?peer, "received incoming QUIC stream");
+                                if let Err(e) =
+                                    Self::sync(client.clone(), peer, stream, &active_team).await
+                                {
+                                    error!(?e, ?peer, "server unable to sync with peer");
+                                    break;
+                                }
+                            }
+                            Ok(None) => {
+                                debug!(?peer, "QUIC connection was closed");
+                                return;
+                            }
+                            Err(e) => {
+                                error!(?peer, "error receiving QUIC stream: {}", e);
+                                return;
                             }
                         }
-                        Ok(None) => {
-                            debug!(?peer, "QUIC connection was closed");
-                            return;
-                        }
-                        Err(e) => {
-                            error!(?peer, "error receiving QUIC stream: {}", e);
-                            return;
-                        }
                     }
-                }
-            });
-        }
+                });
+            }
+        })
+        .await;
 
-        error!("server terminated: {:?}", self.local_addr());
+        error!("server terminated");
     }
 
     /// Responds to a sync.
@@ -539,6 +525,17 @@ where
                 client.lock().await.provider(),
                 &mut PeerCache::new(),
             )
+            .or_else(|err| {
+                if matches!(
+                    err,
+                    aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
+                ) {
+                    warn!("missing requested graph, we likely have not synced yet");
+                    Ok(0)
+                } else {
+                    Err(err)
+                }
+            })
             .context("sync resp poll failed")?;
         debug!(len = len, "sync poll finished");
         buf.truncate(len);

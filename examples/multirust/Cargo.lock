@@ -75,7 +75,7 @@ checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
 
 [[package]]
 name = "aranya-client"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -119,7 +119,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon-api"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -237,7 +237,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-util"
-version = "0.7.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "aranya-internal-s2n-quic",

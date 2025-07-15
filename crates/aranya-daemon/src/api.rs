@@ -15,11 +15,12 @@ pub(crate) use aranya_daemon_api::crypto::ApiKey;
 use aranya_daemon_api::{
     self as api,
     crypto::txp::{self, LengthDelimitedCodec},
-    DaemonApi, SeedMode, Text, WrappedSeed,
+    DaemonApi, Text, WrappedSeed,
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
 use aranya_util::{task::scope, Addr};
+use derive_where::derive_where;
 use futures_util::{StreamExt, TryStreamExt};
 pub(crate) use quic_sync::Data as QSData;
 use tarpc::{
@@ -27,7 +28,7 @@ use tarpc::{
     server::{incoming::Incoming, BaseChannel, Channel},
 };
 use tokio::{net::UnixListener, sync::mpsc};
-use tracing::{debug, error, info, instrument, trace, warn, Instrument};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
     actions::Actions,
@@ -128,7 +129,6 @@ impl DaemonApiServer {
                     }
                     info!("effect handler exiting");
                 }
-                .in_current_span()
             });
 
             let server = {
@@ -229,6 +229,7 @@ impl EffectHandler {
 ///
 /// This is separated out so we only have to clone one [`Arc`]
 /// (inside [`Api`]).
+#[derive_where(Debug)]
 struct ApiInner {
     client: Client,
     /// Local socket address of the API.
@@ -242,6 +243,7 @@ struct ApiInner {
     /// Keeps track of which graphs are invalid due to a finalization error.
     invalid: InvalidGraphs,
     aqc: Arc<Aqc<CE, KS>>,
+    #[derive_where(skip(Debug))]
     crypto: tokio::sync::Mutex<Crypto>,
     seed_id_dir: SeedDir,
     quic: Option<quic_sync::Data>,
@@ -263,18 +265,6 @@ impl ApiInner {
         let pk = self.pk.lock().expect("poisoned");
         let id = pk.ident_pk.id()?;
         Ok(id)
-    }
-}
-
-impl std::fmt::Debug for ApiInner {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Inner API Data")
-            .field("seed_id_dir", &self.seed_id_dir)
-            .field("client", &self.client)
-            .field("local_addr", &self.local_addr)
-            .field("pk", &self.pk)
-            .field("aqc", &self.aqc)
-            .finish_non_exhaustive()
     }
 }
 
@@ -374,13 +364,9 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[instrument(skip(self), err)]
-    async fn add_team(
-        mut self,
-        _: context::Context,
-        team: api::TeamId,
-        cfg: api::TeamConfig,
-    ) -> api::Result<()> {
+    #[instrument(skip(self))]
+    async fn add_team(mut self, _: context::Context, cfg: api::AddTeamConfig) -> api::Result<()> {
+        let team = cfg.team_id;
         self.check_team_valid(team).await?;
 
         match cfg.quic_sync {
@@ -411,7 +397,7 @@ impl DaemonApi for Api {
     async fn create_team(
         mut self,
         _: context::Context,
-        cfg: api::TeamConfig,
+        cfg: api::CreateTeamConfig,
     ) -> api::Result<api::TeamId> {
         info!("create_team");
 

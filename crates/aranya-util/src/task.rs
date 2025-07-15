@@ -4,6 +4,7 @@ use std::panic::resume_unwind;
 use futures_util::FutureExt as _;
 use tokio::sync::mpsc;
 use tokio_util::task::TaskTracker;
+use tracing::Instrument;
 
 // TODO(jdygert): Abort all tasks on drop?
 
@@ -69,10 +70,12 @@ where
 
 type Panic = Box<dyn Any + Send>;
 
+#[derive(Debug)]
 pub struct Scope {
     tracker: TaskTracker,
     tx: mpsc::Sender<Panic>,
 }
+
 impl Scope {
     fn new() -> (Self, mpsc::Receiver<Panic>) {
         let (tx, rx) = mpsc::channel(1);
@@ -93,14 +96,17 @@ impl Scope {
         Fut: Future<Output = ()> + Send + 'static,
     {
         let tx = self.tx.clone();
-        self.tracker.spawn(async move {
-            // Note: Tokio's join error gives you the panic payload anyways, so using
-            // `AssertUnwindSafe` here isn't any less unwind-safe than that.
-            // (`UnwindSafe` is more like a lint anyways.)
-            if let Err(err) = AssertUnwindSafe(fut).catch_unwind().await {
-                _ = tx.try_send(err);
+        self.tracker.spawn(
+            async move {
+                // Note: Tokio's join error gives you the panic payload anyways, so using
+                // `AssertUnwindSafe` here isn't any less unwind-safe than that.
+                // (`UnwindSafe` is more like a lint anyways.)
+                if let Err(err) = AssertUnwindSafe(fut).catch_unwind().await {
+                    _ = tx.try_send(err);
+                }
             }
-        });
+            .in_current_span(),
+        );
     }
 }
 

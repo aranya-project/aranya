@@ -9,10 +9,10 @@
     rust_2018_idioms
 )]
 
-use std::time::Duration;
-
 use anyhow::{bail, Context, Result};
-use aranya_client::{QuicSyncConfig, TeamConfig};
+use aranya_client::{
+    config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+};
 use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
@@ -34,8 +34,8 @@ async fn test_sync_now() -> Result<()> {
     let owner_addr = team.owner.aranya_local_addr().await?;
 
     // Grab the shorthand for the teams we need to operate on.
-    let mut owner = team.owner.client.team(team_id);
-    let mut admin = team.admin.client.team(team_id);
+    let owner = team.owner.client.team(team_id);
+    let admin = team.admin.client.team(team_id);
 
     // Add the admin as a new device, but don't give it a role.
     info!("adding admin to team");
@@ -84,23 +84,24 @@ async fn test_remove_devices() -> Result<()> {
     team.add_all_device_roles(team_id).await?;
 
     // Remove devices from the team while checking that the device count decreases each time a device is removed.
-    let mut owner = team.owner.client.team(team_id);
+    let owner = team.owner.client.team(team_id);
+    let queries = owner.queries();
 
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 5);
+    assert_eq!(queries.devices_on_team().await?.iter().count(), 5);
 
     owner.remove_device_from_team(team.membera.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 4);
+    assert_eq!(queries.devices_on_team().await?.iter().count(), 4);
 
     owner.remove_device_from_team(team.memberb.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 3);
+    assert_eq!(queries.devices_on_team().await?.iter().count(), 3);
 
     owner.revoke_role(team.operator.id, Role::Operator).await?;
     owner.remove_device_from_team(team.operator.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 2);
+    assert_eq!(queries.devices_on_team().await?.iter().count(), 2);
 
     owner.revoke_role(team.admin.id, Role::Admin).await?;
     owner.remove_device_from_team(team.admin.id).await?;
-    assert_eq!(owner.queries().devices_on_team().await?.iter().count(), 1);
+    assert_eq!(queries.devices_on_team().await?.iter().count(), 1);
 
     owner.revoke_role(team.owner.id, Role::Owner).await?;
     owner
@@ -126,8 +127,8 @@ async fn test_query_functions() -> Result<()> {
     team.add_all_device_roles(team_id).await?;
 
     // Test all our fact database queries.
-    let mut memberb = team.membera.client.team(team_id);
-    let mut queries = memberb.queries();
+    let memberb = team.membera.client.team(team_id);
+    let queries = memberb.queries();
 
     // First, let's check how many devices are on the team.
     let devices = queries.devices_on_team().await?;
@@ -154,22 +155,20 @@ async fn test_query_functions() -> Result<()> {
 /// a peer calls the add_team() API
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_add_team() -> Result<()> {
-    const TLS_HANDSHAKE_DURATION: Duration = Duration::from_secs(10);
-
     // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
-    let mut team = TeamCtx::new("test_add_team", work_dir).await?;
+    let team = TeamCtx::new("test_add_team", work_dir).await?;
 
     // Grab the shorthand for our address.
     let owner_addr = team.owner.aranya_local_addr().await?;
 
     // Create the initial team, and get our TeamId.
-    let mut owner = team
+    let owner = team
         .owner
         .client
         .create_team({
-            TeamConfig::builder()
-                .quic_sync(QuicSyncConfig::builder().build()?)
+            CreateTeamConfig::builder()
+                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
                 .build()?
         })
         .await
@@ -190,13 +189,18 @@ async fn test_add_team() -> Result<()> {
 
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
-        let mut admin = team.admin.client.team(team_id);
-        admin.sync_now(owner_addr.into(), None).await?;
-        sleep(TLS_HANDSHAKE_DURATION).await;
+        let admin = team.admin.client.team(team_id);
+        match admin.sync_now(owner_addr.into(), None).await {
+            Ok(()) => bail!("expected syncing to fail"),
+            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
+            // but currently the handshake timeout races with the tarpc timeout.
+            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
+            Err(err) => return Err(err).context("unexpected error while syncing"),
+        }
 
         // Now, we try to assign a role using the admin, which is expected to fail.
         match admin.assign_role(team.operator.id, Role::Operator).await {
-            Ok(_) => bail!("Expected role assignment to fail"),
+            Ok(()) => bail!("Expected role assignment to fail"),
             Err(aranya_client::Error::Aranya(_)) => {}
             Err(_) => bail!("Unexpected error"),
         }
@@ -207,10 +211,11 @@ async fn test_add_team() -> Result<()> {
         .await?;
     team.admin
         .client
-        .add_team(team_id, {
-            TeamConfig::builder()
+        .add_team({
+            AddTeamConfig::builder()
+                .team_id(team_id)
                 .quic_sync(
-                    QuicSyncConfig::builder()
+                    AddTeamQuicSyncConfig::builder()
                         .wrapped_seed(&admin_seed)?
                         .build()?,
                 )
@@ -218,7 +223,7 @@ async fn test_add_team() -> Result<()> {
         })
         .await?;
     {
-        let mut admin = team.admin.client.team(team_id);
+        let admin = team.admin.client.team(team_id);
         admin.sync_now(owner_addr.into(), None).await?;
         sleep(SLEEP_INTERVAL).await;
 
@@ -249,8 +254,8 @@ async fn test_remove_team() -> Result<()> {
     team.add_all_sync_peers(team_id).await?;
 
     {
-        let mut owner = team.owner.client.team(team_id);
-        let mut admin = team.admin.client.team(team_id);
+        let owner = team.owner.client.team(team_id);
+        let admin = team.admin.client.team(team_id);
 
         // Add the operator as a new device.
         info!("adding operator to team");
@@ -274,7 +279,7 @@ async fn test_remove_team() -> Result<()> {
     sleep(SLEEP_INTERVAL).await;
 
     {
-        let mut admin = team.admin.client.team(team_id);
+        let admin = team.admin.client.team(team_id);
 
         // Role assignment should fail
         match admin.assign_role(team.operator.id, Role::Member).await {
@@ -319,7 +324,7 @@ async fn test_multi_team_sync() -> Result<()> {
     // Admin2 syncs on team 1
     {
         let owner1_addr = team1.owner.aranya_local_addr().await?;
-        let mut owner1 = team1.owner.client.team(team_id_1);
+        let owner1 = team1.owner.client.team(team_id_1);
 
         let admin_seed = {
             let admin2_device = &mut team2.admin;
@@ -341,18 +346,19 @@ async fn test_multi_team_sync() -> Result<()> {
         team2
             .admin
             .client
-            .add_team(team_id_1, {
-                TeamConfig::builder()
+            .add_team({
+                AddTeamConfig::builder()
                     .quic_sync(
-                        QuicSyncConfig::builder()
+                        AddTeamQuicSyncConfig::builder()
                             .wrapped_seed(&admin_seed)?
                             .build()?,
                     )
+                    .team_id(team_id_1)
                     .build()?
             })
             .await?;
         {
-            let mut admin2 = team2.admin.client.team(team_id_1);
+            let admin2 = team2.admin.client.team(team_id_1);
             admin2.sync_now(owner1_addr.into(), None).await?;
 
             sleep(SLEEP_INTERVAL).await;
@@ -363,7 +369,7 @@ async fn test_multi_team_sync() -> Result<()> {
     // Admin2 syncs on team 2
     {
         let owner2_addr = team2.owner.aranya_local_addr().await?;
-        let mut admin2 = team2.admin.client.team(team_id_2);
+        let admin2 = team2.admin.client.team(team_id_2);
 
         admin2.sync_now(owner2_addr.into(), None).await?;
 

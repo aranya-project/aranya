@@ -1,13 +1,17 @@
 use std::{
     net::{Ipv4Addr, SocketAddr},
     path::PathBuf,
+    ptr,
     time::Duration,
 };
 
 use anyhow::{Context, Result};
-use aranya_client::{client::Client, QuicSyncConfig, SyncPeerConfig, TeamConfig};
+use aranya_client::{
+    client::Client, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
+    CreateTeamQuicSyncConfig, SyncPeerConfig,
+};
 use aranya_daemon::{
-    config::{self as daemon_cfg, Config},
+    config::{self as daemon_cfg, Config, Toggle},
     Daemon, DaemonHandle,
 };
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId, SEED_IKM_SIZE};
@@ -51,30 +55,27 @@ impl TeamCtx {
         })
     }
 
-    pub(super) fn devices(&mut self) -> [&mut DeviceCtx; 5] {
+    fn devices(&self) -> [&DeviceCtx; 5] {
         [
-            &mut self.owner,
-            &mut self.admin,
-            &mut self.operator,
-            &mut self.membera,
-            &mut self.memberb,
+            &self.owner,
+            &self.admin,
+            &self.operator,
+            &self.membera,
+            &self.memberb,
         ]
     }
 
     pub async fn add_all_sync_peers(&mut self, team_id: TeamId) -> Result<()> {
         let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
-        let mut devices = self.devices();
-        for i in 0..devices.len() {
-            let (device, peers) = devices[i..].split_first_mut().expect("expected device");
-            for peer in peers {
+        for device in self.devices() {
+            for peer in self.devices() {
+                if ptr::eq(device, peer) {
+                    continue;
+                }
                 device
                     .client
                     .team(team_id)
                     .add_sync_peer(peer.aranya_local_addr().await?.into(), config.clone())
-                    .await?;
-                peer.client
-                    .team(team_id)
-                    .add_sync_peer(device.aranya_local_addr().await?.into(), config.clone())
                     .await?;
             }
         }
@@ -83,9 +84,9 @@ impl TeamCtx {
 
     pub async fn add_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
         // Shorthand for the teams we need to operate on.
-        let mut owner_team = self.owner.client.team(team_id);
-        let mut admin_team = self.admin.client.team(team_id);
-        let mut operator_team = self.operator.client.team(team_id);
+        let owner_team = self.owner.client.team(team_id);
+        let admin_team = self.admin.client.team(team_id);
+        let operator_team = self.operator.client.team(team_id);
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
@@ -137,26 +138,38 @@ impl TeamCtx {
             self.owner.client.rand(&mut buf).await;
             buf
         };
-        let cfg = {
-            let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
-            TeamConfig::builder().quic_sync(qs_cfg).build()?
+        let owner_cfg = {
+            let qs_cfg = CreateTeamQuicSyncConfig::builder()
+                .seed_ikm(seed_ikm)
+                .build()?;
+            CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
         };
 
         let team = {
             self.owner
                 .client
-                .create_team(cfg.clone())
+                .create_team(owner_cfg)
                 .await
                 .expect("expected to create team")
         };
         let team_id = team.team_id();
         info!(?team_id);
 
+        let cfg = {
+            let qs_cfg = AddTeamQuicSyncConfig::builder()
+                .seed_ikm(seed_ikm)
+                .build()?;
+            AddTeamConfig::builder()
+                .team_id(team_id)
+                .quic_sync(qs_cfg)
+                .build()?
+        };
+
         // Owner has the team added due to calling `create_team`, now we assign it to all other peers
-        self.admin.client.add_team(team_id, cfg.clone()).await?;
-        self.operator.client.add_team(team_id, cfg.clone()).await?;
-        self.membera.client.add_team(team_id, cfg.clone()).await?;
-        self.memberb.client.add_team(team_id, cfg).await?;
+        self.admin.client.add_team(cfg.clone()).await?;
+        self.operator.client.add_team(cfg.clone()).await?;
+        self.membera.client.add_team(cfg.clone()).await?;
+        self.memberb.client.add_team(cfg).await?;
 
         Ok(team_id)
     }
@@ -175,8 +188,6 @@ impl DeviceCtx {
         let addr_any = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
         // Setup daemon config.
-        let quic_sync = Some(daemon_cfg::QuicSyncConfig {});
-
         let cfg = Config {
             name: name.into(),
             runtime_dir: work_dir.join("run"),
@@ -184,10 +195,10 @@ impl DeviceCtx {
             cache_dir: work_dir.join("cache"),
             logs_dir: work_dir.join("log"),
             config_dir: work_dir.join("config"),
-            sync_addr: addr_any,
-            afc: None,
-            aqc: None,
-            quic_sync,
+            aqc: Toggle::Enabled(daemon_cfg::AqcConfig {}),
+            sync: daemon_cfg::SyncConfig {
+                quic: Toggle::Enabled(daemon_cfg::QuicSyncConfig { addr: addr_any }),
+            },
         };
 
         for dir in [
@@ -213,10 +224,10 @@ impl DeviceCtx {
         sleep(SLEEP_INTERVAL).await;
 
         // Initialize the user library - the client will automatically load the daemon's public key.
-        let mut client = (|| {
+        let client = (|| {
             Client::builder()
-                .with_daemon_uds_path(&uds_path)
-                .with_daemon_aqc_addr(&addr_any)
+                .daemon_uds_path(&uds_path)
+                .aqc_server_addr(&addr_any)
                 .connect()
         })
         .retry(ExponentialBuilder::default())
@@ -245,7 +256,6 @@ impl DeviceCtx {
             self.client
                 .aqc()
                 .server_addr()
-                .expect("can get server addr")
                 .to_string()
                 .try_into()
                 .expect("socket addr is valid text"),
