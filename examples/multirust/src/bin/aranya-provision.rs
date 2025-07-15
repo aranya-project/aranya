@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow::{Context as _, Result};
-use aranya_client::{client::Client, QuicSyncConfig, SyncPeerConfig, TeamConfig};
+use aranya_client::{client::Client, SyncPeerConfig};
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
@@ -97,10 +97,10 @@ impl ClientCtx {
 
         let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
-        let mut client = (|| {
+        let client = (|| {
             Client::builder()
-                .with_daemon_uds_path(&uds_sock)
-                .with_daemon_aqc_addr(&any_addr)
+                .daemon_uds_path(&uds_sock)
+                .aqc_server_addr(&any_addr)
                 .connect()
         })
         .retry(ExponentialBuilder::default())
@@ -164,11 +164,11 @@ async fn main() -> Result<()> {
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
     let root = env::current_dir()?.join("daemons");
-    let mut owner = ClientCtx::new(&root, "owner", &daemon_path).await?;
-    let mut admin = ClientCtx::new(&root, "admin", &daemon_path).await?;
-    let mut operator = ClientCtx::new(&root, "operator", &daemon_path).await?;
-    let mut membera = ClientCtx::new(&root, "member-a", &daemon_path).await?;
-    let mut memberb = ClientCtx::new(&root, "member-b", &daemon_path).await?;
+    let owner = ClientCtx::new(&root, "owner", &daemon_path).await?;
+    let admin = ClientCtx::new(&root, "admin", &daemon_path).await?;
+    let operator = ClientCtx::new(&root, "operator", &daemon_path).await?;
+    let membera = ClientCtx::new(&root, "member-a", &daemon_path).await?;
+    let memberb = ClientCtx::new(&root, "member-b", &daemon_path).await?;
 
     operator.write("member-a.id", membera.id).await?;
     operator.write("member-b.id", memberb.id).await?;
@@ -182,9 +182,13 @@ async fn main() -> Result<()> {
         owner.client.rand(&mut buf).await;
         buf
     };
-    let cfg = {
-        let qs_cfg = QuicSyncConfig::builder().seed_ikm(seed_ikm).build()?;
-        TeamConfig::builder().quic_sync(qs_cfg).build()?
+    let create_team_cfg = {
+        let qs_cfg = aranya_client::CreateTeamQuicSyncConfig::builder()
+            .seed_ikm(seed_ikm)
+            .build()?;
+        aranya_client::CreateTeamConfig::builder()
+            .quic_sync(qs_cfg)
+            .build()?
     };
 
     // get sync addresses.
@@ -194,9 +198,9 @@ async fn main() -> Result<()> {
 
     // Create a team.
     info!("creating team");
-    let mut owner_team = owner
+    let owner_team = owner
         .client
-        .create_team(cfg.clone())
+        .create_team(create_team_cfg)
         .await
         .context("expected to create team")?;
     let team_id = owner_team.team_id();
@@ -206,10 +210,20 @@ async fn main() -> Result<()> {
     membera.write("team.id", team_id).await?;
     memberb.write("team.id", team_id).await?;
 
-    let mut admin_team = admin.client.add_team(team_id, cfg.clone()).await?;
-    let mut operator_team = operator.client.add_team(team_id, cfg.clone()).await?;
-    let mut membera_team = membera.client.add_team(team_id, cfg.clone()).await?;
-    let mut memberb_team = memberb.client.add_team(team_id, cfg.clone()).await?;
+    let add_team_cfg = {
+        let qs_cfg = aranya_client::AddTeamQuicSyncConfig::builder()
+            .seed_ikm(seed_ikm)
+            .build()?;
+        aranya_client::AddTeamConfig::builder()
+            .team_id(team_id)
+            .quic_sync(qs_cfg)
+            .build()?
+    };
+
+    let admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
+    let operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
+    let membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
+    let memberb_team = memberb.client.add_team(add_team_cfg.clone()).await?;
 
     info!("adding sync peers");
     owner_team

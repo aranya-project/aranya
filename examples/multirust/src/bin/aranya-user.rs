@@ -117,8 +117,8 @@ impl ClientCtx {
 
         let client = (|| {
             Client::builder()
-                .with_daemon_uds_path(&uds_sock)
-                .with_daemon_aqc_addr(&aqc_addr)
+                .daemon_uds_path(&uds_sock)
+                .aqc_server_addr(&aqc_addr)
                 .connect()
         })
         .retry(ExponentialBuilder::default())
@@ -200,13 +200,13 @@ async fn main() -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
-    let mut ctx = ClientCtx::new(&user, &daemon_path).await?;
+    let ctx = ClientCtx::new(&user, &daemon_path).await?;
+    let team = ctx.client.team(team_id);
 
     match user.as_str() {
         "operator" => {
             let member_a_net_id = NetIdentifier(var::<Text>("ARANYA_MEMBER_A_NET_ID")?);
             let member_b_net_id = NetIdentifier(var::<Text>("ARANYA_MEMBER_B_NET_ID")?);
-            let mut team = ctx.client.team(team_id);
             team.assign_aqc_net_identifier(member_a_device_id.await?, member_a_net_id)
                 .await?;
             team.assign_aqc_net_identifier(member_b_device_id.await?, member_b_net_id)
@@ -214,7 +214,6 @@ async fn main() -> Result<()> {
             pending::<()>().await;
         }
         "member-a" => {
-            let mut team = ctx.client.team(team_id);
             team.add_sync_peer(operator_sync_addr?, sync_cfg).await?;
 
             // membera creates a bidirectional channel.
@@ -231,11 +230,7 @@ async fn main() -> Result<()> {
                 .clone();
             debug!(?label.name);
 
-            let member_b_net_id = get_net_id(
-                ctx.client.team(team_id).queries(),
-                member_b_device_id.await?,
-            )
-            .await?;
+            let member_b_net_id = get_net_id(team.queries(), member_b_device_id.await?).await?;
             debug!(?member_b_net_id);
 
             let mut aqc_chan = ctx
@@ -257,14 +252,9 @@ async fn main() -> Result<()> {
             pending::<()>().await;
         }
         "member-b" => {
-            let mut team = ctx.client.team(team_id);
             team.add_sync_peer(operator_sync_addr?, sync_cfg).await?;
 
-            let member_a_net_id = get_net_id(
-                ctx.client.team(team_id).queries(),
-                member_a_device_id.await?,
-            )
-            .await?;
+            let member_a_net_id = get_net_id(team.queries(), member_a_device_id.await?).await?;
             debug!(?member_a_net_id);
 
             // memberb receives a bidirectional channel.
@@ -295,7 +285,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-async fn get_net_id(mut q: Queries<'_>, peer: DeviceId) -> Result<NetIdentifier> {
+async fn get_net_id(q: Queries<'_>, peer: DeviceId) -> Result<NetIdentifier> {
     loop {
         if let Some(net_id) = q
             .aqc_net_identifier(peer)
