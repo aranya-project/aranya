@@ -8,16 +8,16 @@
 
 use std::{collections::HashMap, future::Future};
 
-use anyhow::{Context, Result};
+use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
 use aranya_runtime::{storage::GraphId, ClientError, Engine, Sink};
 use aranya_util::Addr;
-use buggy::{Bug, BugExt};
+use buggy::BugExt;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
-use tracing::{error, instrument, trace};
+use tracing::{error, instrument, trace, warn};
 
 use super::Result as SyncResult;
 use crate::{
@@ -44,6 +44,8 @@ enum Msg {
         peer: SyncPeer,
     },
 }
+type Request = (Msg, oneshot::Sender<Reply>);
+type Reply = SyncResult<()>;
 
 /// A sync peer.
 /// Contains the information needed to sync with a single peer:
@@ -59,7 +61,7 @@ struct SyncPeer {
 #[derive(Clone, Debug)]
 pub struct SyncPeers {
     /// Send messages to add/remove peers.
-    sender: mpsc::Sender<Msg>,
+    sender: mpsc::Sender<Request>,
 }
 
 /// A response to a sync request.
@@ -73,15 +75,17 @@ pub(crate) enum SyncResponse {
 
 impl SyncPeers {
     /// Create a new peer manager.
-    fn new(sender: mpsc::Sender<Msg>) -> Self {
+    fn new(sender: mpsc::Sender<Request>) -> Self {
         Self { sender }
     }
 
-    async fn send(&self, msg: Msg) -> Result<(), Bug> {
+    async fn send(&self, msg: Msg) -> Reply {
+        let (tx, rx) = oneshot::channel();
         self.sender
-            .send(msg)
+            .send((msg, tx))
             .await
-            .assume("syncer peer channel closed")
+            .assume("syncer peer channel closed")?;
+        rx.await.assume("no syncer reply")?
     }
 
     /// Add peer to [`Syncer`].
@@ -90,13 +94,13 @@ impl SyncPeers {
         addr: Addr,
         graph_id: GraphId,
         cfg: SyncPeerConfig,
-    ) -> Result<(), Bug> {
+    ) -> Reply {
         let peer = SyncPeer { addr, graph_id };
         self.send(Msg::AddPeer { peer, cfg }).await
     }
 
     /// Remove peer from [`Syncer`].
-    pub(crate) async fn remove_peer(&self, addr: Addr, graph_id: GraphId) -> Result<(), Bug> {
+    pub(crate) async fn remove_peer(&self, addr: Addr, graph_id: GraphId) -> Reply {
         let peer = SyncPeer { addr, graph_id };
         self.send(Msg::RemovePeer { peer }).await
     }
@@ -107,7 +111,7 @@ impl SyncPeers {
         addr: Addr,
         graph_id: GraphId,
         cfg: Option<SyncPeerConfig>,
-    ) -> Result<(), Bug> {
+    ) -> Reply {
         let peer = SyncPeer { addr, graph_id };
         self.send(Msg::SyncNow { peer, cfg }).await
     }
@@ -125,7 +129,7 @@ pub struct Syncer<ST> {
     /// Keeps track of peer info.
     peers: HashMap<SyncPeer, (SyncPeerConfig, Key)>,
     /// Receives added/removed peers.
-    recv: mpsc::Receiver<Msg>,
+    recv: mpsc::Receiver<Request>,
     /// Delay queue for getting the next peer to sync with.
     queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
@@ -158,7 +162,7 @@ impl<ST> Syncer<ST> {
         invalid: InvalidGraphs,
         state: ST,
     ) -> (Self, SyncPeers) {
-        let (send, recv) = mpsc::channel::<Msg>(128);
+        let (send, recv) = mpsc::channel::<Request>(128);
         let peers = SyncPeers::new(send);
         (
             Self {
@@ -197,11 +201,11 @@ impl<ST: SyncState> Syncer<ST> {
         tokio::select! {
             biased;
             // receive added/removed peers.
-            Some(msg) = self.recv.recv() => {
-                match msg {
-                    Msg::SyncNow{ peer, cfg: _cfg } => {
+            Some((msg, tx)) = self.recv.recv() => {
+                let reply = match msg {
+                    Msg::SyncNow { peer, cfg: _cfg } => {
                         // sync with peer right now.
-                        self.sync(&peer).await?;
+                        self.sync(&peer).await
                     },
                     Msg::AddPeer { peer, cfg } => {
                         let mut result = Ok(());
@@ -209,11 +213,16 @@ impl<ST: SyncState> Syncer<ST> {
                             result = self.sync(&peer).await;
                         }
                         self.add_peer(peer, cfg);
-                        result?;
+                        result
                     }
                     Msg::RemovePeer { peer } => {
                         self.remove_peer(peer);
+                        Ok(())
                     }
+                };
+                if let Err(reply) = tx.send(reply) {
+                    warn!("syncer operation did not wait for reply");
+                    reply?;
                 }
             }
             // get next peer from delay queue.
