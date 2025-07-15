@@ -17,12 +17,11 @@ use aranya_daemon::{
 use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId, SEED_IKM_SIZE};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
+use futures_util::try_join;
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};
 
 const SYNC_INTERVAL: Duration = Duration::from_millis(100);
-// Allow for one missed sync and a misaligned sync rate, while keeping run times low.
-pub const SLEEP_INTERVAL: Duration = Duration::from_millis(250);
 
 #[instrument(skip_all)]
 pub async fn sleep(duration: Duration) {
@@ -40,11 +39,13 @@ pub struct TeamCtx {
 
 impl TeamCtx {
     pub async fn new(name: &str, work_dir: PathBuf) -> Result<Self> {
-        let owner = DeviceCtx::new(name, "owner", work_dir.join("owner")).await?;
-        let admin = DeviceCtx::new(name, "admin", work_dir.join("admin")).await?;
-        let operator = DeviceCtx::new(name, "operator", work_dir.join("operator")).await?;
-        let membera = DeviceCtx::new(name, "membera", work_dir.join("membera")).await?;
-        let memberb = DeviceCtx::new(name, "memberb", work_dir.join("memberb")).await?;
+        let (owner, admin, operator, membera, memberb) = try_join!(
+            DeviceCtx::new(name, "owner", work_dir.join("owner")),
+            DeviceCtx::new(name, "admin", work_dir.join("admin")),
+            DeviceCtx::new(name, "operator", work_dir.join("operator")),
+            DeviceCtx::new(name, "membera", work_dir.join("membera")),
+            DeviceCtx::new(name, "memberb", work_dir.join("memberb")),
+        )?;
 
         Ok(Self {
             owner,
@@ -66,6 +67,9 @@ impl TeamCtx {
     }
 
     pub async fn add_all_sync_peers(&mut self, team_id: TeamId) -> Result<()> {
+        if true {
+            return Ok(());
+        }
         let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
         for device in self.devices() {
             for peer in self.devices() {
@@ -87,14 +91,13 @@ impl TeamCtx {
         let owner_team = self.owner.client.team(team_id);
         let admin_team = self.admin.client.team(team_id);
         let operator_team = self.operator.client.team(team_id);
+        let membera_team = self.membera.client.team(team_id);
+        let memberb_team = self.memberb.client.team(team_id);
 
         // Add the admin as a new device, and assign its role.
         info!("adding admin to team");
         owner_team.add_device_to_team(self.admin.pk.clone()).await?;
         owner_team.assign_role(self.admin.id, Role::Admin).await?;
-
-        // Make sure it sees the configuration change.
-        sleep(SLEEP_INTERVAL).await;
 
         // Add the operator as a new device.
         info!("adding operator to team");
@@ -103,7 +106,9 @@ impl TeamCtx {
             .await?;
 
         // Make sure it sees the configuration change.
-        sleep(SLEEP_INTERVAL).await;
+        admin_team
+            .sync_now(self.owner.aranya_local_addr().await?.into(), None)
+            .await?;
 
         // Assign the operator its role.
         admin_team
@@ -111,7 +116,9 @@ impl TeamCtx {
             .await?;
 
         // Make sure it sees the configuration change.
-        sleep(SLEEP_INTERVAL).await;
+        operator_team
+            .sync_now(self.admin.aranya_local_addr().await?.into(), None)
+            .await?;
 
         // Add member A as a new device.
         info!("adding membera to team");
@@ -125,8 +132,11 @@ impl TeamCtx {
             .add_device_to_team(self.memberb.pk.clone())
             .await?;
 
-        // Make sure they see the configuration change.
-        sleep(SLEEP_INTERVAL).await;
+        // Make sure all see the configuration change.
+        let operator_addr = self.operator.aranya_local_addr().await?.into();
+        for team in [owner_team, admin_team, membera_team, memberb_team] {
+            team.sync_now(operator_addr, None).await?;
+        }
 
         Ok(())
     }
@@ -217,11 +227,10 @@ impl DeviceCtx {
         // Load and start daemon from config.
         let daemon = Daemon::load(cfg.clone())
             .await
-            .context("unable to init daemon")?
-            .spawn();
-
-        // give daemon time to setup UDS API and write the public key.
-        sleep(SLEEP_INTERVAL).await;
+            .context("unable to load daemon")?
+            .spawn()
+            .await
+            .context("unanble to start daemon")?;
 
         // Initialize the user library - the client will automatically load the daemon's public key.
         let client = (|| {

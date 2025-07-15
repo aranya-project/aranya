@@ -19,7 +19,7 @@ use aranya_daemon_api::{
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
-use aranya_util::{task::scope, Addr};
+use aranya_util::{ready, task::scope, Addr};
 use derive_where::derive_where;
 use futures_util::{StreamExt, TryStreamExt};
 pub(crate) use quic_sync::Data as QSData;
@@ -117,7 +117,7 @@ impl DaemonApiServer {
     }
 
     /// Runs the server.
-    pub(crate) async fn serve(mut self) {
+    pub(crate) async fn serve(mut self, ready: ready::Notifier) {
         scope(async |s| {
             s.spawn({
                 let effect_handler = self.api.effect_handler.clone();
@@ -147,6 +147,9 @@ impl DaemonApiServer {
                 .filter_map(|r| future::ready(r.ok()))
                 .map(BaseChannel::with_defaults)
                 .max_concurrent_requests_per_channel(10);
+
+            ready.notify();
+
             while let Some(ch) = incoming.next().await {
                 let api = self.api.clone();
                 s.spawn(scope(async move |reqs| {

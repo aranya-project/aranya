@@ -41,7 +41,8 @@ fn main() -> Result<()> {
         let daemon = Daemon::load(cfg).await.context("unable to load daemon")?;
         info!("loaded Aranya daemon");
 
-        daemon.spawn().join().await?;
+        let handle = daemon.spawn().await.context("unable to start daemon")?;
+        handle.join().await?;
 
         Ok(())
     })

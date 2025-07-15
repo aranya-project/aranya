@@ -18,7 +18,7 @@ use test_log::test;
 use tracing::{debug, info};
 
 mod common;
-use common::{sleep, TeamCtx, SLEEP_INTERVAL};
+use common::TeamCtx;
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -57,7 +57,6 @@ async fn test_sync_now() -> Result<()> {
 
     // Let's sync immediately, which will propagate the role change.
     admin.sync_now(owner_addr.into(), None).await?;
-    sleep(SLEEP_INTERVAL).await;
 
     // Now we should be able to successfully assign a role.
     admin.assign_role(team.operator.id, Role::Operator).await?;
@@ -225,7 +224,6 @@ async fn test_add_team() -> Result<()> {
     {
         let admin = team.admin.client.team(team_id);
         admin.sync_now(owner_addr.into(), None).await?;
-        sleep(SLEEP_INTERVAL).await;
 
         // Now we should be able to successfully assign a role.
         admin
@@ -267,7 +265,9 @@ async fn test_remove_team() -> Result<()> {
         // Give the admin its role.
         owner.assign_role(team.admin.id, Role::Admin).await?;
 
-        sleep(SLEEP_INTERVAL).await;
+        admin
+            .sync_now(team.owner.aranya_local_addr().await?.into(), None)
+            .await?;
 
         // We should be able to successfully assign a role.
         admin.assign_role(team.operator.id, Role::Operator).await?;
@@ -275,8 +275,6 @@ async fn test_remove_team() -> Result<()> {
 
     // Remove the team from the admin's local storage
     team.admin.client.remove_team(team_id).await?;
-
-    sleep(SLEEP_INTERVAL).await;
 
     {
         let admin = team.admin.client.team(team_id);
@@ -334,7 +332,6 @@ async fn test_multi_team_sync() -> Result<()> {
 
             // Assign Admin2 the Admin role on team 1.
             owner1.assign_role(admin2_device.id, Role::Admin).await?;
-            sleep(SLEEP_INTERVAL).await;
 
             // Create a wrapped seed for Admin2
             owner1
@@ -361,7 +358,6 @@ async fn test_multi_team_sync() -> Result<()> {
             let admin2 = team2.admin.client.team(team_id_1);
             admin2.sync_now(owner1_addr.into(), None).await?;
 
-            sleep(SLEEP_INTERVAL).await;
             admin2.assign_role(team1.membera.id, Role::Operator).await?;
         }
     }
@@ -373,7 +369,6 @@ async fn test_multi_team_sync() -> Result<()> {
 
         admin2.sync_now(owner2_addr.into(), None).await?;
 
-        sleep(SLEEP_INTERVAL).await;
         admin2.assign_role(team2.membera.id, Role::Operator).await?;
     }
 

@@ -22,6 +22,7 @@ use aranya_runtime::{
     SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
+    ready,
     rustls::{NoCertResolver, SkipServerVerification},
     Addr,
 };
@@ -419,11 +420,13 @@ where
 
     /// Begins accepting incoming requests.
     #[instrument(skip_all)]
-    pub async fn serve(mut self) {
+    pub async fn serve(mut self, ready: ready::Notifier) {
         info!(
             "QUIC sync server listening for incoming connections: {:?}",
             self.local_addr()
         );
+
+        ready.notify();
 
         // Accept incoming QUIC connections
         while let Some(mut conn) = self.server.accept().await {
