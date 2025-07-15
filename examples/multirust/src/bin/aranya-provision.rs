@@ -64,7 +64,7 @@ impl ClientCtx {
             let cache_dir = temp.path().join("cache");
             let logs_dir = temp.path().join("logs");
             let config_dir = temp.path().join("config");
-            let cfg_path = config_dir.join("config.json");
+            let cfg_path = config_dir.join("config.toml");
 
             for dir in &[&runtime_dir, &state_dir, &cache_dir, &logs_dir, &config_dir] {
                 fs::create_dir_all(dir)
@@ -74,14 +74,16 @@ impl ClientCtx {
 
             let buf = format!(
                 r#"
-                name: {user_name:?}
-                runtime_dir: {runtime_dir:?}
-                state_dir: {state_dir:?}
-                cache_dir: {cache_dir:?}
-                logs_dir: {logs_dir:?}
-                config_dir: {config_dir:?}
-                sync_addr: "127.0.0.1:0"
-                quic_sync: {{ }}
+                name = {user_name:?}
+                runtime_dir = {runtime_dir:?}
+                state_dir = {state_dir:?}
+                cache_dir = {cache_dir:?}
+                logs_dir = {logs_dir:?}
+                config_dir = {config_dir:?}
+                aqc.enable = true
+                [sync.quic]
+                enable = true
+                addr = "127.0.0.1:0"
                 "#
             );
             fs::write(&cfg_path, buf).await.context("writing config")?;
