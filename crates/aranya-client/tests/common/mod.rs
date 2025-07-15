@@ -1,14 +1,13 @@
 use std::{
     net::{Ipv4Addr, SocketAddr},
     path::PathBuf,
-    ptr,
     time::Duration,
 };
 
 use anyhow::{Context, Result};
 use aranya_client::{
     client::Client, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
-    CreateTeamQuicSyncConfig, SyncPeerConfig,
+    CreateTeamQuicSyncConfig,
 };
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
@@ -20,8 +19,6 @@ use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};
-
-const SYNC_INTERVAL: Duration = Duration::from_millis(100);
 
 #[instrument(skip_all)]
 pub async fn sleep(duration: Duration) {
@@ -54,36 +51,6 @@ impl TeamCtx {
             membera,
             memberb,
         })
-    }
-
-    fn devices(&self) -> [&DeviceCtx; 5] {
-        [
-            &self.owner,
-            &self.admin,
-            &self.operator,
-            &self.membera,
-            &self.memberb,
-        ]
-    }
-
-    pub async fn add_all_sync_peers(&mut self, team_id: TeamId) -> Result<()> {
-        if true {
-            return Ok(());
-        }
-        let config = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
-        for device in self.devices() {
-            for peer in self.devices() {
-                if ptr::eq(device, peer) {
-                    continue;
-                }
-                device
-                    .client
-                    .team(team_id)
-                    .add_sync_peer(peer.aranya_local_addr().await?.into(), config.clone())
-                    .await?;
-            }
-        }
-        Ok(())
     }
 
     pub async fn add_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {

@@ -80,7 +80,6 @@ async fn test_remove_devices() -> Result<()> {
     info!(?team_id);
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
     // Remove devices from the team while checking that the device count decreases each time a device is removed.
@@ -123,7 +122,6 @@ async fn test_query_functions() -> Result<()> {
     let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
     // Test all our fact database queries.
@@ -250,8 +248,6 @@ async fn test_remove_team() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
-    team.add_all_sync_peers(team_id).await?;
-
     {
         let owner = team.owner.client.team(team_id);
         let admin = team.admin.client.team(team_id);
@@ -313,11 +309,8 @@ async fn test_multi_team_sync() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id_2);
 
-    // Tell all peers to sync with one another, and assign their roles.
-    team1.add_all_sync_peers(team_id_1).await?;
+    // Add devices and assign roles.
     team1.add_all_device_roles(team_id_1).await?;
-
-    team2.add_all_sync_peers(team_id_2).await?;
     team2.add_all_device_roles(team_id_2).await?;
 
     // Admin2 syncs on team 1

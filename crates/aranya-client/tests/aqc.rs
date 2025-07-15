@@ -31,7 +31,6 @@ async fn test_aqc_chans() -> Result<()> {
     let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
     let operator_team = team.operator.client.team(team_id);
@@ -256,7 +255,6 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
     let operator_team = team.operator.client.team(team_id);
@@ -333,7 +331,6 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
     let operator_team = team.operator.client.team(team_id);
@@ -410,7 +407,6 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
     let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
     let operator_team = team.operator.client.team(team_id);
@@ -541,7 +537,6 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
     let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
     let operator_team = team.operator.client.team(team_id);
