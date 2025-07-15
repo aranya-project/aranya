@@ -47,6 +47,9 @@ impl TeamCtx {
         let membera = DeviceCtx::new(name, "membera", work_dir.join("membera")).await?;
         let memberb = DeviceCtx::new(name, "memberb", work_dir.join("memberb")).await?;
 
+        // Wait for daemons to start up.
+        sleep(Duration::from_millis(20)).await;
+
         Ok(Self {
             owner,
             admin,
