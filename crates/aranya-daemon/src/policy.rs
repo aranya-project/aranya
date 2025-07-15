@@ -413,7 +413,11 @@ pub trait ActorExt {
         nonce: Vec<u8>,
     ) -> Result<(), ClientError>;
     fn terminate_team(&mut self, team_id: Id) -> Result<(), ClientError>;
-    fn add_device(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
+    fn add_device(
+        &mut self,
+        device_keys: KeyBundle,
+        initial_role_id: Option<Id>,
+    ) -> Result<(), ClientError>;
     fn remove_device(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn add_label_managing_role(
         &mut self,

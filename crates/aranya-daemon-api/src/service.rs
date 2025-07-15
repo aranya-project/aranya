@@ -745,58 +745,92 @@ impl fmt::Display for Op {
 
 #[tarpc::service]
 pub trait DaemonApi {
+    //
+    // Misc
+    //
+
     /// Returns the daemon's version.
     async fn version() -> Result<Version>;
-
     /// Gets local address the Aranya sync server is bound to.
     async fn aranya_local_addr() -> Result<SocketAddr>;
-
     /// Gets the public key bundle for this device
     async fn get_key_bundle() -> Result<KeyBundle>;
-
     /// Gets the public device id.
     async fn get_device_id() -> Result<DeviceId>;
 
+    //
+    // Syncing
+    //
+
     /// Adds the peer for automatic periodic syncing.
     async fn add_sync_peer(addr: Addr, team: TeamId, config: SyncPeerConfig) -> Result<()>;
-
     /// Sync with peer immediately.
     async fn sync_now(addr: Addr, team: TeamId, cfg: Option<SyncPeerConfig>) -> Result<()>;
-
     /// Removes the peer from automatic syncing.
     async fn remove_sync_peer(addr: Addr, team: TeamId) -> Result<()>;
-
-    /// add a team to the local device store that was created by someone else. Not an aranya action/command.
-    async fn add_team(team: TeamId, cfg: TeamConfig) -> Result<()>;
-
-    /// Remove a team from local device storage.
-    async fn remove_team(team: TeamId) -> Result<()>;
-
-    /// Create a new graph/team with the current device as the owner.
-    async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
-    /// Close the team.
-    async fn close_team(team: TeamId) -> Result<()>;
-
+    /// Encrypts the team's syncing PSK(s) for the peer.
     async fn encrypt_psk_seed_for_peer(
         team: TeamId,
         peer_enc_pk: EncryptionPublicKey<CS>,
     ) -> Result<WrappedSeed>;
 
+    //
+    // Local team management
+    //
+
+    /// Add a team to the local device store that was created by
+    /// someone else. Not an aranya action/command.
+    async fn add_team(team: TeamId, cfg: TeamConfig) -> Result<()>;
+    /// Remove a team from local device storage.
+    async fn remove_team(team: TeamId) -> Result<()>;
+
+    //
+    // Team creation
+    //
+
+    /// Creates a new team with the current device as the owner.
+    async fn create_team(cfg: TeamConfig) -> Result<TeamId>;
+    /// Close the team.
+    async fn close_team(team: TeamId) -> Result<()>;
+
+    //
+    // Device onboarding
+    //
+
     /// Adds a device to the team with optional initial roles.
     async fn add_device_to_team(
         team: TeamId,
         keys: KeyBundle,
-        initial_roles: Box<[RoleId]>,
+        initial_role: Option<RoleId>,
     ) -> Result<()>;
     /// Remove device from the team.
     async fn remove_device_from_team(team: TeamId, device: DeviceId) -> Result<()>;
+    /// Returns all the devices on the team.
+    async fn devices_on_team(team: TeamId) -> Result<Box<[DeviceId]>>;
+    /// Returns the device's key bundle.
+    async fn device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
+
+    //
+    // Role creation
+    //
 
     /// Configures the team with default roles from policy.
+    ///
+    /// It returns the default roles that were created.
     async fn setup_default_roles(team: TeamId, owning_role: RoleId) -> Result<Box<[Role]>>;
+    /// Returns the current team roles.
+    async fn team_roles(team: TeamId) -> Result<Box<[Role]>>;
+
+    //
+    // Role management
+    //
+
     /// Adds an owning role to the target role.
     async fn add_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
     /// Removes an owning role from the target role.
     async fn remove_role_owner(team: TeamId, role: RoleId, owning_role: RoleId) -> Result<()>;
+    /// Returns the roles that own the target role.
+    async fn role_owners(team: TeamId, role: RoleId) -> Result<Box<[Role]>>;
     /// Assigns a role management permission to a role.
     async fn assign_role_management_perm(
         team: TeamId,
@@ -811,76 +845,102 @@ pub trait DaemonApi {
         managing_role: RoleId,
         perm: Text,
     ) -> Result<()>;
+
+    //
+    // Role assignment
+    //
+
     /// Assign a role to a device.
     async fn assign_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
     /// Revoke a role from a device.
     async fn revoke_role(team: TeamId, device: DeviceId, role: RoleId) -> Result<()>;
-    /// Returns the current team roles.
-    async fn query_team_roles(team: TeamId) -> Result<Box<[Role]>>;
+    /// Returns the role assigned to the device.
+    async fn device_role(team: TeamId, device: DeviceId) -> Result<Option<Role>>;
 
-    /// Assign a QUIC channels network identifier to a device.
-    async fn assign_aqc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
-    /// Remove a QUIC channels network identifier from a device.
-    async fn remove_aqc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-        name: NetIdentifier,
-    ) -> Result<()>;
+    //
+    // Label creation
+    //
 
-    // Create a label.
+    /// Create a label.
     async fn create_label(team: TeamId, name: Text, managing_role_id: RoleId) -> Result<LabelId>;
-    // Delete a label.
+    /// Delete a label.
     async fn delete_label(team: TeamId, label_id: LabelId) -> Result<()>;
-    // Assign a label to a device.
-    async fn assign_label(
+    /// Returns a specific label.
+    async fn label(team: TeamId, label: LabelId) -> Result<Option<Label>>;
+    /// Returns all labels on the team.
+    async fn labels(team: TeamId) -> Result<Vec<Label>>;
+
+    //
+    // Label assignments
+    //
+
+    /// Assigns a label to a role.
+    async fn assign_label_to_role(
         team: TeamId,
-        device: DeviceId,
-        label_id: LabelId,
+        role: RoleId,
+        label: LabelId,
         op: ChanOp,
     ) -> Result<()>;
-    // Revoke a label from a device.
-    async fn revoke_label(team: TeamId, device: DeviceId, label_id: LabelId) -> Result<()>;
+    /// Revokes a label from a role.
+    async fn revoke_label_from_role(team: TeamId, role: RoleId, label: LabelId) -> Result<()>;
+    /// Returns all labels assigned to the role.
+    async fn labels_assigned_to_role(team: TeamId, role: RoleId) -> Result<Box<[Label]>>;
+    /// Assigns a label to a device.
+    async fn assign_label_to_device(
+        team: TeamId,
+        device: DeviceId,
+        label: LabelId,
+        op: ChanOp,
+    ) -> Result<()>;
+    /// Revokes a label from a device.
+    async fn revoke_label_from_device(team: TeamId, device: DeviceId, label: LabelId)
+        -> Result<()>;
+    /// Returns all labels assigned to the device.
+    async fn labels_assigned_to_device(team: TeamId, device: DeviceId) -> Result<Box<[Label]>>;
 
-    /// Create a bidirectional QUIC channel.
+    //
+    // AQC network identifiers
+    //
+
+    /// Assign a QUIC channels network identifier to a device.
+    async fn assign_aqc_net_id(team: TeamId, device: DeviceId, name: NetIdentifier) -> Result<()>;
+    /// Remove a QUIC channels network identifier from a device.
+    async fn remove_aqc_net_id(team: TeamId, device: DeviceId, name: NetIdentifier) -> Result<()>;
+    /// Returns a device's AQC network identifier.
+    async fn aqc_net_id(team: TeamId, device: DeviceId) -> Result<Option<NetIdentifier>>;
+
+    //
+    // AQC bidi channels
+    //
+
+    /// Creates an AQC bidi channel.
     async fn create_aqc_bidi_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AqcBidiPsks)>;
-    /// Create a unidirectional QUIC channel.
+    /// Deletes an AQC bidi channel.
+    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
+
+    //
+    // AQC uni channels
+    //
+
+    /// Creates an AQC uni channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
     ) -> Result<(AqcCtrl, AqcUniPsks)>;
-    /// Delete a QUIC bidi channel.
-    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
-    /// Delete a QUIC uni channel.
+    /// Deletes an AQC uni channel.
     async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
+
+    //
+    // AQC misc
+    //
+
     /// Receive AQC ctrl message.
     async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
-
-    /// Query devices on team.
-    async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
-    /// Query device role.
-    async fn query_device_roles(team: TeamId, device: DeviceId) -> Result<Box<[Role]>>;
-    /// Query device keybundle.
-    async fn query_device_keybundle(team: TeamId, device: DeviceId) -> Result<KeyBundle>;
-    /// Query device label assignments.
-    async fn query_device_label_assignments(team: TeamId, device: DeviceId) -> Result<Vec<Label>>;
-    /// Query AQC network ID.
-    async fn query_aqc_net_identifier(
-        team: TeamId,
-        device: DeviceId,
-    ) -> Result<Option<NetIdentifier>>;
-    // Query labels on team.
-    async fn query_labels(team: TeamId) -> Result<Vec<Label>>;
-    /// Query whether a label exists.
-    async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
 }
 
 #[cfg(test)]

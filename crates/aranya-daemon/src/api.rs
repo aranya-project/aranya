@@ -42,13 +42,39 @@ use crate::{
 
 mod quic_sync;
 
-/// returns first effect matching a particular type.
-/// returns None if there are no matching effects.
+/// Evaluates to `Some(e)` for the first matching `e`, or `None`
+/// otherwise.
 #[macro_export]
 macro_rules! find_effect {
     ($effects:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
         $effects.into_iter().find(|e| matches!(e, $pattern $(if $guard)?))
     }
+}
+
+/// Evaluates to `Ok(e)` for the first effect
+/// otherwise.
+macro_rules! find_exactly_one {
+    ($effects:expr, Effect::$effect:ident) => {
+        $effects
+            .into_iter()
+            .exactly_one()
+            .map_err(anyhow::Error::from)
+            .and_then(|e| {
+                if let Effect::$effect(e) = e {
+                    Ok(e)
+                } else {
+                    Err(unexpected_effect(&e, stringify!($pattern)))
+                }
+            })
+    };
+}
+
+fn unexpected_effect<E>(got: &Effect, want: &'static str) -> E
+where
+    E: From<anyhow::Error>,
+{
+    warn!(got = got.name(), want, "unexpected effect");
+    anyhow!("unexpected effect `{}`, expected `{want}`", got.name()).into()
 }
 
 type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
@@ -313,6 +339,10 @@ impl Api {
 }
 
 impl DaemonApi for Api {
+    //
+    // Misc
+    //
+
     #[instrument(skip(self), err)]
     async fn version(self, context: context::Context) -> api::Result<api::Version> {
         api::Version::parse(env!("CARGO_PKG_VERSION")).map_err(Into::into)
@@ -335,6 +365,10 @@ impl DaemonApi for Api {
     async fn get_device_id(self, _: context::Context) -> api::Result<api::DeviceId> {
         self.device_id().map(|id| id.into_id().into())
     }
+
+    //
+    // Syncing
+    //
 
     #[instrument(skip(self), err)]
     async fn add_sync_peer(
@@ -384,81 +418,7 @@ impl DaemonApi for Api {
         Ok(())
     }
 
-    #[instrument(skip(self), err)]
-    async fn add_team(
-        mut self,
-        _: context::Context,
-        team: api::TeamId,
-        cfg: api::TeamConfig,
-    ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
-
-        match cfg.quic_sync {
-            Some(cfg) => self.add_team_quic_sync(team, cfg).await,
-            None => Err(anyhow!("Missing QUIC sync config").into()),
-        }
-    }
-
-    #[instrument(skip(self), err)]
-    async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        if let Some(data) = &self.quic {
-            self.remove_team_quic_sync(team, data)?;
-        }
-
-        self.seed_id_dir.remove(&team).await?;
-
-        self.client
-            .aranya
-            .lock()
-            .await
-            .remove_graph(team.into_id().into())
-            .context("unable to remove graph from storage")?;
-
-        Ok(())
-    }
-
-    #[instrument(skip(self), err)]
-    async fn create_team(
-        mut self,
-        _: context::Context,
-        cfg: api::TeamConfig,
-    ) -> api::Result<api::TeamId> {
-        info!("create_team");
-
-        let nonce = &mut [0u8; 16];
-        Rng.fill_bytes(nonce);
-        let pk = self.get_pk()?;
-        let (graph_id, _) = self
-            .client
-            .create_team(pk, Some(nonce))
-            .await
-            .context("unable to create team")?;
-        debug!(?graph_id);
-        let team_id: api::TeamId = graph_id.into_id().into();
-
-        match cfg.quic_sync {
-            Some(qs_cfg) => {
-                self.create_team_quic_sync(team_id, qs_cfg).await?;
-            }
-            None => {
-                warn!("Missing QUIC sync config");
-
-                let seed = qs::PskSeed::new(&mut Rng, team_id);
-                self.add_seed(team_id, seed).await?;
-            }
-        }
-
-        Ok(team_id)
-    }
-
-    #[instrument(skip(self), err)]
-    async fn close_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
-        self.check_team_valid(team).await?;
-
-        todo!();
-    }
-
-    #[instrument(skip(self), err)]
+    #[instrument(skip(self))]
     async fn encrypt_psk_seed_for_peer(
         self,
         _: context::Context,
@@ -496,49 +456,115 @@ impl DaemonApi for Api {
         })
     }
 
+    //
+    // Local team management
+    //
+
     #[instrument(skip(self), err)]
+    async fn add_team(
+        mut self,
+        _: context::Context,
+        team: api::TeamId,
+        cfg: api::TeamConfig,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        match cfg.quic_sync {
+            Some(cfg) => self.add_team_quic_sync(team, cfg).await,
+            None => Err(anyhow!("Missing QUIC sync config").into()),
+        }
+    }
+
+    #[instrument(skip(self), err)]
+    async fn remove_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        if let Some(data) = &self.quic {
+            self.remove_team_quic_sync(team, data)?;
+        }
+
+        self.seed_id_dir.remove(&team).await?;
+
+        self.client
+            .aranya
+            .lock()
+            .await
+            .remove_graph(team.into_id().into())
+            .context("unable to remove graph from storage")?;
+
+        Ok(())
+    }
+
+    //
+    // Team creation
+    //
+
+    #[instrument(skip(self), err)]
+    async fn create_team(
+        mut self,
+        _: context::Context,
+        cfg: api::TeamConfig,
+    ) -> api::Result<api::TeamId> {
+        info!("create_team");
+
+        let nonce = &mut [0u8; 16];
+        Rng.fill_bytes(nonce);
+        let pk = self.get_pk()?;
+        let (graph_id, _) = self
+            .client
+            .create_team(pk, Some(nonce))
+            .await
+            .context("unable to create team")?;
+        debug!(?graph_id);
+        let team_id: api::TeamId = graph_id.into_id().into();
+
+        match cfg.quic_sync {
+            Some(qs_cfg) => {
+                self.create_team_quic_sync(team_id, qs_cfg).await?;
+            }
+            None => {
+                warn!("Missing QUIC sync config");
+
+                let seed = qs::PskSeed::new(&mut Rng, team_id);
+                self.add_seed(team_id, seed).await?;
+            }
+        }
+
+        Ok(team_id)
+    }
+
+    #[instrument(skip(self))]
+    async fn close_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        todo!();
+    }
+
+    //
+    // Device onboarding
+    //
+
+    #[instrument(skip(self))]
     async fn add_device_to_team(
         self,
         _: context::Context,
         team: api::TeamId,
         keys: api::KeyBundle,
-        initial_roles: Box<[api::RoleId]>,
+        initial_role: Option<api::RoleId>,
     ) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        // Ideally this would be a single action, but policy
-        // language v2 does not have any way to pass
-        // a list/vector/etc into an action.
-
-        let actions = self.client.actions(&team.into_id().into());
-
-        let device_id = actions
-            .add_device(keys.into())
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .add_device(keys.into(), initial_role.map(|r| r.into_id().into()))
             .await
-            .context("unable to add device to team")?
-            .into_iter()
-            .exactly_one()
-            .map_err(anyhow::Error::from)
-            .and_then(|e| {
-                if let Effect::DeviceAdded(e) = e {
-                    Ok(e.device_id)
-                } else {
-                    warn!(name = e.name(), "unexpected effect");
-                    bail!("unexpected effect: {}", e.name())
-                }
-            })?;
+            .context("unable to add device to team")?;
+        let device_id = find_exactly_one!(effects, Effect::DeviceAdded)?.device_id;
         debug!(%device_id, "added device to team");
 
-        for role_id in initial_roles {
-            actions
-                .assign_role(device_id.into(), role_id.into_id().into())
-                .await
-                .context("unable to assign initial role")?;
-        }
         Ok(())
     }
 
-    #[instrument(skip(self), err)]
+    #[instrument(skip(self))]
     async fn remove_device_from_team(
         self,
         _: context::Context,
@@ -554,6 +580,56 @@ impl DaemonApi for Api {
             .context("unable to remove device from team")?;
         Ok(())
     }
+
+    #[instrument(skip(self))]
+    async fn devices_on_team(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+    ) -> api::Result<Box<[api::DeviceId]>> {
+        self.check_team_valid(team).await?;
+
+        let devices = self
+            .client
+            .actions(&team.into_id().into())
+            .query_devices_on_team()
+            .await
+            .context("unable to query devices on team")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryDevicesOnTeamResult(e) = e {
+                    Some(e.device_id.into())
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
+            })
+            .collect();
+        Ok(devices)
+    }
+
+    #[instrument(skip(self))]
+    async fn device_keybundle(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<api::KeyBundle> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .query_device_keybundle(device.into_id().into())
+            .await
+            .context("unable to query device keybundle")?;
+        let kb = find_exactly_one!(effects, Effect::QueryDeviceKeyBundleResult)?;
+        Ok(api::KeyBundle::from(kb.device_keys))
+    }
+
+    //
+    // Role creation
+    //
 
     #[instrument(skip(self))]
     async fn setup_default_roles(
@@ -589,6 +665,42 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self))]
+    async fn team_roles(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+    ) -> api::Result<Box<[api::Role]>> {
+        self.check_team_valid(team).await?;
+
+        let roles = self
+            .client
+            .actions(&team.into_id().into())
+            .query_team_roles_off_graph()
+            .await
+            .context("unable to query team roles")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryTeamRolesResult(e) = e {
+                    Some(api::Role {
+                        id: e.role_id.into(),
+                        name: e.name,
+                        author_id: e.author_id.into(),
+                        default: e.default,
+                    })
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
+            })
+            .collect();
+        Ok(roles)
+    }
+
+    //
+    // Role management
+    //
+
+    #[instrument(skip(self))]
     async fn add_role_owner(
         self,
         _: context::Context,
@@ -622,6 +734,18 @@ impl DaemonApi for Api {
             .await
             .context("unable to remove role owner")?;
         Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn role_owners(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        _role: api::RoleId,
+    ) -> api::Result<Box<[api::RoleId]>> {
+        self.check_team_valid(team).await?;
+
+        todo!()
     }
 
     #[instrument(skip(self))]
@@ -670,6 +794,10 @@ impl DaemonApi for Api {
         Ok(())
     }
 
+    //
+    // Role assignment
+    //
+
     #[instrument(skip(self))]
     async fn assign_role(
         self,
@@ -707,22 +835,23 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self))]
-    async fn query_team_roles(
+    async fn device_roles(
         self,
         _: context::Context,
         team: api::TeamId,
+        device: api::DeviceId,
     ) -> api::Result<Box<[api::Role]>> {
         self.check_team_valid(team).await?;
 
         let roles = self
             .client
             .actions(&team.into_id().into())
-            .query_team_roles_off_graph()
+            .query_device_roles_off_graph(device.into_id().into())
             .await
-            .context("unable to query team roles")?
+            .context("unable to query device role")?
             .into_iter()
             .filter_map(|e| {
-                if let Effect::QueryTeamRolesResult(e) = e {
+                if let Effect::QueryDeviceRolesResult(e) = e {
                     Some(api::Role {
                         id: e.role_id.into(),
                         name: e.name,
@@ -737,6 +866,270 @@ impl DaemonApi for Api {
             .collect();
         Ok(roles)
     }
+
+    //
+    // Label creation
+    //
+
+    #[instrument(skip(self), err)]
+    async fn create_label(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        label_name: Text,
+        managing_role_id: api::RoleId,
+    ) -> api::Result<api::LabelId> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .create_label(label_name, managing_role_id.into_id().into())
+            .await
+            .context("unable to create AQC label")?;
+        if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
+            Ok(e.label_id.into())
+        } else {
+            Err(anyhow!("unable to create AQC label").into())
+        }
+    }
+
+    #[instrument(skip(self), err)]
+    async fn delete_label(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        label_id: api::LabelId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .delete_label(label_id.into_id().into())
+            .await
+            .context("unable to delete AQC label")?;
+        if let Some(Effect::LabelDeleted(_e)) = find_effect!(&effects, Effect::LabelDeleted(_e)) {
+            Ok(())
+        } else {
+            Err(anyhow!("unable to delete AQC label").into())
+        }
+    }
+
+    #[instrument(skip(self), err)]
+    async fn query_label_exists(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        label_id: api::LabelId,
+    ) -> api::Result<bool> {
+        self.check_team_valid(team).await?;
+
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_label_exists_off_graph(label_id.into_id().into())
+            .await
+            .context("unable to query label")?;
+        if let Some(Effect::QueryLabelExistsResult(_e)) =
+            find_effect!(&effects, Effect::QueryLabelExistsResult(_e))
+        {
+            Ok(true)
+        } else {
+            Err(anyhow!("unable to query whether label exists").into())
+        }
+    }
+
+    #[instrument(skip(self), err)]
+    async fn query_labels(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+    ) -> api::Result<Vec<api::Label>> {
+        self.check_team_valid(team).await?;
+
+        let (_ctrl, effects) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_labels_off_graph()
+            .await
+            .context("unable to query labels")?;
+        let mut labels: Vec<api::Label> = Vec::new();
+        for e in effects {
+            if let Effect::QueriedLabel(e) = e {
+                labels.push(api::Label {
+                    id: e.label_id.into(),
+                    name: e.label_name,
+                    author_id: e.label_author_id.into(),
+                });
+            }
+        }
+        Ok(labels)
+    }
+
+    //
+    // Label assignment
+    //
+
+    #[instrument(skip(self))]
+    async fn assign_label_to_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        label: api::LabelId,
+        op: api::ChanOp,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .assign_label_to_role(role.into_id().into(), label.into_id().into(), op.into())
+            .await
+            .context("unable to assign label to role")?;
+        find_exactly_one!(effects, Effect::LabelAssignedToRole)?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn revoke_label_from_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+        label: api::LabelId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .revoke_label_from_role(role.into_id().into(), label.into_id().into())
+            .await
+            .context("unable to revoke label from role")?;
+        find_exactly_one!(effects, Effect::LabelRevokedFromRole)?;
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
+    async fn labels_assigned_to_role(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        role: api::RoleId,
+    ) -> api::Result<Box<[api::Label]>> {
+        self.check_team_valid(team).await?;
+
+        let labels = self
+            .client
+            .actions(&team.into_id().into())
+            .query_labels_assigned_to_role(role.into_id().into())
+            .await
+            .context("unable to query labels assigned to role")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryLabelsAssignedToRoleResult(e) = e {
+                    Some(api::Label {
+                        id: e.label_id.into(),
+                        name: e.label_name,
+                        author_id: e.label_author_id.into(),
+                    })
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
+            })
+            .collect();
+        Ok(labels)
+    }
+
+    #[instrument(skip(self))]
+    async fn assign_label_to_device(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device: api::DeviceId,
+        label: api::LabelId,
+        op: api::ChanOp,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .assign_label_to_device(device.into_id().into(), label.into_id().into(), op.into())
+            .await
+            .context("unable to assign label to device")?;
+        if let Some(Effect::LabelAssignedToDevice(_e)) =
+            find_effect!(&effects, Effect::LabelAssignedToDevice(_))
+        {
+            Ok(())
+        } else {
+            Err(anyhow!("unable to assign label").into())
+        }
+    }
+
+    #[instrument(skip(self))]
+    async fn revoke_label_from_device(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device: api::DeviceId,
+        label: api::LabelId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        let effects = self
+            .client
+            .actions(&team.into_id().into())
+            .revoke_label_from_device(device.into_id().into(), label.into_id().into())
+            .await
+            .context("unable to revoke label from device")?;
+        if let Some(Effect::LabelRevokedFromDevice(_e)) =
+            find_effect!(&effects, Effect::LabelRevokedFromDevice(_))
+        {
+            Ok(())
+        } else {
+            Err(anyhow!("unable to assign label").into())
+        }
+    }
+
+    #[instrument(skip(self))]
+    async fn labels_assigned_to_device(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<Box<[api::Label]>> {
+        self.check_team_valid(team).await?;
+
+        let labels = self
+            .client
+            .actions(&team.into_id().into())
+            .query_labels_assigned_to_device(device.into_id().into())
+            .await
+            .context("unable to query labels assigned to device")?
+            .into_iter()
+            .filter_map(|e| {
+                if let Effect::QueryLabelsAssignedToDeviceResult(e) = e {
+                    Some(api::Label {
+                        id: e.label_id.into(),
+                        name: e.label_name,
+                        author_id: e.label_author_id.into(),
+                    })
+                } else {
+                    warn!(name = e.name(), "unexpected effect");
+                    None
+                }
+            })
+            .collect();
+        Ok(labels)
+    }
+
+    //
+    // AQC network identifiers
+    //
 
     #[instrument(skip(self))]
     async fn assign_aqc_net_identifier(
@@ -776,6 +1169,30 @@ impl DaemonApi for Api {
             .await
             .context("unable to remove aqc net identifier")?;
         Ok(())
+    }
+
+    #[instrument(skip(self), err)]
+    async fn aqc_net_identifier(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<Option<api::NetIdentifier>> {
+        self.check_team_valid(team).await?;
+
+        if let Ok((_ctrl, effects)) = self
+            .client
+            .actions(&team.into_id().into())
+            .query_aqc_net_identifier_off_graph(device.into_id().into())
+            .await
+        {
+            if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
+                find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
+            {
+                return Ok(e.net_id.map(api::NetIdentifier));
+            }
+        }
+        Ok(None)
     }
 
     #[instrument(skip(self), err)]
@@ -921,296 +1338,6 @@ impl DaemonApi for Api {
             }
         }
         Err(anyhow!("unable to find AQC effect").into())
-    }
-
-    /// Create a label.
-    #[instrument(skip(self), err)]
-    async fn create_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        label_name: Text,
-        managing_role_id: api::RoleId,
-    ) -> api::Result<api::LabelId> {
-        self.check_team_valid(team).await?;
-
-        let effects = self
-            .client
-            .actions(&team.into_id().into())
-            .create_label(label_name, managing_role_id.into_id().into())
-            .await
-            .context("unable to create AQC label")?;
-        if let Some(Effect::LabelCreated(e)) = find_effect!(&effects, Effect::LabelCreated(_e)) {
-            Ok(e.label_id.into())
-        } else {
-            Err(anyhow!("unable to create AQC label").into())
-        }
-    }
-
-    /// Delete a label.
-    #[instrument(skip(self), err)]
-    async fn delete_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        label_id: api::LabelId,
-    ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
-
-        let effects = self
-            .client
-            .actions(&team.into_id().into())
-            .delete_label(label_id.into_id().into())
-            .await
-            .context("unable to delete AQC label")?;
-        if let Some(Effect::LabelDeleted(_e)) = find_effect!(&effects, Effect::LabelDeleted(_e)) {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to delete AQC label").into())
-        }
-    }
-
-    /// Assign a label.
-    #[instrument(skip(self), err)]
-    async fn assign_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        label_id: api::LabelId,
-        op: api::ChanOp,
-    ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
-
-        let effects = self
-            .client
-            .actions(&team.into_id().into())
-            .assign_label(
-                device.into_id().into(),
-                label_id.into_id().into(),
-                op.into(),
-            )
-            .await
-            .context("unable to assign AQC label")?;
-        if let Some(Effect::LabelAssigned(_e)) = find_effect!(&effects, Effect::LabelAssigned(_e)) {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to assign AQC label").into())
-        }
-    }
-
-    /// Revoke a label.
-    #[instrument(skip(self), err)]
-    async fn revoke_label(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-        label_id: api::LabelId,
-    ) -> api::Result<()> {
-        self.check_team_valid(team).await?;
-
-        let effects = self
-            .client
-            .actions(&team.into_id().into())
-            .revoke_label(device.into_id().into(), label_id.into_id().into())
-            .await
-            .context("unable to revoke AQC label")?;
-        if let Some(Effect::LabelRevoked(_e)) = find_effect!(&effects, Effect::LabelRevoked(_e)) {
-            Ok(())
-        } else {
-            Err(anyhow!("unable to revoke AQC label").into())
-        }
-    }
-
-    /// Query devices on team.
-    #[instrument(skip(self), err)]
-    async fn query_devices_on_team(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-    ) -> api::Result<Vec<api::DeviceId>> {
-        self.check_team_valid(team).await?;
-
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_devices_on_team_off_graph()
-            .await
-            .context("unable to query devices on team")?;
-        let mut devices: Vec<api::DeviceId> = Vec::new();
-        for e in effects {
-            if let Effect::QueryDevicesOnTeamResult(e) = e {
-                devices.push(e.device_id.into());
-            }
-        }
-        return Ok(devices);
-    }
-
-    /// Queries all the roles assigned to `device`.
-    #[instrument(skip(self))]
-    async fn query_device_roles(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-    ) -> api::Result<Box<[api::Role]>> {
-        self.check_team_valid(team).await?;
-
-        let roles = self
-            .client
-            .actions(&team.into_id().into())
-            .query_device_roles_off_graph(device.into_id().into())
-            .await
-            .context("unable to query device role")?
-            .into_iter()
-            .filter_map(|e| {
-                if let Effect::QueryDeviceRolesResult(e) = e {
-                    Some(api::Role {
-                        id: e.role_id.into(),
-                        name: e.name,
-                        author_id: e.author_id.into(),
-                        default: e.default,
-                    })
-                } else {
-                    warn!(name = e.name(), "unexpected effect");
-                    None
-                }
-            })
-            .collect();
-        Ok(roles)
-    }
-
-    /// Query device keybundle.
-    #[instrument(skip(self), err)]
-    async fn query_device_keybundle(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-    ) -> api::Result<api::KeyBundle> {
-        self.check_team_valid(team).await?;
-
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_device_keybundle_off_graph(device.into_id().into())
-            .await
-            .context("unable to query device keybundle")?;
-        if let Some(Effect::QueryDeviceKeyBundleResult(e)) =
-            find_effect!(effects, Effect::QueryDeviceKeyBundleResult(_e))
-        {
-            Ok(api::KeyBundle::from(e.device_keys))
-        } else {
-            Err(anyhow!("unable to query device keybundle").into())
-        }
-    }
-
-    /// Query device label assignments.
-    #[instrument(skip(self), err)]
-    async fn query_device_label_assignments(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-    ) -> api::Result<Vec<api::Label>> {
-        self.check_team_valid(team).await?;
-
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_label_assignments_off_graph(device.into_id().into())
-            .await
-            .context("unable to query device label assignments")?;
-        let mut labels: Vec<api::Label> = Vec::new();
-        for e in effects {
-            if let Effect::QueriedLabelAssignment(e) = e {
-                labels.push(api::Label {
-                    id: e.label_id.into(),
-                    name: e.label_name,
-                    author_id: e.label_author_id.into(),
-                });
-            }
-        }
-        return Ok(labels);
-    }
-
-    /// Query AQC network ID.
-    #[instrument(skip(self), err)]
-    async fn query_aqc_net_identifier(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        device: api::DeviceId,
-    ) -> api::Result<Option<api::NetIdentifier>> {
-        self.check_team_valid(team).await?;
-
-        if let Ok((_ctrl, effects)) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_aqc_net_identifier_off_graph(device.into_id().into())
-            .await
-        {
-            if let Some(Effect::QueryAqcNetIdentifierResult(e)) =
-                find_effect!(effects, Effect::QueryAqcNetIdentifierResult(_e))
-            {
-                return Ok(e.net_id.map(api::NetIdentifier));
-            }
-        }
-        Ok(None)
-    }
-
-    /// Query label exists.
-    #[instrument(skip(self), err)]
-    async fn query_label_exists(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-        label_id: api::LabelId,
-    ) -> api::Result<bool> {
-        self.check_team_valid(team).await?;
-
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_label_exists_off_graph(label_id.into_id().into())
-            .await
-            .context("unable to query label")?;
-        if let Some(Effect::QueryLabelExistsResult(_e)) =
-            find_effect!(&effects, Effect::QueryLabelExistsResult(_e))
-        {
-            Ok(true)
-        } else {
-            Err(anyhow!("unable to query whether label exists").into())
-        }
-    }
-
-    /// Query list of labels.
-    #[instrument(skip(self), err)]
-    async fn query_labels(
-        self,
-        _: context::Context,
-        team: api::TeamId,
-    ) -> api::Result<Vec<api::Label>> {
-        self.check_team_valid(team).await?;
-
-        let (_ctrl, effects) = self
-            .client
-            .actions(&team.into_id().into())
-            .query_labels_off_graph()
-            .await
-            .context("unable to query labels")?;
-        let mut labels: Vec<api::Label> = Vec::new();
-        for e in effects {
-            if let Effect::QueriedLabel(e) = e {
-                labels.push(api::Label {
-                    id: e.label_id.into(),
-                    name: e.label_name,
-                    author_id: e.label_author_id.into(),
-                });
-            }
-        }
-        Ok(labels)
     }
 }
 

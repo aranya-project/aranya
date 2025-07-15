@@ -53,6 +53,7 @@ This policy does NOT control:
 TODO: talk about why we try to avoid using `this.foo`.
 TODO: talk about how `fields` are untrusted, attacker-controlled
 inputs
+TODO: talk about how queries are `QueryXResult`, etc.
 
 ## Imports
 
@@ -2320,9 +2321,11 @@ command TerminateTeam {
 // # Required Permissions
 //
 // - `AddDevice`
-action add_device(device_keys struct KeyBundle) {
+// - `CanAssignRole(role_id)` for the initial role, if any.
+action add_device(device_keys struct KeyBundle, initial_role_id optional id) {
     publish AddDevice {
         device_keys: device_keys,
+        initial_role_id: initial_role_id,
     }
 }
 
@@ -2338,6 +2341,9 @@ command AddDevice {
     fields {
         // The new device's public Device Keys.
         device_keys struct KeyBundle,
+        // The ID of the role that should be assigned to the
+        // device.
+        initial_role_id optional id,
     }
 
     seal { return seal_command(serialize(this)) }
@@ -2350,6 +2356,8 @@ command AddDevice {
         check device_has_simple_perm(author.device_id, SimplePerm::AddDevice)
 
         let dev_key_ids = derive_device_key_ids(this.device_keys)
+
+        // TODO(eric): assign the role if provided.
 
         // At this point we believe the following to be true:
         //
@@ -3314,7 +3322,8 @@ APIs.
 Returns a specific label if it exists.
 
 ```policy
-// Emits `QueryLabelResult` for the label.
+// Emits `QueryLabelResult` for the label if it exists.
+// If the label does not exist then no effects are emitted.
 action query_label(label_id id) {
     publish QueryLabelExists {
         label_id: label_id,
@@ -3362,13 +3371,15 @@ command QueryLabel {
 
 ##### `query_labels`
 
-Returns a list of all labels.
+Returns a list of all labels that exist in the team.
 
 ```policy
-// Emits `QueriedLabel` for all labels.
+// Emits one `QueryLabelsResult` for each label in the team.
+// If the team does not have any labels then no effects are
+// emitted.
 action query_labels() {
     map Label[label_id: ?] as f {
-        publish QueryLabel {
+        publish QueryLabels {
             label_id: f.label_id,
             label_name: f.name,
             label_author_id: f.author_id,
@@ -3402,7 +3413,7 @@ command QueryLabels {
         check team_exists()
 
         finish {
-            emit QueriedLabel {
+            emit QueryLabelsResult {
                 label_id: this.label_id,
                 label_name: this.label_name,
                 label_author_id: this.label_author_id,
@@ -3414,9 +3425,14 @@ command QueryLabels {
 
 ##### `query_labels_assigned_to_role`
 
+Returns a list of all labels that have been assigned to
+a particular role.
+
 ```policy
 // Emits `QueryLabelsAssignedToRoleResult` for all labels that
-// the role has been granted permission to use.
+// have been assigned to the role.
+// If the role has not been assigned any labels, then no effects
+// are emitted.
 action query_labels_assigned_to_role(role_id id) {
     // TODO: make this query more efficient when policy supports
     // it. The key order is optimized for `delete`.
