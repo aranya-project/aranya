@@ -635,6 +635,7 @@ dependencies = [
  "anyhow",
  "aranya-internal-s2n-quic",
  "buggy",
+ "bytes",
  "futures-util",
  "serde",
  "tokio",

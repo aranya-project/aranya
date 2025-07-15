@@ -23,6 +23,7 @@ use aranya_runtime::{
 };
 use aranya_util::{
     rustls::{NoCertResolver, SkipServerVerification},
+    s2n_quic::{is_close_error, read_to_end},
     task::scope,
     Addr,
 };
@@ -44,7 +45,7 @@ use s2n_quic::{
     Client as QuicClient, Connection, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{io::AsyncReadExt, sync::mpsc};
+use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, warn};
 
 use super::SyncResponse;
@@ -268,7 +269,11 @@ impl Syncer<State> {
         send.send(Bytes::from(send_buf))
             .await
             .map_err(Error::from)?;
-        send.close().await.map_err(Error::from)?;
+        if let Err(err) = send.close().await {
+            if !is_close_error(err) {
+                return Err(Error::from(err).into());
+            }
+        }
         debug!(?peer, "sent sync request");
 
         Ok(())
@@ -289,8 +294,7 @@ impl Syncer<State> {
     {
         info!("client receiving sync response from QUIC sync server");
 
-        let mut recv_buf = Vec::new();
-        recv.read_to_end(&mut recv_buf)
+        let recv_buf = read_to_end(recv)
             .await
             .context("failed to read sync response")?;
         debug!(?peer, n = recv_buf.len(), "received sync response");
@@ -462,9 +466,8 @@ where
     ) -> SyncResult<()> {
         info!(?peer, "server received a sync request");
 
-        let mut recv_buf = Vec::new();
         let (mut recv, mut send) = stream.split();
-        recv.read_to_end(&mut recv_buf)
+        let recv_buf = read_to_end(&mut recv)
             .await
             .context("failed to read sync request")?;
         debug!(?peer, n = recv_buf.len(), "received sync request");
@@ -486,7 +489,11 @@ where
         send.send(Bytes::from(data))
             .await
             .context("Could not send sync response")?;
-        send.close().await.map_err(Error::from)?;
+        if let Err(err) = send.close().await {
+            if !is_close_error(err) {
+                return Err(Error::from(err).into());
+            }
+        }
         debug!(?peer, n = data_len, "server sent sync response");
 
         Ok(())
