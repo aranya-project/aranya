@@ -96,7 +96,7 @@ async fn main() -> Result<()> {
     let demo_result = run_demo_body(demo_context).await;
 
     // Wait a moment so we can make sure we capture all metrics state
-    sleep(Duration::from_millis(500)).await;
+    sleep(Duration::from_millis(25)).await;
 
     metrics_handle.abort();
 
@@ -294,8 +294,6 @@ async fn setup_demo() -> Result<(Vec<u32>, DemoContext)> {
     for (i, &user_name) in CLIENT_NAMES.iter().enumerate() {
         let ctx = ClientCtx::new(team_name, user_name, &daemon_path).await?;
 
-        sleep(Duration::from_millis(100)).await;
-
         if let Some(pid) = ctx.daemon.pid() {
             daemon_pids.push(pid);
         } else {
@@ -322,8 +320,8 @@ async fn setup_demo() -> Result<(Vec<u32>, DemoContext)> {
 }
 
 async fn run_demo_body(ctx: DemoContext) -> Result<()> {
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
+    let sync_interval = Duration::from_millis(10);
+    let sleep_interval = Duration::from_millis(25);
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
 
     // Create the team config
@@ -388,6 +386,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     sleep(sleep_interval).await;
 
     // Admin tries to assign a role
+    info!("trying to assign the operator's role without a synced graph (this should fail)");
     match admin_team
         .assign_role(ctx.operator.id, Role::Operator)
         .await
@@ -397,13 +396,13 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
         Err(err) => bail!("unexpected error: {err:?}"),
     }
 
-    // Admin syncs with the Owner peer and retries the role
-    // assignment command
+    // Admin syncs with the Owner peer and retries the role assignment command
+    info!("syncing the graph for proper permissions");
     admin_team.sync_now(owner_addr.into(), None).await?;
 
     sleep(sleep_interval).await;
 
-    info!("assigning role");
+    info!("properly assigning the operator's role");
     admin_team
         .assign_role(ctx.operator.id, Role::Operator)
         .await?;
@@ -591,7 +590,7 @@ async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     info!("completed example Aranya application");
 
     // sleep a moment so we can get a stable final state for all daemons
-    sleep(Duration::from_millis(500)).await;
+    sleep(Duration::from_millis(25)).await;
 
     Ok(())
 }

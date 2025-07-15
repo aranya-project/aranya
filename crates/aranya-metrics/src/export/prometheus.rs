@@ -117,8 +117,6 @@ impl PrometheusConfig {
             }
         }
 
-        println!("{:?}", builder);
-
         builder
             .install()
             .context("Failed to install Prometheus exporter")?;

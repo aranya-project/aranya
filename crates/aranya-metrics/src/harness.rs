@@ -3,9 +3,9 @@ use std::{io, mem, time::Instant};
 use anyhow::{anyhow, Result};
 use metrics::{describe_gauge, describe_histogram, gauge, histogram};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
-use tracing::warn;
+use tracing::{debug, warn};
 
-use crate::MetricsConfig;
+use crate::{export::DebugLogType, MetricsConfig};
 
 /// Collector for process metrics, uses native APIs when possible.
 #[derive(Debug)]
@@ -161,6 +161,11 @@ impl ProcessMetricsCollector {
                 + current.total_disk_write_bytes,
         };
 
+        match self.config.debug_logs {
+            DebugLogType::None => (),
+            _ => debug!("Total Metrics: {:?}", self.total_metrics),
+        }
+
         // Push those values to our backend
         self.update_prometheus_metrics(&current)?;
 
@@ -226,6 +231,10 @@ impl ProcessMetricsCollector {
         metrics.total_memory_bytes += process_metrics.memory_bytes;
         metrics.total_disk_read_bytes += process_metrics.disk_read_bytes;
         metrics.total_disk_write_bytes += process_metrics.disk_write_bytes;
+
+        if let DebugLogType::PerProcess = self.config.debug_logs {
+            debug!("PID {pid} Process Metrics: {process_metrics:?}");
+        }
 
         Ok(())
     }
