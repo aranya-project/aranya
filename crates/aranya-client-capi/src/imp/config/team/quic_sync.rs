@@ -60,11 +60,6 @@ impl AddTeamQuicSyncConfig {
     pub fn builder() -> AddTeamQuicSyncConfigBuilder {
         AddTeamQuicSyncConfigBuilder::default()
     }
-
-    /// Useful for deref coercion.
-    pub(crate) fn imp(&self) -> Self {
-        self.clone()
-    }
 }
 
 impl Typed for AddTeamQuicSyncConfig {

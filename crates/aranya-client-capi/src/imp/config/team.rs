@@ -1,4 +1,5 @@
 use core::mem::MaybeUninit;
+use std::ptr;
 
 use aranya_capi_core::{
     safe::{TypeId, Typed},
@@ -91,10 +92,11 @@ impl Typed for AddTeamConfig {
 }
 
 /// Builder for constructing an [`AddTeamConfig`].
-#[derive(Debug, Default)]
+#[allow(missing_debug_implementations)]
+#[derive(Default)]
 pub struct AddTeamConfigBuilder {
     team_id: Option<TeamId>,
-    quic_sync: Option<AddTeamQuicSyncConfig>,
+    quic_sync: Option<defs::AddTeamQuicSyncConfigBuilder>,
 }
 
 impl AddTeamConfigBuilder {
@@ -103,12 +105,21 @@ impl AddTeamConfigBuilder {
         self.team_id = Some(id);
     }
 
-    /// Configures the quic_sync config..
+    /// Returns a mutable pointer to a builder for an [`AddTeamQuicSyncConfig`].
     ///
-    /// This is an optional field that configures how the team
-    /// synchronizes data over QUIC connections.
-    pub fn quic(&mut self, cfg: AddTeamQuicSyncConfig) {
-        self.quic_sync = Some(cfg);
+    /// This function must be called in order to initialize an [`AddTeamQuicSyncConfigBuilder`]
+    /// with default values.
+    pub fn quic_sync(&mut self) -> *mut defs::AddTeamQuicSyncConfigBuilder {
+        ptr::from_mut(self.quic_sync.get_or_insert_with(|| {
+            let mut ret = MaybeUninit::uninit();
+            defs::AddTeamQuicSyncConfigBuilder::init(
+                &mut ret,
+                AddTeamQuicSyncConfigBuilder::default(),
+            );
+
+            // SAFETY: Initialized in the call above.
+            unsafe { ret.assume_init() }
+        }))
     }
 }
 
@@ -128,7 +139,21 @@ impl Builder for AddTeamConfigBuilder {
             return Err(InvalidArg::new("id", "field not set").into());
         };
 
-        Self::Output::init(out, AddTeamConfig::new(id, self.quic_sync));
+        let maybe_qs_cfg = if let Some(quic_sync_builder) = self.quic_sync {
+            let mut out_qs_cfg = MaybeUninit::uninit();
+
+            // SAFETY: No special considerations.
+            unsafe {
+                quic_sync_builder.build(&mut out_qs_cfg)?;
+            }
+
+            // SAFETY: Initialized in the call above.
+            unsafe { Some(out_qs_cfg.assume_init().into_inner().into_inner()) }
+        } else {
+            None
+        };
+
+        Self::Output::init(out, AddTeamConfig::new(id, maybe_qs_cfg));
         Ok(())
     }
 }

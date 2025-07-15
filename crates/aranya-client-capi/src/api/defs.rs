@@ -762,24 +762,6 @@ pub fn create_team_quic_sync_config_build(
     Ok(())
 }
 
-/// Attempts to construct an [`AddTeamQuicSyncConfig`].
-///
-/// This function consumes and releases any resources associated
-/// with the memory pointed to by `cfg`.
-///
-/// @param[in] cfg a pointer to the QUIC sync config builder [`AddTeamQuicSyncConfigBuilder`]
-/// @param[out] out a pointer to write the QUIC sync config to [`AddTeamQuicSyncConfig`]
-///
-/// @relates AranyaAddTeamQuicSyncConfigBuilder.
-pub fn add_team_quic_sync_config_build(
-    cfg: OwnedPtr<AddTeamQuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<AddTeamQuicSyncConfig>,
-) -> Result<(), imp::Error> {
-    // SAFETY: No special considerations.
-    unsafe { cfg.build(out)? }
-    Ok(())
-}
-
 /// Team configuration used when joining a team.
 ///
 /// Use an [`AddTeamConfigBuilder`] to construct this object.
@@ -788,7 +770,7 @@ pub type AddTeamConfig = Safe<imp::AddTeamConfig>;
 
 /// A builder for initializing an [`AddTeamConfig`].
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 328, align = 8)]
+#[aranya_capi_core::opaque(size = 352, align = 8)]
 pub type AddTeamConfigBuilder = Safe<imp::AddTeamConfigBuilder>;
 
 /// Team configuration used when creating a team.
@@ -805,18 +787,17 @@ pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 /// Configures QUIC syncer for [`AddTeamConfigBuilder`].
 ///
 /// By default, the QUIC syncer config is not set.
+/// This function must be called in order to initialize the builder
+/// with default values
 ///
 /// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
-/// @param[in] quic set the QUIC syncer config [`AddTeamQuicSyncConfig`]
+/// @param[out] __output a ptr to a builder for a quic sync config [`AddTeamQuicSyncConfigBuilder`]
 ///
 /// @relates AranyaAddTeamConfigBuilder.
-pub fn add_team_config_builder_set_quic_syncer(
+pub fn add_team_config_builder_get_quic_syncer(
     cfg: &mut AddTeamConfigBuilder,
-    quic: OwnedPtr<AddTeamQuicSyncConfig>,
-) {
-    // SAFETY: the user is responsible for passing in a valid AddTeamQuicSyncConfig pointer.
-    let quic = unsafe { quic.read() };
-    cfg.quic(quic.imp());
+) -> *mut AddTeamQuicSyncConfigBuilder {
+    cfg.quic_sync()
 }
 
 /// Configures team ID field for [`AddTeamConfigBuilder`].
