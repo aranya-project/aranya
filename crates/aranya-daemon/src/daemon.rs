@@ -259,7 +259,7 @@ impl Daemon {
     }
 
     /// The daemon's entrypoint.
-    pub async fn spawn(mut self) -> Result<DaemonHandle, ready::ReadyError> {
+    pub async fn spawn(mut self) -> Result<DaemonHandle, ready::WaitError> {
         let _guard = self.span.enter();
         let mut set = JoinSet::new();
         let waiter = ready::Waiter::new(3);
