@@ -5,3 +5,5 @@
 *.tar.gz
 
 .vscode
+crates/aranya-cli/testing/env
+crates/aranya-cli/testing/config_daemon*.json
