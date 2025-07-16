@@ -24,20 +24,15 @@ bytes = { workspace = true, features = ["serde"] }
 ciborium = { workspace = true }
 futures-util = { workspace = true }
 pin-project = { version = "1.1" }
-postcard = { workspace = true }
 semver = { workspace = true }
 serde = { workspace = true }
 tarpc = { workspace = true }
 tokio = { workspace = true }
 tokio-serde = { version = "0.9", features = ["messagepack"] }
-tracing = { workspace = true }
 
 [dev-dependencies]
 backon = { workspace = true }
+postcard = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
-
-# Used by `custom_id!`.
-[package.metadata.cargo-machete]
-ignored = ["postcard"]

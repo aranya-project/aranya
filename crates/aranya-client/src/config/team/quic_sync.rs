@@ -100,7 +100,7 @@ impl AddTeamQuicSyncConfigBuilder {
     /// Overwrites [`Self::seed_ikm`].
     pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
         let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
-            error!(?err);
+            error!(error = %err, "could not deserialize wrapped_seed");
             ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
         })?;
         self.mode = Some(AddSeedMode::Wrapped(wrapped));
