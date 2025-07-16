@@ -9,8 +9,7 @@ use anyhow::{Context as _, Result};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
 use serde::Deserialize;
-use tracing::{info, warn};
-use url::Url;
+use tracing::info;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
@@ -40,21 +39,6 @@ pub struct PrometheusConfig {
 }
 
 impl PrometheusConfig {
-    fn format_push_gateway_url(base_url: &str, job_name: &str) -> String {
-        match Url::parse(base_url) {
-            Ok(mut url) => {
-                url.set_path(&format!("/metrics/job/{job_name}"));
-                url.set_query(None);
-                url.set_fragment(None);
-                url.to_string()
-            }
-            Err(_) => {
-                warn!("Failed to parse push gateway URL `{base_url}`");
-                format!("http://localhost:9091/metrics/job/{job_name}")
-            }
-        }
-    }
-
     pub(super) fn install(&self, config: &super::MetricsConfig) -> Result<()> {
         let mut builder = PrometheusBuilder::new();
 
@@ -73,10 +57,17 @@ impl PrometheusConfig {
                 password,
                 use_http_post_method,
             } => {
-                let push_url = Self::format_push_gateway_url(endpoint.as_ref(), &config.job_name);
-                info!("Setting up Prometheus push gateway: {push_url}");
+                let endpoint = endpoint
+                    .parse::<http::Uri>()
+                    .map(|_| endpoint.clone())
+                    .unwrap_or(format!(
+                        "http://localhost:9091/metrics/job/{}",
+                        &config.job_name
+                    ));
+
+                info!("Setting up Prometheus push gateway: {endpoint}");
                 builder = builder.with_push_gateway(
-                    push_url,
+                    endpoint,
                     config.interval,
                     username.clone(),
                     password.clone(),
