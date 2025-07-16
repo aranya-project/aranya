@@ -14,8 +14,9 @@ use aranya_daemon_api::{
     AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
 };
 use aranya_util::{
+    error::ReportExt as _,
     rustls::{NoCertResolver, SkipServerVerification},
-    s2n_quic::{is_close_error, read_to_end},
+    s2n_quic::read_to_end,
 };
 use buggy::BugExt as _;
 use bytes::Bytes;
@@ -315,10 +316,7 @@ impl AqcClient {
                     // The original function logged an error and returned ControlFlow::Break
                     // which implies the loop should terminate or an error state.
                     // For try_receive_channel, this might mean the connection is unusable for ctrl messages.
-                    warn!(
-                        "Receiving control message failed: {}, potential issue with connection.",
-                        e
-                    );
+                    warn!(error = %e.report(), "Receiving control message failed, potential issue with connection.");
                     // Depending on desired behavior, you might return an error or continue.
                     // For now, let's assume it's an error if control message processing fails critically.
                     return Err(TryReceiveError::Error(e));
@@ -361,11 +359,12 @@ impl AqcClient {
         send.send(Bytes::from(msg_bytes)).await?;
         send.finish()?;
 
-        let ack_bytes = read_to_end(&mut recv).await?;
-        let ack = postcard::from_bytes::<AqcAckMessage>(&ack_bytes).map_err(AqcError::Serde)?;
-        match ack {
-            AqcAckMessage::Success => (),
-            AqcAckMessage::Failure(e) => return Err(AqcError::CtrlFailure(e)),
+        let data = recv.receive().await.map_err(|err| match err {
+            s2n_quic::stream::Error::StreamReset { .. } => AqcError::PeerCtrl,
+            _ => AqcError::StreamError(err),
+        })?;
+        if data.is_some() {
+            warn!("peer sent unexpected data")
         }
 
         Ok(())
@@ -379,43 +378,23 @@ impl AqcClient {
             .ok_or(AqcError::ConnectionClosed)?;
         let (mut recv, mut send) = stream.split();
         let ctrl_bytes = read_to_end(&mut recv).await.map_err(AqcError::from)?;
-        match postcard::from_bytes::<AqcCtrlMessage>(&ctrl_bytes) {
-            Ok(ctrl) => {
-                self.process_ctrl_message(ctrl.team_id, ctrl.ctrl).await?;
-                // Send an ACK back
-                let ack_msg = AqcAckMessage::Success;
-                let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
-                send.send(Bytes::from(ack_bytes))
-                    .await
-                    .map_err(AqcError::from)?;
-                if let Err(err) = send.close().await {
-                    if !is_close_error(err) {
-                        return Err(AqcError::from(err).into());
-                    }
+        self.process_ctrl_message(&ctrl_bytes)
+            .await
+            .inspect_err(|_| {
+                if let Err(err) = send.reset(s2n_quic::application::Error::UNKNOWN) {
+                    warn!(error = %err.report(), "could not notify peer of ctrl error");
                 }
-            }
-            Err(e) => {
-                error!("Failed to deserialize AqcCtrlMessage: {}", e);
-                let ack_msg =
-                    AqcAckMessage::Failure(format!("Failed to deserialize AqcCtrlMessage: {e}"));
-                let ack_bytes = postcard::to_stdvec(&ack_msg).assume("can serialize")?;
-                send.send(Bytes::from(ack_bytes)).await.ok();
-                if let Err(err) = send.close().await {
-                    if !is_close_error(err) {
-                        error!(%err, "error closing stream after ctrl failure");
-                    }
-                }
-                return Err(AqcError::Serde(e).into());
-            }
-        }
-        Ok(())
+            })
     }
 
     /// Receives an AQC ctrl message.
-    async fn process_ctrl_message(&self, team: TeamId, ctrl: AqcCtrl) -> crate::Result<()> {
+    async fn process_ctrl_message(&self, ctrl_bytes: &[u8]) -> crate::Result<()> {
+        let msg = postcard::from_bytes::<AqcCtrlMessage>(ctrl_bytes)
+            .map_err(AqcError::InvalidCtrlMessage)?;
+
         let (label_id, psks) = self
             .daemon
-            .receive_aqc_ctrl(context::current(), team, ctrl)
+            .receive_aqc_ctrl(context::current(), msg.team_id, msg.ctrl)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -486,13 +465,4 @@ struct AqcCtrlMessage {
     team_id: TeamId,
     /// The control message.
     ctrl: AqcCtrl,
-}
-
-/// An AQC control message.
-#[derive(serde::Serialize, serde::Deserialize)]
-enum AqcAckMessage {
-    /// The success message.
-    Success,
-    /// The failure message.
-    Failure(String),
 }
