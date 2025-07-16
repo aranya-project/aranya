@@ -490,18 +490,18 @@ AranyaError init_team(Team *t) {
 
         size_t team_info_len = BUFFER_LEN;
         uint8_t *team_info   = calloc(team_info_len, 1);
-        err = aranya_add_team_config_builder_to_team_info(&build, team_info, &team_info_len);
+        err = aranya_add_team_config_builder_into_serialized_team_info(&build, team_info, &team_info_len);
         if (err == ARANYA_ERROR_BUFFER_TOO_SMALL) {
             printf("handling buffer too small error\n");
             team_info = realloc(team_info, team_info_len);
-            err = aranya_add_team_config_builder_to_team_info(&build, team_info, &team_info_len);
+            err = aranya_add_team_config_builder_into_serialized_team_info(&build, team_info, &team_info_len);
         }
 
         // Note: this is where the team owner would send the serialized
         // team info data to the peer.
 
         AranyaAddTeamConfigBuilder new_build;
-        err = aranya_add_team_config_builder_from_team_info(&new_build, team_info, team_info_len);
+        err = aranya_add_team_config_builder_from_serialized_team_info(&new_build, team_info, team_info_len);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to init `AranyaAddTeamConfigBuilder` from team info data\n");
             return err;

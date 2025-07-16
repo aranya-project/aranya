@@ -846,7 +846,7 @@ pub fn add_team_config_build(
 /// @param[in,out] buffer_len the number of bytes written to the buffer.
 ///
 /// @relates AranyaAddTeamConfigBuilder.
-pub unsafe fn add_team_config_builder_to_team_info(
+pub unsafe fn add_team_config_builder_into_serialized_team_info(
     cfg: OwnedPtr<AddTeamConfigBuilder>,
     buffer: *mut MaybeUninit<u8>,
     buffer_len: &mut usize,
@@ -879,7 +879,7 @@ pub unsafe fn add_team_config_builder_to_team_info(
 /// @param[in] team_info the serialized team info data.
 ///
 /// @relates AranyaAddTeamConfigBuilder.
-pub unsafe fn add_team_config_builder_from_team_info(
+pub unsafe fn add_team_config_builder_from_serialized_team_info(
     out: &mut MaybeUninit<AddTeamConfigBuilder>,
     team_info: &[u8],
 ) -> Result<(), imp::Error> {

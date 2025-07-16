@@ -152,6 +152,7 @@ dependencies = [
  "buggy",
  "bytes",
  "futures-util",
+ "postcard",
  "tempfile",
  "tokio",
  "tracing",

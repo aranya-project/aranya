@@ -260,7 +260,11 @@ async fn main() -> Result<()> {
     let admin_team = {
         // This is where the owner could create a TeamInfo struct, serialize it,
         // and transmit it to the admin through an out-of-band process.
-        let team_info = owner_team_cfg_builder.to_team_info();
+        let team_info = {
+            let input = owner_team_cfg_builder.to_team_info();
+            let serialized = postcard::to_allocvec(&input)?;
+            postcard::from_bytes(&serialized)?
+        };
 
         let admin_team_config_builder = AddTeamConfigBuilder::from_team_info(team_info)?;
         let add_team_cfg = admin_team_config_builder.build()?;

@@ -1429,9 +1429,9 @@ AranyaError aranya_add_team_config_build_ext(struct AranyaAddTeamConfigBuilder *
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
-AranyaError aranya_add_team_config_builder_to_team_info(struct AranyaAddTeamConfigBuilder *cfg,
-                                                        uint8_t *buffer,
-                                                        size_t *buffer_len);
+AranyaError aranya_add_team_config_builder_into_serialized_team_info(struct AranyaAddTeamConfigBuilder *cfg,
+                                                                     uint8_t *buffer,
+                                                                     size_t *buffer_len);
 
 /**
  * Attempts to write serialized team info data into buffer.
@@ -1445,10 +1445,10 @@ AranyaError aranya_add_team_config_builder_to_team_info(struct AranyaAddTeamConf
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
-AranyaError aranya_add_team_config_builder_to_team_info_ext(struct AranyaAddTeamConfigBuilder *cfg,
-                                                            uint8_t *buffer,
-                                                            size_t *buffer_len,
-                                                            struct AranyaExtError *__ext_err);
+AranyaError aranya_add_team_config_builder_into_serialized_team_info_ext(struct AranyaAddTeamConfigBuilder *cfg,
+                                                                         uint8_t *buffer,
+                                                                         size_t *buffer_len,
+                                                                         struct AranyaExtError *__ext_err);
 
 /**
  * Initializes a new team config builder instance [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
@@ -1458,9 +1458,9 @@ AranyaError aranya_add_team_config_builder_to_team_info_ext(struct AranyaAddTeam
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
-AranyaError aranya_add_team_config_builder_from_team_info(struct AranyaAddTeamConfigBuilder *out,
-                                                          const uint8_t *team_info,
-                                                          size_t team_info_len);
+AranyaError aranya_add_team_config_builder_from_serialized_team_info(struct AranyaAddTeamConfigBuilder *out,
+                                                                     const uint8_t *team_info,
+                                                                     size_t team_info_len);
 
 /**
  * Initializes a new team config builder instance [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
@@ -1470,10 +1470,10 @@ AranyaError aranya_add_team_config_builder_from_team_info(struct AranyaAddTeamCo
  *
  * @relates AranyaAddTeamConfigBuilder.
  */
-AranyaError aranya_add_team_config_builder_from_team_info_ext(struct AranyaAddTeamConfigBuilder *out,
-                                                              const uint8_t *team_info,
-                                                              size_t team_info_len,
-                                                              struct AranyaExtError *__ext_err);
+AranyaError aranya_add_team_config_builder_from_serialized_team_info_ext(struct AranyaAddTeamConfigBuilder *out,
+                                                                         const uint8_t *team_info,
+                                                                         size_t team_info_len,
+                                                                         struct AranyaExtError *__ext_err);
 
 /**
  * Configures QUIC syncer for [`AranyaCreateTeamConfigBuilder`](@ref AranyaCreateTeamConfigBuilder).

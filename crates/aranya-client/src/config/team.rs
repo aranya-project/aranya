@@ -38,7 +38,7 @@ pub mod versioned {
     /// Team data for initializing an [`super::AddTeamConfigBuilder`].
     #[obake::versioned]
     #[obake(version("0.1.0"))]
-    #[obake(derive(Clone, Debug, Serialize, Deserialize,))]
+    #[obake(derive(Clone, Debug, Serialize, Deserialize))]
     #[derive(Clone, Debug, Serialize, Deserialize)]
     pub struct TeamInfo {
         #[obake(cfg(">=0.1.0"))]
