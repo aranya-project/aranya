@@ -110,7 +110,7 @@ impl DaemonHandle {
             Ok(()) => {}
             Err(err) if err.is_panic() => std::panic::resume_unwind(err.into_panic()),
             Err(err) => {
-                error!(%err, "tasks cancelled");
+                error!(error = %err, "tasks unexpectedly cancelled");
                 bug!("tasks cancelled");
             }
         }

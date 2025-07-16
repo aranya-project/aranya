@@ -9,7 +9,7 @@
 use core::net::SocketAddr;
 use std::{
     collections::{btree_map::Entry, BTreeMap},
-    future::Future,
+    convert::Infallible,
     net::Ipv4Addr,
     sync::Arc,
 };
@@ -22,6 +22,7 @@ use aranya_runtime::{
     SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
+    error::ReportExt as _,
     ready,
     rustls::{NoCertResolver, SkipServerVerification},
     task::scope,
@@ -40,13 +41,14 @@ use s2n_quic::{
     provider::{
         congestion_controller::Bbr,
         tls::rustls::{self as rustls_provider, rustls::server::SelectsPresharedKeys},
+        StartError,
     },
     stream::{BidirectionalStream, ReceiveStream, SendStream},
     Client as QuicClient, Connection, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::{io::AsyncReadExt, sync::mpsc};
-use tracing::{debug, error, info, instrument, warn};
+use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 
 use super::SyncResponse;
 use crate::{
@@ -69,23 +71,26 @@ const ALPN_QUIC_SYNC: &[u8] = b"quic-sync-unstable";
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// QUIC Connection error
-    #[error("QUIC connection error: {0}")]
+    #[error(transparent)]
     QuicConnectionError(#[from] s2n_quic::connection::Error),
     /// QUIC Stream error
-    #[error("QUIC stream error: {0}")]
+    #[error(transparent)]
     QuicStreamError(#[from] s2n_quic::stream::Error),
-    /// QUIC client config error
-    #[error("QUIC client config error: {0}")]
-    ClientConfig(anyhow::Error),
     /// Invalid PSK used for syncing
-    #[error("Invalid PSK used when attempting to sync")]
+    #[error("invalid PSK used when attempting to sync")]
     InvalidPSK,
-    /// QUIC server config error
-    #[error("QUIC server config error: {0}")]
-    ServerConfig(anyhow::Error),
-    /// An unexpected error occured
-    #[error("An unexpected error occured: {0}")]
-    Bug(buggy::Bug),
+    /// QUIC client endpoint start error
+    #[error("could not start QUIC client")]
+    ClientStart(#[source] StartError),
+    /// QUIC server endpoint start error
+    #[error("could not start QUIC server")]
+    ServerStart(#[source] StartError),
+}
+
+impl From<Infallible> for Error {
+    fn from(err: Infallible) -> Self {
+        match err {}
+    }
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
@@ -101,48 +106,46 @@ pub struct State {
 }
 
 impl SyncState for State {
-    #[allow(clippy::manual_async_fn)]
-    #[instrument(skip(syncer, sink))]
     /// Syncs with the peer.
+    ///
     /// Aranya client sends a `SyncRequest` to peer then processes the `SyncResponse`.
-    fn sync_impl<S>(
+    #[instrument(skip_all)]
+    async fn sync_impl<S>(
         syncer: &mut Syncer<Self>,
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> impl Future<Output = SyncResult<()>> + Send
+    ) -> SyncResult<()>
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send,
     {
-        async move {
-            // Sets the active team before starting a QUIC connection
-            syncer.state.store.set_team(id.into_id().into());
+        // Sets the active team before starting a QUIC connection
+        syncer.state.store.set_team(id.into_id().into());
 
-            let stream = syncer
-                .connect(peer)
-                .await
-                .inspect_err(|e| error!("Could not create connection: {e}"))?;
-            // TODO: spawn a task for send/recv?
-            let (mut recv, mut send) = stream.split();
+        let stream = syncer
+            .connect(peer)
+            .await
+            .inspect_err(|e| error!(error = %e.report(), "Could not create connection"))?;
+        // TODO: spawn a task for send/recv?
+        let (mut recv, mut send) = stream.split();
 
-            // TODO: Real server address.
-            let server_addr = ();
-            let mut sync_requester = SyncRequester::new(id, &mut Rng, server_addr);
+        // TODO: Real server address.
+        let server_addr = ();
+        let mut sync_requester = SyncRequester::new(id, &mut Rng, server_addr);
 
-            // send sync request.
-            syncer
-                .send_sync_request(&mut send, &mut sync_requester, peer)
-                .await
-                .map_err(|e| SyncError::SendSyncRequest(Box::new(e)))?;
+        // send sync request.
+        syncer
+            .send_sync_request(&mut send, &mut sync_requester, peer)
+            .await
+            .map_err(|e| SyncError::SendSyncRequest(Box::new(e)))?;
 
-            // receive sync response.
-            syncer
-                .receive_sync_response(&mut recv, &mut sync_requester, &id, sink, peer)
-                .await
-                .map_err(|e| SyncError::ReceiveSyncResponse(Box::new(e)))?;
+        // receive sync response.
+        syncer
+            .receive_sync_response(&mut recv, &mut sync_requester, &id, sink, peer)
+            .await
+            .map_err(|e| SyncError::ReceiveSyncResponse(Box::new(e)))?;
 
-            Ok(())
-        }
+        Ok(())
     }
 }
 
@@ -163,15 +166,11 @@ where {
         let provider = rustls_provider::Client::new(client_config);
 
         let client = QuicClient::builder()
-            .with_tls(provider)
-            .context("can't set quic client config")
-            .map_err(Error::ClientConfig)?
+            .with_tls(provider)?
             .with_io((Ipv4Addr::UNSPECIFIED, 0))
-            .assume("can set quic client addr")
-            .map_err(Error::Bug)?
+            .assume("can set quic client address")?
             .start()
-            .context("can't start quic client")
-            .map_err(Error::ClientConfig)?;
+            .map_err(Error::ClientStart)?;
 
         Ok(Self {
             client,
@@ -182,9 +181,9 @@ where {
 }
 
 impl Syncer<State> {
-    #[instrument(skip(self))]
+    #[instrument(skip_all)]
     async fn connect(&mut self, peer: &Addr) -> SyncResult<BidirectionalStream> {
-        info!(?peer, "client connecting to QUIC sync server");
+        debug!("client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
         let conns = &mut self.state.conns;
@@ -192,38 +191,38 @@ impl Syncer<State> {
 
         let conn = match conns.entry(*peer) {
             Entry::Occupied(entry) => {
-                info!("Client is able to re-use existing QUIC connection");
+                debug!("Client is able to re-use existing QUIC connection");
                 entry.into_mut()
             }
             Entry::Vacant(entry) => {
-                info!(?peer, "existing QUIC connection not found");
+                debug!("existing QUIC connection not found");
 
                 let addr = tokio::net::lookup_host(peer.to_socket_addrs())
                     .await
                     .context("DNS lookup on for peer address")?
                     .next()
-                    .assume("invalid peer address")?;
+                    .context("could not resolve peer address")?;
                 // Note: cert is not used but server name must be set to connect.
-                debug!(?peer, "attempting to create new quic connection");
+                debug!("attempting to create new quic connection");
 
                 let mut conn = client
-                    .connect(Connect::new(addr).with_server_name("127.0.0.1"))
+                    .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
                     .await
                     .map_err(Error::from)?;
 
                 conn.keep_alive(true).map_err(Error::from)?;
-                debug!(?peer, "created new quic connection");
+                debug!("created new quic connection");
                 entry.insert(conn)
             }
         };
 
-        info!("client connected to QUIC sync server");
+        debug!("client connected to QUIC sync server");
 
         let open_stream_res = conn
             .handle()
             .open_bidirectional_stream()
             .await
-            .inspect_err(|e| error!(?peer, "unable to open bidi stream: {}", e));
+            .inspect_err(|e| error!(error = %e.report(), "unable to open bidi stream"));
         let stream = match open_stream_res {
             Ok(stream) => stream,
             // Retry for these errors?
@@ -239,21 +238,21 @@ impl Syncer<State> {
             }
         };
 
-        info!(?peer, "client opened bidi stream with QUIC sync server");
+        debug!("client opened bidi stream with QUIC sync server");
         Ok(stream)
     }
 
-    #[instrument(skip(self, syncer))]
+    #[instrument(skip_all)]
     async fn send_sync_request<A>(
         &self,
         send: &mut SendStream,
         syncer: &mut SyncRequester<'_, A>,
-        peer: &Addr,
+        #[expect(unused, reason = "will be used with peer cache")] peer: &Addr,
     ) -> SyncResult<()>
     where
         A: Serialize + DeserializeOwned + Clone,
     {
-        info!("client sending sync request to QUIC sync server");
+        debug!("client sending sync request to QUIC sync server");
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
         let (len, _) = {
@@ -270,31 +269,31 @@ impl Syncer<State> {
             .await
             .map_err(Error::from)?;
         send.close().await.map_err(Error::from)?;
-        debug!(?peer, "sent sync request");
+        debug!("sent sync request");
 
         Ok(())
     }
 
-    #[instrument(skip(self, syncer, sink))]
+    #[instrument(skip_all)]
     async fn receive_sync_response<S, A>(
         &self,
         recv: &mut ReceiveStream,
         syncer: &mut SyncRequester<'_, A>,
         id: &GraphId,
         sink: &mut S,
-        peer: &Addr,
+        #[expect(unused, reason = "will be used with peer cache")] peer: &Addr,
     ) -> SyncResult<()>
     where
         S: Sink<<crate::EN as Engine>::Effect>,
         A: Serialize + DeserializeOwned + Clone,
     {
-        info!("client receiving sync response from QUIC sync server");
+        debug!("client receiving sync response from QUIC sync server");
 
         let mut recv_buf = Vec::new();
         recv.read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync response")?;
-        debug!(?peer, n = recv_buf.len(), "received sync response");
+        debug!(n = recv_buf.len(), "received sync response");
 
         // process the sync response.
         let resp = postcard::from_bytes(&recv_buf)
@@ -357,6 +356,12 @@ where
     SP: StorageProvider + Send + Sync + 'static,
 {
     /// Creates a new `Server`.
+    ///
+    /// # Panics
+    ///
+    /// Will panic if called outside tokio runtime.
+    ///
+    /// Will panic on poisoned internal mutexes.
     #[inline]
     #[allow(deprecated)]
     pub async fn new(
@@ -381,17 +386,12 @@ where
             .assume("invalid server address")?;
         // Use the rustls server provider
         let server = QuicServer::builder()
-            .with_tls(tls_server_provider)
-            .context("can't set sync server tls config")
-            .map_err(Error::ServerConfig)? // Use the wrapped server config
+            .with_tls(tls_server_provider)?
             .with_io(addr)
-            .assume("can set sync server addr")
-            .map_err(Error::Bug)?
-            .with_congestion_controller(Bbr::default())
-            .context("can't set congestion controller config")
-            .map_err(Error::ServerConfig)?
+            .assume("can set sync server addr")?
+            .with_congestion_controller(Bbr::default())?
             .start()
-            .context("can't start QUIC server")?;
+            .map_err(Error::ServerStart)?;
 
         Ok(Self {
             aranya,
@@ -417,37 +417,37 @@ where
                     continue;
                 };
 
-                let Ok(peer) = conn.remote_addr() else {
-                    error!("unable to get peer address from connection");
+                let Ok(peer) = conn.remote_addr().inspect_err(|err| {
+                    error!(error = %err.report(), "unable to get peer address from connection");
+                }) else {
                     continue;
                 };
 
                 let client = self.aranya.clone();
 
-                s.spawn(async move {
-                    loop {
+                s.spawn(
+                    async move {
                         // Accept incoming streams.
-                        match conn.accept_bidirectional_stream().await {
-                            Ok(Some(stream)) => {
-                                debug!(?peer, "received incoming QUIC stream");
-                                if let Err(e) =
-                                    Self::sync(client.clone(), peer, stream, &active_team).await
-                                {
-                                    error!(?e, ?peer, "server unable to sync with peer");
-                                    break;
+                        while let Some(res) = conn.accept_bidirectional_stream().await.transpose() {
+                            let stream = match res {
+                                Ok(stream) => stream,
+                                Err(err) => {
+                                    error!(error = %err.report(), "error receiving QUIC stream");
+                                    return;
                                 }
-                            }
-                            Ok(None) => {
-                                debug!(?peer, "QUIC connection was closed");
-                                return;
-                            }
-                            Err(e) => {
-                                error!(?peer, "error receiving QUIC stream: {}", e);
+                            };
+                            debug!("received incoming QUIC stream");
+                            if let Err(err) =
+                                Self::sync(client.clone(), peer, stream, &active_team).await
+                            {
+                                error!(error = %err.report(), "server unable to sync with peer");
                                 return;
                             }
                         }
+                        debug!("QUIC connection was closed");
                     }
-                });
+                    .instrument(info_span!("serve_connection", %peer)),
+                );
             }
         })
         .await;
@@ -456,30 +456,31 @@ where
     }
 
     /// Responds to a sync.
-    #[instrument(skip_all, fields(peer = %peer))]
+    #[instrument(skip_all)]
     pub async fn sync(
         client: AranyaClient<EN, SP>,
-        peer: SocketAddr,
+        #[expect(unused, reason = "will be used with peer cache")] peer: SocketAddr,
         stream: BidirectionalStream,
         active_team: &TeamId,
     ) -> SyncResult<()> {
-        info!(?peer, "server received a sync request");
+        debug!("server received a sync request");
 
         let mut recv_buf = Vec::new();
         let (mut recv, mut send) = stream.split();
         recv.read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync request")?;
-        debug!(?peer, n = recv_buf.len(), "received sync request");
+        debug!(n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let sync_response_res = Self::sync_respond(client, &recv_buf, active_team)
-            .await
-            .inspect_err(|e| error!(?e, "error responding to sync request"));
-
+        let sync_response_res = Self::sync_respond(client, &recv_buf, active_team).await;
         let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
-            Err(err) => SyncResponse::Err(format!("{err:?}")),
+            Err(err) => {
+                let error = err.report().to_string();
+                error!(%error, "error responding to sync request");
+                SyncResponse::Err(error)
+            }
         };
         // Serialize the sync response.
         let data =
@@ -490,7 +491,7 @@ where
             .await
             .context("Could not send sync response")?;
         send.close().await.map_err(Error::from)?;
-        debug!(?peer, n = data_len, "server sent sync response");
+        debug!(n = data_len, "server sent sync response");
 
         Ok(())
     }
@@ -502,7 +503,7 @@ where
         request_data: &[u8],
         active_team: &TeamId,
     ) -> SyncResult<Box<[u8]>> {
-        info!("server responding to sync request");
+        debug!("server responding to sync request");
 
         // TODO: Use real server address
         let server_address = ();
@@ -533,7 +534,7 @@ where
                     err,
                     aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
                 ) {
-                    warn!("missing requested graph, we likely have not synced yet");
+                    warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
                     Ok(0)
                 } else {
                     Err(err)
