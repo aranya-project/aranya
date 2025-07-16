@@ -64,3 +64,5 @@ Basically, the "self" PID is an `aranya-client` instance (plus all metrics overh
 The way that we collect the metrics that are generated is using [Prometheus](https://prometheus.io/), an open source metrics collection framework. By default, Prometheus runs in a pull configuration, i.e. every so often Prometheus will scrape this process for metrics, which works for long running processes but isn't ideal for an isolated run. We instead use a separate tool provided by Prometheus called a [`pushgateway`](https://github.com/prometheus/pushgateway).
 
 One caveat is that the `pushgateway` will continue to collect metrics until it's killed, so `cargo make metrics` spawns a `pushgateway` for the duration of the run. `aranya-metrics` generates a unique `job_name` using the current timestamp for easy querying.
+
+`brew install protobuf` for TCP

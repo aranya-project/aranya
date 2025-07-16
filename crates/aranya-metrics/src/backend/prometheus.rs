@@ -1,3 +1,8 @@
+//! Configuration for an exporter to send data to a [Prometheus] backend or a [`pushgateway`].
+//!
+//! [Prometheus]: https://prometheus.io/
+//! [`pushgateway`]: https://github.com/prometheus/pushgateway
+
 use std::{net::SocketAddr, num::NonZeroU32, path::PathBuf, time::Duration};
 
 use anyhow::{Context as _, Result};
@@ -129,7 +134,7 @@ impl Default for PrometheusConfig {
     fn default() -> Self {
         Self {
             mode: PrometheusMode::PushGateway {
-                endpoint: "http://localhost:9091".to_string(),
+                endpoint: SocketAddr::from(([127, 0, 0, 1], 9091)).to_string(),
                 username: None,
                 password: None,
                 use_http_post_method: false,

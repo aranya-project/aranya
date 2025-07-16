@@ -2,26 +2,25 @@ use std::{io, mem, time::Instant};
 
 use anyhow::{anyhow, Result};
 use metrics::{describe_gauge, describe_histogram, gauge, histogram};
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tracing::{debug, warn};
 
-use crate::{export::DebugLogType, MetricsConfig};
+use crate::{backend::DebugLogType, MetricsConfig};
 
 /// Collector for process metrics, uses native APIs when possible.
 #[derive(Debug)]
 pub struct ProcessMetricsCollector {
     /// Config options for the current run
     config: MetricsConfig,
-    /// System handle for fallback metrics
-    system: System,
     /// All child process PIDs for tracking
     child_pids: Vec<u32>,
+    /// System struct for sysinfo fallback
+    system: System,
     /// Collection start time for rate calculations
     _start_time: Instant,
-    /// Previous metrics for rate calculations
-    previous_metrics: Option<AggregatedMetrics>,
     /// Total cumulative metrics for this run
     total_metrics: AggregatedMetrics,
+    // TODO(nikki): total metrics for each process, attach human name to each PID
 }
 
 #[derive(Debug)]
@@ -67,22 +66,18 @@ impl ProcessMetricsCollector {
     pub fn new(config: MetricsConfig, child_pids: Vec<u32>) -> Self {
         Self::register_metrics();
 
-        let system = System::new_with_specifics(
-            RefreshKind::nothing().with_processes(ProcessRefreshKind::nothing().with_disk_usage()),
-        );
-
         Self {
             config,
-            system,
             child_pids,
+            system: System::default(),
             _start_time: Instant::now(),
-            previous_metrics: None,
             total_metrics: AggregatedMetrics::default(),
         }
     }
 
+    /// Register a description for all the gauges, histograms, and counters we use.
     fn register_metrics() {
-        // All our accumulated totals across the run
+        // Accumulated values from across the run
         describe_gauge!(
             "cpu_user_time_microseconds_total",
             "Total User CPU time consumed by all monitored processes in microseconds"
@@ -104,37 +99,12 @@ impl ProcessMetricsCollector {
             "Total bytes written to disk by all monitored processes"
         );
 
-        // All our delta metrics since last tick
-        describe_gauge!(
-            "cpu_user_utilization_rate",
-            "User CPU utilization since last tick"
-        );
-        describe_gauge!(
-            "cpu_system_utilization_rate",
-            "System CPU utilization since last tick"
-        );
-        describe_gauge!(
-            "cpu_total_utilization_rate",
-            "Total CPU utilization since last tick"
-        );
-        describe_gauge!(
-            "memory_allocation_rate",
-            "Amount of allocated memory since last tick"
-        );
-        describe_gauge!(
-            "disk_read_bytes_rate",
-            "Number of bytes read since last tick"
-        );
-        describe_gauge!(
-            "disk_write_bytes_rate",
-            "Number of bytes written since last tick"
-        );
-
         // Other miscellaneous helpful datapoints
         describe_gauge!(
             "monitored_processes_count",
             "Number of processes being monitored"
         );
+        // TODO(nikki): histograms for user/system time
         describe_histogram!(
             "metrics_collection_duration_microseconds",
             "Time spent collecting metrics in microseconds"
@@ -167,10 +137,7 @@ impl ProcessMetricsCollector {
         }
 
         // Push those values to our backend
-        self.update_prometheus_metrics(&current)?;
-
-        // Save those metrics so we have that delta for the next tick
-        self.previous_metrics = Some(current);
+        self.update_prometheus_metrics()?;
 
         // Record how long it took us to actually collect those metrics
         #[allow(clippy::cast_precision_loss)]
@@ -340,7 +307,7 @@ impl ProcessMetricsCollector {
         Ok(())
     }
 
-    fn update_prometheus_metrics(&self, current: &AggregatedMetrics) -> Result<()> {
+    fn update_prometheus_metrics(&self) -> Result<()> {
         // Update all absolute metrics.
         // TODO(nikki): add tags for individual PIDs so we can track each daemon?
         let total = &self.total_metrics;
@@ -358,40 +325,6 @@ impl ProcessMetricsCollector {
             gauge!("monitored_processes_count").set(total.process_count as f64);
         }
 
-        // Update rate metrics if we have a previous timestep.
-        if let Some(previous) = &self.previous_metrics {
-            let time_delta = current
-                .timestamp
-                .duration_since(previous.timestamp)
-                .as_secs_f64();
-
-            #[allow(clippy::cast_precision_loss)]
-            if time_delta > 0.0 {
-                // proc_pidinfo returns cpu time since spinup, as well as "current" memory usage so
-                // we need to get the delta since the previous tick.
-                let cpu_user_rate = ((current.total_cpu_user_time_us as f64)
-                    - (previous.total_cpu_user_time_us as f64))
-                    / time_delta;
-                let cpu_system_rate = ((current.total_cpu_system_time_us as f64)
-                    - (previous.total_cpu_system_time_us as f64))
-                    / time_delta;
-                let memory_alloc_rate = ((current.total_memory_bytes as f64)
-                    - (previous.total_memory_bytes as f64))
-                    / time_delta;
-
-                // sysinfo already gives us the bytes "since last refresh", so this is fine.
-                let disk_read_rate = (current.total_disk_read_bytes as f64) / time_delta;
-                let disk_write_rate = (current.total_disk_write_bytes as f64) / time_delta;
-
-                gauge!("cpu_user_utilization_rate").set(cpu_user_rate);
-                gauge!("cpu_system_utilization_rate").set(cpu_system_rate);
-                gauge!("cpu_total_utilization_rate").set(cpu_user_rate + cpu_system_rate);
-                gauge!("memory_allocation_rate").set(memory_alloc_rate);
-                // TODO(nikki): standardize this on "per second", even if we tick more/less frequently?
-                gauge!("disk_read_bytes_rate").set(disk_read_rate);
-                gauge!("disk_write_bytes_rate").set(disk_write_rate);
-            }
-        }
         Ok(())
     }
 

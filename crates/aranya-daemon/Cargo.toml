@@ -59,7 +59,7 @@ tokio = { workspace = true, features = [
     "time",
 ] }
 tokio-util = { workspace = true, features = ["time"] }
-toml = { version = "0.9", default-features = false, features = ["std", "serde", "parse"] }
+toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 

@@ -1,3 +1,12 @@
+//! Metrics Collection for the Aranya Project.
+//!
+//! This crate contains tooling that allows for collecting various metrics from various systems
+//! inside Aranya. This includes things like disk, memory, and cpu usage.
+
+#![warn(clippy::missing_docs_in_private_items, missing_docs)]
+// TODO(nikki): split the aranya demo code into a separate process so we can remove the overhead
+// from measuring, and make this act as both a library and a binary (and move the warn to the lib).
+
 use std::{
     env,
     net::{Ipv4Addr, SocketAddr},
@@ -30,8 +39,8 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
-use crate::{export::MetricsConfig, harness::ProcessMetricsCollector};
-mod export;
+use crate::{backend::MetricsConfig, harness::ProcessMetricsCollector};
+pub mod backend;
 mod harness;
 
 struct DemoFilter {
@@ -319,6 +328,7 @@ async fn setup_demo() -> Result<(Vec<u32>, DemoContext)> {
     ))
 }
 
+// TODO(nikki): make sure this is using sync_now
 async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     let sync_interval = Duration::from_millis(10);
     let sleep_interval = Duration::from_millis(25);

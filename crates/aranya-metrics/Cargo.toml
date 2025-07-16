@@ -26,7 +26,9 @@ deser-hjson = { version = "2" }
 futures-util = { workspace = true }
 libc = { workspace = true }
 metrics = { workspace = true }
+metrics-exporter-dogstatsd = { version = "0.9" }
 metrics-exporter-prometheus = { version = "0.17", features = ["uds-listener"] }
+metrics-exporter-tcp = { version = "0.11" }
 metrics-util = { workspace = true }
 serde = { workspace = true }
 sysinfo = { workspace = true }
