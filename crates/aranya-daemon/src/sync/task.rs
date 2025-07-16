@@ -19,7 +19,7 @@ use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, Mutex, oneshot};
+use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, instrument, trace, warn};
 
@@ -260,10 +260,10 @@ impl<ST: SyncState> Syncer<ST> {
                     }
                     Msg::RemovePeer { peer } => {
                         self.remove_peer(peer);
-                        Ok(())
+                        Ok(0)
                     }
                 };
-                if let Err(reply) = tx.send(reply) {
+                if let Err(reply) = tx.send(reply.map(|_| ())) {
                     warn!("syncer operation did not wait for reply");
                     reply?;
                 }

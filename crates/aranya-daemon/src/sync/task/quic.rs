@@ -18,9 +18,8 @@ use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Command, Engine, GraphId, PeerCache, Sink, StorageError, StorageProvider, SyncRequestMessage,
+    Command, Engine, GraphId, Sink, StorageError, StorageProvider, SyncRequestMessage,
     SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
-
 };
 use aranya_util::{
     rustls::{NoCertResolver, SkipServerVerification},
