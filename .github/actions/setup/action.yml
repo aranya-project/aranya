@@ -13,6 +13,10 @@ runs:
         gcc --version
         cmake --version
 
+    - name: Update dependencies
+      shell: bash
+      run: sudo apt-get update
+
     - name: patchelf
       shell: bash
       run: |

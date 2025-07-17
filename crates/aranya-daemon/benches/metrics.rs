@@ -30,7 +30,7 @@ fn daemon_startup() -> Result<()> {
         config_dir: work_dir.join("config"),
         sync: SyncConfig {
             quic: Toggle::Enabled(QuicSyncConfig {
-                addr: Addr::from((Ipv4Addr::UNSPECIFIED,0)),
+                addr: Addr::from((Ipv4Addr::UNSPECIFIED, 0)),
             }),
         },
         aqc: Toggle::Enabled(AqcConfig {}),
