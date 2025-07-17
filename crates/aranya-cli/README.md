@@ -2,7 +2,9 @@
 
 # Aranya CLI Testing and Usage Guide
 
-This directory contains comprehensive testing scripts and examples for the Aranya CLI tool. The CLI provides a complete interface for managing Aranya teams, devices, labels, and secure communication channels.
+This `aranya-cli` crate contains a CLI tool for interacting with Aranya. The CLI provides a complete interface for managing Aranya teams, devices, labels, and secure communication channels. The CLI tool connects to the Aranya deamon via the encrypted USD IPC API. Comprehensive testing and example scripts are located in the `testing` subdirectory.
+AQC operations are not currently supported with this tool. An issue has been opened here to provided better support for the CLI tool in Aranya:
+https://github.com/aranya-project/aranya/issues/409
 
 ## Overview
 
