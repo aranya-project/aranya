@@ -634,6 +634,7 @@ dependencies = [
  "anyhow",
  "aranya-internal-s2n-quic",
  "buggy",
+ "bytes",
  "futures-util",
  "serde",
  "thiserror 2.0.12",
