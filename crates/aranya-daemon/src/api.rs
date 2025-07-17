@@ -19,7 +19,7 @@ use aranya_daemon_api::{
 };
 use aranya_keygen::PublicKeys;
 use aranya_runtime::GraphId;
-use aranya_util::{task::scope, Addr};
+use aranya_util::{error::ReportExt as _, task::scope, Addr};
 use derive_where::derive_where;
 use futures_util::{StreamExt, TryStreamExt};
 pub(crate) use quic_sync::Data as QSData;
@@ -28,7 +28,7 @@ use tarpc::{
     server::{incoming::Incoming, BaseChannel, Channel},
 };
 use tokio::{net::UnixListener, sync::mpsc};
-use tracing::{debug, error, info, instrument, trace, warn, Instrument};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 use crate::{
     actions::Actions,
@@ -124,12 +124,11 @@ impl DaemonApiServer {
                 async move {
                     while let Some((graph, effects)) = self.recv_effects.recv().await {
                         if let Err(err) = effect_handler.handle_effects(graph, &effects).await {
-                            error!(?err, "error handling effects");
+                            error!(error = ?err, "error handling effects");
                         }
                     }
                     info!("effect handler exiting");
                 }
-                .in_current_span()
             });
 
             let server = {
@@ -143,7 +142,7 @@ impl DaemonApiServer {
             info!(path = ?self.uds_path, "listening");
 
             let mut incoming = server
-                .inspect_err(|err| warn!(?err, "accept error"))
+                .inspect_err(|err| warn!(error = %err.report(), "accept error"))
                 .filter_map(|r| future::ready(r.ok()))
                 .map(BaseChannel::with_defaults)
                 .max_concurrent_requests_per_channel(10);
@@ -152,7 +151,7 @@ impl DaemonApiServer {
                 s.spawn(scope(async move |reqs| {
                     let requests = ch
                         .requests()
-                        .inspect_err(|err| warn!(?err, "channel failure"))
+                        .inspect_err(|err| warn!(error = %err.report(), "channel failure"))
                         .take_while(|r| future::ready(r.is_ok()))
                         .filter_map(|r| async { r.ok() });
                     let mut requests = pin!(requests);
