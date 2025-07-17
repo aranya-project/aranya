@@ -37,3 +37,9 @@ tempfile = { workspace = true }
 tokio = { workspace = true, features = ["process"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+[[bin]]
+name = "aranya-metrics"
+path = "src/main.rs"
+test = false
+bench = false

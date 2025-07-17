@@ -1,9 +1,3 @@
-//! Metrics Collection for the Aranya Project.
-//!
-//! This crate contains tooling that allows for collecting various metrics from various systems
-//! inside Aranya. This includes things like disk, memory, and cpu usage.
-
-#![warn(clippy::missing_docs_in_private_items, missing_docs)]
 // TODO(nikki): split the aranya demo code into a separate process so we can remove the overhead
 // from measuring, and make this act as both a library and a binary (and move the warn to the lib).
 

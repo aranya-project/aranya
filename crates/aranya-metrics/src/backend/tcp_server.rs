@@ -8,6 +8,10 @@ use anyhow::{Context as _, Result};
 use metrics_exporter_tcp::TcpBuilder;
 use tracing::info;
 
+/// Configuration info for the TCP exporter/server.
+///
+/// This includes the address to listen for TCP connections on, as well as the internal buffer size
+/// used when sending protobuf data to any connected clients.
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(default)]
 pub struct TcpConfig {
@@ -27,6 +31,7 @@ impl Default for TcpConfig {
 }
 
 impl TcpConfig {
+    /// Configures and installs the TCP server using the provided config info.
     pub(super) fn install(&self) -> Result<()> {
         info!("Setting up TCP metrics server: {}", self.listen_addr);
 

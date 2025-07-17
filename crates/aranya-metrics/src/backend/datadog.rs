@@ -10,6 +10,19 @@ use metrics::Label;
 use metrics_exporter_dogstatsd::DogStatsDBuilder;
 use tracing::info;
 
+/// Configuration info for the DogStatsD exporter.
+///
+/// This includes:
+/// * The address of the Datadog Agent to connect to
+/// * How long to try sending before metrics are dropped and the length of each payload trying to be
+///   sent
+/// * The aggregation mode used by the exporter to optimize what payloads are being sent
+/// * Optional prefixes and additional labels that can be attached to metrics being sent
+/// * Whether to enable additional telemetry, which lets the Datadog Agent see additional info about
+///   how the exporter is performing
+/// * Whether to use reservoir sampling to represent arbitrarily large data using a smaller array
+/// * Whether to forward histograms as distributions, which allows the Datadog Agent to process the
+///   data which allows for richer insights
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(default)]
 pub struct DataDogConfig {
@@ -59,6 +72,7 @@ impl Default for DataDogConfig {
 }
 
 impl DataDogConfig {
+    /// Configures and installs the exporter for DogStatsD using the provided config info.
     pub(super) fn install(&self, config: &super::MetricsConfig) -> Result<()> {
         info!("Setting up DogStatsD exporter: {}", self.remote_addr);
 

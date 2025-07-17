@@ -1,3 +1,15 @@
+//! This module contains the metrics harness used to measure CPU, disk, and memory usage for a
+//! process.
+//!
+//! This is done by using a combination of syscalls to collect metrics from the host OS without
+//! having much of an impact on the actual measurement. Note that unless the code being ran is on a
+//! separate process, it's impossible to fully remove the effect of measuring a process. See the
+//! [observer problem] for more details.
+//!
+//! Specifically, this uses `proc_pidinfo` or `rusage` on MacOS to collect CPU and memory usage,
+//! falling back to the `sysinfo` crate for disk usage stats.
+//!
+//! [observer problem]: https://w.wiki/Ekxn
 use std::{io, mem, time::Instant};
 
 use anyhow::{anyhow, Result};
@@ -5,7 +17,7 @@ use metrics::{describe_gauge, describe_histogram, gauge, histogram};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tracing::{debug, warn};
 
-use crate::{backend::DebugLogType, MetricsConfig};
+use crate::backend::{DebugLogType, MetricsConfig};
 
 /// Collector for process metrics, uses native APIs when possible.
 #[derive(Debug)]
@@ -23,18 +35,26 @@ pub struct ProcessMetricsCollector {
     // TODO(nikki): total metrics for each process, attach human name to each PID
 }
 
+/// Contains the metrics collected for all processes.
 #[derive(Debug)]
 struct AggregatedMetrics {
-    /// ~The moment we measured these metrics
+    /// The moment we start collecting metrics, used to calculate the delta of how long it took.
     timestamp: Instant,
+    /// The total time the CPU spent in userspace.
     total_cpu_user_time_us: u64,
+    /// The total time the CPU spent processing syscalls.
     total_cpu_system_time_us: u64,
+    /// The total number of bytes used all processes.
     total_memory_bytes: u64,
+    /// The total number of bytes read from disk by all processes.
     total_disk_read_bytes: u64,
+    /// The total number of bytes written to disk by all processes.
     total_disk_write_bytes: u64,
+
     // TODO(nikki): hook the TCP/QUIC syncer with a metrics macro.
     //total_network_rx_bytes: u64,
     //total_network_tx_bytes: u64,
+    /// The current number of processes we're collecting metrics about.
     process_count: usize,
 }
 
@@ -52,12 +72,18 @@ impl Default for AggregatedMetrics {
     }
 }
 
+/// Contains the metrics collected for a single process.
 #[derive(Debug, Default)]
 struct SingleProcessMetrics {
+    /// The total time the CPU spent in userspace.
     cpu_user_time_us: u64,
+    /// The total time the CPU spent processing syscalls.
     cpu_system_time_us: u64,
+    /// The total number of bytes used.
     memory_bytes: u64,
+    /// The total number of bytes read from disk.
     disk_read_bytes: u64,
+    /// The total number of bytes written to disk.
     disk_write_bytes: u64,
 }
 
@@ -111,6 +137,7 @@ impl ProcessMetricsCollector {
         );
     }
 
+    /// Collects metrics for each process and reports them to the configured exporter.
     fn collect_metrics(&mut self) -> Result<()> {
         let collection_start = Instant::now();
 
@@ -137,7 +164,7 @@ impl ProcessMetricsCollector {
         }
 
         // Push those values to our backend
-        self.update_prometheus_metrics()?;
+        self.report_metrics_info()?;
 
         // Record how long it took us to actually collect those metrics
         #[allow(clippy::cast_precision_loss)]
@@ -147,6 +174,7 @@ impl ProcessMetricsCollector {
         Ok(())
     }
 
+    /// Collects metrics for all processes and aggregates them.
     fn collect_aggregated_metrics(&mut self) -> Result<AggregatedMetrics> {
         let mut metrics = AggregatedMetrics {
             timestamp: Instant::now(),
@@ -174,22 +202,14 @@ impl ProcessMetricsCollector {
         Ok(metrics)
     }
 
+    /// Collects metrics for a specific process, using a number of syscalls.
     #[cfg(target_os = "macos")]
     fn collect_process_metrics(&mut self, pid: u32, metrics: &mut AggregatedMetrics) -> Result<()> {
         // First, let's collect metrics for the individual process.
         let mut process_metrics = SingleProcessMetrics::default();
 
-        if self
-            .collect_native_macos_metrics(pid, &mut process_metrics)
-            .is_err()
-        {
-            // If we're trying to track our own process, we can fallback to rusage.
-            if pid == std::process::id() {
-                self.collect_rusage_metrics(&mut process_metrics)?;
-            }
-        }
-
-        // Always fallback to sysinfo for disk metrics.
+        // Collect what we can using native syscalls, and fall back to sysinfo for disk stats.
+        self.collect_native_macos_metrics(pid, &mut process_metrics)?;
         self.collect_sysinfo_disk_metrics(pid, &mut process_metrics)?;
 
         // Aggregate this process's metrics towards the total.
@@ -206,12 +226,14 @@ impl ProcessMetricsCollector {
         Ok(())
     }
 
+    /// Collects metrics for a specific process, using a number of syscalls.
     #[cfg(not(target_os = "macos"))]
     #[allow(dead_code)]
     fn collect_process_metrics(&self, _pid: u32, _metrics: &mut AggregatedMetrics) -> Result<()> {
         Err(anyhow!("Unsupported target_os!"))
     }
 
+    /// Collects metrics for a specific process, using native MacOS syscalls.
     #[cfg(target_os = "macos")]
     fn collect_native_macos_metrics(
         &self,
@@ -236,6 +258,9 @@ impl ProcessMetricsCollector {
             )
         };
 
+        // TODO(nikki): follow sysinfo's integrations more closely, in case this fails? We have the
+        // option of proc_pid_rusage which gives PID-level information as well.
+
         // NOTE: -1 means error, otherwise it returns the number of bytes obtained.
         if result < 0 {
             return Err(io::Error::from_raw_os_error(result).into());
@@ -255,35 +280,7 @@ impl ProcessMetricsCollector {
         Ok(())
     }
 
-    #[allow(clippy::cast_sign_loss)]
-    #[allow(dead_code)]
-    fn collect_rusage_metrics(&self, process_metrics: &mut SingleProcessMetrics) -> Result<()> {
-        // SAFETY: This has no alignment requirements so mem::zeroed is safe for all variants.
-        let mut usage = unsafe { mem::zeroed::<libc::rusage>() };
-        // SAFETY: The above is safe and we're passing a valid pointer.
-        let result = unsafe { libc::getrusage(libc::RUSAGE_SELF, &raw mut usage) };
-
-        if result < 0 {
-            return Err(io::Error::from_raw_os_error(result))?;
-        }
-
-        process_metrics.cpu_user_time_us =
-            (usage.ru_utime.tv_sec as u64 * 1_000_000) + usage.ru_utime.tv_usec as u64;
-        process_metrics.cpu_system_time_us =
-            (usage.ru_stime.tv_sec as u64 * 1_000_000) + usage.ru_stime.tv_usec as u64;
-
-        // The max resident set size is bytes on MacOS and kilobytes on Linux/BSD. POSIX only really
-        // guarantees the above two fields, so anything else is platform-dependent.
-        process_metrics.memory_bytes = match cfg!(target_os = "macos") {
-            true => usage.ru_maxrss as u64,
-            false => usage.ru_maxrss as u64 * 1024,
-        };
-
-        // TODO(nikki): collect more metrics? There aren't guarantees here on most fields, but we
-        // can get page faults and filesystem I/O count.
-        Ok(())
-    }
-
+    /// Collects disk usage metrics using sysinfo for a process.
     #[allow(dead_code)]
     fn collect_sysinfo_disk_metrics(
         &mut self,
@@ -307,7 +304,8 @@ impl ProcessMetricsCollector {
         Ok(())
     }
 
-    fn update_prometheus_metrics(&self) -> Result<()> {
+    /// Reports metrics to any exporter that may be configured.
+    fn report_metrics_info(&self) -> Result<()> {
         // Update all absolute metrics.
         // TODO(nikki): add tags for individual PIDs so we can track each daemon?
         let total = &self.total_metrics;
@@ -328,6 +326,7 @@ impl ProcessMetricsCollector {
         Ok(())
     }
 
+    /// Spins up a loop that waits for a specific interval and then runs metrics collection.
     pub async fn start_collection_loop(&mut self) -> Result<()> {
         let mut interval = tokio::time::interval(self.config.interval);
 

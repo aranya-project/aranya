@@ -11,6 +11,20 @@ use metrics_util::MetricKindMask;
 use serde::Deserialize;
 use tracing::info;
 
+/// Configuration info for the Prometheus exporter.
+///
+/// This includes:
+/// * The current mode (either exporting to Prometheus via Unix Domain Socket or normal HTTP, or
+///   using a pushgateway that syncs with Prometheus)
+/// * The timeout for a metric before it stops being logged. For long running tasks, this is ideal
+///   to tune since it will give a nice cutoff after a specific task might have finished.
+/// * A whitelist of addresses allowed to connect to the exporter
+/// * The list of quantiles (0.0, 0.5, 0.9, 0.95, 0.99, 0.999, and 1.0) used when rendering
+///   histograms
+/// * The number and size of buckets, which allow for greater flexibility in Prometheus to derive
+///   quantiles
+/// * How often the upkeep task runs, which cleans out metrics that Prometheus has already scraped
+/// * A set of global labels that can be applied to all metrics
 #[derive(Debug, Clone, Deserialize)]
 #[serde(default)]
 pub struct PrometheusConfig {
@@ -39,6 +53,7 @@ pub struct PrometheusConfig {
 }
 
 impl PrometheusConfig {
+    /// Configures and installs the exporter for Prometheus using the provided config info.
     pub(super) fn install(&self, config: &super::MetricsConfig) -> Result<()> {
         let mut builder = PrometheusBuilder::new();
 
@@ -131,7 +146,7 @@ impl Default for PrometheusConfig {
                 use_http_post_method: false,
             },
 
-            idle_timeout: (MetricsKindMask::All, Some(Duration::from_secs(1))),
+            idle_timeout: (MetricsKindMask::All, Some(Duration::from_millis(100))),
             enable_unit_suffix: false,
 
             allowed_addresses: None,
@@ -145,7 +160,9 @@ impl Default for PrometheusConfig {
     }
 }
 
+/// Defines the mode that the Prometheus exporter operates on (listener/gateway).
 #[derive(Debug, Clone, Deserialize)]
+#[allow(clippy::missing_docs_in_private_items)]
 enum PrometheusMode {
     /// Creates an HTTP listener using an HTTP address to scrape from.
     HttpListener { addr: SocketAddr },
