@@ -91,10 +91,11 @@ impl Typed for AddTeamConfig {
 }
 
 /// Builder for constructing an [`AddTeamConfig`].
-#[derive(Debug, Default)]
+#[allow(missing_debug_implementations)]
+#[derive(Default)]
 pub struct AddTeamConfigBuilder {
     team_id: Option<TeamId>,
-    quic_sync: Option<AddTeamQuicSyncConfig>,
+    quic_sync: Option<defs::AddTeamQuicSyncConfigBuilder>,
 }
 
 impl AddTeamConfigBuilder {
@@ -103,12 +104,21 @@ impl AddTeamConfigBuilder {
         self.team_id = Some(id);
     }
 
-    /// Configures the quic_sync config..
+    /// Returns a mutable reference to a builder for an [`AddTeamQuicSyncConfig`].
     ///
-    /// This is an optional field that configures how the team
-    /// synchronizes data over QUIC connections.
-    pub fn quic(&mut self, cfg: AddTeamQuicSyncConfig) {
-        self.quic_sync = Some(cfg);
+    /// This function must be called in order to initialize an [`AddTeamQuicSyncConfigBuilder`]
+    /// with default values.
+    pub fn quic_sync(&mut self) -> &mut defs::AddTeamQuicSyncConfigBuilder {
+        self.quic_sync.get_or_insert_with(|| {
+            let mut ret = MaybeUninit::uninit();
+            defs::AddTeamQuicSyncConfigBuilder::init(
+                &mut ret,
+                AddTeamQuicSyncConfigBuilder::default(),
+            );
+
+            // SAFETY: Initialized in the call above.
+            unsafe { ret.assume_init() }
+        })
     }
 }
 
@@ -128,7 +138,21 @@ impl Builder for AddTeamConfigBuilder {
             return Err(InvalidArg::new("id", "field not set").into());
         };
 
-        Self::Output::init(out, AddTeamConfig::new(id, self.quic_sync));
+        let maybe_qs_cfg = if let Some(quic_sync_builder) = self.quic_sync {
+            let mut out_qs_cfg = MaybeUninit::uninit();
+
+            // SAFETY: No special considerations.
+            unsafe {
+                quic_sync_builder.build(&mut out_qs_cfg)?;
+            }
+
+            // SAFETY: Initialized in the call above.
+            unsafe { Some(out_qs_cfg.assume_init().into_inner().into_inner()) }
+        } else {
+            None
+        };
+
+        Self::Output::init(out, AddTeamConfig::new(id, maybe_qs_cfg));
         Ok(())
     }
 }
@@ -137,10 +161,10 @@ impl From<AddTeamConfig> for aranya_client::AddTeamConfig {
     fn from(value: AddTeamConfig) -> Self {
         let mut builder = Self::builder();
         if let Some(cfg) = value.quic_sync {
-            builder = builder
-                .quic_sync(cfg.into())
-                .team_id((&value.team_id).into());
+            builder.quic_sync().set_from_cfg(cfg.into());
         }
+
+        builder = builder.team_id((&value.team_id).into());
 
         builder.build().expect("All fields set")
     }
@@ -166,5 +190,45 @@ impl From<CreateTeamConfig> for aranya_client::CreateTeamConfig {
 impl From<&CreateTeamConfig> for aranya_client::CreateTeamConfig {
     fn from(value: &CreateTeamConfig) -> Self {
         Self::from(value.to_owned())
+    }
+}
+
+impl From<AddTeamConfigBuilder> for aranya_client::AddTeamConfigBuilder {
+    fn from(value: AddTeamConfigBuilder) -> Self {
+        let mut builder = Self::default();
+
+        if let Some(team_id) = value.team_id {
+            builder = builder.team_id(team_id.into());
+        }
+
+        if let Some(qs_cfg_builder) = value.quic_sync {
+            let qs_cfg_builder = qs_cfg_builder.into_inner().into_inner();
+
+            if let Some(mode) = qs_cfg_builder.mode {
+                builder.quic_sync().mode(mode);
+            }
+        }
+
+        builder
+    }
+}
+
+impl From<aranya_client::AddTeamConfigBuilder> for AddTeamConfigBuilder {
+    fn from(mut value: aranya_client::AddTeamConfigBuilder) -> Self {
+        let mut builder = Self::default();
+
+        if let Some(team_id) = value.get_team_id() {
+            builder.id((*team_id).into());
+        }
+
+        if value.has_quic_sync() {
+            let qs_cfg_builder = value.quic_sync();
+
+            if let Some(mode) = qs_cfg_builder.get_mode() {
+                builder.quic_sync().mode(mode.clone());
+            }
+        }
+
+        builder
     }
 }

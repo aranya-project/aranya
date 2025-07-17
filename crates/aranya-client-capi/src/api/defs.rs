@@ -286,6 +286,12 @@ impl From<&TeamId> for aranya_daemon_api::TeamId {
     }
 }
 
+impl From<TeamId> for aranya_daemon_api::TeamId {
+    fn from(value: TeamId) -> Self {
+        value.id.bytes.into()
+    }
+}
+
 /// Device ID.
 #[repr(C)]
 #[derive(Copy, Clone, Debug)]
@@ -763,24 +769,6 @@ pub fn create_team_quic_sync_config_build(
     Ok(())
 }
 
-/// Attempts to construct an [`AddTeamQuicSyncConfig`].
-///
-/// This function consumes and releases any resources associated
-/// with the memory pointed to by `cfg`.
-///
-/// @param[in] cfg a pointer to the QUIC sync config builder [`AddTeamQuicSyncConfigBuilder`]
-/// @param[out] out a pointer to write the QUIC sync config to [`AddTeamQuicSyncConfig`]
-///
-/// @relates AranyaAddTeamQuicSyncConfigBuilder.
-pub fn add_team_quic_sync_config_build(
-    cfg: OwnedPtr<AddTeamQuicSyncConfigBuilder>,
-    out: &mut MaybeUninit<AddTeamQuicSyncConfig>,
-) -> Result<(), imp::Error> {
-    // SAFETY: No special considerations.
-    unsafe { cfg.build(out)? }
-    Ok(())
-}
-
 /// Team configuration used when joining a team.
 ///
 /// Use an [`AddTeamConfigBuilder`] to construct this object.
@@ -789,7 +777,7 @@ pub type AddTeamConfig = Safe<imp::AddTeamConfig>;
 
 /// A builder for initializing an [`AddTeamConfig`].
 #[aranya_capi_core::derive(Init, Cleanup)]
-#[aranya_capi_core::opaque(size = 328, align = 8)]
+#[aranya_capi_core::opaque(size = 352, align = 8)]
 pub type AddTeamConfigBuilder = Safe<imp::AddTeamConfigBuilder>;
 
 /// Team configuration used when creating a team.
@@ -805,19 +793,28 @@ pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 
 /// Configures QUIC syncer for [`AddTeamConfigBuilder`].
 ///
-/// By default, the QUIC syncer config is not set.
+/// By default, the QUIC syncer config is not set. This function must be called
+/// in order to initialize the builder with default values. Subsequent calls will
+/// return a pointer to the existing config builder.
 ///
-/// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
-/// @param[in] quic set the QUIC syncer config [`AddTeamQuicSyncConfig`]
+/// The returned pointer allows modification of QUIC synchronization settings
+/// for the team configuration.
 ///
-/// @relates AranyaAddTeamConfigBuilder.
-pub fn add_team_config_builder_set_quic_syncer(
+/// @param[in,out] cfg A pointer to the builder for a team config [`AddTeamConfigBuilder`].
+/// @param[out] __output A pointer to a builder for a QUIC sync config [`AddTeamQuicSyncConfigBuilder`].
+///                      This pointer is valid for the lifetime of the parent builder.
+///
+///
+/// @warning The returned pointer becomes invalid when the parent builder is destroyed.
+///
+/// @note If this is the first call for this builder, a new QUIC sync config builder
+///       will be created with default values.
+///
+/// @relates AranyaAddTeamConfigBuilder
+pub fn add_team_config_builder_get_quic_syncer(
     cfg: &mut AddTeamConfigBuilder,
-    quic: OwnedPtr<AddTeamQuicSyncConfig>,
-) {
-    // SAFETY: the user is responsible for passing in a valid AddTeamQuicSyncConfig pointer.
-    let quic = unsafe { quic.read() };
-    cfg.quic(quic.imp());
+) -> *mut AddTeamQuicSyncConfigBuilder {
+    cfg.quic_sync()
 }
 
 /// Configures team ID field for [`AddTeamConfigBuilder`].
@@ -847,6 +844,63 @@ pub fn add_team_config_build(
 ) -> Result<(), imp::Error> {
     // SAFETY: No special considerations.
     unsafe { cfg.build(out)? }
+    Ok(())
+}
+
+/// Attempts to write serialized team info data into buffer.
+///
+/// This function consumes and releases any resources associated
+/// with the memory pointed to by `cfg`.
+///
+/// @param[in] cfg a pointer to the team config builder [`AddTeamConfigBuilder`]
+/// @param[out] buffer the serialized team info data.
+/// @param[in,out] buffer_len the number of bytes written to the buffer.
+///
+/// @relates AranyaAddTeamConfigBuilder.
+pub unsafe fn add_team_config_builder_into_serialized_team_info(
+    cfg: OwnedPtr<AddTeamConfigBuilder>,
+    buffer: *mut MaybeUninit<u8>,
+    buffer_len: &mut usize,
+) -> Result<(), imp::Error> {
+    // SAFETY: Assumes the caller provided a valid ptr.
+    let cfg = unsafe { cfg.read() };
+    let cfg = cfg.into_inner().into_inner();
+    let cfg = aranya_client::AddTeamConfigBuilder::from(cfg);
+
+    let team_info = cfg.to_team_info();
+    let data = postcard::to_allocvec(&team_info)?;
+
+    let out = aranya_capi_core::try_as_mut_slice!(buffer, *buffer_len);
+    if *buffer_len < data.len() {
+        *buffer_len = data.len();
+        return Err(imp::Error::BufferTooSmall);
+    }
+
+    *buffer_len = data.len();
+    for (dst, src) in out.iter_mut().zip(data) {
+        dst.write(src);
+    }
+
+    Ok(())
+}
+
+/// Initializes a new team config builder instance [`AddTeamConfigBuilder`].
+///
+/// @param[out] out the uninitialized team config builder [`AddTeamConfigBuilder`].
+/// @param[in] team_info the serialized team info data.
+///
+/// @relates AranyaAddTeamConfigBuilder.
+pub unsafe fn add_team_config_builder_from_serialized_team_info(
+    out: &mut MaybeUninit<AddTeamConfigBuilder>,
+    team_info: &[u8],
+) -> Result<(), imp::Error> {
+    let team_info = postcard::from_bytes(team_info)?;
+    let builder = aranya_client::AddTeamConfigBuilder::from_team_info(team_info)?;
+
+    let builder = imp::AddTeamConfigBuilder::from(builder);
+
+    AddTeamConfigBuilder::init(out, builder);
+
     Ok(())
 }
 

@@ -7,7 +7,7 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
+    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamConfigBuilder, CreateTeamConfig,
     CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
 };
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
@@ -246,17 +246,32 @@ async fn main() -> Result<()> {
     let team_id = owner_team.team_id();
     info!(%team_id);
 
-    let add_team_cfg = {
-        let qs_cfg = AddTeamQuicSyncConfig::builder()
-            .seed_ikm(seed_ikm)
-            .build()?;
-        AddTeamConfig::builder()
-            .quic_sync(qs_cfg)
-            .team_id(team_id)
-            .build()?
+    let (add_team_cfg, owner_team_cfg_builder) = {
+        let mut team_cfg_builder = AddTeamConfig::builder();
+
+        team_cfg_builder.quic_sync().seed_ikm(seed_ikm);
+        team_cfg_builder = team_cfg_builder.team_id(team_id);
+
+        let builder_clone = team_cfg_builder.clone();
+
+        (team_cfg_builder.build()?, builder_clone)
     };
 
-    let admin_team = admin.client.add_team(add_team_cfg.clone()).await?;
+    let admin_team = {
+        // This is where the owner could create a TeamInfo struct, serialize it,
+        // and transmit it to the admin through an out-of-band process.
+        let team_info = {
+            let input = owner_team_cfg_builder.to_team_info();
+            let serialized = postcard::to_allocvec(&input)?;
+            postcard::from_bytes(&serialized)?
+        };
+
+        let admin_team_config_builder = AddTeamConfigBuilder::from_team_info(team_info)?;
+        let add_team_cfg = admin_team_config_builder.build()?;
+
+        admin.client.add_team(add_team_cfg.clone()).await?
+    };
+
     let operator_team = operator.client.add_team(add_team_cfg.clone()).await?;
     let membera_team = membera.client.add_team(add_team_cfg.clone()).await?;
     let memberb_team = memberb.client.add_team(add_team_cfg).await?;
