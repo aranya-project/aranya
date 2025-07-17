@@ -312,7 +312,7 @@ impl TestCtx {
         }
         for store in stores {
             let team_id = TeamId::from(*clients[0].graph_id.as_array());
-            store.insert(team_id, Arc::new(test_psk.clone()))?;
+            store.insert(team_id, Arc::new(test_psk.clone()));
             store.set_team(team_id);
         }
         Ok(clients)

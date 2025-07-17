@@ -33,9 +33,7 @@ impl Api {
 
         for psk_res in seed.generate_psks(team_id) {
             let psk = psk_res.context("unable to generate psk")?;
-            psk_store
-                .insert(team_id, Arc::new(psk))
-                .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+            psk_store.insert(team_id, Arc::new(psk));
         }
 
         Ok(())
@@ -83,9 +81,7 @@ impl Api {
 
         for psk_res in seed.generate_psks(team) {
             let psk = psk_res.context("unable to generate psk")?;
-            psk_store
-                .insert(team, Arc::new(psk))
-                .inspect_err(|err| error!(err = ?err, "unable to insert PSK"))?
+            psk_store.insert(team, Arc::new(psk));
         }
 
         Ok(())
@@ -96,10 +92,7 @@ impl Api {
         team: api::TeamId,
         data: &Data,
     ) -> anyhow::Result<()> {
-        data.psk_store
-            .remove(team)
-            .inspect_err(|err| error!(err = ?err, "unable to remove PSK"))?;
-
+        data.psk_store.remove(team);
         Ok(())
     }
 }

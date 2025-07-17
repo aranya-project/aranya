@@ -14,19 +14,18 @@ use std::{
 
 use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{storage::GraphId, ClientError, Engine, PeerCache, Sink};
+use aranya_runtime::{storage::GraphId, Engine, PeerCache, Sink};
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
-use tracing::{error, instrument, trace, warn};
+use tracing::{instrument, trace, warn};
 
 use super::Result as SyncResult;
 use crate::{
     daemon::{Client, EF},
-    sync::error::SyncError,
     vm_policy::VecSink,
     InvalidGraphs,
 };
@@ -281,41 +280,29 @@ impl<ST: SyncState> Syncer<ST> {
     }
 
     /// Sync with a peer.
-    #[instrument(skip_all, fields(peer = ?peer))]
+    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
     pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<usize> {
         trace!("syncing with peer");
-        let (effects, cmd_count): (Vec<EF>, usize) = {
-            let mut sink = VecSink::new();
-            let cmd_count =
-                match <ST as SyncState>::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
-                    .await
-                    .context("sync_peer error")
-                    .inspect_err(|err| error!("{err:?}"))
-                {
-                    Ok(count) => count,
-                    Err(e) => {
-                        // If a finalization error has occurred, remove all sync peers for that team.
-                        if e.downcast_ref::<ClientError>()
-                            .is_some_and(|err| matches!(err, ClientError::ParallelFinalize))
-                        {
-                            // Remove sync peers for graph that had finalization error.
-                            self.peers.retain(|p, (_, key)| {
-                                let keep = p.graph_id != peer.graph_id;
-                                if !keep {
-                                    self.queue.remove(key);
-                                }
-                                keep
-                            });
-                            self.invalid.insert(peer.graph_id);
+        let mut sink = VecSink::new();
+        let cmd_count = ST::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
+            .await
+            .inspect_err(|err| {
+                // If a finalization error has occurred, remove all sync peers for that team.
+                if err.is_parallel_finalize() {
+                    // Remove sync peers for graph that had finalization error.
+                    self.peers.retain(|p, (_, key)| {
+                        let keep = p.graph_id != peer.graph_id;
+                        if !keep {
+                            self.queue.remove(key);
                         }
-                        return Err(SyncError::Other(e));
-                    }
-                };
-            let effects = sink
-                .collect()
-                .context("could not collect effects from sync")?;
-            (effects, cmd_count)
-        };
+                        keep
+                    });
+                    self.invalid.insert(peer.graph_id);
+                }
+            })?;
+        let effects = sink
+            .collect()
+            .context("could not collect effects from sync")?;
         let n = effects.len();
         self.send_effects
             .send((peer.graph_id, effects))

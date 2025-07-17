@@ -22,11 +22,10 @@ use aranya_crypto::{
     EncryptionPublicKey, Engine, Id,
 };
 pub use aranya_policy_text::{text, Text};
-use aranya_util::Addr;
+use aranya_util::{error::ReportExt, Addr};
 use buggy::Bug;
 pub use semver::Version;
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 pub mod quic_sync;
 pub use quic_sync::*;
@@ -43,41 +42,35 @@ pub struct Error(String);
 
 impl Error {
     pub fn from_msg(err: &str) -> Self {
-        error!(?err);
         Self(err.into())
     }
 
     pub fn from_err<E: error::Error>(err: E) -> Self {
-        error!(?err);
-        Self(format!("{err:?}"))
+        Self(ReportExt::report(&err).to_string())
     }
 }
 
 impl From<Bug> for Error {
     fn from(err: Bug) -> Self {
-        error!(?err);
-        Self(format!("{err:?}"))
+        Self::from_err(err)
     }
 }
 
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
-        error!(?err);
         Self(format!("{err:?}"))
     }
 }
 
 impl From<semver::Error> for Error {
     fn from(err: semver::Error) -> Self {
-        error!(?err);
-        Self(format!("{err:?}"))
+        Self::from_err(err)
     }
 }
 
 impl From<IdError> for Error {
     fn from(err: IdError) -> Self {
-        error!(%err);
-        Self(err.to_string())
+        Self::from_err(err)
     }
 }
 
