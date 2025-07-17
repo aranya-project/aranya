@@ -16,9 +16,10 @@ use aranya_daemon_api::{
 use aranya_util::{
     error::ReportExt as _,
     rustls::{NoCertResolver, SkipServerVerification},
+    s2n_quic::read_to_end,
 };
 use buggy::BugExt as _;
-use bytes::{Bytes, BytesMut};
+use bytes::Bytes;
 use channels::AqcPeerChannel;
 use s2n_quic::{
     self,
@@ -30,7 +31,6 @@ use s2n_quic::{
             rustls::{server::PresharedKeySelection, ClientConfig, ServerConfig},
         },
     },
-    stream::BidirectionalStream,
     Client, Connection, Server,
 };
 use tarpc::context;
@@ -351,14 +351,15 @@ impl AqcClient {
         team_id: TeamId,
     ) -> Result<(), AqcError> {
         let mut conn = self.client_state.lock().await.connect_ctrl(addr).await?;
-        let mut stream = conn.open_bidirectional_stream().await?;
+        let stream = conn.open_bidirectional_stream().await?;
+        let (mut recv, mut send) = stream.split();
 
         let msg = AqcCtrlMessage { team_id, ctrl };
         let msg_bytes = postcard::to_stdvec(&msg).assume("can serialize")?;
-        stream.send(Bytes::from(msg_bytes)).await?;
-        stream.finish()?;
+        send.send(Bytes::from(msg_bytes)).await?;
+        send.finish()?;
 
-        let data = stream.receive().await.map_err(|err| match err {
+        let data = recv.receive().await.map_err(|err| match err {
             s2n_quic::stream::Error::StreamReset { .. } => AqcError::PeerCtrl,
             _ => AqcError::StreamError(err),
         })?;
@@ -370,16 +371,17 @@ impl AqcClient {
     }
 
     async fn receive_ctrl_message(&self, conn: &mut Connection) -> crate::Result<()> {
-        let mut stream = conn
+        let stream = conn
             .accept_bidirectional_stream()
             .await
             .map_err(AqcError::ConnectionError)?
             .ok_or(AqcError::ConnectionClosed)?;
-        let ctrl_bytes = read_to_end(&mut stream).await.map_err(AqcError::from)?;
+        let (mut recv, mut send) = stream.split();
+        let ctrl_bytes = read_to_end(&mut recv).await.map_err(AqcError::from)?;
         self.process_ctrl_message(&ctrl_bytes)
             .await
             .inspect_err(|_| {
-                if let Err(err) = stream.reset(s2n_quic::application::Error::UNKNOWN) {
+                if let Err(err) = send.reset(s2n_quic::application::Error::UNKNOWN) {
                     warn!(error = %err.report(), "could not notify peer of ctrl error");
                 }
             })
@@ -463,28 +465,4 @@ struct AqcCtrlMessage {
     team_id: TeamId,
     /// The control message.
     ctrl: AqcCtrl,
-}
-
-/// Read all of a stream until it has finished.
-///
-/// A bit more efficient than going through the `AsyncRead`-based impl,
-/// especially if there was only one chunk of data. Also avoids needing to
-/// convert/handle an `io::Error`.
-async fn read_to_end(stream: &mut BidirectionalStream) -> Result<Bytes, s2n_quic::stream::Error> {
-    let Some(first) = stream.receive().await? else {
-        return Ok(Bytes::new());
-    };
-    let Some(mut more) = stream.receive().await? else {
-        return Ok(first);
-    };
-    let mut buf = BytesMut::from(first);
-    loop {
-        buf.extend_from_slice(&more);
-        if let Some(even_more) = stream.receive().await? {
-            more = even_more;
-        } else {
-            break;
-        }
-    }
-    Ok(buf.freeze())
 }
