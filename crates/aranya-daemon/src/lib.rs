@@ -44,5 +44,8 @@ mod daemon;
 mod keystore;
 mod util;
 
+#[cfg(test)]
+mod test;
+
 pub use daemon::*;
 pub use keystore::AranyaStore;
