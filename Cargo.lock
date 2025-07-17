@@ -338,7 +338,6 @@ dependencies = [
  "test-log",
  "tokio",
  "tokio-serde",
- "tracing",
 ]
 
 [[package]]

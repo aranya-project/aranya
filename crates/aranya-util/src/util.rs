@@ -5,6 +5,8 @@ use std::{fs::Permissions, os::unix::fs::PermissionsExt, path::Path};
 use tokio::{fs, io};
 use tracing::warn;
 
+use crate::error::ReportExt as _;
+
 /// Asynchronously writes `data` to the specified `path`, creating the file if it
 /// doesn't exist, and truncating it if it does.
 ///
@@ -20,7 +22,7 @@ pub async fn write_file(path: impl AsRef<Path>, data: &[u8]) -> io::Result<()> {
     fs::write(path.as_ref(), data).await?;
     let perms = Permissions::from_mode(0o600);
     if let Err(err) = fs::set_permissions(&path, perms).await {
-        warn!(err = ?err, path = %path.as_ref().display(), "unable to set file perms to 0o600");
+        warn!(error = %err.report(), path = %path.as_ref().display(), "unable to set file perms to 0o600");
     }
     Ok(())
 }
@@ -41,7 +43,7 @@ pub async fn create_dir_all(path: impl AsRef<Path>) -> io::Result<()> {
     fs::create_dir_all(path.as_ref()).await?;
     let perms = Permissions::from_mode(0o700);
     if let Err(err) = fs::set_permissions(&path, perms).await {
-        warn!(err = ?err, path = %path.as_ref().display(), "unable to set directory perms to 0o700");
+        warn!(error = %err.report(), path = %path.as_ref().display(), "unable to set directory perms to 0o700");
     }
     Ok(())
 }

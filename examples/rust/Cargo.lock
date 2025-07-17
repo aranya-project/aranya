@@ -131,13 +131,11 @@ dependencies = [
  "ciborium",
  "futures-util",
  "pin-project",
- "postcard",
  "semver",
  "serde",
  "tarpc",
  "tokio",
  "tokio-serde",
- "tracing",
 ]
 
 [[package]]

@@ -153,7 +153,7 @@ impl AddTeamQuicSyncConfigBuilder {
     /// This method will be removed soon since certificates will be used instead of PSKs in the future.
     pub fn wrapped_seed(&mut self, encap_seed: &[u8]) -> Result<(), Error> {
         let wrapped = postcard::from_bytes(encap_seed).map_err(|err| {
-            error!(?err);
+            error!(error = %err, "could not deserialize wrapped_seed");
             InvalidArg::new("wrapped_seed", "could not deserialize")
         })?;
         self.mode = Some(AddSeedMode::Wrapped(wrapped));
