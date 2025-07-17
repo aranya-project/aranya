@@ -292,49 +292,9 @@ async fn test_remove_team() -> Result<()> {
     Ok(())
 }
 
-/// Tests that a device can create multiple teams.
+/// Tests that a device can create multiple teams and receive sync requests for each team.
 #[test(tokio::test(flavor = "multi_thread"))]
-async fn test_multi_team_create() -> Result<()> {
-    // Set up our team context so we can run the test.
-    let work_dir1 = tempfile::tempdir()?.path().to_path_buf();
-    let team = TeamCtx::new("test_multi_team_create", work_dir1).await?;
-
-    // Create the initial team, and get our TeamId.
-    let team1 = team
-        .owner
-        .client
-        .create_team({
-            CreateTeamConfig::builder()
-                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
-                .build()?
-        })
-        .await
-        .expect("expected to create team1");
-    let team_id1 = team1.team_id();
-    info!(?team_id1);
-
-    // Create the initial team, and get our TeamId.
-    let team2 = team
-        .owner
-        .client
-        .create_team({
-            CreateTeamConfig::builder()
-                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
-                .build()?
-        })
-        .await
-        .expect("expected to create team2");
-    let team_id2 = team2.team_id();
-    info!(?team_id2);
-
-    return Ok(());
-}
-
-/// Tests multi-graph support by onboarding devices to multiple teams.
-/// A device is onboarded to multiple teams as an `Admin`.
-/// The admin assigns the role of `Operator` to another device that is also on multiple teams.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_multi_team() -> Result<()> {
+async fn test_multi_team_sync() -> Result<()> {
     // Set up our team context so we can run the test.
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
     let team = TeamCtx::new("test_multi_team", work_dir).await?;
@@ -483,92 +443,4 @@ async fn test_multi_team() -> Result<()> {
         .context("Assigning a role should not fail here!")?;
 
     return Ok(());
-}
-
-/// Tests that devices can sync to multiple teams.
-#[test(tokio::test(flavor = "multi_thread"))]
-async fn test_multi_team_sync() -> Result<()> {
-    // Set up our team context so we can run the test.
-    let work_dir = tempfile::tempdir()?.path().to_path_buf();
-    let mut team1 = TeamCtx::new("test_multi_team_sync_1", work_dir.join("team1")).await?;
-    let mut team2 = TeamCtx::new("test_multi_team_sync_2", work_dir.join("team2")).await?;
-
-    // Create the first team, and get our TeamId.
-    let team_id_1 = team1
-        .create_and_add_team()
-        .await
-        .expect("expected to create team");
-    info!(?team_id_1);
-
-    // Create the second team, and get our TeamId.
-    let team_id_2 = team2
-        .create_and_add_team()
-        .await
-        .expect("expected to create team");
-    info!(?team_id_2);
-
-    // Tell all peers to sync with one another, and assign their roles.
-    team1.add_all_sync_peers(team_id_1).await?;
-    team1.add_all_device_roles(team_id_1).await?;
-
-    team2.add_all_sync_peers(team_id_2).await?;
-    team2.add_all_device_roles(team_id_2).await?;
-
-    // Admin2 syncs on team 1
-    {
-        let owner1_addr = team1.owner.aranya_local_addr().await?;
-        let owner1 = team1.owner.client.team(team_id_1);
-
-        let admin_seed = {
-            let admin2_device = &mut team2.admin;
-
-            let admin_keys = admin2_device.pk.clone();
-            owner1.add_device_to_team(admin_keys).await?;
-
-            // Assign Admin2 the Admin role on team 1.
-            owner1.assign_role(admin2_device.id, Role::Admin).await?;
-            sleep(SLEEP_INTERVAL).await;
-
-            // Create a wrapped seed for Admin2
-            owner1
-                .encrypt_psk_seed_for_peer(&admin2_device.pk.encoding)
-                .await?
-        };
-
-        // Admin2 adds team1 to it's local storage using the wrapped seed
-        team2
-            .admin
-            .client
-            .add_team({
-                AddTeamConfig::builder()
-                    .quic_sync(
-                        AddTeamQuicSyncConfig::builder()
-                            .wrapped_seed(&admin_seed)?
-                            .build()?,
-                    )
-                    .team_id(team_id_1)
-                    .build()?
-            })
-            .await?;
-        {
-            let admin2 = team2.admin.client.team(team_id_1);
-            admin2.sync_now(owner1_addr.into(), None).await?;
-
-            sleep(SLEEP_INTERVAL).await;
-            admin2.assign_role(team1.membera.id, Role::Operator).await?;
-        }
-    }
-
-    // Admin2 syncs on team 2
-    {
-        let owner2_addr = team2.owner.aranya_local_addr().await?;
-        let admin2 = team2.admin.client.team(team_id_2);
-
-        admin2.sync_now(owner2_addr.into(), None).await?;
-
-        sleep(SLEEP_INTERVAL).await;
-        admin2.assign_role(team2.membera.id, Role::Operator).await?;
-    }
-
-    Ok(())
 }
