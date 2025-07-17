@@ -1333,14 +1333,24 @@ AranyaError aranya_create_team_config_builder_cleanup_ext(struct AranyaCreateTea
 /**
  * Configures QUIC syncer for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
  *
- * By default, the QUIC syncer config is not set.
- * This function must be called in order to initialize the builder
- * with default values
+ * By default, the QUIC syncer config is not set. This function must be called
+ * in order to initialize the builder with default values. Subsequent calls will
+ * return a pointer to the existing config builder.
  *
- * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[out] __output a ptr to a builder for a quic sync config [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder)
+ * The returned pointer allows modification of QUIC synchronization settings
+ * for the team configuration.
  *
- * @relates AranyaAddTeamConfigBuilder.
+ * @param[in,out] cfg A pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
+ * @param[out] __output A pointer to a builder for a QUIC sync config [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder).
+ *                      This pointer is valid for the lifetime of the parent builder.
+ *
+ *
+ * @warning The returned pointer becomes invalid when the parent builder is destroyed.
+ *
+ * @note If this is the first call for this builder, a new QUIC sync config builder
+ *       will be created with default values.
+ *
+ * @relates AranyaAddTeamConfigBuilder
  */
 AranyaError aranya_add_team_config_builder_get_quic_syncer(struct AranyaAddTeamConfigBuilder *cfg,
                                                            struct AranyaAddTeamQuicSyncConfigBuilder **__output);
@@ -1348,14 +1358,24 @@ AranyaError aranya_add_team_config_builder_get_quic_syncer(struct AranyaAddTeamC
 /**
  * Configures QUIC syncer for [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
  *
- * By default, the QUIC syncer config is not set.
- * This function must be called in order to initialize the builder
- * with default values
+ * By default, the QUIC syncer config is not set. This function must be called
+ * in order to initialize the builder with default values. Subsequent calls will
+ * return a pointer to the existing config builder.
  *
- * @param[in,out] cfg a pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder)
- * @param[out] __output a ptr to a builder for a quic sync config [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder)
+ * The returned pointer allows modification of QUIC synchronization settings
+ * for the team configuration.
  *
- * @relates AranyaAddTeamConfigBuilder.
+ * @param[in,out] cfg A pointer to the builder for a team config [`AranyaAddTeamConfigBuilder`](@ref AranyaAddTeamConfigBuilder).
+ * @param[out] __output A pointer to a builder for a QUIC sync config [`AranyaAddTeamQuicSyncConfigBuilder`](@ref AranyaAddTeamQuicSyncConfigBuilder).
+ *                      This pointer is valid for the lifetime of the parent builder.
+ *
+ *
+ * @warning The returned pointer becomes invalid when the parent builder is destroyed.
+ *
+ * @note If this is the first call for this builder, a new QUIC sync config builder
+ *       will be created with default values.
+ *
+ * @relates AranyaAddTeamConfigBuilder
  */
 AranyaError aranya_add_team_config_builder_get_quic_syncer_ext(struct AranyaAddTeamConfigBuilder *cfg,
                                                                struct AranyaAddTeamQuicSyncConfigBuilder **__output,

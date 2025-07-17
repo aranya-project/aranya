@@ -792,14 +792,24 @@ pub type CreateTeamConfigBuilder = Safe<imp::CreateTeamConfigBuilder>;
 
 /// Configures QUIC syncer for [`AddTeamConfigBuilder`].
 ///
-/// By default, the QUIC syncer config is not set.
-/// This function must be called in order to initialize the builder
-/// with default values
+/// By default, the QUIC syncer config is not set. This function must be called
+/// in order to initialize the builder with default values. Subsequent calls will
+/// return a pointer to the existing config builder.
 ///
-/// @param[in,out] cfg a pointer to the builder for a team config [`AddTeamConfigBuilder`]
-/// @param[out] __output a ptr to a builder for a quic sync config [`AddTeamQuicSyncConfigBuilder`]
+/// The returned pointer allows modification of QUIC synchronization settings
+/// for the team configuration.
 ///
-/// @relates AranyaAddTeamConfigBuilder.
+/// @param[in,out] cfg A pointer to the builder for a team config [`AddTeamConfigBuilder`].
+/// @param[out] __output A pointer to a builder for a QUIC sync config [`AddTeamQuicSyncConfigBuilder`].
+///                      This pointer is valid for the lifetime of the parent builder.
+///
+///
+/// @warning The returned pointer becomes invalid when the parent builder is destroyed.
+///
+/// @note If this is the first call for this builder, a new QUIC sync config builder
+///       will be created with default values.
+///
+/// @relates AranyaAddTeamConfigBuilder
 pub fn add_team_config_builder_get_quic_syncer(
     cfg: &mut AddTeamConfigBuilder,
 ) -> *mut AddTeamQuicSyncConfigBuilder {
