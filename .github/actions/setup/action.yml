@@ -50,6 +50,5 @@ runs:
     - name: Install Protoc
       shell: bash
       run: |
-        sudo apt-get install -y protobuf-compiler \
-            --no-install-recommends
+        sudo apt-get install -y protobuf-compiler
         protoc --version
