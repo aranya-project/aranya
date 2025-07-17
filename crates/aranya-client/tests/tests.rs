@@ -292,6 +292,199 @@ async fn test_remove_team() -> Result<()> {
     Ok(())
 }
 
+/// Tests that a device can create multiple teams.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_multi_team_create() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir1 = tempfile::tempdir()?.path().to_path_buf();
+    let team = TeamCtx::new("test_multi_team_create", work_dir1).await?;
+
+    // Create the initial team, and get our TeamId.
+    let team1 = team
+        .owner
+        .client
+        .create_team({
+            CreateTeamConfig::builder()
+                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
+                .build()?
+        })
+        .await
+        .expect("expected to create team1");
+    let team_id1 = team1.team_id();
+    info!(?team_id1);
+
+    // Create the initial team, and get our TeamId.
+    let team2 = team
+        .owner
+        .client
+        .create_team({
+            CreateTeamConfig::builder()
+                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
+                .build()?
+        })
+        .await
+        .expect("expected to create team2");
+    let team_id2 = team2.team_id();
+    info!(?team_id2);
+
+    return Ok(());
+}
+
+/// Tests multi-graph support by onboarding devices to multiple teams.
+/// A device is onboarded to multiple teams as an `Admin`.
+/// The admin assigns the role of `Operator` to another device that is also on multiple teams.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_multi_team() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let team = TeamCtx::new("test_multi_team", work_dir).await?;
+
+    // Grab the shorthand for our address.
+    let owner_addr = team.owner.aranya_local_addr().await?;
+
+    // Create the initial team, and get our TeamId.
+    let team1 = team
+        .owner
+        .client
+        .create_team({
+            CreateTeamConfig::builder()
+                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
+                .build()?
+        })
+        .await
+        .expect("expected to create team1");
+    let team_id1 = team1.team_id();
+    info!(?team_id1);
+
+    // Create the initial team, and get our TeamId.
+    let team2 = team
+        .owner
+        .client
+        .create_team({
+            CreateTeamConfig::builder()
+                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
+                .build()?
+        })
+        .await
+        .expect("expected to create team2");
+    let team_id2 = team2.team_id();
+    info!(?team_id2);
+
+    // Add the admin as a new device.
+    info!("adding admin1 to team1");
+    team1.add_device_to_team(team.admin.pk.clone()).await?;
+
+    // Add the operator as a new device.
+    info!("adding operator to team");
+    team1.add_device_to_team(team.operator.pk.clone()).await?;
+
+    // Give the admin its role.
+    team1.assign_role(team.admin.id, Role::Admin).await?;
+
+    // Add the admin as a new device.
+    info!("adding admin1 to team2");
+    team2.add_device_to_team(team.admin.pk.clone()).await?;
+
+    // Add the operator as a new device.
+    info!("adding operator1 to team2");
+    team2.add_device_to_team(team.operator.pk.clone()).await?;
+
+    // Give the admin its role.
+    team2.assign_role(team.admin.id, Role::Admin).await?;
+
+    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+    {
+        let admin = team.admin.client.team(team_id2);
+        match admin.sync_now(owner_addr.into(), None).await {
+            Ok(()) => bail!("expected syncing to fail"),
+            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
+            // but currently the handshake timeout races with the tarpc timeout.
+            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
+            Err(err) => return Err(err).context("unexpected error while syncing"),
+        }
+
+        // Now, we try to assign a role using the admin, which is expected to fail.
+        match admin.assign_role(team.operator.id, Role::Operator).await {
+            Ok(()) => bail!("Expected role assignment to fail"),
+            Err(aranya_client::Error::Aranya(_)) => {}
+            Err(_) => bail!("Unexpected error"),
+        }
+    }
+
+    let admin_seed2 = team2
+        .encrypt_psk_seed_for_peer(&team.admin.pk.encoding)
+        .await?;
+    team.admin
+        .client
+        .add_team({
+            AddTeamConfig::builder()
+                .team_id(team_id2)
+                .quic_sync(
+                    AddTeamQuicSyncConfig::builder()
+                        .wrapped_seed(&admin_seed2)?
+                        .build()?,
+                )
+                .build()?
+        })
+        .await?;
+
+    let admin2 = team.admin.client.team(team_id2);
+    admin2.sync_now(owner_addr.into(), None).await?;
+
+    // Now we should be able to successfully assign a role.
+    admin2
+        .assign_role(team.operator.id, Role::Operator)
+        .await
+        .context("Assigning a role should not fail here!")?;
+
+    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+    {
+        let admin = team.admin.client.team(team_id1);
+        match admin.sync_now(owner_addr.into(), None).await {
+            Ok(()) => bail!("expected syncing to fail"),
+            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
+            // but currently the handshake timeout races with the tarpc timeout.
+            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
+            Err(err) => return Err(err).context("unexpected error while syncing"),
+        }
+
+        // Now, we try to assign a role using the admin, which is expected to fail.
+        match admin.assign_role(team.operator.id, Role::Operator).await {
+            Ok(()) => bail!("Expected role assignment to fail"),
+            Err(aranya_client::Error::Aranya(_)) => {}
+            Err(_) => bail!("Unexpected error"),
+        }
+    }
+
+    let admin_seed1 = team1
+        .encrypt_psk_seed_for_peer(&team.admin.pk.encoding)
+        .await?;
+    team.admin
+        .client
+        .add_team({
+            AddTeamConfig::builder()
+                .team_id(team_id1)
+                .quic_sync(
+                    AddTeamQuicSyncConfig::builder()
+                        .wrapped_seed(&admin_seed1)?
+                        .build()?,
+                )
+                .build()?
+        })
+        .await?;
+
+    let admin1 = team.admin.client.team(team_id1);
+    admin1.sync_now(owner_addr.into(), None).await?;
+
+    // Now we should be able to successfully assign a role.
+    admin1
+        .assign_role(team.operator.id, Role::Operator)
+        .await
+        .context("Assigning a role should not fail here!")?;
+
+    return Ok(());
+}
+
 /// Tests that devices can sync to multiple teams.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_multi_team_sync() -> Result<()> {

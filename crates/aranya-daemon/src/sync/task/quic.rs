@@ -87,13 +87,21 @@ pub enum Error {
     Bug(buggy::Bug),
 }
 
+/// Unique key for a connection with a peer.
+/// Each team/graph is synced over a different QUIC connection so a team-specific PSK can be used.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct ConnectionKey {
+    addr: Addr,
+    id: GraphId,
+}
+
 /// QUIC syncer state used for sending sync requests and processing sync responses
 #[derive(Debug)]
 pub struct State {
     /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: QuicClient,
     /// Address -> Connection map to lookup existing connections before creating a new connection.
-    conns: BTreeMap<Addr, Connection>,
+    conns: BTreeMap<ConnectionKey, Connection>,
     /// PSK store shared between the daemon API server and QUIC syncer client and server.
     /// This store is modified by [`crate::api::DaemonApiServer`].
     store: Arc<PskStore>,
@@ -118,7 +126,7 @@ impl SyncState for State {
             syncer.state.store.set_team(id.into_id().into());
 
             let stream = syncer
-                .connect(peer)
+                .connect(peer, id)
                 .await
                 .inspect_err(|e| error!("Could not create connection: {e}"))?;
             // TODO: spawn a task for send/recv?
@@ -182,14 +190,15 @@ where {
 
 impl Syncer<State> {
     #[instrument(skip(self))]
-    async fn connect(&mut self, peer: &Addr) -> SyncResult<BidirectionalStream> {
+    async fn connect(&mut self, peer: &Addr, id: GraphId) -> SyncResult<BidirectionalStream> {
         info!(?peer, "client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
         let conns = &mut self.state.conns;
         let client = &self.state.client;
 
-        let conn = match conns.entry(*peer) {
+        let key = ConnectionKey { addr: *peer, id };
+        let conn = match conns.entry(key) {
             Entry::Occupied(entry) => {
                 info!("Client is able to re-use existing QUIC connection");
                 entry.into_mut()
@@ -233,7 +242,7 @@ impl Syncer<State> {
             }
             // Other errors means the stream has closed
             Err(e) => {
-                conns.remove(peer);
+                conns.remove(&key);
                 return Err(SyncError::QuicSync(e.into()));
             }
         };
