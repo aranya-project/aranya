@@ -37,6 +37,7 @@ use s2n_quic::provider::tls::rustls::rustls::{
     server::PresharedKeySelection, ClientConfig, ServerConfig,
 };
 use s2n_quic::{
+    application::Error as AppError,
     client::Connect,
     connection::Error as ConnErr,
     provider::{
@@ -48,7 +49,7 @@ use s2n_quic::{
     Client as QuicClient, Connection, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 
 use super::SyncResponse;
@@ -97,10 +98,12 @@ impl From<Infallible> for Error {
 /// Unique key for a connection with a peer.
 /// Each team/graph is synced over a different QUIC connection so a team-specific PSK can be used.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-struct ConnectionKey {
+pub(crate) struct ConnectionKey {
     addr: Addr,
     id: GraphId,
 }
+
+pub(crate) type SharedConnectionMap = Arc<RwLock<BTreeMap<ConnectionKey, Arc<Mutex<Connection>>>>>;
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
 #[derive(Debug)]
@@ -108,7 +111,7 @@ pub struct State {
     /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: QuicClient,
     /// Address -> Connection map to lookup existing connections before creating a new connection.
-    conns: BTreeMap<ConnectionKey, Connection>,
+    conns: SharedConnectionMap,
     /// PSK store shared between the daemon API server and QUIC syncer client and server.
     /// This store is modified by [`crate::api::DaemonApiServer`].
     store: Arc<PskStore>,
@@ -160,8 +163,7 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub fn new(psk_store: Arc<PskStore>) -> SyncResult<Self>
-where {
+    pub(crate) fn new(psk_store: Arc<PskStore>, conns: SharedConnectionMap) -> SyncResult<Self> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
@@ -183,7 +185,7 @@ where {
 
         Ok(Self {
             client,
-            conns: BTreeMap::new(),
+            conns,
             store: psk_store,
         })
     }
@@ -195,17 +197,24 @@ impl Syncer<State> {
         debug!("client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
-        let conns = &mut self.state.conns;
+        let conn_map_guard = self.state.conns.read().await;
         let client = &self.state.client;
 
         let key = ConnectionKey { addr: *peer, id };
-        let conn = match conns.entry(key) {
-            Entry::Occupied(entry) => {
+
+        let conn_ref = match conn_map_guard.get(&key) {
+            Some(conn) => {
                 debug!("Client is able to re-use existing QUIC connection");
-                entry.into_mut()
+
+                let conn = Arc::clone(conn);
+                drop(conn_map_guard);
+                conn
             }
-            Entry::Vacant(entry) => {
+            None => {
                 debug!("existing QUIC connection not found");
+
+                // drop guard so we can obtain exclusive access for insert
+                drop(conn_map_guard);
 
                 let addr = tokio::net::lookup_host(peer.to_socket_addrs())
                     .await
@@ -222,13 +231,28 @@ impl Syncer<State> {
 
                 conn.keep_alive(true).map_err(Error::from)?;
                 debug!("created new quic connection");
-                entry.insert(conn)
+
+                let conn = Arc::new(Mutex::new(conn));
+
+                let mut conn_write_guard = self.state.conns.write().await;
+                if let Some(existing) = conn_write_guard.insert(key, Arc::clone(&conn)) {
+                    // TODO: Use appropriate error code
+
+                    // Closing the existing connection may terminate ongoing syncs.
+                    // Return this and close the new connection instead?
+                    (*existing).lock().await.close(AppError::UNKNOWN);
+                }
+
+                // FIXME: Notify the server to start accepting streams for the new connection
+                conn
             }
         };
 
         debug!("client connected to QUIC sync server");
 
-        let open_stream_res = conn
+        let conn_guard = (*conn_ref).lock().await;
+
+        let open_stream_res = conn_guard
             .handle()
             .open_bidirectional_stream()
             .await
@@ -243,7 +267,7 @@ impl Syncer<State> {
             }
             // Other errors means the stream has closed
             Err(e) => {
-                conns.remove(&key);
+                self.state.conns.write().await.remove(&key);
                 return Err(SyncError::QuicSync(e.into()));
             }
         };
@@ -354,6 +378,8 @@ pub struct Server<EN, SP> {
     /// Receives updates for the "active team".
     /// Used to ensure that the chosen PSK corresponds to an incoming sync request.
     active_team_rx: mpsc::Receiver<TeamId>,
+    /// Connection map shared with [`super::Syncer`]
+    conns: SharedConnectionMap,
 }
 
 impl<EN, SP> Server<EN, SP> {
@@ -377,10 +403,11 @@ where
     /// Will panic on poisoned internal mutexes.
     #[inline]
     #[allow(deprecated)]
-    pub async fn new(
+    pub(crate) async fn new(
         aranya: AranyaClient<EN, SP>,
         addr: &Addr,
         server_keys: Arc<dyn SelectsPresharedKeys>,
+        conns: SharedConnectionMap,
         active_team_rx: mpsc::Receiver<TeamId>,
     ) -> SyncResult<Self> {
         // Create Server Config
@@ -409,6 +436,7 @@ where
         Ok(Self {
             aranya,
             server,
+            conns,
             active_team_rx,
         })
     }
@@ -422,7 +450,7 @@ where
 
         scope(async |s| {
             // Accept incoming QUIC connections
-            while let Some(mut conn) = self.server.accept().await {
+            while let Some(conn) = self.server.accept().await {
                 debug!("received incoming QUIC connection");
 
                 let Ok(active_team) = self.active_team_rx.try_recv() else {
@@ -436,12 +464,41 @@ where
                     continue;
                 };
 
+                let conn_ref = {
+                    let mut conn_map_guard = self.conns.write().await;
+                    let key = ConnectionKey {
+                        addr: peer.into(),
+                        id: active_team.into_id().into(),
+                    };
+                    match conn_map_guard.entry(key) {
+                        Entry::Occupied(_) => {
+                            // Close the new connection because one already exists
+
+                            // TODO: Use appropriate error code
+                            conn.close(AppError::UNKNOWN);
+
+                            continue;
+                        }
+                        Entry::Vacant(entry) => {
+                            let conn = Arc::new(Mutex::new(conn));
+                            let _ = entry.insert(Arc::clone(&conn));
+                            conn
+                        }
+                    }
+                };
+
                 let client = self.aranya.clone();
 
                 s.spawn(
                     async move {
                         // Accept incoming streams.
-                        while let Some(res) = conn.accept_bidirectional_stream().await.transpose() {
+                        while let Some(res) = (*conn_ref)
+                            .lock()
+                            .await
+                            .accept_bidirectional_stream()
+                            .await
+                            .transpose()
+                        {
                             let stream = match res {
                                 Ok(stream) => stream,
                                 Err(err) => {

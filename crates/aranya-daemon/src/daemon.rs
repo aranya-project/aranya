@@ -34,7 +34,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{PskStore, State as QuicSyncState},
+        quic::{PskStore, SharedConnectionMap, State as QuicSyncState},
         Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -169,6 +169,9 @@ impl Daemon {
             let (psk_store, active_team_rx) = PskStore::new(initial_keys);
             let psk_store = Arc::new(psk_store);
 
+            // Initialize the connection map used by the syncer and sync server
+            let conn_map: SharedConnectionMap = Default::default();
+
             // Initialize Aranya client.
             let (client, sync_server) = Self::setup_aranya(
                 &cfg,
@@ -179,6 +182,7 @@ impl Daemon {
                 &pks,
                 qs_config.addr,
                 Arc::clone(&psk_store),
+                Arc::clone(&conn_map),
                 active_team_rx,
             )
             .await?;
@@ -188,7 +192,7 @@ impl Daemon {
             let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
             let invalid_graphs = InvalidGraphs::default();
-            let state = QuicSyncState::new(psk_store.clone())?;
+            let state = QuicSyncState::new(psk_store.clone(), conn_map)?;
             let (syncer, peers) =
                 Syncer::new(client.clone(), send_effects, invalid_graphs.clone(), state);
 
@@ -332,6 +336,7 @@ impl Daemon {
         pk: &PublicKeys<CS>,
         external_sync_addr: Addr,
         psk_store: Arc<PskStore>,
+        conns: SharedConnectionMap,
         active_team_rx: Receiver<TeamId>,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
@@ -350,6 +355,7 @@ impl Daemon {
             client.clone(),
             &external_sync_addr,
             psk_store,
+            conns,
             active_team_rx,
         )
         .await
