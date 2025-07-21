@@ -9,6 +9,8 @@
     rust_2018_idioms
 )]
 
+mod common;
+
 use anyhow::{bail, Context, Result};
 use aranya_client::{
     config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
@@ -17,8 +19,7 @@ use aranya_daemon_api::Role;
 use test_log::test;
 use tracing::{debug, info};
 
-mod common;
-use common::{sleep, TeamCtx, SLEEP_INTERVAL};
+use crate::common::TeamCtx;
 
 /// Tests sync_now() by showing that an admin cannot assign any roles until it syncs with the owner.
 #[test(tokio::test(flavor = "multi_thread"))]
@@ -57,7 +58,6 @@ async fn test_sync_now() -> Result<()> {
 
     // Let's sync immediately, which will propagate the role change.
     admin.sync_now(owner_addr.into(), None).await?;
-    sleep(SLEEP_INTERVAL).await;
 
     // Now we should be able to successfully assign a role.
     admin.assign_role(team.operator.id, Role::Operator).await?;
@@ -80,7 +80,6 @@ async fn test_remove_devices() -> Result<()> {
     info!(?team_id);
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
     // Remove devices from the team while checking that the device count decreases each time a device is removed.
@@ -123,7 +122,6 @@ async fn test_query_functions() -> Result<()> {
     let team_id = team.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
     team.add_all_device_roles(team_id).await?;
 
     // Test all our fact database queries.
@@ -225,7 +223,6 @@ async fn test_add_team() -> Result<()> {
     {
         let admin = team.admin.client.team(team_id);
         admin.sync_now(owner_addr.into(), None).await?;
-        sleep(SLEEP_INTERVAL).await;
 
         // Now we should be able to successfully assign a role.
         admin
@@ -251,8 +248,6 @@ async fn test_remove_team() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id);
 
-    team.add_all_sync_peers(team_id).await?;
-
     {
         let owner = team.owner.client.team(team_id);
         let admin = team.admin.client.team(team_id);
@@ -267,7 +262,9 @@ async fn test_remove_team() -> Result<()> {
         // Give the admin its role.
         owner.assign_role(team.admin.id, Role::Admin).await?;
 
-        sleep(SLEEP_INTERVAL).await;
+        admin
+            .sync_now(team.owner.aranya_local_addr().await?.into(), None)
+            .await?;
 
         // We should be able to successfully assign a role.
         admin.assign_role(team.operator.id, Role::Operator).await?;
@@ -275,8 +272,6 @@ async fn test_remove_team() -> Result<()> {
 
     // Remove the team from the admin's local storage
     team.admin.client.remove_team(team_id).await?;
-
-    sleep(SLEEP_INTERVAL).await;
 
     {
         let admin = team.admin.client.team(team_id);
@@ -314,11 +309,8 @@ async fn test_multi_team_sync() -> Result<()> {
         .expect("expected to create team");
     info!(?team_id_2);
 
-    // Tell all peers to sync with one another, and assign their roles.
-    team1.add_all_sync_peers(team_id_1).await?;
+    // Add devices and assign roles.
     team1.add_all_device_roles(team_id_1).await?;
-
-    team2.add_all_sync_peers(team_id_2).await?;
     team2.add_all_device_roles(team_id_2).await?;
 
     // Admin2 syncs on team 1
@@ -334,7 +326,6 @@ async fn test_multi_team_sync() -> Result<()> {
 
             // Assign Admin2 the Admin role on team 1.
             owner1.assign_role(admin2_device.id, Role::Admin).await?;
-            sleep(SLEEP_INTERVAL).await;
 
             // Create a wrapped seed for Admin2
             owner1
@@ -361,7 +352,6 @@ async fn test_multi_team_sync() -> Result<()> {
             let admin2 = team2.admin.client.team(team_id_1);
             admin2.sync_now(owner1_addr.into(), None).await?;
 
-            sleep(SLEEP_INTERVAL).await;
             admin2.assign_role(team1.membera.id, Role::Operator).await?;
         }
     }
@@ -373,7 +363,6 @@ async fn test_multi_team_sync() -> Result<()> {
 
         admin2.sync_now(owner2_addr.into(), None).await?;
 
-        sleep(SLEEP_INTERVAL).await;
         admin2.assign_role(team2.membera.id, Role::Operator).await?;
     }
 
