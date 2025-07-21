@@ -17,7 +17,7 @@ env:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow }}-${{ github.ref != 'refs/heads/main' || github.run_id }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: true
 
 jobs:
   aranya-client-capi-docs:
