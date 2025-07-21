@@ -311,7 +311,7 @@ async fn test_multi_team_sync() -> Result<()> {
     let team_id1 = team1.team_id();
     info!(?team_id1);
 
-    // Create the initial team, and get our TeamId.
+    // Create the second team, and get our TeamId.
     let team2 = team
         .owner
         .client
@@ -346,51 +346,6 @@ async fn test_multi_team_sync() -> Result<()> {
 
     // Give the admin its role.
     team2.assign_role(team.admin.id, Role::Admin).await?;
-
-    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
-    {
-        let admin = team.admin.client.team(team_id2);
-        match admin.sync_now(owner_addr.into(), None).await {
-            Ok(()) => bail!("expected syncing to fail"),
-            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
-            // but currently the handshake timeout races with the tarpc timeout.
-            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
-            Err(err) => return Err(err).context("unexpected error while syncing"),
-        }
-
-        // Now, we try to assign a role using the admin, which is expected to fail.
-        match admin.assign_role(team.operator.id, Role::Operator).await {
-            Ok(()) => bail!("Expected role assignment to fail"),
-            Err(aranya_client::Error::Aranya(_)) => {}
-            Err(_) => bail!("Unexpected error"),
-        }
-    }
-
-    let admin_seed2 = team2
-        .encrypt_psk_seed_for_peer(&team.admin.pk.encoding)
-        .await?;
-    team.admin
-        .client
-        .add_team({
-            AddTeamConfig::builder()
-                .team_id(team_id2)
-                .quic_sync(
-                    AddTeamQuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed2)?
-                        .build()?,
-                )
-                .build()?
-        })
-        .await?;
-
-    let admin2 = team.admin.client.team(team_id2);
-    admin2.sync_now(owner_addr.into(), None).await?;
-
-    // Now we should be able to successfully assign a role.
-    admin2
-        .assign_role(team.operator.id, Role::Operator)
-        .await
-        .context("Assigning a role should not fail here!")?;
 
     // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
     {
@@ -433,6 +388,51 @@ async fn test_multi_team_sync() -> Result<()> {
 
     // Now we should be able to successfully assign a role.
     admin1
+        .assign_role(team.operator.id, Role::Operator)
+        .await
+        .context("Assigning a role should not fail here!")?;
+
+    // Let's sync immediately. The role change will not propogate since add_team() hasn't been called.
+    {
+        let admin = team.admin.client.team(team_id2);
+        match admin.sync_now(owner_addr.into(), None).await {
+            Ok(()) => bail!("expected syncing to fail"),
+            // TODO(#299): This should fail "immediately" with an `Aranya(_)` sync error,
+            // but currently the handshake timeout races with the tarpc timeout.
+            Err(aranya_client::Error::Aranya(_) | aranya_client::Error::Ipc(_)) => {}
+            Err(err) => return Err(err).context("unexpected error while syncing"),
+        }
+
+        // Now, we try to assign a role using the admin, which is expected to fail.
+        match admin.assign_role(team.operator.id, Role::Operator).await {
+            Ok(()) => bail!("Expected role assignment to fail"),
+            Err(aranya_client::Error::Aranya(_)) => {}
+            Err(_) => bail!("Unexpected error"),
+        }
+    }
+
+    let admin_seed2 = team2
+        .encrypt_psk_seed_for_peer(&team.admin.pk.encoding)
+        .await?;
+    team.admin
+        .client
+        .add_team({
+            AddTeamConfig::builder()
+                .team_id(team_id2)
+                .quic_sync(
+                    AddTeamQuicSyncConfig::builder()
+                        .wrapped_seed(&admin_seed2)?
+                        .build()?,
+                )
+                .build()?
+        })
+        .await?;
+
+    let admin2 = team.admin.client.team(team_id2);
+    admin2.sync_now(owner_addr.into(), None).await?;
+
+    // Now we should be able to successfully assign a role.
+    admin2
         .assign_role(team.operator.id, Role::Operator)
         .await
         .context("Assigning a role should not fail here!")?;
