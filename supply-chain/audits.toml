@@ -141,6 +141,16 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.8.4 -> 0.8.5"
 
+[[audits.obake]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "1.0.5"
+
+[[audits.obake_macros]]
+who = "Steve Sweetney <ssweetney@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "1.0.5"
+
 [[audits.object]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
