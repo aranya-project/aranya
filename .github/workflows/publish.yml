@@ -19,7 +19,7 @@ on:
         type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow }}-${{ inputs.tag }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.workflow }}-${{ github.ref != 'refs/heads/main' || github.run_id }}-${{ inputs.tag }}
 
 jobs:
   release:
