@@ -6,16 +6,20 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, future::Future};
+use std::{
+    collections::{BTreeMap, HashMap},
+    future::Future,
+    sync::Arc,
+};
 
 use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{storage::GraphId, Engine, Sink};
+use aranya_runtime::{storage::GraphId, Engine, PeerCache, Sink};
 use aranya_util::Addr;
 use buggy::BugExt;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{instrument, trace, warn};
 
@@ -46,14 +50,23 @@ enum Msg {
 type Request = (Msg, oneshot::Sender<Reply>);
 type Reply = SyncResult<()>;
 
-/// A sync peer.
-/// Contains the information needed to sync with a single peer:
+/// Sync Peer
+///
+/// Uniquely identifies a sync peer, consisting of
 /// - network address
 /// - Aranya graph id
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
-struct SyncPeer {
+pub(crate) struct SyncPeer {
     addr: Addr,
     graph_id: GraphId,
+}
+
+impl SyncPeer {
+    /// Creates a new `SyncPeer`.
+    #[cfg(test)]
+    pub fn new(addr: Addr, graph_id: GraphId) -> Self {
+        Self { addr, graph_id }
+    }
 }
 
 /// Handles adding and removing sync peers.
@@ -118,25 +131,50 @@ impl SyncPeers {
 
 type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 
+/// Key for looking up syncer peer cache in map.
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+pub struct PeerCacheKey {
+    /// The peer address.
+    pub addr: Addr,
+    /// The Aranya graph ID.
+    pub id: GraphId,
+}
+
+impl PeerCacheKey {
+    fn new(addr: Addr, id: GraphId) -> Self {
+        Self { addr, id }
+    }
+}
+
+/// Thread-safe map of peer caches
+/// For a given peer, there's should only be one cache. If separate caches are used
+/// for the server and state it will reduce the efficiency of the syncer.
+pub type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
+
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
 #[derive(Debug)]
 pub struct Syncer<ST> {
-    /// Aranya client to allow syncing the Aranya graph with another peer.
-    pub client: Client,
+    /// The Aranya client.
+    client: crate::aranya::Client<crate::EN, crate::SP>,
     /// Keeps track of peer info.
     peers: HashMap<SyncPeer, (SyncPeerConfig, Key)>,
-    /// Receives added/removed peers.
+    /// Receives requests from [`SyncPeers`].
     recv: mpsc::Receiver<Request>,
-    /// Delay queue for getting the next peer to sync with.
-    queue: DelayQueue<SyncPeer>,
-    /// Used to send effects to the API to be processed.
+    /// Handles delay queue of next sync times for peers.
+    delays: DelayQueue<SyncPeer>,
+    /// Sends effects to the daemon.
     send_effects: EffectSender,
-    /// Keeps track of invalid graphs due to finalization errors.
+    /// Handles invalidated graphs.
     invalid: InvalidGraphs,
     /// Additional state used by the syncer
     state: ST,
+    /// Sync server address.
+    server_addr: Addr,
+    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
+    /// Lock must be acquired after [`Self::client`]
+    caches: PeerCacheMap,
 }
 
 /// Types that contain additional data that are part of a [`Syncer`]
@@ -154,9 +192,9 @@ pub trait SyncState: Sized {
 }
 
 impl<ST> Syncer<ST> {
-    /// Creates a new `Syncer`.
-    pub(crate) fn new(
-        client: Client,
+    /// Creates a new [`Syncer`] and [`SyncPeers`] pair.
+    pub fn new(
+        client: crate::aranya::Client<crate::EN, crate::SP>,
         send_effects: EffectSender,
         invalid: InvalidGraphs,
         state: ST,
@@ -168,10 +206,12 @@ impl<ST> Syncer<ST> {
                 client,
                 peers: HashMap::new(),
                 recv,
-                queue: DelayQueue::new(),
+                delays: DelayQueue::new(),
                 send_effects,
                 invalid,
                 state,
+                server_addr: Addr::from((std::net::Ipv4Addr::LOCALHOST, 0)),
+                caches: Arc::new(Mutex::new(BTreeMap::new())),
             },
             peers,
         )
@@ -179,16 +219,16 @@ impl<ST> Syncer<ST> {
 
     /// Add a peer to the delay queue, overwriting an existing one.
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
-        let new_key = self.queue.insert(peer.clone(), cfg.interval);
+        let new_key = self.delays.insert(peer.clone(), cfg.interval);
         if let Some((_, old_key)) = self.peers.insert(peer, (cfg, new_key)) {
-            self.queue.remove(&old_key);
+            self.delays.remove(&old_key);
         }
     }
 
     /// Remove a peer from the delay queue.
     fn remove_peer(&mut self, peer: SyncPeer) {
         if let Some((_, key)) = self.peers.remove(&peer) {
-            self.queue.remove(&key);
+            self.delays.remove(&key);
         }
     }
 }
@@ -225,10 +265,10 @@ impl<ST: SyncState> Syncer<ST> {
                 }
             }
             // get next peer from delay queue.
-            Some(expired) = self.queue.next() => {
+            Some(expired) = self.delays.next() => {
                 let peer = expired.into_inner();
                 let (cfg, key) = self.peers.get_mut(&peer).assume("peer must exist")?;
-                *key = self.queue.insert(peer.clone(), cfg.interval);
+                *key = self.delays.insert(peer.clone(), cfg.interval);
                 // sync with peer.
                 self.sync(&peer).await?;
             }
@@ -250,13 +290,14 @@ impl<ST: SyncState> Syncer<ST> {
                     self.peers.retain(|p, (_, key)| {
                         let keep = p.graph_id != peer.graph_id;
                         if !keep {
-                            self.queue.remove(key);
+                            self.delays.remove(key);
                         }
                         keep
                     });
                     self.invalid.insert(peer.graph_id);
                 }
             })?;
+
         let effects = sink
             .collect()
             .context("could not collect effects from sync")?;
@@ -267,5 +308,11 @@ impl<ST: SyncState> Syncer<ST> {
             .context("unable to send effects")?;
         trace!(?n, "completed sync");
         Ok(())
+    }
+
+    /// Get peer caches.
+    #[cfg(test)]
+    pub fn get_peer_caches(&self) -> PeerCacheMap {
+        self.caches.clone()
     }
 }

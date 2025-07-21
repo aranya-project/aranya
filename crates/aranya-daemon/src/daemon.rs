@@ -35,7 +35,7 @@ use crate::{
     policy,
     sync::task::{
         quic::{PskStore, State as QuicSyncState},
-        Syncer,
+        PeerCacheMap, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
@@ -57,6 +57,14 @@ pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
+
+/// Sync configuration for setting up Aranya.
+struct SyncParams {
+    psk_store: Arc<PskStore>,
+    active_team_rx: Receiver<TeamId>,
+    caches: PeerCacheMap,
+    external_sync_addr: Addr,
+}
 
 mod invalid_graphs {
     use std::{
@@ -169,6 +177,9 @@ impl Daemon {
             let (psk_store, active_team_rx) = PskStore::new(initial_keys);
             let psk_store = Arc::new(psk_store);
 
+            // Create a shared PeerCacheMap
+            let caches: PeerCacheMap = Arc::new(Mutex::new(BTreeMap::new()));
+
             // Initialize Aranya client.
             let (client, sync_server) = Self::setup_aranya(
                 &cfg,
@@ -177,9 +188,12 @@ impl Daemon {
                     .try_clone()
                     .context("unable to clone keystore")?,
                 &pks,
-                qs_config.addr,
-                Arc::clone(&psk_store),
-                active_team_rx,
+                SyncParams {
+                    psk_store: Arc::clone(&psk_store),
+                    active_team_rx,
+                    caches,
+                    external_sync_addr: qs_config.addr,
+                },
             )
             .await?;
             let local_addr = sync_server.local_addr()?;
@@ -329,9 +343,7 @@ impl Daemon {
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
-        external_sync_addr: Addr,
-        psk_store: Arc<PskStore>,
-        active_team_rx: Receiver<TeamId>,
+        sync_params: SyncParams,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
@@ -344,12 +356,13 @@ impl Daemon {
 
         let client = Client::new(Arc::clone(&aranya));
 
-        info!(addr = %external_sync_addr, "starting QUIC sync server");
+        info!(addr = %sync_params.external_sync_addr, "starting QUIC sync server");
         let server = SyncServer::new(
             client.clone(),
-            &external_sync_addr,
-            psk_store,
-            active_team_rx,
+            &sync_params.external_sync_addr,
+            sync_params.psk_store,
+            sync_params.active_team_rx,
+            sync_params.caches,
         )
         .await
         .context("unable to initialize QUIC sync server")?;

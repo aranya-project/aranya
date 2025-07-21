@@ -54,7 +54,7 @@ use super::SyncResponse;
 use crate::{
     aranya::Client as AranyaClient,
     sync::{
-        task::{SyncState, Syncer},
+        task::{PeerCacheMap, SyncState, Syncer},
         Result as SyncResult, SyncError,
     },
 };
@@ -372,6 +372,7 @@ where
         addr: &Addr,
         server_keys: Arc<dyn SelectsPresharedKeys>,
         active_team_rx: mpsc::Receiver<TeamId>,
+        caches: PeerCacheMap,
     ) -> SyncResult<Self> {
         // Create Server Config
         let mut server_config = ServerConfig::builder()
