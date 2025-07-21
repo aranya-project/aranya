@@ -23,6 +23,7 @@ use aranya_runtime::{
 };
 use aranya_util::{
     error::ReportExt as _,
+    ready,
     rustls::{NoCertResolver, SkipServerVerification},
     s2n_quic::{is_close_error, read_to_end},
     task::scope,
@@ -405,8 +406,10 @@ where
 
     /// Begins accepting incoming requests.
     #[instrument(skip_all, fields(addr = ?self.local_addr()))]
-    pub async fn serve(mut self) {
+    pub async fn serve(mut self, ready: ready::Notifier) {
         info!("QUIC sync server listening for incoming connections");
+
+        ready.notify();
 
         scope(async |s| {
             // Accept incoming QUIC connections
