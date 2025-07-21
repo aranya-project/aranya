@@ -26,7 +26,7 @@ pub async fn sleep(duration: Duration) {
     time::sleep(duration).await;
 }
 
-pub struct TeamCtx {
+pub struct DevicesCtx {
     pub owner: DeviceCtx,
     pub admin: DeviceCtx,
     pub operator: DeviceCtx,
@@ -34,7 +34,7 @@ pub struct TeamCtx {
     pub memberb: DeviceCtx,
 }
 
-impl TeamCtx {
+impl DevicesCtx {
     pub async fn new(name: &str, work_dir: PathBuf) -> Result<Self> {
         let (owner, admin, operator, membera, memberb) = try_join!(
             DeviceCtx::new(name, "owner", work_dir.join("owner")),
