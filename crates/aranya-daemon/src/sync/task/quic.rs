@@ -450,7 +450,7 @@ where
 
         scope(async |s| {
             // Accept incoming QUIC connections
-            while let Some(conn) = self.server.accept().await {
+            while let Some(mut conn) = self.server.accept().await {
                 debug!("received incoming QUIC connection");
 
                 let Ok(active_team) = self.active_team_rx.try_recv() else {
@@ -480,6 +480,12 @@ where
                             continue;
                         }
                         Entry::Vacant(entry) => {
+                            let Ok(()) = conn.keep_alive(true).map_err(Error::from) else {
+                                warn!("unable to keep connection alive");
+                                // TODO: Use appropriate error code
+                                conn.close(AppError::UNKNOWN);
+                                continue;
+                            };
                             let conn = Arc::new(Mutex::new(conn));
                             let _ = entry.insert(Arc::clone(&conn));
                             conn
