@@ -59,7 +59,7 @@ use crate::{
 mod map;
 mod psk;
 
-pub(crate) use map::{Notification, SharedConnectionMap};
+pub(crate) use map::{ConnectionUpdate, SharedConnectionMap};
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
 
@@ -377,7 +377,8 @@ pub struct Server<EN, SP> {
     active_team_rx: mpsc::Receiver<TeamId>,
     /// Connection map shared with [`super::Syncer`]
     conns: Arc<SharedConnectionMap>,
-    conn_rx: mpsc::Receiver<Notification>,
+    /// Receives updates for connections created during outgoing sync requests.
+    conn_rx: mpsc::Receiver<ConnectionUpdate>,
 }
 
 impl<EN, SP> Server<EN, SP> {
@@ -406,7 +407,7 @@ where
         addr: &Addr,
         server_keys: Arc<dyn SelectsPresharedKeys>,
         conns: Arc<SharedConnectionMap>,
-        conn_rx: mpsc::Receiver<Notification>,
+        conn_rx: mpsc::Receiver<ConnectionUpdate>,
         active_team_rx: mpsc::Receiver<TeamId>,
     ) -> SyncResult<Self> {
         // Create Server Config
@@ -506,11 +507,7 @@ where
                         );
                     },
                     // Handle new connections initiated in the syncer
-                    Some(msg) = self.conn_rx.recv() => {
-                        let Notification::Insert((key, acceptor)) = msg else {
-                            continue;
-                        };
-
+                    Some((key, acceptor)) = self.conn_rx.recv() => {
                         let active_team = key.id.into_id().into();
                         let peer = match SocketAddr::try_from(&key.addr)
                             .assume("Can convert `Addr` into `SocketAddr`")

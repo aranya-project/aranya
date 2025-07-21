@@ -13,16 +13,11 @@ use tokio::sync::{self, mpsc, Mutex, RwLock};
 
 use crate::sync::task::quic::ConnectionKey;
 
-pub(crate) enum Msg<T, U> {
-    Insert((T, U)),
-    Remove(T),
-}
-
-pub(crate) type Notification = Msg<ConnectionKey, StreamAcceptor>;
+pub(crate) type ConnectionUpdate = (ConnectionKey, StreamAcceptor);
 type ConnectionMap = BTreeMap<ConnectionKey, Arc<Mutex<Handle>>>;
 
 pub(super) struct RwLockWriteGuard<'a, T: ?Sized> {
-    tx: mpsc::Sender<Notification>,
+    tx: mpsc::Sender<ConnectionUpdate>,
     guard: sync::RwLockWriteGuard<'a, T>,
 }
 
@@ -37,21 +32,13 @@ impl RwLockWriteGuard<'_, ConnectionMap> {
 
         let handle = Arc::new(Mutex::new(handle));
         let existing = self.deref_mut().insert(key, Arc::clone(&handle));
-        self.tx
-            .send(Msg::Insert((key, acceptor)))
-            .await
-            .expect("channel closed");
+        self.tx.send((key, acceptor)).await.expect("channel closed");
 
         (existing, handle)
     }
 
     pub(super) async fn remove(&mut self, key: ConnectionKey) {
         if let Some(existing_conn) = self.deref_mut().remove(&key) {
-            self.tx
-                .send(Msg::Remove(key))
-                .await
-                .expect("channel closed");
-
             // TODO: Use appropriate error code
             existing_conn.lock().await.close(AppError::UNKNOWN);
         }
@@ -75,11 +62,11 @@ impl<T> DerefMut for RwLockWriteGuard<'_, T> {
 #[derive(Debug)]
 pub(crate) struct SharedConnectionMap {
     data: RwLock<BTreeMap<ConnectionKey, Arc<Mutex<Handle>>>>,
-    tx: mpsc::Sender<Notification>,
+    tx: mpsc::Sender<ConnectionUpdate>,
 }
 
 impl SharedConnectionMap {
-    pub(crate) fn new() -> (Self, mpsc::Receiver<Notification>) {
+    pub(crate) fn new() -> (Self, mpsc::Receiver<ConnectionUpdate>) {
         let (tx, rx) = mpsc::channel(10);
 
         (

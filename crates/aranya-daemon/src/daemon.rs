@@ -34,7 +34,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{Notification, PskStore, SharedConnectionMap, State as QuicSyncState},
+        quic::{ConnectionUpdate, PskStore, SharedConnectionMap, State as QuicSyncState},
         Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -64,7 +64,7 @@ struct SyncParams {
     active_team_rx: Receiver<TeamId>,
     external_sync_addr: Addr,
     conns: Arc<SharedConnectionMap>,
-    conn_rx: Receiver<Notification>,
+    conn_rx: Receiver<ConnectionUpdate>,
 }
 
 mod invalid_graphs {
