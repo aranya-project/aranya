@@ -16,10 +16,10 @@ use std::{
     hash::{Hash, Hasher},
     io,
     mem::size_of,
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{AddrParseError, IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     ops::Deref,
-    slice, str,
-    str::FromStr,
+    slice,
+    str::{self, FromStr},
 };
 
 use anyhow::Result;
@@ -197,6 +197,13 @@ impl<'de> Deserialize<'de> for Addr {
             }
         }
         deserializer.deserialize_str(AddrVisitor)
+    }
+}
+
+impl TryFrom<&Addr> for SocketAddr {
+    type Error = AddrParseError;
+    fn try_from(value: &Addr) -> std::result::Result<Self, Self::Error> {
+        Self::from_str(&value.to_string())
     }
 }
 

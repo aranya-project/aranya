@@ -34,7 +34,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{PskStore, SharedConnectionMap, State as QuicSyncState},
+        quic::{Notification, PskStore, SharedConnectionMap, State as QuicSyncState},
         Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -63,7 +63,8 @@ struct SyncParams {
     psk_store: Arc<PskStore>,
     active_team_rx: Receiver<TeamId>,
     external_sync_addr: Addr,
-    conns: SharedConnectionMap,
+    conns: Arc<SharedConnectionMap>,
+    conn_rx: Receiver<Notification>,
 }
 
 mod invalid_graphs {
@@ -178,7 +179,8 @@ impl Daemon {
             let psk_store = Arc::new(psk_store);
 
             // Initialize the connection map used by the syncer and sync server
-            let conn_map: SharedConnectionMap = Default::default();
+            let (conn_map, conn_rx) = SharedConnectionMap::new();
+            let conn_map = Arc::new(conn_map);
 
             // Initialize Aranya client.
             let (client, sync_server) = Self::setup_aranya(
@@ -192,6 +194,7 @@ impl Daemon {
                     psk_store: Arc::clone(&psk_store),
                     conns: Arc::clone(&conn_map),
                     external_sync_addr: qs_config.addr,
+                    conn_rx,
                     active_team_rx,
                 },
             )
@@ -349,6 +352,7 @@ impl Daemon {
             active_team_rx,
             external_sync_addr,
             conns,
+            conn_rx,
         }: SyncParams,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
@@ -368,6 +372,7 @@ impl Daemon {
             &external_sync_addr,
             psk_store,
             conns,
+            conn_rx,
             active_team_rx,
         )
         .await
