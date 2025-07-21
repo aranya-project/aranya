@@ -11,13 +11,13 @@ use std::{collections::HashMap, future::Future};
 use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
 use aranya_runtime::{storage::GraphId, Engine, Sink};
-use aranya_util::Addr;
+use aranya_util::{error::ReportExt as _, ready, Addr};
 use buggy::BugExt;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, oneshot};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
-use tracing::{instrument, trace, warn};
+use tracing::{error, instrument, trace, warn};
 
 use super::Result as SyncResult;
 use crate::{
@@ -194,8 +194,17 @@ impl<ST> Syncer<ST> {
 }
 
 impl<ST: SyncState> Syncer<ST> {
+    pub(crate) async fn run(mut self, ready: ready::Notifier) {
+        ready.notify();
+        loop {
+            if let Err(err) = self.next().await {
+                error!(error = %err.report(), "unable to sync with peer");
+            }
+        }
+    }
+
     /// Syncs with the next peer in the list.
-    pub(crate) async fn next(&mut self) -> SyncResult<()> {
+    async fn next(&mut self) -> SyncResult<()> {
         #![allow(clippy::disallowed_macros)]
         tokio::select! {
             biased;
