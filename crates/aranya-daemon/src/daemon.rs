@@ -58,6 +58,14 @@ pub(crate) type EF = policy::Effect;
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
 
+/// Sync configuration for setting up Aranya.
+struct SyncParams {
+    psk_store: Arc<PskStore>,
+    active_team_rx: Receiver<TeamId>,
+    external_sync_addr: Addr,
+    conns: SharedConnectionMap,
+}
+
 mod invalid_graphs {
     use std::{
         collections::HashSet,
@@ -180,10 +188,12 @@ impl Daemon {
                     .try_clone()
                     .context("unable to clone keystore")?,
                 &pks,
-                qs_config.addr,
-                Arc::clone(&psk_store),
-                Arc::clone(&conn_map),
-                active_team_rx,
+                SyncParams {
+                    psk_store: Arc::clone(&psk_store),
+                    conns: Arc::clone(&conn_map),
+                    external_sync_addr: qs_config.addr,
+                    active_team_rx,
+                },
             )
             .await?;
             let local_addr = sync_server.local_addr()?;
@@ -334,10 +344,12 @@ impl Daemon {
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
-        external_sync_addr: Addr,
-        psk_store: Arc<PskStore>,
-        conns: SharedConnectionMap,
-        active_team_rx: Receiver<TeamId>,
+        SyncParams {
+            psk_store,
+            active_team_rx,
+            external_sync_addr,
+            conns,
+        }: SyncParams,
     ) -> Result<(Client, SyncServer)> {
         let device_id = pk.ident_pk.id()?;
 
