@@ -27,7 +27,7 @@ async fn test_aqc_chans() -> Result<()> {
 
     let mut devices = DevicesCtx::new("test_aqc_chans", work_dir).await?;
 
-    // create devices.
+    // create team.
     let team_id = devices.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
@@ -257,7 +257,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     let work_dir = tmp.path().to_path_buf();
 
     let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_sender", work_dir).await?;
-    // create devices.
+    // create team.
     let team_id = devices.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
@@ -336,7 +336,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 
     let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_recvr", work_dir).await?;
 
-    // create devices.
+    // create team.
     let team_id = devices.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
@@ -415,7 +415,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 
     let mut devices = DevicesCtx::new("test_aqc_chans_close_sender_stream", work_dir).await?;
 
-    // create devices.
+    // create team.
     let team_id = devices.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
@@ -549,7 +549,7 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
 
     let mut devices = DevicesCtx::new("test_aqc_chans_delete_chan_send", work_dir).await?;
 
-    // create devices.
+    // create team.
     let team_id = devices.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.

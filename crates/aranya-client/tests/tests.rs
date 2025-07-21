@@ -69,7 +69,7 @@ async fn test_sync_now() -> Result<()> {
     Ok(())
 }
 
-/// Tests that devices can be removed from the devices.
+/// Tests that devices can be removed from the team.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_remove_devices() -> Result<()> {
     // Set up our team context so we can run the test.
@@ -134,7 +134,7 @@ async fn test_query_functions() -> Result<()> {
     let memberb = devices.membera.client.team(team_id);
     let queries = memberb.queries();
 
-    // First, let's check how many devices are on the devices.
+    // First, let's check how many devices are on the team.
     let devices_query = queries.devices_on_team().await?;
     assert_eq!(devices_query.iter().count(), 5);
     debug!(
@@ -246,7 +246,7 @@ async fn test_add_team() -> Result<()> {
     return Ok(());
 }
 
-/// Tests that devices can be removed from the devices.
+/// Tests that devices can be removed from the team.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_remove_team() -> Result<()> {
     // Set up our team context so we can run the test.
@@ -303,7 +303,7 @@ async fn test_remove_team() -> Result<()> {
     Ok(())
 }
 
-/// Tests that a device can create multiple teams and receive sync requests for each devices.
+/// Tests that a device can create multiple teams and receive sync requests for each team.
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_multi_team_sync() -> Result<()> {
     // Set up our team context so we can run the test.
