@@ -44,7 +44,7 @@ use s2n_quic::{
     Client as QuicClient, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 
 use super::SyncResponse;
@@ -209,10 +209,10 @@ impl Syncer<State> {
 
         let key = ConnectionKey { addr: *peer, id };
 
-        let conn_ref = match conn_map_guard.get(&key) {
+        let conn_ref = match conn_map_guard.get_mut(&key) {
             Some(conn) => {
                 debug!("Client is able to re-use existing QUIC connection");
-                Arc::clone(conn)
+                conn
             }
             None => {
                 debug!("existing QUIC connection not found");
@@ -233,27 +233,18 @@ impl Syncer<State> {
                 conn.keep_alive(true).map_err(Error::from)?;
                 debug!("created new quic connection");
 
-                match conn_map_guard.insert(key, conn).await {
-                    (Some(existing), conn) => {
-                        // TODO: Use appropriate error code
-
-                        // Closing the existing connection may terminate ongoing syncs.
-                        // Return this and close the new connection instead?
-                        (*existing).lock().await.close(AppError::UNKNOWN);
-
-                        conn
-                    }
-                    (None, conn) => conn,
+                let (conn, inserted) = conn_map_guard.insert(key, conn).await;
+                if !inserted {
+                    debug!("New connection wasn't inserted. A live connection was found")
                 }
+
+                conn
             }
         };
-        drop(conn_map_guard);
 
         debug!("client connected to QUIC sync server");
 
-        let mut conn_guard = (*conn_ref).lock().await;
-
-        let open_stream_res = conn_guard
+        let open_stream_res = conn_ref
             .open_bidirectional_stream()
             .await
             .inspect_err(|e| error!(error = %e.report(), "unable to open bidi stream"));
@@ -496,7 +487,7 @@ where
                                     };
 
                                     let (handle, acceptor) = conn.split();
-                                    let _ = entry.insert(Arc::new(Mutex::new(handle)));
+                                    let _ = entry.insert(handle);
                                     acceptor
                                 }
                             }

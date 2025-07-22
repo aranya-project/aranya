@@ -2,9 +2,8 @@
 //! Once a connection has been opened, it is shared between the QUIC syncer client and server.
 
 use std::{
-    collections::BTreeMap,
+    collections::{btree_map::Entry, BTreeMap},
     ops::{Deref, DerefMut},
-    sync::Arc,
 };
 
 use s2n_quic::{
@@ -19,7 +18,7 @@ use crate::sync::task::quic::ConnectionKey;
 /// A [`ConnectionKey`] and [`StreamAcceptor`] pair that is sent over a channel
 /// when a new connection is inserted.
 pub(crate) type ConnectionUpdate = (ConnectionKey, StreamAcceptor);
-type ConnectionMap = BTreeMap<ConnectionKey, Arc<Mutex<Handle>>>;
+type ConnectionMap = BTreeMap<ConnectionKey, Handle>;
 
 pub(super) struct MutexGuard<'a, T: ?Sized> {
     tx: mpsc::Sender<ConnectionUpdate>,
@@ -32,20 +31,35 @@ impl MutexGuard<'_, ConnectionMap> {
         &mut self,
         key: ConnectionKey,
         conn: Connection,
-    ) -> (Option<Arc<Mutex<Handle>>>, Arc<Mutex<Handle>>) {
-        let (handle, acceptor) = conn.split();
+    ) -> (&mut Handle, bool) {
+        let (new_handle, acceptor) = conn.split();
 
-        let handle = Arc::new(Mutex::new(handle));
-        let existing = self.deref_mut().insert(key, Arc::clone(&handle));
-        self.tx.send((key, acceptor)).await.expect("channel closed");
+        let (handle, inserted) = match self.guard.entry(key) {
+            Entry::Occupied(mut occupied_handle_entry) => {
+                if occupied_handle_entry.get_mut().ping().is_ok() {
+                    // TODO: Use appropriate error code
+                    new_handle.close(AppError::UNKNOWN);
 
-        (existing, handle)
+                    (occupied_handle_entry.into_mut(), false)
+                } else {
+                    let _ = occupied_handle_entry.insert(new_handle);
+                    (occupied_handle_entry.into_mut(), true)
+                }
+            }
+            Entry::Vacant(entry) => (entry.insert(new_handle), true),
+        };
+
+        if inserted {
+            self.tx.send((key, acceptor)).await.expect("channel closed");
+        }
+
+        (handle, inserted)
     }
 
     pub(super) async fn remove(&mut self, key: ConnectionKey) {
-        if let Some(existing_conn) = self.deref_mut().remove(&key) {
+        if let Some(existing_conn) = self.guard.remove(&key) {
             // TODO: Use appropriate error code
-            existing_conn.lock().await.close(AppError::UNKNOWN);
+            existing_conn.close(AppError::UNKNOWN);
         }
     }
 }
@@ -66,7 +80,7 @@ impl<T> DerefMut for MutexGuard<'_, T> {
 
 #[derive(Debug)]
 pub(crate) struct SharedConnectionMap {
-    data: Mutex<BTreeMap<ConnectionKey, Arc<Mutex<Handle>>>>,
+    data: Mutex<BTreeMap<ConnectionKey, Handle>>,
     tx: mpsc::Sender<ConnectionUpdate>,
 }
 
