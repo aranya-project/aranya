@@ -18,7 +18,7 @@ use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Engine, GraphId, PeerCache, Sink, StorageError, StorageProvider, SyncRequestMessage,
+    Command, Engine, GraphId, PeerCache, Sink, StorageError, StorageProvider, SyncRequestMessage,
     SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
@@ -47,14 +47,14 @@ use s2n_quic::{
     Client as QuicClient, Connection, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::sync::mpsc;
+use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 
 use super::SyncResponse;
 use crate::{
     aranya::Client as AranyaClient,
     sync::{
-        task::{PeerCacheMap, SyncState, Syncer},
+        task::{PeerCacheKey, PeerCacheMap, SyncState, Syncer},
         Result as SyncResult, SyncError,
     },
 };
@@ -115,7 +115,7 @@ impl SyncState for State {
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> SyncResult<()>
+    ) -> SyncResult<usize>
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send,
     {
@@ -129,23 +129,21 @@ impl SyncState for State {
         // TODO: spawn a task for send/recv?
         let (mut recv, mut send) = stream.split();
 
-        // TODO: Real server address.
-        let server_addr = ();
-        let mut sync_requester = SyncRequester::new(id, &mut Rng, server_addr);
+        let mut sync_requester = SyncRequester::new(id, &mut Rng, syncer.server_addr);
 
         // send sync request.
         syncer
-            .send_sync_request(&mut send, &mut sync_requester, peer)
+            .send_sync_request(&mut send, &mut sync_requester, id, peer)
             .await
             .map_err(|e| SyncError::SendSyncRequest(Box::new(e)))?;
 
         // receive sync response.
-        syncer
+        let cmd_count = syncer
             .receive_sync_response(&mut recv, &mut sync_requester, &id, sink, peer)
             .await
             .map_err(|e| SyncError::ReceiveSyncResponse(Box::new(e)))?;
 
-        Ok(())
+        Ok(cmd_count)
     }
 }
 
@@ -247,7 +245,8 @@ impl Syncer<State> {
         &self,
         send: &mut SendStream,
         syncer: &mut SyncRequester<'_, A>,
-        #[expect(unused, reason = "will be used with peer cache")] peer: &Addr,
+        id: GraphId,
+        peer: &Addr,
     ) -> SyncResult<()>
     where
         A: Serialize + DeserializeOwned + Clone,
@@ -255,45 +254,49 @@ impl Syncer<State> {
         debug!("client sending sync request to QUIC sync server");
         let mut send_buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
 
-        let (len, _) = {
-            let mut client = self.client.lock().await;
-            // TODO: save PeerCache somewhere.
-            syncer
-                .poll(&mut send_buf, client.provider(), &mut PeerCache::new())
-                .context("sync poll failed")?
+        let len = {
+            // Must lock aranya then caches to prevent deadlock.
+            let mut aranya = self.client.aranya.lock().await;
+            let key = PeerCacheKey::new(*peer, id);
+            let mut caches = self.caches.lock().await;
+            let cache = caches.entry(key).or_default();
+            let (len, _) = syncer
+                .poll(&mut send_buf, aranya.provider(), cache)
+                .context("sync poll failed")?;
+            debug!(?len, "sync poll finished");
+            len
         };
-        debug!(?len, "sync poll finished");
         send_buf.truncate(len);
 
         send.send(Bytes::from(send_buf))
             .await
             .map_err(Error::from)?;
-        if let Err(err) = send.close().await {
-            if !is_close_error(err) {
-                return Err(Error::from(err).into());
-            }
-        }
+        send.close().await.map_err(Error::from)?;
         debug!("sent sync request");
 
         Ok(())
     }
 
     #[instrument(skip_all)]
+    /// Receives and processes a sync response from the server.
+    ///
+    /// Returns the number of commands that were received and successfully processed.
     async fn receive_sync_response<S, A>(
         &self,
         recv: &mut ReceiveStream,
         syncer: &mut SyncRequester<'_, A>,
         id: &GraphId,
         sink: &mut S,
-        #[expect(unused, reason = "will be used with peer cache")] peer: &Addr,
-    ) -> SyncResult<()>
+        peer: &Addr,
+    ) -> SyncResult<usize>
     where
         S: Sink<<crate::EN as Engine>::Effect>,
         A: Serialize + DeserializeOwned + Clone,
     {
         debug!("client receiving sync response from QUIC sync server");
 
-        let recv_buf = read_to_end(recv)
+        let mut recv_buf = Vec::new();
+        recv.read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync response")?;
         debug!(n = recv_buf.len(), "received sync response");
@@ -307,29 +310,29 @@ impl Syncer<State> {
         };
         if data.is_empty() {
             debug!("nothing to sync");
-            return Ok(());
+            return Ok(0);
         }
         if let Some(cmds) = syncer.receive(&data)? {
             debug!(num = cmds.len(), "received commands");
             if !cmds.is_empty() {
-                let mut client = self.client.lock().await;
-                let mut trx = client.transaction(*id);
-                // TODO: save PeerCache somewhere.
-                client
+                let mut aranya = self.client.aranya.lock().await;
+                let mut trx = aranya.transaction(*id);
+                aranya
                     .add_commands(&mut trx, sink, &cmds)
                     .context("unable to add received commands")?;
-                client.commit(&mut trx, sink).context("commit failed")?;
-                // TODO: Update heads
-                // client.update_heads(
-                //     id,
-                //     cmds.iter().filter_map(|cmd| cmd.address().ok()),
-                //     heads,
-                // )?;
+                aranya.commit(&mut trx, sink).context("commit failed")?;
                 debug!("committed");
+                let key = PeerCacheKey::new(*peer, *id);
+                let mut caches = self.caches.lock().await;
+                let cache = caches.entry(key).or_default();
+                aranya
+                    .update_heads(*id, cmds.iter().filter_map(|cmd| cmd.address().ok()), cache)
+                    .context("failed to update cache heads")?;
+                return Ok(cmds.len());
             }
         }
 
-        Ok(())
+        Ok(0)
     }
 }
 
@@ -344,6 +347,9 @@ pub struct Server<EN, SP> {
     /// Receives updates for the "active team".
     /// Used to ensure that the chosen PSK corresponds to an incoming sync request.
     active_team_rx: mpsc::Receiver<TeamId>,
+    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
+    /// Lock must be acquired after [`Self::aranya`]
+    caches: PeerCacheMap,
 }
 
 impl<EN, SP> Server<EN, SP> {
@@ -401,6 +407,7 @@ where
             aranya,
             server,
             active_team_rx,
+            caches,
         })
     }
 

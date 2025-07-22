@@ -191,7 +191,7 @@ impl Daemon {
                 SyncParams {
                     psk_store: Arc::clone(&psk_store),
                     active_team_rx,
-                    caches,
+                    caches: caches.clone(),
                     external_sync_addr: qs_config.addr,
                 },
             )
@@ -203,8 +203,14 @@ impl Daemon {
 
             let invalid_graphs = InvalidGraphs::default();
             let state = QuicSyncState::new(psk_store.clone())?;
-            let (syncer, peers) =
-                Syncer::new(client.clone(), send_effects, invalid_graphs.clone(), state);
+            let (syncer, peers) = Syncer::new(
+                client.clone(),
+                send_effects,
+                invalid_graphs.clone(),
+                state,
+                local_addr.into(),
+                caches,
+            );
 
             let graph_ids = client
                 .aranya

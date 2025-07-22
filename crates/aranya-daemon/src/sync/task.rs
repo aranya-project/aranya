@@ -181,12 +181,14 @@ pub struct Syncer<ST> {
 /// object.
 pub trait SyncState: Sized {
     /// Syncs with the peer.
+    ///
+    /// Returns the number of commands that were received and successfully processed.
     fn sync_impl<S>(
         syncer: &mut Syncer<Self>,
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> impl Future<Output = SyncResult<()>> + Send
+    ) -> impl Future<Output = SyncResult<usize>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
 }
@@ -198,6 +200,8 @@ impl<ST> Syncer<ST> {
         send_effects: EffectSender,
         invalid: InvalidGraphs,
         state: ST,
+        server_addr: Addr,
+        caches: PeerCacheMap,
     ) -> (Self, SyncPeers) {
         let (send, recv) = mpsc::channel::<Request>(128);
         let peers = SyncPeers::new(send);
@@ -210,8 +214,8 @@ impl<ST> Syncer<ST> {
                 send_effects,
                 invalid,
                 state,
-                server_addr: Addr::from((std::net::Ipv4Addr::LOCALHOST, 0)),
-                caches: Arc::new(Mutex::new(BTreeMap::new())),
+                server_addr,
+                caches,
             },
             peers,
         )
@@ -244,12 +248,12 @@ impl<ST: SyncState> Syncer<ST> {
                 let reply = match msg {
                     Msg::SyncNow { peer, cfg: _cfg } => {
                         // sync with peer right now.
-                        self.sync(&peer).await
+                        self.sync(&peer).await.map(|_| ())
                     },
                     Msg::AddPeer { peer, cfg } => {
                         let mut result = Ok(());
                         if cfg.sync_now {
-                            result = self.sync(&peer).await;
+                            result = self.sync(&peer).await.map(|_| ());
                         }
                         self.add_peer(peer, cfg);
                         result
@@ -278,10 +282,10 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<()> {
+    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<usize> {
         trace!("syncing with peer");
         let mut sink = VecSink::new();
-        ST::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
+        let cmd_count = ST::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
             .await
             .inspect_err(|err| {
                 // If a finalization error has occurred, remove all sync peers for that team.
@@ -307,7 +311,7 @@ impl<ST: SyncState> Syncer<ST> {
             .await
             .context("unable to send effects")?;
         trace!(?n, "completed sync");
-        Ok(())
+        Ok(cmd_count)
     }
 
     /// Get peer caches.
