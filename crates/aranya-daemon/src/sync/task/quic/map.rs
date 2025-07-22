@@ -9,20 +9,20 @@ use s2n_quic::{
     connection::{Handle, StreamAcceptor},
     Connection,
 };
-use tokio::sync::{self, mpsc, Mutex, RwLock};
+use tokio::sync::{self, mpsc, Mutex};
 
 use crate::sync::task::quic::ConnectionKey;
 
 pub(crate) type ConnectionUpdate = (ConnectionKey, StreamAcceptor);
 type ConnectionMap = BTreeMap<ConnectionKey, Arc<Mutex<Handle>>>;
 
-pub(super) struct RwLockWriteGuard<'a, T: ?Sized> {
+pub(super) struct MutexGuard<'a, T: ?Sized> {
     tx: mpsc::Sender<ConnectionUpdate>,
-    guard: sync::RwLockWriteGuard<'a, T>,
+    guard: sync::MutexGuard<'a, T>,
 }
 
 #[allow(clippy::expect_used, reason = "channel closed")]
-impl RwLockWriteGuard<'_, ConnectionMap> {
+impl MutexGuard<'_, ConnectionMap> {
     pub(super) async fn insert(
         &mut self,
         key: ConnectionKey,
@@ -45,15 +45,15 @@ impl RwLockWriteGuard<'_, ConnectionMap> {
     }
 }
 
-impl<'a, T> Deref for RwLockWriteGuard<'a, T> {
-    type Target = sync::RwLockWriteGuard<'a, T>;
+impl<'a, T> Deref for MutexGuard<'a, T> {
+    type Target = sync::MutexGuard<'a, T>;
 
     fn deref(&self) -> &Self::Target {
         &self.guard
     }
 }
 
-impl<T> DerefMut for RwLockWriteGuard<'_, T> {
+impl<T> DerefMut for MutexGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.guard
     }
@@ -61,7 +61,7 @@ impl<T> DerefMut for RwLockWriteGuard<'_, T> {
 
 #[derive(Debug)]
 pub(crate) struct SharedConnectionMap {
-    data: RwLock<BTreeMap<ConnectionKey, Arc<Mutex<Handle>>>>,
+    data: Mutex<BTreeMap<ConnectionKey, Arc<Mutex<Handle>>>>,
     tx: mpsc::Sender<ConnectionUpdate>,
 }
 
@@ -71,7 +71,7 @@ impl SharedConnectionMap {
 
         (
             Self {
-                data: RwLock::new(BTreeMap::new()),
+                data: Mutex::new(BTreeMap::new()),
                 tx,
             },
             rx,
@@ -79,14 +79,9 @@ impl SharedConnectionMap {
     }
 
     #[inline]
-    pub(super) async fn read(&self) -> sync::RwLockReadGuard<'_, ConnectionMap> {
-        self.data.read().await
-    }
-
-    #[inline]
-    pub(super) async fn write(&self) -> RwLockWriteGuard<'_, ConnectionMap> {
-        let guard = self.data.write().await;
-        RwLockWriteGuard {
+    pub(super) async fn lock(&self) -> MutexGuard<'_, ConnectionMap> {
+        let guard = self.data.lock().await;
+        MutexGuard {
             guard,
             tx: self.tx.clone(),
         }

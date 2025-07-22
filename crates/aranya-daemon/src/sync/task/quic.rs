@@ -195,7 +195,7 @@ impl Syncer<State> {
         debug!("client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
-        let conn_map_guard = self.state.conns.read().await;
+        let mut conn_map_guard = self.state.conns.lock().await;
         let client = &self.state.client;
 
         let key = ConnectionKey { addr: *peer, id };
@@ -203,16 +203,10 @@ impl Syncer<State> {
         let conn_ref = match conn_map_guard.get(&key) {
             Some(conn) => {
                 debug!("Client is able to re-use existing QUIC connection");
-
-                let conn = Arc::clone(conn);
-                drop(conn_map_guard);
-                conn
+                Arc::clone(conn)
             }
             None => {
                 debug!("existing QUIC connection not found");
-
-                // drop guard so we can obtain exclusive access for insert
-                drop(conn_map_guard);
 
                 let addr = tokio::net::lookup_host(peer.to_socket_addrs())
                     .await
@@ -230,8 +224,7 @@ impl Syncer<State> {
                 conn.keep_alive(true).map_err(Error::from)?;
                 debug!("created new quic connection");
 
-                let mut conn_write_guard = self.state.conns.write().await;
-                match conn_write_guard.insert(key, conn).await {
+                match conn_map_guard.insert(key, conn).await {
                     (Some(existing), conn) => {
                         // TODO: Use appropriate error code
 
@@ -245,6 +238,7 @@ impl Syncer<State> {
                 }
             }
         };
+        drop(conn_map_guard);
 
         debug!("client connected to QUIC sync server");
 
@@ -264,7 +258,7 @@ impl Syncer<State> {
             }
             // Other errors means the stream has closed
             Err(e) => {
-                self.state.conns.write().await.remove(key).await;
+                self.state.conns.lock().await.remove(key).await;
                 return Err(SyncError::QuicSync(e.into()));
             }
         };
@@ -470,7 +464,7 @@ where
                         };
 
                         let acceptor = {
-                            let mut conn_map_guard = self.conns.write().await;
+                            let mut conn_map_guard = self.conns.lock().await;
                             let key = ConnectionKey {
                                 addr: peer.into(),
                                 id: active_team.into_id().into(),
