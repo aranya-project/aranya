@@ -3,7 +3,7 @@
 
 use std::{
     collections::{btree_map::Entry, BTreeMap},
-    ops::{Deref, DerefMut},
+    ops::Deref,
 };
 
 use s2n_quic::{
@@ -85,6 +85,11 @@ impl MutexGuard<'_, ConnectionMap> {
             existing_conn.close(AppError::UNKNOWN);
         }
     }
+
+    #[inline]
+    pub(super) fn get_mut(&mut self, key: &ConnectionKey) -> Option<&mut Handle> {
+        self.guard.get_mut(key)
+    }
 }
 
 impl<'a, T> Deref for MutexGuard<'a, T> {
@@ -92,12 +97,6 @@ impl<'a, T> Deref for MutexGuard<'a, T> {
 
     fn deref(&self) -> &Self::Target {
         &self.guard
-    }
-}
-
-impl<T> DerefMut for MutexGuard<'_, T> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.guard
     }
 }
 
