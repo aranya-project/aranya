@@ -27,6 +27,29 @@ pub(super) struct MutexGuard<'a, T: ?Sized> {
 
 #[allow(clippy::expect_used, reason = "channel closed")]
 impl MutexGuard<'_, ConnectionMap> {
+    /// Inserts a QUIC connection into the map.
+    ///
+    /// Splits the connection into a handle and stream acceptor. If a connection already exists
+    /// for the key, checks for open connections via ping - reuses open connections and replaces
+    /// closed ones. Sends a [`ConnectionUpdate`] when a new connection is inserted.
+    ///
+    /// # Parameters
+    ///
+    /// * `key` - The [`ConnectionKey`] that uniquely identifies the connection pair
+    /// * `conn` - The [`Connection`] to insert
+    ///
+    /// # Returns
+    ///
+    /// * `&mut Handle` - Mutable reference to the connection handle
+    /// * `bool` - `true` if new connection was inserted, `false` if existing connection was reused
+    ///
+    /// # Note
+    ///
+    /// If an existing connection was reused, the connection that would've been inserted is closed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal connection update channel is closed.
     pub(super) async fn insert(
         &mut self,
         key: ConnectionKey,

@@ -7,7 +7,7 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::net::SocketAddr;
-use std::{collections::btree_map::Entry, convert::Infallible, net::Ipv4Addr, sync::Arc};
+use std::{convert::Infallible, net::Ipv4Addr, sync::Arc};
 
 use anyhow::Context;
 use aranya_crypto::Rng;
@@ -32,7 +32,6 @@ use s2n_quic::provider::tls::rustls::rustls::{
     server::PresharedKeySelection, ClientConfig, ServerConfig,
 };
 use s2n_quic::{
-    application::Error as AppError,
     client::Connect,
     connection::{Error as ConnErr, StreamAcceptor},
     provider::{
@@ -235,7 +234,7 @@ impl Syncer<State> {
 
                 let (conn, inserted) = conn_map_guard.insert(key, conn).await;
                 if !inserted {
-                    debug!("New connection wasn't inserted. A live connection was found")
+                    debug!("New connection wasn't inserted. A healthy connection was found")
                 }
 
                 conn
@@ -450,7 +449,7 @@ where
             loop {
                 tokio::select! {
                     // Accept incoming QUIC connections.
-                    Some(mut conn) = self.server.accept() => {
+                    Some(conn) = self.server.accept() => {
                         debug!("received incoming QUIC connection");
                         let Ok(active_team) = self.active_team_rx.try_recv() else {
                             warn!("no active team for accepted connection");
@@ -463,44 +462,14 @@ where
                             continue;
                         };
 
-                        let acceptor = {
-                            let mut conn_map_guard = self.conns.lock().await;
-                            let key = ConnectionKey {
-                                addr: peer.into(),
-                                id: active_team.into_id().into(),
-                            };
-                            match conn_map_guard.entry(key) {
-                                Entry::Occupied(_) => {
-                                    // Close the new connection because one already exists
-
-                                    // TODO: Use appropriate error code
-                                    conn.close(AppError::UNKNOWN);
-
-                                    continue;
-                                }
-                                Entry::Vacant(entry) => {
-                                    let Ok(()) = conn.keep_alive(true).map_err(Error::from) else {
-                                        warn!("unable to keep connection alive");
-                                        // TODO: Use appropriate error code
-                                        conn.close(AppError::UNKNOWN);
-                                        continue;
-                                    };
-
-                                    let (handle, acceptor) = conn.split();
-                                    let _ = entry.insert(handle);
-                                    acceptor
-                                }
-                            }
+                        let mut conn_map_guard = self.conns.lock().await;
+                        let key = ConnectionKey {
+                            addr: peer.into(),
+                            id: active_team.into_id().into(),
                         };
-
-                        let client = self.aranya.clone();
-
-                        s.spawn(
-                            Self::handle_streams(client, acceptor, peer, active_team)
-                                .instrument(info_span!("serve_connection", %peer)),
-                        );
+                        let _ = conn_map_guard.insert(key, conn).await;
                     },
-                    // Handle new connections initiated in the syncer
+                    // Handle new connections inserted in the map
                     Some((key, acceptor)) = self.conn_rx.recv() => {
                         let active_team = key.id.into_id().into();
                         let peer = match SocketAddr::try_from(&key.addr)
@@ -508,7 +477,7 @@ where
                         {
                             Ok(peer) => peer,
                             Err(err) => {
-                                warn!(error = %err.report(), "unable to handle new connections from the syncer");
+                                warn!(error = %err.report(), "unable to handle new connection");
                                 continue;
                             }
                         };
