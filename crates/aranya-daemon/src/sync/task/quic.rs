@@ -56,10 +56,10 @@ use crate::{
     },
 };
 
-mod map;
+mod connections;
 mod psk;
 
-pub(crate) use map::{ConnectionUpdate, SharedConnectionMap};
+pub(crate) use connections::{ConnectionUpdate, SharedConnectionMap};
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
 
@@ -98,6 +98,15 @@ impl From<Infallible> for Error {
 pub(crate) struct ConnectionKey {
     pub(crate) addr: Addr,
     pub(crate) id: GraphId,
+}
+
+/// Sync configuration for setting up Aranya.
+pub(crate) struct SyncParams {
+    pub(crate) psk_store: Arc<PskStore>,
+    pub(crate) active_team_rx: mpsc::Receiver<TeamId>,
+    pub(crate) external_sync_addr: Addr,
+    pub(crate) conns: Arc<SharedConnectionMap>,
+    pub(crate) conn_rx: mpsc::Receiver<ConnectionUpdate>,
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
@@ -496,7 +505,7 @@ where
                         let client = self.aranya.clone();
 
                         s.spawn(
-                            Self::handle_stream(client, acceptor, peer, active_team)
+                            Self::handle_streams(client, acceptor, peer, active_team)
                                 .instrument(info_span!("serve_connection", %peer)),
                         );
                     },
@@ -507,12 +516,12 @@ where
                             .assume("Can convert `Addr` into `SocketAddr`")
                         {
                             Ok(peer) => peer,
-                            Err(e) => {
-                                warn!(%e);
+                            Err(err) => {
+                                warn!(error = %err.report(), "unable to handle new connections from the syncer");
                                 continue;
                             }
                         };
-                        s.spawn(Self::handle_stream(client.clone(), acceptor, peer, active_team)
+                        s.spawn(Self::handle_streams(client.clone(), acceptor, peer, active_team)
                             .instrument(info_span!("serve_connection", %peer)))
                     }
                     else => break,
@@ -524,7 +533,7 @@ where
         error!("server terminated");
     }
 
-    async fn handle_stream(
+    async fn handle_streams(
         client: AranyaClient<EN, SP>,
         mut acceptor: StreamAcceptor,
         peer: SocketAddr,

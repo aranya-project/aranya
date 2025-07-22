@@ -7,22 +7,17 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
-use aranya_daemon_api::TeamId;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, StorageProvider,
 };
-use aranya_util::{ready, Addr};
+use aranya_util::ready;
 use bimap::BiBTreeMap;
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{
-    fs,
-    sync::{mpsc::Receiver, Mutex},
-    task::JoinSet,
-};
+use tokio::{fs, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
@@ -34,7 +29,7 @@ use crate::{
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{ConnectionUpdate, PskStore, SharedConnectionMap, State as QuicSyncState},
+        quic::{PskStore, SharedConnectionMap, State as QuicSyncClientState, SyncParams},
         Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
@@ -57,15 +52,6 @@ pub(crate) type EF = policy::Effect;
 
 pub(crate) type Client = aranya::Client<EN, SP>;
 pub(crate) type SyncServer = crate::sync::task::quic::Server<EN, SP>;
-
-/// Sync configuration for setting up Aranya.
-struct SyncParams {
-    psk_store: Arc<PskStore>,
-    active_team_rx: Receiver<TeamId>,
-    external_sync_addr: Addr,
-    conns: Arc<SharedConnectionMap>,
-    conn_rx: Receiver<ConnectionUpdate>,
-}
 
 mod invalid_graphs {
     use std::{
@@ -132,7 +118,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    syncer: Syncer<QuicSyncState>,
+    syncer: Syncer<QuicSyncClientState>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -205,7 +191,7 @@ impl Daemon {
             let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
 
             let invalid_graphs = InvalidGraphs::default();
-            let state = QuicSyncState::new(psk_store.clone(), conn_map)?;
+            let state = QuicSyncClientState::new(psk_store.clone(), conn_map)?;
             let (syncer, peers) =
                 Syncer::new(client.clone(), send_effects, invalid_graphs.clone(), state);
 
@@ -492,6 +478,7 @@ mod tests {
 
     use std::time::Duration;
 
+    use aranya_util::Addr;
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;

@@ -1,3 +1,6 @@
+//! This modules contains a map for storing persistent QUIC connections between pairs of sync peers.
+//! Once a connection has been opened, it is shared between the QUIC syncer client and server.
+
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
@@ -13,6 +16,8 @@ use tokio::sync::{self, mpsc, Mutex};
 
 use crate::sync::task::quic::ConnectionKey;
 
+/// A [`ConnectionKey`] and [`StreamAcceptor`] pair that is sent over a channel
+/// when a new connection is inserted.
 pub(crate) type ConnectionUpdate = (ConnectionKey, StreamAcceptor);
 type ConnectionMap = BTreeMap<ConnectionKey, Arc<Mutex<Handle>>>;
 
