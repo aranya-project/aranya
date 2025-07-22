@@ -319,4 +319,14 @@ impl<ST: SyncState> Syncer<ST> {
     pub fn get_peer_caches(&self) -> PeerCacheMap {
         self.caches.clone()
     }
+
+    #[cfg(test)]
+    pub fn client(&self) -> &crate::aranya::Client<crate::EN, crate::SP> {
+        &self.client
+    }
+
+    #[cfg(test)]
+    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<crate::EN, crate::SP> {
+        &mut self.client
+    }
 }

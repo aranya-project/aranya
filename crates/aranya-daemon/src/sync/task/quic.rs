@@ -18,13 +18,12 @@ use anyhow::Context;
 use aranya_crypto::Rng;
 use aranya_daemon_api::TeamId;
 use aranya_runtime::{
-    Command, Engine, GraphId, PeerCache, Sink, StorageError, StorageProvider, SyncRequestMessage,
+    Command, Engine, GraphId, Sink, StorageError, StorageProvider, SyncRequestMessage,
     SyncRequester, SyncResponder, SyncType, MAX_SYNC_MESSAGE_SIZE,
 };
 use aranya_util::{
     error::ReportExt as _,
     rustls::{NoCertResolver, SkipServerVerification},
-    s2n_quic::{is_close_error, read_to_end},
     task::scope,
     Addr,
 };
@@ -433,6 +432,7 @@ where
                 };
 
                 let client = self.aranya.clone();
+                let caches = self.caches.clone();
 
                 s.spawn(
                     async move {
@@ -446,8 +446,14 @@ where
                                 }
                             };
                             debug!("received incoming QUIC stream");
-                            if let Err(err) =
-                                Self::sync(client.clone(), peer, stream, &active_team).await
+                            if let Err(err) = Self::sync(
+                                client.clone(),
+                                caches.clone(),
+                                peer.into(),
+                                stream,
+                                &active_team,
+                            )
+                            .await
                             {
                                 error!(error = %err.report(), "server unable to sync with peer");
                                 return;
@@ -468,20 +474,23 @@ where
     #[instrument(skip_all)]
     pub async fn sync(
         client: AranyaClient<EN, SP>,
-        #[expect(unused, reason = "will be used with peer cache")] peer: SocketAddr,
+        caches: PeerCacheMap,
+        peer: Addr,
         stream: BidirectionalStream,
         active_team: &TeamId,
     ) -> SyncResult<()> {
         debug!("server received a sync request");
 
+        let mut recv_buf = Vec::new();
         let (mut recv, mut send) = stream.split();
-        let recv_buf = read_to_end(&mut recv)
+        recv.read_to_end(&mut recv_buf)
             .await
             .context("failed to read sync request")?;
         debug!(n = recv_buf.len(), "received sync request");
 
         // Generate a sync response for a sync request.
-        let sync_response_res = Self::sync_respond(client, &recv_buf, active_team).await;
+        let sync_response_res =
+            Self::sync_respond(client, caches, peer, &recv_buf, active_team).await;
         let resp = match sync_response_res {
             Ok(data) => SyncResponse::Ok(data),
             Err(err) => {
@@ -490,19 +499,16 @@ where
                 SyncResponse::Err(error)
             }
         };
-        // Serialize the sync response.
-        let data =
-            postcard::to_allocvec(&resp).context("postcard unable to serialize sync response")?;
 
-        let data_len = data.len();
-        send.send(Bytes::from(data))
-            .await
-            .context("Could not send sync response")?;
-        if let Err(err) = send.close().await {
-            if !is_close_error(err) {
-                return Err(Error::from(err).into());
-            }
-        }
+        let data_len = {
+            let data = postcard::to_allocvec(&resp).context("postcard serialization failed")?;
+            let data_len = data.len();
+            send.send(Bytes::from(data))
+                .await
+                .context("Could not send sync response")?;
+            data_len
+        };
+        send.close().await.map_err(Error::from)?;
         debug!(n = data_len, "server sent sync response");
 
         Ok(())
@@ -512,54 +518,56 @@ where
     #[instrument(skip_all)]
     async fn sync_respond(
         client: AranyaClient<EN, SP>,
+        caches: PeerCacheMap,
+        addr: Addr,
         request_data: &[u8],
         active_team: &TeamId,
     ) -> SyncResult<Box<[u8]>> {
         debug!("server responding to sync request");
 
-        // TODO: Use real server address
-        let server_address = ();
-        let mut resp = SyncResponder::new(server_address);
+        let mut resp = SyncResponder::new(addr);
 
         let SyncType::Poll {
             request: request_msg,
-            address: (),
-        } = postcard::from_bytes(request_data).map_err(|e| anyhow::anyhow!(e))?
+            address: peer_server_addr,
+        }: SyncType<Addr> = postcard::from_bytes(request_data).map_err(|e| anyhow::anyhow!(e))?
         else {
             bug!("Other sync types are not implemented");
         };
 
-        check_request(active_team, &request_msg)?;
+        let storage_id = check_request(active_team, &request_msg)?;
 
         resp.receive(request_msg).context("sync recv failed")?;
 
         let mut buf = vec![0u8; MAX_SYNC_MESSAGE_SIZE];
-        // TODO: save PeerCache somewhere.
-        let len = resp
-            .poll(
-                &mut buf,
-                client.lock().await.provider(),
-                &mut PeerCache::new(),
-            )
-            .or_else(|err| {
-                if matches!(
-                    err,
-                    aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
-                ) {
-                    warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
-                    Ok(0)
-                } else {
-                    Err(err)
-                }
-            })
-            .context("sync resp poll failed")?;
+        let len = {
+            // Must lock aranya then caches to prevent deadlock.
+            let mut aranya = client.aranya.lock().await;
+            let key = PeerCacheKey::new(peer_server_addr, storage_id);
+            let mut caches = caches.lock().await;
+            let cache = caches.entry(key).or_default();
+
+            resp.poll(&mut buf, aranya.provider(), cache)
+                .or_else(|err| {
+                    if matches!(
+                        err,
+                        aranya_runtime::SyncError::Storage(StorageError::NoSuchStorage)
+                    ) {
+                        warn!(team = %active_team, "missing requested graph, we likely have not synced yet");
+                        Ok(0)
+                    } else {
+                        Err(err)
+                    }
+                })
+                .context("sync resp poll failed")?
+        };
         debug!(len = len, "sync poll finished");
         buf.truncate(len);
         Ok(buf.into())
     }
 }
 
-fn check_request(team_id: &TeamId, request: &SyncRequestMessage) -> SyncResult<()> {
+fn check_request(team_id: &TeamId, request: &SyncRequestMessage) -> SyncResult<GraphId> {
     let SyncRequestMessage::SyncRequest { storage_id, .. } = request else {
         bug!("Should be a SyncRequest")
     };
@@ -567,5 +575,5 @@ fn check_request(team_id: &TeamId, request: &SyncRequestMessage) -> SyncResult<(
         return Err(SyncError::QuicSync(Error::InvalidPSK));
     }
 
-    Ok(())
+    Ok(*storage_id)
 }
