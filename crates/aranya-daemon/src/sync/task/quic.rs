@@ -7,7 +7,7 @@
 //! Each sync request/response will use a single QUIC stream which is closed after the sync completes.
 
 use core::net::SocketAddr;
-use std::{convert::Infallible, net::Ipv4Addr, sync::Arc};
+use std::{collections::HashMap, convert::Infallible, net::Ipv4Addr, sync::Arc};
 
 use anyhow::Context;
 use aranya_crypto::Rng;
@@ -44,21 +44,23 @@ use s2n_quic::{
 };
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::mpsc;
+use tokio_util::time::DelayQueue;
 use tracing::{debug, error, info, info_span, instrument, warn, Instrument as _};
 
-use super::SyncResponse;
+use super::{Request, SyncPeers, SyncResponse};
 use crate::{
     aranya::Client as AranyaClient,
     sync::{
         task::{SyncState, Syncer},
         Result as SyncResult, SyncError,
     },
+    InvalidGraphs,
 };
 
 mod connections;
 mod psk;
 
-pub(crate) use connections::{ConnectionUpdate, SharedConnectionMap};
+pub(crate) use connections::{ConnectionKey, ConnectionUpdate, SharedConnectionMap};
 pub(crate) use psk::PskSeed;
 pub use psk::PskStore;
 
@@ -91,21 +93,11 @@ impl From<Infallible> for Error {
     }
 }
 
-/// Unique key for a connection with a peer.
-/// Each team/graph is synced over a different QUIC connection so a team-specific PSK can be used.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
-pub(crate) struct ConnectionKey {
-    pub(crate) addr: Addr,
-    pub(crate) id: GraphId,
-}
-
 /// Sync configuration for setting up Aranya.
 pub(crate) struct SyncParams {
     pub(crate) psk_store: Arc<PskStore>,
     pub(crate) active_team_rx: mpsc::Receiver<TeamId>,
-    pub(crate) external_sync_addr: Addr,
-    pub(crate) conns: Arc<SharedConnectionMap>,
-    pub(crate) conn_rx: mpsc::Receiver<ConnectionUpdate>,
+    pub(crate) server_addr: Addr,
 }
 
 /// QUIC syncer state used for sending sync requests and processing sync responses
@@ -166,10 +158,7 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    pub(crate) fn new(
-        psk_store: Arc<PskStore>,
-        conns: Arc<SharedConnectionMap>,
-    ) -> SyncResult<Self> {
+    fn new(psk_store: Arc<PskStore>, conns: Arc<SharedConnectionMap>) -> SyncResult<Self> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
@@ -198,6 +187,41 @@ impl State {
 }
 
 impl Syncer<State> {
+    /// Creates a new [`Syncer`].
+    pub(crate) fn new(
+        client: super::Client,
+        send_effects: super::EffectSender,
+        invalid: InvalidGraphs,
+        psk_store: Arc<PskStore>,
+    ) -> SyncResult<(
+        Self,
+        SyncPeers,
+        Arc<SharedConnectionMap>,
+        mpsc::Receiver<ConnectionUpdate>,
+    )> {
+        let (send, recv) = mpsc::channel::<Request>(128);
+        let peers = SyncPeers::new(send);
+
+        let (conns, conn_rx) = SharedConnectionMap::new();
+        let conns = Arc::new(conns);
+        let state = State::new(psk_store, Arc::clone(&conns))?;
+
+        Ok((
+            Self {
+                client,
+                peers: HashMap::new(),
+                recv,
+                queue: DelayQueue::new(),
+                send_effects,
+                invalid,
+                state,
+            },
+            peers,
+            conns,
+            conn_rx,
+        ))
+    }
+
     #[instrument(skip_all)]
     async fn connect(&mut self, peer: &Addr, id: GraphId) -> SyncResult<BidirectionalStream> {
         debug!("client connecting to QUIC sync server");

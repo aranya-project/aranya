@@ -22,15 +22,15 @@ use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
     actions::Actions,
-    api::{ApiKey, DaemonApiServer, QSData},
+    api::{ApiKey, DaemonApiServer, EffectReceiver, QSData},
     aqc::Aqc,
     aranya,
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{PskStore, SharedConnectionMap, State as QuicSyncClientState, SyncParams},
-        Syncer,
+        quic::{PskStore, State as QuicSyncClientState, SyncParams},
+        SyncPeers, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
@@ -164,12 +164,10 @@ impl Daemon {
             let (psk_store, active_team_rx) = PskStore::new(initial_keys);
             let psk_store = Arc::new(psk_store);
 
-            // Initialize the connection map used by the syncer and sync server
-            let (conn_map, conn_rx) = SharedConnectionMap::new();
-            let conn_map = Arc::new(conn_map);
+            let invalid_graphs = InvalidGraphs::default();
 
-            // Initialize Aranya client.
-            let (client, sync_server) = Self::setup_aranya(
+            // Initialize Aranya client, sync client,and sync server.
+            let (client, sync_server, syncer, peers, recv_effects) = Self::setup_aranya(
                 &cfg,
                 eng.clone(),
                 aranya_store
@@ -178,22 +176,13 @@ impl Daemon {
                 &pks,
                 SyncParams {
                     psk_store: Arc::clone(&psk_store),
-                    conns: Arc::clone(&conn_map),
-                    external_sync_addr: qs_config.addr,
-                    conn_rx,
+                    server_addr: qs_config.addr,
                     active_team_rx,
                 },
+                invalid_graphs.clone(),
             )
             .await?;
             let local_addr = sync_server.local_addr()?;
-
-            // Sync in the background at some specified interval.
-            let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-
-            let invalid_graphs = InvalidGraphs::default();
-            let state = QuicSyncClientState::new(psk_store.clone(), conn_map)?;
-            let (syncer, peers) =
-                Syncer::new(client.clone(), send_effects, invalid_graphs.clone(), state);
 
             let graph_ids = client
                 .aranya
@@ -327,7 +316,7 @@ impl Daemon {
         Ok(())
     }
 
-    /// Creates the Aranya client and sync server.
+    /// Creates the Aranya client, sync client, and sync server.
     async fn setup_aranya(
         cfg: &Config,
         eng: CE,
@@ -336,11 +325,16 @@ impl Daemon {
         SyncParams {
             psk_store,
             active_team_rx,
-            external_sync_addr,
-            conns,
-            conn_rx,
+            server_addr,
         }: SyncParams,
-    ) -> Result<(Client, SyncServer)> {
+        invalid_graphs: InvalidGraphs,
+    ) -> Result<(
+        Client,
+        SyncServer,
+        Syncer<QuicSyncClientState>,
+        SyncPeers,
+        EffectReceiver,
+    )> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -352,10 +346,21 @@ impl Daemon {
 
         let client = Client::new(Arc::clone(&aranya));
 
-        info!(addr = %external_sync_addr, "starting QUIC sync server");
+        // Sync in the background at some specified interval.
+        let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
+
+        // Initialize the syncer
+        let (syncer, peers, conns, conn_rx) = Syncer::new(
+            client.clone(),
+            send_effects,
+            invalid_graphs,
+            psk_store.clone(),
+        )?;
+
+        info!(addr = %server_addr, "starting QUIC sync server");
         let server = SyncServer::new(
             client.clone(),
-            &external_sync_addr,
+            &server_addr,
             psk_store,
             conns,
             conn_rx,
@@ -366,7 +371,7 @@ impl Daemon {
 
         info!(device_id = %device_id, "set up Aranya");
 
-        Ok((client, server))
+        Ok((client, server, syncer, peers, recv_effects))
     }
 
     /// Loads the crypto engine.

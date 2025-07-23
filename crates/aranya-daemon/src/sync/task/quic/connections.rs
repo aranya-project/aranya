@@ -6,6 +6,8 @@ use std::{
     ops::Deref,
 };
 
+use aranya_runtime::GraphId;
+use aranya_util::Addr;
 use s2n_quic::{
     application::Error as AppError,
     connection::{Handle, StreamAcceptor},
@@ -13,12 +15,18 @@ use s2n_quic::{
 };
 use tokio::sync::{self, mpsc, Mutex};
 
-use crate::sync::task::quic::ConnectionKey;
-
 /// A [`ConnectionKey`] and [`StreamAcceptor`] pair that is sent over a channel
 /// when a new connection is inserted.
 pub(crate) type ConnectionUpdate = (ConnectionKey, StreamAcceptor);
 type ConnectionMap = BTreeMap<ConnectionKey, Handle>;
+
+/// Unique key for a connection with a peer.
+/// Each team/graph is synced over a different QUIC connection so a team-specific PSK can be used.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub(crate) struct ConnectionKey {
+    pub(crate) addr: Addr,
+    pub(crate) id: GraphId,
+}
 
 pub(super) struct MutexGuard<'a> {
     tx: mpsc::Sender<ConnectionUpdate>,
