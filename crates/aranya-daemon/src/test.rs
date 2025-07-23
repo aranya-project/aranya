@@ -27,7 +27,7 @@ use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, GraphId,
 };
-use aranya_util::Addr;
+use aranya_util::{ready, Addr};
 use s2n_quic::provider::tls::rustls::rustls::crypto::PresharedKey;
 use serial_test::serial;
 use tempfile::{tempdir, TempDir};
@@ -90,7 +90,9 @@ impl TestDevice {
         psk_store: Arc<PskStore>,
         caches: PeerCacheMap,
     ) -> Result<Self> {
-        let handle = task::spawn(async { server.serve().await }).abort_handle();
+        let waiter = ready::Waiter::new(1);
+        let notifier = waiter.notifier();
+        let handle = task::spawn(async { server.serve(notifier).await }).abort_handle();
         let (send_effects, effect_recv) = mpsc::channel(1);
         let (syncer, _sync_peers) = TestSyncer::new(
             client,

@@ -16,7 +16,6 @@ use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
 use aranya_runtime::{storage::GraphId, Engine, PeerCache, Sink};
 use aranya_util::{error::ReportExt as _, ready, Addr};
-
 use buggy::BugExt;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
