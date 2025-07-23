@@ -108,7 +108,7 @@ pub(crate) struct SharedConnectionMap {
 
 impl SharedConnectionMap {
     pub(crate) fn new() -> (Self, mpsc::Receiver<ConnectionUpdate>) {
-        let (tx, rx) = mpsc::channel(10);
+        let (tx, rx) = mpsc::channel(32);
 
         (
             Self {

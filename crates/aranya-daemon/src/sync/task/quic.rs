@@ -370,7 +370,7 @@ pub struct Server<EN, SP> {
     active_team_rx: mpsc::Receiver<TeamId>,
     /// Connection map shared with [`super::Syncer`]
     conns: Arc<SharedConnectionMap>,
-    /// Receives updates for connections created during outgoing sync requests.
+    /// Receives updates for connections inserted into the [connection map][`Self::conns`].
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
 }
 
