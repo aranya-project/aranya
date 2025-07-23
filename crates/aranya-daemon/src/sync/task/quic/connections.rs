@@ -7,7 +7,6 @@ use std::{
 };
 
 use aranya_runtime::GraphId;
-use aranya_util::Addr;
 use s2n_quic::{
     application::Error as AppError,
     connection::{Handle, StreamAcceptor},
@@ -24,7 +23,7 @@ type ConnectionMap = BTreeMap<ConnectionKey, Handle>;
 /// Each team/graph is synced over a different QUIC connection so a team-specific PSK can be used.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct ConnectionKey {
-    pub(crate) addr: Addr,
+    pub(crate) addr: super::SocketAddr,
     pub(crate) id: GraphId,
 }
 

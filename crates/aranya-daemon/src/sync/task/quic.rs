@@ -230,7 +230,13 @@ impl Syncer<State> {
         let mut conn_map_guard = self.state.conns.lock().await;
         let client = &self.state.client;
 
-        let key = ConnectionKey { addr: *peer, id };
+        let addr = tokio::net::lookup_host(peer.to_socket_addrs())
+            .await
+            .context("DNS lookup on for peer address")?
+            .next()
+            .context("could not resolve peer address")?;
+
+        let key = ConnectionKey { addr, id };
 
         let conn_ref = match conn_map_guard.get_mut(&key) {
             Some(conn) => {
@@ -240,11 +246,6 @@ impl Syncer<State> {
             None => {
                 debug!("existing QUIC connection not found");
 
-                let addr = tokio::net::lookup_host(peer.to_socket_addrs())
-                    .await
-                    .context("DNS lookup on for peer address")?
-                    .next()
-                    .context("could not resolve peer address")?;
                 // Note: cert is not used but server name must be set to connect.
                 debug!("attempting to create new quic connection");
 
@@ -498,15 +499,7 @@ where
                     // Handle new connections inserted in the map
                     Some((key, acceptor)) = self.conn_rx.recv() => {
                         let active_team = key.id.into_id().into();
-                        let peer = match SocketAddr::try_from(&key.addr)
-                            .assume("Can convert `Addr` into `SocketAddr`")
-                        {
-                            Ok(peer) => peer,
-                            Err(err) => {
-                                warn!(error = %err.report(), "unable to handle new connection");
-                                continue;
-                            }
-                        };
+                        let peer = key.addr;
                         s.spawn(Self::handle_streams(client.clone(), acceptor, peer, active_team)
                             .instrument(info_span!("serve_connection", %peer)))
                     }
