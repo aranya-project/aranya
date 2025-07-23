@@ -473,7 +473,6 @@ dependencies = [
  "backon",
  "buggy",
  "bytes",
- "deser-hjson",
  "futures-util",
  "http",
  "libc",
@@ -486,6 +485,7 @@ dependencies = [
  "sysinfo",
  "tempfile",
  "tokio",
+ "toml",
  "tracing",
  "tracing-subscriber",
 ]
@@ -742,12 +742,11 @@ dependencies = [
 
 [[package]]
 name = "backon"
-version = "1.4.0"
+version = "1.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49fef586913a57ff189f25c9b3d034356a5bf6b3fa9a7f067588fe1698ba1f5d"
+checksum = "302eaff5357a264a2c42f127ecb8bac761cf99749fc3dc95677e2743991f99e7"
 dependencies = [
  "fastrand",
- "gloo-timers",
  "tokio",
 ]
 
@@ -1193,15 +1192,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "deser-hjson"
-version = "2.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d94aac4095c08ded7e4b9ba7fc2b2929f11b94bb96897ca188b0f64e01688e1"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "diff"
 version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1612,18 +1602,6 @@ name = "glob"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8d1add55171497b4705a648c6b583acafb01d58050a51727785f0b2c8e0a2b2"
-
-[[package]]
-name = "gloo-timers"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbb143cf96099802033e0d4f4963b19fd2e0b728bcf076cd9cf7f6634f092994"
-dependencies = [
- "futures-channel",
- "futures-core",
- "js-sys",
- "wasm-bindgen",
-]
 
 [[package]]
 name = "group"
@@ -3971,7 +3949,6 @@ checksum = "1edc8929d7499fc4e8f0be2262a241556cfc54a0bea223790e71446f2aab1ef5"
 dependencies = [
  "cfg-if",
  "once_cell",
- "rustversion",
  "wasm-bindgen-macro",
 ]
 

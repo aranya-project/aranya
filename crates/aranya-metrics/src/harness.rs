@@ -25,7 +25,7 @@ pub struct ProcessMetricsCollector {
     /// Config options for the current run
     config: MetricsConfig,
     /// All child process PIDs for tracking
-    child_pids: Vec<u32>,
+    pids: Vec<u32>,
     /// System struct for sysinfo fallback
     system: System,
     /// Collection start time for rate calculations
@@ -89,12 +89,12 @@ struct SingleProcessMetrics {
 
 impl ProcessMetricsCollector {
     /// Create a new instance to collect process metrics.
-    pub fn new(config: MetricsConfig, child_pids: Vec<u32>) -> Self {
+    pub fn new(config: MetricsConfig, pids: Vec<u32>) -> Self {
         Self::register_metrics();
 
         Self {
             config,
-            child_pids,
+            pids,
             system: System::default(),
             _start_time: Instant::now(),
             total_metrics: AggregatedMetrics::default(),
@@ -188,16 +188,17 @@ impl ProcessMetricsCollector {
             process_count: 0,
         };
 
-        // Collect metrics for the current process
-        self.collect_process_metrics(std::process::id(), &mut metrics)?;
-
-        for &pid in self.child_pids.clone().iter() {
+        let mut removals = Vec::with_capacity(self.pids.len());
+        for (index, &pid) in self.pids.clone().iter().enumerate() {
             if let Err(e) = self.collect_process_metrics(pid, &mut metrics) {
-                warn!("Failed to collect metrics for child PID {pid}: {e}");
+                warn!("Failed to collect metrics for PID {pid}: {e}");
+                removals.push(index);
             }
         }
 
-        metrics.process_count = 1 + self.child_pids.len();
+        self.pids.retain(|&pid| !removals.contains(&(pid as usize)));
+
+        metrics.process_count = self.pids.len();
 
         Ok(metrics)
     }

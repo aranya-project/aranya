@@ -22,6 +22,12 @@ criteria = "safe-to-deploy"
 delta = "0.1.83 -> 0.1.87"
 
 [[audits.backon]]
+who = "nikki-aranya <npoelma@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "1.5.1"
+notes = "Changes since 1.2.0 include additional documentation, a handful of refactoring, better comments, a couple new fields for e.g. RNG, a couple new feature flags, and some additional tests."
+
+[[audits.backon]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-run"
 delta = "1.3.0 -> 1.4.0"
