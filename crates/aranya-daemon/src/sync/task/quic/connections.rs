@@ -25,7 +25,6 @@ pub(super) struct MutexGuard<'a, T: ?Sized> {
     guard: sync::MutexGuard<'a, T>,
 }
 
-#[allow(clippy::expect_used, reason = "channel closed")]
 impl MutexGuard<'_, ConnectionMap> {
     /// Inserts a QUIC connection into the map.
     ///
@@ -50,6 +49,7 @@ impl MutexGuard<'_, ConnectionMap> {
     /// # Panics
     ///
     /// Panics if the internal connection update channel is closed.
+    #[allow(clippy::expect_used, reason = "channel closed")]
     pub(super) async fn insert(
         &mut self,
         key: ConnectionKey,

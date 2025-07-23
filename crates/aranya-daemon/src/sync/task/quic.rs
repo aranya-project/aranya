@@ -234,6 +234,8 @@ impl Syncer<State> {
 
                 let (conn, inserted) = conn_map_guard.insert(key, conn).await;
                 if !inserted {
+                    // Note(Steve): This shouldn't be reached because the map
+                    // is still locked until `conn_map_guard` is dropped
                     debug!("New connection wasn't inserted. A healthy connection was found")
                 }
 
@@ -257,7 +259,7 @@ impl Syncer<State> {
             }
             // Other errors means the stream has closed
             Err(e) => {
-                self.state.conns.lock().await.remove(key).await;
+                conn_map_guard.remove(key).await;
                 return Err(SyncError::QuicSync(e.into()));
             }
         };
