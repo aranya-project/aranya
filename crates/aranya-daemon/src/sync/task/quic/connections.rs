@@ -20,12 +20,12 @@ use crate::sync::task::quic::ConnectionKey;
 pub(crate) type ConnectionUpdate = (ConnectionKey, StreamAcceptor);
 type ConnectionMap = BTreeMap<ConnectionKey, Handle>;
 
-pub(super) struct MutexGuard<'a, T: ?Sized> {
+pub(super) struct MutexGuard<'a> {
     tx: mpsc::Sender<ConnectionUpdate>,
-    guard: sync::MutexGuard<'a, T>,
+    guard: sync::MutexGuard<'a, ConnectionMap>,
 }
 
-impl MutexGuard<'_, ConnectionMap> {
+impl MutexGuard<'_> {
     /// Inserts a QUIC connection into the map.
     ///
     /// Splits the connection into a handle and stream acceptor. If a connection already exists
@@ -92,8 +92,8 @@ impl MutexGuard<'_, ConnectionMap> {
     }
 }
 
-impl<'a, T> Deref for MutexGuard<'a, T> {
-    type Target = sync::MutexGuard<'a, T>;
+impl<'a> Deref for MutexGuard<'a> {
+    type Target = sync::MutexGuard<'a, ConnectionMap>;
 
     fn deref(&self) -> &Self::Target {
         &self.guard
@@ -120,7 +120,7 @@ impl SharedConnectionMap {
     }
 
     #[inline]
-    pub(super) async fn lock(&self) -> MutexGuard<'_, ConnectionMap> {
+    pub(super) async fn lock(&self) -> MutexGuard<'_> {
         let guard = self.data.lock().await;
         MutexGuard {
             guard,
