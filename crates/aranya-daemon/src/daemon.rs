@@ -13,7 +13,7 @@ use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, StorageProvider,
 };
-use aranya_util::{error::ReportExt as _, Addr};
+use aranya_util::{ready, Addr};
 use bimap::BiBTreeMap;
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
@@ -279,26 +279,27 @@ impl Daemon {
     }
 
     /// The daemon's entrypoint.
-    pub fn spawn(mut self) -> DaemonHandle {
+    pub async fn spawn(self) -> Result<DaemonHandle, ready::WaitError> {
         let _guard = self.span.enter();
         let mut set = JoinSet::new();
+        let waiter = ready::Waiter::new(3);
         set.spawn(
             self.sync_server
-                .serve()
+                .serve(waiter.notifier())
                 .instrument(info_span!("sync-server")),
         );
+        set.spawn({
+            self.syncer
+                .run(waiter.notifier())
+                .instrument(info_span!("syncer"))
+        });
         set.spawn(
-            async move {
-                loop {
-                    if let Err(err) = self.syncer.next().await {
-                        error!(error = %err.report(), "unable to sync with peer");
-                    }
-                }
-            }
-            .instrument(info_span!("syncer")),
+            self.api
+                .serve(waiter.notifier())
+                .instrument(info_span!("api-server")),
         );
-        set.spawn(self.api.serve().instrument(info_span!("api-server")));
-        DaemonHandle { set }
+        waiter.wait().await?;
+        Ok(DaemonHandle { set })
     }
 
     /// Initializes the environment (creates directories, etc.).
@@ -529,8 +530,11 @@ mod tests {
             .await
             .expect("should be able to load `Daemon`");
 
-        time::timeout(Duration::from_secs(1), daemon.spawn().join())
-            .await
-            .expect_err("`Timeout` should return Elapsed");
+        time::timeout(
+            Duration::from_secs(1),
+            daemon.spawn().await.expect("startup").join(),
+        )
+        .await
+        .expect_err("`Timeout` should return Elapsed");
     }
 }

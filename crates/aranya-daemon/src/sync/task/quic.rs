@@ -23,6 +23,7 @@ use aranya_runtime::{
 };
 use aranya_util::{
     error::ReportExt as _,
+    ready,
     rustls::{NoCertResolver, SkipServerVerification},
     task::scope,
     Addr,
@@ -92,13 +93,21 @@ impl From<Infallible> for Error {
     }
 }
 
+/// Unique key for a connection with a peer.
+/// Each team/graph is synced over a different QUIC connection so a team-specific PSK can be used.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct ConnectionKey {
+    addr: Addr,
+    id: GraphId,
+}
+
 /// QUIC syncer state used for sending sync requests and processing sync responses
 #[derive(Debug)]
 pub struct State {
     /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: QuicClient,
     /// Address -> Connection map to lookup existing connections before creating a new connection.
-    conns: BTreeMap<Addr, Connection>,
+    conns: BTreeMap<ConnectionKey, Connection>,
     /// PSK store shared between the daemon API server and QUIC syncer client and server.
     /// This store is modified by [`crate::api::DaemonApiServer`].
     store: Arc<PskStore>,
@@ -122,7 +131,7 @@ impl SyncState for State {
         syncer.state.store.set_team(id.into_id().into());
 
         let stream = syncer
-            .connect(peer)
+            .connect(peer, id)
             .await
             .inspect_err(|e| error!(error = %e.report(), "Could not create connection"))?;
         // TODO: spawn a task for send/recv?
@@ -179,14 +188,15 @@ where {
 
 impl Syncer<State> {
     #[instrument(skip_all)]
-    async fn connect(&mut self, peer: &Addr) -> SyncResult<BidirectionalStream> {
+    async fn connect(&mut self, peer: &Addr, id: GraphId) -> SyncResult<BidirectionalStream> {
         debug!("client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
         let conns = &mut self.state.conns;
         let client = &self.state.client;
 
-        let conn = match conns.entry(*peer) {
+        let key = ConnectionKey { addr: *peer, id };
+        let conn = match conns.entry(key) {
             Entry::Occupied(entry) => {
                 debug!("Client is able to re-use existing QUIC connection");
                 entry.into_mut()
@@ -230,7 +240,7 @@ impl Syncer<State> {
             }
             // Other errors means the stream has closed
             Err(e) => {
-                conns.remove(peer);
+                conns.remove(&key);
                 return Err(SyncError::QuicSync(e.into()));
             }
         };
@@ -412,8 +422,10 @@ where
 
     /// Begins accepting incoming requests.
     #[instrument(skip_all, fields(addr = ?self.local_addr()))]
-    pub async fn serve(mut self) {
+    pub async fn serve(mut self, ready: ready::Notifier) {
         info!("QUIC sync server listening for incoming connections");
+
+        ready.notify();
 
         scope(async |s| {
             // Accept incoming QUIC connections
