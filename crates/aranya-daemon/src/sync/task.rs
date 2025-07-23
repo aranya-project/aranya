@@ -24,7 +24,11 @@ use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{instrument, trace, warn};
 
 use super::Result as SyncResult;
-use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs};
+use crate::{
+    daemon::{Client, EF},
+    vm_policy::VecSink,
+    InvalidGraphs,
+};
 
 pub mod quic;
 
@@ -151,19 +155,19 @@ pub type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
 #[derive(Debug)]
 pub struct Syncer<ST> {
-    /// The Aranya client.
-    client: crate::aranya::Client<crate::EN, crate::SP>,
+    /// Aranya client to allow syncing the Aranya graph with another peer.
+    pub client: Client,
     /// Keeps track of peer info.
     peers: HashMap<SyncPeer, (SyncPeerConfig, Key)>,
-    /// Receives requests from [`SyncPeers`].
+    /// Receives added/removed peers.
     recv: mpsc::Receiver<Request>,
-    /// Handles delay queue of next sync times for peers.
+    /// Delay queue for getting the next peer to sync with.
     delays: DelayQueue<SyncPeer>,
-    /// Sends effects to the daemon.
+    /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
-    /// Handles invalidated graphs.
+    /// Keeps track of invalid graphs due to finalization errors.
     invalid: InvalidGraphs,
-    /// Additional state used by the syncer
+    /// Additional state used by the syncer.
     state: ST,
     /// Sync server address.
     server_addr: Addr,
