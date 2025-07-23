@@ -230,12 +230,12 @@ struct DemoContext {
 }
 
 async fn setup_demo(team_name: &str) -> Result<(Vec<u32>, DemoContext)> {
-    let daemon_path = {
-        let mut args = env::args();
-        args.next(); // skip executable name
-        let exe_path = args.next().context("missing `daemon` executable path")?;
-        PathBuf::from(exe_path)
-    };
+    let daemon_path = PathBuf::from(
+        env::args()
+            .skip(1)
+            .next()
+            .context("missing `daemon` executable path")?,
+    );
 
     // TODO(nikki): move TeamId here?
 
