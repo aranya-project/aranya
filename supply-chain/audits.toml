@@ -262,12 +262,6 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.38.42 -> 0.38.44"
 
-[[audits.rustls]]
-who = "Ben Zimmerman <bzimmerman@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.23.26@git:648a02550dd319360664f9af79862716be2879ff"
-importable = false
-
 [[audits.rustversion]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
