@@ -162,7 +162,7 @@ pub struct Syncer<ST> {
     /// Receives added/removed peers.
     recv: mpsc::Receiver<Request>,
     /// Delay queue for getting the next peer to sync with.
-    delays: DelayQueue<SyncPeer>,
+    queue: DelayQueue<SyncPeer>,
     /// Used to send effects to the API to be processed.
     send_effects: EffectSender,
     /// Keeps track of invalid graphs due to finalization errors.
@@ -193,9 +193,9 @@ pub trait SyncState: Sized {
 }
 
 impl<ST> Syncer<ST> {
-    /// Creates a new [`Syncer`] and [`SyncPeers`] pair.
+    /// Creates a new [`Syncer`].
     pub(crate) fn new(
-        client: crate::aranya::Client<crate::EN, crate::SP>,
+        client: Client,
         send_effects: EffectSender,
         invalid: InvalidGraphs,
         state: ST,
@@ -209,7 +209,7 @@ impl<ST> Syncer<ST> {
                 client,
                 peers: HashMap::new(),
                 recv,
-                delays: DelayQueue::new(),
+                queue: DelayQueue::new(),
                 send_effects,
                 invalid,
                 state,
@@ -222,16 +222,16 @@ impl<ST> Syncer<ST> {
 
     /// Add a peer to the delay queue, overwriting an existing one.
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
-        let new_key = self.delays.insert(peer.clone(), cfg.interval);
+        let new_key = self.queue.insert(peer.clone(), cfg.interval);
         if let Some((_, old_key)) = self.peers.insert(peer, (cfg, new_key)) {
-            self.delays.remove(&old_key);
+            self.queue.remove(&old_key);
         }
     }
 
     /// Remove a peer from the delay queue.
     fn remove_peer(&mut self, peer: SyncPeer) {
         if let Some((_, key)) = self.peers.remove(&peer) {
-            self.delays.remove(&key);
+            self.queue.remove(&key);
         }
     }
 }
@@ -268,10 +268,10 @@ impl<ST: SyncState> Syncer<ST> {
                 }
             }
             // get next peer from delay queue.
-            Some(expired) = self.delays.next() => {
+            Some(expired) = self.queue.next() => {
                 let peer = expired.into_inner();
                 let (cfg, key) = self.peers.get_mut(&peer).assume("peer must exist")?;
-                *key = self.delays.insert(peer.clone(), cfg.interval);
+                *key = self.queue.insert(peer.clone(), cfg.interval);
                 // sync with peer.
                 self.sync(&peer).await?;
             }
@@ -293,7 +293,7 @@ impl<ST: SyncState> Syncer<ST> {
                     self.peers.retain(|p, (_, key)| {
                         let keep = p.graph_id != peer.graph_id;
                         if !keep {
-                            self.delays.remove(key);
+                            self.queue.remove(key);
                         }
                         keep
                     });
