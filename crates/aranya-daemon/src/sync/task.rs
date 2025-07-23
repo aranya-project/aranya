@@ -24,11 +24,7 @@ use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{instrument, trace, warn};
 
 use super::Result as SyncResult;
-use crate::{
-    daemon::{Client, EF},
-    vm_policy::VecSink,
-    InvalidGraphs,
-};
+use crate::{daemon::EF, vm_policy::VecSink, InvalidGraphs};
 
 pub mod quic;
 
@@ -50,9 +46,8 @@ enum Msg {
 type Request = (Msg, oneshot::Sender<Reply>);
 type Reply = SyncResult<()>;
 
-/// Sync Peer
-///
-/// Uniquely identifies a sync peer, consisting of
+/// A sync peer.
+/// Contains the information needed to sync with a single peer:
 /// - network address
 /// - Aranya graph id
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
@@ -195,7 +190,7 @@ pub trait SyncState: Sized {
 
 impl<ST> Syncer<ST> {
     /// Creates a new [`Syncer`] and [`SyncPeers`] pair.
-    pub fn new(
+    pub(crate) fn new(
         client: crate::aranya::Client<crate::EN, crate::SP>,
         send_effects: EffectSender,
         invalid: InvalidGraphs,
@@ -320,11 +315,13 @@ impl<ST: SyncState> Syncer<ST> {
         self.caches.clone()
     }
 
+    /// Returns a reference to the Aranya client.
     #[cfg(test)]
     pub fn client(&self) -> &crate::aranya::Client<crate::EN, crate::SP> {
         &self.client
     }
 
+    /// Returns a mutable reference to the Aranya client.
     #[cfg(test)]
     pub fn client_mut(&mut self) -> &mut crate::aranya::Client<crate::EN, crate::SP> {
         &mut self.client
