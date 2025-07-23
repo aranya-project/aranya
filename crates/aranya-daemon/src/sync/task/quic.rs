@@ -32,15 +32,11 @@ use s2n_quic::provider::tls::rustls::rustls::{
     server::PresharedKeySelection, ClientConfig, ServerConfig,
 };
 use s2n_quic::{
-    client::Connect,
-    connection::{Error as ConnErr, StreamAcceptor},
-    provider::{
+    application::Error as AppError, client::Connect, connection::{Error as ConnErr, StreamAcceptor}, provider::{
         congestion_controller::Bbr,
         tls::rustls::{self as rustls_provider, rustls::server::SelectsPresharedKeys},
         StartError,
-    },
-    stream::{BidirectionalStream, ReceiveStream, SendStream},
-    Client as QuicClient, Server as QuicServer,
+    }, stream::{BidirectionalStream, ReceiveStream, SendStream}, Client as QuicClient, Server as QuicServer
 };
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::mpsc;
@@ -473,18 +469,22 @@ where
                         debug!("received incoming QUIC connection");
                         let Ok(active_team) = self.active_team_rx.try_recv() else {
                             warn!("no active team for accepted connection");
+                            // TODO: Use appropriate error code
+                            conn.close(AppError::UNKNOWN);
                             continue;
                         };
 
                         let Ok(peer) = conn.remote_addr().inspect_err(|err| {
                             error!(error = %err.report(), "unable to get peer address from connection");
                         }) else {
+                            // TODO: Use appropriate error code
+                            conn.close(AppError::UNKNOWN);
                             continue;
                         };
 
                         let mut conn_map_guard = self.conns.lock().await;
                         let key = ConnectionKey {
-                            addr: peer.into(),
+                            addr: peer,
                             id: active_team.into_id().into(),
                         };
                         let _ = conn_map_guard.insert(key, conn).await;
