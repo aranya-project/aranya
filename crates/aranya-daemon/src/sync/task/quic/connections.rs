@@ -47,7 +47,6 @@ impl MutexGuard<'_> {
     /// # Returns
     ///
     /// * `&mut Handle` - Mutable reference to the connection handle
-    /// * `bool` - `true` if new connection was inserted, `false` if existing connection was reused
     ///
     /// # Note
     ///
@@ -57,11 +56,7 @@ impl MutexGuard<'_> {
     ///
     /// Panics if the internal connection update channel is closed.
     #[allow(clippy::expect_used, reason = "channel closed")]
-    pub(super) async fn insert(
-        &mut self,
-        key: ConnectionKey,
-        conn: Connection,
-    ) -> (&mut Handle, bool) {
+    pub(super) async fn insert(&mut self, key: ConnectionKey, conn: Connection) -> &mut Handle {
         let (new_handle, acceptor) = conn.split();
 
         let (handle, inserted) = match self.guard.entry(key) {
@@ -83,7 +78,7 @@ impl MutexGuard<'_> {
             self.tx.send((key, acceptor)).await.expect("channel closed");
         }
 
-        (handle, inserted)
+        handle
     }
 
     pub(super) async fn remove(&mut self, key: ConnectionKey) {

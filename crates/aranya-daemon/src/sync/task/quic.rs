@@ -257,14 +257,7 @@ impl Syncer<State> {
                 conn.keep_alive(true).map_err(Error::from)?;
                 debug!("created new quic connection");
 
-                let (conn, inserted) = conn_map_guard.insert(key, conn).await;
-                if !inserted {
-                    // Note(Steve): This shouldn't be reached because the map
-                    // is still locked until `conn_map_guard` is dropped
-                    debug!("New connection wasn't inserted. A healthy connection was found")
-                }
-
-                conn
+                conn_map_guard.insert(key, conn).await
             }
         };
 
