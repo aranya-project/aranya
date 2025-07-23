@@ -232,7 +232,6 @@ impl Syncer<State> {
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
         let mut conn_map_guard = self.state.conns.lock().await;
-        let client = &self.state.client;
 
         let addr = tokio::net::lookup_host(peer.to_socket_addrs())
             .await
@@ -241,33 +240,24 @@ impl Syncer<State> {
             .context("could not resolve peer address")?;
 
         let key = ConnectionKey { addr, id };
+        let client = &self.state.client;
 
-        let conn_ref = match conn_map_guard.get_mut(&key) {
-            Some(conn) => {
-                debug!("Client is able to re-use existing QUIC connection");
-                conn
-            }
-            None => {
-                debug!("existing QUIC connection not found");
-
-                // Note: cert is not used but server name must be set to connect.
-                debug!("attempting to create new quic connection");
-
-                let mut conn = client
+        let handle = conn_map_guard
+            .get_or_try_insert_with(key, async || {
+                client
                     .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
                     .await
-                    .map_err(Error::from)?;
-
-                conn.keep_alive(true).map_err(Error::from)?;
-                debug!("created new quic connection");
-
-                conn_map_guard.insert(key, conn).await?
-            }
-        };
+                    .and_then(|mut conn| match conn.keep_alive(true) {
+                        Ok(_) => Ok(conn),
+                        Err(e) => Err(e),
+                    })
+                    .map_err(Error::from)
+            })
+            .await?;
 
         debug!("client connected to QUIC sync server");
 
-        let open_stream_res = conn_ref
+        let open_stream_res = handle
             .open_bidirectional_stream()
             .await
             .inspect_err(|e| error!(error = %e.report(), "unable to open bidi stream"));
@@ -473,7 +463,7 @@ where
             loop {
                 tokio::select! {
                     // Accept incoming QUIC connections.
-                    Some(conn) = self.server.accept() => {
+                    Some(mut conn) = self.server.accept() => {
                         debug!("received incoming QUIC connection");
                         let Ok(active_team) = self.active_team_rx.try_recv() else {
                             warn!("no active team for accepted connection");
@@ -490,12 +480,19 @@ where
                             continue;
                         };
 
+                        if let Err(err) = conn.keep_alive(true) {
+                            warn!(err = %err.report(), "unable to keep connection alive");
+
+                            // TODO: Use appropriate error code
+                            conn.close(AppError::UNKNOWN);
+                        }
+
                         let mut conn_map_guard = self.conns.lock().await;
                         let key = ConnectionKey {
                             addr: peer,
                             id: active_team.into_id().into(),
                         };
-                        let _ = conn_map_guard.insert(key, conn).await;
+                        let _ = conn_map_guard.get_or_try_insert_with(key, async || Ok(conn)).await;
                     },
                     // Handle new connections inserted in the map
                     Some((key, acceptor)) = self.conn_rx.recv() => {
