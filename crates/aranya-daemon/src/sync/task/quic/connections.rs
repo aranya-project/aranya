@@ -1,5 +1,7 @@
 //! This modules contains a map for storing persistent QUIC connections between pairs of sync peers.
-//! Once a connection has been opened, it is shared between the QUIC syncer client and server.
+//! The [connection map][SharedConnectionMap] allows the sync client and server to share existing connections by providing
+//! the client access to a mutable connection [handle][Handle]. The corresponding [stream acceptor][StreamAcceptor],
+//! that's used by the sync server, is sent over a channel when new connections are inserted in the map.
 
 use std::{
     collections::{btree_map::Entry, BTreeMap},
@@ -27,6 +29,8 @@ pub(crate) struct ConnectionKey {
     pub(crate) id: GraphId,
 }
 
+/// A mutex guard that provides exclusive access to the [connection map][SharedConnectionMap]
+/// with a [sender][mpsc::Sender] for sending [updates][ConnectionUpdate].
 pub(super) struct MutexGuard<'a> {
     tx: mpsc::Sender<ConnectionUpdate>,
     guard: sync::MutexGuard<'a, ConnectionMap>,
@@ -55,7 +59,6 @@ impl MutexGuard<'_> {
     /// # Panics
     ///
     /// Panics if the internal connection update channel is closed.
-    #[allow(clippy::expect_used, reason = "channel closed")]
     pub(super) async fn insert(
         &mut self,
         key: ConnectionKey,
@@ -88,6 +91,7 @@ impl MutexGuard<'_> {
         Ok(handle)
     }
 
+    /// Removes a connection from the map and closes it.
     pub(super) async fn remove(&mut self, key: ConnectionKey) {
         if let Some(existing_conn) = self.guard.remove(&key) {
             // TODO: Use appropriate error code
@@ -109,6 +113,9 @@ impl<'a> Deref for MutexGuard<'a> {
     }
 }
 
+/// Thread-safe map for sharing QUIC connections between sync peers.
+///
+/// This map stores persistent QUIC connections indexed by [`ConnectionKey`].
 #[derive(Debug)]
 pub(crate) struct SharedConnectionMap {
     data: Mutex<BTreeMap<ConnectionKey, Handle>>,

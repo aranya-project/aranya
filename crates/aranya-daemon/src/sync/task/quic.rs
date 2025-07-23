@@ -530,7 +530,7 @@ where
             };
             debug!("received incoming QUIC stream");
             if let Err(err) = Self::sync(client.clone(), peer, stream, &active_team).await {
-                error!(error = %err.report(), "server unable to sync with peer");
+                error!(error = %err.report(), "server unable to respond to sync request from peer");
                 return;
             }
         }
