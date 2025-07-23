@@ -32,11 +32,16 @@ use s2n_quic::provider::tls::rustls::rustls::{
     server::PresharedKeySelection, ClientConfig, ServerConfig,
 };
 use s2n_quic::{
-    application::Error as AppError, client::Connect, connection::{Error as ConnErr, StreamAcceptor}, provider::{
+    application::Error as AppError,
+    client::Connect,
+    connection::{Error as ConnErr, StreamAcceptor},
+    provider::{
         congestion_controller::Bbr,
         tls::rustls::{self as rustls_provider, rustls::server::SelectsPresharedKeys},
         StartError,
-    }, stream::{BidirectionalStream, ReceiveStream, SendStream}, Client as QuicClient, Server as QuicServer
+    },
+    stream::{BidirectionalStream, ReceiveStream, SendStream},
+    Client as QuicClient, Server as QuicServer,
 };
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::sync::mpsc;
@@ -75,6 +80,9 @@ pub enum Error {
     /// Invalid PSK used for syncing
     #[error("invalid PSK used when attempting to sync")]
     InvalidPSK,
+    /// Channel Closed Error
+    #[error("Connection update channel was closed")]
+    ChannelClosed,
     /// QUIC client endpoint start error
     #[error("could not start QUIC client")]
     ClientStart(#[source] StartError),
@@ -253,7 +261,7 @@ impl Syncer<State> {
                 conn.keep_alive(true).map_err(Error::from)?;
                 debug!("created new quic connection");
 
-                conn_map_guard.insert(key, conn).await
+                conn_map_guard.insert(key, conn).await?
             }
         };
 
