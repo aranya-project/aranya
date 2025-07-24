@@ -170,7 +170,7 @@ impl MutexGuard<'_> {
                 // TODO: Use appropriate error code
                 handle.close(AppError::UNKNOWN);
 
-                return Err(e.into());
+                Err(e)
             }
         }
     }
