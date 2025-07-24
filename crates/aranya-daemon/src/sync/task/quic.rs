@@ -499,7 +499,7 @@ where
             anyhow::Ok(())
         }
         .unwrap_or_else(move |err| {
-            error!(error = ?err, "TODO");
+            error!(error = ?err, "server unable to accept connection");
             handle.close(AppError::UNKNOWN);
         })
     }
