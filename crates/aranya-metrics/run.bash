@@ -28,8 +28,5 @@ cleanup() {
 trap 'cleanup' EXIT
 trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
 
-cd crates/aranya-metrics
-
 echo "Running metrics collection..."
-cd ../..
 CONFIG_PATH=crates/aranya-metrics/metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
