@@ -37,6 +37,6 @@ fn daemon_startup() -> Result<()> {
     };
 
     let rt = Runtime::new()?;
-    let _daemon = rt.block_on(Daemon::load(cfg))?;
+    let _daemon = rt.block_on(Daemon::load(cfg).await?.spawn())?;
     Ok(())
 }
