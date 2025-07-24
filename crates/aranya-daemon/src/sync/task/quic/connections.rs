@@ -5,7 +5,7 @@
 
 use std::{
     collections::{btree_map::Entry, BTreeMap},
-    ops::Deref,
+    net::SocketAddr,
 };
 
 use aranya_runtime::GraphId;
@@ -26,7 +26,7 @@ type ConnectionMap = BTreeMap<ConnectionKey, Handle>;
 /// Each team/graph is synced over a different QUIC connection so a team-specific PSK can be used.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct ConnectionKey {
-    pub(crate) addr: super::SocketAddr,
+    pub(crate) addr: SocketAddr,
     pub(crate) id: GraphId,
 }
 
@@ -93,12 +93,9 @@ impl MutexGuard<'_> {
 
         if let Some(acceptor) = maybe_acceptor {
             debug!("created new quic connection");
-            Self::send(self.tx.clone(), (key, acceptor), handle)
-                .await
-                .map_err(Into::into)
-        } else {
-            Ok(handle)
+            self.tx.send((key, acceptor)).await.ok();
         }
+        Ok(handle)
     }
 
     /// Attempts to insert a QUIC connection into the map, failing if an open connection exists.
@@ -122,20 +119,18 @@ impl MutexGuard<'_> {
     ///
     /// * [`TryInsertError::Occupied`] - If an open connection already exists for the key
     /// * [`TryInsertError::ChannelClosed`] - If the internal connection update channel is closed
-    pub(super) async fn try_insert(
-        &mut self,
-        key: ConnectionKey,
-        conn: Connection,
-    ) -> Result<&mut Handle, TryInsertError> {
+    pub(super) async fn insert(&mut self, key: ConnectionKey, conn: Connection) -> &mut Handle {
         let (handle, acceptor) = match self.guard.entry(key) {
             Entry::Occupied(mut entry) => {
                 debug!("existing QUIC connection found");
 
                 if entry.get_mut().ping().is_ok() {
-                    return Err(TryInsertError::Occupied(conn));
+                    debug!(connection_key = ?key, "Closing the connection because an open connection was already found");
+                    conn.close(AppError::UNKNOWN);
+                    return entry.into_mut();
                 } else {
                     let (handle, acceptor) = conn.split();
-                    let _ = entry.insert(handle);
+                    entry.insert(handle);
                     (entry.into_mut(), acceptor)
                 }
             }
@@ -148,39 +143,9 @@ impl MutexGuard<'_> {
         };
 
         debug!("created new quic connection");
-        Self::send(self.tx.clone(), (key, acceptor), handle)
-            .await
-            .map_err(Into::into)
-    }
+        self.tx.send((key, acceptor)).await.ok();
 
-    /// Sends a connection update over the channel, closing the connection on failure.
-    async fn send(
-        sender: mpsc::Sender<ConnectionUpdate>,
-        (key, acceptor): ConnectionUpdate,
-        handle: &mut Handle,
-    ) -> Result<&mut Handle, ChannelClosedError> {
-        let send_result = sender
-            .send((key, acceptor))
-            .await
-            .map_err(|_| ChannelClosedError);
-
-        match send_result {
-            Ok(_) => Ok(handle),
-            Err(e) => {
-                // TODO: Use appropriate error code
-                handle.close(AppError::UNKNOWN);
-
-                Err(e)
-            }
-        }
-    }
-}
-
-impl<'a> Deref for MutexGuard<'a> {
-    type Target = sync::MutexGuard<'a, ConnectionMap>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.guard
+        handle
     }
 }
 
@@ -214,18 +179,4 @@ impl SharedConnectionMap {
             tx: self.tx.clone(),
         }
     }
-}
-
-/// New connection could not be inserted into the map due to the channel being closed.
-#[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, thiserror::Error)]
-#[error("connection update channel was closed")]
-pub struct ChannelClosedError;
-
-/// The error returned by [try_insert][MutexGuard::try_insert].
-#[derive(Debug, thiserror::Error)]
-pub enum TryInsertError {
-    #[error("Failed to a insert a new conneection into the map because an open connection already exists.")]
-    Occupied(Connection),
-    #[error(transparent)]
-    ChannelClosed(#[from] ChannelClosedError),
 }
