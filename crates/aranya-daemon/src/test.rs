@@ -53,30 +53,30 @@ use crate::{
 };
 
 // Aranya graph client for testing.
-pub type TestClient =
+type TestClient =
     aranya::Client<PolicyEngine<DefaultEngine, Store>, LinearStorageProvider<FileManager>>;
 
 type TestState = sync::task::quic::State;
 // Aranya sync client for testing.
-pub type TestSyncer = sync::task::Syncer<TestState>;
+type TestSyncer = sync::task::Syncer<TestState>;
 
 // Aranya sync server for testing.
-pub type TestServer = sync::task::quic::Server<
+type TestServer = sync::task::quic::Server<
     PolicyEngine<DefaultEngine, Store>,
     LinearStorageProvider<FileManager>,
 >;
 
-pub struct TestDevice {
+struct TestDevice {
     /// Aranya sync client.
-    pub syncer: TestSyncer,
+    syncer: TestSyncer,
     /// The Aranya graph ID.
-    pub graph_id: GraphId,
+    graph_id: GraphId,
     /// The address that the sync server is listening on.
-    pub sync_local_addr: Addr,
+    sync_local_addr: Addr,
     /// Aborts the server task.
     handle: AbortHandle,
     /// Public keys
-    pub pk: PublicKeys<DefaultCipherSuite>,
+    pk: PublicKeys<DefaultCipherSuite>,
     effect_recv: Receiver<(GraphId, Vec<Effect>)>,
 }
 
@@ -84,7 +84,7 @@ impl TestDevice {
     pub fn new(
         client: TestClient,
         server: TestServer,
-        local_addr: Addr,
+        sync_local_addr: Addr,
         pk: PublicKeys<DefaultCipherSuite>,
         graph_id: GraphId,
         psk_store: Arc<PskStore>,
@@ -93,7 +93,6 @@ impl TestDevice {
         let waiter = ready::Waiter::new(1);
         let notifier = waiter.notifier();
         let handle = task::spawn(async { server.serve(notifier).await }).abort_handle();
-        waiter.wait().await?;
         let (send_effects, effect_recv) = mpsc::channel(1);
         let (syncer, _sync_peers) = TestSyncer::new(
             client,
@@ -106,7 +105,7 @@ impl TestDevice {
         Ok(Self {
             syncer,
             graph_id,
-            local_addr,
+            sync_local_addr,
             handle,
             pk,
             effect_recv,
@@ -125,9 +124,9 @@ impl TestDevice {
     ) -> Result<Vec<Effect>> {
         let cmd_count = self
             .syncer
-            .sync(&SyncPeer::new(device.local_addr, self.graph_id))
+            .sync(&SyncPeer::new(device.sync_local_addr, self.graph_id))
             .await
-            .with_context(|| format!("unable to sync with peer at {}", device.local_addr))?;
+            .with_context(|| format!("unable to sync with peer at {}", device.sync_local_addr))?;
         if let Some(must_receive) = must_receive {
             assert_eq!(cmd_count, must_receive);
         }
@@ -171,12 +170,12 @@ impl DerefMut for TestDevice {
     }
 }
 
-pub struct TestTeam<'a> {
-    pub owner: &'a mut TestDevice,
-    pub admin: &'a mut TestDevice,
-    pub operator: &'a mut TestDevice,
-    pub membera: &'a mut TestDevice,
-    pub memberb: &'a mut TestDevice,
+struct TestTeam<'a> {
+    owner: &'a mut TestDevice,
+    admin: &'a mut TestDevice,
+    operator: &'a mut TestDevice,
+    membera: &'a mut TestDevice,
+    memberb: &'a mut TestDevice,
 }
 
 impl<'a> TestTeam<'a> {
@@ -196,7 +195,7 @@ impl<'a> TestTeam<'a> {
     }
 }
 
-pub struct TestCtx {
+struct TestCtx {
     /// The working directory for the test.
     dir: TempDir,
     // Per-client ID.
@@ -349,7 +348,7 @@ impl TestCtx {
 
         let admin_caches = admin.syncer.get_peer_caches();
         let owner_key = PeerCacheKey {
-            addr: owner.local_addr,
+            addr: owner.sync_local_addr,
             id: admin.graph_id,
         };
         let admin_cache_size = admin_caches

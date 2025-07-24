@@ -132,7 +132,7 @@ type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 
 /// Key for looking up syncer peer cache in map.
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
-pub(crate) struct PeerCacheKey {
+pub struct PeerCacheKey {
     /// The peer address.
     pub addr: Addr,
     /// The Aranya graph ID.
@@ -324,7 +324,7 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Get peer caches.
     #[cfg(test)]
-    pub fn get_peer_caches(&self) -> PeerCacheMap {
+    pub(crate) fn get_peer_caches(&self) -> PeerCacheMap {
         self.caches.clone()
     }
 
