@@ -96,8 +96,62 @@ impl MutexGuard<'_> {
             self.tx
                 .send((key, acceptor))
                 .await
-                .map_err(|_| super::Error::ChannelClosed)?;
+                .map_err(|_| ChannelClosedError)?;
         }
+
+        Ok(handle)
+    }
+
+    /// Attempts to insert a QUIC connection into the map, failing if an open connection exists.
+    ///
+    /// Checks if a connection already exists for the key. If found and still alive via ping,
+    /// returns an error with the original connection. If found but closed, replaces it with the
+    /// new connection. If no connection exists, inserts the new one. Sends a [`ConnectionUpdate`]
+    /// when a connection is successfully inserted.
+    ///
+    /// # Parameters
+    ///
+    /// * `key` - The [`ConnectionKey`] that uniquely identifies the connection pair
+    /// * `conn` - The [`Connection`] to insert
+    ///
+    /// # Returns
+    ///
+    /// * `&mut Handle` - Mutable reference to the connection handle
+    ///
+    /// # Errors
+    ///
+    /// * [`TryInsertError::Occupied`] - If an open connection already exists for the key
+    /// * [`TryInsertError::ChannelClosed`] - If the internal connection update channel is closed
+    pub(super) async fn try_insert(
+        &mut self,
+        key: ConnectionKey,
+        conn: Connection,
+    ) -> Result<&mut Handle, TryInsertError> {
+        let (handle, acceptor) = match self.guard.entry(key) {
+            Entry::Occupied(mut entry) => {
+                debug!("existing QUIC connection found");
+
+                if entry.get_mut().ping().is_ok() {
+                    return Err(TryInsertError::Occupied(conn));
+                } else {
+                    let (handle, acceptor) = conn.split();
+                    let _ = entry.insert(handle);
+                    (entry.into_mut(), acceptor)
+                }
+            }
+            Entry::Vacant(entry) => {
+                debug!("existing QUIC connection not found");
+                let (handle, acceptor) = conn.split();
+
+                (entry.insert(handle), acceptor)
+            }
+        };
+
+        debug!("created new quic connection");
+        self.tx
+            .send((key, acceptor))
+            .await
+            .map_err(|_| ChannelClosedError)?;
 
         Ok(handle)
     }
@@ -141,4 +195,18 @@ impl SharedConnectionMap {
             tx: self.tx.clone(),
         }
     }
+}
+
+/// New connection could not be inserted into the map due to the channel being closed.
+#[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, thiserror::Error)]
+#[error("connection update channel was closed")]
+pub struct ChannelClosedError;
+
+/// The error returned by [try_insert][MutexGuard::try_insert].
+#[derive(Debug, thiserror::Error)]
+pub enum TryInsertError {
+    #[error("Failed to a insert a new conneection into the map because an open connection already exists.")]
+    Occupied(Connection),
+    #[error(transparent)]
+    ChannelClosed(#[from] ChannelClosedError),
 }

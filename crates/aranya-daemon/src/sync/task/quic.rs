@@ -81,8 +81,8 @@ pub enum Error {
     #[error("invalid PSK used when attempting to sync")]
     InvalidPSK,
     /// Channel Closed Error
-    #[error("Connection update channel was closed")]
-    ChannelClosed,
+    #[error(transparent)]
+    ChannelClosed(#[from] connections::ChannelClosedError),
     /// QUIC client endpoint start error
     #[error("could not start QUIC client")]
     ClientStart(#[source] StartError),
@@ -492,7 +492,20 @@ where
                             addr: peer,
                             id: active_team.into_id().into(),
                         };
-                        let _ = conn_map_guard.get_or_try_insert_with(key, async || Ok(conn)).await;
+                        if let Err(err) = conn_map_guard.try_insert(key, conn).await {
+                            use connections::TryInsertError::*;
+                            match err {
+                                ChannelClosed(err) => {
+                                    error!(error = %err.report());
+                                }
+                                Occupied(conn) => {
+                                    debug!(connection_key = ?key, "Closing the incoming connection because an open connection was already found");
+                                    // TODO: Use appropriate error code
+                                    conn.close(AppError::UNKNOWN);
+                                }
+                            }
+
+                        }
                     },
                     // Handle new connections inserted in the map
                     Some((key, acceptor)) = self.conn_rx.recv() => {
