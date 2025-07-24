@@ -25,7 +25,7 @@ pub struct ProcessMetricsCollector {
     /// Config options for the current run
     config: MetricsConfig,
     /// All child process PIDs for tracking
-    pids: Vec<u32>,
+    pids: Vec<(&'static str, u32)>,
     /// System struct for sysinfo fallback
     system: System,
     /// Collection start time for rate calculations
@@ -89,7 +89,7 @@ struct SingleProcessMetrics {
 
 impl ProcessMetricsCollector {
     /// Create a new instance to collect process metrics.
-    pub fn new(config: MetricsConfig, pids: Vec<u32>) -> Self {
+    pub fn new(config: MetricsConfig, pids: Vec<(&'static str, u32)>) -> Self {
         Self::register_metrics();
 
         Self {
@@ -160,7 +160,7 @@ impl ProcessMetricsCollector {
 
         match self.config.debug_logs {
             DebugLogType::None => (),
-            _ => debug!("Total Metrics: {:?}", self.total_metrics),
+            _ => debug!("Total Metrics (cumulative): {:?}", self.total_metrics),
         }
 
         // Push those values to our backend
@@ -191,12 +191,12 @@ impl ProcessMetricsCollector {
         let mut removals = Vec::with_capacity(self.pids.len());
         for (index, &pid) in self.pids.clone().iter().enumerate() {
             if let Err(e) = self.collect_process_metrics(pid, &mut metrics) {
-                warn!("Failed to collect metrics for PID {pid}: {e}");
+                warn!("Failed to collect metrics for \"{}\", PID {}: {e}", pid.0, pid.1);
                 removals.push(index);
             }
         }
 
-        self.pids.retain(|&pid| !removals.contains(&(pid as usize)));
+        self.pids.retain(|&pid| !removals.contains(&(pid.1 as usize)));
 
         metrics.process_count = self.pids.len();
 
@@ -205,13 +205,13 @@ impl ProcessMetricsCollector {
 
     /// Collects metrics for a specific process, using a number of syscalls.
     #[cfg(target_os = "macos")]
-    fn collect_process_metrics(&mut self, pid: u32, metrics: &mut AggregatedMetrics) -> Result<()> {
+    fn collect_process_metrics(&mut self, pid: (&'static str, u32), metrics: &mut AggregatedMetrics) -> Result<()> {
         // First, let's collect metrics for the individual process.
         let mut process_metrics = SingleProcessMetrics::default();
 
         // Collect what we can using native syscalls, and fall back to sysinfo for disk stats.
-        self.collect_native_macos_metrics(pid, &mut process_metrics)?;
-        self.collect_sysinfo_disk_metrics(pid, &mut process_metrics)?;
+        self.collect_native_macos_metrics(pid.1, &mut process_metrics)?;
+        self.collect_sysinfo_disk_metrics(pid.1, &mut process_metrics)?;
 
         // Aggregate this process's metrics towards the total.
         metrics.total_cpu_user_time_us += process_metrics.cpu_user_time_us;
@@ -221,7 +221,7 @@ impl ProcessMetricsCollector {
         metrics.total_disk_write_bytes += process_metrics.disk_write_bytes;
 
         if let DebugLogType::PerProcess = self.config.debug_logs {
-            debug!("PID {pid} Process Metrics: {process_metrics:?}");
+            debug!("Process Metrics (last tick) for \"{}\", PID {}: {process_metrics:?}", pid.0, pid.1);
         }
 
         Ok(())
