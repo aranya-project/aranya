@@ -93,6 +93,7 @@ impl TestDevice {
         let waiter = ready::Waiter::new(1);
         let notifier = waiter.notifier();
         let handle = task::spawn(async { server.serve(notifier).await }).abort_handle();
+        waiter.wait().await?;
         let (send_effects, effect_recv) = mpsc::channel(1);
         let (syncer, _sync_peers) = TestSyncer::new(
             client,
