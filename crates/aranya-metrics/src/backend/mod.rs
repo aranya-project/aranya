@@ -4,7 +4,7 @@
 //! The currently supported backends are:
 //! * [Prometheus], using either [Prometheus](https://prometheus.io/) scraping, or a `pushgateway`.
 //! * [Datadog] using [DogStatsD], provided as a service as part of a Datadog Agent.
-//! * [TCP Server], used for more advanced metrics collection and processing, sent using [`protobuf`].
+//! * [TCP Server], a lightweight TCP server for more customized metrics collection and processing, sent using [`protobuf`].
 //!
 //! [Prometheus]: https://docs.rs/metrics-exporter-prometheus/
 //! [DataDog]: https://docs.rs/metrics-exporter-dogstatsd/
