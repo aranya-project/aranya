@@ -15,6 +15,7 @@ echo "Starting pushgateway..."
 pushgateway &
 PUSHGATEWAY_PID=$!
 
+# Wait for `pushgateway` server endpoint
 for i in {1..24}; do
     if curl -s http://localhost:9091/metrics >/dev/null 2>&1; then
         break
