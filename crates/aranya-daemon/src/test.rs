@@ -71,8 +71,8 @@ pub struct TestDevice {
     pub syncer: TestSyncer,
     /// The Aranya graph ID.
     pub graph_id: GraphId,
-    /// The address that the server is listening on.
-    pub local_addr: Addr,
+    /// The address that the sync server is listening on.
+    pub sync_local_addr: Addr,
     /// Aborts the server task.
     handle: AbortHandle,
     /// Public keys
