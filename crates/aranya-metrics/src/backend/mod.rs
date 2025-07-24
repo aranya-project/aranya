@@ -14,7 +14,6 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
-use serde::Deserialize;
 
 pub mod datadog;
 pub mod prometheus;
@@ -24,7 +23,7 @@ pub mod tcp_server;
 ///
 /// [`interval`]: MetricsConfig::interval
 /// [`tracing::debug!()`]: tracing::debug
-#[derive(Debug, Default, Clone, Deserialize)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum DebugLogType {
     /// Turns off metrics logging for the current run.
@@ -37,7 +36,7 @@ pub enum DebugLogType {
 }
 
 /// Configuration info used to report metrics to a remote server, as well as logging metrics.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct MetricsConfig {
     /// The method used to export metrics to a remote server.
@@ -88,7 +87,7 @@ impl Default for MetricsConfig {
 }
 
 /// Defines which remote backend to configure and send metrics to.
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub enum MetricsMode {
     /// Uses the Prometheus exporter to collect data. Depending on the mode, Prometheus will either
     /// scrape data every [`interval`], or has data pushed to it every [`interval`].

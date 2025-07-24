@@ -232,8 +232,7 @@ struct DemoContext {
 async fn setup_demo(team_name: &str) -> Result<(Vec<(&str, u32)>, DemoContext)> {
     let daemon_path = PathBuf::from(
         env::args()
-            .skip(1)
-            .next()
+            .nth(1)
             .context("missing `daemon` executable path")?,
     );
 

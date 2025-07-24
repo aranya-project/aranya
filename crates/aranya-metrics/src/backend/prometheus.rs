@@ -8,35 +8,23 @@ use std::{net::SocketAddr, num::NonZeroU32, path::PathBuf, time::Duration};
 use anyhow::{Context as _, Result};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_util::MetricKindMask;
-use serde::Deserialize;
 use tracing::info;
 
 /// Configuration info for the Prometheus exporter.
-///
-/// This includes:
-/// * The current mode (either exporting to Prometheus via Unix Domain Socket or normal HTTP, or
-///   using a pushgateway that syncs with Prometheus)
-/// * The timeout for a metric before it stops being logged. For long running tasks, this is ideal
-///   to tune since it will give a nice cutoff after a specific task might have finished.
-/// * A whitelist of addresses allowed to connect to the exporter
-/// * The list of quantiles (0.0, 0.5, 0.9, 0.95, 0.99, 0.999, and 1.0) used when rendering
-///   histograms
-/// * The number and size of buckets, which allow for greater flexibility in Prometheus to derive
-///   quantiles
-/// * How often the upkeep task runs, which cleans out metrics that Prometheus has already scraped
-/// * A set of global labels that can be applied to all metrics
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct PrometheusConfig {
     /// The current mode that the Prometheus exporter is operating as.
     mode: PrometheusMode,
 
-    /// Sets the idle timeout for metrics.
+    /// Sets the idle timeout for metrics, which disables a specific metric if it hasn't been
+    /// updated in a specific amount of time.
     idle_timeout: (MetricsKindMask, Option<Duration>),
+
     /// Sets whether a unit suffix is added to metric names.
     enable_unit_suffix: bool,
 
-    /// Allows only certain addresses to access the scrape endpoint.
+    /// Acts as a whitelist to only certain addresses to access the scrape endpoint.
     allowed_addresses: Option<Vec<String>>,
     /// Sets the number of quantiles when rendering histograms.
     quantiles: Option<Vec<f64>>,
@@ -46,7 +34,8 @@ pub struct PrometheusConfig {
     bucket_duration: Option<Duration>,
     /// Sets the number of buckets kept in memory at one time.
     bucket_count: Option<NonZeroU32>,
-    /// Sets the interval that the upkeep task runs at.
+    /// Sets the interval that the upkeep task runs at, which cleans out metrics that Prometheus has
+    /// already scraped.
     upkeep_timeout: Option<Duration>,
     /// Sets global labels that are applied to all metrics.
     global_labels: Option<Vec<(String, String)>>,
@@ -161,7 +150,7 @@ impl Default for PrometheusConfig {
 }
 
 /// Defines the mode that the Prometheus exporter operates on (listener/gateway).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[allow(clippy::missing_docs_in_private_items)]
 enum PrometheusMode {
     /// Creates an HTTP listener using an HTTP address to scrape from.
@@ -169,6 +158,8 @@ enum PrometheusMode {
     /// Creates an HTTP listener using a UDS address to scrape from.
     UdsListener { addr: PathBuf },
     /// Tells the exporter to periodically push data to a push gateway.
+    ///
+    /// If a PushGateway server is hosted publicly, it should have a username and password.
     PushGateway {
         endpoint: String,
         username: Option<String>,
@@ -177,7 +168,7 @@ enum PrometheusMode {
     },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 enum MetricsKindMask {
     None = 0,
     Counter = 1,

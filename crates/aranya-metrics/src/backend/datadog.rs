@@ -12,21 +12,10 @@ use tracing::info;
 
 /// Configuration info for the DogStatsD exporter.
 ///
-/// This includes:
-/// * The address of the Datadog Agent to connect to
-/// * How long to try sending before metrics are dropped and the length of each payload trying to be
-///   sent
-/// * The aggregation mode used by the exporter to optimize what payloads are being sent
-/// * Optional prefixes and additional labels that can be attached to metrics being sent
-/// * Whether to enable additional telemetry, which lets the Datadog Agent see additional info about
-///   how the exporter is performing
-/// * Whether to use reservoir sampling to represent arbitrarily large data using a smaller array
-/// * Whether to forward histograms as distributions, which allows the Datadog Agent to process the
-///   data which allows for richer insights
-#[derive(Debug, Clone, serde::Deserialize)]
+/// Note that the current backend is always synchronous.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct DataDogConfig {
-    // Current backend is always synchronous, so we don't bother with it here.
     /// The remote address to send metrics to (UDP or UDS).
     remote_addr: String,
     /// Write timeout for forwarding metrics.
@@ -42,7 +31,8 @@ pub struct DataDogConfig {
     /// Sets global labels that are applied to all metrics.
     global_labels: Option<Vec<(String, String)>>,
 
-    /// Whether to enable telemetry for the exporter.
+    /// Whether to enable additional telemetry for the exporter, which lets the Datadog Agent see
+    /// info about how the exporter is performing.
     telemetry: bool,
     /// Whether to enable histogram sampling, which uses a reservoir to sample an arbitrarily large
     /// number of inputs using a const sized array.
@@ -134,7 +124,7 @@ impl DataDogConfig {
 }
 
 /// Defines the strategy used for aggregating data to send to the remote server.
-#[derive(Debug, Default, Clone, serde::Deserialize)]
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 pub enum AggregationMode {
     /// Updates are sent more frequently, but reduces network traffic by not sending timestamps.
     /// Data is flushed every 3 seconds by default.

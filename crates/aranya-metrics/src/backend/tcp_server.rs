@@ -2,7 +2,7 @@
 //!
 //! [`protobuf`]: https://protobuf.dev/
 
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 
 use anyhow::{Context as _, Result};
 use metrics_exporter_tcp::TcpBuilder;
@@ -10,9 +10,9 @@ use tracing::info;
 
 /// Configuration info for the TCP exporter/server.
 ///
-/// This includes the address to listen for TCP connections on, as well as the internal buffer size
-/// used when sending protobuf data to any connected clients.
-#[derive(Debug, Clone, serde::Deserialize)]
+/// This works by encoding metrics using `protobuf` and sending them over TCP, so if encryption is a
+/// concern, this should currently be avoided.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 pub struct TcpConfig {
     /// The address to listen on for TCP connections.
@@ -24,7 +24,7 @@ pub struct TcpConfig {
 impl Default for TcpConfig {
     fn default() -> Self {
         Self {
-            listen_addr: SocketAddr::from(([0, 0, 0, 0], 5000)),
+            listen_addr: SocketAddr::from((Ipv4Addr::LOCALHOST, 5000)),
             buffer_size: Some(1024),
         }
     }

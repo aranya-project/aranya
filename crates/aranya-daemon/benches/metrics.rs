@@ -17,6 +17,7 @@ fn main() {
 }
 
 // NOTE: divan currently requires sync functions to work, so we spawn a runtime and block on async.
+/// Benchmarks how long the daemon takes to set itself up to be spawned.
 #[divan::bench]
 fn daemon_startup() -> Result<()> {
     let work_dir = tempfile::tempdir()?.path().to_path_buf();
@@ -30,13 +31,13 @@ fn daemon_startup() -> Result<()> {
         config_dir: work_dir.join("config"),
         sync: SyncConfig {
             quic: Toggle::Enabled(QuicSyncConfig {
-                addr: Addr::from((Ipv4Addr::UNSPECIFIED, 0)),
+                addr: Addr::from((Ipv4Addr::LOCALHOST, 0)),
             }),
         },
         aqc: Toggle::Enabled(AqcConfig {}),
     };
 
     let rt = Runtime::new()?;
-    let _daemon = rt.block_on(Daemon::load(cfg).await?.spawn())?;
+    let _daemon = rt.block_on(Daemon::load(cfg))?;
     Ok(())
 }

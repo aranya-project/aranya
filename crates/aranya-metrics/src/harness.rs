@@ -191,12 +191,16 @@ impl ProcessMetricsCollector {
         let mut removals = Vec::with_capacity(self.pids.len());
         for (index, &pid) in self.pids.clone().iter().enumerate() {
             if let Err(e) = self.collect_process_metrics(pid, &mut metrics) {
-                warn!("Failed to collect metrics for \"{}\", PID {}: {e}", pid.0, pid.1);
+                warn!(
+                    "Failed to collect metrics for \"{}\", PID {}: {e}",
+                    pid.0, pid.1
+                );
                 removals.push(index);
             }
         }
 
-        self.pids.retain(|&pid| !removals.contains(&(pid.1 as usize)));
+        self.pids
+            .retain(|&pid| !removals.contains(&(pid.1 as usize)));
 
         metrics.process_count = self.pids.len();
 
@@ -205,7 +209,11 @@ impl ProcessMetricsCollector {
 
     /// Collects metrics for a specific process, using a number of syscalls.
     #[cfg(target_os = "macos")]
-    fn collect_process_metrics(&mut self, pid: (&'static str, u32), metrics: &mut AggregatedMetrics) -> Result<()> {
+    fn collect_process_metrics(
+        &mut self,
+        pid: (&'static str, u32),
+        metrics: &mut AggregatedMetrics,
+    ) -> Result<()> {
         // First, let's collect metrics for the individual process.
         let mut process_metrics = SingleProcessMetrics::default();
 
@@ -221,7 +229,10 @@ impl ProcessMetricsCollector {
         metrics.total_disk_write_bytes += process_metrics.disk_write_bytes;
 
         if let DebugLogType::PerProcess = self.config.debug_logs {
-            debug!("Process Metrics (last tick) for \"{}\", PID {}: {process_metrics:?}", pid.0, pid.1);
+            debug!(
+                "Process Metrics (last tick) for \"{}\", PID {}: {process_metrics:?}",
+                pid.0, pid.1
+            );
         }
 
         Ok(())
