@@ -148,7 +148,7 @@ impl PeerCacheKey {
 /// Thread-safe map of peer caches
 /// For a given peer, there's should only be one cache. If separate caches are used
 /// for the server and state it will reduce the efficiency of the syncer.
-pub type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
+pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
 
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
