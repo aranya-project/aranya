@@ -132,7 +132,7 @@ type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 
 /// Key for looking up syncer peer cache in map.
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
-pub struct PeerCacheKey {
+pub(crate) struct PeerCacheKey {
     /// The peer address.
     pub addr: Addr,
     /// The Aranya graph ID.
