@@ -50,7 +50,7 @@ impl MutexGuard<'_> {
     ///
     /// First checks if a connection already exists for the key. If found, verifies the connection
     /// is still alive via ping - reuses open connections and replaces closed ones. Sends a [`ConnectionUpdate`] when
-    /// a new connection is created.
+    /// a new connection is created. If the update cannot be sent, the newly created connection is closed.
     ///
     /// # Parameters
     ///
@@ -93,13 +93,12 @@ impl MutexGuard<'_> {
 
         if let Some(acceptor) = maybe_acceptor {
             debug!("created new quic connection");
-            self.tx
-                .send((key, acceptor))
+            Self::send(self.tx.clone(), (key, acceptor), handle)
                 .await
-                .map_err(|_| ChannelClosedError)?;
+                .map_err(Into::into)
+        } else {
+            Ok(handle)
         }
-
-        Ok(handle)
     }
 
     /// Attempts to insert a QUIC connection into the map, failing if an open connection exists.
@@ -107,7 +106,8 @@ impl MutexGuard<'_> {
     /// Checks if a connection already exists for the key. If found and still alive via ping,
     /// returns an error with the original connection. If found but closed, replaces it with the
     /// new connection. If no connection exists, inserts the new one. Sends a [`ConnectionUpdate`]
-    /// when a connection is successfully inserted.
+    /// when a connection is successfully inserted. If the update cannot be sent, the newly
+    /// inserted connection is closed.
     ///
     /// # Parameters
     ///
@@ -148,12 +148,31 @@ impl MutexGuard<'_> {
         };
 
         debug!("created new quic connection");
-        self.tx
+        Self::send(self.tx.clone(), (key, acceptor), handle)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Sends a connection update over the channel, closing the connection on failure.
+    async fn send(
+        sender: mpsc::Sender<ConnectionUpdate>,
+        (key, acceptor): ConnectionUpdate,
+        handle: &mut Handle,
+    ) -> Result<&mut Handle, ChannelClosedError> {
+        let send_result = sender
             .send((key, acceptor))
             .await
-            .map_err(|_| ChannelClosedError)?;
+            .map_err(|_| ChannelClosedError);
 
-        Ok(handle)
+        match send_result {
+            Ok(_) => Ok(handle),
+            Err(e) => {
+                // TODO: Use appropriate error code
+                handle.close(AppError::UNKNOWN);
+
+                return Err(e.into());
+            }
+        }
     }
 }
 
