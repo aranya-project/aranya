@@ -108,7 +108,7 @@ pub struct State {
     /// QUIC client to make sync requests to another peer's sync server and handle sync responses.
     client: QuicClient,
     /// Address -> Connection map to lookup existing connections before creating a new connection.
-    conns: Arc<SharedConnectionMap>,
+    conns: SharedConnectionMap,
     /// PSK store shared between the daemon API server and QUIC syncer client and server.
     /// This store is modified by [`crate::api::DaemonApiServer`].
     store: Arc<PskStore>,
@@ -160,7 +160,7 @@ impl SyncState for State {
 
 impl State {
     /// Creates a new instance
-    fn new(psk_store: Arc<PskStore>, conns: Arc<SharedConnectionMap>) -> SyncResult<Self> {
+    fn new(psk_store: Arc<PskStore>, conns: SharedConnectionMap) -> SyncResult<Self> {
         // Create client config (INSECURE: skips server cert verification)
         let mut client_config = ClientConfig::builder()
             .dangerous()
@@ -198,15 +198,14 @@ impl Syncer<State> {
     ) -> SyncResult<(
         Self,
         SyncPeers,
-        Arc<SharedConnectionMap>,
+        SharedConnectionMap,
         mpsc::Receiver<ConnectionUpdate>,
     )> {
         let (send, recv) = mpsc::channel::<Request>(128);
         let peers = SyncPeers::new(send);
 
         let (conns, conn_rx) = SharedConnectionMap::new();
-        let conns = Arc::new(conns);
-        let state = State::new(psk_store, Arc::clone(&conns))?;
+        let state = State::new(psk_store, conns.clone())?;
 
         Ok((
             Self {
@@ -229,7 +228,6 @@ impl Syncer<State> {
         debug!("client connecting to QUIC sync server");
         // Check if there is an existing connection with the peer.
         // If not, create a new connection.
-        let mut conn_map_guard = self.state.conns.lock().await;
 
         let addr = tokio::net::lookup_host(peer.to_socket_addrs())
             .await
@@ -240,7 +238,9 @@ impl Syncer<State> {
         let key = ConnectionKey { addr, id };
         let client = &self.state.client;
 
-        let handle = conn_map_guard
+        let mut handle = self
+            .state
+            .conns
             .get_or_try_insert_with(key, async || {
                 client
                     .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
@@ -269,7 +269,7 @@ impl Syncer<State> {
             }
             // Other errors means the stream has closed
             Err(e) => {
-                conn_map_guard.remove(key).await;
+                self.state.conns.remove(key, handle).await;
                 return Err(SyncError::QuicSync(e.into()));
             }
         };
@@ -381,7 +381,7 @@ pub struct Server<EN, SP> {
     /// Used to ensure that the chosen PSK corresponds to an incoming sync request.
     active_team_rx: mpsc::Receiver<TeamId>,
     /// Connection map shared with [`super::Syncer`]
-    conns: Arc<SharedConnectionMap>,
+    conns: SharedConnectionMap,
     /// Receives updates for connections inserted into the [connection map][`Self::conns`].
     conn_rx: mpsc::Receiver<ConnectionUpdate>,
 }
@@ -411,7 +411,7 @@ where
         aranya: AranyaClient<EN, SP>,
         addr: &Addr,
         server_keys: Arc<dyn SelectsPresharedKeys>,
-        conns: Arc<SharedConnectionMap>,
+        conns: SharedConnectionMap,
         conn_rx: mpsc::Receiver<ConnectionUpdate>,
         active_team_rx: mpsc::Receiver<TeamId>,
     ) -> SyncResult<Self> {
@@ -495,7 +495,7 @@ where
                 addr: peer,
                 id: active_team.into_id().into(),
             };
-            self.conns.lock().await.insert(key, conn).await;
+            self.conns.insert(key, conn).await;
             anyhow::Ok(())
         }
         .unwrap_or_else(move |err| {
