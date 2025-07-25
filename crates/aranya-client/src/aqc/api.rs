@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 
 use aranya_daemon_api::{LabelId, NetIdentifier, TeamId};
 use tarpc::context;
-use tracing::{debug, instrument};
+use tracing::{debug, info, instrument};
 
 use super::{net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcSendChannel};
 use crate::{
@@ -16,11 +16,11 @@ use crate::{
 /// receiving data with peers.
 #[derive(Debug)]
 pub struct AqcChannels<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
 }
 
 impl<'a> AqcChannels<'a> {
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: &'a mut Client) -> Self {
         Self { client }
     }
 
@@ -127,35 +127,25 @@ impl<'a> AqcChannels<'a> {
 
     /// Deletes an AQC bidi channel.
     #[instrument(skip_all, fields(?chan))]
-    pub async fn delete_bidi_channel(&mut self, mut chan: AqcBidiChannel) -> crate::Result<()> {
-        // let _ctrl = self
-        //     .client
-        //     .daemon
-        //     .delete_aqc_bidi_channel(context::current(), chan.aqc_id().into_id().into())
-        //     .await
-        //     .map_err(IpcError::new)?
-        //     .map_err(aranya_error)?;
-        chan.close();
+    pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannel) -> crate::Result<()> {
+        self.client.aqc.delete_bidi_channel(chan).await;
         Ok(())
     }
 
     /// Deletes an AQC uni channel.
     #[instrument(skip_all, fields(?chan))]
-    pub async fn delete_uni_channel(&mut self, mut chan: AqcSendChannel) -> crate::Result<()> {
-        // let _ctrl = self
-        //     .client
-        //     .daemon
-        //     .delete_aqc_uni_channel(context::current(), chan.aqc_id().into_id().into())
-        //     .await
-        //     .map_err(IpcError::new)?
-        //     .map_err(aranya_error)?;
-        chan.close();
+    pub async fn delete_uni_channel(&mut self, chan: AqcSendChannel) -> crate::Result<()> {
+        self.client.aqc.delete_uni_channel(chan).await;
         Ok(())
     }
 
     /// Waits for a peer to create an AQC channel with this client.
     pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
-        self.client.aqc.receive_channel().await
+        info!("receive_channel");
+        let chan = self.client.aqc.receive_channel().await?;
+        info!("received channel");
+
+        Ok(chan)
     }
 
     /// Receive the next available channel.

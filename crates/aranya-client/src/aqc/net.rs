@@ -9,7 +9,7 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
-use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
+use aranya_crypto::aqc::{BidiChannelId, UniChannelId, UniPskId};
 use aranya_daemon_api::{
     AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
 };
@@ -46,6 +46,7 @@ pub mod channels;
 const ALPN_AQC: &[u8] = b"aqc-v1";
 
 /// An AQC client. Used to create and receive channels.
+// TODO: query daemon to see if active AQC channels are invalid. Delete invalid channels.
 #[derive(Debug)]
 pub(crate) struct AqcClient {
     /// Local address of `quic_client`.
@@ -80,6 +81,7 @@ struct ClientState {
 
 impl ClientState {
     fn connect_ctrl(&mut self, addr: SocketAddr) -> s2n_quic::client::ConnectionAttempt {
+        debug!("connect ctrl");
         self.client_keys.set_key(CTRL_PSK.clone());
         self.quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
@@ -90,9 +92,19 @@ impl ClientState {
         addr: SocketAddr,
         psks: AqcPsks,
     ) -> s2n_quic::client::ConnectionAttempt {
+        debug!("connect data");
         self.client_keys.load_psks(psks);
         self.quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
+    }
+
+    fn zeroize_psks(&mut self, identities: &[PskIdentity]) {
+        debug!("zeroizing client psks");
+        self.client_keys.zeroize_psks(identities);
+    }
+
+    fn clear(&mut self) {
+        self.client_keys.clear();
     }
 }
 
@@ -105,7 +117,7 @@ struct ServerState {
 }
 
 /// Identity of a preshared key.
-type PskIdentity = Vec<u8>;
+pub type PskIdentity = Vec<u8>;
 
 impl AqcClient {
     pub async fn new(server_addr: SocketAddr, daemon: DaemonApiClient) -> Result<Self, AqcError> {
@@ -191,18 +203,43 @@ impl AqcClient {
         psks: AqcUniPsks,
     ) -> Result<channels::AqcSendChannel, AqcError> {
         let channel_id = UniChannelId::from(*psks.channel_id());
-        let mut conn = self
+        let Ok(mut conn) = self
             .client_state
             .lock()
             .await
-            .connect_data(addr, AqcPsks::Uni(psks))
-            .await?;
+            .connect_data(addr, AqcPsks::Uni(psks.clone()))
+            .await
+        else {
+            error!("connection closed");
+            let identities: Vec<PskIdentity> = psks
+                .into_iter()
+                .map(|(_, p)| p.identity.as_bytes().to_vec())
+                .collect();
+            self.client_state.lock().await.zeroize_psks(&identities);
+            return Err(AqcError::ConnectionClosed);
+        };
         conn.keep_alive(true)?;
+        debug!("getting psk identities");
+        let identities: Vec<UniPskId> = psks.into_iter().map(|(_, psk)| psk.identity).collect();
+        debug!("got psk identities");
         Ok(channels::AqcSendChannel::new(
             label_id,
             channel_id,
             conn.handle(),
+            identities,
         ))
+    }
+
+    /// Deletes a unidirectional channel.
+    pub async fn delete_uni_channel(&self, mut chan: channels::AqcSendChannel) {
+        debug!("uni channel zeroize psks");
+        let identities: Vec<PskIdentity> = chan
+            .identities()
+            .iter()
+            .map(|i| i.as_bytes().to_vec())
+            .collect();
+        self.zeroize_psks(identities).await;
+        chan.close();
     }
 
     /// Creates a new bidirectional channel to the given address.
@@ -213,26 +250,63 @@ impl AqcClient {
         psks: AqcBidiPsks,
     ) -> Result<channels::AqcBidiChannel, AqcError> {
         let channel_id = BidiChannelId::from(*psks.channel_id());
-        let mut conn = self
+        let Ok(mut conn) = self
             .client_state
             .lock()
             .await
-            .connect_data(addr, AqcPsks::Bidi(psks))
-            .await?;
+            .connect_data(addr, AqcPsks::Bidi(psks.clone()))
+            .await
+        else {
+            debug!("connection closed");
+            let identities: Vec<PskIdentity> = psks
+                .into_iter()
+                .map(|(_, p)| p.identity.as_bytes().to_vec())
+                .collect();
+            self.zeroize_psks(identities).await;
+            return Err(AqcError::ConnectionClosed);
+        };
         conn.keep_alive(true)?;
-        Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
+        debug!("fetching psk identities");
+        let identities: Vec<PskIdentity> = psks
+            .into_iter()
+            .map(|(_, psk)| psk.identity.as_bytes().to_vec())
+            .collect();
+        debug!("received psk identities");
+        Ok(channels::AqcBidiChannel::new(
+            label_id, channel_id, conn, identities,
+        ))
+    }
+
+    /// Deletes a bidirectional channel.
+    pub async fn delete_bidi_channel(&self, mut chan: channels::AqcBidiChannel) {
+        debug!("bidi channel zeroize psks");
+        self.zeroize_psks(chan.identities()).await;
+        chan.close();
+    }
+
+    /// Zeroize PSKs from client and server.
+    async fn zeroize_psks(&self, identities: Vec<PskIdentity>) {
+        debug!("zeroize client and server psks");
+        self.client_state.lock().await.zeroize_psks(&identities);
+        self.server_keys.zeroize_psks(&identities);
+        for identity in identities {
+            self.channels.write().expect("poisoned").remove(&identity);
+        }
     }
 
     /// Receive the next available channel.
-    pub async fn receive_channel(&self) -> crate::Result<AqcPeerChannel> {
-        let mut server_state = self.server_state.lock().await;
+    pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
         loop {
+            debug!("accept a new connection");
             // Accept a new connection
-            let mut conn = server_state
-                .quic_server
-                .accept()
-                .await
-                .ok_or(AqcError::ServerConnectionTerminated)?;
+            let mut server_state = self.server_state.lock().await;
+            let Some(mut conn) = server_state.quic_server.accept().await else {
+                error!("server connection terminated");
+                drop(server_state);
+                self.close().await;
+                return Err(crate::Error::Aqc(AqcError::ServerConnectionTerminated));
+            };
+            debug!("accepted connection");
             // Receive a PSK identity hint.
             // TODO: Instead of receiving the PSK identity hint here, we should
             // pull it directly from the connection.
@@ -244,11 +318,14 @@ impl AqcClient {
                 "Processing connection accepted after seeing PSK identity hint: {:02x?}",
                 identity
             );
+            debug!("received PSK identity hint");
             // If the PSK identity hint is the control PSK, receive a control message.
             // This will update the channel map with the PSK and associate it with an
             // AqcChannel.
             if identity == PSK_IDENTITY_CTRL {
+                debug!("receive ctrl message");
                 self.receive_ctrl_message(&mut conn).await?;
+                debug!("received ctrl message");
                 continue;
             }
             // If the PSK identity hint is not the control PSK, check if it's in the channel map.
@@ -266,6 +343,7 @@ impl AqcClient {
                 channel_info.label_id,
                 channel_info.channel_id,
                 conn,
+                identity,
             ));
         }
     }
@@ -274,7 +352,7 @@ impl AqcClient {
     ///
     /// If there is no channel available, return Empty.
     /// If the channel is closed, return Closed.
-    pub fn try_receive_channel(&self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
+    pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         let mut server_state = self
             .server_state
             .try_lock()
@@ -285,6 +363,8 @@ impl AqcClient {
             let mut conn = match server_state.quic_server.poll_accept(&mut cx) {
                 Poll::Ready(Some(conn)) => conn,
                 Poll::Ready(None) => {
+                    drop(server_state);
+                    futures_lite::future::block_on(self.close());
                     return Err(TryReceiveError::Error(
                         AqcError::ServerConnectionTerminated.into(),
                     ));
@@ -339,6 +419,7 @@ impl AqcClient {
                 channel_info.label_id,
                 channel_info.channel_id,
                 conn,
+                identity,
             ));
         }
     }
@@ -350,6 +431,7 @@ impl AqcClient {
         ctrl: AqcCtrl,
         team_id: TeamId,
     ) -> Result<(), AqcError> {
+        debug!("sending ctrl message");
         let mut conn = self.client_state.lock().await.connect_ctrl(addr).await?;
         let stream = conn.open_bidirectional_stream().await?;
         let (mut recv, mut send) = stream.split();
@@ -428,6 +510,21 @@ impl AqcClient {
         }
 
         Ok(())
+    }
+
+    /// Close the AQC client.
+    pub async fn close(&mut self) {
+        warn!("AQC client close");
+        self.channels.write().expect("poisoned").clear();
+        self.client_state.lock().await.clear();
+        self.server_keys.clear();
+    }
+}
+
+impl Drop for AqcClient {
+    fn drop(&mut self) {
+        warn!("dropping AQC client");
+        futures_lite::future::block_on(self.close());
     }
 }
 

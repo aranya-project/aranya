@@ -1,11 +1,11 @@
 use core::task::{Context, Poll, Waker};
 
-use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
+use aranya_crypto::aqc::{BidiChannelId, UniChannelId, UniPskId};
 use aranya_daemon_api::LabelId;
 use bytes::Bytes;
 
 use super::{AqcChannelId, TryReceiveError};
-use crate::error::AqcError;
+use crate::{aqc::net::PskIdentity, error::AqcError};
 
 mod s2n {
     pub use s2n_quic::{
@@ -25,18 +25,23 @@ pub enum AqcPeerChannel {
 }
 
 impl AqcPeerChannel {
-    pub(super) fn new(label_id: LabelId, channel_id: AqcChannelId, conn: s2n::Connection) -> Self {
+    pub(super) fn new(
+        label_id: LabelId,
+        channel_id: AqcChannelId,
+        conn: s2n::Connection,
+        identity: Vec<u8>,
+    ) -> Self {
         match channel_id {
             AqcChannelId::Bidi(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let channel = AqcBidiChannel::new(label_id, id, conn);
+                let channel = AqcBidiChannel::new(label_id, id, conn, vec![identity]);
                 AqcPeerChannel::Bidi(channel)
             }
             AqcChannelId::Uni(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let receiver = AqcReceiveChannel::new(label_id, id, conn);
+                let receiver = AqcReceiveChannel::new(label_id, id, conn, vec![identity]);
                 AqcPeerChannel::Receive(receiver)
             }
         }
@@ -50,18 +55,28 @@ pub struct AqcSendChannel {
     label_id: LabelId,
     handle: s2n::Handle,
     id: UniChannelId,
+    identities: Vec<UniPskId>,
 }
 
 impl AqcSendChannel {
-    /// Create a new channel with the given id and conection handle.
+    /// Create a new channel with the given id and connection handle.
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub(super) fn new(label_id: LabelId, id: UniChannelId, handle: s2n::Handle) -> Self {
+    pub(super) fn new<I>(
+        label_id: LabelId,
+        id: UniChannelId,
+        handle: s2n::Handle,
+        identities: I,
+    ) -> Self
+    where
+        I: IntoIterator<Item = UniPskId>,
+    {
         Self {
             label_id,
             id,
             handle,
+            identities: identities.into_iter().collect(),
         }
     }
 
@@ -73,6 +88,11 @@ impl AqcSendChannel {
     /// Get the channel id.
     pub fn aqc_id(&self) -> UniChannelId {
         self.id
+    }
+
+    /// Get PSK identities.
+    pub fn identities(&self) -> Vec<UniPskId> {
+        self.identities.clone()
     }
 
     /// Creates a new unidirectional stream for the channel.
@@ -101,6 +121,7 @@ pub struct AqcReceiveChannel {
     label_id: LabelId,
     aqc_id: UniChannelId,
     conn: s2n::Connection,
+    identities: Vec<PskIdentity>,
 }
 
 impl AqcReceiveChannel {
@@ -108,11 +129,20 @@ impl AqcReceiveChannel {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub(super) fn new(label_id: LabelId, aqc_id: UniChannelId, conn: s2n::Connection) -> Self {
+    pub(super) fn new<I>(
+        label_id: LabelId,
+        aqc_id: UniChannelId,
+        conn: s2n::Connection,
+        identities: I,
+    ) -> Self
+    where
+        I: IntoIterator<Item = Vec<u8>>,
+    {
         Self {
             label_id,
             aqc_id,
             conn,
+            identities: identities.into_iter().collect(),
         }
     }
 
@@ -126,11 +156,19 @@ impl AqcReceiveChannel {
         self.aqc_id
     }
 
+    /// Get PSK identities.
+    pub fn identities(&self) -> Vec<PskIdentity> {
+        self.identities.clone()
+    }
+
     /// Returns the next unidirectional stream.
     pub async fn receive_uni_stream(&mut self) -> Result<AqcReceiveStream, AqcError> {
         match self.conn.accept_receive_stream().await {
             Ok(Some(stream)) => Ok(AqcReceiveStream(stream)),
-            Ok(None) => Err(AqcError::ConnectionClosed),
+            Ok(None) => {
+                // TODO: send signal to `AqcClient`?
+                Err(AqcError::ConnectionClosed)
+            }
             Err(e) => Err(AqcError::ConnectionError(e)),
         }
     }
@@ -142,8 +180,14 @@ impl AqcReceiveChannel {
         let mut cx = Context::from_waker(Waker::noop());
         match self.conn.poll_accept_receive_stream(&mut cx) {
             Poll::Ready(Ok(Some(stream))) => Ok(AqcReceiveStream(stream)),
-            Poll::Ready(Ok(None)) => Err(TryReceiveError::Empty),
-            Poll::Ready(Err(e)) => Err(TryReceiveError::Error(AqcError::ConnectionError(e))),
+            Poll::Ready(Ok(None)) => {
+                // TODO: send signal to `AqcClient`?
+                Err(TryReceiveError::Error(AqcError::ConnectionClosed))
+            }
+            Poll::Ready(Err(e)) => {
+                // TODO: send signal to `AqcClient`?
+                Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
+            }
             Poll::Pending => Err(TryReceiveError::Empty),
         }
     }
@@ -156,15 +200,25 @@ pub struct AqcBidiChannel {
     label_id: LabelId,
     aqc_id: BidiChannelId,
     conn: s2n::Connection,
+    identities: Vec<PskIdentity>,
 }
 
 impl AqcBidiChannel {
     /// Create a new bidirectional channel with the given id and conection handle.
-    pub(super) fn new(label_id: LabelId, aqc_id: BidiChannelId, conn: s2n::Connection) -> Self {
+    pub(super) fn new<I>(
+        label_id: LabelId,
+        aqc_id: BidiChannelId,
+        conn: s2n::Connection,
+        identities: I,
+    ) -> Self
+    where
+        I: IntoIterator<Item = Vec<u8>>,
+    {
         Self {
             label_id,
             aqc_id,
             conn,
+            identities: identities.into_iter().collect(),
         }
     }
 
@@ -178,14 +232,27 @@ impl AqcBidiChannel {
         self.aqc_id
     }
 
+    /// Get PSK identities.
+    pub fn identities(&self) -> Vec<PskIdentity> {
+        self.identities.clone()
+    }
+
     /// Returns the next available stream.
     /// If the stream is bidirectional, return a tuple of the send and receive streams.
     /// If the stream is unidirectional, return a tuple of None and the receive stream.
     pub async fn receive_stream(&mut self) -> Result<AqcPeerStream, AqcError> {
         match self.conn.accept().await {
             Ok(Some(stream)) => Ok(AqcPeerStream::new(stream)),
-            Ok(None) => Err(AqcError::ConnectionClosed),
-            Err(e) => Err(AqcError::ConnectionError(e)),
+            Ok(None) => {
+                // TODO: send signal to `AqcClient`?
+                Err(AqcError::ConnectionClosed)
+            }
+            Err(e) => {
+                // An error occurred on the connection while trying to accept a stream.
+                // This likely means the connection is unusable for new streams.
+                // TODO: send signal to `AqcClient`?
+                Err(AqcError::ConnectionError(e))
+            }
         }
     }
 
@@ -199,11 +266,13 @@ impl AqcBidiChannel {
             Poll::Ready(Ok(Some(stream))) => Ok(AqcPeerStream::new(stream)),
             Poll::Ready(Ok(None)) => {
                 // Connection closed by peer, no more streams will be accepted.
+                // TODO: send signal to `AqcClient`?
                 Err(TryReceiveError::Error(AqcError::ConnectionClosed))
             }
             Poll::Ready(Err(e)) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
+                // TODO: send signal to `AqcClient`?
                 Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
             }
             Poll::Pending => {
