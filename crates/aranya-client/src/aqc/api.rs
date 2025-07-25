@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 
 use aranya_daemon_api::{LabelId, NetIdentifier, TeamId};
 use tarpc::context;
-use tracing::{debug, instrument};
+use tracing::{debug, info, instrument};
 
 use super::{net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcSendChannel};
 use crate::{
@@ -141,7 +141,11 @@ impl<'a> AqcChannels<'a> {
 
     /// Waits for a peer to create an AQC channel with this client.
     pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
-        self.client.aqc.receive_channel().await
+        info!("receive_channel");
+        let chan = self.client.aqc.receive_channel().await?;
+        info!("received channel");
+
+        Ok(chan)
     }
 
     /// Receive the next available channel.

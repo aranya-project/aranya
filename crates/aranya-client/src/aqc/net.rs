@@ -81,6 +81,7 @@ struct ClientState {
 
 impl ClientState {
     fn connect_ctrl(&mut self, addr: SocketAddr) -> s2n_quic::client::ConnectionAttempt {
+        debug!("connect ctrl");
         self.client_keys.set_key(CTRL_PSK.clone());
         self.quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
@@ -91,12 +92,14 @@ impl ClientState {
         addr: SocketAddr,
         psks: AqcPsks,
     ) -> s2n_quic::client::ConnectionAttempt {
+        debug!("connect data");
         self.client_keys.load_psks(psks);
         self.quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
     }
 
     fn zeroize_psks(&mut self, identities: &[PskIdentity]) {
+        debug!("zeroizing client psks");
         self.client_keys.zeroize_psks(identities);
     }
 
@@ -207,6 +210,7 @@ impl AqcClient {
             .connect_data(addr, AqcPsks::Uni(psks.clone()))
             .await
         else {
+            error!("connection closed");
             let identities: Vec<PskIdentity> = psks
                 .into_iter()
                 .map(|(_, p)| p.identity.as_bytes().to_vec())
@@ -215,7 +219,9 @@ impl AqcClient {
             return Err(AqcError::ConnectionClosed);
         };
         conn.keep_alive(true)?;
+        debug!("getting psk identities");
         let identities: Vec<UniPskId> = psks.into_iter().map(|(_, psk)| psk.identity).collect();
+        debug!("got psk identities");
         Ok(channels::AqcSendChannel::new(
             label_id,
             channel_id,
@@ -226,6 +232,7 @@ impl AqcClient {
 
     /// Deletes a unidirectional channel.
     pub async fn delete_uni_channel(&self, mut chan: channels::AqcSendChannel) {
+        debug!("uni channel zeroize psks");
         let identities: Vec<PskIdentity> = chan
             .identities()
             .iter()
@@ -250,6 +257,7 @@ impl AqcClient {
             .connect_data(addr, AqcPsks::Bidi(psks.clone()))
             .await
         else {
+            debug!("connection closed");
             let identities: Vec<PskIdentity> = psks
                 .into_iter()
                 .map(|(_, p)| p.identity.as_bytes().to_vec())
@@ -258,10 +266,12 @@ impl AqcClient {
             return Err(AqcError::ConnectionClosed);
         };
         conn.keep_alive(true)?;
+        debug!("fetching psk identities");
         let identities: Vec<PskIdentity> = psks
             .into_iter()
             .map(|(_, psk)| psk.identity.as_bytes().to_vec())
             .collect();
+        debug!("received psk identities");
         Ok(channels::AqcBidiChannel::new(
             label_id, channel_id, conn, identities,
         ))
@@ -269,12 +279,14 @@ impl AqcClient {
 
     /// Deletes a bidirectional channel.
     pub async fn delete_bidi_channel(&self, mut chan: channels::AqcBidiChannel) {
+        debug!("bidi channel zeroize psks");
         self.zeroize_psks(chan.identities()).await;
         chan.close();
     }
 
     /// Zeroize PSKs from client and server.
     async fn zeroize_psks(&self, identities: Vec<PskIdentity>) {
+        debug!("zeroize client and server psks");
         self.client_state.lock().await.zeroize_psks(&identities);
         self.server_keys.zeroize_psks(&identities);
         for identity in identities {
@@ -285,13 +297,16 @@ impl AqcClient {
     /// Receive the next available channel.
     pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
         loop {
+            debug!("accept a new connection");
             // Accept a new connection
             let mut server_state = self.server_state.lock().await;
             let Some(mut conn) = server_state.quic_server.accept().await else {
+                error!("server connection terminated");
                 drop(server_state);
                 self.close().await;
                 return Err(crate::Error::Aqc(AqcError::ServerConnectionTerminated));
             };
+            debug!("accepted connection");
             // Receive a PSK identity hint.
             // TODO: Instead of receiving the PSK identity hint here, we should
             // pull it directly from the connection.
@@ -303,11 +318,14 @@ impl AqcClient {
                 "Processing connection accepted after seeing PSK identity hint: {:02x?}",
                 identity
             );
+            debug!("received PSK identity hint");
             // If the PSK identity hint is the control PSK, receive a control message.
             // This will update the channel map with the PSK and associate it with an
             // AqcChannel.
             if identity == PSK_IDENTITY_CTRL {
+                debug!("receive ctrl message");
                 self.receive_ctrl_message(&mut conn).await?;
+                debug!("received ctrl message");
                 continue;
             }
             // If the PSK identity hint is not the control PSK, check if it's in the channel map.
@@ -413,6 +431,7 @@ impl AqcClient {
         ctrl: AqcCtrl,
         team_id: TeamId,
     ) -> Result<(), AqcError> {
+        debug!("sending ctrl message");
         let mut conn = self.client_state.lock().await.connect_ctrl(addr).await?;
         let stream = conn.open_bidirectional_stream().await?;
         let (mut recv, mut send) = stream.split();
@@ -495,6 +514,7 @@ impl AqcClient {
 
     /// Close the AQC client.
     pub async fn close(&mut self) {
+        warn!("AQC client close");
         self.channels.write().expect("poisoned").clear();
         self.client_state.lock().await.clear();
         self.server_keys.clear();
@@ -503,6 +523,7 @@ impl AqcClient {
 
 impl Drop for AqcClient {
     fn drop(&mut self) {
+        warn!("dropping AQC client");
         futures_lite::future::block_on(self.close());
     }
 }

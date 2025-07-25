@@ -13,6 +13,7 @@ use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::try_join, FutureExt};
 use tempfile::tempdir;
+use tracing::info;
 
 use crate::common::{sleep, DevicesCtx};
 
@@ -75,6 +76,7 @@ async fn test_aqc_chans() -> Result<()> {
         .await?;
 
     {
+        info!("creating bidi channel");
         let (mut bidi_chan1, peer_channel) = try_join(
             devices.membera.client.aqc().create_bidi_channel(
                 team_id,
@@ -85,6 +87,7 @@ async fn test_aqc_chans() -> Result<()> {
         )
         .await
         .expect("can create and receive channel");
+        info!("created bidi channel");
 
         let mut bidi_chan2 = match peer_channel {
             AqcPeerChannel::Bidi(channel) => channel,
@@ -162,6 +165,7 @@ async fn test_aqc_chans() -> Result<()> {
 
     {
         // membera creates aqc uni channel with memberb concurrently
+        info!("creating uni channel");
         let (mut uni_chan1, peer_channel) = try_join(
             devices.membera.client.aqc().create_uni_channel(
                 team_id,
@@ -172,6 +176,7 @@ async fn test_aqc_chans() -> Result<()> {
         )
         .await
         .expect("can create uni channel");
+        info!("created uni channel");
 
         let mut uni_chan2 = match peer_channel {
             AqcPeerChannel::Receive(receiver) => receiver,
@@ -191,6 +196,7 @@ async fn test_aqc_chans() -> Result<()> {
         let bytes = recv2_1.receive().await?.assume("no data received")?;
         assert_eq!(bytes, msg1);
 
+        info!("deleting uni channel");
         devices
             .membera
             .client
@@ -254,6 +260,7 @@ async fn test_aqc_chans() -> Result<()> {
         let bytes = recv2_1.receive().await?.assume("no data received")?;
         assert_eq!(bytes, msg1);
 
+        info!("deleting bidi channel");
         devices
             .membera
             .client

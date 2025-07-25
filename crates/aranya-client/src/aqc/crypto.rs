@@ -119,14 +119,11 @@ impl ClientPresharedKeys {
     }
 
     pub fn load_psks(&self, psks: AqcPsks) {
-        let psks = psks
-            .into_iter()
-            .map(|(suite, psk)| make_preshared_key(suite, psk))
-            .collect::<Option<Vec<_>>>()
-            .expect("can create psks");
-        let mut keys = self.keys.lock().expect("poisoined");
-        for psk in psks {
-            keys.insert(psk.identity().to_vec(), psk);
+        let mut keys = self.keys.lock().expect("poisoned");
+        for (suite, psk) in psks {
+            let identity = psk.identity().as_bytes().to_vec();
+            let key = make_preshared_key(suite, psk).expect("can make psk");
+            keys.insert(identity, key);
         }
     }
 
