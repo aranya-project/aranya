@@ -62,8 +62,12 @@ impl ServerPresharedKeys {
         }
     }
 
-    pub fn remove(&self, identity: Vec<u8>) {
-        self.keys.lock().expect("poisoned").remove(&identity);
+    pub fn zeroize_psks(&self, identities: &Vec<PskIdentity>) {
+        let mut keys = self.keys.lock().expect("poisoned");
+        for identity in identities {
+            // TODO: zeroize
+            keys.remove(identity);
+        }
     }
 
     pub fn load_psks(&self, psks: AqcPsks) {
@@ -73,6 +77,11 @@ impl ServerPresharedKeys {
             let key = make_preshared_key(suite, psk).expect("can make psk");
             keys.insert(identity, key);
         }
+    }
+
+    pub fn clear(&self) {
+        // TODO: zeroize
+        self.keys.lock().expect("poisoned").clear()
     }
 }
 
@@ -116,11 +125,25 @@ impl ClientPresharedKeys {
         *self.keys.lock().expect("poisoned") = keys;
     }
 
-    pub fn remove(&self, identity: PskIdentity) {
+    pub fn zeroize_psks(&self, identities: &Vec<PskIdentity>) {
+        // TODO: zeroize
+        for identity in identities {
+            self.remove(identity);
+        }
+    }
+
+    fn remove(&self, identity: &Vec<u8>) {
+        // TODO: zeroize
         let mut keys = self.keys.lock().expect("poisoned");
-        if let Some(index) = keys.iter().position(|v| v.identity().to_vec() == identity) {
+        // TODO: switch from vec to map for faster lookup.
+        if let Some(index) = keys.iter().position(|v| v.identity().to_vec() == *identity) {
             keys.swap_remove(index);
         }
+    }
+
+    pub fn clear(&self) {
+        // TODO: zeroize
+        self.keys.lock().expect("poisoned").clear()
     }
 }
 

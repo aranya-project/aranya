@@ -165,7 +165,10 @@ impl AqcReceiveChannel {
     pub async fn receive_uni_stream(&mut self) -> Result<AqcReceiveStream, AqcError> {
         match self.conn.accept_receive_stream().await {
             Ok(Some(stream)) => Ok(AqcReceiveStream(stream)),
-            Ok(None) => Err(AqcError::ConnectionClosed),
+            Ok(None) => {
+                // TODO: zeroize PSK/cert. Send signal to `AqcClient`?
+                Err(AqcError::ConnectionClosed)
+            }
             Err(e) => Err(AqcError::ConnectionError(e)),
         }
     }
@@ -177,8 +180,14 @@ impl AqcReceiveChannel {
         let mut cx = Context::from_waker(Waker::noop());
         match self.conn.poll_accept_receive_stream(&mut cx) {
             Poll::Ready(Ok(Some(stream))) => Ok(AqcReceiveStream(stream)),
-            Poll::Ready(Ok(None)) => Err(TryReceiveError::Empty),
-            Poll::Ready(Err(e)) => Err(TryReceiveError::Error(AqcError::ConnectionError(e))),
+            Poll::Ready(Ok(None)) => {
+                // TODO: zeroize PSK/cert. Send signal to `AqcClient`?
+                Err(TryReceiveError::Error(AqcError::ConnectionClosed))
+            }
+            Poll::Ready(Err(e)) => {
+                // TODO: zeroize PSK/cert. Send signal to `AqcClient`?
+                Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
+            }
             Poll::Pending => Err(TryReceiveError::Empty),
         }
     }
@@ -234,8 +243,16 @@ impl AqcBidiChannel {
     pub async fn receive_stream(&mut self) -> Result<AqcPeerStream, AqcError> {
         match self.conn.accept().await {
             Ok(Some(stream)) => Ok(AqcPeerStream::new(stream)),
-            Ok(None) => Err(AqcError::ConnectionClosed),
-            Err(e) => Err(AqcError::ConnectionError(e)),
+            Ok(None) => {
+                // TODO: zeroize PSK/cert and close connection. Send signal to `AqcClient`?
+                Err(AqcError::ConnectionClosed)
+            }
+            Err(e) => {
+                // An error occurred on the connection while trying to accept a stream.
+                // This likely means the connection is unusable for new streams.
+                // TODO: zeroize PSK/cert and close connection. Send signal to `AqcClient`?
+                Err(AqcError::ConnectionError(e))
+            }
         }
     }
 
@@ -249,11 +266,13 @@ impl AqcBidiChannel {
             Poll::Ready(Ok(Some(stream))) => Ok(AqcPeerStream::new(stream)),
             Poll::Ready(Ok(None)) => {
                 // Connection closed by peer, no more streams will be accepted.
+                // TODO: zeroize PSK/cert and close connection. Send signal to `AqcClient`?
                 Err(TryReceiveError::Error(AqcError::ConnectionClosed))
             }
             Poll::Ready(Err(e)) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
+                // TODO: zeroize PSK/cert and close connection. Send signal to `AqcClient`?
                 Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
             }
             Poll::Pending => {

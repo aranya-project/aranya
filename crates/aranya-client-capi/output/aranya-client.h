@@ -2677,7 +2677,7 @@ AranyaError aranya_aqc_receive_stream_cleanup_ext(struct AranyaAqcReceiveStream 
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_create_bidi_channel(const struct AranyaClient *client,
+AranyaError aranya_aqc_create_bidi_channel(struct AranyaClient *client,
                                            const struct AranyaTeamId *team,
                                            AranyaNetIdentifier peer,
                                            const struct AranyaLabelId *label_id,
@@ -2696,7 +2696,7 @@ AranyaError aranya_aqc_create_bidi_channel(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_create_bidi_channel_ext(const struct AranyaClient *client,
+AranyaError aranya_aqc_create_bidi_channel_ext(struct AranyaClient *client,
                                                const struct AranyaTeamId *team,
                                                AranyaNetIdentifier peer,
                                                const struct AranyaLabelId *label_id,
@@ -2716,7 +2716,7 @@ AranyaError aranya_aqc_create_bidi_channel_ext(const struct AranyaClient *client
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_create_uni_channel(const struct AranyaClient *client,
+AranyaError aranya_aqc_create_uni_channel(struct AranyaClient *client,
                                           const struct AranyaTeamId *team,
                                           AranyaNetIdentifier peer,
                                           const struct AranyaLabelId *label_id,
@@ -2735,7 +2735,7 @@ AranyaError aranya_aqc_create_uni_channel(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_create_uni_channel_ext(const struct AranyaClient *client,
+AranyaError aranya_aqc_create_uni_channel_ext(struct AranyaClient *client,
                                               const struct AranyaTeamId *team,
                                               AranyaNetIdentifier peer,
                                               const struct AranyaLabelId *label_id,
@@ -2752,7 +2752,7 @@ AranyaError aranya_aqc_create_uni_channel_ext(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_bidi_channel(const struct AranyaClient *client,
+AranyaError aranya_aqc_delete_bidi_channel(struct AranyaClient *client,
                                            struct AranyaAqcBidiChannel *channel);
 
 /**
@@ -2765,7 +2765,7 @@ AranyaError aranya_aqc_delete_bidi_channel(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_bidi_channel_ext(const struct AranyaClient *client,
+AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
                                                struct AranyaAqcBidiChannel *channel,
                                                struct AranyaExtError *__ext_err);
 
@@ -2779,7 +2779,7 @@ AranyaError aranya_aqc_delete_bidi_channel_ext(const struct AranyaClient *client
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_uni_channel(const struct AranyaClient *client,
+AranyaError aranya_aqc_delete_uni_channel(struct AranyaClient *client,
                                           struct AranyaAqcSendChannel *channel);
 
 /**
@@ -2792,7 +2792,7 @@ AranyaError aranya_aqc_delete_uni_channel(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_uni_channel_ext(const struct AranyaClient *client,
+AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaClient *client,
                                               struct AranyaAqcSendChannel *channel,
                                               struct AranyaExtError *__ext_err);
 
@@ -2826,7 +2826,7 @@ AranyaError aranya_aqc_delete_uni_channel_ext(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_try_receive_channel(const struct AranyaClient *client,
+AranyaError aranya_aqc_try_receive_channel(struct AranyaClient *client,
                                            struct AranyaAqcPeerChannel *channel,
                                            AranyaAqcChannelType *__output);
 
@@ -2860,7 +2860,7 @@ AranyaError aranya_aqc_try_receive_channel(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_try_receive_channel_ext(const struct AranyaClient *client,
+AranyaError aranya_aqc_try_receive_channel_ext(struct AranyaClient *client,
                                                struct AranyaAqcPeerChannel *channel,
                                                AranyaAqcChannelType *__output,
                                                struct AranyaExtError *__ext_err);

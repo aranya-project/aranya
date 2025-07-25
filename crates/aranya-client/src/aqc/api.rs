@@ -16,11 +16,11 @@ use crate::{
 /// receiving data with peers.
 #[derive(Debug)]
 pub struct AqcChannels<'a> {
-    client: &'a Client,
+    client: &'a mut Client,
 }
 
 impl<'a> AqcChannels<'a> {
-    pub(crate) fn new(client: &'a Client) -> Self {
+    pub(crate) fn new(client: &'a mut Client) -> Self {
         Self { client }
     }
 
@@ -128,14 +128,14 @@ impl<'a> AqcChannels<'a> {
     /// Deletes an AQC bidi channel.
     #[instrument(skip_all, fields(?chan))]
     pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannel) -> crate::Result<()> {
-        self.client.aqc.delete_bidi_channel(chan).await?;
+        self.client.aqc.delete_bidi_channel(chan).await;
         Ok(())
     }
 
     /// Deletes an AQC uni channel.
     #[instrument(skip_all, fields(?chan))]
     pub async fn delete_uni_channel(&mut self, chan: AqcSendChannel) -> crate::Result<()> {
-        self.client.aqc.delete_uni_channel(chan).await?;
+        self.client.aqc.delete_uni_channel(chan).await;
         Ok(())
     }
 

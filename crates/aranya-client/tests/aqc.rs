@@ -190,6 +190,14 @@ async fn test_aqc_chans() -> Result<()> {
 
         let bytes = recv2_1.receive().await?.assume("no data received")?;
         assert_eq!(bytes, msg1);
+
+        devices
+            .membera
+            .client
+            .aqc()
+            .delete_uni_channel(uni_chan1)
+            .await
+            .expect("expected to delete uni channel");
     }
 
     {
@@ -245,6 +253,14 @@ async fn test_aqc_chans() -> Result<()> {
             .assume("is recv stream")?;
         let bytes = recv2_1.receive().await?.assume("no data received")?;
         assert_eq!(bytes, msg1);
+
+        devices
+            .membera
+            .client
+            .aqc()
+            .delete_bidi_channel(bidi_chan1)
+            .await
+            .expect("expected to delete bidi channel");
     }
 
     Ok(())

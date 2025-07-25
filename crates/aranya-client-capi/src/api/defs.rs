@@ -1674,7 +1674,7 @@ pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_bidi_channel(
-    client: &Client,
+    client: &mut Client,
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
@@ -1683,7 +1683,7 @@ pub unsafe fn aqc_create_bidi_channel(
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
 
-    let client = client.imp();
+    let client = client.imp_mut();
     let chan = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
         peer,
@@ -1706,7 +1706,7 @@ pub unsafe fn aqc_create_bidi_channel(
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_uni_channel(
-    client: &Client,
+    client: &mut Client,
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
@@ -1715,7 +1715,7 @@ pub unsafe fn aqc_create_uni_channel(
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
 
-    let client = client.imp();
+    let client = client.imp_mut();
     let chan = client.rt.block_on(client.inner.aqc().create_uni_channel(
         team.into(),
         peer,
@@ -1735,13 +1735,13 @@ pub unsafe fn aqc_create_uni_channel(
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_bidi_channel(
-    client: &Client,
+    client: &mut Client,
     channel: OwnedPtr<AqcBidiChannel>,
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid AqcBidiChannel pointer.
     let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
 
-    let client = client.imp();
+    let client = client.imp_mut();
     client
         .rt
         .block_on(client.inner.aqc().delete_bidi_channel(channel))?;
@@ -1757,13 +1757,13 @@ pub fn aqc_delete_bidi_channel(
 ///
 /// @relates AranyaClient.
 pub fn aqc_delete_uni_channel(
-    client: &Client,
+    client: &mut Client,
     channel: OwnedPtr<AqcSendChannel>,
 ) -> Result<(), imp::Error> {
     // SAFETY: the user is responsible for passing in a valid AqcSendChannel pointer.
     let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
 
-    let client = client.imp();
+    let client = client.imp_mut();
     client
         .rt
         .block_on(client.inner.aqc().delete_uni_channel(channel))?;
@@ -1799,7 +1799,7 @@ pub fn aqc_delete_uni_channel(
 ///
 /// @relates AranyaClient.
 pub fn aqc_try_receive_channel(
-    client: &Client,
+    client: &mut Client,
     channel: &mut MaybeUninit<AqcPeerChannel>,
 ) -> Result<AqcChannelType, imp::Error> {
     let chan = client.inner.aqc().try_receive_channel()?;

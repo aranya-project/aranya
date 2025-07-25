@@ -14,6 +14,11 @@ impl Client {
     pub(crate) fn imp(&self) -> &Self {
         self
     }
+
+    /// Useful for deref coercion.
+    pub(crate) fn imp_mut(&mut self) -> &mut Self {
+        self
+    }
 }
 
 impl Typed for Client {
