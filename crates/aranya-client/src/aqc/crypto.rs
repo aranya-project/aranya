@@ -60,6 +60,10 @@ impl ServerPresharedKeys {
         }
     }
 
+    pub fn remove(&self, identity: Vec<u8>) {
+        self.keys.lock().expect("poisoned").remove(&identity);
+    }
+
     pub fn load_psks(&self, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
         for (suite, psk) in psks {

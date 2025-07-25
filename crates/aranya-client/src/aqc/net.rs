@@ -9,7 +9,7 @@ use std::{
     task::{Context, Poll, Waker},
 };
 
-use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
+use aranya_crypto::aqc::{BidiChannelId, UniChannelId, UniPskId};
 use aranya_daemon_api::{
     AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
 };
@@ -195,14 +195,32 @@ impl AqcClient {
             .client_state
             .lock()
             .await
-            .connect_data(addr, AqcPsks::Uni(psks))
+            .connect_data(addr, AqcPsks::Uni(psks.clone()))
             .await?;
         conn.keep_alive(true)?;
+        let identities: Vec<UniPskId> = psks.into_iter().map(|(_, psk)| psk.identity).collect();
         Ok(channels::AqcSendChannel::new(
             label_id,
             channel_id,
             conn.handle(),
+            identities,
         ))
+    }
+
+    /// Deletes a unidirectional channel.
+    pub async fn delete_uni_channel(
+        &self,
+        mut chan: channels::AqcSendChannel,
+    ) -> Result<(), AqcError> {
+        let mut channels = self.channels.write().expect("poisoned");
+        for identity in chan.identities() {
+            let v = identity.as_bytes().to_vec();
+            self.server_keys.remove(v.clone());
+            channels.remove(&v);
+        }
+        chan.close();
+
+        Ok(())
     }
 
     /// Creates a new bidirectional channel to the given address.
@@ -217,10 +235,31 @@ impl AqcClient {
             .client_state
             .lock()
             .await
-            .connect_data(addr, AqcPsks::Bidi(psks))
+            .connect_data(addr, AqcPsks::Bidi(psks.clone()))
             .await?;
         conn.keep_alive(true)?;
-        Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
+        let identities: Vec<Vec<u8>> = psks
+            .into_iter()
+            .map(|(_, psk)| psk.identity.as_bytes().to_vec())
+            .collect();
+        Ok(channels::AqcBidiChannel::new(
+            label_id, channel_id, conn, identities,
+        ))
+    }
+
+    /// Deletes a bidirectional channel.
+    pub async fn delete_bidi_channel(
+        &self,
+        mut chan: channels::AqcBidiChannel,
+    ) -> Result<(), AqcError> {
+        let mut channels = self.channels.write().expect("poisoned");
+        for identity in chan.identities() {
+            self.server_keys.remove(identity.clone());
+            channels.remove(&identity);
+        }
+        chan.close();
+
+        Ok(())
     }
 
     /// Receive the next available channel.
@@ -266,6 +305,7 @@ impl AqcClient {
                 channel_info.label_id,
                 channel_info.channel_id,
                 conn,
+                identity,
             ));
         }
     }
@@ -339,6 +379,7 @@ impl AqcClient {
                 channel_info.label_id,
                 channel_info.channel_id,
                 conn,
+                identity,
             ));
         }
     }

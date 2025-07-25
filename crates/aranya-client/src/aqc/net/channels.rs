@@ -1,6 +1,6 @@
 use core::task::{Context, Poll, Waker};
 
-use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
+use aranya_crypto::aqc::{BidiChannelId, UniChannelId, UniPskId};
 use aranya_daemon_api::LabelId;
 use bytes::Bytes;
 
@@ -25,18 +25,23 @@ pub enum AqcPeerChannel {
 }
 
 impl AqcPeerChannel {
-    pub(super) fn new(label_id: LabelId, channel_id: AqcChannelId, conn: s2n::Connection) -> Self {
+    pub(super) fn new(
+        label_id: LabelId,
+        channel_id: AqcChannelId,
+        conn: s2n::Connection,
+        identity: Vec<u8>,
+    ) -> Self {
         match channel_id {
             AqcChannelId::Bidi(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let channel = AqcBidiChannel::new(label_id, id, conn);
+                let channel = AqcBidiChannel::new(label_id, id, conn, vec![identity]);
                 AqcPeerChannel::Bidi(channel)
             }
             AqcChannelId::Uni(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let receiver = AqcReceiveChannel::new(label_id, id, conn);
+                let receiver = AqcReceiveChannel::new(label_id, id, conn, vec![identity]);
                 AqcPeerChannel::Receive(receiver)
             }
         }
@@ -50,18 +55,28 @@ pub struct AqcSendChannel {
     label_id: LabelId,
     handle: s2n::Handle,
     id: UniChannelId,
+    identities: Vec<UniPskId>,
 }
 
 impl AqcSendChannel {
-    /// Create a new channel with the given id and conection handle.
+    /// Create a new channel with the given id and connection handle.
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub(super) fn new(label_id: LabelId, id: UniChannelId, handle: s2n::Handle) -> Self {
+    pub(super) fn new<I>(
+        label_id: LabelId,
+        id: UniChannelId,
+        handle: s2n::Handle,
+        identities: I,
+    ) -> Self
+    where
+        I: IntoIterator<Item = UniPskId>,
+    {
         Self {
             label_id,
             id,
             handle,
+            identities: identities.into_iter().collect(),
         }
     }
 
@@ -73,6 +88,11 @@ impl AqcSendChannel {
     /// Get the channel id.
     pub fn aqc_id(&self) -> UniChannelId {
         self.id
+    }
+
+    /// Get PSK identities.
+    pub fn identities(&self) -> Vec<UniPskId> {
+        self.identities.clone()
     }
 
     /// Creates a new unidirectional stream for the channel.
@@ -101,6 +121,7 @@ pub struct AqcReceiveChannel {
     label_id: LabelId,
     aqc_id: UniChannelId,
     conn: s2n::Connection,
+    identities: Vec<Vec<u8>>,
 }
 
 impl AqcReceiveChannel {
@@ -108,11 +129,20 @@ impl AqcReceiveChannel {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub(super) fn new(label_id: LabelId, aqc_id: UniChannelId, conn: s2n::Connection) -> Self {
+    pub(super) fn new<I>(
+        label_id: LabelId,
+        aqc_id: UniChannelId,
+        conn: s2n::Connection,
+        identities: I,
+    ) -> Self
+    where
+        I: IntoIterator<Item = Vec<u8>>,
+    {
         Self {
             label_id,
             aqc_id,
             conn,
+            identities: identities.into_iter().collect(),
         }
     }
 
@@ -124,6 +154,11 @@ impl AqcReceiveChannel {
     /// Get the aqc id.
     pub fn aqc_id(&self) -> UniChannelId {
         self.aqc_id
+    }
+
+    /// Get PSK identities.
+    pub fn identities(&self) -> Vec<Vec<u8>> {
+        self.identities.clone()
     }
 
     /// Returns the next unidirectional stream.
@@ -156,15 +191,25 @@ pub struct AqcBidiChannel {
     label_id: LabelId,
     aqc_id: BidiChannelId,
     conn: s2n::Connection,
+    identities: Vec<Vec<u8>>,
 }
 
 impl AqcBidiChannel {
     /// Create a new bidirectional channel with the given id and conection handle.
-    pub(super) fn new(label_id: LabelId, aqc_id: BidiChannelId, conn: s2n::Connection) -> Self {
+    pub(super) fn new<I>(
+        label_id: LabelId,
+        aqc_id: BidiChannelId,
+        conn: s2n::Connection,
+        identities: I,
+    ) -> Self
+    where
+        I: IntoIterator<Item = Vec<u8>>,
+    {
         Self {
             label_id,
             aqc_id,
             conn,
+            identities: identities.into_iter().collect(),
         }
     }
 
@@ -176,6 +221,11 @@ impl AqcBidiChannel {
     /// Get the aqc id.
     pub fn aqc_id(&self) -> BidiChannelId {
         self.aqc_id
+    }
+
+    /// Get PSK identities.
+    pub fn identities(&self) -> Vec<Vec<u8>> {
+        self.identities.clone()
     }
 
     /// Returns the next available stream.

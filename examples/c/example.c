@@ -285,7 +285,8 @@ AranyaError init_team(Team *t) {
     AranyaCreateTeamQuicSyncConfigBuilder owner_quic_build;
     err = aranya_create_team_quic_sync_config_builder_init(&owner_quic_build);
     if (err != ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr, "unable to init `AranyaCreateTeamQuicSyncConfigBuilder`\n");
+        fprintf(stderr,
+                "unable to init `AranyaCreateTeamQuicSyncConfigBuilder`\n");
         return err;
     }
 
@@ -297,25 +298,29 @@ AranyaError init_team(Team *t) {
             fprintf(stderr, "unable to generate random bytes\n");
             return err;
         }
-        err = aranya_create_team_quic_sync_config_raw_seed_ikm(&owner_quic_build, &ikm);
+        err = aranya_create_team_quic_sync_config_raw_seed_ikm(
+            &owner_quic_build, &ikm);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr,
-                    "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` raw IKM seed"
+                    "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` raw "
+                    "IKM seed"
                     "mode\n");
             return err;
         }
     } else {
         err = aranya_create_team_quic_sync_config_generate(&owner_quic_build);
         if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr,
-                    "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` generate"
-                    "mode\n");
+            fprintf(
+                stderr,
+                "unable to set `AranyaCreateTeamQuicSyncConfigBuilder` generate"
+                "mode\n");
             return err;
         }
     }
 
     AranyaCreateTeamQuicSyncConfig owner_quic_cfg;
-    err = aranya_create_team_quic_sync_config_build(&owner_quic_build, &owner_quic_cfg);
+    err = aranya_create_team_quic_sync_config_build(&owner_quic_build,
+                                                    &owner_quic_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr, "unable to init `AranyaCreateTeamQuicSyncConfig`\n");
         return err;
@@ -329,7 +334,7 @@ AranyaError init_team(Team *t) {
     }
 
     err = aranya_create_team_config_builder_set_quic_syncer(&owner_build,
-                                                     &owner_quic_cfg);
+                                                            &owner_quic_cfg);
     if (err != ARANYA_ERROR_SUCCESS) {
         fprintf(stderr,
                 "unable to set `CreateQuicSyncConfig` for "
@@ -424,16 +429,19 @@ AranyaError init_team(Team *t) {
         AranyaAddTeamQuicSyncConfigBuilder quic_build;
         err = aranya_add_team_quic_sync_config_builder_init(&quic_build);
         if (err != ARANYA_ERROR_SUCCESS) {
-            fprintf(stderr, "unable to init `AranyaAddTeamQuicSyncConfigBuilder`\n");
+            fprintf(stderr,
+                    "unable to init `AranyaAddTeamQuicSyncConfigBuilder`\n");
             return err;
         }
 
         AranyaTeamId team_id_from_peer = t->id;
         if (t->seed_mode == RAW_IKM) {
-            err = aranya_add_team_quic_sync_config_raw_seed_ikm(&quic_build, &ikm);
+            err = aranya_add_team_quic_sync_config_raw_seed_ikm(&quic_build,
+                                                                &ikm);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
-                        "unable to set `AranyaAddTeamQuicSyncConfigBuilder` raw IKM "
+                        "unable to set `AranyaAddTeamQuicSyncConfigBuilder` "
+                        "raw IKM "
                         "seed\n");
                 return err;
             }
@@ -465,7 +473,8 @@ AranyaError init_team(Team *t) {
                 &quic_build, wrapped_seed, wrapped_seed_len);
             if (err != ARANYA_ERROR_SUCCESS) {
                 fprintf(stderr,
-                        "unable to set `AranyaAddTeamQuicSyncConfigBuilder` wrapped "
+                        "unable to set `AranyaAddTeamQuicSyncConfigBuilder` "
+                        "wrapped "
                         "seed\n");
                 return err;
             }
@@ -511,7 +520,7 @@ AranyaError init_team(Team *t) {
         }
 
         Client *client = &t->clients_arr[i];
-        err = aranya_add_team(&client->client, &cfg);
+        err            = aranya_add_team(&client->client, &cfg);
         if (err != ARANYA_ERROR_SUCCESS) {
             fprintf(stderr, "unable to add_team() for client: %s\n",
                     client_names[i]);

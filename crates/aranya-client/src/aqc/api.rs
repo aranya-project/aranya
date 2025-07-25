@@ -127,29 +127,15 @@ impl<'a> AqcChannels<'a> {
 
     /// Deletes an AQC bidi channel.
     #[instrument(skip_all, fields(?chan))]
-    pub async fn delete_bidi_channel(&mut self, mut chan: AqcBidiChannel) -> crate::Result<()> {
-        // let _ctrl = self
-        //     .client
-        //     .daemon
-        //     .delete_aqc_bidi_channel(context::current(), chan.aqc_id().into_id().into())
-        //     .await
-        //     .map_err(IpcError::new)?
-        //     .map_err(aranya_error)?;
-        chan.close();
+    pub async fn delete_bidi_channel(&mut self, chan: AqcBidiChannel) -> crate::Result<()> {
+        self.client.aqc.delete_bidi_channel(chan).await?;
         Ok(())
     }
 
     /// Deletes an AQC uni channel.
     #[instrument(skip_all, fields(?chan))]
-    pub async fn delete_uni_channel(&mut self, mut chan: AqcSendChannel) -> crate::Result<()> {
-        // let _ctrl = self
-        //     .client
-        //     .daemon
-        //     .delete_aqc_uni_channel(context::current(), chan.aqc_id().into_id().into())
-        //     .await
-        //     .map_err(IpcError::new)?
-        //     .map_err(aranya_error)?;
-        chan.close();
+    pub async fn delete_uni_channel(&mut self, chan: AqcSendChannel) -> crate::Result<()> {
+        self.client.aqc.delete_uni_channel(chan).await?;
         Ok(())
     }
 
