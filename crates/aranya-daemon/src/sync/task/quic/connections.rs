@@ -5,7 +5,8 @@
 
 use std::{
     collections::{btree_map::Entry, BTreeMap},
-    ops::Deref,
+    net::SocketAddr,
+    sync::Arc,
 };
 
 use aranya_runtime::GraphId;
@@ -14,7 +15,7 @@ use s2n_quic::{
     connection::{Handle, StreamAcceptor},
     Connection,
 };
-use tokio::sync::{self, mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex};
 use tracing::debug;
 
 /// A [`ConnectionKey`] and [`StreamAcceptor`] pair that is sent over a channel
@@ -26,23 +27,44 @@ type ConnectionMap = BTreeMap<ConnectionKey, Handle>;
 /// Each team/graph is synced over a different QUIC connection so a team-specific PSK can be used.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct ConnectionKey {
-    pub(crate) addr: super::SocketAddr,
+    pub(crate) addr: SocketAddr,
     pub(crate) id: GraphId,
 }
 
-/// A mutex guard that provides exclusive access to the [connection map][SharedConnectionMap]
-/// with a [sender][mpsc::Sender] for sending [updates][ConnectionUpdate].
-pub(super) struct MutexGuard<'a> {
+/// Thread-safe map for sharing QUIC connections between sync peers.
+///
+/// This map stores persistent QUIC connections indexed by [`ConnectionKey`].
+#[derive(Clone, Debug)]
+pub struct SharedConnectionMap {
     tx: mpsc::Sender<ConnectionUpdate>,
-    guard: sync::MutexGuard<'a, ConnectionMap>,
+    handles: Arc<Mutex<ConnectionMap>>,
 }
 
-impl MutexGuard<'_> {
+impl SharedConnectionMap {
+    pub(crate) fn new() -> (Self, mpsc::Receiver<ConnectionUpdate>) {
+        let (tx, rx) = mpsc::channel(32);
+        (
+            Self {
+                tx,
+                handles: Arc::default(),
+            },
+            rx,
+        )
+    }
+
     /// Removes a connection from the map and closes it.
-    pub(super) async fn remove(&mut self, key: ConnectionKey) {
-        if let Some(existing_conn) = self.guard.remove(&key) {
-            // TODO: Use appropriate error code
-            existing_conn.close(AppError::UNKNOWN);
+    ///
+    /// If the handle does not match the one in the map,
+    /// it has been replaced and does not need to be removed.
+    pub(super) async fn remove(&mut self, key: ConnectionKey, handle: Handle) {
+        match self.handles.lock().await.entry(key) {
+            Entry::Vacant(_) => {}
+            Entry::Occupied(entry) => {
+                if entry.get().id() == handle.id() {
+                    entry.remove();
+                    handle.close(AppError::UNKNOWN);
+                }
+            }
         }
     }
 
@@ -50,7 +72,7 @@ impl MutexGuard<'_> {
     ///
     /// First checks if a connection already exists for the key. If found, verifies the connection
     /// is still alive via ping - reuses open connections and replaces closed ones. Sends a [`ConnectionUpdate`] when
-    /// a new connection is created. If the update cannot be sent, the newly created connection is closed.
+    /// a new connection is created.
     ///
     /// # Parameters
     ///
@@ -59,55 +81,50 @@ impl MutexGuard<'_> {
     ///
     /// # Returns
     ///
-    /// * `&mut Handle` - Mutable reference to the connection handle
+    /// * `Handle` - The connection handle
     ///
     /// # Errors
     ///
-    /// Returns an error if the connection creation closure fails or if the internal
-    /// connection update channel is closed.
+    /// Returns an error if the connection creation closure fails.
     pub(super) async fn get_or_try_insert_with(
         &mut self,
         key: ConnectionKey,
         make_conn: impl AsyncFnOnce() -> Result<Connection, super::Error>,
-    ) -> Result<&mut Handle, super::Error> {
-        let (handle, maybe_acceptor) = match self.guard.entry(key) {
+    ) -> Result<Handle, super::Error> {
+        let (handle, maybe_acceptor) = match self.handles.lock().await.entry(key) {
             Entry::Occupied(mut entry) => {
                 debug!("existing QUIC connection found");
 
                 if entry.get_mut().ping().is_ok() {
                     debug!("re-using QUIC connection");
-                    (entry.into_mut(), None)
+                    (entry.get().clone(), None)
                 } else {
                     let (handle, acceptor) = make_conn().await?.split();
                     let _ = entry.insert(handle);
-                    (entry.into_mut(), Some(acceptor))
+                    (entry.get().clone(), Some(acceptor))
                 }
             }
             Entry::Vacant(entry) => {
                 debug!("existing QUIC connection not found");
                 let (handle, acceptor) = make_conn().await?.split();
 
-                (entry.insert(handle), Some(acceptor))
+                (entry.insert(handle).clone(), Some(acceptor))
             }
         };
 
         if let Some(acceptor) = maybe_acceptor {
             debug!("created new quic connection");
-            Self::send(self.tx.clone(), (key, acceptor), handle)
-                .await
-                .map_err(Into::into)
-        } else {
-            Ok(handle)
+            self.tx.send((key, acceptor)).await.ok();
         }
+        Ok(handle)
     }
 
-    /// Attempts to insert a QUIC connection into the map, failing if an open connection exists.
+    /// Inserts a QUIC connection into the map, unless an open connection exists.
     ///
     /// Checks if a connection already exists for the key. If found and still alive via ping,
-    /// returns an error with the original connection. If found but closed, replaces it with the
-    /// new connection. If no connection exists, inserts the new one. Sends a [`ConnectionUpdate`]
-    /// when a connection is successfully inserted. If the update cannot be sent, the newly
-    /// inserted connection is closed.
+    /// returns the original connection. If found but closed, replaces it with the new connection.
+    /// If no connection exists, inserts the new one. Sends a [`ConnectionUpdate`] when a
+    /// connection is successfully inserted.
     ///
     /// # Parameters
     ///
@@ -116,116 +133,33 @@ impl MutexGuard<'_> {
     ///
     /// # Returns
     ///
-    /// * `&mut Handle` - Mutable reference to the connection handle
-    ///
-    /// # Errors
-    ///
-    /// * [`TryInsertError::Occupied`] - If an open connection already exists for the key
-    /// * [`TryInsertError::ChannelClosed`] - If the internal connection update channel is closed
-    pub(super) async fn try_insert(
-        &mut self,
-        key: ConnectionKey,
-        conn: Connection,
-    ) -> Result<&mut Handle, TryInsertError> {
-        let (handle, acceptor) = match self.guard.entry(key) {
+    /// * `Handle` - The connection handle
+    pub(super) async fn insert(&mut self, key: ConnectionKey, conn: Connection) -> Handle {
+        let (handle, acceptor) = match self.handles.lock().await.entry(key) {
             Entry::Occupied(mut entry) => {
                 debug!("existing QUIC connection found");
 
                 if entry.get_mut().ping().is_ok() {
-                    return Err(TryInsertError::Occupied(conn));
+                    debug!(connection_key = ?key, "Closing the connection because an open connection was already found");
+                    conn.close(AppError::UNKNOWN);
+                    return entry.get().clone();
                 } else {
                     let (handle, acceptor) = conn.split();
-                    let _ = entry.insert(handle);
-                    (entry.into_mut(), acceptor)
+                    entry.insert(handle);
+                    (entry.get().clone(), acceptor)
                 }
             }
             Entry::Vacant(entry) => {
                 debug!("existing QUIC connection not found");
                 let (handle, acceptor) = conn.split();
 
-                (entry.insert(handle), acceptor)
+                (entry.insert(handle).clone(), acceptor)
             }
         };
 
         debug!("created new quic connection");
-        Self::send(self.tx.clone(), (key, acceptor), handle)
-            .await
-            .map_err(Into::into)
+        self.tx.send((key, acceptor)).await.ok();
+
+        handle
     }
-
-    /// Sends a connection update over the channel, closing the connection on failure.
-    async fn send(
-        sender: mpsc::Sender<ConnectionUpdate>,
-        (key, acceptor): ConnectionUpdate,
-        handle: &mut Handle,
-    ) -> Result<&mut Handle, ChannelClosedError> {
-        let send_result = sender
-            .send((key, acceptor))
-            .await
-            .map_err(|_| ChannelClosedError);
-
-        match send_result {
-            Ok(_) => Ok(handle),
-            Err(e) => {
-                // TODO: Use appropriate error code
-                handle.close(AppError::UNKNOWN);
-
-                Err(e)
-            }
-        }
-    }
-}
-
-impl<'a> Deref for MutexGuard<'a> {
-    type Target = sync::MutexGuard<'a, ConnectionMap>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.guard
-    }
-}
-
-/// Thread-safe map for sharing QUIC connections between sync peers.
-///
-/// This map stores persistent QUIC connections indexed by [`ConnectionKey`].
-#[derive(Debug)]
-pub(crate) struct SharedConnectionMap {
-    data: Mutex<BTreeMap<ConnectionKey, Handle>>,
-    tx: mpsc::Sender<ConnectionUpdate>,
-}
-
-impl SharedConnectionMap {
-    pub(crate) fn new() -> (Self, mpsc::Receiver<ConnectionUpdate>) {
-        let (tx, rx) = mpsc::channel(32);
-
-        (
-            Self {
-                data: Mutex::new(BTreeMap::new()),
-                tx,
-            },
-            rx,
-        )
-    }
-
-    #[inline]
-    pub(super) async fn lock(&self) -> MutexGuard<'_> {
-        let guard = self.data.lock().await;
-        MutexGuard {
-            guard,
-            tx: self.tx.clone(),
-        }
-    }
-}
-
-/// New connection could not be inserted into the map due to the channel being closed.
-#[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq, PartialOrd, Ord, thiserror::Error)]
-#[error("connection update channel was closed")]
-pub struct ChannelClosedError;
-
-/// The error returned by [try_insert][MutexGuard::try_insert].
-#[derive(Debug, thiserror::Error)]
-pub enum TryInsertError {
-    #[error("Failed to a insert a new conneection into the map because an open connection already exists.")]
-    Occupied(Connection),
-    #[error(transparent)]
-    ChannelClosed(#[from] ChannelClosedError),
 }
