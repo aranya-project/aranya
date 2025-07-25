@@ -137,6 +137,20 @@ impl Client {
     }
 
     /// Creates a client connection to the daemon.
+    ///
+    /// # Example
+    /// ```rust,no_run
+    /// use std::net::Ipv4Addr;
+    /// # use aranya_client::Client;
+    /// # #[tokio::main]
+    /// # async fn main() -> anyhow::Result<()> {
+    /// let client = Client::builder()
+    ///     .daemon_uds_path("/var/run/aranya/uds.sock".as_ref())
+    ///     .aqc_server_addr(&(Ipv4Addr::UNSPECIFIED, 1234).into())
+    ///     .connect()
+    ///     .await?;
+    /// #    Ok(())
+    /// # }
     #[instrument(skip_all)]
     async fn connect(uds_path: &Path, aqc_addr: &Addr) -> Result<Self> {
         info!(path = ?uds_path, "connecting to daemon");

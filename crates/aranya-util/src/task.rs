@@ -40,7 +40,8 @@ use tracing::Instrument;
 ///         sleep(Duration::from_secs(1)).await;
 ///         println!("{msg}");
 ///     });
-/// }).await;
+/// })
+/// .await;
 /// # }
 /// ```
 pub async fn scope<F>(f: F)
