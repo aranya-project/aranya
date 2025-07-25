@@ -96,7 +96,7 @@ impl ClientState {
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
     }
 
-    fn zeroize_psks(&mut self, identities: &Vec<PskIdentity>) {
+    fn zeroize_psks(&mut self, identities: &[PskIdentity]) {
         self.client_keys.zeroize_psks(identities);
     }
 

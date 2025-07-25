@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::{hash_map::Entry, BTreeMap, HashMap},
     sync::{Arc, LazyLock, Mutex},
 };
 
@@ -62,12 +62,11 @@ impl ServerPresharedKeys {
         }
     }
 
-    pub fn zeroize_psks(&self, identities: &Vec<PskIdentity>) {
+    pub fn zeroize_psks(&self, identities: &[PskIdentity]) {
         let mut keys = self.keys.lock().expect("poisoned");
-        for identity in identities {
-            // TODO: zeroize
-            keys.remove(identity);
-        }
+        identities.iter().for_each(|i| {
+            keys.remove(i);
+        });
     }
 
     pub fn load_psks(&self, psks: AqcPsks) {
@@ -101,45 +100,42 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
 // TODO: switch from vec to map for faster identity lookups.
 #[derive(Debug)]
 pub struct ClientPresharedKeys {
-    keys: Mutex<Vec<Arc<PresharedKey>>>,
+    keys: Mutex<BTreeMap<PskIdentity, Arc<PresharedKey>>>,
 }
 
 impl ClientPresharedKeys {
     pub fn new(key: Arc<PresharedKey>) -> Self {
+        let mut keys = BTreeMap::new();
+        keys.insert(key.identity().to_vec(), key);
         Self {
-            keys: Mutex::new(vec![key]),
+            keys: Mutex::new(keys),
         }
     }
 
     pub fn set_key(&self, key: Arc<PresharedKey>) {
         let mut keys_guard = self.keys.lock().expect("Client PSK mutex poisoned");
         keys_guard.clear();
-        keys_guard.push(key);
+        keys_guard.insert(key.identity().to_vec(), key);
     }
 
     pub fn load_psks(&self, psks: AqcPsks) {
-        let keys = psks
+        let psks = psks
             .into_iter()
             .map(|(suite, psk)| make_preshared_key(suite, psk))
             .collect::<Option<Vec<_>>>()
             .expect("can create psks");
-        *self.keys.lock().expect("poisoned") = keys;
-    }
-
-    pub fn zeroize_psks(&self, identities: &Vec<PskIdentity>) {
-        // TODO: zeroize
-        for identity in identities {
-            self.remove(identity);
+        let mut keys = self.keys.lock().expect("poisoined");
+        for psk in psks {
+            keys.insert(psk.identity().to_vec(), psk);
         }
     }
 
-    fn remove(&self, identity: &Vec<u8>) {
+    pub fn zeroize_psks(&self, identities: &[PskIdentity]) {
         // TODO: zeroize
         let mut keys = self.keys.lock().expect("poisoned");
-        // TODO: switch from vec to map for faster identity lookups.
-        if let Some(index) = keys.iter().position(|v| v.identity().to_vec() == *identity) {
-            keys.swap_remove(index);
-        }
+        identities.iter().for_each(|i| {
+            keys.remove(i);
+        });
     }
 
     pub fn clear(&self) {
@@ -150,7 +146,12 @@ impl ClientPresharedKeys {
 
 impl PresharedKeyStore for ClientPresharedKeys {
     fn psks(&self, _server_name: &rustls::pki_types::ServerName<'_>) -> Vec<Arc<PresharedKey>> {
-        self.keys.lock().expect("Client PSK mutex poisoned").clone()
+        self.keys
+            .lock()
+            .expect("Client PSK mutex poisoned")
+            .iter()
+            .map(|(_, p)| p.clone())
+            .collect()
     }
 }
 
