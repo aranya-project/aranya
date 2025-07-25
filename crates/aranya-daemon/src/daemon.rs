@@ -7,35 +7,30 @@ use aranya_crypto::{
     keystore::{fs_keystore::Store, KeyStore},
     Engine, Rng,
 };
-use aranya_daemon_api::TeamId;
 use aranya_keygen::{KeyBundle, PublicKeys};
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, StorageProvider,
 };
-use aranya_util::{ready, Addr};
+use aranya_util::ready;
 use bimap::BiBTreeMap;
 use buggy::{bug, Bug, BugExt};
 use ciborium as cbor;
 use serde::{de::DeserializeOwned, Serialize};
-use tokio::{
-    fs,
-    sync::{mpsc::Receiver, Mutex},
-    task::JoinSet,
-};
+use tokio::{fs, sync::Mutex, task::JoinSet};
 use tracing::{error, info, info_span, Instrument as _};
 
 use crate::{
     actions::Actions,
-    api::{ApiKey, DaemonApiServer, QSData},
+    api::{ApiKey, DaemonApiServer, EffectReceiver, QSData},
     aqc::Aqc,
     aranya,
     config::{Config, Toggle},
     keystore::{AranyaStore, LocalStore},
     policy,
     sync::task::{
-        quic::{PskStore, State as QuicSyncState},
-        Syncer,
+        quic::{PskStore, State as QuicSyncClientState, SyncParams},
+        SyncPeers, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
@@ -123,7 +118,7 @@ impl DaemonHandle {
 #[derive(Debug)]
 pub struct Daemon {
     sync_server: SyncServer,
-    syncer: Syncer<QuicSyncState>,
+    syncer: Syncer<QuicSyncClientState>,
     api: DaemonApiServer,
     span: tracing::Span,
 }
@@ -169,28 +164,25 @@ impl Daemon {
             let (psk_store, active_team_rx) = PskStore::new(initial_keys);
             let psk_store = Arc::new(psk_store);
 
-            // Initialize Aranya client.
-            let (client, sync_server) = Self::setup_aranya(
+            let invalid_graphs = InvalidGraphs::default();
+
+            // Initialize Aranya client, sync client,and sync server.
+            let (client, sync_server, syncer, peers, recv_effects) = Self::setup_aranya(
                 &cfg,
                 eng.clone(),
                 aranya_store
                     .try_clone()
                     .context("unable to clone keystore")?,
                 &pks,
-                qs_config.addr,
-                Arc::clone(&psk_store),
-                active_team_rx,
+                SyncParams {
+                    psk_store: Arc::clone(&psk_store),
+                    server_addr: qs_config.addr,
+                    active_team_rx,
+                },
+                invalid_graphs.clone(),
             )
             .await?;
             let local_addr = sync_server.local_addr()?;
-
-            // Sync in the background at some specified interval.
-            let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
-
-            let invalid_graphs = InvalidGraphs::default();
-            let state = QuicSyncState::new(psk_store.clone())?;
-            let (syncer, peers) =
-                Syncer::new(client.clone(), send_effects, invalid_graphs.clone(), state);
 
             let graph_ids = client
                 .aranya
@@ -324,16 +316,25 @@ impl Daemon {
         Ok(())
     }
 
-    /// Creates the Aranya client and sync server.
+    /// Creates the Aranya client, sync client, and sync server.
     async fn setup_aranya(
         cfg: &Config,
         eng: CE,
         store: AranyaStore<KS>,
         pk: &PublicKeys<CS>,
-        external_sync_addr: Addr,
-        psk_store: Arc<PskStore>,
-        active_team_rx: Receiver<TeamId>,
-    ) -> Result<(Client, SyncServer)> {
+        SyncParams {
+            psk_store,
+            active_team_rx,
+            server_addr,
+        }: SyncParams,
+        invalid_graphs: InvalidGraphs,
+    ) -> Result<(
+        Client,
+        SyncServer,
+        Syncer<QuicSyncClientState>,
+        SyncPeers,
+        EffectReceiver,
+    )> {
         let device_id = pk.ident_pk.id()?;
 
         let aranya = Arc::new(Mutex::new(ClientState::new(
@@ -345,11 +346,24 @@ impl Daemon {
 
         let client = Client::new(Arc::clone(&aranya));
 
-        info!(addr = %external_sync_addr, "starting QUIC sync server");
+        // Sync in the background at some specified interval.
+        let (send_effects, recv_effects) = tokio::sync::mpsc::channel(256);
+
+        // Initialize the syncer
+        let (syncer, peers, conns, conn_rx) = Syncer::new(
+            client.clone(),
+            send_effects,
+            invalid_graphs,
+            psk_store.clone(),
+        )?;
+
+        info!(addr = %server_addr, "starting QUIC sync server");
         let server = SyncServer::new(
             client.clone(),
-            &external_sync_addr,
+            &server_addr,
             psk_store,
+            conns,
+            conn_rx,
             active_team_rx,
         )
         .await
@@ -357,7 +371,7 @@ impl Daemon {
 
         info!(device_id = %device_id, "set up Aranya");
 
-        Ok((client, server))
+        Ok((client, server, syncer, peers, recv_effects))
     }
 
     /// Loads the crypto engine.
@@ -469,6 +483,7 @@ mod tests {
 
     use std::time::Duration;
 
+    use aranya_util::Addr;
     use tempfile::tempdir;
     use test_log::test;
     use tokio::time;
