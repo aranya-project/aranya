@@ -242,14 +242,11 @@ impl Syncer<State> {
             .state
             .conns
             .get_or_try_insert_with(key, async || {
-                client
+                let mut conn = client
                     .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
-                    .await
-                    .and_then(|mut conn| match conn.keep_alive(true) {
-                        Ok(_) => Ok(conn),
-                        Err(e) => Err(e),
-                    })
-                    .map_err(Error::from)
+                    .await?;
+                conn.keep_alive(true)?;
+                Ok(conn)
             })
             .await?;
 

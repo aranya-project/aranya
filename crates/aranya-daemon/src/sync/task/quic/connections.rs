@@ -27,8 +27,8 @@ type ConnectionMap = BTreeMap<ConnectionKey, Handle>;
 /// Each team/graph is synced over a different QUIC connection so a team-specific PSK can be used.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub(crate) struct ConnectionKey {
-    pub(crate) addr: SocketAddr,
-    pub(crate) id: GraphId,
+    pub(super) addr: SocketAddr,
+    pub(super) id: GraphId,
 }
 
 /// Thread-safe map for sharing QUIC connections between sync peers.
@@ -76,7 +76,7 @@ impl SharedConnectionMap {
     ///
     /// # Parameters
     ///
-    /// * `key` - The [`ConnectionKey`] that uniquely identifies the connection pair
+    /// * `key` - The [`ConnectionKey`] that uniquely identifies the connection pair based on team ID and the peer's network address.
     /// * `make_conn` - Async closure that creates a new [`Connection`] when needed
     ///
     /// # Returns
