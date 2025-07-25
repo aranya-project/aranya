@@ -98,6 +98,7 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
     }
 }
 
+// TODO: switch from vec to map for faster identity lookups.
 #[derive(Debug)]
 pub struct ClientPresharedKeys {
     keys: Mutex<Vec<Arc<PresharedKey>>>,
@@ -135,7 +136,7 @@ impl ClientPresharedKeys {
     fn remove(&self, identity: &Vec<u8>) {
         // TODO: zeroize
         let mut keys = self.keys.lock().expect("poisoned");
-        // TODO: switch from vec to map for faster lookup.
+        // TODO: switch from vec to map for faster identity lookups.
         if let Some(index) = keys.iter().position(|v| v.identity().to_vec() == *identity) {
             keys.swap_remove(index);
         }
