@@ -52,7 +52,7 @@ macro_rules! find_effect {
     }
 }
 
-type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
+pub(crate) type EffectReceiver = mpsc::Receiver<(GraphId, Vec<EF>)>;
 
 /// Daemon API Server.
 #[derive(Debug)]
