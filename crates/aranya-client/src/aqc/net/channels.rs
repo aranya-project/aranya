@@ -5,7 +5,7 @@ use aranya_daemon_api::LabelId;
 use bytes::Bytes;
 
 use super::{AqcChannelId, TryReceiveError};
-use crate::error::AqcError;
+use crate::{aqc::net::PskIdentity, error::AqcError};
 
 mod s2n {
     pub use s2n_quic::{
@@ -121,7 +121,7 @@ pub struct AqcReceiveChannel {
     label_id: LabelId,
     aqc_id: UniChannelId,
     conn: s2n::Connection,
-    identities: Vec<Vec<u8>>,
+    identities: Vec<PskIdentity>,
 }
 
 impl AqcReceiveChannel {
@@ -157,7 +157,7 @@ impl AqcReceiveChannel {
     }
 
     /// Get PSK identities.
-    pub fn identities(&self) -> Vec<Vec<u8>> {
+    pub fn identities(&self) -> Vec<PskIdentity> {
         self.identities.clone()
     }
 
@@ -191,7 +191,7 @@ pub struct AqcBidiChannel {
     label_id: LabelId,
     aqc_id: BidiChannelId,
     conn: s2n::Connection,
-    identities: Vec<Vec<u8>>,
+    identities: Vec<PskIdentity>,
 }
 
 impl AqcBidiChannel {
@@ -224,7 +224,7 @@ impl AqcBidiChannel {
     }
 
     /// Get PSK identities.
-    pub fn identities(&self) -> Vec<Vec<u8>> {
+    pub fn identities(&self) -> Vec<PskIdentity> {
         self.identities.clone()
     }
 

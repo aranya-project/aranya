@@ -14,6 +14,8 @@ use s2n_quic::provider::tls::rustls::rustls::{
 use tokio::sync::mpsc;
 use tracing::error;
 
+use crate::aqc::net::PskIdentity;
+
 // Define constant PSK identity and bytes
 pub(super) const PSK_IDENTITY_CTRL: &[u8; 16] = b"aranya-ctrl-psk!"; // 16 bytes
 const PSK_BYTES_CTRL: &[u8; 32] = b"this-is-a-32-byte-secret-psk!!!!"; // 32 bytes
@@ -112,6 +114,13 @@ impl ClientPresharedKeys {
             .collect::<Option<Vec<_>>>()
             .expect("can create psks");
         *self.keys.lock().expect("poisoned") = keys;
+    }
+
+    pub fn remove(&self, identity: PskIdentity) {
+        let mut keys = self.keys.lock().expect("poisoned");
+        if let Some(index) = keys.iter().position(|v| v.identity().to_vec() == identity) {
+            keys.swap_remove(index);
+        }
     }
 }
 

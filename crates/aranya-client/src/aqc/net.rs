@@ -94,6 +94,10 @@ impl ClientState {
         self.quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
     }
+
+    fn remove(&mut self, identity: PskIdentity) {
+        self.client_keys.remove(identity);
+    }
 }
 
 #[derive(Debug)]
@@ -105,7 +109,7 @@ struct ServerState {
 }
 
 /// Identity of a preshared key.
-type PskIdentity = Vec<u8>;
+pub type PskIdentity = Vec<u8>;
 
 impl AqcClient {
     pub async fn new(server_addr: SocketAddr, daemon: DaemonApiClient) -> Result<Self, AqcError> {
@@ -212,11 +216,11 @@ impl AqcClient {
         &self,
         mut chan: channels::AqcSendChannel,
     ) -> Result<(), AqcError> {
-        let mut channels = self.channels.write().expect("poisoned");
-        for identity in chan.identities() {
-            let v = identity.as_bytes().to_vec();
-            self.server_keys.remove(v.clone());
-            channels.remove(&v);
+        for psk_id in chan.identities() {
+            let identity: PskIdentity = psk_id.as_bytes().to_vec();
+            self.server_keys.remove(identity.clone());
+            self.client_state.lock().await.remove(identity.clone());
+            self.channels.write().expect("poisoned").remove(&identity);
         }
         chan.close();
 
@@ -238,7 +242,7 @@ impl AqcClient {
             .connect_data(addr, AqcPsks::Bidi(psks.clone()))
             .await?;
         conn.keep_alive(true)?;
-        let identities: Vec<Vec<u8>> = psks
+        let identities: Vec<PskIdentity> = psks
             .into_iter()
             .map(|(_, psk)| psk.identity.as_bytes().to_vec())
             .collect();
@@ -252,10 +256,10 @@ impl AqcClient {
         &self,
         mut chan: channels::AqcBidiChannel,
     ) -> Result<(), AqcError> {
-        let mut channels = self.channels.write().expect("poisoned");
         for identity in chan.identities() {
             self.server_keys.remove(identity.clone());
-            channels.remove(&identity);
+            self.client_state.lock().await.remove(identity.clone());
+            self.channels.write().expect("poisoned").remove(&identity);
         }
         chan.close();
 
