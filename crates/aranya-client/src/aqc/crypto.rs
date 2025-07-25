@@ -79,7 +79,6 @@ impl ServerPresharedKeys {
     }
 
     pub fn clear(&self) {
-        // TODO: zeroize
         self.keys.lock().expect("poisoned").clear()
     }
 }
@@ -128,7 +127,6 @@ impl ClientPresharedKeys {
     }
 
     pub fn zeroize_psks(&self, identities: &[PskIdentity]) {
-        // TODO: zeroize
         let mut keys = self.keys.lock().expect("poisoned");
         identities.iter().for_each(|i| {
             keys.remove(i);
@@ -136,7 +134,6 @@ impl ClientPresharedKeys {
     }
 
     pub fn clear(&self) {
-        // TODO: zeroize
         self.keys.lock().expect("poisoned").clear()
     }
 }
