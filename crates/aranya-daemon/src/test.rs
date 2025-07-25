@@ -42,6 +42,7 @@ use tokio::{
 
 use crate::{
     actions::Actions,
+    api::EffectReceiver,
     aranya,
     policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
@@ -82,26 +83,17 @@ struct TestDevice {
 
 impl TestDevice {
     pub fn new(
-        client: TestClient,
         server: TestServer,
         sync_local_addr: Addr,
         pk: PublicKeys<DefaultCipherSuite>,
         graph_id: GraphId,
-        psk_store: Arc<PskStore>,
-        caches: PeerCacheMap,
+        syncer: TestSyncer,
+        effect_recv: EffectReceiver,
     ) -> Result<Self> {
         let waiter = ready::Waiter::new(1);
         let notifier = waiter.notifier();
         let handle = task::spawn(async { server.serve(notifier).await }).abort_handle();
-        let (send_effects, effect_recv) = mpsc::channel(1);
-        let (syncer, _sync_peers) = TestSyncer::new(
-            client,
-            send_effects,
-            InvalidGraphs::default(),
-            TestState::new(psk_store)?,
-            Addr::from((Ipv4Addr::LOCALHOST, 0)),
-            caches,
-        );
+        // let (send_effects, effect_recv) = mpsc::channel(1);
         Ok(Self {
             syncer,
             graph_id,
@@ -221,7 +213,9 @@ impl TestCtx {
         let root = self.dir.path().join(name);
         assert!(!root.try_exists()?, "duplicate client name: {name}");
 
-        let (client, server, local_addr, pk, psk_store, caches) = {
+        let caches = PeerCacheMap::new(Mutex::new(BTreeMap::new()));
+
+        let (syncer, server, local_addr, pk, psk_store, effects_recv) = {
             let mut store = {
                 let path = root.join("keystore");
                 fs::create_dir_all(&path)?;
@@ -249,31 +243,39 @@ impl TestCtx {
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
             let local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
-            let (psk_store, receiver) = PskStore::new([]);
+            let (psk_store, active_team_rx) = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
-            let caches = PeerCacheMap::new(Mutex::new(BTreeMap::new()));
+
+            let (syncer, conn_map, conn_rx, effects_recv) = {
+                let (send_effects, effect_recv) = mpsc::channel(1);
+                let (syncer, _sync_peers, conn_map, conn_rx) = TestSyncer::new(
+                    client.clone(),
+                    send_effects,
+                    InvalidGraphs::default(),
+                    psk_store.clone(),
+                    Addr::from((Ipv4Addr::LOCALHOST, 0)),
+                    caches.clone(),
+                )?;
+
+                (syncer, conn_map, conn_rx, effect_recv)
+            };
+
             let server: TestServer = TestServer::new(
                 client.clone(),
                 &local_addr,
                 psk_store.clone(),
-                receiver,
+                conn_map,
+                conn_rx,
+                active_team_rx,
                 caches.clone(),
             )
             .await?;
             let local_addr = server.local_addr()?;
-            (client, server, local_addr, pk, psk_store, caches)
+            (syncer, server, local_addr, pk, psk_store, effects_recv)
         };
 
         Ok((
-            TestDevice::new(
-                client,
-                server,
-                local_addr.into(),
-                pk,
-                id,
-                psk_store.clone(),
-                caches,
-            )?,
+            TestDevice::new(server, local_addr.into(), pk, id, syncer, effects_recv)?,
             psk_store,
         ))
     }

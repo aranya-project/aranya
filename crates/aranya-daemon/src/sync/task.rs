@@ -193,33 +193,6 @@ pub trait SyncState: Sized {
 }
 
 impl<ST> Syncer<ST> {
-    /// Creates a new [`Syncer`].
-    pub(crate) fn new(
-        client: Client,
-        send_effects: EffectSender,
-        invalid: InvalidGraphs,
-        state: ST,
-        server_addr: Addr,
-        caches: PeerCacheMap,
-    ) -> (Self, SyncPeers) {
-        let (send, recv) = mpsc::channel::<Request>(128);
-        let peers = SyncPeers::new(send);
-        (
-            Self {
-                client,
-                peers: HashMap::new(),
-                recv,
-                queue: DelayQueue::new(),
-                send_effects,
-                invalid,
-                state,
-                server_addr,
-                caches,
-            },
-            peers,
-        )
-    }
-
     /// Add a peer to the delay queue, overwriting an existing one.
     fn add_peer(&mut self, peer: SyncPeer, cfg: SyncPeerConfig) {
         let new_key = self.queue.insert(peer.clone(), cfg.interval);
