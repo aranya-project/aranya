@@ -257,3 +257,11 @@ category = "examples"
 description = "Run Rust example application"
 cwd = "examples/rust"
 script = "./run.bash"
+
+# Metrics
+
+# Run `aranya-metrics`
+[tasks.metrics]
+category = "metrics"
+description = "Run Metrics Crate"
+script = "crates/aranya-metrics/run.bash"
