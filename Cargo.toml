@@ -61,7 +61,7 @@ aranya-keygen = { version = "1.0.0", path = "crates/aranya-keygen" }
 aranya-util = { version = "1.0.0", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
-backon = { version = "1.5.1", default-features = false, features = ["std", "tokio-sleep"] }
+backon = { version = "1.2.0" }
 bytes = { version = "1.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
@@ -83,10 +83,10 @@ serial_test = { version = "3" }
 sysinfo = { version = "0.35" }
 tarpc = { version = "0.35.0", features = ["unix", "serde-transport", "serde-transport-json"] }
 tempfile = { version = "3.6.0" }
-test-log = { version = "0.2", default-features = false, features = ["trace"] }
-thiserror = { version = "2" }
-tokio = { version = "1.46" }
-tokio-util = { version = "0.7" }
+test-log = { version = "0.2.14", default-features = false, features = ["trace"] }
+thiserror = { version = "2.0" }
+tokio = { version = "1.44" }
+tokio-util = { version = "0.7.12" }
 toml = { version = "0.9", default-features = false, features = ["std", "serde", "parse"] }
 tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

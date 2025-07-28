@@ -22,12 +22,6 @@ criteria = "safe-to-deploy"
 delta = "0.1.83 -> 0.1.87"
 
 [[audits.backon]]
-who = "nikki-aranya <npoelma@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "1.5.1"
-notes = "Changes since 1.2.0 include additional documentation, a handful of refactoring, better comments, a couple new fields for e.g. RNG, a couple new feature flags, and some additional tests."
-
-[[audits.backon]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-run"
 delta = "1.3.0 -> 1.4.0"
@@ -262,6 +256,12 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.38.42 -> 0.38.44"
 
+[[audits.rustls]]
+who = "Ben Zimmerman <bzimmerman@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.23.26@git:648a02550dd319360664f9af79862716be2879ff"
+importable = false
+
 [[audits.rustversion]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -336,12 +336,6 @@ delta = "2.0.90 -> 2.0.99"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "3.14.0 -> 3.17.1"
-
-[[audits.test-log]]
-who = "nikki-aranya <npoelma@spideroak.com>"
-criteria = "safe-to-run"
-version = "0.2.18"
-notes = "Trivially reviewable, mostly compatibility changes compared to 0.2.14, as well as some feature flag cleanup."
 
 [[audits.test-log]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -447,12 +441,6 @@ delta = "0.1.5 -> 0.1.6"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.5 -> 0.1.6"
-
-[[trusted.aho-corasick]]
-criteria = "safe-to-deploy"
-user-id = 189 # Andrew Gallant (BurntSushi)
-start = "2019-03-28"
-end = "2026-07-23"
 
 [[trusted.anstream]]
 criteria = "safe-to-deploy"
@@ -706,29 +694,11 @@ user-id = 293722 # aranya-project-bot
 start = "2024-11-12"
 end = "2025-12-19"
 
-[[trusted.async-trait]]
-criteria = "safe-to-deploy"
-user-id = 3618 # David Tolnay (dtolnay)
-start = "2019-07-23"
-end = "2026-07-23"
-
-[[trusted.backtrace]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2019-04-03"
-end = "2026-07-23"
-
 [[trusted.buggy]]
 criteria = "safe-to-deploy"
 user-id = 293722 # aranya-project-bot
 start = "2025-01-24"
 end = "2026-03-12"
-
-[[trusted.bytes]]
-criteria = "safe-to-deploy"
-user-id = 6741 # Alice Ryhl (Darksonn)
-start = "2021-01-11"
-end = "2026-07-23"
 
 [[trusted.cc]]
 criteria = "safe-to-deploy"
@@ -736,23 +706,11 @@ user-id = 2915 # Amanieu d'Antras (Amanieu)
 start = "2024-02-20"
 end = "2026-05-16"
 
-[[trusted.clap]]
-criteria = "safe-to-deploy"
-user-id = 6743 # Ed Page (epage)
-start = "2021-12-08"
-end = "2026-07-23"
-
 [[trusted.clap_builder]]
 criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
 start = "2023-03-28"
 end = "2026-07-09"
-
-[[trusted.clap_derive]]
-criteria = "safe-to-deploy"
-user-id = 6743 # Ed Page (epage)
-start = "2021-12-08"
-end = "2026-07-23"
 
 [[trusted.clap_lex]]
 criteria = "safe-to-deploy"
@@ -790,113 +748,17 @@ user-id = 1 # Alex Crichton (alexcrichton)
 start = "2019-03-15"
 end = "2026-05-16"
 
-[[trusted.js-sys]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2019-03-04"
-end = "2026-07-23"
-
-[[trusted.libc]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2019-03-29"
-end = "2026-07-23"
-
-[[trusted.libm]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2019-05-14"
-end = "2026-07-23"
-
-[[trusted.memchr]]
-criteria = "safe-to-deploy"
-user-id = 189 # Andrew Gallant (BurntSushi)
-start = "2019-07-07"
-end = "2026-07-23"
-
-[[trusted.openssl-probe]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2020-08-04"
-end = "2026-07-23"
-
-[[trusted.paste]]
-criteria = "safe-to-deploy"
-user-id = 3618 # David Tolnay (dtolnay)
-start = "2019-03-19"
-end = "2026-07-23"
-
-[[trusted.prettyplease]]
-criteria = "safe-to-deploy"
-user-id = 3618 # David Tolnay (dtolnay)
-start = "2022-01-04"
-end = "2026-07-23"
-
-[[trusted.regex]]
-criteria = "safe-to-deploy"
-user-id = 189 # Andrew Gallant (BurntSushi)
-start = "2019-02-27"
-end = "2026-07-23"
-
-[[trusted.regex-automata]]
-criteria = "safe-to-deploy"
-user-id = 189 # Andrew Gallant (BurntSushi)
-start = "2019-02-25"
-end = "2026-07-23"
-
-[[trusted.regex-lite]]
-criteria = "safe-to-deploy"
-user-id = 189 # Andrew Gallant (BurntSushi)
-start = "2023-02-28"
-end = "2026-07-23"
-
-[[trusted.regex-syntax]]
-criteria = "safe-to-deploy"
-user-id = 189 # Andrew Gallant (BurntSushi)
-start = "2019-03-30"
-end = "2026-07-23"
-
-[[trusted.ryu]]
-criteria = "safe-to-deploy"
-user-id = 3618 # David Tolnay (dtolnay)
-start = "2019-05-02"
-end = "2026-07-23"
-
 [[trusted.scopeguard]]
 criteria = "safe-to-deploy"
 user-id = 2915 # Amanieu d'Antras (Amanieu)
 start = "2020-02-16"
 end = "2026-05-16"
 
-[[trusted.serde_json]]
-criteria = "safe-to-deploy"
-user-id = 3618 # David Tolnay (dtolnay)
-start = "2019-02-28"
-end = "2026-07-23"
-
 [[trusted.serde_spanned]]
 criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
 start = "2023-01-20"
 end = "2026-07-09"
-
-[[trusted.serde_yaml]]
-criteria = "safe-to-deploy"
-user-id = 3618 # David Tolnay (dtolnay)
-start = "2019-05-02"
-end = "2026-07-23"
-
-[[trusted.slab]]
-criteria = "safe-to-deploy"
-user-id = 6741 # Alice Ryhl (Darksonn)
-start = "2021-10-13"
-end = "2026-07-23"
-
-[[trusted.socket2]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2019-05-06"
-end = "2026-07-23"
 
 [[trusted.spideroak-base58]]
 criteria = "safe-to-deploy"
@@ -916,53 +778,11 @@ user-id = 293722 # aranya-project-bot
 start = "2025-01-23"
 end = "2026-06-13"
 
-[[trusted.syn]]
-criteria = "safe-to-deploy"
-user-id = 3618 # David Tolnay (dtolnay)
-start = "2019-03-01"
-end = "2026-07-23"
-
-[[trusted.termcolor]]
-criteria = "safe-to-deploy"
-user-id = 189 # Andrew Gallant (BurntSushi)
-start = "2019-06-04"
-end = "2026-07-23"
-
-[[trusted.thiserror]]
-criteria = "safe-to-deploy"
-user-id = 3618 # David Tolnay (dtolnay)
-start = "2019-10-09"
-end = "2026-07-23"
-
-[[trusted.thiserror-impl]]
-criteria = "safe-to-deploy"
-user-id = 3618 # David Tolnay (dtolnay)
-start = "2019-10-09"
-end = "2026-07-23"
-
-[[trusted.tokio]]
-criteria = "safe-to-deploy"
-user-id = 6741 # Alice Ryhl (Darksonn)
-start = "2020-12-25"
-end = "2026-07-23"
-
-[[trusted.tokio-macros]]
-criteria = "safe-to-deploy"
-user-id = 6741 # Alice Ryhl (Darksonn)
-start = "2020-10-26"
-end = "2026-07-23"
-
-[[trusted.tokio-util]]
-criteria = "safe-to-deploy"
-user-id = 6741 # Alice Ryhl (Darksonn)
-start = "2021-01-12"
-end = "2026-07-23"
-
 [[trusted.toml]]
 criteria = "safe-to-deploy"
 user-id = 6743 # Ed Page (epage)
 start = "2022-12-14"
-end = "2026-07-23"
+end = "2026-07-09"
 
 [[trusted.toml_datetime]]
 criteria = "safe-to-deploy"
@@ -982,191 +802,11 @@ user-id = 6743 # Ed Page (epage)
 start = "2025-07-08"
 end = "2026-07-09"
 
-[[trusted.ucd-trie]]
-criteria = "safe-to-deploy"
-user-id = 189 # Andrew Gallant (BurntSushi)
-start = "2019-07-21"
-end = "2026-07-23"
-
-[[trusted.unsafe-libyaml]]
-criteria = "safe-to-deploy"
-user-id = 3618 # David Tolnay (dtolnay)
-start = "2022-07-03"
-end = "2026-07-23"
-
-[[trusted.wasi]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2020-06-03"
-end = "2026-07-23"
-
 [[trusted.wasi]]
 criteria = "safe-to-deploy"
 user-id = 6825 # Dan Gohman (sunfishcode)
 start = "2019-07-22"
 end = "2026-05-16"
-
-[[trusted.wasm-bindgen]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2019-03-04"
-end = "2026-07-23"
-
-[[trusted.wasm-bindgen-backend]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2019-03-04"
-end = "2026-07-23"
-
-[[trusted.wasm-bindgen-macro]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2019-03-04"
-end = "2026-07-23"
-
-[[trusted.wasm-bindgen-macro-support]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2019-03-04"
-end = "2026-07-23"
-
-[[trusted.wasm-bindgen-shared]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2019-03-04"
-end = "2026-07-23"
-
-[[trusted.web-sys]]
-criteria = "safe-to-deploy"
-user-id = 1 # Alex Crichton (alexcrichton)
-start = "2019-03-04"
-end = "2026-07-23"
-
-[[trusted.winapi-util]]
-criteria = "safe-to-deploy"
-user-id = 189 # Andrew Gallant (BurntSushi)
-start = "2020-01-11"
-end = "2026-07-23"
-
-[[trusted.windows]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2021-01-15"
-end = "2026-07-23"
-
-[[trusted.windows-collections]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2025-02-06"
-end = "2026-07-23"
-
-[[trusted.windows-core]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2021-11-15"
-end = "2026-07-23"
-
-[[trusted.windows-future]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2025-02-10"
-end = "2026-07-23"
-
-[[trusted.windows-implement]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2022-01-27"
-end = "2026-07-23"
-
-[[trusted.windows-interface]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2022-02-18"
-end = "2026-07-23"
-
-[[trusted.windows-numerics]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2023-05-15"
-end = "2026-07-23"
-
-[[trusted.windows-result]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2024-02-02"
-end = "2026-07-23"
-
-[[trusted.windows-strings]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2024-02-02"
-end = "2026-07-23"
-
-[[trusted.windows-sys]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2021-11-15"
-end = "2026-07-23"
-
-[[trusted.windows-targets]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2022-09-09"
-end = "2026-07-23"
-
-[[trusted.windows-threading]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2025-04-29"
-end = "2026-07-23"
-
-[[trusted.windows_aarch64_gnullvm]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2022-09-01"
-end = "2026-07-23"
-
-[[trusted.windows_aarch64_msvc]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2021-11-05"
-end = "2026-07-23"
-
-[[trusted.windows_i686_gnu]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2021-10-28"
-end = "2026-07-23"
-
-[[trusted.windows_i686_gnullvm]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2024-04-02"
-end = "2026-07-23"
-
-[[trusted.windows_i686_msvc]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2021-10-27"
-end = "2026-07-23"
-
-[[trusted.windows_x86_64_gnu]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2021-10-28"
-end = "2026-07-23"
-
-[[trusted.windows_x86_64_gnullvm]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2022-09-01"
-end = "2026-07-23"
-
-[[trusted.windows_x86_64_msvc]]
-criteria = "safe-to-deploy"
-user-id = 64539 # Kenny Kerr (kennykerr)
-start = "2021-10-27"
-end = "2026-07-23"
 
 [[trusted.winnow]]
 criteria = "safe-to-deploy"
