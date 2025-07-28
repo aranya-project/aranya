@@ -125,7 +125,7 @@ pub struct AqcReceiveChannel {
 }
 
 impl AqcReceiveChannel {
-    /// Create a new channel with the given conection handle.
+    /// Create a new channel with the given connection handle.
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
@@ -166,10 +166,16 @@ impl AqcReceiveChannel {
         match self.conn.accept_receive_stream().await {
             Ok(Some(stream)) => Ok(AqcReceiveStream(stream)),
             Ok(None) => {
-                // TODO: send signal to `AqcClient`?
+                // Connection closed by peer, no more streams will be accepted.
+                self.close();
                 Err(AqcError::ConnectionClosed)
             }
-            Err(e) => Err(AqcError::ConnectionError(e)),
+            Err(e) => {
+                // An error occurred on the connection while trying to accept a stream.
+                // This likely means the connection is unusable for new streams.
+                self.close();
+                Err(AqcError::ConnectionError(e))
+            }
         }
     }
 
@@ -181,15 +187,32 @@ impl AqcReceiveChannel {
         match self.conn.poll_accept_receive_stream(&mut cx) {
             Poll::Ready(Ok(Some(stream))) => Ok(AqcReceiveStream(stream)),
             Poll::Ready(Ok(None)) => {
-                // TODO: send signal to `AqcClient`?
+                // Connection closed by peer, no more streams will be accepted.
+                self.close();
                 Err(TryReceiveError::Error(AqcError::ConnectionClosed))
             }
             Poll::Ready(Err(e)) => {
-                // TODO: send signal to `AqcClient`?
+                // An error occurred on the connection while trying to accept a stream.
+                // This likely means the connection is unusable for new streams.
+                self.close();
                 Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
             }
             Poll::Pending => Err(TryReceiveError::Empty),
         }
+    }
+
+    /// Close the receive channel.
+    pub fn close(&mut self) {
+        const ERROR_CODE: u32 = 0;
+        self.conn.close(ERROR_CODE.into());
+
+        // TODO: notify `AqcClient` to delete PSKs.
+    }
+}
+
+impl Drop for AqcReceiveChannel {
+    fn drop(&mut self) {
+        self.close();
     }
 }
 
@@ -244,13 +267,14 @@ impl AqcBidiChannel {
         match self.conn.accept().await {
             Ok(Some(stream)) => Ok(AqcPeerStream::new(stream)),
             Ok(None) => {
-                // TODO: send signal to `AqcClient`?
+                // Connection closed by peer, no more streams will be accepted.
+                self.close();
                 Err(AqcError::ConnectionClosed)
             }
             Err(e) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
-                // TODO: send signal to `AqcClient`?
+                self.close();
                 Err(AqcError::ConnectionError(e))
             }
         }
@@ -266,13 +290,13 @@ impl AqcBidiChannel {
             Poll::Ready(Ok(Some(stream))) => Ok(AqcPeerStream::new(stream)),
             Poll::Ready(Ok(None)) => {
                 // Connection closed by peer, no more streams will be accepted.
-                // TODO: send signal to `AqcClient`?
+                self.close();
                 Err(TryReceiveError::Error(AqcError::ConnectionClosed))
             }
             Poll::Ready(Err(e)) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
-                // TODO: send signal to `AqcClient`?
+                self.close();
                 Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
             }
             Poll::Pending => {
@@ -298,6 +322,8 @@ impl AqcBidiChannel {
     pub fn close(&mut self) {
         const ERROR_CODE: u32 = 0;
         self.conn.close(ERROR_CODE.into());
+
+        // TODO: notify `AqcClient` to delete PSKs.
     }
 }
 
@@ -308,6 +334,7 @@ impl Drop for AqcBidiChannel {
 }
 
 /// Used to send and receive data with a peer.
+// TODO: implement `Drop`
 #[derive(Debug)]
 pub struct AqcBidiStream(s2n::BidirectionalStream);
 
@@ -387,6 +414,18 @@ impl AqcReceiveStream {
             Poll::Pending => Err(TryReceiveError::Empty),
         }
     }
+
+    /// Notify peer to stop sending to receive stream.
+    pub fn close(&mut self) {
+        const ERROR_CODE: u32 = 0;
+        let _ = self.0.stop_sending(ERROR_CODE.into());
+    }
+}
+
+impl Drop for AqcReceiveStream {
+    fn drop(&mut self) {
+        self.close();
+    }
 }
 
 /// Used to send data to a peer.
@@ -403,6 +442,12 @@ impl AqcSendStream {
     pub async fn close(&mut self) -> Result<(), AqcError> {
         self.0.close().await?;
         Ok(())
+    }
+}
+
+impl Drop for AqcSendStream {
+    fn drop(&mut self) {
+        let _ = futures_lite::future::block_on(self.close());
     }
 }
 
