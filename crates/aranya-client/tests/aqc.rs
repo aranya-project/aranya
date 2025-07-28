@@ -3,15 +3,18 @@
 use std::time::Duration;
 
 mod common;
-use anyhow::Result;
+
+use anyhow::{Context as _, Result};
 use aranya_client::aqc::AqcPeerChannel;
 use aranya_crypto::dangerous::spideroak_crypto::csprng::rand;
 use aranya_daemon_api::{text, ChanOp};
+use backon::{ConstantBuilder, Retryable as _};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
-use common::{sleep, TeamCtx};
-use futures_util::future::try_join;
+use futures_util::{future::try_join, FutureExt};
 use tempfile::tempdir;
+
+use crate::common::{sleep, DevicesCtx};
 
 /// Demonstrate nominal usage of AQC channels.
 /// 1. Create bidirectional and unidirectional AQC channels.
@@ -19,69 +22,66 @@ use tempfile::tempdir;
 /// 3. Delete AQC channels.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans() -> Result<()> {
-    let interval = Duration::from_millis(100);
-    let sleep_interval = interval * 6;
-
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans", work_dir).await?;
 
     // create team.
-    let team_id = team.create_and_add_team().await?;
-
-    sleep(sleep_interval).await;
+    let team_id = devices.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
-    team.add_all_device_roles(team_id).await?;
+    devices.add_all_device_roles(team_id).await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    let operator_team = team.operator.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
         .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // wait for ctrl message to be sent.
-    sleep(Duration::from_millis(100)).await;
 
     let label1 = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label1, op)
+        .assign_label(devices.membera.id, label1, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label1, op)
+        .assign_label(devices.memberb.id, label1, op)
         .await?;
 
     let label2 = operator_team.create_label(text!("label2")).await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label2, op)
+        .assign_label(devices.membera.id, label2, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label2, op)
+        .assign_label(devices.memberb.id, label2, op)
         .await?;
 
     // wait for syncing.
-    sleep(sleep_interval).await;
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
 
     {
         let (mut bidi_chan1, peer_channel) = try_join(
-            team.membera.client.aqc().create_bidi_channel(
+            devices.membera.client.aqc().create_bidi_channel(
                 team_id,
-                team.memberb.aqc_net_id(),
+                devices.memberb.aqc_net_id(),
                 label1,
             ),
-            team.memberb.client.aqc().receive_channel(),
+            devices.memberb.client.aqc().receive_channel(),
         )
         .await
         .expect("can create and receive channel");
@@ -143,16 +143,17 @@ async fn test_aqc_chans() -> Result<()> {
             if dest_bytes.len() >= big_data.len() {
                 break;
             }
-            tokio::time::sleep(Duration::from_millis(20)).await;
         }
         assert_eq!(dest_bytes.freeze(), big_data);
 
-        team.membera
+        devices
+            .membera
             .client
             .aqc()
             .delete_bidi_channel(bidi_chan1)
             .await?;
-        team.memberb
+        devices
+            .memberb
             .client
             .aqc()
             .delete_bidi_channel(bidi_chan2)
@@ -162,12 +163,12 @@ async fn test_aqc_chans() -> Result<()> {
     {
         // membera creates aqc uni channel with memberb concurrently
         let (mut uni_chan1, peer_channel) = try_join(
-            team.membera.client.aqc().create_uni_channel(
+            devices.membera.client.aqc().create_uni_channel(
                 team_id,
-                team.memberb.aqc_net_id(),
+                devices.memberb.aqc_net_id(),
                 label1,
             ),
-            team.memberb.client.aqc().receive_channel(),
+            devices.memberb.client.aqc().receive_channel(),
         )
         .await
         .expect("can create uni channel");
@@ -193,20 +194,27 @@ async fn test_aqc_chans() -> Result<()> {
 
     {
         let (mut bidi_chan1, peer_channel) = try_join(
-            team.membera.client.aqc().create_bidi_channel(
-                team_id,
-                team.memberb.aqc_net_id(),
-                label2,
+            devices
+                .membera
+                .client
+                .aqc()
+                .create_bidi_channel(team_id, devices.memberb.aqc_net_id(), label2)
+                .map(|r| r.context("member-a creating channel")),
+            (|| {
+                std::future::ready(
+                    devices
+                        .memberb
+                        .client
+                        .aqc()
+                        .try_receive_channel()
+                        .context("member-b receiving channel"),
+                )
+            })
+            .retry(
+                ConstantBuilder::new()
+                    .with_delay(Duration::from_millis(10))
+                    .with_max_times(10),
             ),
-            async {
-                Ok(loop {
-                    let peer_channel_result = team.memberb.client.aqc().try_receive_channel();
-                    if let Ok(peer_channel) = peer_channel_result {
-                        break peer_channel;
-                    }
-                    tokio::time::sleep(Duration::from_millis(100)).await;
-                })
-            },
         )
         .await
         .expect("can create and receive with try_receive_channel");
@@ -223,10 +231,14 @@ async fn test_aqc_chans() -> Result<()> {
         // Send from 1 to 2 with a unidirectional stream
         let msg1 = Bytes::from_static(b"hello");
         send1_1.send(msg1.clone()).await?;
-        tokio::time::sleep(Duration::from_millis(100)).await;
         // Receive a unidirectional stream from peer 1
-        let mut recv2_1 = bidi_chan2
-            .try_receive_stream()
+        let mut recv2_1 = (|| std::future::ready(bidi_chan2.try_receive_stream()))
+            .retry(
+                ConstantBuilder::new()
+                    .with_delay(Duration::from_millis(10))
+                    .with_max_times(10),
+            )
+            .await
             .assume("stream not received")?
             .into_receive()
             .ok()
@@ -241,53 +253,40 @@ async fn test_aqc_chans() -> Result<()> {
 /// Demonstrate that a device cannot create an AQC channel with a label that is not assigned to it.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
-    let interval = Duration::from_millis(100);
-    let sleep_interval = interval * 6;
-
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_sender", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_sender", work_dir).await?;
     // create team.
-    let team_id = team.create_and_add_team().await?;
+    let team_id = devices.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
-    team.add_all_device_roles(team_id).await?;
+    devices.add_all_device_roles(team_id).await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    let operator_team = team.operator.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
         .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // wait for ctrl message to be sent.
-    sleep(Duration::from_millis(100)).await;
 
     let label1 = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label1, op)
+        .assign_label(devices.membera.id, label1, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label1, op)
+        .assign_label(devices.memberb.id, label1, op)
         .await?;
 
     let label2 = operator_team.create_label(text!("label2")).await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label2, op)
+        .assign_label(devices.membera.id, label2, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label2, op)
+        .assign_label(devices.memberb.id, label2, op)
         .await?;
 
     let label3 = operator_team.create_label(text!("label3")).await?;
@@ -295,18 +294,31 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
     // assign label 3 to only the receiver, we are testing if the sender can create
     // a channel without the label assignment
     operator_team
-        .assign_label(team.memberb.id, label3, op)
+        .assign_label(devices.memberb.id, label3, op)
         .await?;
 
     // wait for syncing.
-    sleep(sleep_interval).await;
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
 
     let err = try_join(
-        team.membera
-            .client
-            .aqc()
-            .create_bidi_channel(team_id, team.memberb.aqc_net_id(), label3),
-        team.memberb.client.aqc().receive_channel(),
+        devices.membera.client.aqc().create_bidi_channel(
+            team_id,
+            devices.memberb.aqc_net_id(),
+            label3,
+        ),
+        devices.memberb.client.aqc().receive_channel(),
     )
     .await
     .err()
@@ -319,54 +331,41 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
 /// Demonstrate that a device cannot receive an AQC channel with a label that is not assigned to the device.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
-    let interval = Duration::from_millis(100);
-    let sleep_interval = interval * 6;
-
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans_not_auth_label_recvr", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_recvr", work_dir).await?;
 
     // create team.
-    let team_id = team.create_and_add_team().await?;
+    let team_id = devices.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
-    team.add_all_device_roles(team_id).await?;
+    devices.add_all_device_roles(team_id).await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    let operator_team = team.operator.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
         .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // wait for ctrl message to be sent.
-    sleep(Duration::from_millis(100)).await;
 
     let label1 = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label1, op)
+        .assign_label(devices.membera.id, label1, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label1, op)
+        .assign_label(devices.memberb.id, label1, op)
         .await?;
 
     let label2 = operator_team.create_label(text!("label2")).await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label2, op)
+        .assign_label(devices.membera.id, label2, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label2, op)
+        .assign_label(devices.memberb.id, label2, op)
         .await?;
 
     let label3 = operator_team.create_label(text!("label3")).await?;
@@ -374,18 +373,31 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
     // assign label 3 to only the sender, we are testing if the receiver can receive
     // a channel without the label assignment
     operator_team
-        .assign_label(team.membera.id, label3, op)
+        .assign_label(devices.membera.id, label3, op)
         .await?;
 
     // wait for syncing.
-    sleep(sleep_interval).await;
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
 
     let err = try_join(
-        team.membera
-            .client
-            .aqc()
-            .create_bidi_channel(team_id, team.memberb.aqc_net_id(), label3),
-        team.memberb.client.aqc().receive_channel(),
+        devices.membera.client.aqc().create_bidi_channel(
+            team_id,
+            devices.memberb.aqc_net_id(),
+            label3,
+        ),
+        devices.memberb.client.aqc().receive_channel(),
     )
     .await
     .err()
@@ -398,67 +410,66 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 /// Demonstrate that data cannot be received on a closed AQC QUIC stream.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_close_sender_stream() -> Result<()> {
-    let interval = Duration::from_millis(100);
-    let sleep_interval = interval * 6;
-
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans_close_sender_stream", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_close_sender_stream", work_dir).await?;
 
     // create team.
-    let team_id = team.create_and_add_team().await?;
+    let team_id = devices.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
-    team.add_all_device_roles(team_id).await?;
+    devices.add_all_device_roles(team_id).await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    let operator_team = team.operator.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
         .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // wait for ctrl message to be sent.
-    sleep(Duration::from_millis(100)).await;
 
     let label1 = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label1, op)
+        .assign_label(devices.membera.id, label1, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label1, op)
+        .assign_label(devices.memberb.id, label1, op)
         .await?;
 
     let label2 = operator_team.create_label(text!("label2")).await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label2, op)
+        .assign_label(devices.membera.id, label2, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label2, op)
+        .assign_label(devices.memberb.id, label2, op)
         .await?;
 
     // wait for syncing.
-    sleep(sleep_interval).await;
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
 
     {
         let (mut bidi_chan1, peer_channel) = try_join(
-            team.membera.client.aqc().create_bidi_channel(
+            devices.membera.client.aqc().create_bidi_channel(
                 team_id,
-                team.memberb.aqc_net_id(),
+                devices.memberb.aqc_net_id(),
                 label1,
             ),
-            team.memberb.client.aqc().receive_channel(),
+            devices.memberb.client.aqc().receive_channel(),
         )
         .await
         .expect("can create and receive channel");
@@ -513,12 +524,14 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         // we expect the result of bidi1_2 to be none, as the stream is closed. (per s2n docs)
         assert!(bidi1_2.receive().await?.is_none());
 
-        team.membera
+        devices
+            .membera
             .client
             .aqc()
             .delete_bidi_channel(bidi_chan1)
             .await?;
-        team.memberb
+        devices
+            .memberb
             .client
             .aqc()
             .delete_bidi_channel(bidi_chan2)
@@ -531,67 +544,66 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 /// Demonstrate that data cannot be sent or received on a deleted AQC channel.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
-    let interval = Duration::from_millis(100);
-    let sleep_interval = interval * 6;
-
     let tmp = tempdir()?;
     let work_dir = tmp.path().to_path_buf();
 
-    let mut team = TeamCtx::new("test_aqc_chans_delete_chan_send", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_delete_chan_send", work_dir).await?;
 
     // create team.
-    let team_id = team.create_and_add_team().await?;
+    let team_id = devices.create_and_add_team().await?;
 
     // Tell all peers to sync with one another, and assign their roles.
-    team.add_all_sync_peers(team_id).await?;
-    team.add_all_device_roles(team_id).await?;
+    devices.add_all_device_roles(team_id).await?;
 
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    let operator_team = team.operator.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
     operator_team
-        .assign_aqc_net_identifier(team.membera.id, team.membera.aqc_net_id())
+        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
         .await?;
     operator_team
-        .assign_aqc_net_identifier(team.memberb.id, team.memberb.aqc_net_id())
+        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
         .await?;
-
-    // wait for syncing.
-    sleep(sleep_interval).await;
-
-    // wait for ctrl message to be sent.
-    sleep(Duration::from_millis(100)).await;
 
     let label1 = operator_team.create_label(text!("label1")).await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label1, op)
+        .assign_label(devices.membera.id, label1, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label1, op)
+        .assign_label(devices.memberb.id, label1, op)
         .await?;
 
     let label2 = operator_team.create_label(text!("label2")).await?;
     let op = ChanOp::SendRecv;
     operator_team
-        .assign_label(team.membera.id, label2, op)
+        .assign_label(devices.membera.id, label2, op)
         .await?;
     operator_team
-        .assign_label(team.memberb.id, label2, op)
+        .assign_label(devices.memberb.id, label2, op)
         .await?;
 
     // wait for syncing.
-    sleep(sleep_interval).await;
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
 
     {
         let (mut bidi_chan1, peer_channel) = try_join(
-            team.membera.client.aqc().create_bidi_channel(
+            devices.membera.client.aqc().create_bidi_channel(
                 team_id,
-                team.memberb.aqc_net_id(),
+                devices.memberb.aqc_net_id(),
                 label1,
             ),
-            team.memberb.client.aqc().receive_channel(),
+            devices.memberb.client.aqc().receive_channel(),
         )
         .await
         .expect("can create and receive channel");
@@ -638,12 +650,14 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         let bytes = bidi1_2.receive().await?.assume("no data received")?;
         assert_eq!(bytes, msg3);
 
-        team.membera
+        devices
+            .membera
             .client
             .aqc()
             .delete_bidi_channel(bidi_chan1)
             .await?;
-        team.memberb
+        devices
+            .memberb
             .client
             .aqc()
             .delete_bidi_channel(bidi_chan2)
