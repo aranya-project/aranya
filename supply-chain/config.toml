@@ -640,28 +640,12 @@ criteria = "safe-to-deploy"
 version = "0.7.13"
 criteria = "safe-to-deploy"
 
-[[exemptions.tracing]]
-version = "0.1.41"
-criteria = "safe-to-deploy"
-
-[[exemptions.tracing-attributes]]
-version = "0.1.28"
-criteria = "safe-to-deploy"
-
-[[exemptions.tracing-core]]
-version = "0.1.33"
-criteria = "safe-to-deploy"
-
 [[exemptions.tracing-log]]
 version = "0.2.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.tracing-opentelemetry]]
 version = "0.27.0"
-criteria = "safe-to-deploy"
-
-[[exemptions.tracing-subscriber]]
-version = "0.3.19"
 criteria = "safe-to-deploy"
 
 [[exemptions.typenum]]
