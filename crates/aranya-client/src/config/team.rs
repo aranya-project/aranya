@@ -37,7 +37,6 @@ mod versioned {
 
     use super::{quic_sync, TeamId};
 
-    /// Team data for initializing an [`super::AddTeamConfigBuilder`].
     #[obake::versioned]
     #[obake(version("0.1.0"))]
     #[obake(derive(Clone, Debug, Serialize, Deserialize))]
@@ -49,7 +48,7 @@ mod versioned {
         pub(super) quic_sync: quic_sync::versioned::MaybeQuicSyncTeamInfo,
     }
 }
-pub use versioned::TeamInfo;
+use versioned::TeamInfo;
 
 /// Builder for creating a new team configuration.
 #[derive(Debug, Default)]
@@ -141,7 +140,7 @@ impl AddTeamConfigBuilder {
     }
 
     /// Attempts to build the latest [`VersionedTeamInfo`] using the provided parameters.
-    pub fn to_team_info(self) -> obake::AnyVersion<TeamInfo> {
+    pub fn to_team_info(self) -> VersionedTeamInfo {
         let team_info = TeamInfo {
             team_id: self.team_id,
             quic_sync: self
@@ -153,8 +152,8 @@ impl AddTeamConfigBuilder {
         VersionedTeamInfo::from(team_info)
     }
 
-    /// Initializes a builder from any version of a [`TeamInfo`]
-    pub fn from_team_info(team_info: obake::AnyVersion<TeamInfo>) -> Result<Self> {
+    /// Initializes a builder from any version of a [TeamInfo][VersionedTeamInfo]
+    pub fn from_team_info(team_info: VersionedTeamInfo) -> Result<Self> {
         // Convert any version of `TeamInfo` into the latest version
         let TeamInfo {
             team_id,
@@ -237,7 +236,7 @@ mod test {
         let deserialized: VersionedTeamInfo = serde_json::from_str(&json).expect("can deserialize");
 
         let builder = AddTeamConfigBuilder::from_team_info(deserialized).expect("can initialize");
-        // assert_eq!(team_info, builder.build_team_info().expect("can build"));
+
         assert!(builder.build().is_ok());
     }
 }
