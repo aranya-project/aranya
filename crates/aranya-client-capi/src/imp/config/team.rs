@@ -214,17 +214,16 @@ impl From<AddTeamConfigBuilder> for aranya_client::AddTeamConfigBuilder {
 }
 
 impl From<aranya_client::AddTeamConfigBuilder> for AddTeamConfigBuilder {
-    fn from(mut value: aranya_client::AddTeamConfigBuilder) -> Self {
+    fn from(value: aranya_client::AddTeamConfigBuilder) -> Self {
+        let value = aranya_client::config::PubAddTeamConfigBuilder::from(value);
         let mut builder = Self::default();
 
-        if let Some(team_id) = value.get_team_id() {
-            builder.id((*team_id).into());
+        if let Some(team_id) = value.team_id {
+            builder.id(team_id.into());
         }
 
-        if value.has_quic_sync() {
-            let qs_cfg_builder = value.quic_sync();
-
-            if let Some(mode) = qs_cfg_builder.get_mode() {
+        if let Some(qs_cfg_builder) = value.quic_sync {
+            if let Some(mode) = qs_cfg_builder.mode {
                 builder.quic_sync().mode(mode.clone());
             }
         }

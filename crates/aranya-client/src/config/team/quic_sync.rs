@@ -82,12 +82,6 @@ pub struct AddTeamQuicSyncConfigBuilder {
 }
 
 impl AddTeamQuicSyncConfigBuilder {
-    /// gets the PSK seed mode.
-    #[doc(hidden)]
-    pub fn get_mode(&self) -> Option<&AddSeedMode> {
-        self.mode.as_ref()
-    }
-
     /// Sets the PSK seed mode.
     #[doc(hidden)]
     pub fn mode(&mut self, mode: AddSeedMode) -> &mut Self {
@@ -139,6 +133,20 @@ impl AddTeamQuicSyncConfigBuilder {
         };
 
         Ok(AddTeamQuicSyncConfig { mode })
+    }
+}
+
+#[doc(hidden)]
+#[non_exhaustive]
+#[derive(Debug)]
+pub struct PubAddTeamQuicSyncConfigBuilder {
+    pub mode: Option<AddSeedMode>,
+}
+
+#[doc(hidden)]
+impl From<AddTeamQuicSyncConfigBuilder> for PubAddTeamQuicSyncConfigBuilder {
+    fn from(value: AddTeamQuicSyncConfigBuilder) -> Self {
+        Self { mode: value.mode }
     }
 }
 
