@@ -150,6 +150,10 @@ pub enum AqcError {
     #[error("peer could not process control message")]
     PeerCtrl,
 
+    /// Unable to send to mpsc channel.
+    #[error("unable to send to mpsc channel")]
+    Send,
+
     /// An internal bug was discovered.
     #[error(transparent)]
     Bug(#[from] buggy::Bug),

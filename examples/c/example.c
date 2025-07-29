@@ -876,7 +876,7 @@ static void *membera_aqc_thread(void *arg) {
     printf("Received AQC bidi stream data: \"%s\"\n", uni_buffer);
 
 exit:
-    err         = aranya_aqc_delete_bidi_channel(ctx->client, &bidi_chan);
+    err         = aranya_aqc_delete_bidi_channel(&bidi_chan);
     ctx->result = err;
     return NULL;
 }
@@ -1004,7 +1004,7 @@ static void *memberb_aqc_thread(void *arg) {
     sleep(2);
 
 exit:
-    err         = aranya_aqc_delete_uni_channel(ctx->client, &uni_send);
+    err         = aranya_aqc_delete_uni_channel(&uni_send);
     ctx->result = err;
     return NULL;
 }

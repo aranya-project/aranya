@@ -453,7 +453,7 @@ async fn main() -> Result<()> {
 
     // membera deletes the AQC channel.
     info!("membera deleting aqc channel");
-    membera.client.aqc().delete_bidi_channel(created_aqc_chan).await?;
+    drop(created_aqc_chan);
 
     info!("revoking label from membera");
     operator_team.revoke_label(membera.id, label3).await?;

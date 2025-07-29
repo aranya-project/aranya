@@ -531,7 +531,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcPeerChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[144];
+    uint8_t __for_size_only[152];
 } AranyaAqcPeerChannel;
 
 /**
@@ -543,7 +543,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[136];
+    uint8_t __for_size_only[144];
 } AranyaAqcBidiChannel;
 
 /**
@@ -555,7 +555,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcSendChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[136];
+    uint8_t __for_size_only[144];
 } AranyaAqcSendChannel;
 
 /**
@@ -567,7 +567,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[136];
+    uint8_t __for_size_only[144];
 } AranyaAqcReceiveChannel;
 
 /**
@@ -2747,26 +2747,18 @@ AranyaError aranya_aqc_create_uni_channel_ext(struct AranyaClient *client,
  *
  * Note that this function takes ownership of the [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) and invalidates any further use.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
- *
- * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_bidi_channel(struct AranyaClient *client,
-                                           struct AranyaAqcBidiChannel *channel);
+AranyaError aranya_aqc_delete_bidi_channel(struct AranyaAqcBidiChannel *_channel);
 
 /**
  * Delete a bidirectional AQC channel.
  *
  * Note that this function takes ownership of the [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) and invalidates any further use.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
- *
- * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
-                                               struct AranyaAqcBidiChannel *channel,
+AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaAqcBidiChannel *_channel,
                                                struct AranyaExtError *__ext_err);
 
 /**
@@ -2774,26 +2766,18 @@ AranyaError aranya_aqc_delete_bidi_channel_ext(struct AranyaClient *client,
  *
  * Note that this function takes ownership of the [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) and invalidates any further use.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) to delete.
- *
- * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_uni_channel(struct AranyaClient *client,
-                                          struct AranyaAqcSendChannel *channel);
+AranyaError aranya_aqc_delete_uni_channel(struct AranyaAqcSendChannel *_channel);
 
 /**
  * Delete a unidirectional AQC channel.
  *
  * Note that this function takes ownership of the [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) and invalidates any further use.
  *
- * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) to delete.
- *
- * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaClient *client,
-                                              struct AranyaAqcSendChannel *channel,
+AranyaError aranya_aqc_delete_uni_channel_ext(struct AranyaAqcSendChannel *_channel,
                                               struct AranyaExtError *__ext_err);
 
 /**
