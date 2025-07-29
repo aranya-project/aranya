@@ -96,7 +96,6 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
     }
 }
 
-// TODO: switch from vec to map for faster identity lookups.
 #[derive(Debug)]
 pub struct ClientPresharedKeys {
     keys: Mutex<BTreeMap<PskIdentity, Arc<PresharedKey>>>,

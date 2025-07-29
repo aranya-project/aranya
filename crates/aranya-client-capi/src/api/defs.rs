@@ -1621,7 +1621,7 @@ pub unsafe fn aqc_remove_net_identifier(
 /// `try_receive_channel`, and is invalidated after calling
 /// `get_bidi_channel`/`get_receive_channel`.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 152, align = 8)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AqcPeerChannel = Safe<imp::AqcPeerChannel>;
 
 /// An enum containing all [`AqcPeerChannel`] variants.
@@ -1634,17 +1634,17 @@ pub enum AqcChannelType {
 
 /// An AQC Bidirectional Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 144, align = 8)]
+#[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
 
 /// An AQC Sender Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 144, align = 8)]
+#[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AqcSendChannel = Safe<imp::AqcSendChannel>;
 
 /// An AQC Receiver Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 144, align = 8)]
+#[aranya_capi_core::opaque(size = 152, align = 8)]
 pub type AqcReceiveChannel = Safe<imp::AqcReceiveChannel>;
 
 /// An AQC Bidirectional Stream Object.

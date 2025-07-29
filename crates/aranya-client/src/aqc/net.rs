@@ -38,7 +38,10 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
 use super::crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL};
-use crate::error::{aranya_error, AqcError, IpcError};
+use crate::{
+    aqc::net::channels::ChannelKeys,
+    error::{aranya_error, AqcError, IpcError},
+};
 
 pub mod channels;
 
@@ -225,11 +228,16 @@ impl AqcClient {
             .map(|(_, psk)| psk.identity.as_bytes().to_vec())
             .collect();
         debug!("got psk identities");
+        let keys = ChannelKeys::new(
+            self.client_state.lock().await.client_keys.clone(),
+            self.server_keys.clone(),
+        );
         Ok(channels::AqcSendChannel::new(
             label_id,
             channel_id,
             conn.handle(),
             identities,
+            keys,
         ))
     }
 
@@ -263,8 +271,12 @@ impl AqcClient {
             .map(|(_, psk)| psk.identity.as_bytes().to_vec())
             .collect();
         debug!("received psk identities");
+        let keys = ChannelKeys::new(
+            self.client_state.lock().await.client_keys.clone(),
+            self.server_keys.clone(),
+        );
         Ok(channels::AqcBidiChannel::new(
-            label_id, channel_id, conn, identities,
+            label_id, channel_id, conn, identities, keys,
         ))
     }
 
@@ -313,6 +325,7 @@ impl AqcClient {
             // If the PSK identity hint is not the control PSK, check if it's in the channel map.
             // If it is, create a channel of the appropriate type. We should have already received
             // the control message for this PSK, if we don't we can't create a channel.
+            let client_keys = self.client_state.lock().await.client_keys.clone();
             let channels = self.channels.read().expect("poisoned");
             let channel_info = channels.get(&identity).ok_or_else(|| {
                 warn!(
@@ -321,11 +334,13 @@ impl AqcClient {
                 );
                 AqcError::NoChannelInfoFound
             })?;
+            let keys = ChannelKeys::new(client_keys, self.server_keys.clone());
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
                 conn,
                 identity,
+                keys,
             ));
         }
     }
@@ -395,11 +410,16 @@ impl AqcClient {
                 );
                 TryReceiveError::Error(AqcError::NoChannelInfoFound.into())
             })?;
+            let client_keys = futures_lite::future::block_on(self.client_state.lock())
+                .client_keys
+                .clone();
+            let keys = ChannelKeys::new(client_keys, self.server_keys.clone());
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
                 conn,
                 identity,
+                keys,
             ));
         }
     }
