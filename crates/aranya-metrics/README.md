@@ -1,53 +1,28 @@
 # Aranya Metrics Collection
 
-As with any project that grows large enough, Aranya is now able to collect various metrics to measure performance and find areas to target for improvement. This is accomplished in several ways:
+As with any project that grows large enough, Aranya has a need for collecting benchmarks and other metrics to see if performance is improving or regressing over time and to get a sense for what could be improved. The `aranya-metrics` crate accomplishes this by providing a "harness" that measures memory, cpu, and disk usage and reporting it through one of several backends.
 
--   Benchmarks that use `divan` to measure runtime and memory usage
--   The `aranya-metrics` crate that adds a harness on top of Aranya code that's representative of typical operation in order to see how the entire stack performs in that scenario. This includes cpu time, memory usage, and disk usage.
+Future plans to collect more information include:
 
-Future plans to support more information include:
+-   Adding `metrics-rs` into the daemon binary itself to collect additional metrics such as network usage and statistics about how the directed acyclic graph is performing. The provided exporter will need to be hidden behind a feature flag, and any metrics collection should compile out completely with it off.
+-   Augmenting existing metrics with more information using key-value pairs, as well as reporting metrics for individual daemons.
+-   Extending the above metrics harness with benchmarks using `divan` and [flame graphs](https://www.brendangregg.com/flamegraphs.html) to identify performance bottlenecks and functions that need to be annotated with `#[fastrace::trace]` for better measurement of hotspots.
 
--   Adding `metrics-rs` into more areas of Aranya to measure performance directly, with an optional recorder enabled to actually collect and display those values. Note that `metrics-rs` is designed to be lightweight enough that without a recorder, the performance impact is negligible.
--   Adding more granular metrics, using key-value pairs to report the data from specific daemon instances.
--   Using the above `divan` benchmarks, as well as [flame graphs](https://www.brendangregg.com/flamegraphs.html) to narrow down specific functions to augment with `#[fastrace::trace]` for measuring hot spots for improvements.
--   Adding a `metrics-rs` recorder and `fastrace` reporter to the daemon binary behind a feature flag to enable collecting metrics in production.
+# Prometheus Exporter
 
-# Installation Instructions
+One of the supported metrics backends allows for communicating with a [Prometheus](https://prometheus.io/) instance. Note that with the way that Prometheus works, a datapoint is only created once the data is scraped, so any data created locally that gets overwritten before being scraped is lost. This can either be letting the main Prometheus backend scrape data from the exporter which is meant for longer running data, or using a `pushgateway` with a unique job name to easily filter out specific runs, which is meant more for short runs.
 
-Make sure [homebrew](https://brew.sh/) is installed, and then install the following packages:
+## Installation Instructions
+You can get Prometheus through your favorite package manager; on MacOS it's preferred to use [homebrew](https://brew.sh/).
 
--   [brew install prometheus](https://formulae.brew.sh/formula/prometheus), which installs [Prometheus](https://prometheus.io/), an open source metrics collection backend.
--   [brew install grafana](https://formulae.brew.sh/formula/grafana), which will install [Grafana](https://grafana.com/), an open source frontend to better visualize our metrics.
+### MacOS Installation
+Make sure homebrew is installed, and then run [brew install prometheus](https://formulae.brew.sh/formula/prometheus).
 
-Download the correct package for the [`pushgateway`](https://prometheus.io/download/#pushgateway) since it's not available on `homebrew`, extract it, and `sudo cp pushgateway /usr/local/bin/` to install it as a tool.
+If you need the `pushgateway` binary, it's not available using homebrew, so'll have to [download it](https://prometheus.io/download/#pushgateway) from the Prometheus website, extract it, and install it using `sudo cp pushgateway /usr/local/bin/`. Note that when you first try to run the binary, MacOS will block it from running since it hasn't been notarized. After trying to run it once, follow the instructions on [Apple's website](https://support.apple.com/en-us/102445#openanyway) to allow the binary to run anyways.
 
-Modify the Prometheus config file at `/opt/homebrew/etc/prometheus.yml` (or `/usr/local/etc/prometheus.yml`) to the following, to add `pushgateway` and `node_exporter` support:
+You'll also have to modify the Prometheus config file at `/opt/homebrew/etc/prometheus.yml` (or `/usr/local/etc/prometheus.yml`), with your chosen scrape interval and `pushgateway` information if you're going that route. We've provided an [example file](prometheus.yml) for use with the exporter, which you can `sudo cp prometheus.yml /opt/homebrew/etc/prometheus.yml` to replace.
 
-```yaml
-global:
-    # By default, Prometheus will scrape data from our endpoints every 15 seconds
-    scrape_interval: 15s
-
-scrape_configs:
-    # Prometheus runs on localhost:9090
-    - job_name: "prometheus"
-      static_configs:
-          - targets: ["localhost:9090"]
-
-    # Our pushgateway runs on localhost:9091, and we scrape it every 100ms
-    - job_name: "pushgateway"
-      static_configs:
-          - targets: ["localhost:9091"]
-      scrape_interval: 100ms
-      honor_labels: true # Important
-```
-
-Finally, install the above as long-running services:
-
--   `brew services start prometheus`
--   `brew services start grafana`
-
-Grafana can be accessed at `https://localhost:3000/`, sign-in by default is `admin:admin`.
+Once you've configured Prometheus, you'll want to set Prometheus to start automatically: `brew services start prometheus`. If you ran that command before changing the config, run `brew services restart prometheus`.
 
 # Collecting Metrics
 
