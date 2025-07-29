@@ -6,16 +6,20 @@
 //! [`SyncPeers`] and [`Syncer`] communicate via mpsc channels so they can run independently.
 //! This prevents the need for an `Arc<<Mutex>>` which would lock until the next peer is retrieved from the [`DelayQueue`]
 
-use std::{collections::HashMap, future::Future};
+use std::{
+    collections::{BTreeMap, HashMap},
+    future::Future,
+    sync::Arc,
+};
 
 use anyhow::Context;
 use aranya_daemon_api::SyncPeerConfig;
-use aranya_runtime::{storage::GraphId, Engine, Sink};
+use aranya_runtime::{storage::GraphId, Engine, PeerCache, Sink};
 use aranya_util::{error::ReportExt as _, ready, Addr};
 use buggy::BugExt;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{mpsc, oneshot, Mutex};
 use tokio_util::time::{delay_queue::Key, DelayQueue};
 use tracing::{error, instrument, trace, warn};
 
@@ -51,9 +55,17 @@ type Reply = SyncResult<()>;
 /// - network address
 /// - Aranya graph id
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
-struct SyncPeer {
+pub(crate) struct SyncPeer {
     addr: Addr,
     graph_id: GraphId,
+}
+
+impl SyncPeer {
+    /// Creates a new `SyncPeer`.
+    #[cfg(test)]
+    pub fn new(addr: Addr, graph_id: GraphId) -> Self {
+        Self { addr, graph_id }
+    }
 }
 
 /// Handles adding and removing sync peers.
@@ -118,6 +130,26 @@ impl SyncPeers {
 
 type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
 
+/// Key for looking up syncer peer cache in map.
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq, Debug)]
+pub struct PeerCacheKey {
+    /// The peer address.
+    pub addr: Addr,
+    /// The Aranya graph ID.
+    pub id: GraphId,
+}
+
+impl PeerCacheKey {
+    fn new(addr: Addr, id: GraphId) -> Self {
+        Self { addr, id }
+    }
+}
+
+/// Thread-safe map of peer caches
+/// For a given peer, there's should only be one cache. If separate caches are used
+/// for the server and state it will reduce the efficiency of the syncer.
+pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
+
 /// Syncs with each peer after the specified interval.
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
@@ -135,20 +167,27 @@ pub struct Syncer<ST> {
     send_effects: EffectSender,
     /// Keeps track of invalid graphs due to finalization errors.
     invalid: InvalidGraphs,
-    /// Additional state used by the syncer
+    /// Additional state used by the syncer.
     state: ST,
+    /// Sync server address.
+    server_addr: Addr,
+    /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
+    /// Lock must be acquired after [`Self::client`]
+    caches: PeerCacheMap,
 }
 
 /// Types that contain additional data that are part of a [`Syncer`]
 /// object.
 pub trait SyncState: Sized {
     /// Syncs with the peer.
+    ///
+    /// Returns the number of commands that were received and successfully processed.
     fn sync_impl<S>(
         syncer: &mut Syncer<Self>,
         id: GraphId,
         sink: &mut S,
         peer: &Addr,
-    ) -> impl Future<Output = SyncResult<()>> + Send
+    ) -> impl Future<Output = SyncResult<usize>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
 }
@@ -190,12 +229,12 @@ impl<ST: SyncState> Syncer<ST> {
                 let reply = match msg {
                     Msg::SyncNow { peer, cfg: _cfg } => {
                         // sync with peer right now.
-                        self.sync(&peer).await
+                        self.sync(&peer).await.map(|_| ())
                     },
                     Msg::AddPeer { peer, cfg } => {
                         let mut result = Ok(());
                         if cfg.sync_now {
-                            result = self.sync(&peer).await;
+                            result = self.sync(&peer).await.map(|_| ());
                         }
                         self.add_peer(peer, cfg);
                         result
@@ -224,10 +263,10 @@ impl<ST: SyncState> Syncer<ST> {
 
     /// Sync with a peer.
     #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
-    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<()> {
+    pub(crate) async fn sync(&mut self, peer: &SyncPeer) -> SyncResult<usize> {
         trace!("syncing with peer");
         let mut sink = VecSink::new();
-        ST::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
+        let cmd_count = ST::sync_impl(self, peer.graph_id, &mut sink, &peer.addr)
             .await
             .inspect_err(|err| {
                 // If a finalization error has occurred, remove all sync peers for that team.
@@ -243,6 +282,7 @@ impl<ST: SyncState> Syncer<ST> {
                     self.invalid.insert(peer.graph_id);
                 }
             })?;
+
         let effects = sink
             .collect()
             .context("could not collect effects from sync")?;
@@ -252,6 +292,24 @@ impl<ST: SyncState> Syncer<ST> {
             .await
             .context("unable to send effects")?;
         trace!(?n, "completed sync");
-        Ok(())
+        Ok(cmd_count)
+    }
+
+    /// Get peer caches.
+    #[cfg(test)]
+    pub(crate) fn get_peer_caches(&self) -> PeerCacheMap {
+        self.caches.clone()
+    }
+
+    /// Returns a reference to the Aranya client.
+    #[cfg(test)]
+    pub fn client(&self) -> &crate::aranya::Client<crate::EN, crate::SP> {
+        &self.client
+    }
+
+    /// Returns a mutable reference to the Aranya client.
+    #[cfg(test)]
+    pub fn client_mut(&mut self) -> &mut crate::aranya::Client<crate::EN, crate::SP> {
+        &mut self.client
     }
 }

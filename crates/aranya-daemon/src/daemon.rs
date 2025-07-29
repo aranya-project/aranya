@@ -30,7 +30,7 @@ use crate::{
     policy,
     sync::task::{
         quic::{PskStore, State as QuicSyncClientState, SyncParams},
-        SyncPeers, Syncer,
+        PeerCacheMap, SyncPeers, Syncer,
     },
     util::{load_team_psk_pairs, SeedDir},
     vm_policy::{PolicyEngine, TEST_POLICY_1},
@@ -166,6 +166,9 @@ impl Daemon {
 
             let invalid_graphs = InvalidGraphs::default();
 
+            // Create a shared PeerCacheMap
+            let caches: PeerCacheMap = Arc::new(Mutex::new(BTreeMap::new()));
+
             // Initialize Aranya client, sync client,and sync server.
             let (client, sync_server, syncer, peers, recv_effects) = Self::setup_aranya(
                 &cfg,
@@ -176,6 +179,7 @@ impl Daemon {
                 &pks,
                 SyncParams {
                     psk_store: Arc::clone(&psk_store),
+                    caches: caches.clone(),
                     server_addr: qs_config.addr,
                     active_team_rx,
                 },
@@ -325,6 +329,7 @@ impl Daemon {
         SyncParams {
             psk_store,
             active_team_rx,
+            caches,
             server_addr,
         }: SyncParams,
         invalid_graphs: InvalidGraphs,
@@ -354,7 +359,9 @@ impl Daemon {
             client.clone(),
             send_effects,
             invalid_graphs,
-            psk_store.clone(),
+            Arc::clone(&psk_store),
+            server_addr,
+            Arc::clone(&caches),
         )?;
 
         info!(addr = %server_addr, "starting QUIC sync server");
@@ -365,6 +372,7 @@ impl Daemon {
             conns,
             conn_rx,
             active_team_rx,
+            caches,
         )
         .await
         .context("unable to initialize QUIC sync server")?;
