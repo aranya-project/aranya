@@ -258,11 +258,13 @@ async fn main() -> Result<()> {
     };
 
     let admin_team = {
-        // This is where the owner could create a TeamInfo struct, serialize it,
-        // and transmit it to the admin through an out-of-band process.
         let team_info = {
+            // This is where the owner could create a TeamInfo struct and serialize it
             let input = owner_team_cfg_builder.to_team_info();
             let serialized = postcard::to_allocvec(&input)?;
+
+            // This is where the serialized `TeamInfo` bytes would be transmitted to the peer.
+
             postcard::from_bytes(&serialized)?
         };
 

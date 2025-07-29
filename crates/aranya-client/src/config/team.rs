@@ -25,6 +25,10 @@ pub use quic_sync::{
 };
 
 /// Team data for initializing an [`super::AddTeamConfigBuilder`].
+///
+/// ## Implements
+/// * [serde::Serialize]
+/// * [serde::Deserialize]
 pub type VersionedTeamInfo = versioned::VersionedTeamInfo;
 
 mod versioned {
