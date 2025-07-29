@@ -3,7 +3,6 @@ use core::task::{Context, Poll, Waker};
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::LabelId;
 use bytes::Bytes;
-use tokio::sync::mpsc;
 use tracing::debug;
 
 use super::{AqcChannelId, TryReceiveError};
@@ -16,9 +15,6 @@ mod s2n {
         Connection,
     };
 }
-
-/// Sends the `AqcClient` a list of PSK identities that can be deleted.
-pub(crate) type PskIdentitySender = mpsc::Sender<Vec<PskIdentity>>;
 
 /// A channel opened by a peer.
 #[derive(Debug)]
@@ -35,19 +31,18 @@ impl AqcPeerChannel {
         channel_id: AqcChannelId,
         conn: s2n::Connection,
         identity: Vec<u8>,
-        send: PskIdentitySender,
     ) -> Self {
         match channel_id {
             AqcChannelId::Bidi(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let channel = AqcBidiChannel::new(label_id, id, conn, vec![identity], send);
+                let channel = AqcBidiChannel::new(label_id, id, conn, vec![identity]);
                 AqcPeerChannel::Bidi(channel)
             }
             AqcChannelId::Uni(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let receiver = AqcReceiveChannel::new(label_id, id, conn, vec![identity], send);
+                let receiver = AqcReceiveChannel::new(label_id, id, conn, vec![identity]);
                 AqcPeerChannel::Receive(receiver)
             }
         }
@@ -62,7 +57,6 @@ pub struct AqcSendChannel {
     handle: s2n::Handle,
     id: UniChannelId,
     identities: Vec<PskIdentity>,
-    send: PskIdentitySender,
 }
 
 impl AqcSendChannel {
@@ -75,7 +69,6 @@ impl AqcSendChannel {
         id: UniChannelId,
         handle: s2n::Handle,
         identities: I,
-        send: PskIdentitySender,
     ) -> Self
     where
         I: IntoIterator<Item = PskIdentity>,
@@ -85,7 +78,6 @@ impl AqcSendChannel {
             id,
             handle,
             identities: identities.into_iter().collect(),
-            send,
         }
     }
 
@@ -115,13 +107,6 @@ impl AqcSendChannel {
         debug!("closing aqc send channel");
         const ERROR_CODE: u32 = 0;
         self.handle.close(ERROR_CODE.into());
-        let n = self.identities.len();
-        debug!(?n, "sending PSK identities to zeroize");
-        self.send
-            .send(self.identities.clone())
-            .await
-            .map_err(|_| AqcError::Send)?;
-        debug!(?n, "sent PSK identities to zeroize");
 
         Ok(())
     }
@@ -142,7 +127,6 @@ pub struct AqcReceiveChannel {
     aqc_id: UniChannelId,
     conn: s2n::Connection,
     identities: Vec<PskIdentity>,
-    send: PskIdentitySender,
 }
 
 impl AqcReceiveChannel {
@@ -155,7 +139,6 @@ impl AqcReceiveChannel {
         aqc_id: UniChannelId,
         conn: s2n::Connection,
         identities: I,
-        send: PskIdentitySender,
     ) -> Self
     where
         I: IntoIterator<Item = PskIdentity>,
@@ -165,7 +148,6 @@ impl AqcReceiveChannel {
             aqc_id,
             conn,
             identities: identities.into_iter().collect(),
-            send,
         }
     }
 
@@ -229,13 +211,6 @@ impl AqcReceiveChannel {
         debug!("closing aqc receive channel");
         const ERROR_CODE: u32 = 0;
         self.conn.close(ERROR_CODE.into());
-        let n = self.identities.len();
-        debug!(?n, "sending PSK identities to zeroize");
-        self.send
-            .send(self.identities.clone())
-            .await
-            .map_err(|_| AqcError::Send)?;
-        debug!(?n, "sent PSK identities to zeroize");
 
         Ok(())
     }
@@ -256,7 +231,6 @@ pub struct AqcBidiChannel {
     aqc_id: BidiChannelId,
     conn: s2n::Connection,
     identities: Vec<PskIdentity>,
-    send: PskIdentitySender,
 }
 
 impl AqcBidiChannel {
@@ -266,7 +240,6 @@ impl AqcBidiChannel {
         aqc_id: BidiChannelId,
         conn: s2n::Connection,
         identities: I,
-        send: PskIdentitySender,
     ) -> Self
     where
         I: IntoIterator<Item = Vec<u8>>,
@@ -276,7 +249,6 @@ impl AqcBidiChannel {
             aqc_id,
             conn,
             identities: identities.into_iter().collect(),
-            send,
         }
     }
 
@@ -358,13 +330,6 @@ impl AqcBidiChannel {
         debug!("closing aqc bidi channel");
         const ERROR_CODE: u32 = 0;
         self.conn.close(ERROR_CODE.into());
-        let n = self.identities.len();
-        debug!(?n, "sending PSK identities to zeroize");
-        self.send
-            .send(self.identities.clone())
-            .await
-            .map_err(|_| AqcError::Send)?;
-        debug!(?n, "sent PSK identities to zeroize");
 
         Ok(())
     }

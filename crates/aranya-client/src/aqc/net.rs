@@ -34,22 +34,16 @@ use s2n_quic::{
     Client, Connection, Server,
 };
 use tarpc::context;
-use tokio::sync::mpsc::{self, error::TryRecvError};
+use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
 use super::crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL};
-use crate::{
-    aqc::net::channels::PskIdentitySender,
-    error::{aranya_error, AqcError, IpcError},
-};
+use crate::error::{aranya_error, AqcError, IpcError};
 
 pub mod channels;
 
 /// ALPN protocol identifier for Aranya QUIC Channels
 const ALPN_AQC: &[u8] = b"aqc-v1";
-
-/// Receives a list of PSK identities to be deleted.
-pub(crate) type PskIdentityReceiver = mpsc::Receiver<Vec<PskIdentity>>;
 
 /// An AQC client. Used to create and receive channels.
 // TODO: query daemon to see if active AQC channels are invalid. Delete invalid channels.
@@ -71,10 +65,6 @@ pub(crate) struct AqcClient {
 
     /// Map of PSK identity to channel type
     channels: std::sync::RwLock<HashMap<PskIdentity, AqcChannelInfo>>,
-    /// Receives PSK identities to delete.
-    recv: PskIdentityReceiver,
-    /// Sends PSK identities to delete.
-    send: PskIdentitySender,
 
     daemon: DaemonApiClient,
 }
@@ -178,8 +168,6 @@ impl AqcClient {
         let server_addr = server.local_addr().assume("can get addr")?;
         let client_addr = quic_client.local_addr().assume("can get addr")?;
 
-        let (send, recv) = mpsc::channel::<Vec<PskIdentity>>(8);
-
         Ok(AqcClient {
             client_addr,
             client_state: tokio::sync::Mutex::new(ClientState {
@@ -194,8 +182,6 @@ impl AqcClient {
                 quic_server: server,
                 identity_rx,
             }),
-            recv,
-            send,
         })
     }
 
@@ -244,7 +230,6 @@ impl AqcClient {
             channel_id,
             conn.handle(),
             identities,
-            self.send.clone(),
         ))
     }
 
@@ -279,11 +264,7 @@ impl AqcClient {
             .collect();
         debug!("received psk identities");
         Ok(channels::AqcBidiChannel::new(
-            label_id,
-            channel_id,
-            conn,
-            identities,
-            self.send.clone(),
+            label_id, channel_id, conn, identities,
         ))
     }
 
@@ -297,33 +278,14 @@ impl AqcClient {
         }
     }
 
-    /// Receive PSK identities to zeroize.
-    async fn recv_ident_to_zeroize(&mut self) {
-        debug!("receiving PSK identities to zeroize");
-        match self.recv.try_recv() {
-            Ok(identities) => {
-                debug!(n = identities.len(), "received PSK identities to zeroize");
-                self.zeroize_psks(identities).await
-            }
-            Err(TryRecvError::Empty) => debug!("didn't receive PSK identities to zeroize"),
-            Err(TryRecvError::Disconnected) => {
-                warn!("mpsc channel for receiving PSK identities disconnected")
-            }
-        }
-    }
-
     /// Receive the next available channel.
     pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
         loop {
-            self.recv_ident_to_zeroize().await;
-
             debug!("accept a new connection");
             // Accept a new connection
             let mut server_state = self.server_state.lock().await;
             let Some(mut conn) = server_state.quic_server.accept().await else {
                 error!("server connection terminated");
-                //drop(server_state);
-                //self.close().await;
                 return Err(crate::Error::Aqc(AqcError::ServerConnectionTerminated));
             };
             debug!("accepted connection");
@@ -364,7 +326,6 @@ impl AqcClient {
                 channel_info.channel_id,
                 conn,
                 identity,
-                self.send.clone(),
             ));
         }
     }
@@ -380,10 +341,6 @@ impl AqcClient {
             .map_err(|_| TryReceiveError::Empty)?; // TODO: Is this really what we want?
         let mut cx = Context::from_waker(Waker::noop());
         loop {
-            while let Ok(identities) = self.recv.try_recv() {
-                futures_lite::future::block_on(self.zeroize_psks(identities));
-            }
-
             // Accept a new connection
             let mut conn = match server_state.quic_server.poll_accept(&mut cx) {
                 Poll::Ready(Some(conn)) => conn,
@@ -443,7 +400,6 @@ impl AqcClient {
                 channel_info.channel_id,
                 conn,
                 identity,
-                self.send.clone(),
             ));
         }
     }
@@ -539,10 +495,6 @@ impl AqcClient {
     /// Close the AQC client.
     pub async fn close(&mut self) {
         warn!("AQC client close");
-        if !self.recv.is_empty() {
-            warn!(n = self.recv.len(), "deleting PSKs for inactive channels");
-        }
-        self.recv.close();
         self.channels.write().expect("poisoned").clear();
         self.client_state.lock().await.clear();
         self.server_keys.clear();
