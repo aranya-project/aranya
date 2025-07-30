@@ -284,7 +284,6 @@ impl AqcClient {
     /// Zeroize PSKs from client and server.
     #[instrument(skip(self))]
     async fn zeroize_psks(&self, identities: Vec<PskIdentity>) {
-        debug!("zeroize client and server psks");
         self.client_state.lock().await.zeroize_psks(&identities);
         self.server_keys.zeroize_psks(&identities);
         for identity in identities {
@@ -511,8 +510,8 @@ impl AqcClient {
     }
 
     /// Close the AQC client.
+    #[instrument(skip_all)]
     pub async fn close(&mut self) {
-        debug!("AQC client close");
         self.channels.write().expect("poisoned").clear();
         self.client_state.lock().await.clear();
         self.server_keys.clear();
@@ -521,7 +520,6 @@ impl AqcClient {
 
 impl Drop for AqcClient {
     fn drop(&mut self) {
-        debug!("dropping AQC client");
         futures_lite::future::block_on(self.close());
     }
 }

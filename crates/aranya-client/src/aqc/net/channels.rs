@@ -4,7 +4,7 @@ use std::sync::Arc;
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::LabelId;
 use bytes::Bytes;
-use tracing::debug;
+use tracing::instrument;
 
 use super::{AqcChannelId, TryReceiveError};
 use crate::{
@@ -150,8 +150,8 @@ impl AqcSendChannel {
     }
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
+    #[instrument(skip_all)]
     pub async fn close(&mut self) -> Result<(), AqcError> {
-        debug!("closing aqc send channel");
         const ERROR_CODE: u32 = ConnectionCloseError::ChannelClosed as u32;
         self.handle.close(ERROR_CODE.into());
         self.keys.zeroize();
@@ -242,8 +242,8 @@ impl AqcReceiveChannel {
     }
 
     /// Close the receive channel.
+    #[instrument(skip_all)]
     pub async fn close(&mut self) -> Result<(), AqcError> {
-        debug!("closing aqc receive channel");
         const ERROR_CODE: u32 = ConnectionCloseError::ChannelClosed as u32;
         self.conn.close(ERROR_CODE.into());
         self.keys.zeroize();
@@ -363,8 +363,8 @@ impl AqcBidiChannel {
     }
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
+    #[instrument(skip_all)]
     pub async fn close(&mut self) -> Result<(), AqcError> {
-        debug!("closing aqc bidi channel");
         const ERROR_CODE: u32 = ConnectionCloseError::ChannelClosed as u32;
         self.conn.close(ERROR_CODE.into());
         self.keys.zeroize();
@@ -449,8 +449,8 @@ impl AqcBidiStream {
     }
 
     /// Close the stream.
+    #[instrument(skip_all)]
     pub async fn close(&mut self) -> Result<(), AqcError> {
-        debug!("closing aqc bidi stream");
         if let Err(e) = self.stream.close().await {
             if channel_closed(e) {
                 self.keys.zeroize();
@@ -516,8 +516,8 @@ impl AqcReceiveStream {
     }
 
     /// Notify peer to stop sending to receive stream.
+    #[instrument(skip_all)]
     pub fn close(&mut self) {
-        debug!("closing aqc receive stream");
         const ERROR_CODE: u32 = ConnectionCloseError::ConnectionClosed as u32;
         let _ = self.stream.stop_sending(ERROR_CODE.into());
     }
@@ -525,7 +525,6 @@ impl AqcReceiveStream {
 
 impl Drop for AqcReceiveStream {
     fn drop(&mut self) {
-        debug!("dropping aqc receive stream");
         self.close();
     }
 }
@@ -555,8 +554,8 @@ impl AqcSendStream {
         Ok(())
     }
     /// Close the stream.
+    #[instrument(skip_all)]
     pub async fn close(&mut self) -> Result<(), AqcError> {
-        debug!("closing aqc send stream");
         if let Err(e) = self.stream.close().await {
             if channel_closed(e) {
                 self.keys.zeroize();
@@ -569,7 +568,6 @@ impl AqcSendStream {
 
 impl Drop for AqcSendStream {
     fn drop(&mut self) {
-        debug!("dropping aqc send stream");
         let _ = futures_lite::future::block_on(self.close());
     }
 }
