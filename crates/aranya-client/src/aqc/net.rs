@@ -229,6 +229,7 @@ impl AqcClient {
             .collect();
         debug!("got psk identities");
         let keys = ChannelKeys::new(
+            identities,
             self.client_state.lock().await.client_keys.clone(),
             self.server_keys.clone(),
         );
@@ -236,7 +237,6 @@ impl AqcClient {
             label_id,
             channel_id,
             conn.handle(),
-            identities,
             keys,
         ))
     }
@@ -272,11 +272,12 @@ impl AqcClient {
             .collect();
         debug!("received psk identities");
         let keys = ChannelKeys::new(
+            identities,
             self.client_state.lock().await.client_keys.clone(),
             self.server_keys.clone(),
         );
         Ok(channels::AqcBidiChannel::new(
-            label_id, channel_id, conn, identities, keys,
+            label_id, channel_id, conn, keys,
         ))
     }
 
@@ -334,12 +335,11 @@ impl AqcClient {
                 );
                 AqcError::NoChannelInfoFound
             })?;
-            let keys = ChannelKeys::new(client_keys, self.server_keys.clone());
+            let keys = ChannelKeys::new(vec![identity], client_keys, self.server_keys.clone());
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
                 conn,
-                identity,
                 keys,
             ));
         }
@@ -413,12 +413,11 @@ impl AqcClient {
             let client_keys = futures_lite::future::block_on(self.client_state.lock())
                 .client_keys
                 .clone();
-            let keys = ChannelKeys::new(client_keys, self.server_keys.clone());
+            let keys = ChannelKeys::new(vec![identity], client_keys, self.server_keys.clone());
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
                 conn,
-                identity,
                 keys,
             ));
         }
@@ -537,9 +536,12 @@ pub enum TryReceiveError<E = AqcError> {
     /// An error occurred.
     #[error("an error occurred")]
     Error(E),
-    /// The channel or stream is closed.
-    #[error("channel or stream is closed")]
-    Closed,
+    /// The  stream is closed.
+    #[error("stream is closed")]
+    StreamClosed,
+    /// The channel is closed.
+    #[error("channel is closed")]
+    ChannelClosed,
 }
 
 #[derive(Debug)]

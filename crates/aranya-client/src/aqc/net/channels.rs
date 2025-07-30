@@ -29,27 +29,36 @@ enum ConnectionCloseError {
     ChannelClosed,
 }
 
-/// AQC Channel Keys.
-#[derive(Debug)]
+/// AQC channel Keys.
+///
+/// Each AQC channel will have a unique set of PSK identities and keys.
+/// This structure provides access to a copy of client and server keys.
+/// It enables the channel PSKs to easily be zeroized when an AQC channel is deleted.
+#[derive(Debug, Clone)]
 pub struct ChannelKeys {
+    identities: Arc<Vec<PskIdentity>>,
     client_keys: Arc<ClientPresharedKeys>,
     server_keys: Arc<ServerPresharedKeys>,
 }
 
 impl ChannelKeys {
-    pub fn new(
+    /// Create a new set of AQC channel keys.
+    pub(crate) fn new(
+        identities: Vec<PskIdentity>,
         client_keys: Arc<ClientPresharedKeys>,
         server_keys: Arc<ServerPresharedKeys>,
     ) -> Self {
         Self {
+            identities: Arc::new(identities),
             client_keys,
             server_keys,
         }
     }
 
-    pub fn zeroize_psks(&self, identities: &[PskIdentity]) {
-        self.client_keys.zeroize_psks(identities);
-        self.server_keys.zeroize_psks(identities);
+    /// Zeroize the PSKs.
+    pub fn zeroize(&self) {
+        self.client_keys.zeroize_psks(&self.identities);
+        self.server_keys.zeroize_psks(&self.identities);
     }
 }
 
@@ -67,20 +76,19 @@ impl AqcPeerChannel {
         label_id: LabelId,
         channel_id: AqcChannelId,
         conn: s2n::Connection,
-        identity: Vec<u8>,
         keys: ChannelKeys,
     ) -> Self {
         match channel_id {
             AqcChannelId::Bidi(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let channel = AqcBidiChannel::new(label_id, id, conn, vec![identity], keys);
+                let channel = AqcBidiChannel::new(label_id, id, conn, keys);
                 AqcPeerChannel::Bidi(channel)
             }
             AqcChannelId::Uni(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let receiver = AqcReceiveChannel::new(label_id, id, conn, vec![identity], keys);
+                let receiver = AqcReceiveChannel::new(label_id, id, conn, keys);
                 AqcPeerChannel::Receive(receiver)
             }
         }
@@ -94,7 +102,6 @@ pub struct AqcSendChannel {
     label_id: LabelId,
     handle: s2n::Handle,
     id: UniChannelId,
-    identities: Vec<PskIdentity>,
     keys: ChannelKeys,
 }
 
@@ -103,21 +110,16 @@ impl AqcSendChannel {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub(super) fn new<I>(
+    pub(super) fn new(
         label_id: LabelId,
         id: UniChannelId,
         handle: s2n::Handle,
-        identities: I,
         keys: ChannelKeys,
-    ) -> Self
-    where
-        I: IntoIterator<Item = PskIdentity>,
-    {
+    ) -> Self {
         Self {
             label_id,
             id,
             handle,
-            identities: identities.into_iter().collect(),
             keys,
         }
     }
@@ -134,8 +136,16 @@ impl AqcSendChannel {
 
     /// Creates a new unidirectional stream for the channel.
     pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream, AqcError> {
-        let send = self.handle.open_send_stream().await?;
-        Ok(AqcSendStream(send))
+        match self.handle.open_send_stream().await {
+            Ok(send) => Ok(AqcSendStream::new(send, self.keys.clone())),
+            Err(e) => {
+                if conn_channel_closed(e) {
+                    let _ = self.close().await;
+                    return Err(AqcError::ChannelClosed);
+                }
+                Err(AqcError::ConnectionError(e))
+            }
+        }
     }
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
@@ -143,7 +153,7 @@ impl AqcSendChannel {
         debug!("closing aqc send channel");
         const ERROR_CODE: u32 = ConnectionCloseError::ChannelClosed as u32;
         self.handle.close(ERROR_CODE.into());
-        self.keys.zeroize_psks(&self.identities);
+        self.keys.zeroize();
 
         Ok(())
     }
@@ -163,7 +173,6 @@ pub struct AqcReceiveChannel {
     label_id: LabelId,
     aqc_id: UniChannelId,
     conn: s2n::Connection,
-    identities: Vec<PskIdentity>,
     keys: ChannelKeys,
 }
 
@@ -172,21 +181,16 @@ impl AqcReceiveChannel {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub(super) fn new<I>(
+    pub(super) fn new(
         label_id: LabelId,
         aqc_id: UniChannelId,
         conn: s2n::Connection,
-        identities: I,
         keys: ChannelKeys,
-    ) -> Self
-    where
-        I: IntoIterator<Item = PskIdentity>,
-    {
+    ) -> Self {
         Self {
             label_id,
             aqc_id,
             conn,
-            identities: identities.into_iter().collect(),
             keys,
         }
     }
@@ -204,7 +208,7 @@ impl AqcReceiveChannel {
     /// Returns the next unidirectional stream.
     pub async fn receive_uni_stream(&mut self) -> Result<AqcReceiveStream, AqcError> {
         match self.conn.accept_receive_stream().await {
-            Ok(Some(stream)) => Ok(AqcReceiveStream(stream)),
+            Ok(Some(stream)) => Ok(AqcReceiveStream::new(stream, self.keys.clone())),
             Ok(None) => {
                 // Connection closed by peer, no more streams will be accepted.
                 Err(AqcError::ConnectionClosed)
@@ -212,10 +216,9 @@ impl AqcReceiveChannel {
             Err(e) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
-                if let s2n_quic::connection::Error::Transport { code, .. } = e {
-                    if code.as_u64() == ConnectionCloseError::ChannelClosed as u64 {
-                        let _ = self.close().await;
-                    }
+                if conn_channel_closed(e) {
+                    let _ = self.close().await;
+                    return Err(AqcError::ChannelClosed);
                 }
                 Err(AqcError::ConnectionError(e))
             }
@@ -228,7 +231,7 @@ impl AqcReceiveChannel {
     pub fn try_receive_uni_stream(&mut self) -> Result<AqcReceiveStream, TryReceiveError> {
         let mut cx = Context::from_waker(Waker::noop());
         match self.conn.poll_accept_receive_stream(&mut cx) {
-            Poll::Ready(Ok(Some(stream))) => Ok(AqcReceiveStream(stream)),
+            Poll::Ready(Ok(Some(stream))) => Ok(AqcReceiveStream::new(stream, self.keys.clone())),
             Poll::Ready(Ok(None)) => {
                 // Connection closed by peer, no more streams will be accepted.
                 Err(TryReceiveError::Error(AqcError::ConnectionClosed))
@@ -236,12 +239,10 @@ impl AqcReceiveChannel {
             Poll::Ready(Err(e)) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
-                if let s2n_quic::connection::Error::Transport { code, .. } = e {
-                    if code.as_u64() == ConnectionCloseError::ChannelClosed as u64 {
-                        let _ = futures_lite::future::block_on(self.close());
-                    }
+                if conn_channel_closed(e) {
+                    let _ = futures_lite::future::block_on(self.close());
+                    return Err(TryReceiveError::Error(AqcError::ChannelClosed));
                 }
-                let _ = futures_lite::future::block_on(self.close());
                 Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
             }
             Poll::Pending => Err(TryReceiveError::Empty),
@@ -253,7 +254,7 @@ impl AqcReceiveChannel {
         debug!("closing aqc receive channel");
         const ERROR_CODE: u32 = ConnectionCloseError::ChannelClosed as u32;
         self.conn.close(ERROR_CODE.into());
-        self.keys.zeroize_psks(&self.identities);
+        self.keys.zeroize();
 
         Ok(())
     }
@@ -273,27 +274,21 @@ pub struct AqcBidiChannel {
     label_id: LabelId,
     aqc_id: BidiChannelId,
     conn: s2n::Connection,
-    identities: Vec<PskIdentity>,
     keys: ChannelKeys,
 }
 
 impl AqcBidiChannel {
     /// Create a new bidirectional channel with the given id and conection handle.
-    pub(super) fn new<I>(
+    pub(super) fn new(
         label_id: LabelId,
         aqc_id: BidiChannelId,
         conn: s2n::Connection,
-        identities: I,
         keys: ChannelKeys,
-    ) -> Self
-    where
-        I: IntoIterator<Item = Vec<u8>>,
-    {
+    ) -> Self {
         Self {
             label_id,
             aqc_id,
             conn,
-            identities: identities.into_iter().collect(),
             keys,
         }
     }
@@ -313,7 +308,7 @@ impl AqcBidiChannel {
     /// If the stream is unidirectional, return a tuple of None and the receive stream.
     pub async fn receive_stream(&mut self) -> Result<AqcPeerStream, AqcError> {
         match self.conn.accept().await {
-            Ok(Some(stream)) => Ok(AqcPeerStream::new(stream)),
+            Ok(Some(stream)) => Ok(AqcPeerStream::new(stream, self.keys.clone())),
             Ok(None) => {
                 // Connection closed by peer, no more streams will be accepted.
                 Err(AqcError::ConnectionClosed)
@@ -321,10 +316,9 @@ impl AqcBidiChannel {
             Err(e) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
-                if let s2n_quic::connection::Error::Transport { code, .. } = e {
-                    if code.as_u64() == ConnectionCloseError::ChannelClosed as u64 {
-                        let _ = self.close().await;
-                    }
+                if conn_channel_closed(e) {
+                    let _ = self.close().await;
+                    return Err(AqcError::ChannelClosed);
                 }
                 Err(AqcError::ConnectionError(e))
             }
@@ -338,7 +332,7 @@ impl AqcBidiChannel {
         let mut cx = Context::from_waker(Waker::noop());
 
         match self.conn.poll_accept(&mut cx) {
-            Poll::Ready(Ok(Some(stream))) => Ok(AqcPeerStream::new(stream)),
+            Poll::Ready(Ok(Some(stream))) => Ok(AqcPeerStream::new(stream, self.keys.clone())),
             Poll::Ready(Ok(None)) => {
                 // Connection closed by peer, no more streams will be accepted.
                 Err(TryReceiveError::Error(AqcError::ConnectionClosed))
@@ -346,10 +340,9 @@ impl AqcBidiChannel {
             Poll::Ready(Err(e)) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
-                if let s2n_quic::connection::Error::Transport { code, .. } = e {
-                    if code.as_u64() == ConnectionCloseError::ChannelClosed as u64 {
-                        let _ = futures_lite::future::block_on(self.close());
-                    }
+                if conn_channel_closed(e) {
+                    let _ = futures_lite::future::block_on(self.close());
+                    return Err(TryReceiveError::Error(AqcError::ChannelClosed));
                 }
                 Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
             }
@@ -362,14 +355,30 @@ impl AqcBidiChannel {
 
     /// Creates a new unidirectional stream for the channel.
     pub async fn create_uni_stream(&mut self) -> Result<AqcSendStream, AqcError> {
-        let send = self.conn.open_send_stream().await?;
-        Ok(AqcSendStream(send))
+        match self.conn.open_send_stream().await {
+            Ok(send) => Ok(AqcSendStream::new(send, self.keys.clone())),
+            Err(e) => {
+                if conn_channel_closed(e) {
+                    let _ = self.close().await;
+                    return Err(AqcError::ChannelClosed);
+                }
+                Err(AqcError::ConnectionError(e))
+            }
+        }
     }
 
     /// Creates a new bidirectional stream for the channel.
     pub async fn create_bidi_stream(&mut self) -> Result<AqcBidiStream, AqcError> {
-        let bidi = self.conn.open_bidirectional_stream().await?;
-        Ok(AqcBidiStream(bidi))
+        match self.conn.open_bidirectional_stream().await {
+            Ok(bidi) => Ok(AqcBidiStream::new(bidi, self.keys.clone())),
+            Err(e) => {
+                if conn_channel_closed(e) {
+                    let _ = self.close().await;
+                    return Err(AqcError::ChannelClosed);
+                }
+                Err(AqcError::ConnectionError(e))
+            }
+        }
     }
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
@@ -377,7 +386,7 @@ impl AqcBidiChannel {
         debug!("closing aqc bidi channel");
         const ERROR_CODE: u32 = ConnectionCloseError::ChannelClosed as u32;
         self.conn.close(ERROR_CODE.into());
-        self.keys.zeroize_psks(&self.identities);
+        self.keys.zeroize();
 
         Ok(())
     }
@@ -393,27 +402,49 @@ impl Drop for AqcBidiChannel {
 /// Used to send and receive data with a peer.
 // TODO: implement `Drop`
 #[derive(Debug)]
-pub struct AqcBidiStream(s2n::BidirectionalStream);
+pub struct AqcBidiStream {
+    stream: s2n::BidirectionalStream,
+    keys: ChannelKeys,
+}
 
 impl AqcBidiStream {
+    /// Creates a new AQC bidirectional stream.
+    pub fn new(stream: s2n::BidirectionalStream, keys: ChannelKeys) -> Self {
+        Self { stream, keys }
+    }
+
     /// Split a bidi stream into send and receive halves.
     pub fn split(self) -> (AqcSendStream, AqcReceiveStream) {
-        let (recv, send) = self.0.split();
-        (AqcSendStream(send), AqcReceiveStream(recv))
+        let (recv, send) = self.stream.split();
+        (
+            AqcSendStream::new(send, self.keys.clone()),
+            AqcReceiveStream::new(recv, self.keys.clone()),
+        )
     }
 
     /// Send data to the given stream.
     pub async fn send(&mut self, data: Bytes) -> Result<(), AqcError> {
-        debug!("sending aqc data");
-        self.0.send(data).await?;
-        debug!("sent aqc data");
+        if let Err(e) = self.stream.send(data).await {
+            let _ = self.close().await;
+            if channel_closed(e) {
+                self.keys.zeroize();
+                return Err(AqcError::ChannelClosed);
+            }
+            return Err(AqcError::StreamError(e));
+        }
         Ok(())
     }
 
     /// Close the stream.
     pub async fn close(&mut self) -> Result<(), AqcError> {
         debug!("closing aqc bidi stream");
-        self.0.close().await?;
+        if let Err(e) = self.stream.close().await {
+            if channel_closed(e) {
+                self.keys.zeroize();
+                return Err(AqcError::ChannelClosed);
+            }
+            return Err(AqcError::ConnectionClosed);
+        }
         Ok(())
     }
 
@@ -424,10 +455,17 @@ impl AqcBidiStream {
     /// The data is not guaranteed to be complete, and may need to be called
     /// multiple times to receive all data from a message.
     pub async fn receive(&mut self) -> Result<Option<Bytes>, AqcError> {
-        debug!("receiving aqc data");
-        let data = self.0.receive().await?;
-        debug!(?data, "received aqc data");
-        Ok(data)
+        match self.stream.receive().await {
+            Ok(data) => Ok(data),
+            Err(e) => {
+                let _ = self.close().await;
+                if channel_closed(e) {
+                    self.keys.zeroize();
+                    return Err(AqcError::ChannelClosed);
+                }
+                Err(AqcError::ConnectionClosed)
+            }
+        }
     }
 
     /// Receive the next available data from a stream.
@@ -438,10 +476,17 @@ impl AqcBidiStream {
     /// - Closed: The stream is closed.
     pub fn try_receive(&mut self) -> Result<Bytes, TryReceiveError> {
         let mut cx = Context::from_waker(Waker::noop());
-        match self.0.poll_receive(&mut cx) {
+        match self.stream.poll_receive(&mut cx) {
             Poll::Ready(Ok(Some(chunk))) => Ok(chunk),
-            Poll::Ready(Ok(None)) => Err(TryReceiveError::Closed),
-            Poll::Ready(Err(_e)) => Err(TryReceiveError::Closed),
+            Poll::Ready(Ok(None)) => Err(TryReceiveError::StreamClosed),
+            Poll::Ready(Err(e)) => {
+                if channel_closed(e) {
+                    let _ = futures_lite::future::block_on(self.close());
+                    self.keys.zeroize();
+                    return Err(TryReceiveError::ChannelClosed);
+                }
+                Err(TryReceiveError::StreamClosed)
+            }
             Poll::Pending => Err(TryReceiveError::Empty),
         }
     }
@@ -449,9 +494,17 @@ impl AqcBidiStream {
 
 /// Used to receive data from a peer.
 #[derive(Debug)]
-pub struct AqcReceiveStream(s2n::ReceiveStream);
+pub struct AqcReceiveStream {
+    stream: s2n::ReceiveStream,
+    keys: ChannelKeys,
+}
 
 impl AqcReceiveStream {
+    /// Creates a new AQC receive stream.
+    pub fn new(stream: s2n::ReceiveStream, keys: ChannelKeys) -> Self {
+        Self { stream, keys }
+    }
+
     /// Receive the next available data from a stream. If the stream has
     /// been closed, return None.
     ///
@@ -459,7 +512,17 @@ impl AqcReceiveStream {
     /// The data is not guaranteed to be complete, and may need to be called
     /// multiple times to receive all data from a message.
     pub async fn receive(&mut self) -> Result<Option<Bytes>, AqcError> {
-        Ok(self.0.receive().await?)
+        match self.stream.receive().await {
+            Ok(bytes) => Ok(bytes),
+            Err(e) => {
+                self.close();
+                if channel_closed(e) {
+                    self.keys.zeroize();
+                    return Err(AqcError::ChannelClosed);
+                }
+                Err(AqcError::ConnectionClosed)
+            }
+        }
     }
 
     /// Receive the next available data from a stream.
@@ -470,10 +533,17 @@ impl AqcReceiveStream {
     /// - Closed: The stream is closed.
     pub fn try_receive(&mut self) -> Result<Bytes, TryReceiveError> {
         let mut cx = Context::from_waker(Waker::noop());
-        match self.0.poll_receive(&mut cx) {
+        match self.stream.poll_receive(&mut cx) {
             Poll::Ready(Ok(Some(chunk))) => Ok(chunk),
-            Poll::Ready(Ok(None)) => Err(TryReceiveError::Closed),
-            Poll::Ready(Err(_e)) => Err(TryReceiveError::Closed),
+            Poll::Ready(Ok(None)) => Err(TryReceiveError::StreamClosed),
+            Poll::Ready(Err(e)) => {
+                self.close();
+                if channel_closed(e) {
+                    self.keys.zeroize();
+                    return Err(TryReceiveError::ChannelClosed);
+                }
+                Err(TryReceiveError::StreamClosed)
+            }
             Poll::Pending => Err(TryReceiveError::Empty),
         }
     }
@@ -482,7 +552,7 @@ impl AqcReceiveStream {
     pub fn close(&mut self) {
         debug!("closing aqc receive stream");
         const ERROR_CODE: u32 = 0;
-        let _ = self.0.stop_sending(ERROR_CODE.into());
+        let _ = self.stream.stop_sending(ERROR_CODE.into());
     }
 }
 
@@ -495,18 +565,38 @@ impl Drop for AqcReceiveStream {
 
 /// Used to send data to a peer.
 #[derive(Debug)]
-pub struct AqcSendStream(s2n::SendStream);
+pub struct AqcSendStream {
+    stream: s2n::SendStream,
+    keys: ChannelKeys,
+}
 
 impl AqcSendStream {
+    /// Creates a new AQC send stream.
+    pub fn new(stream: s2n::SendStream, keys: ChannelKeys) -> Self {
+        Self { stream, keys }
+    }
+
     /// Send data to the given stream.
     pub async fn send(&mut self, data: Bytes) -> Result<(), AqcError> {
-        self.0.send(data).await?;
+        if let Err(e) = self.stream.send(data).await {
+            let _ = self.close().await;
+            if channel_closed(e) {
+                self.keys.zeroize();
+                return Err(AqcError::ChannelClosed);
+            }
+            return Err(AqcError::StreamError(e));
+        }
         Ok(())
     }
     /// Close the stream.
     pub async fn close(&mut self) -> Result<(), AqcError> {
         debug!("closing aqc send stream");
-        self.0.close().await?;
+        if let Err(e) = self.stream.close().await {
+            if channel_closed(e) {
+                self.keys.zeroize();
+            }
+            return Err(AqcError::StreamError(e));
+        }
         Ok(())
     }
 }
@@ -528,10 +618,10 @@ pub enum AqcPeerStream {
 }
 
 impl AqcPeerStream {
-    fn new(stream: s2n_quic::stream::PeerStream) -> Self {
+    fn new(stream: s2n_quic::stream::PeerStream, keys: ChannelKeys) -> Self {
         match stream {
-            s2n::PeerStream::Bidirectional(stream) => Self::Bidi(AqcBidiStream(stream)),
-            s2n::PeerStream::Receive(recv) => Self::Receive(AqcReceiveStream(recv)),
+            s2n::PeerStream::Bidirectional(stream) => Self::Bidi(AqcBidiStream::new(stream, keys)),
+            s2n::PeerStream::Receive(recv) => Self::Receive(AqcReceiveStream::new(recv, keys)),
         }
     }
 
@@ -580,4 +670,28 @@ impl AqcPeerStream {
             AqcPeerStream::Receive(s) => s.try_receive(),
         }
     }
+}
+
+/// Returns true if the connection error indicates the AQC channel was closed.
+fn conn_channel_closed(e: s2n_quic::connection::Error) -> bool {
+    if let s2n_quic::connection::Error::Transport { code, .. } = e {
+        if code.as_u64() == ConnectionCloseError::ChannelClosed as u64 {
+            return true;
+        }
+    }
+    false
+}
+
+// Returns true if the stream error indicates the AQC channel was closed.
+fn channel_closed(e: s2n_quic::stream::Error) -> bool {
+    if let s2n_quic::stream::Error::ConnectionError {
+        error: s2n_quic::connection::Error::Transport { code, .. },
+        ..
+    } = e
+    {
+        if code.as_u64() == ConnectionCloseError::ChannelClosed as u64 {
+            return true;
+        }
+    }
+    false
 }

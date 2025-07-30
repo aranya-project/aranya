@@ -875,6 +875,10 @@ static void *membera_aqc_thread(void *arg) {
     }
     printf("Received AQC bidi stream data: \"%s\"\n", uni_buffer);
 
+    printf("Deleting AQC bidi channel\n");
+    err = aranya_aqc_delete_bidi_channel(&bidi_chan);
+    EXPECT("Unable to delete AQC bidi channel", err);
+
 exit:
     err         = aranya_aqc_delete_bidi_channel(&bidi_chan);
     ctx->result = err;
@@ -1000,6 +1004,10 @@ static void *memberb_aqc_thread(void *arg) {
                                       (const uint8_t *)uni_string,
                                       strnlen(uni_string, BUFFER_LEN - 1) + 1);
     EXPECT("Unable to send uni data from Member B", err);
+
+    printf("Deleting AQC uni channel\n");
+    err = aranya_aqc_delete_uni_channel(&uni_send);
+    EXPECT("Unable to delete AQC uni channel", err);
 
     sleep(2);
 

@@ -68,7 +68,15 @@ pub enum Error {
 
     /// A connection got unexpectedly closed.
     #[capi(msg = "connection got closed")]
-    Closed,
+    ConnectionClosed,
+
+    /// A stream got unexpectedly closed.
+    #[capi(msg = "stream got closed")]
+    StreamClosed,
+
+    /// A channel got unexpectedly closed.
+    #[capi(msg = "channel got closed")]
+    ChannelClosed,
 
     /// Unable to create configuration info.
     #[capi(msg = "invalid config")]
@@ -106,7 +114,9 @@ impl From<&imp::Error> for Error {
                 }
             },
             imp::Error::WouldBlock => Self::WouldBlock,
-            imp::Error::Closed => Self::Closed,
+            imp::Error::ConnectionClosed => Self::ConnectionClosed,
+            imp::Error::StreamClosed => Self::StreamClosed,
+            imp::Error::ChannelClosed => Self::ChannelClosed,
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
             imp::Error::Other(_) => Self::Other,
@@ -1649,17 +1659,17 @@ pub type AqcReceiveChannel = Safe<imp::AqcReceiveChannel>;
 
 /// An AQC Bidirectional Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 184, align = 8)]
+#[aranya_capi_core::opaque(size = 208, align = 8)]
 pub type AqcBidiStream = Safe<imp::AqcBidiStream>;
 
 /// An AQC Sender Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 152, align = 8)]
+#[aranya_capi_core::opaque(size = 176, align = 8)]
 pub type AqcSendStream = Safe<imp::AqcSendStream>;
 
 /// An AQC Receiver Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 184, align = 8)]
+#[aranya_capi_core::opaque(size = 208, align = 8)]
 pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 
 /// Create a bidirectional AQC channel between this device and a peer.

@@ -126,6 +126,10 @@ pub enum AqcError {
     #[error("the connection was closed")]
     ConnectionClosed,
 
+    /// The AQC channel was closed.
+    #[error("the AQC channel was closed")]
+    ChannelClosed,
+
     /// A connection error.
     #[error(transparent)]
     ConnectionError(#[from] s2n_quic::connection::Error),
@@ -149,10 +153,6 @@ pub enum AqcError {
     /// Peer could not process control message.
     #[error("peer could not process control message")]
     PeerCtrl,
-
-    /// Unable to send to mpsc channel.
-    #[error("unable to send to mpsc channel")]
-    Send,
 
     /// An internal bug was discovered.
     #[error(transparent)]
