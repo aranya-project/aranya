@@ -42,6 +42,7 @@ pub struct PrometheusConfig {
 }
 
 impl PrometheusConfig {
+    /// Formats an incoming URL to the correct path to start a new job.
     fn format_pushgateway_url(endpoint: &str, job_name: &str) -> String {
         // Try to parse the Uri, or else set it to our default.
         let uri = endpoint
