@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hubble-storage
+  labels:
+    app: hubble-telescope
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hubble-telescope
+  labels:
+    app: hubble-telescope
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hubble-telescope
+  template:
+    metadata:
+      labels:
+        app: hubble-telescope
+    spec:
+      containers:
+      - name: telescope
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: data-volume
+          mountPath: /data
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: data-volume
+        persistentVolumeClaim:
+          claimName: hubble-storage
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hubble-service
+  labels:
+    app: hubble-telescope
+spec:
+  selector:
+    app: hubble-telescope
+  ports:
+  - port: 80
+    targetPort: 80
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hubble-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: hubble.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: hubble-service
+            port:
+              number: 80
