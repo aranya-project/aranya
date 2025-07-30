@@ -198,10 +198,6 @@ enum AranyaError
      */
     ARANYA_ERROR_WOULD_BLOCK,
     /**
-     * A channel got unexpectedly closed.
-     */
-    ARANYA_ERROR_CHANNEL_CLOSED,
-    /**
      * A connection got unexpectedly closed.
      */
     ARANYA_ERROR_CONNECTION_CLOSED,

@@ -66,10 +66,6 @@ pub enum Error {
     #[capi(msg = "no response ready yet")]
     WouldBlock,
 
-    /// A channel got unexpectedly closed.
-    #[capi(msg = "channel got closed")]
-    ChannelClosed,
-
     /// A connection got unexpectedly closed.
     #[capi(msg = "connection got closed")]
     ConnectionClosed,
@@ -114,7 +110,6 @@ impl From<&imp::Error> for Error {
                 }
             },
             imp::Error::WouldBlock => Self::WouldBlock,
-            imp::Error::ChannelClosed => Self::ChannelClosed,
             imp::Error::ConnectionClosed => Self::ConnectionClosed,
             imp::Error::StreamClosed => Self::StreamClosed,
             imp::Error::Config(_) => Self::Config,
@@ -1755,7 +1750,6 @@ pub fn aqc_delete_bidi_channel(
     client
         .rt
         .block_on(client.inner.aqc().delete_bidi_channel(channel))?;
-
     Ok(())
 }
 
@@ -1778,7 +1772,6 @@ pub fn aqc_delete_uni_channel(
     client
         .rt
         .block_on(client.inner.aqc().delete_uni_channel(channel))?;
-
     Ok(())
 }
 

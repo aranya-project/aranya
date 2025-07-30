@@ -13,7 +13,6 @@ use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::try_join, FutureExt};
 use tempfile::tempdir;
-use tracing::info;
 
 use crate::common::{sleep, DevicesCtx};
 
@@ -76,7 +75,6 @@ async fn test_aqc_chans() -> Result<()> {
         .await?;
 
     {
-        info!("creating bidi channel");
         let (mut bidi_chan1, peer_channel) = try_join(
             devices.membera.client.aqc().create_bidi_channel(
                 team_id,
@@ -87,7 +85,6 @@ async fn test_aqc_chans() -> Result<()> {
         )
         .await
         .expect("can create and receive channel");
-        info!("created bidi channel");
 
         let mut bidi_chan2 = match peer_channel {
             AqcPeerChannel::Bidi(channel) => channel,
@@ -165,7 +162,6 @@ async fn test_aqc_chans() -> Result<()> {
 
     {
         // membera creates aqc uni channel with memberb concurrently
-        info!("creating uni channel");
         let (mut uni_chan1, peer_channel) = try_join(
             devices.membera.client.aqc().create_uni_channel(
                 team_id,
@@ -176,7 +172,6 @@ async fn test_aqc_chans() -> Result<()> {
         )
         .await
         .expect("can create uni channel");
-        info!("created uni channel");
 
         let mut uni_chan2 = match peer_channel {
             AqcPeerChannel::Receive(receiver) => receiver,
@@ -674,18 +669,16 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         // try sending after channels are closed
         let msg2 = Bytes::from_static(b"hello2");
         let err = bidi1_2.send(msg2.clone()).await.err().unwrap();
-        info!("{:?}", err);
         assert!(matches!(
             err,
-            aranya_client::error::AqcError::ConnectionClosed
+            aranya_client::error::AqcError::StreamError(_)
         ));
 
         // try receiving after channels are closed.
         let err = bidi1_2.receive().await.err().unwrap();
-        info!("{:?}", err);
         assert!(matches!(
             err,
-            aranya_client::error::AqcError::ConnectionClosed
+            aranya_client::error::AqcError::StreamError(_)
         ));
     }
 

@@ -35,7 +35,7 @@ use s2n_quic::{
 };
 use tarpc::context;
 use tokio::sync::mpsc;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, instrument, warn};
 
 use super::crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL};
 use crate::{
@@ -83,29 +83,30 @@ struct ClientState {
 }
 
 impl ClientState {
+    #[instrument(skip(self))]
     fn connect_ctrl(&mut self, addr: SocketAddr) -> s2n_quic::client::ConnectionAttempt {
-        debug!("connect ctrl");
         self.client_keys.set_key(CTRL_PSK.clone());
         self.quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
     }
 
+    #[instrument(skip(self, psks))]
     fn connect_data(
         &mut self,
         addr: SocketAddr,
         psks: AqcPsks,
     ) -> s2n_quic::client::ConnectionAttempt {
-        debug!("connect data");
         self.client_keys.load_psks(psks);
         self.quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
     }
 
+    #[instrument(skip(self))]
     fn zeroize_psks(&mut self, identities: &[PskIdentity]) {
-        debug!("zeroizing client psks");
         self.client_keys.zeroize_psks(identities);
     }
 
+    #[instrument(skip(self))]
     fn clear(&mut self) {
         self.client_keys.clear();
     }
@@ -213,7 +214,6 @@ impl AqcClient {
             .connect_data(addr, AqcPsks::Uni(psks.clone()))
             .await
         else {
-            error!("connection closed");
             let identities: Vec<PskIdentity> = psks
                 .into_iter()
                 .map(|(_, p)| p.identity.as_bytes().to_vec())
@@ -282,6 +282,7 @@ impl AqcClient {
     }
 
     /// Zeroize PSKs from client and server.
+    #[instrument(skip(self))]
     async fn zeroize_psks(&self, identities: Vec<PskIdentity>) {
         debug!("zeroize client and server psks");
         self.client_state.lock().await.zeroize_psks(&identities);
@@ -298,7 +299,6 @@ impl AqcClient {
             // Accept a new connection
             let mut server_state = self.server_state.lock().await;
             let Some(mut conn) = server_state.quic_server.accept().await else {
-                error!("server connection terminated");
                 return Err(crate::Error::Aqc(AqcError::ServerConnectionTerminated));
             };
             debug!("accepted connection");
@@ -318,9 +318,7 @@ impl AqcClient {
             // This will update the channel map with the PSK and associate it with an
             // AqcChannel.
             if identity == PSK_IDENTITY_CTRL {
-                debug!("receive ctrl message");
                 self.receive_ctrl_message(&mut conn).await?;
-                debug!("received ctrl message");
                 continue;
             }
             // If the PSK identity hint is not the control PSK, check if it's in the channel map.
@@ -424,13 +422,13 @@ impl AqcClient {
     }
 
     /// Send a control message to the given address.
+    #[instrument(skip(self, ctrl))]
     pub async fn send_ctrl(
         &self,
         addr: SocketAddr,
         ctrl: AqcCtrl,
         team_id: TeamId,
     ) -> Result<(), AqcError> {
-        debug!("sending ctrl message");
         let mut conn = self.client_state.lock().await.connect_ctrl(addr).await?;
         let stream = conn.open_bidirectional_stream().await?;
         let (mut recv, mut send) = stream.split();
@@ -451,6 +449,7 @@ impl AqcClient {
         Ok(())
     }
 
+    #[instrument(skip_all)]
     async fn receive_ctrl_message(&self, conn: &mut Connection) -> crate::Result<()> {
         let stream = conn
             .accept_bidirectional_stream()
@@ -513,7 +512,7 @@ impl AqcClient {
 
     /// Close the AQC client.
     pub async fn close(&mut self) {
-        warn!("AQC client close");
+        debug!("AQC client close");
         self.channels.write().expect("poisoned").clear();
         self.client_state.lock().await.clear();
         self.server_keys.clear();
@@ -522,7 +521,7 @@ impl AqcClient {
 
 impl Drop for AqcClient {
     fn drop(&mut self) {
-        warn!("dropping AQC client");
+        debug!("dropping AQC client");
         futures_lite::future::block_on(self.close());
     }
 }
@@ -542,9 +541,6 @@ pub enum TryReceiveError<E = AqcError> {
     /// The connection is closed.
     #[error("connection is closed")]
     ConnectionClosed,
-    /// The channel is closed.
-    #[error("channel is closed")]
-    ChannelClosed,
 }
 
 #[derive(Debug)]

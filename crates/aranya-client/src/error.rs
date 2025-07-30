@@ -126,10 +126,6 @@ pub enum AqcError {
     #[error("the connection was closed")]
     ConnectionClosed,
 
-    /// The AQC channel was closed.
-    #[error("the AQC channel was closed")]
-    ChannelClosed,
-
     /// A connection error.
     #[error(transparent)]
     ConnectionError(#[from] s2n_quic::connection::Error),

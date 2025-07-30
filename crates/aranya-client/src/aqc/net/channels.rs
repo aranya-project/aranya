@@ -25,6 +25,8 @@ mod s2n {
 /// AQC connection close error codes.
 #[derive(Debug, Copy, Clone)]
 enum ConnectionCloseError {
+    /// The QUIC connection has been closed without any error.
+    ConnectionClosed,
     /// The AQC channel has been closed by the peer when closing the QUIC connection.
     ChannelClosed,
 }
@@ -141,7 +143,6 @@ impl AqcSendChannel {
             Err(e) => {
                 if conn_channel_closed(e) {
                     let _ = self.close().await;
-                    return Err(AqcError::ChannelClosed);
                 }
                 Err(AqcError::ConnectionError(e))
             }
@@ -211,7 +212,6 @@ impl AqcReceiveChannel {
                 // This likely means the connection is unusable for new streams.
                 if conn_channel_closed(e) {
                     let _ = self.close().await;
-                    return Err(AqcError::ChannelClosed);
                 }
                 Err(AqcError::ConnectionError(e))
             }
@@ -234,7 +234,6 @@ impl AqcReceiveChannel {
                 // This likely means the connection is unusable for new streams.
                 if conn_channel_closed(e) {
                     let _ = futures_lite::future::block_on(self.close());
-                    return Err(TryReceiveError::Error(AqcError::ChannelClosed));
                 }
                 Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
             }
@@ -304,7 +303,6 @@ impl AqcBidiChannel {
                 // This likely means the connection is unusable for new streams.
                 if conn_channel_closed(e) {
                     let _ = self.close().await;
-                    return Err(AqcError::ChannelClosed);
                 }
                 Err(AqcError::ConnectionError(e))
             }
@@ -328,7 +326,6 @@ impl AqcBidiChannel {
                 // This likely means the connection is unusable for new streams.
                 if conn_channel_closed(e) {
                     let _ = futures_lite::future::block_on(self.close());
-                    return Err(TryReceiveError::Error(AqcError::ChannelClosed));
                 }
                 Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
             }
@@ -346,7 +343,6 @@ impl AqcBidiChannel {
             Err(e) => {
                 if conn_channel_closed(e) {
                     let _ = self.close().await;
-                    return Err(AqcError::ChannelClosed);
                 }
                 Err(AqcError::ConnectionError(e))
             }
@@ -360,7 +356,6 @@ impl AqcBidiChannel {
             Err(e) => {
                 if conn_channel_closed(e) {
                     let _ = self.close().await;
-                    return Err(AqcError::ChannelClosed);
                 }
                 Err(AqcError::ConnectionError(e))
             }
@@ -406,25 +401,8 @@ impl AqcBidiStream {
             let _ = self.close().await;
             if channel_closed(e) {
                 self.keys.zeroize();
-                return Err(AqcError::ChannelClosed);
-            }
-            if connection_closed(e) {
-                return Err(AqcError::ConnectionClosed);
             }
             return Err(AqcError::StreamError(e));
-        }
-        Ok(())
-    }
-
-    /// Close the stream.
-    pub async fn close(&mut self) -> Result<(), AqcError> {
-        debug!("closing aqc bidi stream");
-        if let Err(e) = self.stream.close().await {
-            if channel_closed(e) {
-                self.keys.zeroize();
-                return Err(AqcError::ChannelClosed);
-            }
-            return Err(AqcError::ConnectionClosed);
         }
         Ok(())
     }
@@ -442,10 +420,6 @@ impl AqcBidiStream {
                 let _ = self.close().await;
                 if channel_closed(e) {
                     self.keys.zeroize();
-                    return Err(AqcError::ChannelClosed);
-                }
-                if connection_closed(e) {
-                    return Err(AqcError::ConnectionClosed);
                 }
                 Err(AqcError::StreamError(e))
             }
@@ -467,15 +441,23 @@ impl AqcBidiStream {
                 if channel_closed(e) {
                     let _ = futures_lite::future::block_on(self.close());
                     self.keys.zeroize();
-                    return Err(TryReceiveError::ChannelClosed);
-                }
-                if connection_closed(e) {
-                    return Err(TryReceiveError::ConnectionClosed);
                 }
                 Err(TryReceiveError::StreamClosed)
             }
             Poll::Pending => Err(TryReceiveError::Empty),
         }
+    }
+
+    /// Close the stream.
+    pub async fn close(&mut self) -> Result<(), AqcError> {
+        debug!("closing aqc bidi stream");
+        if let Err(e) = self.stream.close().await {
+            if channel_closed(e) {
+                self.keys.zeroize();
+            }
+            return Err(AqcError::StreamError(e));
+        }
+        Ok(())
     }
 }
 
@@ -505,10 +487,6 @@ impl AqcReceiveStream {
                 self.close();
                 if channel_closed(e) {
                     self.keys.zeroize();
-                    return Err(AqcError::ChannelClosed);
-                }
-                if connection_closed(e) {
-                    return Err(AqcError::ConnectionClosed);
                 }
                 Err(AqcError::StreamError(e))
             }
@@ -530,10 +508,6 @@ impl AqcReceiveStream {
                 self.close();
                 if channel_closed(e) {
                     self.keys.zeroize();
-                    return Err(TryReceiveError::ChannelClosed);
-                }
-                if connection_closed(e) {
-                    return Err(TryReceiveError::ConnectionClosed);
                 }
                 Err(TryReceiveError::StreamClosed)
             }
@@ -544,7 +518,7 @@ impl AqcReceiveStream {
     /// Notify peer to stop sending to receive stream.
     pub fn close(&mut self) {
         debug!("closing aqc receive stream");
-        const ERROR_CODE: u32 = 0;
+        const ERROR_CODE: u32 = ConnectionCloseError::ConnectionClosed as u32;
         let _ = self.stream.stop_sending(ERROR_CODE.into());
     }
 }
@@ -575,10 +549,6 @@ impl AqcSendStream {
             let _ = self.close().await;
             if channel_closed(e) {
                 self.keys.zeroize();
-                return Err(AqcError::ChannelClosed);
-            }
-            if connection_closed(e) {
-                return Err(AqcError::ConnectionClosed);
             }
             return Err(AqcError::StreamError(e));
         }
@@ -688,14 +658,6 @@ fn channel_closed(e: s2n_quic::stream::Error) -> bool {
         if code.as_u64() == ConnectionCloseError::ChannelClosed as u64 {
             return true;
         }
-    }
-    false
-}
-
-// Returns true if the stream error indicates the AQC channel was closed.
-fn connection_closed(e: s2n_quic::stream::Error) -> bool {
-    if let s2n_quic::stream::Error::ConnectionError { .. } = e {
-        return true;
     }
     false
 }

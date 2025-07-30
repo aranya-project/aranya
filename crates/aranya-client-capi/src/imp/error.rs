@@ -26,9 +26,6 @@ pub enum Error {
     #[error("haven't received any data yet")]
     WouldBlock,
 
-    #[error("channel was unexpectedly closed")]
-    ChannelClosed,
-
     #[error("connection was unexpectedly closed")]
     ConnectionClosed,
 
@@ -63,7 +60,6 @@ impl From<AqcError> for Error {
 impl From<TryReceiveError<AqcError>> for Error {
     fn from(value: TryReceiveError<AqcError>) -> Self {
         match value {
-            TryReceiveError::ChannelClosed => Self::ChannelClosed,
             TryReceiveError::ConnectionClosed => Self::ConnectionClosed,
             TryReceiveError::StreamClosed => Self::StreamClosed,
             TryReceiveError::Empty => Self::WouldBlock,
@@ -75,7 +71,6 @@ impl From<TryReceiveError<AqcError>> for Error {
 impl From<TryReceiveError<aranya_client::Error>> for Error {
     fn from(value: TryReceiveError<aranya_client::Error>) -> Self {
         match value {
-            TryReceiveError::ChannelClosed => Self::ChannelClosed,
             TryReceiveError::ConnectionClosed => Self::ConnectionClosed,
             TryReceiveError::StreamClosed => Self::StreamClosed,
             TryReceiveError::Empty => Self::WouldBlock,
