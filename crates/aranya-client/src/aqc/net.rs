@@ -292,7 +292,7 @@ impl AqcClient {
     }
 
     /// Receive the next available channel.
-    pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
+    pub async fn receive_channel(&self) -> crate::Result<AqcPeerChannel> {
         loop {
             debug!("accept a new connection");
             // Accept a new connection
@@ -349,7 +349,7 @@ impl AqcClient {
     ///
     /// If there is no channel available, return Empty.
     /// If the channel is closed, return Closed.
-    pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
+    pub fn try_receive_channel(&self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         let mut server_state = self
             .server_state
             .try_lock()

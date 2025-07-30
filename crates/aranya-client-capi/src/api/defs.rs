@@ -1684,7 +1684,7 @@ pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_bidi_channel(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
@@ -1693,7 +1693,7 @@ pub unsafe fn aqc_create_bidi_channel(
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
 
-    let client = client.imp_mut();
+    let client = client.imp();
     let chan = client.rt.block_on(client.inner.aqc().create_bidi_channel(
         team.into(),
         peer,
@@ -1716,7 +1716,7 @@ pub unsafe fn aqc_create_bidi_channel(
 ///
 /// @relates AranyaClient.
 pub unsafe fn aqc_create_uni_channel(
-    client: &mut Client,
+    client: &Client,
     team: &TeamId,
     peer: NetIdentifier,
     label_id: &LabelId,
@@ -1725,7 +1725,7 @@ pub unsafe fn aqc_create_uni_channel(
     // SAFETY: Caller must ensure `peer` is a valid C String.
     let peer = unsafe { peer.as_underlying() }?;
 
-    let client = client.imp_mut();
+    let client = client.imp();
     let chan = client.rt.block_on(client.inner.aqc().create_uni_channel(
         team.into(),
         peer,
@@ -1785,7 +1785,7 @@ pub fn aqc_delete_uni_channel(_channel: OwnedPtr<AqcSendChannel>) -> Result<(), 
 ///
 /// @relates AranyaClient.
 pub fn aqc_try_receive_channel(
-    client: &mut Client,
+    client: &Client,
     channel: &mut MaybeUninit<AqcPeerChannel>,
 ) -> Result<AqcChannelType, imp::Error> {
     let chan = client.inner.aqc().try_receive_channel()?;

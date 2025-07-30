@@ -121,7 +121,7 @@ impl ClientCtx {
 
         let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
 
-        let mut client = (|| {
+        let client = (|| {
             Client::builder()
                 .daemon_uds_path(&uds_sock)
                 .aqc_server_addr(&any_addr)
@@ -210,8 +210,8 @@ async fn main() -> Result<()> {
     let owner = ClientCtx::new(team_name, "owner", &daemon_path).await?;
     let admin = ClientCtx::new(team_name, "admin", &daemon_path).await?;
     let operator = ClientCtx::new(team_name, "operator", &daemon_path).await?;
-    let mut membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
-    let mut memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
+    let membera = ClientCtx::new(team_name, "member_a", &daemon_path).await?;
+    let memberb = ClientCtx::new(team_name, "member_b", &daemon_path).await?;
 
     // Create the team config
     let seed_ikm = {
@@ -407,7 +407,6 @@ async fn main() -> Result<()> {
 
     // Creating and receiving a channel "blocks" until both sides have
     // joined the channel, so we do them concurrently with `try_join`.
-    let memberb_net_id = memberb.aqc_net_id();
     let (mut created_aqc_chan, mut received_aqc_chan) = try_join(
         async {
             // membera creates a bidirectional channel.
@@ -415,7 +414,7 @@ async fn main() -> Result<()> {
             let chan = membera
                 .client
                 .aqc()
-                .create_bidi_channel(team_id, memberb_net_id, label3)
+                .create_bidi_channel(team_id, memberb.aqc_net_id(), label3)
                 .await?;
             Ok(chan)
         },

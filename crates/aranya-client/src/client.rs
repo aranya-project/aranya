@@ -299,7 +299,7 @@ impl Client {
     }
 
     /// Get access to Aranya QUIC Channels.
-    pub fn aqc(&mut self) -> AqcChannels<'_> {
+    pub fn aqc(&self) -> AqcChannels<'_> {
         AqcChannels::new(self)
     }
 }

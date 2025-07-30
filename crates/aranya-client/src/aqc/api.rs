@@ -16,11 +16,11 @@ use crate::{
 /// receiving data with peers.
 #[derive(Debug)]
 pub struct AqcChannels<'a> {
-    client: &'a mut Client,
+    client: &'a Client,
 }
 
 impl<'a> AqcChannels<'a> {
-    pub(crate) fn new(client: &'a mut Client) -> Self {
+    pub(crate) fn new(client: &'a Client) -> Self {
         Self { client }
     }
 
@@ -126,7 +126,7 @@ impl<'a> AqcChannels<'a> {
     }
 
     /// Waits for a peer to create an AQC channel with this client.
-    pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
+    pub async fn receive_channel(&self) -> crate::Result<AqcPeerChannel> {
         info!("receive_channel");
         let chan = self.client.aqc.receive_channel().await?;
         info!("received channel");
@@ -138,7 +138,7 @@ impl<'a> AqcChannels<'a> {
     ///
     /// If there is no channel available, return Empty.
     /// If the channel is closed, return Closed.
-    pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
+    pub fn try_receive_channel(&self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         self.client.aqc.try_receive_channel()
     }
 }
