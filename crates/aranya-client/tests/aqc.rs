@@ -148,6 +148,19 @@ async fn test_aqc_chans() -> Result<()> {
             }
         }
         assert_eq!(dest_bytes.freeze(), big_data);
+
+        devices
+            .membera
+            .client
+            .aqc()
+            .delete_bidi_channel(bidi_chan1)
+            .await?;
+        devices
+            .memberb
+            .client
+            .aqc()
+            .delete_bidi_channel(bidi_chan2)
+            .await?;
     }
 
     {
@@ -515,6 +528,19 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
         bidi2_2.send(msg3.clone()).await?;
         // we expect the result of bidi1_2 to be none, as the stream is closed. (per s2n docs)
         assert!(bidi1_2.receive().await?.is_none());
+
+        devices
+            .membera
+            .client
+            .aqc()
+            .delete_bidi_channel(bidi_chan1)
+            .await?;
+        devices
+            .memberb
+            .client
+            .aqc()
+            .delete_bidi_channel(bidi_chan2)
+            .await?;
     }
 
     Ok(())
@@ -575,7 +601,7 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         .sync_now(operator_addr, None)
         .await?;
 
-    let mut bidi1_2 = {
+    {
         let (mut bidi_chan1, peer_channel) = try_join(
             devices.membera.client.aqc().create_bidi_channel(
                 team_id,
@@ -629,26 +655,39 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
         let bytes = bidi1_2.receive().await?.assume("no data received")?;
         assert_eq!(bytes, msg3);
 
+        devices
+            .membera
+            .client
+            .aqc()
+            .delete_bidi_channel(bidi_chan1)
+            .await?;
+        devices
+            .memberb
+            .client
+            .aqc()
+            .delete_bidi_channel(bidi_chan2)
+            .await?;
+
         // wait for ctrl message to be sent.
         sleep(Duration::from_millis(100)).await;
 
-        bidi1_2
-    };
+        // try sending after channels are closed
+        let msg2 = Bytes::from_static(b"hello2");
+        let err = bidi1_2.send(msg2.clone()).await.err().unwrap();
+        info!("{:?}", err);
+        assert!(matches!(
+            err,
+            aranya_client::error::AqcError::ConnectionClosed
+        ));
 
-    // try sending after channels are closed
-    let msg2 = Bytes::from_static(b"hello2");
-    let err = bidi1_2.send(msg2.clone()).await.err().unwrap();
-    assert!(matches!(
-        err,
-        aranya_client::error::AqcError::StreamError(_)
-    ));
-
-    // try receiving after channels are closed.
-    assert!(bidi1_2
-        .receive()
-        .await
-        .expect("expected to recv data")
-        .is_none());
+        // try receiving after channels are closed.
+        let err = bidi1_2.receive().await.err().unwrap();
+        info!("{:?}", err);
+        assert!(matches!(
+            err,
+            aranya_client::error::AqcError::ConnectionClosed
+        ));
+    }
 
     Ok(())
 }

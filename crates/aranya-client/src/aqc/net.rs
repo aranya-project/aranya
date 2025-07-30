@@ -539,6 +539,9 @@ pub enum TryReceiveError<E = AqcError> {
     /// The  stream is closed.
     #[error("stream is closed")]
     StreamClosed,
+    /// The connection is closed.
+    #[error("connection is closed")]
+    ConnectionClosed,
     /// The channel is closed.
     #[error("channel is closed")]
     ChannelClosed,

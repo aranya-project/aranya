@@ -66,6 +66,10 @@ pub enum Error {
     #[capi(msg = "no response ready yet")]
     WouldBlock,
 
+    /// A channel got unexpectedly closed.
+    #[capi(msg = "channel got closed")]
+    ChannelClosed,
+
     /// A connection got unexpectedly closed.
     #[capi(msg = "connection got closed")]
     ConnectionClosed,
@@ -73,10 +77,6 @@ pub enum Error {
     /// A stream got unexpectedly closed.
     #[capi(msg = "stream got closed")]
     StreamClosed,
-
-    /// A channel got unexpectedly closed.
-    #[capi(msg = "channel got closed")]
-    ChannelClosed,
 
     /// Unable to create configuration info.
     #[capi(msg = "invalid config")]
@@ -114,9 +114,9 @@ impl From<&imp::Error> for Error {
                 }
             },
             imp::Error::WouldBlock => Self::WouldBlock,
+            imp::Error::ChannelClosed => Self::ChannelClosed,
             imp::Error::ConnectionClosed => Self::ConnectionClosed,
             imp::Error::StreamClosed => Self::StreamClosed,
-            imp::Error::ChannelClosed => Self::ChannelClosed,
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
             imp::Error::Other(_) => Self::Other,
@@ -1740,9 +1740,22 @@ pub unsafe fn aqc_create_uni_channel(
 ///
 /// Note that this function takes ownership of the [`AqcBidiChannel`] and invalidates any further use.
 ///
+/// @param[in] client the Aranya Client [`Client`].
 /// @param[in] channel the AQC Channel [`AqcBidiChannel`] to delete.
-pub fn aqc_delete_bidi_channel(_channel: OwnedPtr<AqcBidiChannel>) -> Result<(), imp::Error> {
-    // Channel is deleted implicitly via `Drop` of owned channel.
+///
+/// @relates AranyaClient.
+pub fn aqc_delete_bidi_channel(
+    client: &Client,
+    channel: OwnedPtr<AqcBidiChannel>,
+) -> Result<(), imp::Error> {
+    // SAFETY: the user is responsible for passing in a valid AqcBidiChannel pointer.
+    let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
+
+    let client = client.imp();
+    client
+        .rt
+        .block_on(client.inner.aqc().delete_bidi_channel(channel))?;
+
     Ok(())
 }
 
@@ -1750,9 +1763,22 @@ pub fn aqc_delete_bidi_channel(_channel: OwnedPtr<AqcBidiChannel>) -> Result<(),
 ///
 /// Note that this function takes ownership of the [`AqcSendChannel`] and invalidates any further use.
 ///
+/// @param[in] client the Aranya Client [`Client`].
 /// @param[in] channel the AQC Channel [`AqcSendChannel`] to delete.
-pub fn aqc_delete_uni_channel(_channel: OwnedPtr<AqcSendChannel>) -> Result<(), imp::Error> {
-    // Channel is deleted implicitly via `Drop` of owned channel.
+///
+/// @relates AranyaClient.
+pub fn aqc_delete_uni_channel(
+    client: &Client,
+    channel: OwnedPtr<AqcSendChannel>,
+) -> Result<(), imp::Error> {
+    // SAFETY: the user is responsible for passing in a valid AqcSendChannel pointer.
+    let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
+
+    let client = client.imp();
+    client
+        .rt
+        .block_on(client.inner.aqc().delete_uni_channel(channel))?;
+
     Ok(())
 }
 

@@ -159,13 +159,6 @@ impl AqcSendChannel {
     }
 }
 
-impl Drop for AqcSendChannel {
-    fn drop(&mut self) {
-        debug!("dropping aqc send channel");
-        let _ = futures_lite::future::block_on(self.close());
-    }
-}
-
 /// The receive end of a unidirectional channel.
 /// Allows receiving data streams over a channel.
 #[derive(Debug)]
@@ -257,13 +250,6 @@ impl AqcReceiveChannel {
         self.keys.zeroize();
 
         Ok(())
-    }
-}
-
-impl Drop for AqcReceiveChannel {
-    fn drop(&mut self) {
-        debug!("dropping aqc receive channel");
-        let _ = futures_lite::future::block_on(self.close());
     }
 }
 
@@ -392,15 +378,7 @@ impl AqcBidiChannel {
     }
 }
 
-impl Drop for AqcBidiChannel {
-    fn drop(&mut self) {
-        debug!("dropping aqc bidi channel");
-        let _ = futures_lite::future::block_on(self.close());
-    }
-}
-
 /// Used to send and receive data with a peer.
-// TODO: implement `Drop`
 #[derive(Debug)]
 pub struct AqcBidiStream {
     stream: s2n::BidirectionalStream,
@@ -429,6 +407,9 @@ impl AqcBidiStream {
             if channel_closed(e) {
                 self.keys.zeroize();
                 return Err(AqcError::ChannelClosed);
+            }
+            if connection_closed(e) {
+                return Err(AqcError::ConnectionClosed);
             }
             return Err(AqcError::StreamError(e));
         }
@@ -463,7 +444,10 @@ impl AqcBidiStream {
                     self.keys.zeroize();
                     return Err(AqcError::ChannelClosed);
                 }
-                Err(AqcError::ConnectionClosed)
+                if connection_closed(e) {
+                    return Err(AqcError::ConnectionClosed);
+                }
+                Err(AqcError::StreamError(e))
             }
         }
     }
@@ -484,6 +468,9 @@ impl AqcBidiStream {
                     let _ = futures_lite::future::block_on(self.close());
                     self.keys.zeroize();
                     return Err(TryReceiveError::ChannelClosed);
+                }
+                if connection_closed(e) {
+                    return Err(TryReceiveError::ConnectionClosed);
                 }
                 Err(TryReceiveError::StreamClosed)
             }
@@ -520,7 +507,10 @@ impl AqcReceiveStream {
                     self.keys.zeroize();
                     return Err(AqcError::ChannelClosed);
                 }
-                Err(AqcError::ConnectionClosed)
+                if connection_closed(e) {
+                    return Err(AqcError::ConnectionClosed);
+                }
+                Err(AqcError::StreamError(e))
             }
         }
     }
@@ -541,6 +531,9 @@ impl AqcReceiveStream {
                 if channel_closed(e) {
                     self.keys.zeroize();
                     return Err(TryReceiveError::ChannelClosed);
+                }
+                if connection_closed(e) {
+                    return Err(TryReceiveError::ConnectionClosed);
                 }
                 Err(TryReceiveError::StreamClosed)
             }
@@ -583,6 +576,9 @@ impl AqcSendStream {
             if channel_closed(e) {
                 self.keys.zeroize();
                 return Err(AqcError::ChannelClosed);
+            }
+            if connection_closed(e) {
+                return Err(AqcError::ConnectionClosed);
             }
             return Err(AqcError::StreamError(e));
         }
@@ -692,6 +688,14 @@ fn channel_closed(e: s2n_quic::stream::Error) -> bool {
         if code.as_u64() == ConnectionCloseError::ChannelClosed as u64 {
             return true;
         }
+    }
+    false
+}
+
+// Returns true if the stream error indicates the AQC channel was closed.
+fn connection_closed(e: s2n_quic::stream::Error) -> bool {
+    if let s2n_quic::stream::Error::ConnectionError { .. } = e {
+        return true;
     }
     false
 }

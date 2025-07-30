@@ -125,6 +125,20 @@ impl<'a> AqcChannels<'a> {
         Ok(channel)
     }
 
+    /// Deletes an AQC bidi channel.
+    #[instrument(skip_all, fields(aqc_id = %chan.aqc_id(), label = %chan.label_id()))]
+    pub async fn delete_bidi_channel(&mut self, mut chan: AqcBidiChannel) -> crate::Result<()> {
+        chan.close().await?;
+        Ok(())
+    }
+
+    /// Deletes an AQC uni channel.
+    #[instrument(skip_all, fields(aqc_id = %chan.aqc_id(), label = %chan.label_id()))]
+    pub async fn delete_uni_channel(&mut self, mut chan: AqcSendChannel) -> crate::Result<()> {
+        chan.close().await?;
+        Ok(())
+    }
+
     /// Waits for a peer to create an AQC channel with this client.
     pub async fn receive_channel(&self) -> crate::Result<AqcPeerChannel> {
         info!("receive_channel");

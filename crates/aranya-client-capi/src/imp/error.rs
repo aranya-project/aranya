@@ -26,14 +26,14 @@ pub enum Error {
     #[error("haven't received any data yet")]
     WouldBlock,
 
-    #[error("stream was unexpectedly closed")]
-    StreamClosed,
-
     #[error("channel was unexpectedly closed")]
     ChannelClosed,
 
     #[error("connection was unexpectedly closed")]
     ConnectionClosed,
+
+    #[error("stream was unexpectedly closed")]
+    StreamClosed,
 
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),
@@ -64,6 +64,7 @@ impl From<TryReceiveError<AqcError>> for Error {
     fn from(value: TryReceiveError<AqcError>) -> Self {
         match value {
             TryReceiveError::ChannelClosed => Self::ChannelClosed,
+            TryReceiveError::ConnectionClosed => Self::ConnectionClosed,
             TryReceiveError::StreamClosed => Self::StreamClosed,
             TryReceiveError::Empty => Self::WouldBlock,
             TryReceiveError::Error(e) => Self::Client(aranya_client::Error::Aqc(e)),
@@ -75,6 +76,7 @@ impl From<TryReceiveError<aranya_client::Error>> for Error {
     fn from(value: TryReceiveError<aranya_client::Error>) -> Self {
         match value {
             TryReceiveError::ChannelClosed => Self::ChannelClosed,
+            TryReceiveError::ConnectionClosed => Self::ConnectionClosed,
             TryReceiveError::StreamClosed => Self::StreamClosed,
             TryReceiveError::Empty => Self::WouldBlock,
             TryReceiveError::Error(e) => Self::Client(e),
