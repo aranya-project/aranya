@@ -8,14 +8,14 @@ Future plans to collect more information include:
 -   Augmenting existing metrics with more information using key-value pairs, as well as reporting metrics for individual daemons.
 -   Extending the above metrics harness with benchmarks using `divan` and [flame graphs](https://www.brendangregg.com/flamegraphs.html) to identify performance bottlenecks and functions that need to be annotated with `#[fastrace::trace]` for better measurement of hotspots.
 
-# Prometheus Exporter
+## Prometheus Exporter
 
 One of the supported metrics backends allows for communicating with a [Prometheus](https://prometheus.io/) instance. Note that with the way that Prometheus works, a datapoint is only created once the data is scraped, so any data created locally that gets overwritten before being scraped is lost. This can either be letting the main Prometheus backend scrape data from the exporter which is meant for longer running data, or using a `pushgateway` with a unique job name to easily filter out specific runs, which is meant more for short runs.
 
-## Installation Instructions
+### Installation Instructions
 You can get Prometheus through your favorite package manager; on MacOS it's preferred to use [homebrew](https://brew.sh/).
 
-### MacOS Installation
+#### MacOS Installation
 Make sure homebrew is installed, and then run [brew install prometheus](https://formulae.brew.sh/formula/prometheus).
 
 If you need the `pushgateway` binary, it's not available using homebrew, so'll have to [download it](https://prometheus.io/download/#pushgateway) from the Prometheus website, extract it, and install it using `sudo cp pushgateway /usr/local/bin/`. Note that when you first try to run the binary, MacOS will block it from running since it hasn't been notarized. After trying to run it once, follow the instructions on [Apple's website](https://support.apple.com/en-us/102445#openanyway) to allow the binary to run anyways.
@@ -24,20 +24,32 @@ You'll also have to modify the Prometheus config file at `/opt/homebrew/etc/prom
 
 Once you've configured Prometheus, you'll want to set Prometheus to start automatically: `brew services start prometheus`. If you ran that command before changing the config, run `brew services restart prometheus`.
 
-# Collecting Metrics
+## DogStatsD Exporter
+Another supported backend is using `dogstatsd` to export metrics to a Datadog Agent.
 
-The easiest way to do an `aranya-metrics` run is to simply call `cargo make metrics`, which will compile the daemon and this crate, spin up a `pushgateway`, run the example, and close everything.
+<!-- TODO(nikki): more information about this exporter -->
 
-After that's done and you have the job name (i.e. `aranya_demo_1751415368`), the easiest way to view the data is to go to Prometheus (`localhost:9090`), query for the job (`{job="aranya_demo_1751415368"}`), go to the graph tab, adjust the timescale to one where you can see the whole run, and you can click and drag to select a smaller range. Make sure to change the resolution to whatever your scrape interval is (the above config sets it to 100ms). You can then selectively look at categories using the list below the graph.
+## TCP Exporter
+`aranya-metrics` also supports exporting data over plaintext TCP (meaning no encryption). This works by serializing data using [`protobuf`](https://protobuf.dev/) and sending it to any connected client.
 
-# Technical Details
+### Installation Instructions
+All you need to do is connect to the configured TCP address/port and listen for data coming back. You'll need to have `protoc` installed to be able to compile the exporter, as well as having the corresponding [protobuf file](https://github.com/metrics-rs/metrics/blob/main/metrics-exporter-tcp/proto/event.proto) to be able to decode the serialized data, but this allows sending metrics to clients written using many different programming languages. See your language's ecosystem for more support on protobuf, as well as the documentation website linked above.
 
-Due to `sysinfo` only providing percentages of CPU usage at each refresh instead of raw user time/system time, we use `proc_pidinfo` on MacOS (falling back to `rusage` which only distinguishes between "self" and a generic "children") to grab CPU time and memory usage, using sysinfo for file I/O. `proc_pidinfo` and `rusage` both capture information "at the current moment" which means there isn't really a delta, whereas sysinfo's bytes_read/written is "since last refresh" so we have to aggregate it along with all previous deltas.
+## MacOS Installation
+Make sure homebrew is installed, and then simply run [brew install protobuf](https://formulae.brew.sh/formula/protobuf).
 
-Basically, the "self" PID is an `aranya-client` instance (plus all metrics overhead), and since we use `Command::spawn()`, all `aranya-daemon` instances are children of the current PID which means we're allowed to access their information (`proc_pidinfo` can do weird stuff if you don't have permissions to access another process's info).
+## Collecting Metrics
 
-The way that we collect the metrics that are generated is using [Prometheus](https://prometheus.io/), an open source metrics collection framework. By default, Prometheus runs in a pull configuration, i.e. every so often Prometheus will scrape this process for metrics, which works for long running processes but isn't ideal for an isolated run. We instead use a separate tool provided by Prometheus called a [`pushgateway`](https://github.com/prometheus/pushgateway).
+The easiest way to do an `aranya-metrics` run is to simply run `cargo make metrics`, which will compile the daemon and this crate, and then log metrics to the command line.
 
-One caveat is that the `pushgateway` will continue to collect metrics until it's killed, so `cargo make metrics` spawns a `pushgateway` for the duration of the run. `aranya-metrics` generates a unique `job_name` using the current timestamp for easy querying.
+Alternatively, you can run `cargo make metrics-prometheus` which will spin up a `pushgateway` and run the example. Once that's done and you have the job name (i.e. `aranya_demo_1751415368`), the easiest way to view the data is to go to Prometheus (`localhost:9090`), query for the job (`{job="aranya_demo_1751415368"}`), go to the graph tab, adjust the timescale to one where you can see the whole run, and you can click and drag to select a smaller range. Make sure to change the resolution to whatever your scrape interval is (the above config sets it to 100ms). You can then filter specific metrics using the list below the graph.
 
-`brew install protobuf` for TCP
+## Technical Details
+
+Due to `sysinfo` only providing percentages of CPU usage at each refresh instead of raw user time/system time, we use `proc_pidinfo` on MacOS to grab the raw CPU time and memory usage, using sysinfo for file I/O. `proc_pidinfo` captures information "at the current moment" which means there isn't really a delta, whereas sysinfo's bytes_read/written is "since last refresh" so we have to aggregate it along with all previous deltas.
+
+The PIDs being tracked include "client", which is an `aranya-client` instance (plus metrics overhead), as well as five `aranya-daemon` instances ("owner", "admin", "operator", "member_a", and "member_b"), which are created as sub-processes using `Command::spawn()` (`proc_pidinfo` can do weird stuff if you don't have permissions to access another process's info).
+
+As mentioned above, Prometheus works using a pull/scrape model and `pushgateway` will push metrics to Prometheus every tick, but that means that the scrape interval dictates the "resolution" of the data, data can be overwritten if the metrics are run twice before they get scraped. `pushgateway` also continues to push datapoints until metrics time out, so configuring an adequate timeout using `aranya-metrics`'s config is important. As mentioned above, we also use a unique `job_name` using the current timestamp to make it easy to query for.
+
+<!-- TODO(nikki): technical details for datadog and TCP -->

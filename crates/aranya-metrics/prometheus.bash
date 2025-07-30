@@ -2,6 +2,11 @@
 
 set -e # Exit on any errors
 
+if ! command -v prometheus >/dev/null 2>&1; then
+    echo "Error: Prometheus is not installed. Please install it using your favorite package manager."
+    exit 1
+fi
+
 if ! command -v pushgateway >/dev/null 2>&1; then
     echo "Error: pushgateway is not installed. Please grab the latest binary from https://prometheus.io/download/#pushgateway"
     exit 1
@@ -11,6 +16,7 @@ echo "Building our binaries..."
 cargo build --bin aranya-daemon --release
 cargo build --bin aranya-metrics --release
 
+# We assume that if they installed prometheus, it's already running in the background.
 echo "Starting pushgateway..."
 pushgateway &
 PUSHGATEWAY_PID=$!
@@ -30,4 +36,4 @@ trap 'cleanup' EXIT
 trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
 
 echo "Running metrics collection..."
-CONFIG_PATH=crates/aranya-metrics/metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
+CONFIG_PATH=crates/aranya-metrics/prometheus.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon

@@ -264,4 +264,16 @@ script = "./run.bash"
 [tasks.metrics]
 category = "metrics"
 description = "Run Metrics Crate"
-script = "crates/aranya-metrics/run.bash"
+script = '''
+#!/usr/bin/env bash
+set -e
+cargo build --bin aranya-daemon --release
+cargo build --bin aranya-metrics --release
+CONFIG_PATH=crates/aranya-metrics/metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
+'''
+
+# Run `aranya-metrics` using prometheus
+[tasks.metrics-prometheus]
+category = "metrics"
+description = "Run Metrics Crate w/ a Push Gateway"
+script = "crates/aranya-metrics/prometheus.bash"

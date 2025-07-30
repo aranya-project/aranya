@@ -42,6 +42,19 @@ pub struct PrometheusConfig {
 }
 
 impl PrometheusConfig {
+    fn format_pushgateway_url(endpoint: &str, job_name: &str) -> String {
+        // Try to parse the Uri, or else set it to our default.
+        let uri = endpoint
+            .parse::<http::Uri>()
+            .unwrap_or(http::Uri::from_static("http://localhost:9091/"));
+        let scheme = uri.scheme_str().unwrap_or("http");
+        let authority = uri
+            .authority()
+            .map(|a| a.as_str())
+            .unwrap_or("localhost:9091");
+        format!("{scheme}://{authority}/metrics/job/{job_name}")
+    }
+
     /// Configures and installs the exporter for Prometheus using the provided config info.
     pub(super) fn install(&self, config: &super::MetricsConfig) -> Result<()> {
         let mut builder = PrometheusBuilder::new();
@@ -61,14 +74,7 @@ impl PrometheusConfig {
                 password,
                 use_http_post_method,
             } => {
-                let endpoint = endpoint
-                    .parse::<http::Uri>()
-                    .map(|_| endpoint.clone())
-                    .unwrap_or(format!(
-                        "http://localhost:9091/metrics/job/{}",
-                        &config.job_name
-                    ));
-
+                let endpoint = Self::format_pushgateway_url(endpoint, &config.job_name);
                 info!("Setting up Prometheus push gateway: {endpoint}");
                 builder = builder.with_push_gateway(
                     endpoint,
