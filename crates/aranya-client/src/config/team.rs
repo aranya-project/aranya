@@ -11,118 +11,102 @@
 //!
 //! Both operations support optional transport configuration.
 
+use aranya_daemon_api as api;
 use aranya_daemon_api::TeamId;
 
-use crate::{error::InvalidArg, ConfigError, Result};
-
 pub mod quic_sync;
-pub use quic_sync::{
-    AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig, CreateTeamQuicSyncConfigBuilder,
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
+
+use crate::{
+    config::{
+        private::{ConfigFor, UseDefaultSpread},
+        ConfigResult,
+    },
+    error::InvalidArg,
 };
 
-/// Builder for [`CreateTeamConfig`].
-#[derive(Debug, Default)]
-pub struct CreateTeamConfigBuilder {
-    quic_sync: Option<CreateTeamQuicSyncConfig>,
+#[skip_serializing_none]
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct CreateTeamConfigV1 {
+    pub quic_sync: Option<quic_sync::CreateTeamQuicSyncConfigV1>,
+    #[doc(hidden)]
+    #[serde(skip)]
+    pub __use_default_spread: UseDefaultSpread,
 }
 
-impl CreateTeamConfigBuilder {
-    /// Configures the quic_sync config..
-    ///
-    /// This is an optional field that configures how the team
-    /// synchronizes data over QUIC connections.
-    pub fn quic_sync(mut self, cfg: CreateTeamQuicSyncConfig) -> Self {
-        self.quic_sync = Some(cfg);
-        self
-    }
-
-    /// Builds the configuration for creating a new team.
-    pub fn build(self) -> Result<CreateTeamConfig> {
-        Ok(CreateTeamConfig {
-            quic_sync: self.quic_sync,
+impl ConfigFor<api::CreateTeamConfig> for CreateTeamConfigV1 {
+    fn resolve(self) -> ConfigResult<api::CreateTeamConfig> {
+        Ok(api::CreateTeamConfig {
+            quic_sync: self.quic_sync.map(|x| x.into_api()).transpose()?,
         })
     }
 }
 
-/// Builder for [`AddTeamConfig`].
-#[derive(Debug, Default)]
-pub struct AddTeamConfigBuilder {
-    id: Option<TeamId>,
-    quic_sync: Option<AddTeamQuicSyncConfig>,
+#[skip_serializing_none]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct AddTeamConfigV1 {
+    pub team_id: Option<TeamId>,
+    pub quic_sync: Option<quic_sync::AddTeamQuicSyncConfigV1>,
+    #[doc(hidden)]
+    #[serde(skip)]
+    pub __use_default_spread: UseDefaultSpread,
 }
 
-impl AddTeamConfigBuilder {
-    /// Sets the ID of the team to add.
-    pub fn team_id(mut self, id: TeamId) -> Self {
-        self.id = Some(id);
-        self
-    }
-
-    /// Configures the quic_sync config..
-    ///
-    /// This is an optional field that configures how the team
-    /// synchronizes data over QUIC connections.
-    pub fn quic_sync(mut self, cfg: AddTeamQuicSyncConfig) -> Self {
-        self.quic_sync = Some(cfg);
-        self
-    }
-
-    /// Attempts to build an [`AddTeamConfig`] using the provided parameters.
-    pub fn build(self) -> Result<AddTeamConfig> {
-        let id = self.id.ok_or_else(|| {
-            ConfigError::InvalidArg(InvalidArg::new(
-                "id",
-                "Missing `id` field when calling `AddTeamConfigBuilder::build`",
-            ))
-        })?;
-
-        Ok(AddTeamConfig {
-            id,
-            quic_sync: self.quic_sync,
+impl ConfigFor<api::AddTeamConfig> for AddTeamConfigV1 {
+    fn resolve(self) -> ConfigResult<api::AddTeamConfig> {
+        Ok(api::AddTeamConfig {
+            team_id: self.team_id.ok_or(InvalidArg::new("team_id", "missing"))?,
+            quic_sync: self.quic_sync.map(|x| x.into_api()).transpose()?,
         })
     }
 }
 
-/// Configuration for creating a new team.
-#[derive(Clone, Debug)]
-pub struct CreateTeamConfig {
-    quic_sync: Option<CreateTeamQuicSyncConfig>,
-}
+#[cfg(test)]
+mod test {
+    use super::*;
 
-impl CreateTeamConfig {
-    /// Creates a default [`CreateTeamConfigBuilder`].
-    pub fn builder() -> CreateTeamConfigBuilder {
-        CreateTeamConfigBuilder::default()
-    }
-}
+    mod cbor {
+        use anyhow::Result;
 
-impl From<CreateTeamConfig> for aranya_daemon_api::CreateTeamConfig {
-    fn from(value: CreateTeamConfig) -> Self {
-        Self {
-            quic_sync: value.quic_sync.map(Into::into),
+        pub fn to_vec<T: serde::Serialize>(value: &T) -> Result<Vec<u8>> {
+            let mut buf = Vec::new();
+            ciborium::into_writer(value, &mut buf)?;
+            Ok(buf)
+        }
+
+        pub fn from_bytes<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T> {
+            Ok(ciborium::from_reader(bytes)?)
         }
     }
-}
 
-/// Configuration for joining an existing team.
-#[derive(Clone, Debug)]
-pub struct AddTeamConfig {
-    id: TeamId,
-    quic_sync: Option<AddTeamQuicSyncConfig>,
-}
-
-impl AddTeamConfig {
-    /// Creates a default [`AddTeamConfigBuilder`].
-    pub fn builder() -> AddTeamConfigBuilder {
-        AddTeamConfigBuilder::default()
+    #[test]
+    fn test_full_config() {
+        let config1 = AddTeamConfigV1 {
+            team_id: Some(std::array::from_fn(|i| i as u8).into()),
+            quic_sync: Some(quic_sync::AddTeamQuicSyncConfigV1 {
+                seed_mode: Some(quic_sync::AddSeedModeV1::Ikm(quic_sync::SeedIkm::from(
+                    [0u8; 32],
+                ))),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let bytes = cbor::to_vec(&config1).unwrap();
+        println!("{bytes:?}");
+        println!("{:?}", cbor::from_bytes::<ciborium::Value>(&bytes).unwrap());
+        let config2: AddTeamConfigV1 = cbor::from_bytes(&bytes).unwrap();
+        assert_eq!(format!("{config1:?}"), format!("{config2:?}"));
     }
-}
 
-impl From<AddTeamConfig> for aranya_daemon_api::AddTeamConfig {
-    fn from(value: AddTeamConfig) -> Self {
-        Self {
-            team_id: value.id,
-            quic_sync: value.quic_sync.map(Into::into),
-        }
+    #[test]
+    fn test_empty_config() {
+        let config1 = AddTeamConfigV1::default();
+        let bytes = cbor::to_vec(&config1).unwrap();
+        println!("{bytes:?}");
+        assert_eq!(bytes.len(), 1);
+        println!("{:?}", cbor::from_bytes::<ciborium::Value>(&bytes).unwrap());
+        let config2: AddTeamConfigV1 = cbor::from_bytes(&bytes).unwrap();
+        assert_eq!(format!("{config1:?}"), format!("{config2:?}"));
     }
 }

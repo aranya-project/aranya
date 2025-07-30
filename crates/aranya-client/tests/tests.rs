@@ -12,8 +12,9 @@
 mod common;
 
 use anyhow::{bail, Context, Result};
-use aranya_client::{
-    config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamQuicSyncConfig,
+use aranya_client::config::{
+    quic_sync::{AddSeedModeV1, AddTeamQuicSyncConfigV1},
+    AddTeamConfigV1, CreateTeamConfigV1,
 };
 use aranya_daemon_api::Role;
 use test_log::test;
@@ -173,11 +174,7 @@ async fn test_add_team() -> Result<()> {
     let owner = devices
         .owner
         .client
-        .create_team({
-            CreateTeamConfig::builder()
-                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
-                .build()?
-        })
+        .create_team(CreateTeamConfigV1::default())
         .await
         .expect("expected to create team");
     let team_id = owner.team_id();
@@ -221,15 +218,13 @@ async fn test_add_team() -> Result<()> {
     devices
         .admin
         .client
-        .add_team({
-            AddTeamConfig::builder()
-                .team_id(team_id)
-                .quic_sync(
-                    AddTeamQuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed)?
-                        .build()?,
-                )
-                .build()?
+        .add_team(AddTeamConfigV1 {
+            team_id: Some(team_id),
+            quic_sync: Some(AddTeamQuicSyncConfigV1 {
+                seed_mode: Some(AddSeedModeV1::Wrapped(admin_seed.into())),
+                ..Default::default()
+            }),
+            ..Default::default()
         })
         .await?;
     {
@@ -317,11 +312,7 @@ async fn test_multi_team_sync() -> Result<()> {
     let team1 = devices
         .owner
         .client
-        .create_team({
-            CreateTeamConfig::builder()
-                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
-                .build()?
-        })
+        .create_team(CreateTeamConfigV1::default())
         .await
         .expect("expected to create team1");
     let team_id1 = team1.team_id();
@@ -331,11 +322,7 @@ async fn test_multi_team_sync() -> Result<()> {
     let team2 = devices
         .owner
         .client
-        .create_team({
-            CreateTeamConfig::builder()
-                .quic_sync(CreateTeamQuicSyncConfig::builder().build()?)
-                .build()?
-        })
+        .create_team(CreateTeamConfigV1::default())
         .await
         .expect("expected to create team2");
     let team_id2 = team2.team_id();
@@ -392,15 +379,13 @@ async fn test_multi_team_sync() -> Result<()> {
     devices
         .admin
         .client
-        .add_team({
-            AddTeamConfig::builder()
-                .team_id(team_id1)
-                .quic_sync(
-                    AddTeamQuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed1)?
-                        .build()?,
-                )
-                .build()?
+        .add_team(AddTeamConfigV1 {
+            team_id: Some(team_id1),
+            quic_sync: Some(AddTeamQuicSyncConfigV1 {
+                seed_mode: Some(AddSeedModeV1::Wrapped(admin_seed1.into())),
+                ..Default::default()
+            }),
+            ..Default::default()
         })
         .await?;
 
@@ -438,15 +423,13 @@ async fn test_multi_team_sync() -> Result<()> {
     devices
         .admin
         .client
-        .add_team({
-            AddTeamConfig::builder()
-                .team_id(team_id2)
-                .quic_sync(
-                    AddTeamQuicSyncConfig::builder()
-                        .wrapped_seed(&admin_seed2)?
-                        .build()?,
-                )
-                .build()?
+        .add_team(AddTeamConfigV1 {
+            team_id: Some(team_id2),
+            quic_sync: Some(AddTeamQuicSyncConfigV1 {
+                seed_mode: Some(AddSeedModeV1::Wrapped(admin_seed2.into())),
+                ..Default::default()
+            }),
+            ..Default::default()
         })
         .await?;
 

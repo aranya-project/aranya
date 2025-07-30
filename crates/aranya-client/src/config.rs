@@ -9,6 +9,17 @@ use crate::{error::InvalidArg, ConfigError, Result};
 pub mod team;
 pub use team::*;
 
+pub(crate) type ConfigResult<T, E = ConfigError> = core::result::Result<T, E>;
+
+pub(crate) mod private {
+    #[derive(Clone, Debug, Default)]
+    pub struct UseDefaultSpread;
+
+    pub trait ConfigFor<C> {
+        fn resolve(self) -> super::ConfigResult<C>;
+    }
+}
+
 /// Configuration info for syncing with a peer.
 #[derive(Debug, Clone)]
 pub struct SyncPeerConfig {

@@ -20,7 +20,7 @@ use tracing::{debug, error, info, instrument};
 
 use crate::{
     aqc::{AqcChannels, AqcClient},
-    config::{AddTeamConfig, CreateTeamConfig, SyncPeerConfig},
+    config::{private::ConfigFor, SyncPeerConfig},
     error::{self, aranya_error, InvalidArg, IpcError, Result},
 };
 
@@ -246,10 +246,13 @@ impl Client {
     }
 
     /// Create a new graph/team with the current device as the owner.
-    pub async fn create_team(&self, cfg: CreateTeamConfig) -> Result<Team<'_>> {
+    pub async fn create_team(
+        &self,
+        cfg: impl ConfigFor<aranya_daemon_api::CreateTeamConfig>,
+    ) -> Result<Team<'_>> {
         let team_id = self
             .daemon
-            .create_team(context::current(), cfg.into())
+            .create_team(context::current(), cfg.resolve()?)
             .await
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
@@ -274,8 +277,11 @@ impl Client {
     }
 
     /// Add a team to local device storage.
-    pub async fn add_team(&self, cfg: AddTeamConfig) -> Result<Team<'_>> {
-        let cfg = aranya_daemon_api::AddTeamConfig::from(cfg);
+    pub async fn add_team(
+        &self,
+        cfg: impl ConfigFor<aranya_daemon_api::AddTeamConfig>,
+    ) -> Result<Team<'_>> {
+        let cfg = cfg.resolve()?;
         let team_id = cfg.team_id;
 
         self.daemon

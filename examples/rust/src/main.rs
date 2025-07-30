@@ -7,8 +7,13 @@ use std::{
 
 use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
+    aqc::AqcPeerChannel,
+    client::Client,
+    config::{
+        quic_sync::{AddTeamQuicSyncConfigV1, CreateTeamQuicSyncConfigV1, SeedIkm},
+        AddTeamConfigV1, CreateTeamConfigV1,
+    },
+    Error, SyncPeerConfig,
 };
 use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
@@ -217,13 +222,14 @@ async fn main() -> Result<()> {
     let seed_ikm = {
         let mut buf = [0; 32];
         owner.client.rand(&mut buf).await;
-        buf
+        SeedIkm::from(buf)
     };
-    let owner_cfg = {
-        let qs_cfg = CreateTeamQuicSyncConfig::builder()
-            .seed_ikm(seed_ikm)
-            .build()?;
-        CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
+    let owner_cfg = CreateTeamConfigV1 {
+        quic_sync: Some(CreateTeamQuicSyncConfigV1 {
+            seed_mode: Some(seed_ikm.clone().into()),
+            ..Default::default()
+        }),
+        ..Default::default()
     };
 
     // get sync addresses.
@@ -246,14 +252,13 @@ async fn main() -> Result<()> {
     let team_id = owner_team.team_id();
     info!(%team_id);
 
-    let add_team_cfg = {
-        let qs_cfg = AddTeamQuicSyncConfig::builder()
-            .seed_ikm(seed_ikm)
-            .build()?;
-        AddTeamConfig::builder()
-            .quic_sync(qs_cfg)
-            .team_id(team_id)
-            .build()?
+    let add_team_cfg = AddTeamConfigV1 {
+        team_id: Some(team_id),
+        quic_sync: Some(AddTeamQuicSyncConfigV1 {
+            seed_mode: Some(seed_ikm.into()),
+            ..Default::default()
+        }),
+        ..Default::default()
     };
 
     let admin_team = admin.client.add_team(add_team_cfg.clone()).await?;

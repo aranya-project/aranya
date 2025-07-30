@@ -25,11 +25,13 @@ anyhow = { workspace = true }
 aranya-crypto = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
+ciborium = "0.2"
 futures-lite = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
 s2n-quic = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_with = "3"
 tarpc = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }

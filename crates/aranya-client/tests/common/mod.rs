@@ -6,8 +6,11 @@ use std::{
 
 use anyhow::{Context, Result};
 use aranya_client::{
-    client::Client, config::CreateTeamConfig, AddTeamConfig, AddTeamQuicSyncConfig,
-    CreateTeamQuicSyncConfig,
+    client::Client,
+    config::{
+        quic_sync::{AddTeamQuicSyncConfigV1, CreateTeamQuicSyncConfigV1, SeedIkm},
+        AddTeamConfigV1, CreateTeamConfigV1,
+    },
 };
 use aranya_daemon::{
     config::{self as daemon_cfg, Config, Toggle},
@@ -113,13 +116,14 @@ impl DevicesCtx {
         let seed_ikm = {
             let mut buf = [0; SEED_IKM_SIZE];
             self.owner.client.rand(&mut buf).await;
-            buf
+            SeedIkm::from(buf)
         };
-        let owner_cfg = {
-            let qs_cfg = CreateTeamQuicSyncConfig::builder()
-                .seed_ikm(seed_ikm)
-                .build()?;
-            CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
+        let owner_cfg = CreateTeamConfigV1 {
+            quic_sync: Some(CreateTeamQuicSyncConfigV1 {
+                seed_mode: Some(seed_ikm.clone().into()),
+                ..Default::default()
+            }),
+            ..Default::default()
         };
 
         let team = {
@@ -132,14 +136,13 @@ impl DevicesCtx {
         let team_id = team.team_id();
         info!(?team_id);
 
-        let cfg = {
-            let qs_cfg = AddTeamQuicSyncConfig::builder()
-                .seed_ikm(seed_ikm)
-                .build()?;
-            AddTeamConfig::builder()
-                .team_id(team_id)
-                .quic_sync(qs_cfg)
-                .build()?
+        let cfg = AddTeamConfigV1 {
+            team_id: Some(team_id),
+            quic_sync: Some(AddTeamQuicSyncConfigV1 {
+                seed_mode: Some(seed_ikm.into()),
+                ..Default::default()
+            }),
+            ..Default::default()
         };
 
         // Owner has the team added due to calling `create_team`, now we assign it to all other peers

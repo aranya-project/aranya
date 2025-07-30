@@ -6,133 +6,128 @@
 //! - [`CreateTeamQuicSyncConfig`] - For creating new teams
 //! - [`AddTeamQuicSyncConfig`] - For adding members to existing teams
 
-use aranya_daemon_api::{AddSeedMode, CreateSeedMode, SEED_IKM_SIZE};
-use tracing::error;
+use core::fmt;
 
-use crate::{error::InvalidArg, ConfigError, Result};
+use aranya_crypto::zeroize::Zeroize as _;
+use aranya_daemon_api::{self as api, Secret};
+use serde::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
+
+use crate::{
+    config::{private::UseDefaultSpread, ConfigResult},
+    error::InvalidArg,
+};
 
 /// Configuration for creating a new team with QUIC synchronization.
-#[derive(Clone, Debug)]
-pub struct CreateTeamQuicSyncConfig {
-    mode: CreateSeedMode,
+#[skip_serializing_none]
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct CreateTeamQuicSyncConfigV1 {
+    pub seed_mode: Option<CreateSeedModeV1>,
+    #[doc(hidden)]
+    #[serde(skip)]
+    pub __use_default_spread: UseDefaultSpread,
 }
 
-impl CreateTeamQuicSyncConfig {
-    /// Creates a new builder for team creation configuration.
-    pub fn builder() -> CreateTeamQuicSyncConfigBuilder {
-        CreateTeamQuicSyncConfigBuilder::default()
-    }
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub enum CreateSeedModeV1 {
+    #[default]
+    Generate,
+    Ikm(SeedIkm),
 }
 
 /// Configuration for adding members to an existing team with QUIC synchronization.
-#[derive(Clone, Debug)]
-pub struct AddTeamQuicSyncConfig {
-    mode: AddSeedMode,
-}
-
-impl AddTeamQuicSyncConfig {
-    /// Creates a new builder for team member addition configuration.
-    pub fn builder() -> AddTeamQuicSyncConfigBuilder {
-        AddTeamQuicSyncConfigBuilder::default()
-    }
-}
-
-/// Builder for [`CreateTeamQuicSyncConfig`]
-#[derive(Debug, Default)]
-pub struct CreateTeamQuicSyncConfigBuilder {
-    mode: CreateSeedMode,
-}
-
-impl CreateTeamQuicSyncConfigBuilder {
-    /// Sets the PSK seed mode.
+#[skip_serializing_none]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct AddTeamQuicSyncConfigV1 {
+    pub seed_mode: Option<AddSeedModeV1>,
     #[doc(hidden)]
-    pub fn mode(mut self, mode: CreateSeedMode) -> Self {
-        self.mode = mode;
-        self
-    }
+    #[serde(skip)]
+    pub __use_default_spread: UseDefaultSpread,
+}
 
-    /// Sets the seed to be generated.
-    ///
-    /// Overwrites [`Self::seed_ikm`].
-    pub fn gen_seed(mut self) -> Self {
-        self.mode = CreateSeedMode::Generate;
-        self
-    }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum AddSeedModeV1 {
+    Ikm(SeedIkm),
+    Wrapped(Secret),
+}
 
-    /// Sets the seed mode to 'IKM'.
-    ///
-    /// Overwrites [`Self::gen_seed`].
-    pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
-        self.mode = CreateSeedMode::IKM(ikm.into());
-        self
-    }
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SeedIkm([u8; 32]);
 
-    /// Builds the config.
-    pub fn build(self) -> Result<CreateTeamQuicSyncConfig> {
-        Ok(CreateTeamQuicSyncConfig { mode: self.mode })
+impl CreateTeamQuicSyncConfigV1 {
+    pub(crate) fn into_api(self) -> ConfigResult<aranya_daemon_api::CreateTeamQuicSyncConfig> {
+        Ok(aranya_daemon_api::CreateTeamQuicSyncConfig {
+            seed_mode: self
+                .seed_mode
+                .map_or(api::CreateSeedMode::Generate, |m| m.into_api()),
+        })
     }
 }
 
-/// Builder for [`AddTeamQuicSyncConfig`]
-#[derive(Debug, Default)]
-pub struct AddTeamQuicSyncConfigBuilder {
-    mode: Option<AddSeedMode>,
-}
-
-impl AddTeamQuicSyncConfigBuilder {
-    /// Sets the PSK seed mode.
-    #[doc(hidden)]
-    pub fn mode(mut self, mode: AddSeedMode) -> Self {
-        self.mode = Some(mode);
-        self
-    }
-
-    /// Sets the seed mode to 'IKM'.
-    ///
-    /// Overwrites [`Self::wrapped_seed`].
-    pub fn seed_ikm(mut self, ikm: [u8; SEED_IKM_SIZE]) -> Self {
-        self.mode = Some(AddSeedMode::IKM(ikm.into()));
-        self
-    }
-
-    /// Sets the seed mode to 'Wrapped'.
-    ///
-    /// Overwrites [`Self::seed_ikm`].
-    pub fn wrapped_seed(mut self, wrapped_seed: &[u8]) -> Result<Self> {
-        let wrapped = postcard::from_bytes(wrapped_seed).map_err(|err| {
-            error!(error = %err, "could not deserialize wrapped_seed");
-            ConfigError::InvalidArg(InvalidArg::new("wrapped_seed", "could not deserialize"))
-        })?;
-        self.mode = Some(AddSeedMode::Wrapped(wrapped));
-        Ok(self)
-    }
-
-    /// Builds the config.
-    pub fn build(self) -> Result<AddTeamQuicSyncConfig> {
-        let Some(mode) = self.mode else {
-            return Err(ConfigError::InvalidArg(InvalidArg::new(
-                "mode",
-                "`mode` must be set in order to build an `AddQuicSyncConfig`",
-            ))
-            .into());
-        };
-
-        Ok(AddTeamQuicSyncConfig { mode })
+impl From<SeedIkm> for CreateSeedModeV1 {
+    fn from(value: SeedIkm) -> Self {
+        Self::Ikm(value)
     }
 }
 
-impl From<CreateTeamQuicSyncConfig> for aranya_daemon_api::CreateTeamQuicSyncConfig {
-    fn from(value: CreateTeamQuicSyncConfig) -> Self {
-        aranya_daemon_api::CreateTeamQuicSyncConfig {
-            seed_mode: value.mode,
+impl CreateSeedModeV1 {
+    fn into_api(self) -> api::CreateSeedMode {
+        match self {
+            Self::Generate => api::CreateSeedMode::Generate,
+            Self::Ikm(seed_ikm) => api::CreateSeedMode::IKM(seed_ikm.into_api()),
         }
     }
 }
 
-impl From<AddTeamQuicSyncConfig> for aranya_daemon_api::AddTeamQuicSyncConfig {
-    fn from(value: AddTeamQuicSyncConfig) -> Self {
-        aranya_daemon_api::AddTeamQuicSyncConfig {
-            seed_mode: value.mode,
-        }
+impl AddTeamQuicSyncConfigV1 {
+    pub(crate) fn into_api(self) -> ConfigResult<api::AddTeamQuicSyncConfig> {
+        Ok(api::AddTeamQuicSyncConfig {
+            seed_mode: self
+                .seed_mode
+                .ok_or(InvalidArg::new("seed_mode", "missing"))?
+                .into_api()?,
+        })
+    }
+}
+
+impl From<SeedIkm> for AddSeedModeV1 {
+    fn from(value: SeedIkm) -> Self {
+        Self::Ikm(value)
+    }
+}
+
+impl AddSeedModeV1 {
+    fn into_api(self) -> ConfigResult<api::AddSeedMode> {
+        Ok(match self {
+            AddSeedModeV1::Ikm(seed_ikm) => api::AddSeedMode::IKM(seed_ikm.into_api()),
+            AddSeedModeV1::Wrapped(secret) => api::AddSeedMode::Wrapped(
+                postcard::from_bytes(secret.raw_secret_bytes())
+                    .map_err(|_| InvalidArg::new("wrapped seed", "invalid"))?,
+            ),
+        })
+    }
+}
+
+impl Drop for SeedIkm {
+    fn drop(&mut self) {
+        self.0.zeroize()
+    }
+}
+
+impl fmt::Debug for SeedIkm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("SeedIkm").finish_non_exhaustive()
+    }
+}
+
+impl From<[u8; 32]> for SeedIkm {
+    fn from(value: [u8; 32]) -> Self {
+        Self(value)
+    }
+}
+
+impl SeedIkm {
+    fn into_api(self) -> aranya_daemon_api::Ikm {
+        aranya_daemon_api::Ikm::from(self.0)
     }
 }
