@@ -218,7 +218,7 @@ impl AqcClient {
                 .into_iter()
                 .map(|(_, p)| p.identity.as_bytes().to_vec())
                 .collect();
-            self.client_state.lock().await.zeroize_psks(&identities);
+            self.zeroize_psks(identities).await;
             return Err(AqcError::ConnectionClosed);
         };
         conn.keep_alive(true)?;
