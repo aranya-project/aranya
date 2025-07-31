@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, BTreeMap, HashMap},
+    collections::HashSet,
     sync::{Arc, LazyLock, Mutex},
 };
 
@@ -31,7 +31,7 @@ pub(super) static CTRL_PSK: LazyLock<Arc<PresharedKey>> = LazyLock::new(|| {
 
 #[derive(Debug)]
 pub(crate) struct ServerPresharedKeys {
-    keys: Mutex<HashMap<Vec<u8>, Arc<PresharedKey>>>,
+    keys: Mutex<HashSet<PskIdAsKey>>,
     // Optional sender to report the selected identity
     identity_sender: mpsc::Sender<Vec<u8>>,
 }
@@ -52,29 +52,24 @@ impl ServerPresharedKeys {
 
     pub fn insert(&self, psk: Arc<PresharedKey>) {
         let identity = psk.identity().to_vec();
-        match self.keys.lock().expect("poisoned").entry(identity.clone()) {
-            Entry::Vacant(v) => {
-                v.insert(psk);
-            }
-            Entry::Occupied(_) => {
-                error!("Duplicate PSK identity inserted: {:?}", identity);
-            }
+        let mut keys = self.keys.lock().expect("poisoned");
+        if !keys.insert(PskIdAsKey(psk)) {
+            error!("Duplicate PSK identity inserted: {:?}", identity);
         }
     }
 
     pub fn zeroize_psks(&self, identities: &[PskIdentity]) {
         let mut keys = self.keys.lock().expect("poisoned");
         identities.iter().for_each(|i| {
-            keys.remove(i);
+            keys.remove(i.as_slice());
         });
     }
 
     pub fn load_psks(&self, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
         for (suite, psk) in psks {
-            let identity = psk.identity().as_bytes().to_vec();
             let key = make_preshared_key(suite, psk).expect("can make psk");
-            keys.insert(identity, key);
+            keys.insert(PskIdAsKey(key));
         }
     }
 
@@ -85,7 +80,10 @@ impl ServerPresharedKeys {
 
 impl SelectsPresharedKeys for ServerPresharedKeys {
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
-        self.keys.lock().expect("poisoned").get(identity).cloned()
+        if let Some(psk) = self.keys.lock().expect("poisoned").get(identity) {
+            return Some(psk.0.clone());
+        }
+        None
     }
 
     fn chosen(&self, identity: &[u8]) {
@@ -98,13 +96,13 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
 
 #[derive(Debug)]
 pub struct ClientPresharedKeys {
-    keys: Mutex<BTreeMap<PskIdentity, Arc<PresharedKey>>>,
+    keys: Mutex<HashSet<PskIdAsKey>>,
 }
 
 impl ClientPresharedKeys {
     pub fn new(key: Arc<PresharedKey>) -> Self {
-        let mut keys = BTreeMap::new();
-        keys.insert(key.identity().to_vec(), key);
+        let mut keys = HashSet::new();
+        keys.insert(PskIdAsKey(key));
         Self {
             keys: Mutex::new(keys),
         }
@@ -113,23 +111,22 @@ impl ClientPresharedKeys {
     pub fn set_key(&self, key: Arc<PresharedKey>) {
         let mut keys_guard = self.keys.lock().expect("Client PSK mutex poisoned");
         keys_guard.clear();
-        keys_guard.insert(key.identity().to_vec(), key);
+        keys_guard.insert(PskIdAsKey(key));
     }
 
     pub fn load_psks(&self, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
         keys.clear();
         for (suite, psk) in psks {
-            let identity = psk.identity().as_bytes().to_vec();
             let key = make_preshared_key(suite, psk).expect("can make psk");
-            keys.insert(identity, key);
+            keys.insert(PskIdAsKey(key));
         }
     }
 
     pub fn zeroize_psks(&self, identities: &[PskIdentity]) {
         let mut keys = self.keys.lock().expect("poisoned");
         identities.iter().for_each(|i| {
-            keys.remove(i);
+            keys.remove(i.as_slice());
         });
     }
 
@@ -144,7 +141,7 @@ impl PresharedKeyStore for ClientPresharedKeys {
             .lock()
             .expect("Client PSK mutex poisoned")
             .iter()
-            .map(|(_, p)| p.clone())
+            .map(|p| p.0.clone())
             .collect()
     }
 }
@@ -164,4 +161,23 @@ fn suite_hash(suite: CipherSuiteId) -> Option<HashAlgorithm> {
         CipherSuiteId::TlsAes128Ccm8Sha256 => HashAlgorithm::SHA256,
         _ => return None,
     })
+}
+
+#[derive(Debug)]
+struct PskIdAsKey(Arc<PresharedKey>);
+impl core::hash::Hash for PskIdAsKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.identity().hash(state);
+    }
+}
+impl core::borrow::Borrow<[u8]> for PskIdAsKey {
+    fn borrow(&self) -> &[u8] {
+        self.0.identity()
+    }
+}
+impl Eq for PskIdAsKey {}
+impl PartialEq for PskIdAsKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.identity() == other.0.identity()
+    }
 }
