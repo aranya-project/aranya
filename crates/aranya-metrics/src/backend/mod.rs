@@ -54,7 +54,7 @@ pub struct MetricsConfig {
 
 impl MetricsConfig {
     /// Sets up the selected exporter using the provided configuration info.
-    pub const fn install(&self) -> Result<()> {
+    pub fn install(&self) -> Result<()> {
         match &self.mode {
             #[cfg(feature = "prometheus")]
             MetricsMode::Prometheus(prometheus) => {
