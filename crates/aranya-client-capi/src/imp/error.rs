@@ -27,7 +27,10 @@ pub enum Error {
     WouldBlock,
 
     #[error("connection was unexpectedly closed")]
-    Closed,
+    ConnectionClosed,
+
+    #[error("stream was unexpectedly closed")]
+    StreamClosed,
 
     #[error(transparent)]
     Utf8(#[from] core::str::Utf8Error),
@@ -57,7 +60,8 @@ impl From<AqcError> for Error {
 impl From<TryReceiveError<AqcError>> for Error {
     fn from(value: TryReceiveError<AqcError>) -> Self {
         match value {
-            TryReceiveError::Closed => Self::Closed,
+            TryReceiveError::ConnectionClosed => Self::ConnectionClosed,
+            TryReceiveError::StreamClosed => Self::StreamClosed,
             TryReceiveError::Empty => Self::WouldBlock,
             TryReceiveError::Error(e) => Self::Client(aranya_client::Error::Aqc(e)),
         }
@@ -67,7 +71,8 @@ impl From<TryReceiveError<AqcError>> for Error {
 impl From<TryReceiveError<aranya_client::Error>> for Error {
     fn from(value: TryReceiveError<aranya_client::Error>) -> Self {
         match value {
-            TryReceiveError::Closed => Self::Closed,
+            TryReceiveError::ConnectionClosed => Self::ConnectionClosed,
+            TryReceiveError::StreamClosed => Self::StreamClosed,
             TryReceiveError::Empty => Self::WouldBlock,
             TryReceiveError::Error(e) => Self::Client(e),
         }

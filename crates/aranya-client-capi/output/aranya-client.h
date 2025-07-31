@@ -200,7 +200,11 @@ enum AranyaError
     /**
      * A connection got unexpectedly closed.
      */
-    ARANYA_ERROR_CLOSED,
+    ARANYA_ERROR_CONNECTION_CLOSED,
+    /**
+     * A stream got unexpectedly closed.
+     */
+    ARANYA_ERROR_STREAM_CLOSED,
     /**
      * Unable to create configuration info.
      */
@@ -531,7 +535,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcPeerChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[120];
+    uint8_t __for_size_only[160];
 } AranyaAqcPeerChannel;
 
 /**
@@ -543,7 +547,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[112];
+    uint8_t __for_size_only[152];
 } AranyaAqcBidiChannel;
 
 /**
@@ -555,7 +559,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcSendChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[112];
+    uint8_t __for_size_only[152];
 } AranyaAqcSendChannel;
 
 /**
@@ -567,7 +571,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[112];
+    uint8_t __for_size_only[152];
 } AranyaAqcReceiveChannel;
 
 /**
@@ -579,7 +583,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiStream {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[184];
+    uint8_t __for_size_only[208];
 } AranyaAqcBidiStream;
 
 /**
@@ -591,7 +595,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcSendStream {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[152];
+    uint8_t __for_size_only[176];
 } AranyaAqcSendStream;
 
 /**
@@ -603,7 +607,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveStream {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[184];
+    uint8_t __for_size_only[208];
 } AranyaAqcReceiveStream;
 
 #ifdef __cplusplus

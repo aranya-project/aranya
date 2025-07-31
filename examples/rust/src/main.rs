@@ -450,6 +450,10 @@ async fn main() -> Result<()> {
     let bytes = peer2.receive().await?.assume("no data received")?;
     assert_eq!(bytes, msg);
 
+    // membera deletes the AQC channel.
+    info!("membera deleting aqc channel");
+    membera.client.aqc().delete_bidi_channel(created_aqc_chan).await?;
+
     info!("revoking label from membera");
     operator_team.revoke_label(membera.id, label3).await?;
     info!("revoking label from memberb");
