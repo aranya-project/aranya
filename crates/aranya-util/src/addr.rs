@@ -18,8 +18,8 @@ use std::{
     mem::size_of,
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     ops::Deref,
-    slice, str,
-    str::FromStr,
+    slice,
+    str::{self, FromStr},
 };
 
 use anyhow::Result;
