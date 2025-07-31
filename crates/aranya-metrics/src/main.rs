@@ -118,7 +118,7 @@ impl Daemon {
             .args(["--config", cfg_path]);
         debug!(?cmd, "spawning daemon");
         let proc = cmd.spawn().context("unable to spawn daemon")?;
-        Ok(Daemon { proc })
+        Ok(Self { proc })
     }
 
     fn pid(&self) -> Option<u32> {

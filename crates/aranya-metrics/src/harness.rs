@@ -10,7 +10,7 @@
 //! falling back to the `sysinfo` crate for disk usage stats.
 //!
 //! [observer problem]: https://w.wiki/Ekxn
-use std::{io, mem, time::Instant};
+use std::time::Instant;
 
 use anyhow::{anyhow, Result};
 use metrics::{describe_gauge, describe_histogram, gauge, histogram};
@@ -74,6 +74,7 @@ impl Default for AggregatedMetrics {
 
 /// Contains the metrics collected for a single process.
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 struct SingleProcessMetrics {
     /// The total time the CPU spent in userspace.
     cpu_user_time_us: u64,
@@ -228,7 +229,7 @@ impl ProcessMetricsCollector {
         metrics.total_disk_read_bytes += process_metrics.disk_read_bytes;
         metrics.total_disk_write_bytes += process_metrics.disk_write_bytes;
 
-        if let DebugLogType::PerProcess = self.config.debug_logs {
+        if matches!(self.config.debug_logs, DebugLogType::PerProcess) {
             debug!(
                 "Process Metrics (last tick) for \"{}\", PID {}: {process_metrics:?}",
                 pid.0, pid.1
@@ -241,8 +242,15 @@ impl ProcessMetricsCollector {
     /// Collects metrics for a specific process, using a number of syscalls.
     #[cfg(not(target_os = "macos"))]
     #[allow(dead_code)]
-    fn collect_process_metrics(&self, _pid: u32, _metrics: &mut AggregatedMetrics) -> Result<()> {
-        Err(anyhow!("Unsupported target_os!"))
+    fn collect_process_metrics(
+        &self,
+        _pid: (&'static str, u32),
+        _metrics: &mut AggregatedMetrics,
+    ) -> Result<()> {
+        Err(anyhow!(
+            "We don't currently support {} for metrics, sorry!",
+            std::env::consts::OS
+        ))
     }
 
     /// Collects metrics for a specific process, using native MacOS syscalls.
@@ -252,6 +260,7 @@ impl ProcessMetricsCollector {
         pid: u32,
         process_metrics: &mut SingleProcessMetrics,
     ) -> Result<()> {
+        use std::{io, mem};
         // SAFETY: This has no alignment requirements, so mem::zeroed is safe.
         let mut task_info = unsafe { mem::zeroed::<libc::proc_taskinfo>() };
 

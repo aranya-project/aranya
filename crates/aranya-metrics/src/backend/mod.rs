@@ -15,8 +15,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 
+#[cfg(feature = "datadog")]
 pub mod datadog;
+#[cfg(feature = "prometheus")]
 pub mod prometheus;
+#[cfg(feature = "tcp_server")]
 pub mod tcp_server;
 
 /// Sets the granularity of metrics reported using [`tracing::debug!()`] each [`interval`].
@@ -51,14 +54,17 @@ pub struct MetricsConfig {
 
 impl MetricsConfig {
     /// Sets up the selected exporter using the provided configuration info.
-    pub fn install(&self) -> Result<()> {
+    pub const fn install(&self) -> Result<()> {
         match &self.mode {
+            #[cfg(feature = "prometheus")]
             MetricsMode::Prometheus(prometheus) => {
                 prometheus.install(self)?;
             }
+            #[cfg(feature = "datadog")]
             MetricsMode::DataDog(datadog) => {
                 datadog.install(self)?;
             }
+            #[cfg(feature = "tcp_server")]
             MetricsMode::TcpServer(tcp_server) => {
                 tcp_server.install()?;
             }
@@ -96,17 +102,20 @@ pub enum MetricsMode {
     /// scrape as a single snapshot in time.
     ///
     /// [`interval`]: MetricsConfig::interval
+    #[cfg(feature = "prometheus")]
     Prometheus(prometheus::PrometheusConfig),
 
     /// Uses the DogStatsD exporter to collect data. Note that depending on [`interval`], this may
     /// increase network processing overhead.
     ///
     /// [`interval`]: MetricsConfig::interval
+    #[cfg(feature = "datadog")]
     DataDog(datadog::DataDogConfig),
 
     /// Configures a TCP server that listens for connections and streams metrics using [`protobuf`].
     ///
     /// [`protobuf`]: https://protobuf.dev/
+    #[cfg(feature = "tcp_server")]
     TcpServer(tcp_server::TcpConfig),
 
     /// Disables exporting metrics to a remote backend. Note that you can still report metrics using

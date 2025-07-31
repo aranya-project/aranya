@@ -13,12 +13,17 @@ workspace = true
 [features]
 default = []
 
+datadog = ["dep:metrics-exporter-dogstatsd"]
+prometheus = ["dep:metrics-exporter-prometheus"]
+tcp_server = ["dep:metrics-exporter-tcp"]
+
 [dependencies]
 aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 buggy = { workspace = true }
 
+# Required Dependencies
 anyhow = { workspace = true }
 backon = { workspace = true }
 bytes = { workspace = true }
@@ -26,9 +31,6 @@ futures-util = { workspace = true }
 http = { workspace = true }
 libc = { workspace = true }
 metrics = { workspace = true }
-metrics-exporter-dogstatsd = { version = "0.9" }
-metrics-exporter-prometheus = { version = "0.17", features = ["uds-listener"] }
-metrics-exporter-tcp = { version = "0.11" }
 metrics-util = { workspace = true }
 serde = { workspace = true }
 sysinfo = { workspace = true }
@@ -37,6 +39,11 @@ tokio = { workspace = true, features = ["process"] }
 toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
+# Optional Dependencies
+metrics-exporter-dogstatsd = { version = "0.9", optional = true }
+metrics-exporter-prometheus = { version = "0.17", optional = true, features = ["uds-listener"] }
+metrics-exporter-tcp = { version = "0.11", optional = true }
 
 [[bin]]
 name = "aranya-metrics"
