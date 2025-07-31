@@ -812,6 +812,10 @@ effect PermRemovedFromRole {
 }
 
 command RemovePermFromRole {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The ID of the role from which the permission is being
         // removed.
@@ -1354,6 +1358,10 @@ effect RoleManagementPermRevoked {
 }
 
 command RevokeRoleManagementPerm {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The ID of the role whose management permission is being
         // removed.
@@ -1770,6 +1778,10 @@ effect RoleAssigned {
 }
 
 command AssignRole {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The ID of the device being assigned the role.
         device_id id,
@@ -1849,6 +1861,10 @@ effect RoleChanged {
 }
 
 command ChangeRole {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The ID of the device being assigned the role.
         device_id id,
@@ -1940,6 +1956,10 @@ effect RoleRevoked {
 }
 
 command RevokeRole {
+    attributes {
+        priority: 2
+    }
+
     fields {
         // The ID of the device having its role revoked.
         device_id id,
@@ -2283,6 +2303,10 @@ effect TeamTerminated {
 }
 
 command TerminateTeam {
+    attributes {
+        priority: 4
+    }
+
     fields {
         // The ID of the team being terminated.
         team_id id,
@@ -2385,6 +2409,10 @@ effect DeviceRemoved {
 }
 
 command RemoveDevice {
+    attributes {
+        priority: 3
+    }
+
     fields {
         // The ID of the device being removed from the team.
         device_id id,
@@ -2718,6 +2746,10 @@ effect LabelManagingRoleRevoked {
 }
 
 command RevokeLabelManagingRole {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The label to update.
         label_id id,
@@ -2868,6 +2900,10 @@ effect LabelDeleted {
 }
 
 command DeleteLabel {
+    attributes {
+        priority: 2
+    }
+
     fields {
         // The unique ID of the label being deleted.
         label_id id,
@@ -3194,7 +3230,11 @@ effect LabelRevokedFromRole {
     author_id id,
 }
 
-command RevokeLabelFromDevice {
+command RevokeLabelFromRole {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The target role.
         role_id id,
@@ -3265,6 +3305,10 @@ effect LabelRevokedFromDevice {
 }
 
 command RevokeLabelFromDevice {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The target device.
         device_id id,
@@ -3657,6 +3701,10 @@ effect AqcNetworkNameUnset {
 }
 
 command UnsetAqcNetworkName {
+    attributes {
+        priority: 1
+    }
+
     fields {
         device_id id,
     }
