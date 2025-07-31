@@ -222,6 +222,7 @@ impl EffectHandler {
                 QueriedLabelAssignment(_) => {}
                 QueryLabelExistsResult(_) => {}
                 QueryAqcNetworkNamesOutput(_) => {}
+                QueriedBool(_) => {}
             }
         }
         Ok(())
@@ -590,7 +591,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer: api::NetIdentifier,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsks)> {
+    ) -> api::Result<(api::AqcCtrl, api::AqcBidiPsks, api::AqcChannelInfo)> {
         self.check_team_valid(team).await?;
 
         info!("creating bidi channel");
@@ -621,7 +622,15 @@ impl DaemonApi for Api {
         let psks = self.aqc.bidi_channel_created(e).await?;
         info!(num = psks.len(), "bidi channel created");
 
-        Ok((ctrl, psks))
+        let info = api::AqcChannelInfo {
+            channel_id: api::AqcChannelId::Bidi(e.channel_id.into()),
+            team_id: team,
+            device_id: e.author_id.into(),
+            peer_id: e.peer_id.into(),
+            label_id: e.label_id.into(),
+        };
+
+        Ok((ctrl, psks, info))
     }
 
     #[instrument(skip(self), err)]
@@ -631,7 +640,7 @@ impl DaemonApi for Api {
         team: api::TeamId,
         peer: api::NetIdentifier,
         label: api::LabelId,
-    ) -> api::Result<(api::AqcCtrl, api::AqcUniPsks)> {
+    ) -> api::Result<(api::AqcCtrl, api::AqcUniPsks, api::AqcChannelInfo)> {
         self.check_team_valid(team).await?;
 
         info!("creating uni channel");
@@ -662,27 +671,15 @@ impl DaemonApi for Api {
         let psks = self.aqc.uni_channel_created(e).await?;
         info!(num = psks.len(), "uni channel created");
 
-        Ok((ctrl, psks))
-    }
+        let info = api::AqcChannelInfo {
+            channel_id: api::AqcChannelId::Uni(e.channel_id.into()),
+            team_id: team,
+            device_id: e.sender_id.into(),
+            peer_id: e.receiver_id.into(),
+            label_id: e.label_id.into(),
+        };
 
-    #[instrument(skip(self), err)]
-    async fn delete_aqc_bidi_channel(
-        self,
-        _: context::Context,
-        chan: api::AqcBidiChannelId,
-    ) -> api::Result<api::AqcCtrl> {
-        // TODO: remove AQC bidi channel from Aranya.
-        todo!();
-    }
-
-    #[instrument(skip(self), err)]
-    async fn delete_aqc_uni_channel(
-        self,
-        _: context::Context,
-        chan: api::AqcUniChannelId,
-    ) -> api::Result<api::AqcCtrl> {
-        // TODO: remove AQC uni channel from Aranya.
-        todo!();
+        Ok((ctrl, psks, info))
     }
 
     #[instrument(skip(self), err)]
@@ -691,7 +688,7 @@ impl DaemonApi for Api {
         _: context::Context,
         team: api::TeamId,
         ctrl: api::AqcCtrl,
-    ) -> api::Result<(api::LabelId, api::AqcPsks)> {
+    ) -> api::Result<(api::AqcPsks, api::AqcChannelInfo)> {
         self.check_team_valid(team).await?;
 
         let graph = GraphId::from(team.into_id());
@@ -714,13 +711,27 @@ impl DaemonApi for Api {
                     let psks = self.aqc.bidi_channel_received(e).await?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok((e.label_id.into(), psks));
+                    let info = api::AqcChannelInfo {
+                        channel_id: api::AqcChannelId::Uni(e.channel_id.into()),
+                        team_id: team,
+                        device_id: e.author_id.into(),
+                        peer_id: e.peer_id.into(),
+                        label_id: e.label_id.into(),
+                    };
+                    return Ok((psks, info));
                 }
                 Some(Effect::AqcUniChannelReceived(e)) => {
                     let psks = self.aqc.uni_channel_received(e).await?;
                     // NB: Each action should only produce one
                     // ephemeral command.
-                    return Ok((e.label_id.into(), psks));
+                    let info = api::AqcChannelInfo {
+                        channel_id: api::AqcChannelId::Uni(e.channel_id.into()),
+                        team_id: team,
+                        device_id: e.sender_id.into(),
+                        peer_id: e.receiver_id.into(),
+                        label_id: e.label_id.into(),
+                    };
+                    return Ok((psks, info));
                 }
                 Some(_) | None => {}
             }
@@ -1004,6 +1015,34 @@ impl DaemonApi for Api {
             }
         }
         Ok(labels)
+    }
+
+    /// Query whether AQC channels are valid according to policy.
+    #[instrument(skip(self), err)]
+    async fn query_valid_aqc_channels(
+        self,
+        context: ::tarpc::context::Context,
+        chans: Vec<api::AqcChannelInfo>,
+    ) -> api::Result<Vec<bool>> {
+        let mut valid: Vec<bool> = Vec::new();
+        for chan in chans {
+            let (_ctrl, effects) = self
+                .client
+                .actions(&chan.team_id.into_id().into())
+                .query_aqc_channel_valid_off_graph(
+                    chan.device_id.into_id().into(),
+                    chan.peer_id.into_id().into(),
+                    chan.label_id.into_id().into(),
+                )
+                .await
+                .context("unable to query whether aqc channels are valid")?;
+            for e in effects {
+                if let Effect::QueriedBool(e) = e {
+                    valid.push(e.result);
+                }
+            }
+        }
+        Ok(valid)
     }
 }
 

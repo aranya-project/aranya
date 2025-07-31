@@ -11,7 +11,7 @@ use std::{
 
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::{
-    AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
+    self as api, AqcBidiPsks, AqcCtrl, AqcPsks, AqcUniPsks, DaemonApiClient, LabelId, TeamId,
 };
 use aranya_util::{
     error::ReportExt as _,
@@ -64,6 +64,9 @@ pub(crate) struct AqcClient {
 
     /// Map of PSK identity to channel type
     channels: std::sync::RwLock<HashMap<PskIdentity, AqcChannelInfo>>,
+
+    /// Set of active AQC channels.
+    active: std::sync::RwLock<HashMap<api::AqcChannelId, api::AqcChannelInfo>>,
 
     daemon: DaemonApiClient,
 }
@@ -164,6 +167,7 @@ impl AqcClient {
             }),
             server_keys,
             channels: std::sync::RwLock::new(HashMap::new()),
+            active: std::sync::RwLock::new(HashMap::new()),
             daemon,
             server_addr,
             server_state: tokio::sync::Mutex::new(ServerState {
@@ -187,8 +191,8 @@ impl AqcClient {
     pub async fn create_uni_channel(
         &self,
         addr: SocketAddr,
-        label_id: LabelId,
         psks: AqcUniPsks,
+        info: api::AqcChannelInfo,
     ) -> Result<channels::AqcSendChannel, AqcError> {
         let channel_id = UniChannelId::from(*psks.channel_id());
         let mut conn = self
@@ -198,8 +202,12 @@ impl AqcClient {
             .connect_data(addr, AqcPsks::Uni(psks))
             .await?;
         conn.keep_alive(true)?;
+        self.active
+            .write()
+            .expect("poisoned")
+            .insert(info.channel_id, info);
         Ok(channels::AqcSendChannel::new(
-            label_id,
+            info.label_id,
             channel_id,
             conn.handle(),
         ))
@@ -209,8 +217,8 @@ impl AqcClient {
     pub async fn create_bidi_channel(
         &self,
         addr: SocketAddr,
-        label_id: LabelId,
         psks: AqcBidiPsks,
+        info: api::AqcChannelInfo,
     ) -> Result<channels::AqcBidiChannel, AqcError> {
         let channel_id = BidiChannelId::from(*psks.channel_id());
         let mut conn = self
@@ -220,7 +228,15 @@ impl AqcClient {
             .connect_data(addr, AqcPsks::Bidi(psks))
             .await?;
         conn.keep_alive(true)?;
-        Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
+        self.active
+            .write()
+            .expect("poisoned")
+            .insert(info.channel_id, info);
+        Ok(channels::AqcBidiChannel::new(
+            info.label_id,
+            channel_id,
+            conn,
+        ))
     }
 
     /// Receive the next available channel.
@@ -392,7 +408,7 @@ impl AqcClient {
         let msg = postcard::from_bytes::<AqcCtrlMessage>(ctrl_bytes)
             .map_err(AqcError::InvalidCtrlMessage)?;
 
-        let (label_id, psks) = self
+        let (psks, info) = self
             .daemon
             .receive_aqc_ctrl(context::current(), msg.team_id, msg.ctrl)
             .await
@@ -408,7 +424,7 @@ impl AqcClient {
                     channels.insert(
                         psk.identity.as_bytes().to_vec(),
                         AqcChannelInfo {
-                            label_id,
+                            label_id: info.label_id,
                             channel_id: AqcChannelId::Bidi(*psk.identity.channel_id()),
                         },
                     );
@@ -419,7 +435,7 @@ impl AqcClient {
                     channels.insert(
                         psk.identity.as_bytes().to_vec(),
                         AqcChannelInfo {
-                            label_id,
+                            label_id: info.label_id,
                             channel_id: AqcChannelId::Uni(*psk.identity.channel_id()),
                         },
                     );
@@ -428,6 +444,27 @@ impl AqcClient {
         }
 
         Ok(())
+    }
+
+    /// Remove channel from list of active channels.
+    pub async fn remove_channel(&self, aqc_id: AqcChannelId) {
+        let aqc_id = match aqc_id {
+            AqcChannelId::Bidi(bidi_channel_id) => api::AqcChannelId::Bidi(bidi_channel_id),
+            AqcChannelId::Uni(uni_channel_id) => api::AqcChannelId::Uni(uni_channel_id),
+        };
+        self.active.write().expect("poisoned").remove(&aqc_id);
+
+        // TODO: delete PSKs. Work is happening on another PR.
+    }
+
+    /// Return a list of active AQC channels.
+    pub async fn get_active_channels(&self) -> Vec<api::AqcChannelInfo> {
+        self.active
+            .read()
+            .expect("poisoned")
+            .iter()
+            .map(|(_k, v)| *v)
+            .collect()
     }
 }
 
@@ -453,7 +490,7 @@ struct AqcChannelInfo {
 
 /// An AQC Channel ID.
 #[derive(Copy, Clone, Debug)]
-enum AqcChannelId {
+pub enum AqcChannelId {
     Bidi(BidiChannelId),
     Uni(UniChannelId),
 }

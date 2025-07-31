@@ -63,6 +63,7 @@ pub enum Effect {
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
     QueryAqcNetworkNamesOutput(QueryAqcNetworkNamesOutput),
+    QueriedBool(QueriedBool),
 }
 /// TeamCreated policy effect.
 #[effect]
@@ -259,6 +260,11 @@ pub struct QueryAqcNetworkNamesOutput {
     pub net_identifier: Text,
     pub device_id: Id,
 }
+/// QueriedBool policy effect.
+#[effect]
+pub struct QueriedBool {
+    pub result: bool,
+}
 /// Implements all supported policy actions.
 #[actions]
 pub trait ActorExt {
@@ -306,4 +312,10 @@ pub trait ActorExt {
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
+    fn query_aqc_channel_valid(
+        &mut self,
+        device_id: Id,
+        peer_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
 }

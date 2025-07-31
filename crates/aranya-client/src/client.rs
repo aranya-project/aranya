@@ -601,4 +601,19 @@ impl Queries<'_> {
             .map_err(aranya_error)?;
         Ok(Labels { data })
     }
+
+    /// Returns a list of valid AQC channels.
+    pub async fn valid_aqc_channels(
+        &self,
+        chans: Vec<aranya_daemon_api::AqcChannelInfo>,
+    ) -> Result<Vec<bool>> {
+        let valid = self
+            .client
+            .daemon
+            .query_valid_aqc_channels(context::current(), chans)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)?;
+        Ok(valid)
+    }
 }

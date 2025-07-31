@@ -13,7 +13,7 @@ use std::collections::hash_map::{self, HashMap};
 use anyhow::bail;
 pub use aranya_crypto::aqc::CipherSuiteId;
 use aranya_crypto::{
-    aqc::{BidiPskId, UniPskId},
+    aqc::{BidiChannelId, BidiPskId, UniChannelId, UniPskId},
     custom_id,
     default::DefaultEngine,
     id::IdError,
@@ -630,6 +630,24 @@ pub struct Label {
     pub name: Text,
 }
 
+/// AQC channel info for querying whether an AQC channel is valid according to the policy.
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+
+pub struct AqcChannelInfo {
+    pub channel_id: AqcChannelId,
+    pub team_id: TeamId,
+    pub device_id: DeviceId,
+    pub peer_id: DeviceId,
+    pub label_id: LabelId,
+}
+
+/// An AQC Channel ID.
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize)]
+pub enum AqcChannelId {
+    Bidi(BidiChannelId),
+    Uni(UniChannelId),
+}
+
 #[tarpc::service]
 pub trait DaemonApi {
     /// Returns the daemon's version.
@@ -711,19 +729,15 @@ pub trait DaemonApi {
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcBidiPsks)>;
+    ) -> Result<(AqcCtrl, AqcBidiPsks, AqcChannelInfo)>;
     /// Create a unidirectional QUIC channel.
     async fn create_aqc_uni_channel(
         team: TeamId,
         peer: NetIdentifier,
         label_id: LabelId,
-    ) -> Result<(AqcCtrl, AqcUniPsks)>;
-    /// Delete a QUIC bidi channel.
-    async fn delete_aqc_bidi_channel(chan: AqcBidiChannelId) -> Result<AqcCtrl>;
-    /// Delete a QUIC uni channel.
-    async fn delete_aqc_uni_channel(chan: AqcUniChannelId) -> Result<AqcCtrl>;
+    ) -> Result<(AqcCtrl, AqcUniPsks, AqcChannelInfo)>;
     /// Receive AQC ctrl message.
-    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(LabelId, AqcPsks)>;
+    async fn receive_aqc_ctrl(team: TeamId, ctrl: AqcCtrl) -> Result<(AqcPsks, AqcChannelInfo)>;
 
     /// Query devices on team.
     async fn query_devices_on_team(team: TeamId) -> Result<Vec<DeviceId>>;
@@ -742,6 +756,8 @@ pub trait DaemonApi {
     async fn query_labels(team: TeamId) -> Result<Vec<Label>>;
     /// Query whether a label exists.
     async fn query_label_exists(team: TeamId, label: LabelId) -> Result<bool>;
+    /// Query whether AQC channels are valid according to policy.
+    async fn query_valid_aqc_channels(chans: Vec<AqcChannelInfo>) -> Result<Vec<bool>>;
 }
 
 #[cfg(test)]

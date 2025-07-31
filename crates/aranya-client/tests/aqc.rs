@@ -13,6 +13,7 @@ use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::try_join, FutureExt};
 use tempfile::tempdir;
+use tracing::info;
 
 use crate::common::{sleep, DevicesCtx};
 
@@ -681,6 +682,127 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
             aranya_client::error::AqcError::StreamError(_)
         ));
     }
+
+    Ok(())
+}
+
+/// Tests querying for valid AQC channels.
+#[test_log::test(tokio::test(flavor = "multi_thread"))]
+async fn test_aqc_query_valid_chans() -> Result<()> {
+    let tmp = tempdir()?;
+    let work_dir = tmp.path().to_path_buf();
+
+    let mut devices = DevicesCtx::new("test_aqc_chans", work_dir).await?;
+
+    // create team.
+    let team_id = devices.create_and_add_team().await?;
+
+    // Tell all peers to sync with one another, and assign their roles.
+    devices.add_all_device_roles(team_id).await?;
+
+    let operator_team = devices.operator.client.team(team_id);
+    operator_team
+        .assign_aqc_net_identifier(devices.membera.id, devices.membera.aqc_net_id())
+        .await?;
+    operator_team
+        .assign_aqc_net_identifier(devices.memberb.id, devices.memberb.aqc_net_id())
+        .await?;
+
+    let label1 = operator_team.create_label(text!("label1")).await?;
+    let op = ChanOp::SendRecv;
+    operator_team
+        .assign_label(devices.membera.id, label1, op)
+        .await?;
+    operator_team
+        .assign_label(devices.memberb.id, label1, op)
+        .await?;
+
+    // wait for syncing.
+    let operator_addr = devices.operator.aranya_local_addr().await?.into();
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+    devices
+        .memberb
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+
+    let (bidi_chan1, peer_channel) = try_join(
+        devices.membera.client.aqc().create_bidi_channel(
+            team_id,
+            devices.memberb.aqc_net_id(),
+            label1,
+        ),
+        devices.memberb.client.aqc().receive_channel(),
+    )
+    .await
+    .expect("can create and receive channel");
+
+    let bidi_chan2 = match peer_channel {
+        AqcPeerChannel::Bidi(channel) => channel,
+        _ => buggy::bug!("Expected a bidirectional channel on memberb"),
+    };
+
+    // Get a list of active AQC channels.
+    let active = devices.membera.client.aqc().get_active_channels().await;
+
+    // Query daemon to see which channels are valid.
+    info!("{:?}", active);
+    let valid_channels = devices
+        .membera
+        .client
+        .team(team_id)
+        .queries()
+        .valid_aqc_channels(active.clone())
+        .await?;
+    assert_eq!(valid_channels, vec![true]);
+
+    // Unassign label from devices.
+    operator_team
+        .revoke_label(devices.membera.id, label1)
+        .await?;
+    operator_team
+        .revoke_label(devices.memberb.id, label1)
+        .await?;
+    devices
+        .membera
+        .client
+        .team(team_id)
+        .sync_now(operator_addr, None)
+        .await?;
+
+    // Verify channel is no longer valid after unassigning label from devices.
+    let valid_channels = devices
+        .membera
+        .client
+        .team(team_id)
+        .queries()
+        .valid_aqc_channels(active)
+        .await?;
+    assert_eq!(valid_channels, vec![false]);
+
+    // Delete AQC channels.
+    devices
+        .membera
+        .client
+        .aqc()
+        .delete_bidi_channel(bidi_chan1)
+        .await?;
+    devices
+        .memberb
+        .client
+        .aqc()
+        .delete_bidi_channel(bidi_chan2)
+        .await?;
+
+    // Verify AQC reports no active channels.
+    let empty = devices.membera.client.aqc().get_active_channels().await;
+    assert!(empty.is_empty());
 
     Ok(())
 }

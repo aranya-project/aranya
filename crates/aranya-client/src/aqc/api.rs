@@ -2,12 +2,13 @@
 
 use std::net::SocketAddr;
 
-use aranya_daemon_api::{LabelId, NetIdentifier, TeamId};
+use aranya_daemon_api::{self as api, LabelId, NetIdentifier, TeamId};
 use tarpc::context;
 use tracing::{debug, instrument};
 
 use super::{net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcSendChannel};
 use crate::{
+    aqc::net::AqcChannelId,
     error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
 };
@@ -53,7 +54,7 @@ impl<'a> AqcChannels<'a> {
     ) -> crate::Result<AqcBidiChannel> {
         debug!("creating bidi channel");
 
-        let (aqc_ctrl, psks) = self
+        let (aqc_ctrl, psks, info) = self
             .client
             .daemon
             .create_aqc_bidi_channel(context::current(), team_id, peer.clone(), label_id)
@@ -75,7 +76,7 @@ impl<'a> AqcChannels<'a> {
         let channel = self
             .client
             .aqc
-            .create_bidi_channel(peer_addr, label_id, psks)
+            .create_bidi_channel(peer_addr, psks, info)
             .await?;
         Ok(channel)
     }
@@ -97,7 +98,7 @@ impl<'a> AqcChannels<'a> {
     ) -> crate::Result<AqcSendChannel> {
         debug!("creating aqc uni channel");
 
-        let (aqc_ctrl, psks) = self
+        let (aqc_ctrl, psks, info) = self
             .client
             .daemon
             .create_aqc_uni_channel(context::current(), team_id, peer.clone(), label_id)
@@ -120,7 +121,7 @@ impl<'a> AqcChannels<'a> {
         let channel = self
             .client
             .aqc
-            .create_uni_channel(peer_addr, label_id, psks)
+            .create_uni_channel(peer_addr, psks, info)
             .await?;
         Ok(channel)
     }
@@ -128,13 +129,10 @@ impl<'a> AqcChannels<'a> {
     /// Deletes an AQC bidi channel.
     #[instrument(skip_all, fields(?chan))]
     pub async fn delete_bidi_channel(&mut self, mut chan: AqcBidiChannel) -> crate::Result<()> {
-        // let _ctrl = self
-        //     .client
-        //     .daemon
-        //     .delete_aqc_bidi_channel(context::current(), chan.aqc_id().into_id().into())
-        //     .await
-        //     .map_err(IpcError::new)?
-        //     .map_err(aranya_error)?;
+        self.client
+            .aqc
+            .remove_channel(AqcChannelId::Bidi(chan.aqc_id()))
+            .await;
         chan.close();
         Ok(())
     }
@@ -142,13 +140,10 @@ impl<'a> AqcChannels<'a> {
     /// Deletes an AQC uni channel.
     #[instrument(skip_all, fields(?chan))]
     pub async fn delete_uni_channel(&mut self, mut chan: AqcSendChannel) -> crate::Result<()> {
-        // let _ctrl = self
-        //     .client
-        //     .daemon
-        //     .delete_aqc_uni_channel(context::current(), chan.aqc_id().into_id().into())
-        //     .await
-        //     .map_err(IpcError::new)?
-        //     .map_err(aranya_error)?;
+        self.client
+            .aqc
+            .remove_channel(AqcChannelId::Uni(chan.aqc_id()))
+            .await;
         chan.close();
         Ok(())
     }
@@ -164,5 +159,10 @@ impl<'a> AqcChannels<'a> {
     /// If the channel is closed, return Closed.
     pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         self.client.aqc.try_receive_channel()
+    }
+
+    /// Return a list of active AQC channels.
+    pub async fn get_active_channels(&self) -> Vec<api::AqcChannelInfo> {
+        self.client.aqc.get_active_channels().await
     }
 }

@@ -168,6 +168,51 @@ function team_exists() bool {
     return !exists TeamEnd[]=> {}
 }
 
+// Returns whether the device exists on the team.
+// Returns true if the device exists, returns false otherwise.
+function device_exists(device_id id) bool { 
+    // Check to see if device exists on the team.
+    return exists Device[device_id: device_id]
+}
+
+// Returns whether the label exists.
+// Returns true if the label exists, returns false otherwise.
+function label_exists(label_id id) bool { 
+    // Check to see if label exists.
+    return exists Label[label_id: label_id]
+}
+
+// Returns whether a label is assigned to a device.
+// Returns true if the label is assigned to the device, returns false otherwise.
+function label_assigned_to_device(label_id id, device_id id) bool { 
+    // Check to see if label is assigned to device.
+    return exists AssignedLabel[label_id: label_id, device_id: device_id]
+}
+
+// Returns whether an AQC channel is valid.
+// Returns true if the channel is valid, returns false otherwise.
+function aqc_channel_is_valid(device_id id, peer_id id, label_id id) bool {
+    if !team_exists() {
+        return false
+    }
+    if !label_exists(label_id) {
+        return false
+    }
+    if !device_exists(device_id) {
+        return false
+    }
+    if !device_exists(peer_id) {
+        return false
+    }
+    if !label_assigned_to_device(label_id, device_id) {
+        return false
+    }
+    if !label_assigned_to_device(label_id, peer_id) {
+        return false
+    }
+    return true
+}
+
 // Returns a valid Device after performing sanity checks per the stated invariants.
 function get_valid_device(device_id id) struct Device {
     // Get and return device info.
@@ -2197,3 +2242,44 @@ command QueryAqcNetworkNamesCommand {
 
 - A device's net identifier will only be returned if it was created by `SetAqcNetworkName` and
  wasn't yet removed by `UnsetAqcNetworkName`.
+
+# Query Valid AQC Channel
+
+Queries whether an AQC channel is valid according to the policy.
+
+```policy
+// Emits `QueriedBool` indicating whether the channel is valid.
+action query_aqc_channel_valid(device_id id, peer_id id, label_id id) {
+    publish QueryAqcChannelValid {
+        device_id: device_id,
+        peer_id: peer_id,
+        label_id: label_id,
+    }
+}
+
+command QueryAqcChannelValid {
+    fields {
+        device_id id,
+        peer_id id,
+        label_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        let valid = aqc_channel_is_valid(this.device_id, this.peer_id, this.label_id)
+
+        finish {
+            emit QueriedBool {
+                result: valid,
+            }
+        }
+    }
+}
+
+effect QueriedBool {
+    // Boolean query result.
+    result bool,
+}
+```
