@@ -118,6 +118,7 @@ impl ClientPresharedKeys {
 
     pub fn load_psks(&self, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
+        keys.clear();
         for (suite, psk) in psks {
             let identity = psk.identity().as_bytes().to_vec();
             let key = make_preshared_key(suite, psk).expect("can make psk");
