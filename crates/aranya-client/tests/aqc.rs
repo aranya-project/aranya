@@ -13,7 +13,6 @@ use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::try_join, FutureExt};
 use tempfile::tempdir;
-use tracing::info;
 
 use crate::common::{sleep, DevicesCtx};
 
@@ -752,7 +751,6 @@ async fn test_aqc_query_valid_chans() -> Result<()> {
     let active = devices.membera.client.aqc().get_active_channels().await;
 
     // Query daemon to see which channels are valid.
-    info!("{:?}", active);
     let valid_channels = devices
         .membera
         .client
@@ -802,6 +800,8 @@ async fn test_aqc_query_valid_chans() -> Result<()> {
 
     // Verify AQC reports no active channels.
     let empty = devices.membera.client.aqc().get_active_channels().await;
+    assert!(empty.is_empty());
+    let empty = devices.memberb.client.aqc().get_active_channels().await;
     assert!(empty.is_empty());
 
     Ok(())
