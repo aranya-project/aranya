@@ -80,7 +80,7 @@ s2n-quic = { version = "1.58.0-psk.1", default-features = false, features = ["pr
 semver = { version = "1", features = ["serde"] }
 serde = "1"
 serial_test = { version = "3" }
-sysinfo = { version = "0.35" }
+sysinfo = { version = "0.36" }
 tarpc = { version = "0.35.0", features = ["unix", "serde-transport", "serde-transport-json"] }
 tempfile = { version = "3.6.0" }
 test-log = { version = "0.2.14", default-features = false, features = ["trace"] }

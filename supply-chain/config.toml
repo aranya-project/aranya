@@ -432,10 +432,6 @@ criteria = "safe-to-deploy"
 version = "0.6.2"
 criteria = "safe-to-deploy"
 
-[[exemptions.postcard]]
-version = "1.1.1"
-criteria = "safe-to-deploy"
-
 [[exemptions.postcard-derive]]
 version = "0.1.2"
 criteria = "safe-to-deploy"
@@ -590,10 +586,6 @@ criteria = "safe-to-deploy"
 
 [[exemptions.spki]]
 version = "0.7.3"
-criteria = "safe-to-deploy"
-
-[[exemptions.syn]]
-version = "1.0.109"
 criteria = "safe-to-deploy"
 
 [[exemptions.syn]]

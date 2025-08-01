@@ -141,7 +141,6 @@ exceptions = [
     { allow = ["AGPL-3.0"], crate = "aranya-daemon" },
     { allow = ["AGPL-3.0"], crate = "aranya-daemon-api" },
     { allow = ["AGPL-3.0"], crate = "aranya-keygen" },
-    { allow = ["AGPL-3.0"], crate = "aranya-metrics" },
     { allow = ["AGPL-3.0"], crate = "aranya-util" },
 ]
 
