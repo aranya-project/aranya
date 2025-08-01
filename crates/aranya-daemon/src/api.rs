@@ -222,6 +222,7 @@ impl EffectHandler {
                 QueriedLabelAssignment(_) => {}
                 QueryLabelExistsResult(_) => {}
                 QueryAqcNetworkNamesOutput(_) => {}
+                QueriedBool(_) => {}
             }
         }
         Ok(())

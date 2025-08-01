@@ -494,6 +494,26 @@ where
         })
         .in_current_span()
     }
+
+    /// Query whether AQC channel is valid off-graph.
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_aqc_channel_valid_off_graph(
+        &self,
+        device_id: DeviceId,
+        peer_id: DeviceId,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("query_aqc_channel_valid"),
+            args: Cow::Owned(vec![
+                Value::from(device_id),
+                Value::from(peer_id),
+                Value::from(label_id),
+            ]),
+        })
+        .in_current_span()
+    }
 }
 
 /// An implementation of [`Actor`].

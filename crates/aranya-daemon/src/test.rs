@@ -16,6 +16,7 @@ use std::{
 };
 
 use anyhow::{bail, Context, Result};
+use aranya_aqc_util::LabelId;
 use aranya_crypto::{
     default::{DefaultCipherSuite, DefaultEngine},
     keystore::fs_keystore::Store,
@@ -23,6 +24,7 @@ use aranya_crypto::{
 };
 use aranya_daemon_api::TeamId;
 use aranya_keygen::{KeyBundle, PublicKeys};
+use aranya_policy_vm::text;
 use aranya_runtime::{
     storage::linear::{libc::FileManager, LinearStorageProvider},
     ClientState, GraphId,
@@ -44,7 +46,7 @@ use crate::{
     actions::Actions,
     api::EffectReceiver,
     aranya,
-    policy::{Effect, KeyBundle as DeviceKeyBundle, Role},
+    policy::{ChanOp, Effect, KeyBundle as DeviceKeyBundle, Role},
     sync::{
         self,
         task::{quic::PskStore, PeerCacheKey, PeerCacheMap, SyncPeer},
@@ -52,6 +54,14 @@ use crate::{
     vm_policy::{PolicyEngine, TEST_POLICY_1},
     AranyaStore, InvalidGraphs,
 };
+
+/// Returns first matching effect from vector of effects.
+#[macro_export]
+macro_rules! contains_effect {
+    ($effects:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
+        $effects.into_iter().find(|e| matches!(e, $pattern $(if $guard)?))
+    }
+}
 
 // Aranya graph client for testing.
 type TestClient =
@@ -413,5 +423,123 @@ async fn test_create_team() -> Result<()> {
     let mut ctx = TestCtx::new()?;
 
     ctx.new_team().await.context("unable to create team")?;
+    Ok(())
+}
+
+/// Tests querying whether an AQC channel is valid according to the policy.
+#[test(tokio::test(flavor = "multi_thread"))]
+#[serial]
+async fn test_query_aqc_channel_valid() -> Result<()> {
+    let mut ctx = TestCtx::new()?;
+
+    // Create team.
+    let [ref _owner, ref _admin, ref operator, ref mut membera, ref mut memberb] =
+        ctx.new_team().await.context("unable to create team")?[..]
+    else {
+        panic!("unable to create team");
+    };
+    let membera_id = membera.pk.ident_pk.id()?;
+    let memberb_id = memberb.pk.ident_pk.id()?;
+
+    // Verify AQC channel is not valid.
+    let (_, effects) = membera
+        .actions()
+        .query_aqc_channel_valid_off_graph(membera_id, memberb_id, LabelId::default())
+        .await?;
+    let Some(Effect::QueriedBool(e)) = contains_effect!(&effects, Effect::QueriedBool(_)) else {
+        panic!("expected QueriedBool effect: {effects:?}")
+    };
+    assert!(!e.result);
+
+    // Create label and assign it to membera and memberb.
+    let effects = operator.actions().create_label(text!("label")).await?;
+    let Some(Effect::LabelCreated(e)) = contains_effect!(&effects, Effect::LabelCreated(_)) else {
+        panic!("expected LabelCreated effect: {effects:?}")
+    };
+    let label_id: LabelId = e.label_id.into();
+    membera.sync_expect(operator, Some(1)).await?;
+
+    // Verify AQC channel is not valid.
+    let (_, effects) = membera
+        .actions()
+        .query_aqc_channel_valid_off_graph(membera_id, memberb_id, label_id)
+        .await?;
+    let Some(Effect::QueriedBool(e)) = contains_effect!(&effects, Effect::QueriedBool(_)) else {
+        panic!("expected QueriedBool effect: {effects:?}")
+    };
+    assert!(!e.result);
+
+    operator
+        .actions()
+        .assign_label(membera_id, label_id, ChanOp::SendRecv)
+        .await?;
+    membera.sync_expect(operator, Some(1)).await?;
+
+    // Verify AQC channel is not valid.
+    let (_, effects) = membera
+        .actions()
+        .query_aqc_channel_valid_off_graph(membera_id, memberb_id, label_id)
+        .await?;
+    let Some(Effect::QueriedBool(e)) = contains_effect!(&effects, Effect::QueriedBool(_)) else {
+        panic!("expected QueriedBool effect: {effects:?}")
+    };
+    assert!(!e.result);
+
+    operator
+        .actions()
+        .assign_label(memberb_id, label_id, ChanOp::SendRecv)
+        .await?;
+
+    membera.sync_expect(operator, Some(1)).await?;
+    memberb.sync_expect(operator, Some(3)).await?;
+
+    // Verify AQC channel is valid.
+    let (_, effects) = membera
+        .actions()
+        .query_aqc_channel_valid_off_graph(membera_id, memberb_id, label_id)
+        .await?;
+    let Some(Effect::QueriedBool(e)) = contains_effect!(&effects, Effect::QueriedBool(_)) else {
+        panic!("expected QueriedBool effect: {effects:?}")
+    };
+    assert!(e.result);
+
+    // Create AQC channel.
+    let effects = membera
+        .actions()
+        .create_aqc_bidi_channel(memberb_id, label_id)
+        .await?;
+    let Some(Effect::AqcBidiChannelCreated(_e)) =
+        contains_effect!(&effects, Effect::AqcBidiChannelCreated(_))
+    else {
+        panic!("expected AqcBidiChannelCreated effect: {effects:?}")
+    };
+
+    // Verify AQC channel is valid.
+    let (_, effects) = membera
+        .actions()
+        .query_aqc_channel_valid_off_graph(membera_id, memberb_id, label_id)
+        .await?;
+    let Some(Effect::QueriedBool(e)) = contains_effect!(&effects, Effect::QueriedBool(_)) else {
+        panic!("expected AqcBidiChannelCreated effect: {effects:?}")
+    };
+    assert!(e.result);
+
+    // Revoke label from membera.
+    operator
+        .actions()
+        .revoke_label(membera_id, label_id)
+        .await?;
+    membera.sync_expect(operator, Some(1)).await?;
+
+    // Verify AQC channel is no longer valid.
+    let (_, effects) = membera
+        .actions()
+        .query_aqc_channel_valid_off_graph(membera_id, memberb_id, label_id)
+        .await?;
+    let Some(Effect::QueriedBool(e)) = contains_effect!(&effects, Effect::QueriedBool(_)) else {
+        panic!("expected QueriedBool effect: {effects:?}")
+    };
+    assert!(!e.result);
+
     Ok(())
 }
