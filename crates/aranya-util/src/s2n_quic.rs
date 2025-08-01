@@ -1,5 +1,6 @@
+use buggy::{Bug, BugExt as _};
 use bytes::{Bytes, BytesMut};
-use s2n_quic::stream;
+use s2n_quic::{stream, Connection};
 
 /// Read all of a stream until it has finished.
 ///
@@ -34,4 +35,14 @@ pub fn is_close_error(err: stream::Error) -> bool {
             ..
         },
     )
+}
+
+// Extract the chosen PSK identity from the connection context.
+pub fn get_conn_identity(conn: &mut Connection) -> Result<Vec<u8>, Bug> {
+    Ok(*conn
+        .take_tls_context()
+        .assume("connection has tls context")?
+        .downcast::<Vec<u8>>()
+        .ok()
+        .assume("can downcast identity")?)
 }

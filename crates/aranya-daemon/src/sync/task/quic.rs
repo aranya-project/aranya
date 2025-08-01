@@ -20,6 +20,7 @@ use aranya_util::{
     error::ReportExt as _,
     ready,
     rustls::{NoCertResolver, SkipServerVerification},
+    s2n_quic::get_conn_identity,
     task::scope,
     Addr,
 };
@@ -35,11 +36,7 @@ use s2n_quic::{
     application::Error as AppError,
     client::Connect,
     connection::{Error as ConnErr, StreamAcceptor},
-    provider::{
-        congestion_controller::Bbr,
-        tls::rustls::{self as rustls_provider, rustls::server::SelectsPresharedKeys},
-        StartError,
-    },
+    provider::{congestion_controller::Bbr, tls::rustls as rustls_provider, StartError},
     stream::{BidirectionalStream, ReceiveStream, SendStream},
     Client as QuicClient, Server as QuicServer,
 };
@@ -97,7 +94,6 @@ impl From<Infallible> for Error {
 /// Sync configuration for setting up Aranya.
 pub(crate) struct SyncParams {
     pub(crate) psk_store: Arc<PskStore>,
-    pub(crate) active_team_rx: mpsc::Receiver<TeamId>,
     pub(crate) caches: PeerCacheMap,
     pub(crate) server_addr: Addr,
 }
@@ -381,9 +377,7 @@ pub struct Server<EN, SP> {
     aranya: AranyaClient<EN, SP>,
     /// QUIC server to handle sync requests and send sync responses.
     server: QuicServer,
-    /// Receives updates for the "active team".
-    /// Used to ensure that the chosen PSK corresponds to an incoming sync request.
-    active_team_rx: mpsc::Receiver<TeamId>,
+    server_keys: Arc<PskStore>,
     /// Thread-safe reference to an [`Addr`]->[`PeerCache`] map.
     /// Lock must be acquired after [`Self::aranya`]
     caches: PeerCacheMap,
@@ -417,10 +411,9 @@ where
     pub(crate) async fn new(
         aranya: AranyaClient<EN, SP>,
         addr: &Addr,
-        server_keys: Arc<dyn SelectsPresharedKeys>,
+        server_keys: Arc<PskStore>,
         conns: SharedConnectionMap,
         conn_rx: mpsc::Receiver<ConnectionUpdate>,
-        active_team_rx: mpsc::Receiver<TeamId>,
         caches: PeerCacheMap,
     ) -> SyncResult<Self> {
         // Create Server Config
@@ -428,7 +421,8 @@ where
             .with_no_client_auth()
             .with_cert_resolver(Arc::new(NoCertResolver::default()));
         server_config.alpn_protocols = vec![ALPN_QUIC_SYNC.to_vec()]; // Set field directly
-        server_config.preshared_keys = PresharedKeySelection::Required(server_keys);
+        server_config.preshared_keys =
+            PresharedKeySelection::Required(Arc::clone(&server_keys) as _);
 
         let tls_server_provider = rustls_provider::Server::new(server_config);
 
@@ -449,9 +443,9 @@ where
         Ok(Self {
             aranya,
             server,
+            server_keys,
             conns,
             conn_rx,
-            active_team_rx,
             caches,
         })
     }
@@ -491,9 +485,10 @@ where
         let handle = conn.handle();
         async {
             debug!("received incoming QUIC connection");
+            let identity = get_conn_identity(&mut conn)?;
             let active_team = self
-                .active_team_rx
-                .try_recv()
+                .server_keys
+                .get_team_for_identity(&identity)
                 .context("no active team for accepted connection")?;
             let peer = conn
                 .remote_addr()
