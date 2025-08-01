@@ -1,0 +1,16 @@
+global:
+    # By default, Prometheus will scrape data from our endpoints every 15 seconds
+    scrape_interval: 15s
+
+scrape_configs:
+    # Prometheus runs on localhost:9090
+    - job_name: "prometheus"
+      static_configs:
+          - targets: ["localhost:9090"]
+
+    # Our pushgateway runs on localhost:9091, and we scrape it every 10ms since our code is very fast.
+    - job_name: "pushgateway"
+      static_configs:
+          - targets: ["localhost:9091"]
+      scrape_interval: 10ms
+      honor_labels: true # Important
