@@ -18,7 +18,7 @@ use aranya_util::{
     rustls::{NoCertResolver, SkipServerVerification},
     s2n_quic::read_to_end,
 };
-use buggy::BugExt as _;
+use buggy::{Bug, BugExt as _};
 use bytes::Bytes;
 use channels::AqcPeerChannel;
 use s2n_quic::{
@@ -34,7 +34,6 @@ use s2n_quic::{
     Client, Connection, Server,
 };
 use tarpc::context;
-use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
 use super::crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL};
@@ -100,8 +99,6 @@ impl ClientState {
 struct ServerState {
     /// Quic server used to accept channels from peers.
     quic_server: Server,
-    /// Receives latest selected PSK for accepted channel from server PSK provider.
-    identity_rx: mpsc::Receiver<PskIdentity>,
 }
 
 /// Identity of a preshared key.
@@ -122,7 +119,7 @@ impl AqcClient {
         // TODO(jdygert): enable after rustls upstream fix.
         // client_config.psk_kex_modes = vec![PskKexMode::PskOnly];
 
-        let (server_keys, identity_rx) = ServerPresharedKeys::new();
+        let server_keys = ServerPresharedKeys::new();
         server_keys.insert(CTRL_PSK.clone());
         let server_keys = Arc::new(server_keys);
 
@@ -168,7 +165,6 @@ impl AqcClient {
             server_addr,
             server_state: tokio::sync::Mutex::new(ServerState {
                 quic_server: server,
-                identity_rx,
             }),
         })
     }
@@ -234,12 +230,7 @@ impl AqcClient {
                 .await
                 .ok_or(AqcError::ServerConnectionTerminated)?;
             // Receive a PSK identity hint.
-            // TODO: Instead of receiving the PSK identity hint here, we should
-            // pull it directly from the connection.
-            let identity = server_state
-                .identity_rx
-                .try_recv()
-                .assume("identity received after accepting connection")?;
+            let identity = get_conn_identity(&mut conn)?;
             debug!(
                 "Processing connection accepted after seeing PSK identity hint: {:02x?}",
                 identity
@@ -293,14 +284,9 @@ impl AqcClient {
                     return Err(TryReceiveError::Empty);
                 }
             };
-            // Receive a PSK identity hint.
-            // TODO: Instead of receiving the PSK identity hint here, we should
-            // pull it directly from the connection.
-            let identity = server_state
-                .identity_rx
-                .try_recv()
-                .assume("identity received after accepting connection")
-                .map_err(|e| TryReceiveError::Error(e.into()))?;
+            // Receive a PSK identity.
+            let identity =
+                get_conn_identity(&mut conn).map_err(|e| TryReceiveError::Error(e.into()))?;
             debug!(
                 "Processing connection accepted after seeing PSK identity hint: {:02x?}",
                 identity
@@ -465,4 +451,14 @@ struct AqcCtrlMessage {
     team_id: TeamId,
     /// The control message.
     ctrl: AqcCtrl,
+}
+
+// Extract the chosen PSK identity from the connection context.
+fn get_conn_identity(conn: &mut Connection) -> Result<Vec<u8>, Bug> {
+    Ok(*conn
+        .take_tls_context()
+        .assume("connection has tls context")?
+        .downcast::<Vec<u8>>()
+        .ok()
+        .assume("can downcast identity")?)
 }
