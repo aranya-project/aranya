@@ -20,6 +20,7 @@ use aranya_util::{
     error::ReportExt as _,
     ready,
     rustls::{NoCertResolver, SkipServerVerification},
+    s2n_quic::get_conn_identity,
     task::scope,
     Addr,
 };
@@ -484,12 +485,7 @@ where
         let handle = conn.handle();
         async {
             debug!("received incoming QUIC connection");
-            let identity = *conn
-                .take_tls_context()
-                .assume("connection has tls context")?
-                .downcast::<Vec<u8>>()
-                .ok()
-                .assume("can downcast identity")?;
+            let identity = get_conn_identity(&mut conn)?;
             let active_team = self
                 .server_keys
                 .get_team_for_identity(&identity)

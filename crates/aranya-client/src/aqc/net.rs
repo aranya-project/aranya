@@ -16,9 +16,9 @@ use aranya_daemon_api::{
 use aranya_util::{
     error::ReportExt as _,
     rustls::{NoCertResolver, SkipServerVerification},
-    s2n_quic::read_to_end,
+    s2n_quic::{get_conn_identity, read_to_end},
 };
-use buggy::{Bug, BugExt as _};
+use buggy::BugExt as _;
 use bytes::Bytes;
 use channels::AqcPeerChannel;
 use s2n_quic::{
@@ -451,14 +451,4 @@ struct AqcCtrlMessage {
     team_id: TeamId,
     /// The control message.
     ctrl: AqcCtrl,
-}
-
-// Extract the chosen PSK identity from the connection context.
-fn get_conn_identity(conn: &mut Connection) -> Result<Vec<u8>, Bug> {
-    Ok(*conn
-        .take_tls_context()
-        .assume("connection has tls context")?
-        .downcast::<Vec<u8>>()
-        .ok()
-        .assume("can downcast identity")?)
 }
