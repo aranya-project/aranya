@@ -97,11 +97,11 @@ version = "0.23.26-psk.1"
 criteria = "safe-to-deploy"
 
 [[exemptions.aranya-internal-s2n-quic]]
-version = "1.58.0-psk.1"
+version = "1.58.0-psk.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.aranya-internal-s2n-quic-rustls]]
-version = "0.58.0-psk.1"
+version = "0.58.0-psk.2"
 criteria = "safe-to-deploy"
 
 [[exemptions.async-trait]]

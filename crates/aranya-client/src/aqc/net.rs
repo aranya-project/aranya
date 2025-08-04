@@ -30,7 +30,6 @@ use s2n_quic::{
     Client, Connection, Server,
 };
 use tarpc::context;
-use tokio::sync::mpsc;
 use tracing::{debug, error, warn};
 
 use super::crypto::{
@@ -60,8 +59,6 @@ pub(crate) struct AqcClient {
     ///
     /// Inserting to this will add keys which the `server` will accept.
     server_keys: Arc<ServerPresharedKeys>,
-    /// Receives latest selected PSK for accepted channel from server PSK provider.
-    identity_rx: mpsc::Receiver<PskIdentity>,
 
     /// Map of PSK identity to channel type
     channels: HashMap<PskIdentity, AqcChannelInfo>,
@@ -87,7 +84,7 @@ impl AqcClient {
         // TODO(jdygert): enable after rustls upstream fix.
         // client_config.psk_kex_modes = vec![PskKexMode::PskOnly];
 
-        let (server_keys, identity_rx) = ServerPresharedKeys::new();
+        let server_keys = ServerPresharedKeys::new();
         server_keys.insert(CTRL_PSK.clone());
         let server_keys = Arc::new(server_keys);
 
@@ -125,7 +122,6 @@ impl AqcClient {
             channels: HashMap::new(),
             quic_server: server,
             daemon,
-            identity_rx,
         })
     }
 
@@ -187,12 +183,7 @@ impl AqcClient {
                 .await
                 .ok_or(AqcError::ServerConnectionTerminated)?;
             // Receive a PSK identity hint.
-            // TODO: Instead of receiving the PSK identity hint here, we should
-            // pull it directly from the connection.
-            let identity = self
-                .identity_rx
-                .try_recv()
-                .assume("identity received after accepting connection")?;
+            let identity = get_conn_identity(&mut conn)?;
             debug!(
                 "Processing connection accepted after seeing PSK identity hint: {:02x?}",
                 identity
@@ -241,14 +232,9 @@ impl AqcClient {
                     return Err(TryReceiveError::Empty);
                 }
             };
-            // Receive a PSK identity hint.
-            // TODO: Instead of receiving the PSK identity hint here, we should
-            // pull it directly from the connection.
-            let identity = self
-                .identity_rx
-                .try_recv()
-                .assume("identity received after accepting connection")
-                .map_err(|e| TryReceiveError::Error(e.into()))?;
+            // Receive a PSK identity.
+            let identity =
+                get_conn_identity(&mut conn).map_err(|e| TryReceiveError::Error(e.into()))?;
             debug!(
                 "Processing connection accepted after seeing PSK identity hint: {:02x?}",
                 identity
@@ -480,4 +466,14 @@ fn is_close_error(err: s2n_quic::stream::Error) -> bool {
             ..
         },
     )
+}
+
+// Extract the chosen PSK identity from the connection context.
+pub fn get_conn_identity(conn: &mut Connection) -> Result<Vec<u8>, Bug> {
+    Ok(*conn
+        .take_tls_context()
+        .assume("connection has tls context")?
+        .downcast::<Vec<u8>>()
+        .ok()
+        .assume("can downcast identity")?)
 }
