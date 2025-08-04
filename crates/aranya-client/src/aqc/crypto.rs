@@ -50,6 +50,8 @@ impl ServerPresharedKeys {
     }
 
     /// Zeroize PSKs with the provided identities.
+    /// Removes the PSKs from the map so the secret can be zeroized via `Zeroizing` when dropped.
+    /// Assumes there are no other references to the zeroized PSKs held long-term outside of this keystore.
     pub fn zeroize_psks(&self, identities: &[PskIdentity]) {
         let mut keys = self.keys.lock().expect("poisoned");
         identities.iter().for_each(|i| {
@@ -111,6 +113,8 @@ impl ClientPresharedKeys {
     }
 
     /// Zeroize PSKs with the provided identities.
+    /// Removes the PSKs from the map so the secret can be zeroized via `Zeroizing` when dropped.
+    /// Assumes there are no other references to the zeroized PSKs held long-term outside of this keystore.
     pub fn zeroize_psks(&self, identities: &[PskIdentity]) {
         let mut keys = self.keys.lock().expect("poisoned");
         identities.iter().for_each(|i| {
