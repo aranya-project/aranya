@@ -879,10 +879,6 @@ static void *membera_aqc_thread(void *arg) {
     err = aranya_aqc_delete_bidi_channel(ctx->client, &bidi_chan);
     EXPECT("Unable to delete AQC bidi channel", err);
 
-    printf("Deleting AQC uni channel\n");
-    err = aranya_aqc_delete_receive_uni_channel(ctx->client, &uni_recv);
-    EXPECT("Unable to delete AQC uni channel", err);
-
 exit:
     err         = aranya_aqc_delete_bidi_channel(ctx->client, &bidi_chan);
     ctx->result = err;
