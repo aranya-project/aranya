@@ -392,7 +392,8 @@ dependencies = [
 [[package]]
 name = "aranya-internal-s2n-quic"
 version = "1.58.0-psk.2"
-source = "git+https://github.com/aranya-project/aranya-internal-s2n-quic.git?branch=stash-chosen-identity#e4c550a79b68a3d64594e5fb12c55db593039393"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "588457566f9612bf6543270eb6a3ebb511370f6ce245a9c83ca874f27352406a"
 dependencies = [
  "aranya-internal-s2n-quic-rustls",
  "bytes",
@@ -415,7 +416,8 @@ dependencies = [
 [[package]]
 name = "aranya-internal-s2n-quic-rustls"
 version = "0.58.0-psk.2"
-source = "git+https://github.com/aranya-project/aranya-internal-s2n-quic.git?branch=stash-chosen-identity#e4c550a79b68a3d64594e5fb12c55db593039393"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "27a4effc2301b2938e5f5001d5a7b9da0b33a1e8280c4ba7372103a115aacd2d"
 dependencies = [
  "aranya-internal-rustls",
  "bytes",
@@ -2469,7 +2471,8 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "s2n-codec"
 version = "0.58.0"
-source = "git+https://github.com/aranya-project/aranya-internal-s2n-quic.git?branch=stash-chosen-identity#e4c550a79b68a3d64594e5fb12c55db593039393"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2fd58c0435ff3b776442bd32145d7f9611b7d54529b0059e470eb3ab36518f18"
 dependencies = [
  "byteorder",
  "bytes",
@@ -2479,7 +2482,8 @@ dependencies = [
 [[package]]
 name = "s2n-quic-core"
 version = "0.58.0"
-source = "git+https://github.com/aranya-project/aranya-internal-s2n-quic.git?branch=stash-chosen-identity#e4c550a79b68a3d64594e5fb12c55db593039393"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "51c395d015322985dac0aa08ea48c627dbc1f6f60886a4dafcd2b985f06cbd54"
 dependencies = [
  "atomic-waker",
  "byteorder",
@@ -2499,7 +2503,8 @@ dependencies = [
 [[package]]
 name = "s2n-quic-crypto"
 version = "0.58.0"
-source = "git+https://github.com/aranya-project/aranya-internal-s2n-quic.git?branch=stash-chosen-identity#e4c550a79b68a3d64594e5fb12c55db593039393"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fa14f630c587f1a33dfc0588066d24751d1cda1b8ae5d575cc7b02b04ec6068"
 dependencies = [
  "aws-lc-rs",
  "cfg-if",
@@ -2512,7 +2517,8 @@ dependencies = [
 [[package]]
 name = "s2n-quic-platform"
 version = "0.58.0"
-source = "git+https://github.com/aranya-project/aranya-internal-s2n-quic.git?branch=stash-chosen-identity#e4c550a79b68a3d64594e5fb12c55db593039393"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e1b8094d1030ec1990e6d0b357a3f42bdc3b20673cd397a57399fee0e855b30c"
 dependencies = [
  "cfg-if",
  "futures",
@@ -2526,7 +2532,8 @@ dependencies = [
 [[package]]
 name = "s2n-quic-transport"
 version = "0.58.0"
-source = "git+https://github.com/aranya-project/aranya-internal-s2n-quic.git?branch=stash-chosen-identity#e4c550a79b68a3d64594e5fb12c55db593039393"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "813028a3fe43939f5c25d50f9a39f5b6817eb212271cf787112c2b54e72dc38b"
 dependencies = [
  "bytes",
  "futures-channel",

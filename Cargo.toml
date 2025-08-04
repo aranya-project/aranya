@@ -98,7 +98,3 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
-
-
-[patch.crates-io]
-aranya-internal-s2n-quic = { git = "https://github.com/aranya-project/aranya-internal-s2n-quic.git", branch = "stash-chosen-identity" }
