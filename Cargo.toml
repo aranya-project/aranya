@@ -92,7 +92,7 @@ strip = true
 
 
 [workspace.metadata.release]
-allow-branch = ["main"]
+allow-branch = ["release/0.6.x"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
