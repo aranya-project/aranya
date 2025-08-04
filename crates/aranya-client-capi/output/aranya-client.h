@@ -2774,7 +2774,7 @@ AranyaError aranya_aqc_delete_bidi_channel_ext(const struct AranyaClient *client
                                                struct AranyaExtError *__ext_err);
 
 /**
- * Delete a unidirectional AQC channel.
+ * Delete a send unidirectional AQC channel.
  *
  * Note that this function takes ownership of the [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) and invalidates any further use.
  *
@@ -2783,11 +2783,11 @@ AranyaError aranya_aqc_delete_bidi_channel_ext(const struct AranyaClient *client
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_uni_channel(const struct AranyaClient *client,
-                                          struct AranyaAqcSendChannel *channel);
+AranyaError aranya_aqc_delete_send_uni_channel(const struct AranyaClient *client,
+                                               struct AranyaAqcSendChannel *channel);
 
 /**
- * Delete a unidirectional AQC channel.
+ * Delete a send unidirectional AQC channel.
  *
  * Note that this function takes ownership of the [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) and invalidates any further use.
  *
@@ -2796,9 +2796,36 @@ AranyaError aranya_aqc_delete_uni_channel(const struct AranyaClient *client,
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_uni_channel_ext(const struct AranyaClient *client,
-                                              struct AranyaAqcSendChannel *channel,
-                                              struct AranyaExtError *__ext_err);
+AranyaError aranya_aqc_delete_send_uni_channel_ext(const struct AranyaClient *client,
+                                                   struct AranyaAqcSendChannel *channel,
+                                                   struct AranyaExtError *__ext_err);
+
+/**
+ * Delete a receive unidirectional AQC channel.
+ *
+ * Note that this function takes ownership of the [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) and invalidates any further use.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] channel the AQC Channel [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_delete_receive_uni_channel(const struct AranyaClient *client,
+                                                  struct AranyaAqcReceiveChannel *channel);
+
+/**
+ * Delete a receive unidirectional AQC channel.
+ *
+ * Note that this function takes ownership of the [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) and invalidates any further use.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] channel the AQC Channel [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_delete_receive_uni_channel_ext(const struct AranyaClient *client,
+                                                      struct AranyaAqcReceiveChannel *channel,
+                                                      struct AranyaExtError *__ext_err);
 
 /**
  * Tries to poll AQC to see if any channels have been received.

@@ -8,6 +8,7 @@ use tracing::{debug, instrument};
 
 use super::{net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcSendChannel};
 use crate::{
+    aqc::AqcReceiveChannel,
     error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
 };
@@ -132,9 +133,19 @@ impl<'a> AqcChannels<'a> {
         Ok(())
     }
 
-    /// Deletes an AQC uni channel.
+    /// Deletes a send AQC uni channel.
     #[instrument(skip_all, fields(aqc_id = %chan.aqc_id(), label = %chan.label_id()))]
-    pub async fn delete_uni_channel(&mut self, mut chan: AqcSendChannel) -> crate::Result<()> {
+    pub async fn delete_send_uni_channel(&mut self, mut chan: AqcSendChannel) -> crate::Result<()> {
+        chan.close().await?;
+        Ok(())
+    }
+
+    /// Deletes a receive AQC uni channel.
+    #[instrument(skip_all, fields(aqc_id = %chan.aqc_id(), label = %chan.label_id()))]
+    pub async fn delete_receive_uni_channel(
+        &mut self,
+        mut chan: AqcReceiveChannel,
+    ) -> crate::Result<()> {
         chan.close().await?;
         Ok(())
     }

@@ -1753,7 +1753,7 @@ pub fn aqc_delete_bidi_channel(
     Ok(())
 }
 
-/// Delete a unidirectional AQC channel.
+/// Delete a send unidirectional AQC channel.
 ///
 /// Note that this function takes ownership of the [`AqcSendChannel`] and invalidates any further use.
 ///
@@ -1761,7 +1761,7 @@ pub fn aqc_delete_bidi_channel(
 /// @param[in] channel the AQC Channel [`AqcSendChannel`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn aqc_delete_uni_channel(
+pub fn aqc_delete_send_uni_channel(
     client: &Client,
     channel: OwnedPtr<AqcSendChannel>,
 ) -> Result<(), imp::Error> {
@@ -1771,7 +1771,29 @@ pub fn aqc_delete_uni_channel(
     let client = client.imp();
     client
         .rt
-        .block_on(client.inner.aqc().delete_uni_channel(channel))?;
+        .block_on(client.inner.aqc().delete_send_uni_channel(channel))?;
+    Ok(())
+}
+
+/// Delete a receive unidirectional AQC channel.
+///
+/// Note that this function takes ownership of the [`AqcReceiveChannel`] and invalidates any further use.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] channel the AQC Channel [`AqcReceiveChannel`] to delete.
+///
+/// @relates AranyaClient.
+pub fn aqc_delete_receive_uni_channel(
+    client: &Client,
+    channel: OwnedPtr<AqcReceiveChannel>,
+) -> Result<(), imp::Error> {
+    // SAFETY: the user is responsible for passing in a valid AqcSendChannel pointer.
+    let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
+
+    let client = client.imp();
+    client
+        .rt
+        .block_on(client.inner.aqc().delete_receive_uni_channel(channel))?;
     Ok(())
 }
 
