@@ -40,6 +40,7 @@ impl ServerPresharedKeys {
         }
     }
 
+    /// Insert PSK into server key store.
     pub fn insert(&self, psk: Arc<PresharedKey>) {
         let identity = psk.identity().to_vec();
         let mut keys = self.keys.lock().expect("poisoned");
@@ -48,6 +49,7 @@ impl ServerPresharedKeys {
         }
     }
 
+    /// Zeroize PSKs with the provided identities.
     pub fn zeroize_psks(&self, identities: &[PskIdentity]) {
         let mut keys = self.keys.lock().expect("poisoned");
         identities.iter().for_each(|i| {
@@ -55,6 +57,7 @@ impl ServerPresharedKeys {
         });
     }
 
+    /// Load PSKs into server key store.
     pub fn load_psks(&self, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
         for (suite, psk) in psks {
@@ -63,6 +66,7 @@ impl ServerPresharedKeys {
         }
     }
 
+    /// Clear all PSKs from server key store.
     pub fn clear(&self) {
         self.keys.lock().expect("poisoned").clear()
     }
@@ -106,6 +110,7 @@ impl ClientPresharedKeys {
         }
     }
 
+    /// Zeroize PSKs with the provided identities.
     pub fn zeroize_psks(&self, identities: &[PskIdentity]) {
         let mut keys = self.keys.lock().expect("poisoned");
         identities.iter().for_each(|i| {

@@ -82,6 +82,7 @@ struct ClientState {
 }
 
 impl ClientState {
+    /// Establish connection for sending the ctrl message.
     #[instrument(skip(self))]
     fn connect_ctrl(&mut self, addr: SocketAddr) -> s2n_quic::client::ConnectionAttempt {
         self.client_keys.set_key(CTRL_PSK.clone());
@@ -89,6 +90,7 @@ impl ClientState {
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
     }
 
+    /// Establish connection for sending a data message.
     #[instrument(skip(self, psks))]
     fn connect_data(
         &mut self,
@@ -100,11 +102,13 @@ impl ClientState {
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
     }
 
+    /// Zeroize PSKs with provided identities from client keys.
     #[instrument(skip(self))]
     fn zeroize_psks(&mut self, identities: &[PskIdentity]) {
         self.client_keys.zeroize_psks(identities);
     }
 
+    /// Clear PSKs from the client key store.
     #[instrument(skip(self))]
     fn clear(&mut self) {
         self.client_keys.clear();
@@ -277,7 +281,7 @@ impl AqcClient {
         ))
     }
 
-    /// Zeroize PSKs from client and server.
+    /// Zeroize PSKs with provided identities from client and server key stores.
     #[instrument(skip(self))]
     async fn zeroize_psks(&self, identities: Vec<PskIdentity>) {
         self.client_state.lock().await.zeroize_psks(&identities);
