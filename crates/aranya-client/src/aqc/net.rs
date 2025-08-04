@@ -327,7 +327,11 @@ impl AqcClient {
                 );
                 AqcError::NoChannelInfoFound
             })?;
-            let keys = ChannelKeys::new(vec![identity], client_keys, self.server_keys.clone());
+            let keys = ChannelKeys::new(
+                channel_info.identities.clone(),
+                client_keys,
+                self.server_keys.clone(),
+            );
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
@@ -471,25 +475,38 @@ impl AqcClient {
         self.server_keys.load_psks(psks.clone());
 
         let mut channels = self.channels.write().expect("poisoned");
+        let mut identities: Vec<PskIdentity> = Vec::new();
         match psks {
             AqcPsks::Bidi(psks) => {
+                for (_suite, psk) in psks.clone() {
+                    let identity = psk.identity.as_bytes().to_vec();
+                    identities.push(identity.clone());
+                }
                 for (_suite, psk) in psks {
+                    let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
-                        psk.identity.as_bytes().to_vec(),
+                        identity,
                         AqcChannelInfo {
                             label_id,
                             channel_id: AqcChannelId::Bidi(*psk.identity.channel_id()),
+                            identities: identities.clone(),
                         },
                     );
                 }
             }
             AqcPsks::Uni(psks) => {
+                for (_suite, psk) in psks.clone() {
+                    let identity = psk.identity.as_bytes().to_vec();
+                    identities.push(identity.clone());
+                }
                 for (_suite, psk) in psks {
+                    let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
-                        psk.identity.as_bytes().to_vec(),
+                        identity,
                         AqcChannelInfo {
                             label_id,
                             channel_id: AqcChannelId::Uni(*psk.identity.channel_id()),
+                            identities: identities.clone(),
                         },
                     );
                 }
@@ -535,6 +552,7 @@ pub enum TryReceiveError<E = AqcError> {
 struct AqcChannelInfo {
     label_id: LabelId,
     channel_id: AqcChannelId,
+    identities: Vec<PskIdentity>,
 }
 
 /// An AQC Channel ID.
