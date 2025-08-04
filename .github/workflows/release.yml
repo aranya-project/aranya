@@ -9,7 +9,7 @@ permissions:
 on:
   push:
     branches:
-      - main
+      - release/0.6.x
 
 jobs:
   # Publish unpublished crates and create a git tag

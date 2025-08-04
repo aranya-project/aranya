@@ -7,7 +7,7 @@ members = [
 
 
 [workspace.package]
-version = "0.6.1"
+version = "0.6.2"
 authors = ["SpiderOak, Inc."]
 edition = "2021"
 license = "AGPL-3.0-only"
@@ -53,11 +53,11 @@ aranya-runtime = { version = "0.9.0", features = ["std", "libc"] }
 
 buggy = { version = "0.1.0" }
 
-aranya-client = { version = "0.6.1", path = "crates/aranya-client" }
-aranya-daemon = { version = "0.6.1", path = "crates/aranya-daemon" }
-aranya-daemon-api = { version = "0.6.1", path = "crates/aranya-daemon-api" }
-aranya-keygen = { version = "0.6.1", path = "crates/aranya-keygen" }
-aranya-util = { version = "0.6.1", path = "crates/aranya-util" }
+aranya-client = { version = "0.6.2", path = "crates/aranya-client" }
+aranya-daemon = { version = "0.6.2", path = "crates/aranya-daemon" }
+aranya-daemon-api = { version = "0.6.2", path = "crates/aranya-daemon-api" }
+aranya-keygen = { version = "0.6.2", path = "crates/aranya-keygen" }
+aranya-util = { version = "0.6.2", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
 bytes = { version = "1.0" }
@@ -69,7 +69,7 @@ futures-util = { version = "0.3.30" }
 heapless = { version = "0.8", default-features = false }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
-s2n-quic = { version = "1.58.0-psk.1", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"], package = "aranya-internal-s2n-quic" }
+s2n-quic = { version = "1.58.0-psk.2", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"], package = "aranya-internal-s2n-quic" }
 semver = { version = "1", features = ["serde"] }
 serde = "1"
 serial_test = { version = "3" }
