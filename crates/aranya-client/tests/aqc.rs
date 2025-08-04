@@ -202,7 +202,7 @@ async fn test_aqc_chans() -> Result<()> {
             .membera
             .client
             .aqc()
-            .delete_receive_uni_channel(uni_chan1)
+            .delete_receive_uni_channel(uni_chan2)
             .await?;
     }
 
