@@ -229,7 +229,7 @@ impl AqcClient {
             .collect();
         debug!("got psk identities");
         let keys = ChannelKeys::new(
-            identities,
+            Arc::new(identities),
             self.client_state.lock().await.client_keys.clone(),
             self.server_keys.clone(),
         );
@@ -272,7 +272,7 @@ impl AqcClient {
             .collect();
         debug!("received psk identities");
         let keys = ChannelKeys::new(
-            identities,
+            Arc::new(identities),
             self.client_state.lock().await.client_keys.clone(),
             self.server_keys.clone(),
         );
@@ -404,7 +404,11 @@ impl AqcClient {
             let client_keys = futures_lite::future::block_on(self.client_state.lock())
                 .client_keys
                 .clone();
-            let keys = ChannelKeys::new(vec![identity], client_keys, self.server_keys.clone());
+            let keys = ChannelKeys::new(
+                channel_info.identities.clone(),
+                client_keys,
+                self.server_keys.clone(),
+            );
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
@@ -482,6 +486,7 @@ impl AqcClient {
                     let identity = psk.identity.as_bytes().to_vec();
                     identities.push(identity.clone());
                 }
+                let arc = Arc::new(identities);
                 for (_suite, psk) in psks {
                     let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
@@ -489,7 +494,7 @@ impl AqcClient {
                         AqcChannelInfo {
                             label_id,
                             channel_id: AqcChannelId::Bidi(*psk.identity.channel_id()),
-                            identities: identities.clone(),
+                            identities: arc.clone(),
                         },
                     );
                 }
@@ -499,6 +504,7 @@ impl AqcClient {
                     let identity = psk.identity.as_bytes().to_vec();
                     identities.push(identity.clone());
                 }
+                let arc = Arc::new(identities);
                 for (_suite, psk) in psks {
                     let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
@@ -506,7 +512,7 @@ impl AqcClient {
                         AqcChannelInfo {
                             label_id,
                             channel_id: AqcChannelId::Uni(*psk.identity.channel_id()),
-                            identities: identities.clone(),
+                            identities: arc.clone(),
                         },
                     );
                 }
@@ -552,7 +558,7 @@ pub enum TryReceiveError<E = AqcError> {
 struct AqcChannelInfo {
     label_id: LabelId,
     channel_id: AqcChannelId,
-    identities: Vec<PskIdentity>,
+    identities: Arc<Vec<PskIdentity>>,
 }
 
 /// An AQC Channel ID.

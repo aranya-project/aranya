@@ -37,12 +37,12 @@ pub struct ChannelKeys {
 impl ChannelKeys {
     /// Create a new set of AQC channel keys.
     pub(crate) fn new(
-        identities: Vec<PskIdentity>,
+        identities: Arc<Vec<PskIdentity>>,
         client_keys: Arc<ClientPresharedKeys>,
         server_keys: Arc<ServerPresharedKeys>,
     ) -> Self {
         Self {
-            identities: Arc::new(identities),
+            identities,
             client_keys,
             server_keys,
         }
