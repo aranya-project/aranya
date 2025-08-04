@@ -11,7 +11,6 @@ use s2n_quic::provider::tls::rustls::rustls::{
     crypto::{hash::HashAlgorithm, PresharedKey},
     server::SelectsPresharedKeys,
 };
-use tokio::sync::mpsc;
 use tracing::error;
 
 use crate::aqc::net::PskIdentity;
@@ -32,22 +31,13 @@ pub(super) static CTRL_PSK: LazyLock<Arc<PresharedKey>> = LazyLock::new(|| {
 #[derive(Debug)]
 pub(crate) struct ServerPresharedKeys {
     keys: Mutex<HashSet<PskIdAsKey>>,
-    // Optional sender to report the selected identity
-    identity_sender: mpsc::Sender<Vec<u8>>,
 }
 
 impl ServerPresharedKeys {
-    pub fn new() -> (Self, mpsc::Receiver<Vec<u8>>) {
-        // Create the mpsc channel for PSK identities
-        let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(1);
-
-        (
-            Self {
-                keys: Mutex::default(),
-                identity_sender: identity_tx,
-            },
-            identity_rx,
-        )
+    pub fn new() -> Self {
+        Self {
+            keys: Mutex::default(),
+        }
     }
 
     pub fn insert(&self, psk: Arc<PresharedKey>) {
@@ -84,13 +74,6 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
             return Some(psk.0.clone());
         }
         None
-    }
-
-    fn chosen(&self, identity: &[u8]) {
-        // Use try_send for non-blocking behavior.
-        self.identity_sender
-            .try_send(identity.to_vec())
-            .expect("Failed to send identity");
     }
 }
 

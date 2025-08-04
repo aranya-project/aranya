@@ -71,7 +71,7 @@ futures-util = { version = "0.3.30" }
 heapless = { version = "0.8", default-features = false }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
-s2n-quic = { version = "1.58.0-psk.1", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"], package = "aranya-internal-s2n-quic" }
+s2n-quic = { version = "1.58.0-psk.2", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"], package = "aranya-internal-s2n-quic" }
 semver = { version = "1", features = ["serde"] }
 serde = "1"
 serial_test = { version = "3" }
