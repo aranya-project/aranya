@@ -243,7 +243,7 @@ impl TestCtx {
             let aranya = Arc::new(Mutex::new(graph));
             let client = TestClient::new(Arc::clone(&aranya));
             let local_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
-            let (psk_store, active_team_rx) = PskStore::new([]);
+            let psk_store = PskStore::new([]);
             let psk_store = Arc::new(psk_store);
 
             let (syncer, conn_map, conn_rx, effects_recv) = {
@@ -266,7 +266,6 @@ impl TestCtx {
                 psk_store.clone(),
                 conn_map,
                 conn_rx,
-                active_team_rx,
                 caches.clone(),
             )
             .await?;
