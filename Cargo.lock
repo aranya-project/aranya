@@ -404,9 +404,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-internal-s2n-quic"
-version = "1.58.0-psk.1"
+version = "1.58.0-psk.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "815e4ea0e80b186c21c04e3cbe2ec131c6bffbf7fbe4ed3d80613970a825eb4a"
+checksum = "588457566f9612bf6543270eb6a3ebb511370f6ce245a9c83ca874f27352406a"
 dependencies = [
  "aranya-internal-s2n-quic-rustls",
  "bytes",
@@ -428,9 +428,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-internal-s2n-quic-rustls"
-version = "0.58.0-psk.1"
+version = "0.58.0-psk.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f12f2764e3cb3fd7bfe25466fcc244028887dc8495e0ca713946d4f2a7d530bd"
+checksum = "27a4effc2301b2938e5f5001d5a7b9da0b33a1e8280c4ba7372103a115aacd2d"
 dependencies = [
  "aranya-internal-rustls",
  "bytes",

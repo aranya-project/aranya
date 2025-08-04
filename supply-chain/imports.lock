@@ -97,14 +97,14 @@ user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-internal-s2n-quic]]
-version = "1.58.0-psk.1"
-when = "2025-05-29"
+version = "1.58.0-psk.2"
+when = "2025-08-04"
 user-id = 293722
 user-login = "aranya-project-bot"
 
 [[publisher.aranya-internal-s2n-quic-rustls]]
-version = "0.58.0-psk.1"
-when = "2025-05-29"
+version = "0.58.0-psk.2"
+when = "2025-08-04"
 user-id = 293722
 user-login = "aranya-project-bot"
 
