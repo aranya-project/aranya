@@ -10,7 +10,7 @@ Future plans to collect more information include:
 
 ## Prometheus Exporter
 
-One of the supported metrics backends allows for communicating with a [Prometheus](https://prometheus.io/) instance. Note that with the way that Prometheus works, a datapoint is only created once the data is scraped, so any data created locally that gets overwritten before being scraped is lost. This can either be letting the main Prometheus backend scrape data from the exporter which is meant for longer running data, or using a `pushgateway` with a unique job name to easily filter out specific runs, which is meant more for short runs.
+One of the supported metrics backends allows for communicating with a [Prometheus](https://prometheus.io/) instance. Note that with the way that Prometheus works, a datapoint is only created once the data is scraped, so any data created locally that gets overwritten before being scraped is lost. This can either be letting the main Prometheus backend scrape data from the exporter which is meant for longer running data, or using a `pushgateway` with a unique job name to easily filter out specific runs, which is meant for shorter runs.
 
 ### Installation Instructions
 You can get Prometheus through your favorite package manager; on MacOS it's preferred to use [homebrew](https://brew.sh/).
