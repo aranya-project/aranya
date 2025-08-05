@@ -269,7 +269,7 @@ script = '''
 set -e
 cargo build --bin aranya-daemon --release
 cargo build --bin aranya-metrics --release
-CONFIG_PATH=crates/aranya-metrics/metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
+CONFIG_PATH=$(pwd)/crates/aranya-metrics/metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
 '''
 
 # Run `aranya-metrics` using prometheus
