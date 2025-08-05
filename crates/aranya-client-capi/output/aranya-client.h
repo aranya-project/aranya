@@ -2992,29 +2992,6 @@ AranyaError aranya_aqc_bidi_create_bidi_stream_ext(const struct AranyaClient *cl
                                                    struct AranyaExtError *__ext_err);
 
 /**
- * Close a bidirectional stream from an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  stream the AQC send stream object [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_bidi_stream_close(const struct AranyaClient *client,
-                                         struct AranyaAqcBidiStream *stream);
-
-/**
- * Close a bidirectional stream from an [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel).
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  stream the AQC send stream object [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_bidi_stream_close_ext(const struct AranyaClient *client,
-                                             struct AranyaAqcBidiStream *stream,
-                                             struct AranyaExtError *__ext_err);
-
-/**
  * Send some data to a peer using an [`AranyaAqcBidiStream`](@ref AranyaAqcBidiStream).
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
@@ -3190,56 +3167,6 @@ AranyaError aranya_aqc_send_create_uni_stream_ext(const struct AranyaClient *cli
                                                   struct AranyaAqcSendChannel *channel,
                                                   struct AranyaAqcSendStream *stream,
                                                   struct AranyaExtError *__ext_err);
-
-/**
- * Close a unidirectional stream from an [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel).
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  stream the AQC send stream object [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_send_uni_stream_close(const struct AranyaClient *client,
-                                             struct AranyaAqcSendStream *stream);
-
-/**
- * Close a unidirectional stream from an [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel).
- *
- * @param[in]  client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  stream the AQC send stream object [`AranyaAqcSendStream`](@ref AranyaAqcSendStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_send_uni_stream_close_ext(const struct AranyaClient *client,
-                                                 struct AranyaAqcSendStream *stream,
-                                                 struct AranyaExtError *__ext_err);
-
-/**
- * Close a unidirectional stream from an [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
- *
- * The client paramater is currently unused but is required for backward compitibility in case it is needed in the future.
- *
- * @param[in]  _client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  stream the AQC send stream object [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_receive_uni_stream_close(const struct AranyaClient *_client,
-                                                struct AranyaAqcReceiveStream *stream);
-
-/**
- * Close a unidirectional stream from an [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).
- *
- * The client paramater is currently unused but is required for backward compitibility in case it is needed in the future.
- *
- * @param[in]  _client the Aranya Client [`AranyaClient`](@ref AranyaClient).
- * @param[in]  stream the AQC send stream object [`AranyaAqcReceiveStream`](@ref AranyaAqcReceiveStream).
- *
- * @relates AranyaClient.
- */
-AranyaError aranya_aqc_receive_uni_stream_close_ext(const struct AranyaClient *_client,
-                                                    struct AranyaAqcReceiveStream *stream,
-                                                    struct AranyaExtError *__ext_err);
 
 /**
  * Receives the stream from an [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel).

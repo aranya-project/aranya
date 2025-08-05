@@ -1920,23 +1920,6 @@ pub fn aqc_bidi_create_bidi_stream(
     Ok(())
 }
 
-/// Close a bidirectional stream from an [`AqcBidiChannel`].
-///
-/// @param[in]  client the Aranya Client [`Client`].
-/// @param[in]  stream the AQC send stream object [`AqcBidiStream`].
-///
-/// @relates AranyaClient.
-pub fn aqc_bidi_stream_close(
-    client: &Client,
-    stream: OwnedPtr<AqcBidiStream>,
-) -> Result<(), imp::Error> {
-    // SAFETY: the user is responsible for passing in a valid AqcBidiStream pointer.
-    let mut stream = unsafe { Opaque::into_inner(stream.read()).into_inner().inner };
-
-    client.rt.block_on(stream.close())?;
-    Ok(())
-}
-
 /// Send some data to a peer using an [`AqcBidiStream`].
 ///
 /// @param[in] client the Aranya Client [`Client`].
@@ -2068,42 +2051,6 @@ pub fn aqc_send_create_uni_stream(
     let send = client.rt.block_on(channel.inner.create_uni_stream())?;
 
     AqcSendStream::init(stream, imp::AqcSendStream::new(send));
-    Ok(())
-}
-
-/// Close a unidirectional stream from an [`AqcSendChannel`].
-///
-/// @param[in]  client the Aranya Client [`Client`].
-/// @param[in]  stream the AQC send stream object [`AqcSendStream`].
-///
-/// @relates AranyaClient.
-pub fn aqc_send_uni_stream_close(
-    client: &Client,
-    stream: OwnedPtr<AqcSendStream>,
-) -> Result<(), imp::Error> {
-    // SAFETY: the user is responsible for passing in a valid AqcSendStream pointer.
-    let mut stream = unsafe { Opaque::into_inner(stream.read()).into_inner().inner };
-
-    client.rt.block_on(stream.close())?;
-    Ok(())
-}
-
-/// Close a unidirectional stream from an [`AqcReceiveChannel`].
-///
-/// The client paramater is currently unused but is required for backward compitibility in case it is needed in the future.
-///
-/// @param[in]  _client the Aranya Client [`Client`].
-/// @param[in]  stream the AQC send stream object [`AqcReceiveStream`].
-///
-/// @relates AranyaClient.
-pub fn aqc_receive_uni_stream_close(
-    _client: &Client,
-    stream: OwnedPtr<AqcReceiveStream>,
-) -> Result<(), imp::Error> {
-    // SAFETY: the user is responsible for passing in a valid AqcReceiveStream pointer.
-    let mut stream = unsafe { Opaque::into_inner(stream.read()).into_inner().inner };
-
-    stream.close();
     Ok(())
 }
 
