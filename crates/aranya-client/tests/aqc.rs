@@ -12,7 +12,6 @@ use backon::{ConstantBuilder, Retryable as _};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::try_join, FutureExt};
-use tempfile::tempdir;
 
 use crate::common::{sleep, DevicesCtx};
 
@@ -22,10 +21,7 @@ use crate::common::{sleep, DevicesCtx};
 /// 3. Delete AQC channels.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans() -> Result<()> {
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut devices = DevicesCtx::new("test_aqc_chans", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
@@ -253,10 +249,7 @@ async fn test_aqc_chans() -> Result<()> {
 /// Demonstrate that a device cannot create an AQC channel with a label that is not assigned to it.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_sender", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_sender").await?;
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
@@ -331,10 +324,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
 /// Demonstrate that a device cannot receive an AQC channel with a label that is not assigned to the device.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_recvr", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_recvr").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
@@ -410,10 +400,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 /// Demonstrate that data cannot be received on a closed AQC QUIC stream.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_close_sender_stream() -> Result<()> {
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut devices = DevicesCtx::new("test_aqc_chans_close_sender_stream", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_close_sender_stream").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
@@ -544,10 +531,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 /// Demonstrate that data cannot be sent or received on a deleted AQC channel.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut devices = DevicesCtx::new("test_aqc_chans_delete_chan_send", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_delete_chan_send").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
