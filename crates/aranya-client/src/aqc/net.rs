@@ -251,15 +251,6 @@ impl AqcClient {
         ))
     }
 
-    /// Zeroize PSKs with provided identities from client and server key stores.
-    #[instrument(skip(self))]
-    async fn remove_psks(&self, identities: Vec<PskIdentity>) {
-        self.server_keys.remove(&identities);
-        for identity in identities {
-            self.channels.write().expect("poisoned").remove(&identity);
-        }
-    }
-
     /// Receive the next available channel.
     pub async fn receive_channel(&self) -> crate::Result<AqcPeerChannel> {
         loop {
@@ -287,14 +278,14 @@ impl AqcClient {
             // If the PSK identity hint is not the control PSK, check if it's in the channel map.
             // If it is, create a channel of the appropriate type. We should have already received
             // the control message for this PSK, if we don't we can't create a channel.
-            let channels = self.channels.read().expect("poisoned");
-            let channel_info = channels.get(&identity).ok_or_else(|| {
-                warn!(
+            let Some(channel_info) = self.channels.write().expect("poisoned").remove(&identity)
+            else {
+                debug!(
                     "No channel info found in map for identity hint {:02x?}",
                     identity
                 );
-                AqcError::NoChannelInfoFound
-            })?;
+                return Err(crate::Error::Aqc(AqcError::NoChannelInfoFound));
+            };
             let keys = ChannelKeys::new(channel_info.identities.clone(), self.server_keys.clone());
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
@@ -357,14 +348,14 @@ impl AqcClient {
             // If the PSK identity hint is not the control PSK, check if it's in the channel map.
             // If it is, create a channel of the appropriate type. We should have already received
             // the control message for this PSK, if we don't we can't create a channel.
-            let channels = self.channels.read().expect("poisoned");
-            let channel_info = channels.get(&identity).ok_or_else(|| {
+            let Some(channel_info) = self.channels.write().expect("poisoned").remove(&identity)
+            else {
                 debug!(
                     "No channel info found in map for identity hint {:02x?}",
                     identity
                 );
-                TryReceiveError::Error(AqcError::NoChannelInfoFound.into())
-            })?;
+                return Err(TryReceiveError::Error(AqcError::NoChannelInfoFound.into()));
+            };
             let keys = ChannelKeys::new(channel_info.identities.clone(), self.server_keys.clone());
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,

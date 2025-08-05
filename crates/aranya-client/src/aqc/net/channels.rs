@@ -24,7 +24,7 @@ mod s2n {
 /// Each AQC channel will have a unique set of PSK identities and keys.
 /// This structure provides access to a copy of client and server keys.
 /// It enables the channel PSKs to easily be zeroized when an AQC channel is deleted.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ChannelKeys {
     identities: Arc<Vec<PskIdentity>>,
     server_keys: Arc<ServerPresharedKeys>,
