@@ -131,7 +131,7 @@ impl<'a> AqcChannels<'a> {
     /// Closes all associated QUIC connections and streams.
     #[instrument(skip_all, fields(aqc_id = %chan.aqc_id(), label = %chan.label_id()))]
     pub async fn delete_bidi_channel(&mut self, chan: &mut AqcBidiChannel) -> crate::Result<()> {
-        chan.close().await?;
+        chan.close()?;
         Ok(())
     }
 
@@ -143,7 +143,7 @@ impl<'a> AqcChannels<'a> {
         &mut self,
         chan: &mut AqcSendChannel,
     ) -> crate::Result<()> {
-        chan.close().await?;
+        chan.close()?;
         Ok(())
     }
 
@@ -155,7 +155,7 @@ impl<'a> AqcChannels<'a> {
         &mut self,
         chan: &mut AqcReceiveChannel,
     ) -> crate::Result<()> {
-        chan.close().await?;
+        chan.close()?;
         Ok(())
     }
 

@@ -67,11 +67,6 @@ impl ServerPresharedKeys {
             keys.insert(PskIdAsKey(key));
         }
     }
-
-    /// Clear all PSKs from server key store.
-    pub fn clear(&self) {
-        self.keys.lock().expect("poisoned").clear()
-    }
 }
 
 impl SelectsPresharedKeys for ServerPresharedKeys {
@@ -105,7 +100,6 @@ impl ClientPresharedKeys {
 
     pub fn load_psks(&self, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
-        keys.clear();
         for (suite, psk) in psks {
             let key = make_preshared_key(suite, psk).expect("can make psk");
             keys.insert(PskIdAsKey(key));
@@ -121,10 +115,6 @@ impl ClientPresharedKeys {
             keys.remove(i.as_slice());
         });
     }
-
-    pub fn clear(&self) {
-        self.keys.lock().expect("poisoned").clear()
-    }
 }
 
 impl PresharedKeyStore for ClientPresharedKeys {
@@ -132,8 +122,8 @@ impl PresharedKeyStore for ClientPresharedKeys {
         self.keys
             .lock()
             .expect("Client PSK mutex poisoned")
-            .iter()
-            .map(|p| p.0.clone())
+            .drain()
+            .map(|p| p.0)
             .collect()
     }
 }

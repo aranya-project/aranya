@@ -132,7 +132,7 @@ impl AqcSendChannel {
         match self.handle.open_send_stream().await {
             Ok(send) => Ok(AqcSendStream::new(send)),
             Err(e) => {
-                let _ = self.close().await;
+                let _ = self.close();
                 Err(AqcError::ConnectionError(e))
             }
         }
@@ -140,7 +140,7 @@ impl AqcSendChannel {
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
     #[instrument(skip_all)]
-    pub async fn close(&mut self) -> Result<(), AqcError> {
+    pub fn close(&mut self) -> Result<(), AqcError> {
         const ERROR_CODE: u32 = 0;
         self.handle.close(ERROR_CODE.into());
         self.keys.zeroize();
@@ -199,7 +199,7 @@ impl AqcReceiveChannel {
             Err(e) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
-                let _ = self.close().await;
+                let _ = self.close();
                 Err(AqcError::ConnectionError(e))
             }
         }
@@ -219,7 +219,7 @@ impl AqcReceiveChannel {
             Poll::Ready(Err(e)) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
-                let _ = futures_lite::future::block_on(self.close());
+                let _ = self.close();
                 Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
             }
             Poll::Pending => Err(TryReceiveError::Empty),
@@ -228,7 +228,7 @@ impl AqcReceiveChannel {
 
     /// Close the receive channel.
     #[instrument(skip_all)]
-    pub async fn close(&mut self) -> Result<(), AqcError> {
+    pub fn close(&mut self) -> Result<(), AqcError> {
         const ERROR_CODE: u32 = 0;
         self.conn.close(ERROR_CODE.into());
         self.keys.zeroize();
@@ -286,7 +286,7 @@ impl AqcBidiChannel {
             Err(e) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
-                let _ = self.close().await;
+                let _ = self.close();
                 Err(AqcError::ConnectionError(e))
             }
         }
@@ -307,7 +307,7 @@ impl AqcBidiChannel {
             Poll::Ready(Err(e)) => {
                 // An error occurred on the connection while trying to accept a stream.
                 // This likely means the connection is unusable for new streams.
-                let _ = futures_lite::future::block_on(self.close());
+                let _ = self.close();
                 Err(TryReceiveError::Error(AqcError::ConnectionError(e)))
             }
             Poll::Pending => {
@@ -322,7 +322,7 @@ impl AqcBidiChannel {
         match self.conn.open_send_stream().await {
             Ok(send) => Ok(AqcSendStream::new(send)),
             Err(e) => {
-                let _ = self.close().await;
+                let _ = self.close();
                 Err(AqcError::ConnectionError(e))
             }
         }
@@ -333,7 +333,7 @@ impl AqcBidiChannel {
         match self.conn.open_bidirectional_stream().await {
             Ok(bidi) => Ok(AqcBidiStream::new(bidi)),
             Err(e) => {
-                let _ = self.close().await;
+                let _ = self.close();
                 Err(AqcError::ConnectionError(e))
             }
         }
@@ -341,7 +341,7 @@ impl AqcBidiChannel {
 
     /// Close the channel if it's open. If the channel is already closed, do nothing.
     #[instrument(skip_all)]
-    pub async fn close(&mut self) -> Result<(), AqcError> {
+    pub fn close(&mut self) -> Result<(), AqcError> {
         const ERROR_CODE: u32 = 0;
         self.conn.close(ERROR_CODE.into());
         self.keys.zeroize();

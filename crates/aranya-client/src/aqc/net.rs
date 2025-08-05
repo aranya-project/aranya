@@ -107,12 +107,6 @@ impl ClientState {
     fn zeroize_psks(&mut self, identities: &[PskIdentity]) {
         self.client_keys.zeroize_psks(identities);
     }
-
-    /// Clear PSKs from the client key store.
-    #[instrument(skip(self))]
-    fn clear(&mut self) {
-        self.client_keys.clear();
-    }
 }
 
 #[derive(Debug)]
@@ -214,11 +208,6 @@ impl AqcClient {
             .connect_data(addr, AqcPsks::Uni(psks.clone()))
             .await
         else {
-            let identities: Vec<PskIdentity> = psks
-                .into_iter()
-                .map(|(_, p)| p.identity.as_bytes().to_vec())
-                .collect();
-            self.zeroize_psks(identities).await;
             return Err(AqcError::ConnectionClosed);
         };
         conn.keep_alive(true)?;
@@ -520,20 +509,6 @@ impl AqcClient {
         }
 
         Ok(())
-    }
-
-    /// Close the AQC client.
-    #[instrument(skip_all)]
-    pub async fn close(&mut self) {
-        self.channels.write().expect("poisoned").clear();
-        self.client_state.lock().await.clear();
-        self.server_keys.clear();
-    }
-}
-
-impl Drop for AqcClient {
-    fn drop(&mut self) {
-        futures_lite::future::block_on(self.close());
     }
 }
 
