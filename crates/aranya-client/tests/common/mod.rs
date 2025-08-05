@@ -17,6 +17,7 @@ use aranya_daemon_api::{DeviceId, KeyBundle, NetIdentifier, Role, TeamId, SEED_I
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable as _};
 use futures_util::try_join;
+use tempfile::TempDir;
 use tokio::{fs, time};
 use tracing::{info, instrument, trace};
 
@@ -32,16 +33,20 @@ pub struct DevicesCtx {
     pub operator: DeviceCtx,
     pub membera: DeviceCtx,
     pub memberb: DeviceCtx,
+    _work_dir: TempDir,
 }
 
 impl DevicesCtx {
-    pub async fn new(name: &str, work_dir: PathBuf) -> Result<Self> {
+    pub async fn new(name: &str) -> Result<Self> {
+        let work_dir = tempfile::tempdir()?;
+        let work_dir_path = work_dir.path();
+
         let (owner, admin, operator, membera, memberb) = try_join!(
-            DeviceCtx::new(name, "owner", work_dir.join("owner")),
-            DeviceCtx::new(name, "admin", work_dir.join("admin")),
-            DeviceCtx::new(name, "operator", work_dir.join("operator")),
-            DeviceCtx::new(name, "membera", work_dir.join("membera")),
-            DeviceCtx::new(name, "memberb", work_dir.join("memberb")),
+            DeviceCtx::new(name, "owner", work_dir_path.join("owner")),
+            DeviceCtx::new(name, "admin", work_dir_path.join("admin")),
+            DeviceCtx::new(name, "operator", work_dir_path.join("operator")),
+            DeviceCtx::new(name, "membera", work_dir_path.join("membera")),
+            DeviceCtx::new(name, "memberb", work_dir_path.join("memberb")),
         )?;
 
         Ok(Self {
@@ -50,6 +55,7 @@ impl DevicesCtx {
             operator,
             membera,
             memberb,
+            _work_dir: work_dir,
         })
     }
 
