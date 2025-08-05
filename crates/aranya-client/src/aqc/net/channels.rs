@@ -44,7 +44,7 @@ impl ChannelKeys {
 
     /// Zeroize the PSKs.
     pub fn zeroize(&self) {
-        self.server_keys.zeroize_psks(&self.identities);
+        self.server_keys.remove(&self.identities);
     }
 }
 
@@ -324,7 +324,7 @@ impl AqcBidiChannel {
     /// Creates a new bidirectional stream for the channel.
     pub async fn create_bidi_stream(&mut self) -> Result<AqcBidiStream, AqcError> {
         match self.conn.open_bidirectional_stream().await {
-            Ok(bidi) => Ok(AqcBidiStream::new(bidi)),
+            Ok(bidi) => Ok(AqcBidiStream(bidi)),
             Err(e) => {
                 let _ = self.close();
                 Err(AqcError::ConnectionError(e))
@@ -345,25 +345,18 @@ impl AqcBidiChannel {
 
 /// Used to send and receive data with a peer.
 #[derive(Debug)]
-pub struct AqcBidiStream {
-    stream: s2n::BidirectionalStream,
-}
+pub struct AqcBidiStream(s2n::BidirectionalStream);
 
 impl AqcBidiStream {
-    /// Creates a new AQC bidirectional stream.
-    pub fn new(stream: s2n::BidirectionalStream) -> Self {
-        Self { stream }
-    }
-
     /// Split a bidi stream into send and receive halves.
     pub fn split(self) -> (AqcSendStream, AqcReceiveStream) {
-        let (recv, send) = self.stream.split();
+        let (recv, send) = self.0.split();
         (AqcSendStream::new(send), AqcReceiveStream::new(recv))
     }
 
     /// Send data to the given stream.
     pub async fn send(&mut self, data: Bytes) -> Result<(), AqcError> {
-        if let Err(e) = self.stream.send(data).await {
+        if let Err(e) = self.0.send(data).await {
             let _ = self.close().await;
             return Err(AqcError::StreamError(e));
         }
@@ -377,7 +370,7 @@ impl AqcBidiStream {
     /// The data is not guaranteed to be complete, and may need to be called
     /// multiple times to receive all data from a message.
     pub async fn receive(&mut self) -> Result<Option<Bytes>, AqcError> {
-        match self.stream.receive().await {
+        match self.0.receive().await {
             Ok(data) => Ok(data),
             Err(e) => {
                 let _ = self.close().await;
@@ -394,7 +387,7 @@ impl AqcBidiStream {
     /// - Closed: The stream is closed.
     pub fn try_receive(&mut self) -> Result<Bytes, TryReceiveError> {
         let mut cx = Context::from_waker(Waker::noop());
-        match self.stream.poll_receive(&mut cx) {
+        match self.0.poll_receive(&mut cx) {
             Poll::Ready(Ok(Some(chunk))) => Ok(chunk),
             Poll::Ready(Ok(None)) => Err(TryReceiveError::StreamClosed),
             Poll::Ready(Err(_)) => Err(TryReceiveError::StreamClosed),
@@ -405,7 +398,7 @@ impl AqcBidiStream {
     /// Close the stream.
     #[instrument(skip_all)]
     pub async fn close(&mut self) -> Result<(), AqcError> {
-        if let Err(e) = self.stream.close().await {
+        if let Err(e) = self.0.close().await {
             return Err(AqcError::StreamError(e));
         }
         Ok(())
@@ -521,7 +514,7 @@ pub enum AqcPeerStream {
 impl AqcPeerStream {
     fn new(stream: s2n_quic::stream::PeerStream) -> Self {
         match stream {
-            s2n::PeerStream::Bidirectional(stream) => Self::Bidi(AqcBidiStream::new(stream)),
+            s2n::PeerStream::Bidirectional(stream) => Self::Bidi(AqcBidiStream(stream)),
             s2n::PeerStream::Receive(recv) => Self::Receive(AqcReceiveStream::new(recv)),
         }
     }

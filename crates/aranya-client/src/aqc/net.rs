@@ -101,12 +101,6 @@ impl ClientState {
         self.quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
     }
-
-    /// Zeroize PSKs with provided identities from client keys.
-    #[instrument(skip(self))]
-    fn zeroize_psks(&mut self, identities: &[PskIdentity]) {
-        self.client_keys.zeroize_psks(identities);
-    }
 }
 
 #[derive(Debug)]
@@ -242,11 +236,6 @@ impl AqcClient {
             .await
         else {
             debug!("connection closed");
-            let identities: Vec<PskIdentity> = psks
-                .into_iter()
-                .map(|(_, p)| p.identity.as_bytes().to_vec())
-                .collect();
-            self.zeroize_psks(identities).await;
             return Err(AqcError::ConnectionClosed);
         };
         conn.keep_alive(true)?;
@@ -264,9 +253,8 @@ impl AqcClient {
 
     /// Zeroize PSKs with provided identities from client and server key stores.
     #[instrument(skip(self))]
-    async fn zeroize_psks(&self, identities: Vec<PskIdentity>) {
-        self.client_state.lock().await.zeroize_psks(&identities);
-        self.server_keys.zeroize_psks(&identities);
+    async fn remove_psks(&self, identities: Vec<PskIdentity>) {
+        self.server_keys.remove(&identities);
         for identity in identities {
             self.channels.write().expect("poisoned").remove(&identity);
         }
