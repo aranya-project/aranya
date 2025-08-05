@@ -7,10 +7,7 @@ use bytes::Bytes;
 use tracing::instrument;
 
 use super::{AqcChannelId, TryReceiveError};
-use crate::{
-    aqc::{crypto::ServerPresharedKeys, net::PskIdentity},
-    error::AqcError,
-};
+use crate::{aqc::crypto::ServerPresharedKeys, error::AqcError};
 mod s2n {
     pub use s2n_quic::{
         connection::Handle,
@@ -26,25 +23,22 @@ mod s2n {
 /// It enables the channel PSKs to easily be zeroized when an AQC channel is deleted.
 #[derive(Debug)]
 pub struct ChannelKeys {
-    identities: Arc<Vec<PskIdentity>>,
+    channel_id: AqcChannelId,
     server_keys: Arc<ServerPresharedKeys>,
 }
 
 impl ChannelKeys {
     /// Create a new set of AQC channel keys.
-    pub(crate) fn new(
-        identities: Arc<Vec<PskIdentity>>,
-        server_keys: Arc<ServerPresharedKeys>,
-    ) -> Self {
+    pub(crate) fn new(channel_id: AqcChannelId, server_keys: Arc<ServerPresharedKeys>) -> Self {
         Self {
-            identities,
+            channel_id,
             server_keys,
         }
     }
 
     /// Zeroize the PSKs.
     pub fn zeroize(&self) {
-        self.server_keys.remove(&self.identities);
+        self.server_keys.remove(&self.channel_id);
     }
 }
 

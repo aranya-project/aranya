@@ -1,5 +1,5 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     sync::{Arc, LazyLock, Mutex},
 };
 
@@ -13,7 +13,7 @@ use s2n_quic::provider::tls::rustls::rustls::{
 };
 use tracing::error;
 
-use crate::aqc::net::PskIdentity;
+use crate::aqc::net::{AqcChannelId, PskIdentity};
 
 // Define constant PSK identity and bytes
 pub(super) const PSK_IDENTITY_CTRL: &[u8; 16] = b"aranya-ctrl-psk!"; // 16 bytes
@@ -31,12 +31,14 @@ pub(super) static CTRL_PSK: LazyLock<Arc<PresharedKey>> = LazyLock::new(|| {
 #[derive(Debug)]
 pub(crate) struct ServerPresharedKeys {
     keys: Mutex<HashSet<PskIdAsKey>>,
+    identities: Mutex<HashMap<AqcChannelId, Vec<PskIdentity>>>,
 }
 
 impl ServerPresharedKeys {
     pub fn new() -> Self {
         Self {
             keys: Mutex::default(),
+            identities: Mutex::default(),
         }
     }
 
@@ -49,23 +51,31 @@ impl ServerPresharedKeys {
         }
     }
 
-    /// Zeroize PSKs with the provided identities.
+    /// Zeroize PSKs for an AQC channel.
     /// Removes the PSKs from the map so the secret can be zeroized via `Zeroizing` when dropped.
     /// Assumes there are no other references to the zeroized PSKs held long-term outside of this keystore.
-    pub fn remove(&self, identities: &[PskIdentity]) {
-        let mut keys = self.keys.lock().expect("poisoned");
-        identities.iter().for_each(|i| {
-            keys.remove(i.as_slice());
-        });
+    pub fn remove(&self, channel_id: &AqcChannelId) {
+        if let Some(identities) = self.identities.lock().expect("poisoned").remove(channel_id) {
+            let mut keys = self.keys.lock().expect("poisoned");
+            identities.iter().for_each(|i| {
+                keys.remove(i.as_slice());
+            });
+        }
     }
 
-    /// Load PSKs into server key store.
-    pub fn load_psks(&self, psks: AqcPsks) {
+    /// Load AQC channel PSKs into server key store.
+    pub fn load_psks(&self, channel_id: &AqcChannelId, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
+        let mut identities = Vec::new();
         for (suite, psk) in psks {
+            identities.push(psk.identity().as_bytes().to_vec());
             let key = make_preshared_key(suite, psk).expect("can make psk");
             keys.insert(PskIdAsKey(key));
         }
+        self.identities
+            .lock()
+            .expect("poisoned")
+            .insert(*channel_id, identities);
     }
 }
 

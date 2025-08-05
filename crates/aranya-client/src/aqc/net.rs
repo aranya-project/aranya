@@ -205,13 +205,7 @@ impl AqcClient {
             return Err(AqcError::ConnectionClosed);
         };
         conn.keep_alive(true)?;
-        debug!("getting psk identities");
-        let identities: Vec<PskIdentity> = psks
-            .into_iter()
-            .map(|(_, psk)| psk.identity.as_bytes().to_vec())
-            .collect();
-        debug!("got psk identities");
-        let keys = ChannelKeys::new(Arc::new(identities), self.server_keys.clone());
+        let keys = ChannelKeys::new(AqcChannelId::Uni(channel_id), self.server_keys.clone());
         Ok(channels::AqcSendChannel::new(
             label_id,
             channel_id,
@@ -239,13 +233,7 @@ impl AqcClient {
             return Err(AqcError::ConnectionClosed);
         };
         conn.keep_alive(true)?;
-        debug!("fetching psk identities");
-        let identities: Vec<PskIdentity> = psks
-            .into_iter()
-            .map(|(_, psk)| psk.identity.as_bytes().to_vec())
-            .collect();
-        debug!("received psk identities");
-        let keys = ChannelKeys::new(Arc::new(identities), self.server_keys.clone());
+        let keys = ChannelKeys::new(AqcChannelId::Bidi(channel_id), self.server_keys.clone());
         Ok(channels::AqcBidiChannel::new(
             label_id, channel_id, conn, keys,
         ))
@@ -286,7 +274,7 @@ impl AqcClient {
                 );
                 return Err(crate::Error::Aqc(AqcError::NoChannelInfoFound));
             };
-            let keys = ChannelKeys::new(channel_info.identities.clone(), self.server_keys.clone());
+            let keys = ChannelKeys::new(channel_info.channel_id, self.server_keys.clone());
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
@@ -356,7 +344,7 @@ impl AqcClient {
                 );
                 return Err(TryReceiveError::Error(AqcError::NoChannelInfoFound.into()));
             };
-            let keys = ChannelKeys::new(channel_info.identities.clone(), self.server_keys.clone());
+            let keys = ChannelKeys::new(channel_info.channel_id, self.server_keys.clone());
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
@@ -424,43 +412,40 @@ impl AqcClient {
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
 
-        self.server_keys.load_psks(psks.clone());
-
         let mut channels = self.channels.write().expect("poisoned");
-        let mut identities: Vec<PskIdentity> = Vec::new();
-        match psks {
-            AqcPsks::Bidi(psks) => {
-                for (_suite, psk) in psks.clone() {
-                    let identity = psk.identity.as_bytes().to_vec();
-                    identities.push(identity.clone());
-                }
-                let arc = Arc::new(identities);
-                for (_suite, psk) in psks {
+        match psks.clone() {
+            AqcPsks::Bidi(uni_psks) => {
+                let mut id = None;
+                for (_suite, psk) in uni_psks {
+                    let channel_id = AqcChannelId::Bidi(*psk.identity.channel_id());
+                    if id.is_none() {
+                        self.server_keys.load_psks(&channel_id, psks.clone());
+                        id = Some(channel_id);
+                    }
                     let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
                         identity,
                         AqcChannelInfo {
                             label_id,
                             channel_id: AqcChannelId::Bidi(*psk.identity.channel_id()),
-                            identities: arc.clone(),
                         },
                     );
                 }
             }
-            AqcPsks::Uni(psks) => {
-                for (_suite, psk) in psks.clone() {
-                    let identity = psk.identity.as_bytes().to_vec();
-                    identities.push(identity.clone());
-                }
-                let arc = Arc::new(identities);
-                for (_suite, psk) in psks {
+            AqcPsks::Uni(bidi_psks) => {
+                let mut id = None;
+                for (_suite, psk) in bidi_psks {
+                    let channel_id = AqcChannelId::Uni(*psk.identity.channel_id());
+                    if id.is_none() {
+                        self.server_keys.load_psks(&channel_id, psks.clone());
+                        id = Some(channel_id);
+                    }
                     let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
                         identity,
                         AqcChannelInfo {
                             label_id,
-                            channel_id: AqcChannelId::Uni(*psk.identity.channel_id()),
-                            identities: arc.clone(),
+                            channel_id,
                         },
                     );
                 }
@@ -492,12 +477,11 @@ pub enum TryReceiveError<E = AqcError> {
 struct AqcChannelInfo {
     label_id: LabelId,
     channel_id: AqcChannelId,
-    identities: Arc<Vec<PskIdentity>>,
 }
 
 /// An AQC Channel ID.
-#[derive(Copy, Clone, Debug)]
-enum AqcChannelId {
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
+pub enum AqcChannelId {
     Bidi(BidiChannelId),
     Uni(UniChannelId),
 }
