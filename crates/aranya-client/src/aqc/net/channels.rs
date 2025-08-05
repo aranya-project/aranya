@@ -8,10 +8,7 @@ use tracing::instrument;
 
 use super::{AqcChannelId, TryReceiveError};
 use crate::{
-    aqc::{
-        crypto::{ClientPresharedKeys, ServerPresharedKeys},
-        net::PskIdentity,
-    },
+    aqc::{crypto::ServerPresharedKeys, net::PskIdentity},
     error::AqcError,
 };
 mod s2n {
@@ -30,7 +27,6 @@ mod s2n {
 #[derive(Debug, Clone)]
 pub struct ChannelKeys {
     identities: Arc<Vec<PskIdentity>>,
-    client_keys: Arc<ClientPresharedKeys>,
     server_keys: Arc<ServerPresharedKeys>,
 }
 
@@ -38,19 +34,16 @@ impl ChannelKeys {
     /// Create a new set of AQC channel keys.
     pub(crate) fn new(
         identities: Arc<Vec<PskIdentity>>,
-        client_keys: Arc<ClientPresharedKeys>,
         server_keys: Arc<ServerPresharedKeys>,
     ) -> Self {
         Self {
             identities,
-            client_keys,
             server_keys,
         }
     }
 
     /// Zeroize the PSKs.
     pub fn zeroize(&self) {
-        self.client_keys.zeroize_psks(&self.identities);
         self.server_keys.zeroize_psks(&self.identities);
     }
 }

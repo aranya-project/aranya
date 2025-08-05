@@ -71,10 +71,7 @@ impl ServerPresharedKeys {
 
 impl SelectsPresharedKeys for ServerPresharedKeys {
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
-        if let Some(psk) = self.keys.lock().expect("poisoned").get(identity) {
-            return Some(psk.0.clone());
-        }
-        None
+        Some(self.keys.lock().expect("poisoned").get(identity)?.0.clone())
     }
 }
 
