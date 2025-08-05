@@ -2748,8 +2748,8 @@ AranyaError aranya_aqc_create_uni_channel_ext(const struct AranyaClient *client,
 
 /**
  * Delete a bidirectional AQC channel.
- *
- * Note that this function takes ownership of the [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) and invalidates any further use.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
@@ -2761,8 +2761,8 @@ AranyaError aranya_aqc_delete_bidi_channel(const struct AranyaClient *client,
 
 /**
  * Delete a bidirectional AQC channel.
- *
- * Note that this function takes ownership of the [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) and invalidates any further use.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
@@ -2775,8 +2775,8 @@ AranyaError aranya_aqc_delete_bidi_channel_ext(const struct AranyaClient *client
 
 /**
  * Delete a send unidirectional AQC channel.
- *
- * Note that this function takes ownership of the [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) and invalidates any further use.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) to delete.
@@ -2788,8 +2788,8 @@ AranyaError aranya_aqc_delete_send_uni_channel(const struct AranyaClient *client
 
 /**
  * Delete a send unidirectional AQC channel.
- *
- * Note that this function takes ownership of the [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) and invalidates any further use.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) to delete.
@@ -2802,8 +2802,8 @@ AranyaError aranya_aqc_delete_send_uni_channel_ext(const struct AranyaClient *cl
 
 /**
  * Delete a receive unidirectional AQC channel.
- *
- * Note that this function takes ownership of the [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) and invalidates any further use.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) to delete.
@@ -2815,8 +2815,8 @@ AranyaError aranya_aqc_delete_receive_uni_channel(const struct AranyaClient *cli
 
 /**
  * Delete a receive unidirectional AQC channel.
- *
- * Note that this function takes ownership of the [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) and invalidates any further use.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) to delete.

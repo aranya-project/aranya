@@ -906,8 +906,20 @@ exit:
         ctx->result = err;
     }
 
+    printf("membera: cleaning up AQC bidi channel\n");
+    err = aranya_aqc_bidi_channel_cleanup(&bidi_chan);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        ctx->result = err;
+    }
+
     printf("membera: deleting AQC uni channel\n");
     err = aranya_aqc_delete_receive_uni_channel(ctx->client, &uni_recv);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        ctx->result = err;
+    }
+
+    printf("membera: cleaning up AQC uni channel\n");
+    err = aranya_aqc_receive_channel_cleanup(&uni_recv);
     if (err != ARANYA_ERROR_SUCCESS) {
         ctx->result = err;
     }
@@ -1070,8 +1082,20 @@ exit:
         ctx->result = err;
     }
 
+    printf("memberb: cleaning up AQC bidi channel\n");
+    err = aranya_aqc_bidi_channel_cleanup(&bidi_recv);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        ctx->result = err;
+    }
+
     printf("memberb: deleting AQC uni channel\n");
     err = aranya_aqc_delete_send_uni_channel(ctx->client, &uni_send);
+    if (err != ARANYA_ERROR_SUCCESS) {
+        ctx->result = err;
+    }
+
+    printf("memberb: cleaning up AQC uni channel\n");
+    err = aranya_aqc_send_channel_cleanup(&uni_send);
     if (err != ARANYA_ERROR_SUCCESS) {
         ctx->result = err;
     }
