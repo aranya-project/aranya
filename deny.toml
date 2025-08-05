@@ -249,6 +249,7 @@ skip = [
     "rand_core@0.5.1",
     "regex-automata@0.1.10",
     "regex-syntax@0.6.29",
+    "socket@0.5.8",
     "spin@0.9.8",
     "thiserror-impl@1.0.69",
     "thiserror@1.0.69",
@@ -257,8 +258,6 @@ skip = [
     "getrandom@0.2.15",
     "hash32@0.2.1",
     "heapless@0.7.17",
-    "yoke@0.8.0",
-    "yoke-derive@0.8.0",
     "zerocopy@0.7.35",
     "zerocopy-derive@0.7.35",
 ]
