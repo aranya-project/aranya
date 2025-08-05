@@ -19,6 +19,7 @@ use anyhow::Result;
 pub mod datadog;
 #[cfg(feature = "prometheus")]
 pub mod prometheus;
+#[cfg(feature = "tcp")]
 pub mod tcp;
 
 /// Sets the granularity of metrics reported using [`tracing::debug!()`] each [`interval`].
