@@ -80,7 +80,7 @@ async fn main() -> Result<()> {
 
     info!("Setting up daemons...");
     let (mut daemon_pids, demo_context) = setup_demo("rust_example").await?;
-    daemon_pids.push(("client", std::process::id()));
+    daemon_pids.push(("example", std::process::id()));
 
     info!("Starting metrics collection for PIDs: {daemon_pids:?}");
     let mut metrics_collector = ProcessMetricsCollector::new(metrics_config, daemon_pids);
