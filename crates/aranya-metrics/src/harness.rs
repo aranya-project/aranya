@@ -17,7 +17,7 @@ use metrics::{describe_gauge, describe_histogram, gauge, histogram};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
 use tracing::{debug, warn};
 
-use crate::backend::{DebugLogType, MetricsConfig};
+use crate::backend::MetricsConfig;
 
 /// Collector for process metrics, uses native APIs when possible.
 #[derive(Debug)]
@@ -212,6 +212,8 @@ impl ProcessMetricsCollector {
         pid: (&'static str, u32),
         metrics: &mut AggregatedMetrics,
     ) -> Result<()> {
+        use crate::backend::DebugLogType;
+
         // First, let's collect metrics for the individual process.
         let mut process_metrics = SingleProcessMetrics::default();
 
