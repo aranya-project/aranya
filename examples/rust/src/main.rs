@@ -5,12 +5,12 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use aranya_client::{
-    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
-    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
+    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
+    SyncPeerConfig, aqc::AqcPeerChannel, client::Client,
 };
-use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
+use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, text};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -22,11 +22,11 @@ use tokio::{
     process::{Child, Command},
     time::sleep,
 };
-use tracing::{debug, info, Metadata};
+use tracing::{Metadata, debug, info};
 use tracing_subscriber::{
+    EnvFilter,
     layer::{Context, Filter},
     prelude::*,
-    EnvFilter,
 };
 
 #[derive(Clone, Debug)]
@@ -452,7 +452,11 @@ async fn main() -> Result<()> {
 
     // membera deletes the AQC channel.
     info!("membera deleting aqc channel");
-    membera.client.aqc().delete_bidi_channel(created_aqc_chan).await?;
+    membera
+        .client
+        .aqc()
+        .delete_bidi_channel(&mut created_aqc_chan)
+        .await?;
 
     info!("revoking label from membera");
     operator_team.revoke_label(membera.id, label3).await?;
