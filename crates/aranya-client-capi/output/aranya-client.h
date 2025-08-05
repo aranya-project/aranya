@@ -535,7 +535,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcPeerChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[160];
+    uint8_t __for_size_only[168];
 } AranyaAqcPeerChannel;
 
 /**
@@ -547,7 +547,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[152];
+    uint8_t __for_size_only[160];
 } AranyaAqcBidiChannel;
 
 /**
@@ -559,7 +559,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcSendChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[152];
+    uint8_t __for_size_only[160];
 } AranyaAqcSendChannel;
 
 /**
@@ -571,7 +571,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[152];
+    uint8_t __for_size_only[160];
 } AranyaAqcReceiveChannel;
 
 /**
