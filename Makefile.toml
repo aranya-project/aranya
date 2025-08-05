@@ -275,5 +275,5 @@ CONFIG_PATH=$(pwd)/crates/aranya-metrics/metrics.toml $(pwd)/target/release/aran
 # Run `aranya-metrics` using prometheus
 [tasks.metrics-prometheus]
 category = "metrics"
-description = "Run Metrics Crate w/ a Push Gateway"
+description = "Run aranya-metrics crate w/ Prometheus exporter and a Push Gateway"
 script = "crates/aranya-metrics/prometheus.bash"
