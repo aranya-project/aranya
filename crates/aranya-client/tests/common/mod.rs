@@ -33,10 +33,11 @@ pub struct DevicesCtx {
     pub operator: DeviceCtx,
     pub membera: DeviceCtx,
     pub memberb: DeviceCtx,
+    _work_dir: TempDir,
 }
 
 impl DevicesCtx {
-    pub async fn new(name: &str) -> Result<(Self, TempDir)> {
+    pub async fn new(name: &str) -> Result<Self> {
         let work_dir = tempfile::tempdir()?;
         let work_dir_path = work_dir.path();
 
@@ -48,16 +49,14 @@ impl DevicesCtx {
             DeviceCtx::new(name, "memberb", work_dir_path.join("memberb")),
         )?;
 
-        Ok((
-            Self {
-                owner,
-                admin,
-                operator,
-                membera,
-                memberb,
-            },
-            work_dir,
-        ))
+        Ok(Self {
+            owner,
+            admin,
+            operator,
+            membera,
+            memberb,
+            _work_dir: work_dir,
+        })
     }
 
     pub async fn add_all_device_roles(&mut self, team_id: TeamId) -> Result<()> {
