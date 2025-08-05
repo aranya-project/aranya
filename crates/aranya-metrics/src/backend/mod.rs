@@ -19,8 +19,7 @@ use anyhow::Result;
 pub mod datadog;
 #[cfg(feature = "prometheus")]
 pub mod prometheus;
-#[cfg(feature = "tcp_server")]
-pub mod tcp_server;
+pub mod tcp;
 
 /// Sets the granularity of metrics reported using [`tracing::debug!()`] each [`interval`].
 ///
@@ -29,8 +28,6 @@ pub mod tcp_server;
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum DebugLogType {
-    /// Turns off metrics logging for the current run.
-    None,
     /// Reports the total aggregated metrics for the current tick.
     #[default]
     Total,
@@ -64,9 +61,9 @@ impl MetricsConfig {
             MetricsMode::DataDog(datadog) => {
                 datadog.install(self)?;
             }
-            #[cfg(feature = "tcp_server")]
-            MetricsMode::TcpServer(tcp_server) => {
-                tcp_server.install()?;
+            #[cfg(feature = "tcp")]
+            MetricsMode::TcpServer(tcp) => {
+                tcp.install()?;
             }
             MetricsMode::None => {}
         }
@@ -115,8 +112,8 @@ pub enum MetricsMode {
     /// Configures a TCP server that listens for connections and streams metrics using [`protobuf`].
     ///
     /// [`protobuf`]: https://protobuf.dev/
-    #[cfg(feature = "tcp_server")]
-    TcpServer(tcp_server::TcpConfig),
+    #[cfg(feature = "tcp")]
+    TcpServer(tcp::TcpConfig),
 
     /// Disables exporting metrics to a remote backend. Note that you can still report metrics using
     /// [`debug_logs`](MetricsConfig::debug_logs).

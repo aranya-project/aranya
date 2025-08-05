@@ -14,7 +14,7 @@ fi
 
 echo "Building our binaries..."
 cargo build --bin aranya-daemon --release
-cargo build --bin aranya-metrics --release
+cargo build --bin aranya-metrics --release --features prometheus
 
 # We assume that if they installed prometheus, it's already running in the background.
 echo "Starting pushgateway..."

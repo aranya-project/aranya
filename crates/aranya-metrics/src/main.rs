@@ -1,5 +1,4 @@
-// TODO(nikki): split the aranya demo code into a separate process so we can remove the overhead
-// from measuring, and make this act as both a library and a binary (and move the warn to the lib).
+// TODO(nikki): spawn the demo code as a separate process so we can remove measurement overhead
 
 use std::{
     env,
@@ -270,7 +269,6 @@ async fn setup_demo(team_name: &str) -> Result<(Vec<(&str, u32)>, DemoContext)> 
     ))
 }
 
-// TODO(nikki): make sure this is using sync_now
 async fn run_demo_body(ctx: DemoContext) -> Result<()> {
     // Define our constants and other accessors
     let seed_ikm = {

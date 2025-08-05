@@ -15,7 +15,7 @@ default = []
 
 datadog = ["dep:metrics-exporter-dogstatsd"]
 prometheus = ["dep:metrics-exporter-prometheus"]
-tcp_server = ["dep:metrics-exporter-tcp"]
+tcp = ["dep:metrics-exporter-tcp"]
 
 [dependencies]
 aranya-client = { workspace = true }

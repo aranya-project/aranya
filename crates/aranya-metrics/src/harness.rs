@@ -32,7 +32,7 @@ pub struct ProcessMetricsCollector {
     _start_time: Instant,
     /// Total cumulative metrics for this run
     total_metrics: AggregatedMetrics,
-    // TODO(nikki): total metrics for each process, attach human name to each PID
+    // TODO(nikki): total metrics for each process
 }
 
 /// Contains the metrics collected for all processes.
@@ -159,10 +159,7 @@ impl ProcessMetricsCollector {
                 + current.total_disk_write_bytes,
         };
 
-        match self.config.debug_logs {
-            DebugLogType::None => (),
-            _ => debug!("Total Metrics (cumulative): {:?}", self.total_metrics),
-        }
+        debug!("Total Metrics (cumulative): {:?}", self.total_metrics);
 
         // Push those values to our backend
         self.report_metrics_info()?;
@@ -247,6 +244,7 @@ impl ProcessMetricsCollector {
         _pid: (&'static str, u32),
         _metrics: &mut AggregatedMetrics,
     ) -> Result<()> {
+        // TODO(nikki): Linux support using /proc/{PID}
         Err(anyhow!(
             "We don't currently support {} for metrics, sorry!",
             std::env::consts::OS
@@ -338,9 +336,6 @@ impl ProcessMetricsCollector {
             gauge!("memory_total_bytes").set(total.total_memory_bytes as f64);
             gauge!("disk_read_bytes_total").set(total.total_disk_read_bytes as f64);
             gauge!("disk_write_bytes_total").set(total.total_disk_write_bytes as f64);
-            // TODO(nikki): not sure if we should report these here/in each process at the syncer site.
-            //gauge!("network_rx_bytes_total").set(total.total_network_rx_bytes as f64);
-            //gauge!("network_tx_bytes_total").set(total.total_network_tx_bytes as f64);
             gauge!("monitored_processes_count").set(total.process_count as f64);
         }
 

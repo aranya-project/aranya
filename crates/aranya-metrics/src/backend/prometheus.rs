@@ -41,18 +41,20 @@ pub struct PrometheusConfig {
     global_labels: Option<Vec<(String, String)>>,
 }
 
+const PUSHGATEWAY_URL: &str = "localhost:9091";
+
 impl PrometheusConfig {
     /// Formats an incoming URL to the correct path to start a new job.
     fn format_pushgateway_url(endpoint: &str, job_name: &str) -> String {
         // Try to parse the Uri, or else set it to our default.
         let uri = endpoint
             .parse::<http::Uri>()
-            .unwrap_or(http::Uri::from_static("http://localhost:9091/"));
+            .unwrap_or(http::Uri::from_static(PUSHGATEWAY_URL));
         let scheme = uri.scheme_str().unwrap_or("http");
         let authority = uri
             .authority()
             .map(|a| a.as_str())
-            .unwrap_or("localhost:9091");
+            .unwrap_or(PUSHGATEWAY_URL);
         format!("{scheme}://{authority}/metrics/job/{job_name}")
     }
 
@@ -136,7 +138,7 @@ impl Default for PrometheusConfig {
     fn default() -> Self {
         Self {
             mode: PrometheusMode::PushGateway {
-                endpoint: SocketAddr::from(([127, 0, 0, 1], 9091)).to_string(),
+                endpoint: format!("http://{PUSHGATEWAY_URL}/"),
                 username: None,
                 password: None,
                 use_http_post_method: false,
