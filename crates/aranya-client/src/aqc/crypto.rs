@@ -11,7 +11,7 @@ use s2n_quic::provider::tls::rustls::rustls::{
     crypto::{hash::HashAlgorithm, PresharedKey},
     server::SelectsPresharedKeys,
 };
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::aqc::net::{AqcChannelId, PskIdentity};
 
@@ -82,6 +82,34 @@ impl ServerPresharedKeys {
 impl SelectsPresharedKeys for ServerPresharedKeys {
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
         Some(self.keys.lock().expect("poisoned").get(identity)?.0.clone())
+    }
+
+    fn chosen(&self, identity: &[u8]) {
+        // Don't remove ctrl PSK.
+        if identity == CTRL_PSK.identity() {
+            return;
+        }
+
+        let mut keys = self.keys.lock().expect("poisoned");
+        let mut identities = self.identities.lock().expect("poisoned");
+        let channel_id = {
+            let channel_id = identities.iter().find_map(|(k, v)| {
+                if v.iter().any(|i| *i == identity) {
+                    Some(*k)
+                } else {
+                    None
+                }
+            });
+            channel_id
+        };
+        if let Some(channel_id) = channel_id {
+            debug!(?channel_id, "removing chosen channel PSKs");
+            if let Some(idents) = identities.remove(&channel_id) {
+                idents.iter().for_each(|i| {
+                    keys.remove(i.as_slice());
+                });
+            }
+        }
     }
 }
 
