@@ -147,6 +147,12 @@ impl AqcReceiveChannel {
             Poll::Pending => Err(TryReceiveError::Empty),
         }
     }
+
+    /// Close the receive channel.
+    pub fn close(&mut self) {
+        const ERROR_CODE: u32 = 0;
+        self.conn.close(ERROR_CODE.into());
+    }
 }
 
 /// A unique channel between two peers.

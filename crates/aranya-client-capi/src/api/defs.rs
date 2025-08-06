@@ -68,11 +68,7 @@ pub enum Error {
 
     /// A connection got unexpectedly closed.
     #[capi(msg = "connection got closed")]
-    ConnectionClosed,
-
-    /// A stream got unexpectedly closed.
-    #[capi(msg = "stream got closed")]
-    StreamClosed,
+    Closed,
 
     /// Unable to create configuration info.
     #[capi(msg = "invalid config")]
@@ -110,8 +106,7 @@ impl From<&imp::Error> for Error {
                 }
             },
             imp::Error::WouldBlock => Self::WouldBlock,
-            imp::Error::ConnectionClosed => Self::ConnectionClosed,
-            imp::Error::StreamClosed => Self::StreamClosed,
+            imp::Error::Closed => Self::Closed,
             imp::Error::Config(_) => Self::Config,
             imp::Error::Serialization(_) => Self::Serialization,
             imp::Error::Other(_) => Self::Other,

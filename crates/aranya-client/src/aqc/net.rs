@@ -192,15 +192,12 @@ impl AqcClient {
         psks: AqcUniPsks,
     ) -> Result<channels::AqcSendChannel, AqcError> {
         let channel_id = UniChannelId::from(*psks.channel_id());
-        let Ok(mut conn) = self
+        let mut conn = self
             .client_state
             .lock()
             .await
             .connect_data(addr, AqcPsks::Uni(psks.clone()))
-            .await
-        else {
-            return Err(AqcError::ConnectionClosed);
-        };
+            .await?;
         conn.keep_alive(true)?;
         Ok(channels::AqcSendChannel::new(
             label_id,
@@ -217,16 +214,12 @@ impl AqcClient {
         psks: AqcBidiPsks,
     ) -> Result<channels::AqcBidiChannel, AqcError> {
         let channel_id = BidiChannelId::from(*psks.channel_id());
-        let Ok(mut conn) = self
+        let mut conn = self
             .client_state
             .lock()
             .await
             .connect_data(addr, AqcPsks::Bidi(psks.clone()))
-            .await
-        else {
-            debug!("connection closed");
-            return Err(AqcError::ConnectionClosed);
-        };
+            .await?;
         conn.keep_alive(true)?;
         Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
     }
@@ -446,12 +439,9 @@ pub enum TryReceiveError<E = AqcError> {
     /// An error occurred.
     #[error("an error occurred")]
     Error(E),
-    /// The  stream is closed.
-    #[error("stream is closed")]
-    StreamClosed,
-    /// The connection is closed.
-    #[error("connection is closed")]
-    ConnectionClosed,
+    /// The channel or stream is closed.
+    #[error("channel or stream is closed")]
+    Closed,
 }
 
 #[derive(Debug)]
