@@ -1,4 +1,5 @@
-// TODO(nikki): spawn the demo code as a separate process so we can remove measurement overhead
+// TODO(nikki): spawn the demo code as a separate process so we can remove measurement overhead, and
+// migrate to benches/ or examples/.
 
 use std::{
     env,
