@@ -381,6 +381,10 @@ effect QueryDevicesOnTeamResult {
 
 // A trampoline that forwards `device_id` to the effect.
 command QueryDevicesOnTeam {
+    attributes {
+        priority: 0
+    }
+
     fields {
         device_id id,
     }
@@ -429,6 +433,10 @@ effect QueryDeviceRoleResult {
 }
 
 command QueryDeviceRole {
+    attributes {
+        priority: 0
+    }
+
     fields {
         device_id id,
     }
@@ -483,6 +491,10 @@ effect QueryDeviceKeyBundleResult {
 }
 
 command QueryDeviceKeyBundle {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The device whose key bundle is being queried.
         device_id id,
@@ -750,6 +762,10 @@ effect PermAddedToRole {
 }
 
 command AddPermToRole {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The ID of the role to which the permission is being
         // added.
@@ -812,6 +828,10 @@ effect PermRemovedFromRole {
 }
 
 command RemovePermFromRole {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The ID of the role from which the permission is being
         // removed.
@@ -949,6 +969,10 @@ effect RoleOwnerAdded {
 }
 
 command AddRoleOwner {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The ID of the role whose owning role is being
         // changed.
@@ -1012,6 +1036,10 @@ effect RoleOwnerRemoved {
 }
 
 command RemoveRoleOwner {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The ID of the role whose owning role is being
         // changed.
@@ -1232,6 +1260,10 @@ effect RoleManagementPermAssigned {
 }
 
 command AssignRoleManagementPerm {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The ID of the role whose management permission is being
         // assigned.
@@ -1354,6 +1386,10 @@ effect RoleManagementPermRevoked {
 }
 
 command RevokeRoleManagementPerm {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The ID of the role whose management permission is being
         // removed.
@@ -1563,6 +1599,10 @@ action setup_default_roles(owning_role_id id) {
 }
 
 command SetupDefaultRole {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The name of the default role.
         name enum DefaultRoleName,
@@ -1770,6 +1810,10 @@ effect RoleAssigned {
 }
 
 command AssignRole {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The ID of the device being assigned the role.
         device_id id,
@@ -1849,6 +1893,10 @@ effect RoleChanged {
 }
 
 command ChangeRole {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The ID of the device being assigned the role.
         device_id id,
@@ -1940,6 +1988,10 @@ effect RoleRevoked {
 }
 
 command RevokeRole {
+    attributes {
+        priority: 2
+    }
+
     fields {
         // The ID of the device having its role revoked.
         device_id id,
@@ -2015,6 +2067,10 @@ effect QueryTeamRolesResult {
 
 // A trampoline command to forward data to `QueryTeamRolesResult`.
 command QueryTeamRoles {
+    attributes {
+        priority: 0
+    }
+
     fields {
         role_id id,
         name string,
@@ -2103,6 +2159,10 @@ effect TeamCreated {
 }
 
 command CreateTeam {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The initial owner's public Device Keys.
         owner_keys struct KeyBundle,
@@ -2283,6 +2343,10 @@ effect TeamTerminated {
 }
 
 command TerminateTeam {
+    attributes {
+        priority: 4
+    }
+
     fields {
         // The ID of the team being terminated.
         team_id id,
@@ -2335,6 +2399,10 @@ effect DeviceAdded {
 }
 
 command AddDevice {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The new device's public Device Keys.
         device_keys struct KeyBundle,
@@ -2385,6 +2453,10 @@ effect DeviceRemoved {
 }
 
 command RemoveDevice {
+    attributes {
+        priority: 3
+    }
+
     fields {
         // The ID of the device being removed from the team.
         device_id id,
@@ -2654,6 +2726,10 @@ effect LabelManagingRoleAdded {
 }
 
 command AddLabelManagingRole {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The label to update.
         label_id id,
@@ -2718,6 +2794,10 @@ effect LabelManagingRoleRevoked {
 }
 
 command RevokeLabelManagingRole {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The label to update.
         label_id id,
@@ -2788,6 +2868,10 @@ effect LabelCreated {
 }
 
 command CreateLabel {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The label name.
         label_name string,
@@ -2868,6 +2952,10 @@ effect LabelDeleted {
 }
 
 command DeleteLabel {
+    attributes {
+        priority: 2
+    }
+
     fields {
         // The unique ID of the label being deleted.
         label_id id,
@@ -2990,6 +3078,10 @@ effect LabelAssignedToRole {
 }
 
 command AssignLabelToRole {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The target role.
         role_id id,
@@ -3107,6 +3199,10 @@ effect LabelAssignedToDevice {
 }
 
 command AssignLabelToDevice {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // The target device.
         device_id id,
@@ -3194,7 +3290,11 @@ effect LabelRevokedFromRole {
     author_id id,
 }
 
-command RevokeLabelFromDevice {
+command RevokeLabelFromRole {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The target role.
         role_id id,
@@ -3265,6 +3365,10 @@ effect LabelRevokedFromDevice {
 }
 
 command RevokeLabelFromDevice {
+    attributes {
+        priority: 1
+    }
+
     fields {
         // The target device.
         device_id id,
@@ -3331,6 +3435,10 @@ effect QueryLabelResult {
 }
 
 command QueryLabel {
+    attributes {
+        priority: 0
+    }
+
     fields {
         label_id id,
     }
@@ -3387,6 +3495,10 @@ effect QueryLabelsResult {
 
 // Trampoline to forward info to `QueriedLabelsResult`.
 command QueryLabels {
+    attributes {
+        priority: 0
+    }
+
     fields {
         label_id id,
         label_name string,
@@ -3445,6 +3557,10 @@ effect QueryLabelsAssignedToRoleResult {
 }
 
 command QueryLabelsAssignedToRole {
+    attributes {
+        priority: 0
+    }
+
     fields {
         role_id id,
         label_id id,
@@ -3510,6 +3626,10 @@ effect QueryLabelsAssignedToDeviceResult {
 }
 
 command QueryLabelsAssignedToDevice {
+    attributes {
+        priority: 0
+    }
+
     fields {
         device_id id,
         label_id id,
@@ -3599,6 +3719,10 @@ effect AqcNetworkNameSet {
 
 // TODO(eric): rename this to update/upsert/something?
 command SetAqcNetworkName {
+    attributes {
+        priority: 0
+    }
+
     fields {
         device_id id,
         net_id string,
@@ -3657,6 +3781,10 @@ effect AqcNetworkNameUnset {
 }
 
 command UnsetAqcNetworkName {
+    attributes {
+        priority: 1
+    }
+
     fields {
         device_id id,
     }
@@ -3699,6 +3827,10 @@ effect QueryAqcNetIdResult {
 }
 
 command QueryAqcNetId {
+    attributes {
+        priority: 0
+    }
+
     fields {
         device_id id,
     }
@@ -3745,6 +3877,10 @@ effect QueryAqcNetworkNamesResult {
 }
 
 command QueryAqcNetworkNames {
+    attributes {
+        priority: 0
+    }
+
     fields {
         net_id string,
         device_id id,
@@ -3889,6 +4025,10 @@ to the fact database.
 
 ```policy
 command AqcCreateBidiChannel {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // Uniquely identifies the channel.
         channel_id id,
@@ -4067,6 +4207,10 @@ to the fact database.
 
 ```policy
 command AqcCreateUniChannel {
+    attributes {
+        priority: 0
+    }
+
     fields {
         // Uniquely identifies the channel.
         channel_id id,
