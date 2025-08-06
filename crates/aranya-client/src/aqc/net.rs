@@ -402,9 +402,9 @@ impl AqcClient {
 
         let mut channels = self.channels.write().expect("poisoned");
         let channel_id = match psks.clone() {
-            AqcPsks::Bidi(bidi_psks) => {
-                let channel_id = AqcChannelId::Bidi((*bidi_psks.channel_id()).into());
-                for (_suite, psk) in bidi_psks {
+            AqcPsks::Bidi(psks) => {
+                let channel_id = AqcChannelId::Bidi((*psks.channel_id()).into());
+                for (_suite, psk) in psks {
                     let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
                         identity,
@@ -416,9 +416,9 @@ impl AqcClient {
                 }
                 channel_id
             }
-            AqcPsks::Uni(uni_psks) => {
-                let channel_id = AqcChannelId::Uni((*uni_psks.channel_id()).into());
-                for (_suite, psk) in uni_psks {
+            AqcPsks::Uni(psks) => {
+                let channel_id = AqcChannelId::Uni((*psks.channel_id()).into());
+                for (_suite, psk) in psks {
                     let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
                         identity,
