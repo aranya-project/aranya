@@ -37,10 +37,7 @@ use tarpc::context;
 use tracing::{debug, error, instrument, warn};
 
 use super::crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL};
-use crate::{
-    aqc::net::channels::ChannelKeys,
-    error::{aranya_error, AqcError, IpcError},
-};
+use crate::error::{aranya_error, AqcError, IpcError};
 
 pub mod channels;
 
@@ -205,12 +202,10 @@ impl AqcClient {
             return Err(AqcError::ConnectionClosed);
         };
         conn.keep_alive(true)?;
-        let keys = ChannelKeys::new(AqcChannelId::Uni(channel_id), self.server_keys.clone());
         Ok(channels::AqcSendChannel::new(
             label_id,
             channel_id,
             conn.handle(),
-            keys,
         ))
     }
 
@@ -233,10 +228,7 @@ impl AqcClient {
             return Err(AqcError::ConnectionClosed);
         };
         conn.keep_alive(true)?;
-        let keys = ChannelKeys::new(AqcChannelId::Bidi(channel_id), self.server_keys.clone());
-        Ok(channels::AqcBidiChannel::new(
-            label_id, channel_id, conn, keys,
-        ))
+        Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
     }
 
     /// Receive the next available channel.
@@ -274,12 +266,10 @@ impl AqcClient {
                 );
                 return Err(crate::Error::Aqc(AqcError::NoChannelInfoFound));
             };
-            let keys = ChannelKeys::new(channel_info.channel_id, self.server_keys.clone());
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
                 conn,
-                keys,
             ));
         }
     }
@@ -344,12 +334,10 @@ impl AqcClient {
                 );
                 return Err(TryReceiveError::Error(AqcError::NoChannelInfoFound.into()));
             };
-            let keys = ChannelKeys::new(channel_info.channel_id, self.server_keys.clone());
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
                 conn,
-                keys,
             ));
         }
     }

@@ -1,5 +1,4 @@
 use core::task::{Context, Poll, Waker};
-use std::sync::Arc;
 
 use aranya_crypto::aqc::{BidiChannelId, UniChannelId};
 use aranya_daemon_api::LabelId;
@@ -7,39 +6,13 @@ use bytes::Bytes;
 use tracing::instrument;
 
 use super::{AqcChannelId, TryReceiveError};
-use crate::{aqc::crypto::ServerPresharedKeys, error::AqcError};
+use crate::error::AqcError;
 mod s2n {
     pub use s2n_quic::{
         connection::Handle,
         stream::{BidirectionalStream, PeerStream, ReceiveStream, SendStream},
         Connection,
     };
-}
-
-/// AQC channel Keys.
-///
-/// Each AQC channel will have a unique set of PSK identities and keys.
-/// This structure provides access to a copy of client and server keys.
-/// It enables the channel PSKs to easily be zeroized when an AQC channel is deleted.
-#[derive(Debug)]
-pub struct ChannelKeys {
-    channel_id: AqcChannelId,
-    server_keys: Arc<ServerPresharedKeys>,
-}
-
-impl ChannelKeys {
-    /// Create a new set of AQC channel keys.
-    pub(crate) fn new(channel_id: AqcChannelId, server_keys: Arc<ServerPresharedKeys>) -> Self {
-        Self {
-            channel_id,
-            server_keys,
-        }
-    }
-
-    /// Zeroize the PSKs.
-    pub fn zeroize(&self) {
-        self.server_keys.remove(&self.channel_id);
-    }
 }
 
 /// A channel opened by a peer.
@@ -52,23 +25,18 @@ pub enum AqcPeerChannel {
 }
 
 impl AqcPeerChannel {
-    pub(super) fn new(
-        label_id: LabelId,
-        channel_id: AqcChannelId,
-        conn: s2n::Connection,
-        keys: ChannelKeys,
-    ) -> Self {
+    pub(super) fn new(label_id: LabelId, channel_id: AqcChannelId, conn: s2n::Connection) -> Self {
         match channel_id {
             AqcChannelId::Bidi(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let channel = AqcBidiChannel::new(label_id, id, conn, keys);
+                let channel = AqcBidiChannel::new(label_id, id, conn);
                 AqcPeerChannel::Bidi(channel)
             }
             AqcChannelId::Uni(id) => {
                 // Once we accept a valid connection, let's turn it into an AQC Channel that we can
                 // then open an arbitrary number of streams on.
-                let receiver = AqcReceiveChannel::new(label_id, id, conn, keys);
+                let receiver = AqcReceiveChannel::new(label_id, id, conn);
                 AqcPeerChannel::Receive(receiver)
             }
         }
@@ -82,7 +50,6 @@ pub struct AqcSendChannel {
     label_id: LabelId,
     handle: s2n::Handle,
     id: UniChannelId,
-    keys: ChannelKeys,
 }
 
 impl AqcSendChannel {
@@ -90,17 +57,11 @@ impl AqcSendChannel {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub(super) fn new(
-        label_id: LabelId,
-        id: UniChannelId,
-        handle: s2n::Handle,
-        keys: ChannelKeys,
-    ) -> Self {
+    pub(super) fn new(label_id: LabelId, id: UniChannelId, handle: s2n::Handle) -> Self {
         Self {
             label_id,
             id,
             handle,
-            keys,
         }
     }
 
@@ -130,8 +91,6 @@ impl AqcSendChannel {
     pub fn close(&mut self) -> Result<(), AqcError> {
         const ERROR_CODE: u32 = 0;
         self.handle.close(ERROR_CODE.into());
-        self.keys.zeroize();
-
         Ok(())
     }
 }
@@ -143,7 +102,6 @@ pub struct AqcReceiveChannel {
     label_id: LabelId,
     aqc_id: UniChannelId,
     conn: s2n::Connection,
-    keys: ChannelKeys,
 }
 
 impl AqcReceiveChannel {
@@ -151,17 +109,11 @@ impl AqcReceiveChannel {
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
-    pub(super) fn new(
-        label_id: LabelId,
-        aqc_id: UniChannelId,
-        conn: s2n::Connection,
-        keys: ChannelKeys,
-    ) -> Self {
+    pub(super) fn new(label_id: LabelId, aqc_id: UniChannelId, conn: s2n::Connection) -> Self {
         Self {
             label_id,
             aqc_id,
             conn,
-            keys,
         }
     }
 
@@ -218,8 +170,6 @@ impl AqcReceiveChannel {
     pub fn close(&mut self) -> Result<(), AqcError> {
         const ERROR_CODE: u32 = 0;
         self.conn.close(ERROR_CODE.into());
-        self.keys.zeroize();
-
         Ok(())
     }
 }
@@ -231,22 +181,15 @@ pub struct AqcBidiChannel {
     label_id: LabelId,
     aqc_id: BidiChannelId,
     conn: s2n::Connection,
-    keys: ChannelKeys,
 }
 
 impl AqcBidiChannel {
     /// Create a new bidirectional channel with the given id and conection handle.
-    pub(super) fn new(
-        label_id: LabelId,
-        aqc_id: BidiChannelId,
-        conn: s2n::Connection,
-        keys: ChannelKeys,
-    ) -> Self {
+    pub(super) fn new(label_id: LabelId, aqc_id: BidiChannelId, conn: s2n::Connection) -> Self {
         Self {
             label_id,
             aqc_id,
             conn,
-            keys,
         }
     }
 
@@ -331,8 +274,6 @@ impl AqcBidiChannel {
     pub fn close(&mut self) -> Result<(), AqcError> {
         const ERROR_CODE: u32 = 0;
         self.conn.close(ERROR_CODE.into());
-        self.keys.zeroize();
-
         Ok(())
     }
 }
