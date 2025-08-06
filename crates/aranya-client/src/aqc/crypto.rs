@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    mem,
     sync::{Arc, LazyLock, Mutex},
 };
 
@@ -95,41 +96,35 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
 
 #[derive(Debug)]
 pub struct ClientPresharedKeys {
-    keys: Mutex<HashSet<PskIdAsKey>>,
+    keys: Mutex<Vec<Arc<PresharedKey>>>,
 }
 
 impl ClientPresharedKeys {
     pub fn new(key: Arc<PresharedKey>) -> Self {
-        let mut keys = HashSet::new();
-        keys.insert(PskIdAsKey(key));
         Self {
-            keys: Mutex::new(keys),
+            keys: Mutex::new(vec![key]),
         }
     }
 
     pub fn set_key(&self, key: Arc<PresharedKey>) {
         let mut keys_guard = self.keys.lock().expect("Client PSK mutex poisoned");
         keys_guard.clear();
-        keys_guard.insert(PskIdAsKey(key));
+        keys_guard.push(key);
     }
 
     pub fn load_psks(&self, psks: AqcPsks) {
-        let mut keys = self.keys.lock().expect("poisoned");
-        for (suite, psk) in psks {
-            let key = make_preshared_key(suite, psk).expect("can make psk");
-            keys.insert(PskIdAsKey(key));
-        }
+        let keys = psks
+            .into_iter()
+            .map(|(suite, psk)| make_preshared_key(suite, psk))
+            .collect::<Option<Vec<_>>>()
+            .expect("can create psks");
+        *self.keys.lock().expect("poisoned") = keys;
     }
 }
 
 impl PresharedKeyStore for ClientPresharedKeys {
     fn psks(&self, _server_name: &rustls::pki_types::ServerName<'_>) -> Vec<Arc<PresharedKey>> {
-        self.keys
-            .lock()
-            .expect("Client PSK mutex poisoned")
-            .drain()
-            .map(|p| p.0)
-            .collect()
+        mem::take(&mut self.keys.lock().expect("poisoned"))
     }
 }
 
