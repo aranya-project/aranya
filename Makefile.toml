@@ -255,5 +255,5 @@ dependencies = ["build-capi-header", "build-capi-lib"]
 [tasks.run-rust-example]
 category = "examples"
 description = "Run Rust example application"
-cwd = "examples/rust"
+cwd = "examples/rust/aranya-example"
 script = "./run.bash"
