@@ -268,12 +268,6 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.38.42 -> 0.38.44"
 
-[[audits.rustls]]
-who = "Ben Zimmerman <bzimmerman@spideroak.com>"
-criteria = "safe-to-deploy"
-version = "0.23.26@git:648a02550dd319360664f9af79862716be2879ff"
-importable = false
-
 [[audits.rustversion]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -343,6 +337,12 @@ version = "0.1.0"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "2.0.90 -> 2.0.99"
+
+[[audits.sysinfo]]
+who = "nikki-aranya <npoelma@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.36.1"
+notes = "This crate does what it says, using a lot of system API calls (some unofficially documented; for example, Windows doesn't publicly provide a way to get info from other processes so it has to use ntapi to use the info that e.g. Task Manager uses), and any weird behavior is documented with a comment for the most part. It's segmented well so only the code for the platform being compiled for gets added, as well as it's easy to track down how exactly a piece of information is getting gathered. This does use a lot of unsafe for the above reason of needing to make a bunch of system API calls, some of which are calling into other languages like Objective-C, but I didn't see anything obviously malicious or incorrect."
 
 [[audits.tempfile]]
 who = "gknopf <gknopf@spideroak.com>"

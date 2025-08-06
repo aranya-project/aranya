@@ -249,7 +249,7 @@ skip = [
     "rand_core@0.5.1",
     "regex-automata@0.1.10",
     "regex-syntax@0.6.29",
-    "socket@0.5.8",
+    "socket2@0.5.8",
     "spin@0.9.8",
     "thiserror-impl@1.0.69",
     "thiserror@1.0.69",
