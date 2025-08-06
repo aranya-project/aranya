@@ -12,7 +12,8 @@ rust-version.workspace = true
 workspace = true
 
 [features]
-default = []
+default = ["tokio"]
+tokio = ["dep:tokio"]
 
 # Enable debugging.
 debug = []
@@ -32,7 +33,7 @@ s2n-quic = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tarpc = { workspace = true }
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"], optional = true }
 tracing = { workspace = true }
 
 [dev-dependencies]

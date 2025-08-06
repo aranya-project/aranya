@@ -22,6 +22,11 @@
     missing_docs
 )]
 
+#[cfg(not(feature = "default"))]
+compile_error!(
+    "'default' feature must be set!"
+);
+
 pub mod aqc;
 pub mod client;
 pub mod config;
