@@ -394,7 +394,7 @@ impl AqcClient {
             .map_err(aranya_error)?;
 
         let mut channels = self.channels.write().expect("poisoned");
-        let channel_id = match psks.clone() {
+        match psks.clone() {
             AqcPsks::Bidi(psks) => {
                 let channel_id = AqcChannelId::Bidi((*psks.channel_id()).into());
                 for (_suite, psk) in psks {
@@ -407,7 +407,6 @@ impl AqcClient {
                         },
                     );
                 }
-                channel_id
             }
             AqcPsks::Uni(psks) => {
                 let channel_id = AqcChannelId::Uni((*psks.channel_id()).into());
@@ -421,10 +420,9 @@ impl AqcClient {
                         },
                     );
                 }
-                channel_id
             }
-        };
-        self.server_keys.load_psks(&channel_id, psks);
+        }
+        self.server_keys.load_psks(psks);
 
         Ok(())
     }

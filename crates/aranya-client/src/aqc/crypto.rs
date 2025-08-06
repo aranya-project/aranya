@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     mem,
     sync::{Arc, LazyLock, Mutex},
 };
@@ -12,9 +12,7 @@ use s2n_quic::provider::tls::rustls::rustls::{
     crypto::{hash::HashAlgorithm, PresharedKey},
     server::SelectsPresharedKeys,
 };
-use tracing::{debug, error};
-
-use crate::aqc::net::{AqcChannelId, PskIdentity};
+use tracing::error;
 
 // Define constant PSK identity and bytes
 pub(super) const PSK_IDENTITY_CTRL: &[u8; 16] = b"aranya-ctrl-psk!"; // 16 bytes
@@ -31,17 +29,13 @@ pub(super) static CTRL_PSK: LazyLock<Arc<PresharedKey>> = LazyLock::new(|| {
 
 #[derive(Debug)]
 pub(crate) struct ServerPresharedKeys {
-    keys: Mutex<HashSet<PskIdAsKey>>,
-    identities: Mutex<HashMap<AqcChannelId, Vec<PskIdentity>>>,
-    channels: Mutex<HashMap<PskIdentity, AqcChannelId>>,
+    keys: Mutex<HashMap<PskIdAsKey, Arc<[Arc<PresharedKey>]>>>,
 }
 
 impl ServerPresharedKeys {
     pub fn new() -> Self {
         Self {
             keys: Mutex::default(),
-            identities: Mutex::default(),
-            channels: Mutex::default(),
         }
     }
 
@@ -49,46 +43,48 @@ impl ServerPresharedKeys {
     pub fn insert(&self, psk: Arc<PresharedKey>) {
         let identity = psk.identity().to_vec();
         let mut keys = self.keys.lock().expect("poisoned");
-        if !keys.insert(PskIdAsKey(psk)) {
+        if keys.insert(PskIdAsKey(psk), [].into()).is_some() {
             error!("Duplicate PSK identity inserted: {:?}", identity);
         }
     }
 
     /// Load AQC channel PSKs into server key store.
-    pub fn load_psks(&self, channel_id: &AqcChannelId, psks: AqcPsks) {
+    pub fn load_psks(&self, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
-        let mut channels = self.channels.lock().expect("poisoned");
-        let mut identities = Vec::new();
-        for (suite, psk) in psks {
-            let identity = psk.identity().as_bytes().to_vec();
-            identities.push(identity.clone());
-            let key = make_preshared_key(suite, psk).expect("can make psk");
-            keys.insert(PskIdAsKey(key));
-            channels.insert(identity, *channel_id);
-        }
-        self.identities
-            .lock()
-            .expect("poisoned")
-            .insert(*channel_id, identities);
+
+        let psks: Vec<Arc<PresharedKey>> = psks
+            .into_iter()
+            .map(|(suite, psk)| make_preshared_key(suite, psk).expect("can make psk"))
+            .collect();
+        psks.iter().for_each(|psk| {
+            keys.insert(PskIdAsKey(psk.clone()), psks.as_slice().into());
+        });
     }
 }
 
 impl SelectsPresharedKeys for ServerPresharedKeys {
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
-        Some(self.keys.lock().expect("poisoned").get(identity)?.0.clone())
+        Some(
+            self.keys
+                .lock()
+                .expect("poisoned")
+                .get_key_value(identity)?
+                .0
+                 .0
+                .clone(),
+        )
     }
 
     fn chosen(&self, identity: &[u8]) {
+        // Don't remove ctrl PSK.
+        if identity == CTRL_PSK.identity() {
+            return;
+        }
+
         let mut keys = self.keys.lock().expect("poisoned");
-        let mut identities = self.identities.lock().expect("poisoned");
-        let mut channels = self.channels.lock().expect("poisoned");
-        if let Some(channel_id) = channels.remove(identity) {
-            if let Some(identities) = identities.remove(&channel_id) {
-                debug!(?channel_id, "removing chosen channel PSKs");
-                identities.iter().for_each(|i| {
-                    keys.remove(i.as_slice());
-                    channels.remove(i.as_slice());
-                });
+        if let Some(psks) = keys.remove(identity) {
+            for psk in psks.iter() {
+                keys.remove(psk.identity());
             }
         }
     }
