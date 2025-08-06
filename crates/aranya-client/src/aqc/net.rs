@@ -401,33 +401,10 @@ impl AqcClient {
             .map_err(aranya_error)?;
 
         let mut channels = self.channels.write().expect("poisoned");
-        match psks.clone() {
-            AqcPsks::Bidi(uni_psks) => {
-                let mut id = None;
-                for (_suite, psk) in uni_psks {
-                    let channel_id = AqcChannelId::Bidi(*psk.identity.channel_id());
-                    if id.is_none() {
-                        self.server_keys.load_psks(&channel_id, psks.clone());
-                        id = Some(channel_id);
-                    }
-                    let identity = psk.identity.as_bytes().to_vec();
-                    channels.insert(
-                        identity,
-                        AqcChannelInfo {
-                            label_id,
-                            channel_id: AqcChannelId::Bidi(*psk.identity.channel_id()),
-                        },
-                    );
-                }
-            }
-            AqcPsks::Uni(bidi_psks) => {
-                let mut id = None;
+        let channel_id = match psks.clone() {
+            AqcPsks::Bidi(bidi_psks) => {
+                let channel_id = AqcChannelId::Bidi((*bidi_psks.channel_id()).into());
                 for (_suite, psk) in bidi_psks {
-                    let channel_id = AqcChannelId::Uni(*psk.identity.channel_id());
-                    if id.is_none() {
-                        self.server_keys.load_psks(&channel_id, psks.clone());
-                        id = Some(channel_id);
-                    }
                     let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
                         identity,
@@ -437,8 +414,24 @@ impl AqcClient {
                         },
                     );
                 }
+                channel_id
             }
-        }
+            AqcPsks::Uni(uni_psks) => {
+                let channel_id = AqcChannelId::Uni((*uni_psks.channel_id()).into());
+                for (_suite, psk) in uni_psks {
+                    let identity = psk.identity.as_bytes().to_vec();
+                    channels.insert(
+                        identity,
+                        AqcChannelInfo {
+                            label_id,
+                            channel_id,
+                        },
+                    );
+                }
+                channel_id
+            }
+        };
+        self.server_keys.load_psks(&channel_id, psks);
 
         Ok(())
     }
