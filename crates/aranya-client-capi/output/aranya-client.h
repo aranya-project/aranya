@@ -200,11 +200,7 @@ enum AranyaError
     /**
      * A connection got unexpectedly closed.
      */
-    ARANYA_ERROR_CONNECTION_CLOSED,
-    /**
-     * A stream got unexpectedly closed.
-     */
-    ARANYA_ERROR_STREAM_CLOSED,
+    ARANYA_ERROR_CLOSED,
     /**
      * Unable to create configuration info.
      */
