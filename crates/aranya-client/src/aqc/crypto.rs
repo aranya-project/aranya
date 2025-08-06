@@ -32,6 +32,7 @@ pub(super) static CTRL_PSK: LazyLock<Arc<PresharedKey>> = LazyLock::new(|| {
 pub(crate) struct ServerPresharedKeys {
     keys: Mutex<HashSet<PskIdAsKey>>,
     identities: Mutex<HashMap<AqcChannelId, Vec<PskIdentity>>>,
+    channels: Mutex<HashMap<PskIdentity, AqcChannelId>>,
 }
 
 impl ServerPresharedKeys {
@@ -39,6 +40,7 @@ impl ServerPresharedKeys {
         Self {
             keys: Mutex::default(),
             identities: Mutex::default(),
+            channels: Mutex::default(),
         }
     }
 
@@ -54,11 +56,14 @@ impl ServerPresharedKeys {
     /// Load AQC channel PSKs into server key store.
     pub fn load_psks(&self, channel_id: &AqcChannelId, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
+        let mut channels = self.channels.lock().expect("poisoned");
         let mut identities = Vec::new();
         for (suite, psk) in psks {
-            identities.push(psk.identity().as_bytes().to_vec());
+            let identity = psk.identity().as_bytes().to_vec();
+            identities.push(identity.clone());
             let key = make_preshared_key(suite, psk).expect("can make psk");
             keys.insert(PskIdAsKey(key));
+            channels.insert(identity, *channel_id);
         }
         self.identities
             .lock()
@@ -73,28 +78,15 @@ impl SelectsPresharedKeys for ServerPresharedKeys {
     }
 
     fn chosen(&self, identity: &[u8]) {
-        // Don't remove ctrl PSK.
-        if identity == CTRL_PSK.identity() {
-            return;
-        }
-
         let mut keys = self.keys.lock().expect("poisoned");
         let mut identities = self.identities.lock().expect("poisoned");
-        let channel_id = {
-            let channel_id = identities.iter().find_map(|(k, v)| {
-                if v.iter().any(|i| *i == identity) {
-                    Some(*k)
-                } else {
-                    None
-                }
-            });
-            channel_id
-        };
-        if let Some(channel_id) = channel_id {
-            debug!(?channel_id, "removing chosen channel PSKs");
-            if let Some(idents) = identities.remove(&channel_id) {
-                idents.iter().for_each(|i| {
+        let mut channels = self.channels.lock().expect("poisoned");
+        if let Some(channel_id) = channels.remove(identity) {
+            if let Some(identities) = identities.remove(&channel_id) {
+                debug!(?channel_id, "removing chosen channel PSKs");
+                identities.iter().for_each(|i| {
                     keys.remove(i.as_slice());
+                    channels.remove(i.as_slice());
                 });
             }
         }
