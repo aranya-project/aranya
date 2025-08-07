@@ -18,12 +18,14 @@ default = []
 debug = []
 
 [dependencies]
-aranya-daemon = { workspace = true }
+aranya-client = { workspace = true }
 aranya-util = { workspace = true }
 
 anyhow = { workspace = true }
+backon = { workspace = true }
 buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
+clap = { workspace = true }
 futures-lite = { workspace = true }
 futures-util = { workspace = true }
 postcard = { workspace = true }
@@ -35,7 +37,6 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
 [dev-dependencies]
-backon = { workspace = true }
 serial_test = { workspace = true }
 test-log = { workspace = true }
 

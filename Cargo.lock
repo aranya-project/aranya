@@ -383,11 +383,12 @@ name = "aranya-example-multi-node"
 version = "1.0.0"
 dependencies = [
  "anyhow",
- "aranya-daemon",
+ "aranya-client",
  "aranya-util",
  "backon",
  "buggy",
  "bytes",
+ "clap",
  "futures-lite",
  "futures-util",
  "postcard",

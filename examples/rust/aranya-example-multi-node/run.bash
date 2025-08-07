@@ -10,8 +10,6 @@ script_dir="$(dirname "$0")"
 pushd "${script_dir}"
 pushd ../../../
 
-current_dir="$(pwd)"
-
 devices=("owner" "admin" "operator" "membera" "memberb")
 
 for device in "${devices[@]}"; do
@@ -29,12 +27,9 @@ cargo build \
     --manifest-path Cargo.toml \
     --bin aranya-daemon
 
-daemon="${current_dir}/target/release/aranya-daemon"
-
 echo "Building aranya-example-multi-node..."
-cargo run \
+ARANYA_EXAMPLE=info cargo run \
     --release \
     --manifest-path Cargo.toml \
     --bin aranya-example-multi-node \
-    --locked \
-    "${daemon}"
+    --locked

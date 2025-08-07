@@ -1,44 +1,58 @@
 use std::{
     env, future,
+    net::Ipv4Addr,
     path::{Path, PathBuf},
-    process::Command,
+    process::{Child, Command},
 };
 
 use anyhow::{Context as _, Result};
+use aranya_example_multi_node::tracing::init_tracing;
+use aranya_util::Addr;
 use tempfile::tempdir;
 use tokio::{
     fs,
     task::{self, JoinSet},
 };
-use tracing::{info, Metadata};
-use tracing_subscriber::{
-    layer::{Context, Filter},
-    prelude::*,
-    EnvFilter,
-};
+use tracing::info;
 
-struct DemoFilter {
-    env_filter: EnvFilter,
-}
-
-impl<S> Filter<S> for DemoFilter {
-    fn enabled(&self, metadata: &Metadata<'_>, context: &Context<'_, S>) -> bool {
-        if metadata.target().starts_with(module_path!()) {
-            true
-        } else {
-            self.env_filter.enabled(metadata, context.clone())
-        }
-    }
+/// An Aranya device.
+struct Device {
+    /// Human-readable name of the Aranya device.
+    name: String,
+    /// Address to host AQC server at.
+    aqc_addr: Addr,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     init_tracing();
 
-    info!("starting aranya-example-multi-node");
+    info!("starting aranya-example-multi-node example");
 
     let tmp = tempdir()?;
-    let devices = ["owner", "admin", "operator", "membera", "memberb"];
+    let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
+    let devices = [
+        Device {
+            name: "owner".into(),
+            aqc_addr: any_addr,
+        },
+        Device {
+            name: "admin".into(),
+            aqc_addr: any_addr,
+        },
+        Device {
+            name: "operator".into(),
+            aqc_addr: any_addr,
+        },
+        Device {
+            name: "membera".into(),
+            aqc_addr: any_addr,
+        },
+        Device {
+            name: "memberb".into(),
+            aqc_addr: any_addr,
+        },
+    ];
 
     let env = env::var("CARGO_WORKSPACE_DIR")
         .expect("expected CARGO_WORKSPACE_DIR env var to be defined");
@@ -46,32 +60,33 @@ async fn main() -> Result<()> {
     let release = workspace.join("target").join("release");
 
     // Start a daemon for each device.
-    for device in devices {
+    for device in &devices {
         // Generate config file.
-        info!("generating daemon config file for {}", device);
-        let cfg = create_config(device.into(), tmp.path().into()).await?;
+        info!("generating daemon config file for {}", device.name);
+        let cfg = create_config(device.name.clone(), tmp.path().into()).await?;
 
         // Start daemon.
-        info!("starting {} daemon", device);
-        let mut daemon = daemon(&release);
+        info!("starting {} daemon", device.name);
+        let mut child = daemon(&release, &cfg).expect("expected to spawn daemon");
         task::spawn(async move {
-            let output = daemon
-                .arg("--config")
-                .arg(cfg)
-                .output()
-                .expect("expected to spawn aranya daemon");
-            info!("{:?}", output);
+            let _ = child.wait();
         });
     }
 
     // Start device for each team member.
     let mut set = JoinSet::new();
-    for device in devices {
-        info!("starting {} client", device);
-        let mut client = client(device.into(), &release);
+    for device in &devices {
+        info!("starting {} client", device.name);
+        let uds_sock = tmp
+            .path()
+            .join(device.name.clone())
+            .join("daemon")
+            .join("run")
+            .join("uds.sock");
+        let mut child = client(&release, device.name.clone(), &uds_sock, device.aqc_addr)
+            .expect("expected to spawn client");
         set.spawn(async move {
-            let output = client.output().expect("expected to spawn aranya client");
-            info!("{:?}", output);
+            let _ = child.wait();
         });
     }
     set.join_all().await;
@@ -116,34 +131,27 @@ async fn create_config(device: String, dir: PathBuf) -> Result<PathBuf> {
                 "#
     );
     fs::write(&cfg, buf).await?;
+    info!("generated config file: {:?}", cfg);
 
     Ok(cfg)
 }
 
-// Initialize tracing.
-fn init_tracing() {
-    let filter = DemoFilter {
-        env_filter: EnvFilter::try_from_env("ARANYA_EXAMPLE")
-            .unwrap_or_else(|_| EnvFilter::new("off")),
-    };
-
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_file(false)
-                .with_target(false)
-                .compact()
-                .with_filter(filter),
-        )
-        .init();
+// Spawn a daemon child process.
+fn daemon(release: &Path, cfg: &Path) -> Result<Child> {
+    let child = Command::new(release.join("aranya-daemon"))
+        .arg("--config")
+        .arg(cfg)
+        .spawn()?;
+    Ok(child)
 }
 
-// Return a daemon command to run.
-fn daemon(release: &Path) -> Command {
-    Command::new(release.join("aranya-daemon"))
-}
-
-// Return a client command to run.
-fn client(device: String, release: &Path) -> Command {
-    Command::new(release.join(format!("aranya-example-multi-node-{:}", device)))
+// Spawn a client child process.
+fn client(release: &Path, device: String, uds_sock: &Path, aqc_addr: Addr) -> Result<Child> {
+    let child = Command::new(release.join(format!("aranya-example-multi-node-{:}", device)))
+        .arg("--uds-sock")
+        .arg(uds_sock)
+        .arg("--aqc-addr")
+        .arg(aqc_addr.to_string())
+        .spawn()?;
+    Ok(child)
 }
