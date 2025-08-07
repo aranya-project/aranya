@@ -8,6 +8,7 @@ use tracing::{debug, instrument};
 
 use super::{net::TryReceiveError, AqcBidiChannel, AqcPeerChannel, AqcSendChannel};
 use crate::{
+    aqc::AqcReceiveChannel,
     error::{aranya_error, no_addr, AqcError, IpcError},
     Client,
 };
@@ -126,35 +127,44 @@ impl<'a> AqcChannels<'a> {
     }
 
     /// Deletes an AQC bidi channel.
-    #[instrument(skip_all, fields(?chan))]
-    pub async fn delete_bidi_channel(&mut self, mut chan: AqcBidiChannel) -> crate::Result<()> {
-        // let _ctrl = self
-        //     .client
-        //     .daemon
-        //     .delete_aqc_bidi_channel(context::current(), chan.aqc_id().into_id().into())
-        //     .await
-        //     .map_err(IpcError::new)?
-        //     .map_err(aranya_error)?;
+    ///
+    /// Zeroizes PSKs associated with the channel.
+    /// Closes all associated QUIC connections and streams.
+    #[instrument(skip_all, fields(aqc_id = %chan.aqc_id(), label = %chan.label_id()))]
+    pub async fn delete_bidi_channel(&mut self, chan: &mut AqcBidiChannel) -> crate::Result<()> {
         chan.close();
         Ok(())
     }
 
-    /// Deletes an AQC uni channel.
-    #[instrument(skip_all, fields(?chan))]
-    pub async fn delete_uni_channel(&mut self, mut chan: AqcSendChannel) -> crate::Result<()> {
-        // let _ctrl = self
-        //     .client
-        //     .daemon
-        //     .delete_aqc_uni_channel(context::current(), chan.aqc_id().into_id().into())
-        //     .await
-        //     .map_err(IpcError::new)?
-        //     .map_err(aranya_error)?;
+    /// Deletes a send AQC uni channel.
+    ///
+    /// Zeroizes PSKs associated with the channel.
+    /// Closes all associated QUIC connections and streams.
+    #[instrument(skip_all, fields(aqc_id = %chan.aqc_id(), label = %chan.label_id()))]
+    pub async fn delete_send_uni_channel(
+        &mut self,
+        chan: &mut AqcSendChannel,
+    ) -> crate::Result<()> {
+        chan.close();
+        Ok(())
+    }
+
+    /// Deletes a receive AQC uni channel.
+    ///
+    /// Zeroizes PSKs associated with the channel.
+    /// Closes all associated QUIC connections and streams.
+    #[instrument(skip_all, fields(aqc_id = %chan.aqc_id(), label = %chan.label_id()))]
+    pub async fn delete_receive_uni_channel(
+        &mut self,
+        chan: &mut AqcReceiveChannel,
+    ) -> crate::Result<()> {
         chan.close();
         Ok(())
     }
 
     /// Waits for a peer to create an AQC channel with this client.
-    pub async fn receive_channel(&mut self) -> crate::Result<AqcPeerChannel> {
+    #[instrument(skip_all)]
+    pub async fn receive_channel(&self) -> crate::Result<AqcPeerChannel> {
         self.client.aqc.receive_channel().await
     }
 
@@ -162,7 +172,8 @@ impl<'a> AqcChannels<'a> {
     ///
     /// If there is no channel available, return Empty.
     /// If the channel is closed, return Closed.
-    pub fn try_receive_channel(&mut self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
+    #[instrument(skip_all)]
+    pub fn try_receive_channel(&self) -> Result<AqcPeerChannel, TryReceiveError<crate::Error>> {
         self.client.aqc.try_receive_channel()
     }
 }

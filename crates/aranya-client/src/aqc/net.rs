@@ -34,7 +34,8 @@ use s2n_quic::{
     Client, Connection, Server,
 };
 use tarpc::context;
-use tracing::{debug, error, warn};
+use tokio::sync::Mutex;
+use tracing::{debug, error, instrument, warn};
 
 use super::crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL};
 use crate::error::{aranya_error, AqcError, IpcError};
@@ -45,24 +46,25 @@ pub mod channels;
 const ALPN_AQC: &[u8] = b"aqc-v1";
 
 /// An AQC client. Used to create and receive channels.
+// TODO: query daemon to see if active AQC channels are invalid. Delete invalid channels.
 #[derive(Debug)]
 pub(crate) struct AqcClient {
     /// Local address of `quic_client`.
     client_addr: SocketAddr,
     /// Quic client state
-    client_state: tokio::sync::Mutex<ClientState>,
+    client_state: Mutex<ClientState>,
 
     /// Local address of `server_state.quic_server`.
     server_addr: SocketAddr,
     /// Quic server state
-    server_state: tokio::sync::Mutex<ServerState>,
+    server_state: Mutex<ServerState>,
     /// Key provider for `quic_server`.
     ///
     /// Inserting to this will add keys which the `server` will accept.
     server_keys: Arc<ServerPresharedKeys>,
 
     /// Map of PSK identity to channel type
-    channels: std::sync::RwLock<HashMap<PskIdentity, AqcChannelInfo>>,
+    channels: Mutex<HashMap<PskIdentity, AqcChannelInfo>>,
 
     daemon: DaemonApiClient,
 }
@@ -78,12 +80,16 @@ struct ClientState {
 }
 
 impl ClientState {
+    /// Establish connection for sending the ctrl message.
+    #[instrument(skip(self))]
     fn connect_ctrl(&mut self, addr: SocketAddr) -> s2n_quic::client::ConnectionAttempt {
         self.client_keys.set_key(CTRL_PSK.clone());
         self.quic_client
             .connect(Connect::new(addr).with_server_name(addr.ip().to_string()))
     }
 
+    /// Establish connection for sending a data message.
+    #[instrument(skip(self, psks))]
     fn connect_data(
         &mut self,
         addr: SocketAddr,
@@ -155,15 +161,15 @@ impl AqcClient {
 
         Ok(AqcClient {
             client_addr,
-            client_state: tokio::sync::Mutex::new(ClientState {
+            client_state: Mutex::new(ClientState {
                 quic_client,
                 client_keys,
             }),
             server_keys,
-            channels: std::sync::RwLock::new(HashMap::new()),
+            channels: Mutex::new(HashMap::new()),
             daemon,
             server_addr,
-            server_state: tokio::sync::Mutex::new(ServerState {
+            server_state: Mutex::new(ServerState {
                 quic_server: server,
             }),
         })
@@ -221,20 +227,21 @@ impl AqcClient {
 
     /// Receive the next available channel.
     pub async fn receive_channel(&self) -> crate::Result<AqcPeerChannel> {
-        let mut server_state = self.server_state.lock().await;
         loop {
+            debug!("accept a new connection");
             // Accept a new connection
-            let mut conn = server_state
-                .quic_server
-                .accept()
-                .await
-                .ok_or(AqcError::ServerConnectionTerminated)?;
+            let mut server_state = self.server_state.lock().await;
+            let Some(mut conn) = server_state.quic_server.accept().await else {
+                return Err(crate::Error::Aqc(AqcError::ServerConnectionTerminated));
+            };
+            debug!("accepted connection");
             // Receive a PSK identity hint.
             let identity = get_conn_identity(&mut conn)?;
             debug!(
                 "Processing connection accepted after seeing PSK identity hint: {:02x?}",
                 identity
             );
+            debug!("received PSK identity hint");
             // If the PSK identity hint is the control PSK, receive a control message.
             // This will update the channel map with the PSK and associate it with an
             // AqcChannel.
@@ -245,14 +252,13 @@ impl AqcClient {
             // If the PSK identity hint is not the control PSK, check if it's in the channel map.
             // If it is, create a channel of the appropriate type. We should have already received
             // the control message for this PSK, if we don't we can't create a channel.
-            let channels = self.channels.read().expect("poisoned");
-            let channel_info = channels.get(&identity).ok_or_else(|| {
-                warn!(
+            let Some(channel_info) = self.channels.lock().await.remove(&identity) else {
+                debug!(
                     "No channel info found in map for identity hint {:02x?}",
                     identity
                 );
-                AqcError::NoChannelInfoFound
-            })?;
+                return Err(crate::Error::Aqc(AqcError::NoChannelInfoFound));
+            };
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
@@ -313,14 +319,15 @@ impl AqcClient {
             // If the PSK identity hint is not the control PSK, check if it's in the channel map.
             // If it is, create a channel of the appropriate type. We should have already received
             // the control message for this PSK, if we don't we can't create a channel.
-            let channels = self.channels.read().expect("poisoned");
-            let channel_info = channels.get(&identity).ok_or_else(|| {
+            let mut channels =
+                futures_lite::future::block_on(async move { self.channels.lock().await });
+            let Some(channel_info) = channels.remove(&identity) else {
                 debug!(
                     "No channel info found in map for identity hint {:02x?}",
                     identity
                 );
-                TryReceiveError::Error(AqcError::NoChannelInfoFound.into())
-            })?;
+                return Err(TryReceiveError::Error(AqcError::NoChannelInfoFound.into()));
+            };
             return Ok(AqcPeerChannel::new(
                 channel_info.label_id,
                 channel_info.channel_id,
@@ -330,6 +337,7 @@ impl AqcClient {
     }
 
     /// Send a control message to the given address.
+    #[instrument(skip(self, ctrl))]
     pub async fn send_ctrl(
         &self,
         addr: SocketAddr,
@@ -356,6 +364,7 @@ impl AqcClient {
         Ok(())
     }
 
+    #[instrument(skip_all)]
     async fn receive_ctrl_message(&self, conn: &mut Connection) -> crate::Result<()> {
         let stream = conn
             .accept_bidirectional_stream()
@@ -385,28 +394,31 @@ impl AqcClient {
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
 
+        let mut channels = self.channels.lock().await;
         self.server_keys.load_psks(psks.clone());
-
-        let mut channels = self.channels.write().expect("poisoned");
         match psks {
             AqcPsks::Bidi(psks) => {
+                let channel_id = AqcChannelId::Bidi((*psks.channel_id()).into());
                 for (_suite, psk) in psks {
+                    let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
-                        psk.identity.as_bytes().to_vec(),
+                        identity,
                         AqcChannelInfo {
                             label_id,
-                            channel_id: AqcChannelId::Bidi(*psk.identity.channel_id()),
+                            channel_id,
                         },
                     );
                 }
             }
             AqcPsks::Uni(psks) => {
+                let channel_id = AqcChannelId::Uni((*psks.channel_id()).into());
                 for (_suite, psk) in psks {
+                    let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
-                        psk.identity.as_bytes().to_vec(),
+                        identity,
                         AqcChannelInfo {
                             label_id,
-                            channel_id: AqcChannelId::Uni(*psk.identity.channel_id()),
+                            channel_id,
                         },
                     );
                 }
