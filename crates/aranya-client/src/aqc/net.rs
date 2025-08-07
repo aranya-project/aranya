@@ -395,10 +395,11 @@ impl AqcClient {
             .map_err(aranya_error)?;
 
         let mut channels = self.channels.lock().await;
-        match &psks {
+        self.server_keys.load_psks(psks.clone());
+        match psks {
             AqcPsks::Bidi(psks) => {
                 let channel_id = AqcChannelId::Bidi((*psks.channel_id()).into());
-                for (_suite, psk) in psks.clone() {
+                for (_suite, psk) in psks {
                     let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
                         identity,
@@ -411,7 +412,7 @@ impl AqcClient {
             }
             AqcPsks::Uni(psks) => {
                 let channel_id = AqcChannelId::Uni((*psks.channel_id()).into());
-                for (_suite, psk) in psks.clone() {
+                for (_suite, psk) in psks {
                     let identity = psk.identity.as_bytes().to_vec();
                     channels.insert(
                         identity,
@@ -423,7 +424,6 @@ impl AqcClient {
                 }
             }
         }
-        self.server_keys.load_psks(psks);
 
         Ok(())
     }
