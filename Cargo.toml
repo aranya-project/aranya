@@ -98,3 +98,26 @@ allow-branch = ["main"]
 shared-version = true
 tag-message = ""
 tag-prefix = ""
+
+# Patch all aranya-core dependencies to use local versions with sync-hello support
+[patch.crates-io]
+aranya-aqc-util = { path = "../aranya-core/crates/aranya-aqc-util" }
+aranya-crypto = { path = "../aranya-core/crates/aranya-crypto" }
+aranya-crypto-ffi = { path = "../aranya-core/crates/aranya-crypto-ffi" }
+aranya-device-ffi = { path = "../aranya-core/crates/aranya-device-ffi" }
+aranya-envelope-ffi = { path = "../aranya-core/crates/aranya-envelope-ffi" }
+aranya-idam-ffi = { path = "../aranya-core/crates/aranya-idam-ffi" }
+aranya-perspective-ffi = { path = "../aranya-core/crates/aranya-perspective-ffi" }
+aranya-policy-ast = { path = "../aranya-core/crates/aranya-policy-ast" }
+aranya-policy-compiler = { path = "../aranya-core/crates/aranya-policy-compiler" }
+aranya-policy-derive = { path = "../aranya-core/crates/aranya-policy-derive" }
+aranya-policy-ifgen = { path = "../aranya-core/crates/aranya-policy-ifgen" }
+aranya-policy-ifgen-build = { path = "../aranya-core/crates/aranya-policy-ifgen-build" }
+aranya-policy-ifgen-macro = { path = "../aranya-core/crates/aranya-policy-ifgen-macro" }
+aranya-policy-lang = { path = "../aranya-core/crates/aranya-policy-lang" }
+aranya-policy-module = { path = "../aranya-core/crates/aranya-policy-module" }
+aranya-policy-text = { path = "../aranya-core/crates/aranya-policy-text" }
+aranya-policy-text-macro = { path = "../aranya-core/crates/aranya-policy-text-macro" }
+aranya-policy-vm = { path = "../aranya-core/crates/aranya-policy-vm" }
+aranya-policy-vm-explorer = { path = "../aranya-core/crates/aranya-policy-vm-explorer" }
+aranya-runtime = { path = "../aranya-core/crates/aranya-runtime" }
