@@ -43,8 +43,9 @@ use crate::{
 
 mod quic_sync;
 
-/// returns first effect matching a particular type.
-/// returns None if there are no matching effects.
+/// Find the first effect matching a given pattern.
+///
+/// Returns `None` if there are no matching effects.
 #[macro_export]
 macro_rules! find_effect {
     ($effects:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {

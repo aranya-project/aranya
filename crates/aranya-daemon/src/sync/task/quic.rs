@@ -370,6 +370,7 @@ impl Syncer<State> {
 }
 
 /// The Aranya QUIC sync server.
+///
 /// Used to listen for incoming `SyncRequests` and respond with `SyncResponse` when they are received.
 #[derive_where(Debug)]
 pub struct Server<EN, SP> {
