@@ -34,6 +34,7 @@ use s2n_quic::{
     Client, Connection, Server,
 };
 use tarpc::context;
+use tokio::sync::Mutex;
 use tracing::{debug, error, instrument, warn};
 
 use super::crypto::{ClientPresharedKeys, ServerPresharedKeys, CTRL_PSK, PSK_IDENTITY_CTRL};
@@ -51,19 +52,19 @@ pub(crate) struct AqcClient {
     /// Local address of `quic_client`.
     client_addr: SocketAddr,
     /// Quic client state
-    client_state: tokio::sync::Mutex<ClientState>,
+    client_state: Mutex<ClientState>,
 
     /// Local address of `server_state.quic_server`.
     server_addr: SocketAddr,
     /// Quic server state
-    server_state: tokio::sync::Mutex<ServerState>,
+    server_state: Mutex<ServerState>,
     /// Key provider for `quic_server`.
     ///
     /// Inserting to this will add keys which the `server` will accept.
     server_keys: Arc<ServerPresharedKeys>,
 
     /// Map of PSK identity to channel type
-    channels: std::sync::RwLock<HashMap<PskIdentity, AqcChannelInfo>>,
+    channels: Mutex<HashMap<PskIdentity, AqcChannelInfo>>,
 
     daemon: DaemonApiClient,
 }
@@ -107,7 +108,7 @@ struct ServerState {
 }
 
 /// Identity of a preshared key.
-pub type PskIdentity = Vec<u8>;
+type PskIdentity = Vec<u8>;
 
 impl AqcClient {
     pub async fn new(server_addr: SocketAddr, daemon: DaemonApiClient) -> Result<Self, AqcError> {
@@ -160,15 +161,15 @@ impl AqcClient {
 
         Ok(AqcClient {
             client_addr,
-            client_state: tokio::sync::Mutex::new(ClientState {
+            client_state: Mutex::new(ClientState {
                 quic_client,
                 client_keys,
             }),
             server_keys,
-            channels: std::sync::RwLock::new(HashMap::new()),
+            channels: Mutex::new(HashMap::new()),
             daemon,
             server_addr,
-            server_state: tokio::sync::Mutex::new(ServerState {
+            server_state: Mutex::new(ServerState {
                 quic_server: server,
             }),
         })
@@ -196,7 +197,7 @@ impl AqcClient {
             .client_state
             .lock()
             .await
-            .connect_data(addr, AqcPsks::Uni(psks.clone()))
+            .connect_data(addr, AqcPsks::Uni(psks))
             .await?;
         conn.keep_alive(true)?;
         Ok(channels::AqcSendChannel::new(
@@ -218,7 +219,7 @@ impl AqcClient {
             .client_state
             .lock()
             .await
-            .connect_data(addr, AqcPsks::Bidi(psks.clone()))
+            .connect_data(addr, AqcPsks::Bidi(psks))
             .await?;
         conn.keep_alive(true)?;
         Ok(channels::AqcBidiChannel::new(label_id, channel_id, conn))
@@ -251,8 +252,7 @@ impl AqcClient {
             // If the PSK identity hint is not the control PSK, check if it's in the channel map.
             // If it is, create a channel of the appropriate type. We should have already received
             // the control message for this PSK, if we don't we can't create a channel.
-            let Some(channel_info) = self.channels.write().expect("poisoned").remove(&identity)
-            else {
+            let Some(channel_info) = self.channels.lock().await.remove(&identity) else {
                 debug!(
                     "No channel info found in map for identity hint {:02x?}",
                     identity
@@ -319,8 +319,9 @@ impl AqcClient {
             // If the PSK identity hint is not the control PSK, check if it's in the channel map.
             // If it is, create a channel of the appropriate type. We should have already received
             // the control message for this PSK, if we don't we can't create a channel.
-            let Some(channel_info) = self.channels.write().expect("poisoned").remove(&identity)
-            else {
+            let mut channels =
+                futures_lite::future::block_on(async move { self.channels.lock().await });
+            let Some(channel_info) = channels.remove(&identity) else {
                 debug!(
                     "No channel info found in map for identity hint {:02x?}",
                     identity
@@ -393,7 +394,7 @@ impl AqcClient {
             .map_err(IpcError::new)?
             .map_err(aranya_error)?;
 
-        let mut channels = self.channels.write().expect("poisoned");
+        let mut channels = self.channels.lock().await;
         match &psks {
             AqcPsks::Bidi(psks) => {
                 let channel_id = AqcChannelId::Bidi((*psks.channel_id()).into());
@@ -449,8 +450,8 @@ struct AqcChannelInfo {
 }
 
 /// An AQC Channel ID.
-#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
-pub enum AqcChannelId {
+#[derive(Copy, Clone, Debug)]
+enum AqcChannelId {
     Bidi(BidiChannelId),
     Uni(UniChannelId),
 }

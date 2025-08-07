@@ -127,6 +127,7 @@ impl<'a> AqcChannels<'a> {
     }
 
     /// Deletes an AQC bidi channel.
+    ///
     /// Zeroizes PSKs associated with the channel.
     /// Closes all associated QUIC connections and streams.
     #[instrument(skip_all, fields(aqc_id = %chan.aqc_id(), label = %chan.label_id()))]
@@ -136,6 +137,7 @@ impl<'a> AqcChannels<'a> {
     }
 
     /// Deletes a send AQC uni channel.
+    ///
     /// Zeroizes PSKs associated with the channel.
     /// Closes all associated QUIC connections and streams.
     #[instrument(skip_all, fields(aqc_id = %chan.aqc_id(), label = %chan.label_id()))]
@@ -148,6 +150,7 @@ impl<'a> AqcChannels<'a> {
     }
 
     /// Deletes a receive AQC uni channel.
+    ///
     /// Zeroizes PSKs associated with the channel.
     /// Closes all associated QUIC connections and streams.
     #[instrument(skip_all, fields(aqc_id = %chan.aqc_id(), label = %chan.label_id()))]

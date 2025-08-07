@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{hash_map::Entry, HashMap},
     mem,
     sync::{Arc, LazyLock, Mutex},
 };
@@ -41,10 +41,15 @@ impl ServerPresharedKeys {
 
     /// Insert PSK into server key store.
     pub fn insert(&self, psk: Arc<PresharedKey>) {
-        let identity = psk.identity().to_vec();
         let mut keys = self.keys.lock().expect("poisoned");
-        if keys.insert(PskIdAsKey(psk), [].into()).is_some() {
-            error!("Duplicate PSK identity inserted: {:?}", identity);
+        match keys.entry(PskIdAsKey(psk)) {
+            Entry::Vacant(v) => {
+                v.insert(Arc::default());
+            }
+            Entry::Occupied(v) => {
+                let identity = v.key().0.identity();
+                error!("Duplicate PSK identity inserted: {:?}", identity);
+            }
         }
     }
 
@@ -52,12 +57,12 @@ impl ServerPresharedKeys {
     pub fn load_psks(&self, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
 
-        let psks: Vec<Arc<PresharedKey>> = psks
+        let psks: Arc<[_]> = psks
             .into_iter()
             .map(|(suite, psk)| make_preshared_key(suite, psk).expect("can make psk"))
             .collect();
         psks.iter().for_each(|psk| {
-            keys.insert(PskIdAsKey(psk.clone()), psks.as_slice().into());
+            keys.insert(PskIdAsKey(psk.clone()), psks.clone());
         });
     }
 }
