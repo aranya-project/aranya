@@ -257,3 +257,9 @@ category = "examples"
 description = "Run Rust example application"
 cwd = "examples/rust/aranya-example"
 script = "./run.bash"
+
+[tasks.run-rust-example-multi-node]
+category = "examples"
+description = "Run Rust example applicationon multiple nodes"
+cwd = "examples/rust/aranya-example-multi-node"
+script = "./run.bash"
