@@ -22,6 +22,7 @@
     missing_docs
 )]
 
+// TODO: https://github.com/aranya-project/aranya/issues/448
 #[cfg(not(feature = "default"))]
 compile_error!("'default' feature must be enabled!");
 

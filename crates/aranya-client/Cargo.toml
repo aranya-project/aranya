@@ -48,5 +48,5 @@ name = "tests"
 path = "tests/tests.rs"
 
 [package.metadata.cargo-all-features]
-# TODO: Remove when enabling the 'default' feature is no longer required
+# TODO: https://github.com/aranya-project/aranya/issues/448
 always_include_features = ["default"]
