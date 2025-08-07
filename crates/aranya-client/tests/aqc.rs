@@ -16,6 +16,7 @@ use futures_util::{future::try_join, FutureExt};
 use crate::common::{sleep, DevicesCtx};
 
 /// Demonstrate nominal usage of AQC channels.
+///
 /// 1. Create bidirectional and unidirectional AQC channels.
 /// 2. Send and receive data via AQC channels.
 /// 3. Delete AQC channels.

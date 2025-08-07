@@ -44,6 +44,7 @@ impl AqcPeerChannel {
 }
 
 /// The sending end of a unidirectional channel.
+///
 /// Allows sending data streams over a channel.
 #[derive(Debug)]
 pub struct AqcSendChannel {
@@ -95,6 +96,7 @@ impl Drop for AqcSendChannel {
 }
 
 /// The receive end of a unidirectional channel.
+///
 /// Allows receiving data streams over a channel.
 #[derive(Debug)]
 pub struct AqcReceiveChannel {
@@ -150,6 +152,7 @@ impl AqcReceiveChannel {
 }
 
 /// A unique channel between two peers.
+///
 /// Allows sending and receiving data streams over a channel.
 #[derive(Debug)]
 pub struct AqcBidiChannel {
