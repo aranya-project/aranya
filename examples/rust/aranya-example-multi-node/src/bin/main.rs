@@ -1,4 +1,8 @@
-use std::{env, future, path::Path, process::Command};
+use std::{
+    env, future,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use anyhow::{Context as _, Result};
 use tempfile::tempdir;
@@ -29,6 +33,95 @@ impl<S> Filter<S> for DemoFilter {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    init_tracing();
+
+    info!("starting aranya-example-multi-node");
+
+    let tmp = tempdir()?;
+    let devices = ["owner", "admin", "operator", "membera", "memberb"];
+
+    let env = env::var("CARGO_WORKSPACE_DIR")
+        .expect("expected CARGO_WORKSPACE_DIR env var to be defined");
+    let workspace = Path::new(&env);
+    let release = workspace.join("target").join("release");
+
+    // Start a daemon for each device.
+    for device in devices {
+        // Generate config file.
+        info!("generating daemon config file for {}", device);
+        let cfg = create_config(device.into(), tmp.path().into()).await?;
+
+        // Start daemon.
+        info!("starting {} daemon", device);
+        let mut daemon = daemon(&release);
+        task::spawn(async move {
+            let output = daemon
+                .arg("--config")
+                .arg(cfg)
+                .output()
+                .expect("expected to spawn aranya daemon");
+            info!("{:?}", output);
+        });
+    }
+
+    // Start device for each team member.
+    let mut set = JoinSet::new();
+    for device in devices {
+        info!("starting {} client", device);
+        let mut client = client(device.into(), &release);
+        set.spawn(async move {
+            let output = client.output().expect("expected to spawn aranya client");
+            info!("{:?}", output);
+        });
+    }
+    set.join_all().await;
+
+    // TODO: rm
+    future::pending().await
+}
+
+// Create a daemon config file.
+async fn create_config(device: String, dir: PathBuf) -> Result<PathBuf> {
+    let device_dir = dir.join(&device);
+    let work_dir = device_dir.join("daemon");
+    fs::create_dir_all(&work_dir).await?;
+
+    let cfg = work_dir.join("config.toml");
+
+    let runtime_dir = work_dir.join("run");
+    let state_dir = work_dir.join("state");
+    let cache_dir = work_dir.join("cache");
+    let logs_dir = work_dir.join("logs");
+    let config_dir = work_dir.join("config");
+    for dir in &[&runtime_dir, &state_dir, &cache_dir, &logs_dir, &config_dir] {
+        fs::create_dir_all(dir)
+            .await
+            .with_context(|| format!("unable to create directory: {}", dir.display()))?;
+    }
+
+    let buf = format!(
+        r#"
+                name = {device:?}
+                runtime_dir = {runtime_dir:?}
+                state_dir = {state_dir:?}
+                cache_dir = {cache_dir:?}
+                logs_dir = {logs_dir:?}
+                config_dir = {config_dir:?}
+
+                aqc.enable = true
+
+                [sync.quic]
+                enable = true
+                addr = "127.0.0.1:0"
+                "#
+    );
+    fs::write(&cfg, buf).await?;
+
+    Ok(cfg)
+}
+
+// Initialize tracing.
+fn init_tracing() {
     let filter = DemoFilter {
         env_filter: EnvFilter::try_from_env("ARANYA_EXAMPLE")
             .unwrap_or_else(|_| EnvFilter::new("off")),
@@ -43,83 +136,14 @@ async fn main() -> Result<()> {
                 .with_filter(filter),
         )
         .init();
+}
 
-    info!("starting aranya-example-multi-node");
+// Return a daemon command to run.
+fn daemon(release: &Path) -> Command {
+    Command::new(release.join("aranya-daemon"))
+}
 
-    let tmp_dir = tempdir()?;
-    let devices = ["owner", "admin", "operator", "membera", "memberb"];
-
-    let env = env::var("CARGO_WORKSPACE_DIR")
-        .expect("expected CARGO_WORKSPACE_DIR env var to be defined");
-    let workspace = Path::new(&env);
-    info!("{:?}", workspace);
-    let release = workspace.join("target").join("release");
-
-    // Start a daemon for each device.
-    for device in devices {
-        // Generate config file
-        let device_dir = tmp_dir.path().join(device);
-        let work_dir = device_dir.join("daemon");
-        fs::create_dir_all(&work_dir).await?;
-
-        let cfg_path = work_dir.join("config.toml");
-
-        let runtime_dir = work_dir.join("run");
-        let state_dir = work_dir.join("state");
-        let cache_dir = work_dir.join("cache");
-        let logs_dir = work_dir.join("logs");
-        let config_dir = work_dir.join("config");
-        for dir in &[&runtime_dir, &state_dir, &cache_dir, &logs_dir, &config_dir] {
-            fs::create_dir_all(dir)
-                .await
-                .with_context(|| format!("unable to create directory: {}", dir.display()))?;
-        }
-
-        let buf = format!(
-            r#"
-                name = {device:?}
-                runtime_dir = {runtime_dir:?}
-                state_dir = {state_dir:?}
-                cache_dir = {cache_dir:?}
-                logs_dir = {logs_dir:?}
-                config_dir = {config_dir:?}
-
-                aqc.enable = true
-
-                [sync.quic]
-                enable = true
-                addr = "127.0.0.1:0"
-                "#
-        );
-        fs::write(&cfg_path, buf).await?;
-
-        // Start daemon
-        let daemon_path = release.join("aranya-daemon");
-        info!("daemon cmd: {:?} --config {:?}", daemon_path, cfg_path);
-        let mut cmd = Command::new(daemon_path);
-        task::spawn(async move {
-            let output = cmd
-                .arg("--config")
-                .arg(cfg_path)
-                .output()
-                .expect("expected to run command");
-            info!("{:?}", output);
-        });
-    }
-
-    // Start device for each team member.
-    let mut set = JoinSet::new();
-    for device in devices {
-        let path = release.join(format!("aranya-example-multi-node-{:}", device));
-        info!("device cmd: {:?}", path);
-        let mut cmd = Command::new(path);
-        set.spawn(async move {
-            let output = cmd.output().expect("expected to run command");
-            info!("{:?}", output);
-        });
-    }
-    set.join_all().await;
-
-    // TODO: rm
-    future::pending().await
+// Return a client command to run.
+fn client(device: String, release: &Path) -> Command {
+    Command::new(release.join(format!("aranya-example-multi-node-{:}", device)))
 }
