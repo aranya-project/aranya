@@ -192,7 +192,7 @@ workspace = true
 script = '''
 cargo clippy
 cargo clippy --all-targets
-cargo clippy --no-default-features
+# cargo clippy --no-default-features (TODO: Uncomment when aranya-client no longer requires the 'default' feature to be enabled) 
 cargo clippy --all-targets --all-features
 '''
 install_crate = { rustup_component_name = "clippy" }

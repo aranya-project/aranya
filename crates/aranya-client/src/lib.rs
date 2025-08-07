@@ -23,9 +23,7 @@
 )]
 
 #[cfg(not(feature = "default"))]
-compile_error!(
-    "'default' feature must be set!"
-);
+compile_error!("'default' feature must be enabled!");
 
 pub mod aqc;
 pub mod client;
