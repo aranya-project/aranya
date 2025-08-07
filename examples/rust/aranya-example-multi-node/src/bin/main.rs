@@ -9,10 +9,15 @@ async fn main() -> Result<()> {
 
     let devices = ["owner", "admin", "operator", "membera", "memberb"];
 
-    let binding = env::var("CARGO_WORKSPACE_DIR")?;
+    let binding = env::var("CARGO_WORKSPACE_DIR")
+        .expect("expected CARGO_WORKSPACE_DIR env var to be defined");
     let workspace = Path::new(&binding);
     println!("{:?}", workspace);
     let release = workspace.join("target").join("release");
+
+    // TODO: start daemons.
+
+    // Start device for each team member.
     let mut set = JoinSet::new();
     for device in devices {
         let path = release.join(format!("aranya-example-multi-node-{:}", device));
