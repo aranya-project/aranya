@@ -15,7 +15,6 @@ use tracing::error;
 
 use crate::imp::{self, aqc::consume_bytes};
 
-/// **
 /// * ─────────────────────── Extended‐error (_ext) Variants ───────────────────────
 /// *
 /// * Functions suffixed with `_ext` accept an extra
@@ -44,7 +43,6 @@ use crate::imp::{self, aqc::consume_bytes};
 /// *         // `buf` now holds the detailed error message
 /// *     }
 /// * ──────────────────────────────────────────────────────────────────────────────
-/// */
 
 /// An error code.
 ///

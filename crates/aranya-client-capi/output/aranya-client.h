@@ -144,15 +144,14 @@ typedef uint8_t AranyaChanOp;
 #endif // __cplusplus
 
 /**
- * **
  * * ─────────────────────── Extended‐error (_ext) Variants ───────────────────────
  * *
  * * Functions suffixed with `_ext` accept an extra
- * * `struct AranyaExtError *ext_err` parameter for detailed diagnostics.
+ * * `struct AranyaExtError *ext_err` parameter for extended error information.
  * *
  * * - `ext_err` must be a valid, non-NULL pointer.
  * * - If the call returns anything other than `ARANYA_ERROR_SUCCESS`,
- * *   `*ext_err` is populated with provider-specific error details.
+ * *   `*ext_err` is populated with additional error details.
  * * - On success, the contents of `ext_err` are undefined.
  * * - To extract a human-readable message:
  * *
@@ -173,7 +172,6 @@ typedef uint8_t AranyaChanOp;
  * *         // `buf` now holds the detailed error message
  * *     }
  * * ──────────────────────────────────────────────────────────────────────────────
- * */
  * An error code.
  *
  * For extended error information, see [`AranyaExtError`](@ref AranyaExtError).
