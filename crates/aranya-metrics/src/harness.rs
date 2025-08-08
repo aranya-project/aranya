@@ -10,7 +10,7 @@
 //! the `sysinfo` crate for disk usage stats.
 //!
 //! [observer problem]: https://w.wiki/Ekxn
-use std::{collections::HashMap, time::Instant};
+use std::{collections::HashMap, fmt, time::Instant};
 
 use anyhow::{anyhow, Result};
 use metrics::{describe_gauge, describe_histogram, gauge, histogram};
@@ -72,6 +72,43 @@ impl Default for ProcessMetrics {
             disk_write_bytes: 0,
             process_count: 1,
         }
+    }
+}
+
+#[allow(clippy::cast_precision_loss)]
+impl fmt::Display for ProcessMetrics {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "User Time: {}ms, System Time: {}ms, Physical Memory: {}, Virtual Memory: {}, Disk Reads: {}, Disk Writes: {}",
+            self.cpu_user_time_us as f64 / 1000.0,
+            self.cpu_system_time_us as f64 / 1000.0,
+            scale_bytes(self.physical_memory_bytes),
+            scale_bytes(self.virtual_memory_bytes),
+            scale_bytes(self.disk_read_bytes),
+            scale_bytes(self.disk_write_bytes)
+        )
+    }
+}
+
+/// Scales up a number of bytes to the nearest unit under 1024.
+#[allow(clippy::cast_precision_loss)]
+fn scale_bytes(bytes: u64) -> String {
+    const UNITS: &[&str] = &["bytes", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB"];
+
+    // We lose precision but for the sizes we care about it's probably fine
+    let mut value = bytes as f64;
+    let mut unit_index = 0;
+
+    while value >= 1024.0 && unit_index < UNITS.len() {
+        value /= 1024.0;
+        unit_index += 1;
+    }
+
+    if unit_index == 0 {
+        format!("{bytes} {}", UNITS[unit_index])
+    } else {
+        format!("{value:.2}{}", UNITS[unit_index])
     }
 }
 
@@ -150,7 +187,7 @@ impl ProcessMetricsCollector {
             disk_write_bytes: self.total_metrics.disk_write_bytes + current.disk_write_bytes,
         };
 
-        debug!("Total Metrics (cumulative): {:?}", self.total_metrics);
+        debug!("Total Metrics: {}", self.total_metrics);
 
         // Push those values to our backend
         self.report_metrics_info()?;
@@ -208,18 +245,14 @@ impl ProcessMetricsCollector {
         metrics.cpu_user_time_us += process_metrics.cpu_user_time_us;
         metrics.cpu_system_time_us += process_metrics.cpu_system_time_us;
         metrics.physical_memory_bytes += process_metrics.physical_memory_bytes;
+        metrics.virtual_memory_bytes = metrics
+            .virtual_memory_bytes
+            .max(process_metrics.virtual_memory_bytes);
         metrics.disk_read_bytes += process_metrics.disk_read_bytes;
         metrics.disk_write_bytes += process_metrics.disk_write_bytes;
 
-        if matches!(self.config.debug_logs, DebugLogType::PerProcess) {
-            debug!(
-                "Process Metrics (last tick) for \"{}\", PID {}: {process_metrics:?}",
-                pid.0, pid.1
-            );
-        }
-
         // Store the latest per-process metrics
-        match self.individual_metrics.entry(pid.1) {
+        let result = match self.individual_metrics.entry(pid.1) {
             Entry::Occupied(mut entry) => {
                 // Update the entries we need to accumulate
                 let stored = entry.get_mut();
@@ -227,11 +260,13 @@ impl ProcessMetricsCollector {
                 process_metrics.disk_read_bytes += stored.disk_read_bytes;
                 process_metrics.disk_write_bytes += stored.disk_write_bytes;
 
-                entry.insert(process_metrics);
+                &mut entry.insert(process_metrics)
             }
-            Entry::Vacant(entry) => {
-                entry.insert(process_metrics);
-            }
+            Entry::Vacant(entry) => entry.insert(process_metrics),
+        };
+
+        if matches!(self.config.debug_logs, DebugLogType::PerProcess) {
+            debug!("Process Metrics for \"{}\": PID {}, {result}", pid.0, pid.1);
         }
 
         Ok(())
