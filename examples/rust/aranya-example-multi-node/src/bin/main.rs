@@ -21,6 +21,8 @@ struct Device {
     name: String,
     /// Address to host AQC server at.
     aqc_addr: Addr,
+    /// Address to host TCP server at.
+    tcp_addr: Addr,
 }
 
 #[tokio::main]
@@ -30,29 +32,36 @@ async fn main() -> Result<()> {
     info!("starting aranya-example-multi-node example");
 
     let tmp = tempdir()?;
-    let any_addr = Addr::from((Ipv4Addr::LOCALHOST, 0));
     let devices = [
         Device {
             name: "owner".into(),
-            aqc_addr: any_addr,
+            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10001)),
+            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10002)),
         },
         Device {
             name: "admin".into(),
-            aqc_addr: any_addr,
+            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10003)),
+            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10004)),
         },
         Device {
             name: "operator".into(),
-            aqc_addr: any_addr,
+            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10005)),
+            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10006)),
         },
         Device {
             name: "membera".into(),
-            aqc_addr: any_addr,
+            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10007)),
+            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10008)),
         },
         Device {
             name: "memberb".into(),
-            aqc_addr: any_addr,
+            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10009)),
+            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10010)),
         },
     ];
+
+    // Set environment variables before spawning child processes.
+    set_env_vars(&devices);
 
     let env = env::var("CARGO_WORKSPACE_DIR")
         .expect("expected CARGO_WORKSPACE_DIR env var to be defined");
@@ -83,8 +92,14 @@ async fn main() -> Result<()> {
             .join("daemon")
             .join("run")
             .join("uds.sock");
-        let mut child = client(&release, device.name.clone(), &uds_sock, device.aqc_addr)
-            .expect("expected to spawn client");
+        let mut child = client(
+            &release,
+            device.name.clone(),
+            &uds_sock,
+            device.aqc_addr,
+            device.tcp_addr,
+        )
+        .expect("expected to spawn client");
         set.spawn(async move {
             let _ = child.wait();
         });
@@ -93,6 +108,21 @@ async fn main() -> Result<()> {
 
     // TODO: rm
     future::pending().await
+}
+
+// Set environment variables for child processes.
+fn set_env_vars(devices: &[Device]) {
+    env::set_var("ARANYA_EXAMPLE", "info");
+    for device in devices {
+        env::set_var(
+            format!("ARANYA_AQC_ADDR_{}", device.name.to_uppercase()),
+            device.aqc_addr.to_string(),
+        );
+        env::set_var(
+            format!("ARANYA_TCP_ADDR_{}", device.name.to_uppercase()),
+            device.tcp_addr.to_string(),
+        );
+    }
 }
 
 // Create a daemon config file.
@@ -146,12 +176,20 @@ fn daemon(release: &Path, cfg: &Path) -> Result<Child> {
 }
 
 // Spawn a client child process.
-fn client(release: &Path, device: String, uds_sock: &Path, aqc_addr: Addr) -> Result<Child> {
+fn client(
+    release: &Path,
+    device: String,
+    uds_sock: &Path,
+    aqc_addr: Addr,
+    tcp_addr: Addr,
+) -> Result<Child> {
     let child = Command::new(release.join(format!("aranya-example-multi-node-{:}", device)))
         .arg("--uds-sock")
         .arg(uds_sock)
         .arg("--aqc-addr")
         .arg(aqc_addr.to_string())
+        .arg("--tcp-addr")
+        .arg(tcp_addr.to_string())
         .spawn()?;
     Ok(child)
 }

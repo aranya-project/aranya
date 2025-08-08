@@ -384,6 +384,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "aranya-client",
+ "aranya-daemon-api",
  "aranya-util",
  "backon",
  "buggy",

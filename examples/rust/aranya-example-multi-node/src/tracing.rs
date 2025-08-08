@@ -22,6 +22,7 @@ impl<S> Filter<S> for DemoFilter {
 
 // Initialize tracing for example executable.
 pub fn init_tracing() {
+    // TODO: prefix or span for each device.
     let filter = DemoFilter {
         env_filter: EnvFilter::try_from_env("ARANYA_EXAMPLE")
             .unwrap_or_else(|_| EnvFilter::new("off")),

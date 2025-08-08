@@ -1,13 +1,15 @@
-use std::{net::Ipv4Addr, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
-use aranya_example_multi_node::tracing::init_tracing;
+use aranya_example_multi_node::{env::EnvVars, tracing::init_tracing};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
+use tokio::{io::AsyncWriteExt, net::TcpStream};
 use tracing::info;
 
+/// CLI args.
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
@@ -16,7 +18,10 @@ struct Args {
     uds_sock: PathBuf,
     /// AQC server address.
     #[arg(long)]
-    aqc_addr: Option<Addr>,
+    aqc_addr: Addr,
+    /// TCP server address for receiving team info from peers.
+    #[arg(long)]
+    tcp_addr: Addr,
 }
 
 #[tokio::main]
@@ -26,17 +31,14 @@ async fn main() -> Result<()> {
 
     // Parse input args.
     let args = Args::parse();
-    let aqc_addr = match args.aqc_addr {
-        Some(aqc_addr) => aqc_addr,
-        None => Addr::from((Ipv4Addr::LOCALHOST, 0)),
-    };
+    let env = EnvVars::load()?;
 
     // Initialize client.
     info!("owner: initializing client");
     let client = (|| {
         Client::builder()
             .daemon_uds_path(&args.uds_sock)
-            .aqc_server_addr(&aqc_addr)
+            .aqc_server_addr(&args.aqc_addr)
             .connect()
     })
     .retry(ExponentialBuilder::default())
@@ -57,11 +59,34 @@ async fn main() -> Result<()> {
             .build()?;
         CreateTeamConfig::builder().quic_sync(qs_cfg).build()?
     };
-    client
+    let team = client
         .create_team(cfg)
         .await
         .expect("expected to create team");
-    info!("owner: created team");
+    let team_id = team.team_id();
+    info!("owner: created team: {}", team_id);
+
+    // Send team ID to admin.
+    info!("owner: sending team ID to admin");
+    let mut stream = (|| TcpStream::connect(env.admin_tcp_addr.to_socket_addrs()))
+        .retry(ExponentialBuilder::default())
+        .await
+        .expect("expected to connect to admin TCP server");
+    let serialized = postcard::to_allocvec(&team_id)?;
+    stream.write_all(&serialized).await?;
+    stream.flush().await?;
+    info!("owner: sent team ID to admin");
+
+    // Send seed IKM to admin.
+    info!("owner: sending seed ikm to admin");
+    let mut stream = (|| TcpStream::connect(env.admin_tcp_addr.to_socket_addrs()))
+        .retry(ExponentialBuilder::default())
+        .await
+        .expect("expected to connect to admin TCP server");
+    let serialized = postcard::to_allocvec(&seed_ikm)?;
+    stream.write_all(&serialized).await?;
+    stream.flush().await?;
+    info!("owner: sent seed ikm to admin");
 
     Ok(())
 }
