@@ -1,12 +1,13 @@
+//! Owner device.
+
 use std::path::PathBuf;
 
 use anyhow::Result;
 use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
-use aranya_example_multi_node::{env::EnvVars, tracing::init_tracing};
+use aranya_example_multi_node::{env::EnvVars, tcp::TcpClient, tracing::init_tracing};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
-use tokio::{io::AsyncWriteExt, net::TcpStream};
 use tracing::info;
 
 /// CLI args.
@@ -66,27 +67,23 @@ async fn main() -> Result<()> {
     let team_id = team.team_id();
     info!("owner: created team: {}", team_id);
 
-    // Send team ID to admin.
-    info!("owner: sending team ID to admin");
-    let mut stream = (|| TcpStream::connect(env.admin_tcp_addr.to_socket_addrs()))
-        .retry(ExponentialBuilder::default())
-        .await
-        .expect("expected to connect to admin TCP server");
-    let serialized = postcard::to_allocvec(&team_id)?;
-    stream.write_all(&serialized).await?;
-    stream.flush().await?;
-    info!("owner: sent team ID to admin");
+    // Send team ID and IKM to each device except for itself.
+    for device in env.devices.get(1..).expect("expected devices") {
+        info!("owner: sending team ID to {}", device.name);
+        TcpClient::connect(device.tcp_addr)
+            .await?
+            .send(&postcard::to_allocvec(&team_id)?)
+            .await?;
+        info!("owner: sent team ID to {}", device.name);
 
-    // Send seed IKM to admin.
-    info!("owner: sending seed ikm to admin");
-    let mut stream = (|| TcpStream::connect(env.admin_tcp_addr.to_socket_addrs()))
-        .retry(ExponentialBuilder::default())
-        .await
-        .expect("expected to connect to admin TCP server");
-    let serialized = postcard::to_allocvec(&seed_ikm)?;
-    stream.write_all(&serialized).await?;
-    stream.flush().await?;
-    info!("owner: sent seed ikm to admin");
+        // Send seed IKM to admin.
+        info!("owner: sending seed ikm to {}", device.name);
+        TcpClient::connect(device.tcp_addr)
+            .await?
+            .send(&postcard::to_allocvec(&seed_ikm)?)
+            .await?;
+        info!("owner: sent seed ikm to {}", device.name);
+    }
 
     Ok(())
 }

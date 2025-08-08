@@ -1,3 +1,5 @@
+//! Multi-node Aranya example written in Rust.
+
 use std::{
     env, future,
     net::Ipv4Addr,

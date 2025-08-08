@@ -1,13 +1,14 @@
+//! Admin device.
+
 use std::path::PathBuf;
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client};
 use aranya_daemon_api::TeamId;
-use aranya_example_multi_node::{env::EnvVars, tracing::init_tracing};
+use aranya_example_multi_node::{env::EnvVars, tcp::TcpServer, tracing::init_tracing};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
-use tokio::{io::AsyncReadExt, net::TcpListener};
 use tracing::info;
 
 #[derive(Debug, Parser)]
@@ -34,7 +35,9 @@ async fn main() -> Result<()> {
     let _env = EnvVars::load()?;
 
     // Start TCP server.
-    let listener = TcpListener::bind(args.tcp_addr.to_socket_addrs()).await?;
+    info!("admin: starting tcp server");
+    let server = TcpServer::bind(args.tcp_addr).await?;
+    info!("admin: started tcp server");
 
     // Initialize client.
     info!("admin: initializing client");
@@ -50,22 +53,11 @@ async fn main() -> Result<()> {
     info!("admin: initialized client");
 
     // Get team ID from owner.
-    let mut buf = Vec::new();
-    let (mut stream, _addr) = listener.accept().await?;
-    let n = stream
-        .read_to_end(&mut buf)
-        .await
-        .expect("expected to read_to_end on tcp stream");
-    let team_id: TeamId = postcard::from_bytes(buf.get(0..n).expect("expected team id"))?;
+    let team_id: TeamId = postcard::from_bytes(&server.recv().await?)?;
     info!("admin: received team ID from owner");
 
     // Get seed IKM from owner.
-    let (mut stream, _addr) = listener.accept().await?;
-    let n = stream
-        .read_to_end(&mut buf)
-        .await
-        .expect("expected to read_to_end on tcp stream");
-    let seed_ikm = postcard::from_bytes(buf.get(0..n).expect("expected seed ikm"))?;
+    let seed_ikm = postcard::from_bytes(&server.recv().await?)?;
     info!("admin: received seed ikm from owner");
 
     // Add team.

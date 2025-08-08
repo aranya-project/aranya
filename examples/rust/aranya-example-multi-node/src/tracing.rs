@@ -1,3 +1,5 @@
+//! Utilities for initializing tracing for the example.
+
 use tracing::Metadata;
 use tracing_subscriber::{
     layer::{Context, Filter},
