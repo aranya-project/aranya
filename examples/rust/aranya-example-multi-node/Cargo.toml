@@ -24,15 +24,11 @@ aranya-util = { workspace = true }
 
 anyhow = { workspace = true }
 backon = { workspace = true }
-buggy = { workspace = true, features = ["std"] }
 bytes = { workspace = true }
 clap = { workspace = true }
-futures-lite = { workspace = true }
-futures-util = { workspace = true }
 postcard = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 tempfile = { workspace = true }
-thiserror = { workspace = true }
 tokio = { workspace = true, features = ["io-util", "macros", "net", "sync"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
