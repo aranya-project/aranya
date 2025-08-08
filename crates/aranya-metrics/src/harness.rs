@@ -80,11 +80,10 @@ impl fmt::Display for ProcessMetrics {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "User Time: {}ms, System Time: {}ms, Physical Memory: {}, Virtual Memory: {}, Disk Reads: {}, Disk Writes: {}",
+            "User Time: {}ms, System Time: {}ms, Physical Memory: {}, Disk Reads: {}, Disk Writes: {}",
             self.cpu_user_time_us as f64 / 1000.0,
             self.cpu_system_time_us as f64 / 1000.0,
             scale_bytes(self.physical_memory_bytes),
-            scale_bytes(self.virtual_memory_bytes),
             scale_bytes(self.disk_read_bytes),
             scale_bytes(self.disk_write_bytes)
         )

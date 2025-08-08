@@ -41,7 +41,7 @@ pub enum DebugLogType {
 #[serde(default)]
 pub struct MetricsConfig {
     /// The method used to export metrics to a remote server.
-    pub mode: MetricsMode,
+    pub exporter: MetricsExporter,
     /// How often to forward data to the remote server. See [`MetricsMode`] for more information.
     pub interval: Duration,
     /// The current job name, used for filtering out metrics to the current run.
@@ -53,20 +53,20 @@ pub struct MetricsConfig {
 impl MetricsConfig {
     /// Sets up the selected exporter using the provided configuration info.
     pub fn install(&self) -> Result<()> {
-        match &self.mode {
+        match &self.exporter {
             #[cfg(feature = "prometheus")]
-            MetricsMode::Prometheus(prometheus) => {
+            MetricsExporter::Prometheus(prometheus) => {
                 prometheus.install(self)?;
             }
             #[cfg(feature = "datadog")]
-            MetricsMode::DataDog(datadog) => {
+            MetricsExporter::DataDog(datadog) => {
                 datadog.install(self)?;
             }
             #[cfg(feature = "tcp")]
-            MetricsMode::TcpServer(tcp) => {
+            MetricsExporter::TcpServer(tcp) => {
                 tcp.install()?;
             }
-            MetricsMode::None => {}
+            MetricsExporter::None => {}
         }
 
         Ok(())
@@ -76,7 +76,7 @@ impl MetricsConfig {
 impl Default for MetricsConfig {
     fn default() -> Self {
         Self {
-            mode: MetricsMode::default(),
+            exporter: MetricsExporter::default(),
             interval: Duration::from_millis(10),
             job_name: format!(
                 "aranya_demo_{}",
@@ -92,7 +92,8 @@ impl Default for MetricsConfig {
 
 /// Defines which remote backend to configure and send metrics to.
 #[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
-pub enum MetricsMode {
+#[serde(tag = "type")]
+pub enum MetricsExporter {
     /// Uses the Prometheus exporter to collect data. Depending on the mode, Prometheus will either
     /// scrape data every [`interval`], or has data pushed to it every [`interval`].
     ///

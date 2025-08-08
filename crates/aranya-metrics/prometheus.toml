@@ -1,5 +1,4 @@
-#interval = "1s"
-#job_name = "this_is_a_test"
 debug_logs = "PerProcess"
 
-[mode.Prometheus]
+[exporter]
+type = "Prometheus"
