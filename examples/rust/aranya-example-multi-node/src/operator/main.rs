@@ -113,15 +113,15 @@ async fn main() -> Result<()> {
     // Get device info from membera and memberb.
     // TODO: get human-readable name from owner or graph.
     let (membera, memberb) = {
-        let device_info1: DeviceInfo = postcard::from_bytes(&server.recv().await?)?;
-        info!("operator: received device info from {}", device_info1.name);
-        let device_info2: DeviceInfo = postcard::from_bytes(&server.recv().await?)?;
-        info!("operator: received device info from {}", device_info2.name);
+        let info1: DeviceInfo = postcard::from_bytes(&server.recv().await?)?;
+        info!("operator: received device info from {}", info1.name);
+        let info2: DeviceInfo = postcard::from_bytes(&server.recv().await?)?;
+        info!("operator: received device info from {}", info2.name);
 
-        if device_info1.name == "membera" {
-            (device_info1.device_id, device_info2.device_id)
+        if info1.name == "membera" {
+            (info1.device_id, info2.device_id)
         } else {
-            (device_info2.device_id, device_info1.device_id)
+            (info2.device_id, info1.device_id)
         }
     };
 
