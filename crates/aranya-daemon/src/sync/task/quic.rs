@@ -75,8 +75,8 @@ struct HelloSubscription {
     subscriber_address: SocketAddr,
     /// The graph ID they're subscribed to
     team_id: GraphId,
-    /// Delay in seconds between notifications to this subscriber
-    delay_seconds: u64,
+    /// Delay in milliseconds between notifications to this subscriber
+    delay_milliseconds: u64,
     /// Last notification time for delay management
     last_notified: Option<Instant>,
 }
@@ -331,6 +331,83 @@ impl Syncer<State> {
         send.close().await.map_err(Error::from)?;
         debug!("sent sync request");
 
+        Ok(())
+    }
+
+    /// Sends a subscribe request to a peer for hello notifications.
+    ///
+    /// This method sends a `SyncHelloType::Subscribe` message to the specified peer,
+    /// requesting to be notified when the peer's graph head changes. The peer will
+    /// send hello notifications with the specified delay between them.
+    ///
+    /// # Arguments
+    /// * `peer` - The network address of the peer to send the subscribe request to
+    /// * `id` - The graph ID for the team/graph to subscribe to
+    /// * `delay_milliseconds` - Delay in milliseconds between notifications (0 = immediate)
+    ///
+    /// # Returns
+    /// * `Ok(())` if the subscribe request was sent successfully
+    /// * `Err(SyncError)` if there was an error connecting or sending the message
+    #[instrument(skip_all)]
+    async fn send_hello_subscribe_request(
+        &mut self,
+        peer: &Addr,
+        id: GraphId,
+        delay_milliseconds: u64,
+    ) -> SyncResult<()> {
+        debug!("client sending subscribe request to QUIC sync server");
+
+        // Create the subscribe message
+        let hello_msg = aranya_runtime::SyncHelloType::Subscribe { delay_milliseconds };
+        let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
+
+        // Serialize the message
+        let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
+
+        // Connect to the peer
+        let stream = self.connect(peer, id).await?;
+        let (_recv, mut send) = stream.split();
+
+        // Send the message
+        send.send(Bytes::from(data)).await.map_err(Error::from)?;
+        send.close().await.map_err(Error::from)?;
+
+        debug!("sent subscribe request");
+        Ok(())
+    }
+
+    /// Sends an unsubscribe request to a peer to stop hello notifications.
+    ///
+    /// This method sends a `SyncHelloType::Unsubscribe` message to the specified peer,
+    /// requesting to stop receiving hello notifications when the peer's graph head changes.
+    ///
+    /// # Arguments
+    /// * `peer` - The network address of the peer to send the unsubscribe request to
+    /// * `id` - The graph ID for the team/graph to unsubscribe from
+    ///
+    /// # Returns
+    /// * `Ok(())` if the unsubscribe request was sent successfully
+    /// * `Err(SyncError)` if there was an error connecting or sending the message
+    #[instrument(skip_all)]
+    async fn send_hello_unsubscribe_request(&mut self, peer: &Addr, id: GraphId) -> SyncResult<()> {
+        debug!("client sending unsubscribe request to QUIC sync server");
+
+        // Create the unsubscribe message
+        let hello_msg = aranya_runtime::SyncHelloType::Unsubscribe;
+        let sync_type: SyncType<Addr> = SyncType::Hello(hello_msg);
+
+        // Serialize the message
+        let data = postcard::to_allocvec(&sync_type).context("postcard serialization failed")?;
+
+        // Connect to the peer
+        let stream = self.connect(peer, id).await?;
+        let (_recv, mut send) = stream.split();
+
+        // Send the message
+        send.send(Bytes::from(data)).await.map_err(Error::from)?;
+        send.close().await.map_err(Error::from)?;
+
+        debug!("sent unsubscribe request");
         Ok(())
     }
 
@@ -724,8 +801,8 @@ where
 
         let graph_id = active_team.into_id().into();
         match hello_msg {
-            SyncHelloType::Subscribe { delay_seconds } => {
-                debug!(delay_seconds, "received Subscribe hello message");
+            SyncHelloType::Subscribe { delay_milliseconds } => {
+                debug!(delay_milliseconds, "received Subscribe hello message");
 
                 // Convert peer_addr to SocketAddr
                 let subscriber_address = match tokio::net::lookup_host(peer_addr.to_socket_addrs())
@@ -743,7 +820,7 @@ where
                 let subscription = HelloSubscription {
                     subscriber_address,
                     team_id: graph_id,
-                    delay_seconds,
+                    delay_milliseconds,
                     last_notified: None,
                 };
 
@@ -755,7 +832,7 @@ where
                 debug!(
                     team_id = ?active_team,
                     ?subscriber_address,
-                    delay_seconds,
+                    delay_milliseconds,
                     "stored hello subscription"
                 );
             }
