@@ -15,6 +15,8 @@ pub struct Device {
     pub aqc_addr: Addr,
     /// TCP address.
     pub tcp_addr: Addr,
+    /// Sync address.
+    pub sync_addr: Addr,
     /// Device's role.
     pub role: Role,
 }
@@ -52,6 +54,7 @@ impl EnvVars {
                 name: device.0.to_string(),
                 aqc_addr: env_var(&format!("ARANYA_AQC_ADDR_{}", device.0.to_uppercase()))?,
                 tcp_addr: env_var(&format!("ARANYA_TCP_ADDR_{}", device.0.to_uppercase()))?,
+                sync_addr: env_var(&format!("ARANYA_SYNC_ADDR_{}", device.0.to_uppercase()))?,
                 role: device.1,
             };
             devices.push(device);

@@ -25,6 +25,8 @@ struct Device {
     aqc_addr: Addr,
     /// Address to host TCP server at.
     tcp_addr: Addr,
+    /// Address to host QUIC sync server at.
+    sync_addr: Addr,
 }
 
 #[tokio::main]
@@ -39,26 +41,31 @@ async fn main() -> Result<()> {
             name: "owner".into(),
             aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10001)),
             tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10002)),
+            sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10003)),
         },
         Device {
             name: "admin".into(),
-            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10003)),
-            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10004)),
+            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10004)),
+            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10005)),
+            sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10006)),
         },
         Device {
             name: "operator".into(),
-            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10005)),
-            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10006)),
+            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10007)),
+            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10008)),
+            sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10009)),
         },
         Device {
             name: "membera".into(),
-            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10007)),
-            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10008)),
+            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10010)),
+            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10011)),
+            sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10012)),
         },
         Device {
             name: "memberb".into(),
-            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10009)),
-            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10010)),
+            aqc_addr: Addr::from((Ipv4Addr::LOCALHOST, 10013)),
+            tcp_addr: Addr::from((Ipv4Addr::LOCALHOST, 10014)),
+            sync_addr: Addr::from((Ipv4Addr::LOCALHOST, 10015)),
         },
     ];
 
@@ -74,7 +81,7 @@ async fn main() -> Result<()> {
     for device in &devices {
         // Generate config file.
         info!("generating daemon config file for {}", device.name);
-        let cfg = create_config(device.name.clone(), tmp.path().into()).await?;
+        let cfg = create_config(device.name.clone(), device.sync_addr, tmp.path().into()).await?;
 
         // Start daemon.
         info!("starting {} daemon", device.name);
@@ -124,11 +131,15 @@ fn set_env_vars(devices: &[Device]) {
             format!("ARANYA_TCP_ADDR_{}", device.name.to_uppercase()),
             device.tcp_addr.to_string(),
         );
+        env::set_var(
+            format!("ARANYA_SYNC_ADDR_{}", device.name.to_uppercase()),
+            device.sync_addr.to_string(),
+        );
     }
 }
 
 // Create a daemon config file.
-async fn create_config(device: String, dir: PathBuf) -> Result<PathBuf> {
+async fn create_config(device: String, sync_addr: Addr, dir: PathBuf) -> Result<PathBuf> {
     let device_dir = dir.join(&device);
     let work_dir = device_dir.join("daemon");
     fs::create_dir_all(&work_dir).await?;
@@ -140,6 +151,7 @@ async fn create_config(device: String, dir: PathBuf) -> Result<PathBuf> {
     let cache_dir = work_dir.join("cache");
     let logs_dir = work_dir.join("logs");
     let config_dir = work_dir.join("config");
+    let sync_addr = sync_addr.to_string();
     for dir in &[&runtime_dir, &state_dir, &cache_dir, &logs_dir, &config_dir] {
         fs::create_dir_all(dir)
             .await
@@ -159,7 +171,7 @@ async fn create_config(device: String, dir: PathBuf) -> Result<PathBuf> {
 
                 [sync.quic]
                 enable = true
-                addr = "127.0.0.1:0"
+                addr = {sync_addr:?}
                 "#
     );
     fs::write(&cfg, buf).await?;

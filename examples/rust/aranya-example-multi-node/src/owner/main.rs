@@ -1,9 +1,9 @@
 //! Owner device.
 
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
-use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
+use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig, SyncPeerConfig};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
 use aranya_example_multi_node::{
     env::EnvVars,
@@ -14,6 +14,9 @@ use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
 use tracing::info;
+
+/// Name of the current Aranya device.
+const DEVICE_NAME: &str = "owner";
 
 /// CLI args.
 #[derive(Debug, Parser)]
@@ -81,7 +84,11 @@ async fn main() -> Result<()> {
     // Receive the device ID and public key bundle from each device.
     // Add each device to the team.
     // Assign the proper role to each device.
-    for device in env.devices.get(1..).expect("expected devices") {
+    for device in &env.devices {
+        if device.name == DEVICE_NAME {
+            continue;
+        }
+
         // Send team ID to device.
         info!("owner: sending team ID to {}", device.name);
         TcpClient::connect(device.tcp_addr)
@@ -100,10 +107,14 @@ async fn main() -> Result<()> {
 
         // Receive device ID from device.
         let id: DeviceId = postcard::from_bytes(&server.recv().await?)?;
+        info!("owner: received device ID from {}", device.name);
 
         // Receive public keys from device.
         let pk: KeyBundle = postcard::from_bytes(&server.recv().await?)?;
+        info!("owner: received public keys from {}", device.name);
+
         team.add_device_to_team(pk).await?;
+        info!("owner: added device to team {}", device.name);
 
         // Devices are assigned the `Role::Member` role by default when added to the team. No need to assign it again.
         if device.role != Role::Member {
@@ -118,6 +129,18 @@ async fn main() -> Result<()> {
                 device.role, device.name
             );
         }
+    }
+
+    // Setup sync peers.
+    let sync_interval = Duration::from_millis(100);
+    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
+    for device in &env.devices {
+        if device.name == DEVICE_NAME {
+            continue;
+        }
+        info!("owner: adding sync peer {}", device.name);
+        team.add_sync_peer(device.sync_addr, sync_cfg.clone())
+            .await?;
     }
 
     Ok(())

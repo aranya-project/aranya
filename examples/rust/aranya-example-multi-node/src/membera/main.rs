@@ -1,9 +1,9 @@
 //! Member A device.
 
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
-use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client};
+use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_daemon_api::TeamId;
 use aranya_example_multi_node::{
     env::EnvVars,
@@ -28,6 +28,9 @@ struct Args {
     #[arg(long)]
     tcp_addr: Addr,
 }
+
+/// Name of the current Aranya device.
+const DEVICE_NAME: &str = "membera";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -74,7 +77,7 @@ async fn main() -> Result<()> {
             .team_id(team_id)
             .build()?
     };
-    let _team = client.add_team(add_team_cfg.clone()).await?;
+    let team = client.add_team(add_team_cfg.clone()).await?;
     info!("membera: added team");
 
     // Send device ID to owner.
@@ -88,6 +91,18 @@ async fn main() -> Result<()> {
         .await?
         .send(&postcard::to_allocvec(&client.get_key_bundle().await?)?)
         .await?;
+
+    // Setup sync peers.
+    let sync_interval = Duration::from_millis(100);
+    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
+    for device in &env.devices {
+        if device.name == DEVICE_NAME {
+            continue;
+        }
+        info!("membera: adding sync peer {}", device.name);
+        team.add_sync_peer(device.sync_addr, sync_cfg.clone())
+            .await?;
+    }
 
     Ok(())
 }
