@@ -48,5 +48,5 @@ name = "tests"
 path = "tests/tests.rs"
 
 [package.metadata.cargo-all-features]
-# TODO: https://github.com/aranya-project/aranya/issues/448
+# TODO: remove in #448
 always_include_features = ["default"]
