@@ -80,7 +80,10 @@ async fn main() -> Result<()> {
             .team_id(team_id)
             .build()?
     };
-    let team = client.add_team(add_team_cfg.clone()).await?;
+    let team = client
+        .add_team(add_team_cfg.clone())
+        .await
+        .expect("expected to add team");
     info!("membera: added team");
 
     // Send device ID to owner.
@@ -105,7 +108,8 @@ async fn main() -> Result<()> {
         }
         info!("membera: adding sync peer {}", device.name);
         team.add_sync_peer(device.sync_addr, sync_cfg.clone())
-            .await?;
+            .await
+            .expect("expected to add sync peer");
     }
 
     // wait for syncing.
@@ -142,16 +146,23 @@ async fn main() -> Result<()> {
             ),
             label.id,
         )
-        .await?;
+        .await
+        .expect("expected to create bidi channel");
 
     // Create stream on bidi channel.
     info!("membera: creating bidi stream");
-    let mut stream = chan.create_bidi_stream().await?;
+    let mut stream = chan
+        .create_bidi_stream()
+        .await
+        .expect("expected to create bidi stream");
 
     // Send data.
     info!("membera: sending AQC data");
     let req = Bytes::from_static(b"hello");
-    stream.send(req.clone()).await?;
+    stream
+        .send(req.clone())
+        .await
+        .expect("expected to send data");
     info!("membera: sent AQC data");
 
     // Receive data.

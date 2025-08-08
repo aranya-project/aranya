@@ -26,7 +26,7 @@ struct Args {
     /// AQC server address.
     #[arg(long)]
     aqc_addr: Addr,
-    /// TCP server address for receiving team info from owner.
+    /// TCP server address for receiving onboarding data from peers.
     #[arg(long)]
     tcp_addr: Addr,
 }
@@ -136,7 +136,8 @@ async fn main() -> Result<()> {
                 .expect("addr is valid text"),
         ),
     )
-    .await?;
+    .await
+    .expect("expected to assign net identifier");
     team.assign_aqc_net_identifier(
         memberb,
         NetIdentifier(
@@ -147,7 +148,8 @@ async fn main() -> Result<()> {
                 .expect("addr is valid text"),
         ),
     )
-    .await?;
+    .await
+    .expect("expected to assign net identifier");
 
     // Create label.
     info!("creating aqc label");

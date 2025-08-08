@@ -123,7 +123,9 @@ async fn main() -> Result<()> {
                 "owner: assigning role {:?} to device {}",
                 device.role, device.name
             );
-            team.assign_role(id, device.role).await?;
+            team.assign_role(id, device.role)
+                .await
+                .expect("expected to assign role");
             info!(
                 "owner: assigned role {:?} to device {}",
                 device.role, device.name
@@ -140,7 +142,8 @@ async fn main() -> Result<()> {
         }
         info!("owner: adding sync peer {}", device.name);
         team.add_sync_peer(device.sync_addr, sync_cfg.clone())
-            .await?;
+            .await
+            .expect("expected to add sync peer");
     }
 
     info!("owner: complete");

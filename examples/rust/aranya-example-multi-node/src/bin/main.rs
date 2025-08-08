@@ -1,7 +1,7 @@
 //! Multi-node Aranya example written in Rust.
 
 use std::{
-    env, future,
+    env,
     net::Ipv4Addr,
     path::{Path, PathBuf},
     process::{Child, Command},
@@ -11,10 +11,7 @@ use anyhow::{Context as _, Result};
 use aranya_example_multi_node::tracing::init_tracing;
 use aranya_util::Addr;
 use tempfile::tempdir;
-use tokio::{
-    fs,
-    task::{self, JoinSet},
-};
+use tokio::{fs, task::JoinSet};
 use tracing::info;
 
 /// An Aranya device.
@@ -36,6 +33,7 @@ async fn main() -> Result<()> {
     info!("starting aranya-example-multi-node example");
 
     let tmp = tempdir()?;
+    // TODO: load this info from config or env file that can be copied onto other machines.
     let devices = [
         Device {
             name: "owner".into(),
@@ -78,17 +76,18 @@ async fn main() -> Result<()> {
     let release = workspace.join("target").join("release");
 
     // Start a daemon for each device.
+    let mut handles = Vec::new();
     for device in &devices {
         // Generate config file.
         info!("generating daemon config file for {}", device.name);
-        let cfg = create_config(device.name.clone(), device.sync_addr, tmp.path().into()).await?;
+        let cfg = create_config(device.name.clone(), device.sync_addr, tmp.path().into())
+            .await
+            .expect("expected to generate daemon config file");
 
         // Start daemon.
         info!("starting {} daemon", device.name);
-        let mut child = daemon(&release, &cfg).expect("expected to spawn daemon");
-        task::spawn(async move {
-            let _ = child.wait();
-        });
+        let child = daemon(&release, &cfg).expect("expected to spawn daemon");
+        handles.push(child);
     }
 
     // Start device for each team member.
@@ -114,9 +113,13 @@ async fn main() -> Result<()> {
         });
     }
     set.join_all().await;
+    for mut handle in handles {
+        let _ = handle.kill();
+    }
 
-    // TODO: rm
-    future::pending().await
+    info!("completed aranya-example-multi-node example");
+
+    Ok(())
 }
 
 // Set environment variables for child processes.

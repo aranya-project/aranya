@@ -82,7 +82,10 @@ async fn main() -> Result<()> {
             .team_id(team_id)
             .build()?
     };
-    let team = client.add_team(add_team_cfg.clone()).await?;
+    let team = client
+        .add_team(add_team_cfg.clone())
+        .await
+        .expect("expected to add team");
     info!("memberb: added team");
 
     // Send device ID to owner.
@@ -107,7 +110,8 @@ async fn main() -> Result<()> {
         }
         info!("memberb: adding sync peer {}", device.name);
         team.add_sync_peer(device.sync_addr, sync_cfg.clone())
-            .await?;
+            .await
+            .expect("expected to add sync peer");
     }
 
     // wait for syncing.
@@ -127,13 +131,22 @@ async fn main() -> Result<()> {
 
     // Receive bidi channel.
     info!("memberb: receiving AQC bidi channel");
-    let AqcPeerChannel::Bidi(mut chan) = client.aqc().receive_channel().await? else {
+    let AqcPeerChannel::Bidi(mut chan) = client
+        .aqc()
+        .receive_channel()
+        .await
+        .expect("expected to receive channel")
+    else {
         bail!("expected a bidirectional channel");
     };
     info!("memberb: received AQC bidi channel");
 
     // Receive bidi steam.
-    let AqcPeerStream::Bidi(mut stream) = chan.receive_stream().await? else {
+    let AqcPeerStream::Bidi(mut stream) = chan
+        .receive_stream()
+        .await
+        .expect("expected to receive stream")
+    else {
         bail!("expected a bidirectional stream");
     };
     info!("memberb: received bidi stream");
@@ -143,7 +156,7 @@ async fn main() -> Result<()> {
     info!("memberb: received AQC data");
 
     // Send data.
-    stream.send(data).await?;
+    stream.send(data).await.expect("expected to send data");
     info!("memberb: sent AQC data");
 
     // wait for membera to receive the data before closing the stream.
