@@ -6,11 +6,11 @@
 //! separate process, it's impossible to fully remove the effect of measuring a process. See the
 //! [observer problem] for more details.
 //!
-//! Specifically, this uses `proc_pidinfo` or `rusage` on MacOS to collect CPU and memory usage,
-//! falling back to the `sysinfo` crate for disk usage stats.
+//! Specifically, this uses `proc_pidinfo` on MacOS to collect CPU and memory usage, falling back to
+//! the `sysinfo` crate for disk usage stats.
 //!
 //! [observer problem]: https://w.wiki/Ekxn
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 use anyhow::{anyhow, Result};
 use metrics::{describe_gauge, describe_histogram, gauge, histogram};
@@ -31,61 +31,48 @@ pub struct ProcessMetricsCollector {
     /// Collection start time for rate calculations
     _start_time: Instant,
     /// Total cumulative metrics for this run
-    total_metrics: AggregatedMetrics,
-    // TODO(nikki): total metrics for each process
+    total_metrics: ProcessMetrics,
+    /// Total cumulative metrics for individual processes
+    individual_metrics: HashMap<u32, ProcessMetrics>,
 }
 
-/// Contains the metrics collected for all processes.
+/// Container struct for collected metrics data
 #[derive(Debug)]
-struct AggregatedMetrics {
-    /// The moment we start collecting metrics, used to calculate the delta of how long it took.
+struct ProcessMetrics {
+    /// Metrics collection start time for calculating deltas.
     timestamp: Instant,
-    /// The total time the CPU spent in userspace.
-    total_cpu_user_time_us: u64,
-    /// The total time the CPU spent processing syscalls.
-    total_cpu_system_time_us: u64,
-    /// The total number of bytes used all processes.
-    total_memory_bytes: u64,
-    /// The total number of bytes read from disk by all processes.
-    total_disk_read_bytes: u64,
-    /// The total number of bytes written to disk by all processes.
-    total_disk_write_bytes: u64,
-
-    // TODO(nikki): hook the TCP/QUIC syncer with a metrics macro.
-    //total_network_rx_bytes: u64,
-    //total_network_tx_bytes: u64,
-    /// The current number of processes we're collecting metrics about.
+    /// The time the CPU spent in userspace.
+    cpu_user_time_us: u64,
+    /// The time the CPU spent processing syscalls.
+    cpu_system_time_us: u64,
+    /// How much physical memory is being used.
+    physical_memory_bytes: u64,
+    /// How much virtual memory is being used.
+    virtual_memory_bytes: u64,
+    /// The amount of data read from disk.
+    disk_read_bytes: u64,
+    /// The amount of data written from disk.
+    disk_write_bytes: u64,
+    /// The number of processes this collection represents.
     process_count: usize,
+    // TODO(nikki): these need to be collected inside aranya-daemon
+    // total_network_rx_bytes: u64,
+    // total_network_tx_bytes: u64,
 }
 
-impl Default for AggregatedMetrics {
+impl Default for ProcessMetrics {
     fn default() -> Self {
         Self {
             timestamp: Instant::now(),
-            total_cpu_user_time_us: 0,
-            total_cpu_system_time_us: 0,
-            total_memory_bytes: 0,
-            total_disk_read_bytes: 0,
-            total_disk_write_bytes: 0,
-            process_count: 0,
+            cpu_user_time_us: 0,
+            cpu_system_time_us: 0,
+            physical_memory_bytes: 0,
+            virtual_memory_bytes: 0,
+            disk_read_bytes: 0,
+            disk_write_bytes: 0,
+            process_count: 1,
         }
     }
-}
-
-/// Contains the metrics collected for a single process.
-#[derive(Debug, Default)]
-#[allow(dead_code)]
-struct SingleProcessMetrics {
-    /// The total time the CPU spent in userspace.
-    cpu_user_time_us: u64,
-    /// The total time the CPU spent processing syscalls.
-    cpu_system_time_us: u64,
-    /// The total number of bytes used.
-    memory_bytes: u64,
-    /// The total number of bytes read from disk.
-    disk_read_bytes: u64,
-    /// The total number of bytes written to disk.
-    disk_write_bytes: u64,
 }
 
 impl ProcessMetricsCollector {
@@ -96,9 +83,10 @@ impl ProcessMetricsCollector {
         Self {
             config,
             pids,
-            system: System::default(),
             _start_time: Instant::now(),
-            total_metrics: AggregatedMetrics::default(),
+            system: System::default(),
+            total_metrics: ProcessMetrics::default(),
+            individual_metrics: HashMap::default(),
         }
     }
 
@@ -114,8 +102,12 @@ impl ProcessMetricsCollector {
             "Total System CPU time consumed by all monitored processes in microseconds"
         );
         describe_gauge!(
-            "memory_total_bytes",
-            "Total memory usage across all monitored processes"
+            "total_memory_usage",
+            "Total amount of memory used by all monitored processes (bytes)"
+        );
+        describe_gauge!(
+            "total_virtual_memory_usage",
+            "Total amount of virtual memory accessible by all monitored processes (bytes)"
         );
         describe_gauge!(
             "disk_read_bytes_total",
@@ -146,17 +138,16 @@ impl ProcessMetricsCollector {
         let current = self.collect_aggregated_metrics()?;
 
         // Calculate our totals
-        self.total_metrics = AggregatedMetrics {
+        self.total_metrics = ProcessMetrics {
             timestamp: current.timestamp,
             process_count: current.process_count,
-            total_cpu_user_time_us: current.total_cpu_user_time_us,
-            total_cpu_system_time_us: current.total_cpu_system_time_us,
-            total_memory_bytes: current.total_memory_bytes,
+            cpu_user_time_us: current.cpu_user_time_us,
+            cpu_system_time_us: current.cpu_system_time_us,
+            physical_memory_bytes: current.physical_memory_bytes,
+            virtual_memory_bytes: current.virtual_memory_bytes,
             // These need to be cumulative since sysinfo only returns bytes since last refresh.
-            total_disk_read_bytes: self.total_metrics.total_disk_read_bytes
-                + current.total_disk_read_bytes,
-            total_disk_write_bytes: self.total_metrics.total_disk_write_bytes
-                + current.total_disk_write_bytes,
+            disk_read_bytes: self.total_metrics.disk_read_bytes + current.disk_read_bytes,
+            disk_write_bytes: self.total_metrics.disk_write_bytes + current.disk_write_bytes,
         };
 
         debug!("Total Metrics (cumulative): {:?}", self.total_metrics);
@@ -173,18 +164,8 @@ impl ProcessMetricsCollector {
     }
 
     /// Collects metrics for all processes and aggregates them.
-    fn collect_aggregated_metrics(&mut self) -> Result<AggregatedMetrics> {
-        let mut metrics = AggregatedMetrics {
-            timestamp: Instant::now(),
-            total_cpu_user_time_us: 0,
-            total_cpu_system_time_us: 0,
-            total_memory_bytes: 0,
-            total_disk_read_bytes: 0,
-            total_disk_write_bytes: 0,
-            //total_network_rx_bytes: 0,
-            //total_network_tx_bytes: 0,
-            process_count: 0,
-        };
+    fn collect_aggregated_metrics(&mut self) -> Result<ProcessMetrics> {
+        let mut metrics = ProcessMetrics::default();
 
         let mut removals = Vec::with_capacity(self.pids.len());
         for (index, &pid) in self.pids.clone().iter().enumerate() {
@@ -210,29 +191,47 @@ impl ProcessMetricsCollector {
     fn collect_process_metrics(
         &mut self,
         pid: (&'static str, u32),
-        metrics: &mut AggregatedMetrics,
+        metrics: &mut ProcessMetrics,
     ) -> Result<()> {
+        use std::collections::hash_map::Entry;
+
         use crate::backend::DebugLogType;
 
         // First, let's collect metrics for the individual process.
-        let mut process_metrics = SingleProcessMetrics::default();
+        let mut process_metrics = ProcessMetrics::default();
 
         // Collect what we can using native syscalls, and fall back to sysinfo for disk stats.
-        self.collect_native_macos_metrics(pid.1, &mut process_metrics)?;
+        self.collect_native_macos_metrics(pid, &mut process_metrics)?;
         self.collect_sysinfo_disk_metrics(pid.1, &mut process_metrics)?;
 
         // Aggregate this process's metrics towards the total.
-        metrics.total_cpu_user_time_us += process_metrics.cpu_user_time_us;
-        metrics.total_cpu_system_time_us += process_metrics.cpu_system_time_us;
-        metrics.total_memory_bytes += process_metrics.memory_bytes;
-        metrics.total_disk_read_bytes += process_metrics.disk_read_bytes;
-        metrics.total_disk_write_bytes += process_metrics.disk_write_bytes;
+        metrics.cpu_user_time_us += process_metrics.cpu_user_time_us;
+        metrics.cpu_system_time_us += process_metrics.cpu_system_time_us;
+        metrics.physical_memory_bytes += process_metrics.physical_memory_bytes;
+        metrics.disk_read_bytes += process_metrics.disk_read_bytes;
+        metrics.disk_write_bytes += process_metrics.disk_write_bytes;
 
         if matches!(self.config.debug_logs, DebugLogType::PerProcess) {
             debug!(
                 "Process Metrics (last tick) for \"{}\", PID {}: {process_metrics:?}",
                 pid.0, pid.1
             );
+        }
+
+        // Store the latest per-process metrics
+        match self.individual_metrics.entry(pid.1) {
+            Entry::Occupied(mut entry) => {
+                // Update the entries we need to accumulate
+                let stored = entry.get_mut();
+                process_metrics.timestamp = stored.timestamp;
+                process_metrics.disk_read_bytes += stored.disk_read_bytes;
+                process_metrics.disk_write_bytes += stored.disk_write_bytes;
+
+                entry.insert(process_metrics);
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(process_metrics);
+            }
         }
 
         Ok(())
@@ -244,7 +243,7 @@ impl ProcessMetricsCollector {
     fn collect_process_metrics(
         &self,
         _pid: (&'static str, u32),
-        _metrics: &mut AggregatedMetrics,
+        _metrics: &mut ProcessMetrics,
     ) -> Result<()> {
         // TODO(nikki): Linux support using /proc/{PID}
         Err(anyhow!(
@@ -257,25 +256,22 @@ impl ProcessMetricsCollector {
     #[cfg(target_os = "macos")]
     fn collect_native_macos_metrics(
         &self,
-        pid: u32,
-        process_metrics: &mut SingleProcessMetrics,
+        pid: (&'static str, u32),
+        process_metrics: &mut ProcessMetrics,
     ) -> Result<()> {
         use std::{io, mem};
         // SAFETY: This has no alignment requirements, so mem::zeroed is safe.
         let mut task_info = unsafe { mem::zeroed::<libc::proc_taskinfo>() };
 
+        // SAFETY: We should have a valid PID and buffer.
         #[allow(clippy::cast_possible_wrap)]
-        let pid = pid as libc::pid_t;
-
-        #[allow(clippy::cast_possible_wrap)]
-        // SAFETY: We should have a valid PID, as well as buffer.
         let result = unsafe {
             libc::proc_pidinfo(
-                pid,
+                pid.1 as _,
                 libc::PROC_PIDTASKINFO,
                 0,
-                &raw mut task_info as *mut libc::c_void,
-                size_of::<libc::proc_taskinfo>() as libc::c_int,
+                &raw mut task_info as _,
+                size_of::<libc::proc_taskinfo>() as _,
             )
         };
 
@@ -289,14 +285,15 @@ impl ProcessMetricsCollector {
 
         #[allow(clippy::cast_sign_loss)]
         if result as usize != size_of::<libc::proc_taskinfo>() {
-            return Err(anyhow!("Unable to obtain `proc_taskinfo` for PID {pid}!"));
+            return Err(anyhow!("Unable to obtain `proc_taskinfo` for {}!", pid.0));
         }
 
         // These are in nanoseconds, convert to microseconds. TODO(nikki): more precision?
         process_metrics.cpu_user_time_us = task_info.pti_total_user / 1000;
         process_metrics.cpu_system_time_us = task_info.pti_total_system / 1000;
 
-        process_metrics.memory_bytes = task_info.pti_resident_size;
+        process_metrics.physical_memory_bytes = task_info.pti_resident_size;
+        process_metrics.virtual_memory_bytes = task_info.pti_virtual_size;
         // TODO(nikki): collect more fields? We can get page faults, syscall counts, and more.
         Ok(())
     }
@@ -306,7 +303,7 @@ impl ProcessMetricsCollector {
     fn collect_sysinfo_disk_metrics(
         &mut self,
         pid: u32,
-        process_metrics: &mut SingleProcessMetrics,
+        process_metrics: &mut ProcessMetrics,
     ) -> Result<()> {
         let pid = Pid::from_u32(pid);
         self.system.refresh_processes_specifics(
@@ -327,18 +324,37 @@ impl ProcessMetricsCollector {
 
     /// Reports metrics to any exporter that may be configured.
     fn report_metrics_info(&self) -> Result<()> {
-        // Update all absolute metrics.
-        // TODO(nikki): add tags for individual PIDs so we can track each daemon?
         let total = &self.total_metrics;
 
+        // Report the overall information
         #[allow(clippy::cast_precision_loss)]
         {
-            gauge!("cpu_user_time_microseconds_total").set(total.total_cpu_user_time_us as f64);
-            gauge!("cpu_system_time_microseconds_total").set(total.total_cpu_system_time_us as f64);
-            gauge!("memory_total_bytes").set(total.total_memory_bytes as f64);
-            gauge!("disk_read_bytes_total").set(total.total_disk_read_bytes as f64);
-            gauge!("disk_write_bytes_total").set(total.total_disk_write_bytes as f64);
+            gauge!("cpu_user_time_microseconds_total").set(total.cpu_user_time_us as f64);
+            gauge!("cpu_system_time_microseconds_total").set(total.cpu_system_time_us as f64);
+            gauge!("total_memory_usage").set(total.physical_memory_bytes as f64);
+            gauge!("total_virtual_memory_usage").set(total.virtual_memory_bytes as f64);
+            gauge!("disk_read_bytes_total").set(total.disk_read_bytes as f64);
+            gauge!("disk_write_bytes_total").set(total.disk_write_bytes as f64);
             gauge!("monitored_processes_count").set(total.process_count as f64);
+        }
+
+        // Report the information for individual processes
+        #[allow(clippy::cast_precision_loss)]
+        for (pid, metrics) in self.individual_metrics.iter() {
+            gauge!("cpu_user_time_microseconds_total", "pid" => format!("{pid}"))
+                .set(metrics.cpu_user_time_us as f64);
+            gauge!("cpu_system_time_microseconds_total", "pid" => format!("{pid}"))
+                .set(metrics.cpu_system_time_us as f64);
+            gauge!("total_memory_usage", "pid" => format!("{pid}"))
+                .set(metrics.physical_memory_bytes as f64);
+            gauge!("total_virtual_memory_usage", "pid" => format!("{pid}"))
+                .set(metrics.virtual_memory_bytes as f64);
+            gauge!("disk_read_bytes_total", "pid" => format!("{pid}"))
+                .set(metrics.disk_read_bytes as f64);
+            gauge!("disk_write_bytes_total", "pid" => format!("{pid}"))
+                .set(metrics.disk_write_bytes as f64);
+            gauge!("monitored_processes_count", "pid" => format!("{pid}"))
+                .set(metrics.process_count as f64);
         }
 
         Ok(())
