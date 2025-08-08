@@ -5,12 +5,12 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context as _, Result, bail};
+use anyhow::{bail, Context as _, Result};
 use aranya_client::{
-    AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig, CreateTeamQuicSyncConfig, Error,
-    SyncPeerConfig, aqc::AqcPeerChannel, client::Client,
+    aqc::AqcPeerChannel, client::Client, AddTeamConfig, AddTeamQuicSyncConfig, CreateTeamConfig,
+    CreateTeamQuicSyncConfig, Error, SyncPeerConfig,
 };
-use aranya_daemon_api::{ChanOp, DeviceId, KeyBundle, NetIdentifier, Role, text};
+use aranya_daemon_api::{text, ChanOp, DeviceId, KeyBundle, NetIdentifier, Role};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use buggy::BugExt;
@@ -22,11 +22,11 @@ use tokio::{
     process::{Child, Command},
     time::sleep,
 };
-use tracing::{Metadata, debug, info};
+use tracing::{debug, info, Metadata};
 use tracing_subscriber::{
-    EnvFilter,
     layer::{Context, Filter},
     prelude::*,
+    EnvFilter,
 };
 
 #[derive(Clone, Debug)]
