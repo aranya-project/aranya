@@ -4,7 +4,12 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
-use aranya_example_multi_node::{env::EnvVars, tcp::TcpClient, tracing::init_tracing};
+use aranya_daemon_api::{DeviceId, KeyBundle, Role};
+use aranya_example_multi_node::{
+    env::EnvVars,
+    tcp::{TcpClient, TcpServer},
+    tracing::init_tracing,
+};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
@@ -33,6 +38,11 @@ async fn main() -> Result<()> {
     // Parse input args.
     let args = Args::parse();
     let env = EnvVars::load()?;
+
+    // Start TCP server.
+    info!("owner: starting tcp server");
+    let server = TcpServer::bind(args.tcp_addr).await?;
+    info!("owner: started tcp server");
 
     // Initialize client.
     info!("owner: initializing client");
@@ -68,7 +78,11 @@ async fn main() -> Result<()> {
     info!("owner: created team: {}", team_id);
 
     // Send team ID and IKM to each device except for itself.
+    // Receive the device ID and public key bundle from each device.
+    // Add each device to the team.
+    // Assign the proper role to each device.
     for device in env.devices.get(1..).expect("expected devices") {
+        // Send team ID to device.
         info!("owner: sending team ID to {}", device.name);
         TcpClient::connect(device.tcp_addr)
             .await?
@@ -76,13 +90,34 @@ async fn main() -> Result<()> {
             .await?;
         info!("owner: sent team ID to {}", device.name);
 
-        // Send seed IKM to admin.
+        // Send seed IKM to device.
         info!("owner: sending seed ikm to {}", device.name);
         TcpClient::connect(device.tcp_addr)
             .await?
             .send(&postcard::to_allocvec(&seed_ikm)?)
             .await?;
         info!("owner: sent seed ikm to {}", device.name);
+
+        // Receive device ID from device.
+        let id: DeviceId = postcard::from_bytes(&server.recv().await?)?;
+
+        // Receive public keys from device.
+        let pk: KeyBundle = postcard::from_bytes(&server.recv().await?)?;
+        team.add_device_to_team(pk).await?;
+
+        // Devices are assigned the `Role::Member` role by default when added to the team. No need to assign it again.
+        if device.role != Role::Member {
+            // Assign role to device.
+            info!(
+                "owner: assigning role {:?} to device {}",
+                device.role, device.name
+            );
+            team.assign_role(id, device.role).await?;
+            info!(
+                "owner: assigned role {:?} to device {}",
+                device.role, device.name
+            );
+        }
     }
 
     Ok(())

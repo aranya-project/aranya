@@ -3,6 +3,7 @@
 use std::str::FromStr;
 
 use anyhow::{Context, Result};
+use aranya_daemon_api::Role;
 use aranya_util::Addr;
 
 /// Aranya device info.
@@ -14,6 +15,8 @@ pub struct Device {
     pub aqc_addr: Addr,
     /// TCP address.
     pub tcp_addr: Addr,
+    /// Device's role.
+    pub role: Role,
 }
 
 /// Environment variables.
@@ -34,15 +37,22 @@ pub struct EnvVars {
 }
 
 impl EnvVars {
-    /// Load environment variables.
+    /// Load device info from environment variables.
     pub fn load() -> Result<Self> {
-        let names = ["owner", "admin", "operator", "membera", "memberb"];
+        let list = [
+            ("owner", Role::Owner),
+            ("admin", Role::Admin),
+            ("operator", Role::Operator),
+            ("membera", Role::Member),
+            ("memberb", Role::Member),
+        ];
         let mut devices = Vec::new();
-        for name in names {
+        for device in list {
             let device = Device {
-                name: name.to_string(),
-                aqc_addr: env_var(&format!("ARANYA_AQC_ADDR_{}", name.to_uppercase()))?,
-                tcp_addr: env_var(&format!("ARANYA_TCP_ADDR_{}", name.to_uppercase()))?,
+                name: device.0.to_string(),
+                aqc_addr: env_var(&format!("ARANYA_AQC_ADDR_{}", device.0.to_uppercase()))?,
+                tcp_addr: env_var(&format!("ARANYA_TCP_ADDR_{}", device.0.to_uppercase()))?,
+                role: device.1,
             };
             devices.push(device);
         }

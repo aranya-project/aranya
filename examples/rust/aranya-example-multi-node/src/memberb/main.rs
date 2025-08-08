@@ -5,7 +5,11 @@ use std::path::PathBuf;
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client};
 use aranya_daemon_api::TeamId;
-use aranya_example_multi_node::{env::EnvVars, tcp::TcpServer, tracing::init_tracing};
+use aranya_example_multi_node::{
+    env::EnvVars,
+    tcp::{TcpClient, TcpServer},
+    tracing::init_tracing,
+};
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
@@ -32,7 +36,7 @@ async fn main() -> Result<()> {
 
     // Parse input args.
     let args = Args::parse();
-    let _env = EnvVars::load()?;
+    let env = EnvVars::load()?;
 
     // Start TCP server.
     info!("memberb: starting tcp server");
@@ -72,6 +76,18 @@ async fn main() -> Result<()> {
     };
     let _team = client.add_team(add_team_cfg.clone()).await?;
     info!("memberb: added team");
+
+    // Send device ID to owner.
+    TcpClient::connect(env.owner.tcp_addr)
+        .await?
+        .send(&postcard::to_allocvec(&client.get_device_id().await?)?)
+        .await?;
+
+    // Send public keys to owner.
+    TcpClient::connect(env.owner.tcp_addr)
+        .await?
+        .send(&postcard::to_allocvec(&client.get_key_bundle().await?)?)
+        .await?;
 
     Ok(())
 }
