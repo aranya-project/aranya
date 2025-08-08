@@ -370,6 +370,31 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    /// Subscribe to hello notifications from a peer.
+    ///
+    /// This will request the peer to send hello notifications when their graph head changes.
+    /// The `delay_milliseconds` parameter specifies the minimum delay between notifications.
+    pub async fn hello_subscribe(&self, addr: Addr, delay_milliseconds: u64) -> Result<()> {
+        self.client
+            .daemon
+            .hello_subscribe(context::current(), addr, self.team_id, delay_milliseconds)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
+    /// Unsubscribe from hello notifications from a peer.
+    ///
+    /// This will stop receiving hello notifications from the specified peer.
+    pub async fn hello_unsubscribe(&self, addr: Addr) -> Result<()> {
+        self.client
+            .daemon
+            .hello_unsubscribe(context::current(), addr, self.team_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Removes a peer from automatic Aranya state syncing.
     pub async fn remove_sync_peer(&self, addr: Addr) -> Result<()> {
         self.client

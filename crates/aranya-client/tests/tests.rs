@@ -461,3 +461,126 @@ async fn test_multi_team_sync() -> Result<()> {
 
     Ok(())
 }
+
+/// Tests hello subscription functionality by demonstrating that devices can subscribe
+/// to and unsubscribe from hello notifications from peers.
+#[test(tokio::test(flavor = "multi_thread"))]
+async fn test_hello_subscription() -> Result<()> {
+    // Set up our team context so we can run the test.
+    let work_dir = tempfile::tempdir()?.path().to_path_buf();
+    let mut devices = DevicesCtx::new("test_hello_subscription", work_dir).await?;
+
+    // Create the initial team, and get our TeamId.
+    let team_id = devices.create_and_add_team().await?;
+
+    // Tell all peers to sync with one another, and assign their roles.
+    devices.add_all_device_roles(team_id).await?;
+
+    // Grab addresses for testing
+    let owner_addr = devices.owner.aranya_local_addr().await?;
+    let admin_addr = devices.admin.aranya_local_addr().await?;
+    let operator_addr = devices.operator.aranya_local_addr().await?;
+
+    // Grab the shorthand for the teams we need to operate on.
+    let owner_team = devices.owner.client.team(team_id);
+    let admin_team = devices.admin.client.team(team_id);
+    let operator_team = devices.operator.client.team(team_id);
+    let membera_team = devices.membera.client.team(team_id);
+
+    info!("testing hello subscription between owner and admin");
+
+    // Admin subscribes to hello notifications from Owner with 1-second delay
+    admin_team.hello_subscribe(owner_addr.into(), 1000).await?;
+    info!("admin subscribed to hello notifications from owner");
+
+    // Owner subscribes to hello notifications from Admin with 500ms delay
+    owner_team.hello_subscribe(admin_addr.into(), 500).await?;
+    info!("owner subscribed to hello notifications from admin");
+
+    // Test that the subscriptions don't interfere with normal operations
+    // Create a label to generate graph changes that might trigger hello notifications
+    let label1 = operator_team
+        .create_label(aranya_daemon_api::text!("hello_test_label"))
+        .await?;
+    info!("created test label to generate graph activity");
+
+    // Wait a bit to allow any hello notifications to be exchanged
+    common::sleep(std::time::Duration::from_millis(1500)).await;
+
+    info!("testing multiple subscriptions");
+
+    // Operator subscribes to both owner and admin
+    operator_team
+        .hello_subscribe(owner_addr.into(), 2000)
+        .await?;
+    operator_team
+        .hello_subscribe(admin_addr.into(), 1500)
+        .await?;
+    info!("operator subscribed to both owner and admin");
+
+    // MemberA subscribes to operator
+    membera_team
+        .hello_subscribe(operator_addr.into(), 800)
+        .await?;
+    info!("membera subscribed to operator");
+
+    // Generate more graph activity
+    operator_team
+        .assign_label(
+            devices.membera.id,
+            label1,
+            aranya_daemon_api::ChanOp::SendRecv,
+        )
+        .await?;
+    info!("assigned label to generate more graph activity");
+
+    // Wait for potential hello notifications
+    common::sleep(std::time::Duration::from_millis(2500)).await;
+
+    info!("testing unsubscribe functionality");
+
+    // Test unsubscribing - should not cause errors
+    admin_team.hello_unsubscribe(owner_addr.into()).await?;
+    info!("admin unsubscribed from owner");
+
+    owner_team.hello_unsubscribe(admin_addr.into()).await?;
+    info!("owner unsubscribed from admin");
+
+    // Test unsubscribing multiple subscriptions
+    operator_team.hello_unsubscribe(owner_addr.into()).await?;
+    operator_team.hello_unsubscribe(admin_addr.into()).await?;
+    info!("operator unsubscribed from owner and admin");
+
+    membera_team.hello_unsubscribe(operator_addr.into()).await?;
+    info!("membera unsubscribed from operator");
+
+    // Test that operations still work after unsubscribing
+    operator_team
+        .revoke_label(devices.membera.id, label1)
+        .await?;
+    info!("revoked test label assignment");
+
+    // Wait a bit to ensure unsubscriptions are processed
+    common::sleep(std::time::Duration::from_millis(500)).await;
+
+    info!("testing edge cases");
+
+    // Test subscribing and immediately unsubscribing
+    admin_team.hello_subscribe(owner_addr.into(), 100).await?;
+    admin_team.hello_unsubscribe(owner_addr.into()).await?;
+    info!("tested immediate subscribe/unsubscribe");
+
+    // Test multiple subscribes to the same peer (should replace previous subscription)
+    owner_team.hello_subscribe(admin_addr.into(), 1000).await?;
+    owner_team.hello_subscribe(admin_addr.into(), 2000).await?; // This should replace the previous one
+    owner_team.hello_unsubscribe(admin_addr.into()).await?;
+    info!("tested multiple subscribes to same peer");
+
+    // Test unsubscribing from non-subscribed peer (should not cause errors)
+    let memberb_addr = devices.memberb.aranya_local_addr().await?;
+    admin_team.hello_unsubscribe(memberb_addr.into()).await?;
+    info!("tested unsubscribing from non-subscribed peer");
+
+    info!("hello subscription test completed successfully");
+    Ok(())
+}

@@ -352,6 +352,37 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
+    async fn hello_subscribe(
+        self,
+        _: context::Context,
+        peer: Addr,
+        team: api::TeamId,
+        delay_milliseconds: u64,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.peers
+            .hello_subscribe(peer, team.into_id().into(), delay_milliseconds)
+            .await?;
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
+    async fn hello_unsubscribe(
+        self,
+        _: context::Context,
+        peer: Addr,
+        team: api::TeamId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.peers
+            .hello_unsubscribe(peer, team.into_id().into())
+            .await?;
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
     async fn remove_sync_peer(
         self,
         _: context::Context,

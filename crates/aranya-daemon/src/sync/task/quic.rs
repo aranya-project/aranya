@@ -174,6 +174,31 @@ impl SyncState for State {
 
         Ok(cmd_count)
     }
+
+    /// Subscribe to hello notifications from a peer.
+    #[instrument(skip_all)]
+    async fn hello_subscribe_impl(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        peer: &Addr,
+        delay_milliseconds: u64,
+    ) -> SyncResult<()> {
+        syncer.state.store.set_team(id.into_id().into());
+        syncer
+            .send_hello_subscribe_request(peer, id, delay_milliseconds)
+            .await
+    }
+
+    /// Unsubscribe from hello notifications from a peer.
+    #[instrument(skip_all)]
+    async fn hello_unsubscribe_impl(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        peer: &Addr,
+    ) -> SyncResult<()> {
+        syncer.state.store.set_team(id.into_id().into());
+        syncer.send_hello_unsubscribe_request(peer, id).await
+    }
 }
 
 impl State {

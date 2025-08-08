@@ -46,6 +46,13 @@ enum Msg {
     RemovePeer {
         peer: SyncPeer,
     },
+    HelloSubscribe {
+        peer: SyncPeer,
+        delay_milliseconds: u64,
+    },
+    HelloUnsubscribe {
+        peer: SyncPeer,
+    },
 }
 type Request = (Msg, oneshot::Sender<Reply>);
 type Reply = SyncResult<()>;
@@ -126,6 +133,27 @@ impl SyncPeers {
         let peer = SyncPeer { addr, graph_id };
         self.send(Msg::SyncNow { peer, cfg }).await
     }
+
+    /// Subscribe to hello notifications from a peer.
+    pub(crate) async fn hello_subscribe(
+        &self,
+        addr: Addr,
+        graph_id: GraphId,
+        delay_milliseconds: u64,
+    ) -> Reply {
+        let peer = SyncPeer { addr, graph_id };
+        self.send(Msg::HelloSubscribe {
+            peer,
+            delay_milliseconds,
+        })
+        .await
+    }
+
+    /// Unsubscribe from hello notifications from a peer.
+    pub(crate) async fn hello_unsubscribe(&self, addr: Addr, graph_id: GraphId) -> Reply {
+        let peer = SyncPeer { addr, graph_id };
+        self.send(Msg::HelloUnsubscribe { peer }).await
+    }
 }
 
 type EffectSender = mpsc::Sender<(GraphId, Vec<EF>)>;
@@ -190,6 +218,21 @@ pub trait SyncState: Sized {
     ) -> impl Future<Output = SyncResult<usize>> + Send
     where
         S: Sink<<crate::EN as Engine>::Effect> + Send;
+
+    /// Subscribe to hello notifications from a peer.
+    fn hello_subscribe_impl(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        peer: &Addr,
+        delay_milliseconds: u64,
+    ) -> impl Future<Output = SyncResult<()>> + Send;
+
+    /// Unsubscribe from hello notifications from a peer.
+    fn hello_unsubscribe_impl(
+        syncer: &mut Syncer<Self>,
+        id: GraphId,
+        peer: &Addr,
+    ) -> impl Future<Output = SyncResult<()>> + Send;
 }
 
 impl<ST> Syncer<ST> {
@@ -243,6 +286,12 @@ impl<ST: SyncState> Syncer<ST> {
                         self.remove_peer(peer);
                         Ok(())
                     }
+                    Msg::HelloSubscribe { peer, delay_milliseconds } => {
+                        self.hello_subscribe(&peer, delay_milliseconds).await
+                    }
+                    Msg::HelloUnsubscribe { peer } => {
+                        self.hello_unsubscribe(&peer).await
+                    }
                 };
                 if let Err(reply) = tx.send(reply) {
                     warn!("syncer operation did not wait for reply");
@@ -293,6 +342,24 @@ impl<ST: SyncState> Syncer<ST> {
             .context("unable to send effects")?;
         trace!(?n, "completed sync");
         Ok(cmd_count)
+    }
+
+    /// Subscribe to hello notifications from a peer.
+    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
+    async fn hello_subscribe(
+        &mut self,
+        peer: &SyncPeer,
+        delay_milliseconds: u64,
+    ) -> SyncResult<()> {
+        trace!("subscribing to hello notifications from peer");
+        ST::hello_subscribe_impl(self, peer.graph_id, &peer.addr, delay_milliseconds).await
+    }
+
+    /// Unsubscribe from hello notifications from a peer.
+    #[instrument(skip_all, fields(peer = %peer.addr, graph = %peer.graph_id))]
+    async fn hello_unsubscribe(&mut self, peer: &SyncPeer) -> SyncResult<()> {
+        trace!("unsubscribing from hello notifications from peer");
+        ST::hello_unsubscribe_impl(self, peer.graph_id, &peer.addr).await
     }
 
     /// Get peer caches.
