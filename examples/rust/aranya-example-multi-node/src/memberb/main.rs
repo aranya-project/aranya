@@ -2,17 +2,22 @@
 
 use std::{path::PathBuf, time::Duration};
 
-use anyhow::Result;
-use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
+use anyhow::{bail, Result};
+use aranya_client::{
+    aqc::{AqcPeerChannel, AqcPeerStream},
+    AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig,
+};
 use aranya_daemon_api::TeamId;
 use aranya_example_multi_node::{
     env::EnvVars,
+    info::DeviceInfo,
     tcp::{TcpClient, TcpServer},
     tracing::init_tracing,
 };
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
+use tokio::time::sleep;
 use tracing::info;
 
 #[derive(Debug, Parser)]
@@ -94,6 +99,7 @@ async fn main() -> Result<()> {
 
     // Setup sync peers.
     let sync_interval = Duration::from_millis(100);
+    let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
     for device in &env.devices {
         if device.name == DEVICE_NAME {
@@ -103,6 +109,47 @@ async fn main() -> Result<()> {
         team.add_sync_peer(device.sync_addr, sync_cfg.clone())
             .await?;
     }
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // Send device info to operator.
+    TcpClient::connect(env.operator.tcp_addr)
+        .await?
+        .send(&postcard::to_allocvec(&DeviceInfo {
+            name: DEVICE_NAME.to_string(),
+            device_id: client.get_device_id().await?,
+        })?)
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // Receive bidi channel.
+    info!("memberb: receiving AQC bidi channel");
+    let AqcPeerChannel::Bidi(mut chan) = client.aqc().receive_channel().await? else {
+        bail!("expected a bidirectional channel");
+    };
+    info!("memberb: received AQC bidi channel");
+
+    // Receive bidi steam.
+    let AqcPeerStream::Bidi(mut stream) = chan.receive_stream().await? else {
+        bail!("expected a bidirectional stream");
+    };
+    info!("memberb: received bidi stream");
+
+    // Receive data.
+    let data = stream.receive().await?.expect("expected to receive data");
+    info!("memberb: received AQC data");
+
+    // Send data.
+    stream.send(data).await?;
+    info!("memberb: sent AQC data");
+
+    // wait for membera to receive the data before closing the stream.
+    sleep(sleep_interval).await;
+
+    info!("memberb: complete");
 
     Ok(())
 }

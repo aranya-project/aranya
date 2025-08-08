@@ -4,15 +4,17 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
-use aranya_daemon_api::TeamId;
+use aranya_daemon_api::{text, ChanOp, NetIdentifier, TeamId};
 use aranya_example_multi_node::{
     env::EnvVars,
+    info::DeviceInfo,
     tcp::{TcpClient, TcpServer},
     tracing::init_tracing,
 };
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
+use tokio::time::sleep;
 use tracing::info;
 
 #[derive(Debug, Parser)]
@@ -94,6 +96,7 @@ async fn main() -> Result<()> {
 
     // Setup sync peers.
     let sync_interval = Duration::from_millis(100);
+    let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
     for device in &env.devices {
         if device.name == DEVICE_NAME {
@@ -103,6 +106,61 @@ async fn main() -> Result<()> {
         team.add_sync_peer(device.sync_addr, sync_cfg.clone())
             .await?;
     }
+
+    // Wait to sync effects.
+    sleep(sleep_interval).await;
+
+    // Get device info from membera and memberb.
+    // TODO: get human-readable name from owner or graph.
+    let (membera, memberb) = {
+        let device_info1: DeviceInfo = postcard::from_bytes(&server.recv().await?)?;
+        info!("operator: received device info from {}", device_info1.name);
+        let device_info2: DeviceInfo = postcard::from_bytes(&server.recv().await?)?;
+        info!("operator: received device info from {}", device_info2.name);
+
+        if device_info1.name == "membera" {
+            (device_info1.device_id, device_info2.device_id)
+        } else {
+            (device_info2.device_id, device_info1.device_id)
+        }
+    };
+
+    // Assign network identifiers for AQC.
+    team.assign_aqc_net_identifier(
+        membera,
+        NetIdentifier(
+            env.membera
+                .aqc_addr
+                .to_string()
+                .try_into()
+                .expect("addr is valid text"),
+        ),
+    )
+    .await?;
+    team.assign_aqc_net_identifier(
+        memberb,
+        NetIdentifier(
+            env.memberb
+                .aqc_addr
+                .to_string()
+                .try_into()
+                .expect("addr is valid text"),
+        ),
+    )
+    .await?;
+
+    // Create label.
+    info!("creating aqc label");
+    let label1 = team.create_label(text!("label1")).await?;
+
+    // Assign label to members.
+    let op = ChanOp::SendRecv;
+    info!("operator: assigning label to membera");
+    team.assign_label(membera, label1, op).await?;
+    info!("operator assigning label to memberb");
+    team.assign_label(memberb, label1, op).await?;
+
+    info!("operator: complete");
 
     Ok(())
 }

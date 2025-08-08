@@ -143,5 +143,7 @@ async fn main() -> Result<()> {
             .await?;
     }
 
+    info!("owner: complete");
+
     Ok(())
 }

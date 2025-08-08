@@ -104,5 +104,7 @@ async fn main() -> Result<()> {
             .await?;
     }
 
+    info!("admin: complete");
+
     Ok(())
 }

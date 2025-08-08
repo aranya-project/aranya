@@ -4,15 +4,18 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
-use aranya_daemon_api::TeamId;
+use aranya_daemon_api::{NetIdentifier, TeamId};
 use aranya_example_multi_node::{
     env::EnvVars,
+    info::DeviceInfo,
     tcp::{TcpClient, TcpServer},
     tracing::init_tracing,
 };
 use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
+use bytes::Bytes;
 use clap::Parser;
+use tokio::time::sleep;
 use tracing::info;
 
 #[derive(Debug, Parser)]
@@ -94,6 +97,7 @@ async fn main() -> Result<()> {
 
     // Setup sync peers.
     let sync_interval = Duration::from_millis(100);
+    let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
     for device in &env.devices {
         if device.name == DEVICE_NAME {
@@ -103,6 +107,60 @@ async fn main() -> Result<()> {
         team.add_sync_peer(device.sync_addr, sync_cfg.clone())
             .await?;
     }
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // Send device info to operator.
+    TcpClient::connect(env.operator.tcp_addr)
+        .await?
+        .send(&postcard::to_allocvec(&DeviceInfo {
+            name: DEVICE_NAME.to_string(),
+            device_id: client.get_device_id().await?,
+        })?)
+        .await?;
+
+    // wait for syncing.
+    sleep(sleep_interval).await;
+
+    // Create a bidi AQC channel.
+    info!("membera: creating bidi channel");
+    let queries = team.queries();
+    // Note: assumes there is only 1 label on the team.
+    let labels = queries.labels().await?;
+    let label = labels.iter().next().expect("expected label");
+    let mut chan = client
+        .aqc()
+        .create_bidi_channel(
+            team_id,
+            NetIdentifier(
+                env.memberb
+                    .aqc_addr
+                    .to_string()
+                    .try_into()
+                    .expect("addr is valid text"),
+            ),
+            label.id,
+        )
+        .await?;
+
+    // Create stream on bidi channel.
+    info!("membera: creating bidi stream");
+    let mut stream = chan.create_bidi_stream().await?;
+
+    // Send data.
+    info!("membera: sending AQC data");
+    let req = Bytes::from_static(b"hello");
+    stream.send(req.clone()).await?;
+    info!("membera: sent AQC data");
+
+    // Receive data.
+    info!("membera: receiving AQC data");
+    let resp = stream.receive().await?.expect("expected to receive data");
+    assert_eq!(req, resp);
+    info!("membera: received AQC data");
+
+    info!("membera: complete");
 
     Ok(())
 }
