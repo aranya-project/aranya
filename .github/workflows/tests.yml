@@ -71,3 +71,20 @@ jobs:
       - name: Rust Example Application
         run: |
           cargo make run-rust-example
+
+  rust-example-application-multi-node:
+    strategy:
+      matrix:
+        runner:
+          - ubuntu-latest
+          - ubuntu2404-arm64-4core
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup
+
+      - name: Rust Multi-node Example Application
+        run: |
+          cargo make run-rust-example-multi-node
