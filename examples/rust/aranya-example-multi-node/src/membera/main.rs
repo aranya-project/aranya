@@ -143,15 +143,10 @@ async fn run(uds_sock: &Path, env: &EnvVars) -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
-    for device in &env.devices {
-        if device.name == DEVICE_NAME {
-            continue;
-        }
-        info!("membera: adding sync peer {}", device.name);
-        team.add_sync_peer(device.sync_addr, sync_cfg.clone())
-            .await
-            .expect("expected to add sync peer");
-    }
+    info!("membera: adding operator sync peer");
+    team.add_sync_peer(env.operator.sync_addr, sync_cfg.clone())
+        .await
+        .expect("expected to add sync peer");
 
     // wait for syncing.
     sleep(sleep_interval).await;
@@ -167,6 +162,9 @@ async fn run(uds_sock: &Path, env: &EnvVars) -> Result<()> {
 
     // wait for syncing.
     sleep(sleep_interval).await;
+
+    // Remove operator sync peer.
+    team.remove_sync_peer(env.operator.sync_addr).await?;
 
     // Query the AQC label.
     let queries = team.queries();

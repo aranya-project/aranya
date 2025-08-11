@@ -7,7 +7,7 @@ use std::{
 };
 
 use anyhow::Result;
-use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig, SyncPeerConfig};
+use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
 use aranya_example_multi_node::{
     config::create_config,
@@ -174,23 +174,9 @@ async fn run(uds_sock: &Path, env: &EnvVars) -> Result<()> {
         }
     }
 
-    // Setup sync peers.
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
-    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
-    for device in &env.devices {
-        if device.name == DEVICE_NAME {
-            continue;
-        }
-        info!("owner: adding sync peer {}", device.name);
-        team.add_sync_peer(device.sync_addr, sync_cfg.clone())
-            .await
-            .expect("expected to add sync peer");
-    }
-
-    // TODO: need to keep owner daemon running so member syncs with operator don't get blocked on timed out sync requests.
-    // Wait for syncing.
-    sleep(10 * sleep_interval).await;
+    sleep(sleep_interval).await;
 
     info!("owner: complete");
 

@@ -138,18 +138,17 @@ async fn run(uds_sock: &Path, env: &EnvVars) -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
-    for device in &env.devices {
-        if device.name == DEVICE_NAME {
-            continue;
-        }
-        info!("admin: adding sync peer {}", device.name);
-        team.add_sync_peer(device.sync_addr, sync_cfg.clone())
-            .await?;
-    }
 
-    // TODO: need to keep admin daemon running so member syncs with operator don't get blocked on timed out sync requests.
+    info!("admin: adding owner sync peer");
+    team.add_sync_peer(env.owner.sync_addr, sync_cfg.clone())
+        .await?;
+
     // Wait for syncing.
-    sleep(10 * sleep_interval).await;
+    sleep(sleep_interval).await;
+
+    // Remove owner sync peer.
+    info!("admin: removing owner sync peer");
+    team.remove_sync_peer(env.owner.sync_addr).await?;
 
     info!("admin: complete");
 

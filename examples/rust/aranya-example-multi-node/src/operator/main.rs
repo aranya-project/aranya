@@ -139,17 +139,16 @@ async fn run(uds_sock: &Path, env: &EnvVars) -> Result<()> {
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
-    for device in &env.devices {
-        if device.name == DEVICE_NAME {
-            continue;
-        }
-        info!("operator: adding sync peer {}", device.name);
-        team.add_sync_peer(device.sync_addr, sync_cfg.clone())
-            .await?;
-    }
+    info!("operator: adding admin sync peer");
+    team.add_sync_peer(env.admin.sync_addr, sync_cfg.clone())
+        .await?;
 
     // Wait to sync effects.
     sleep(sleep_interval).await;
+
+    // Remove admin sync peer.
+    info!("operator: removing admin sync peer");
+    team.remove_sync_peer(env.admin.sync_addr).await?;
 
     // Get device info from membera and memberb.
     // TODO: get human-readable name from owner or graph.
@@ -204,7 +203,7 @@ async fn run(uds_sock: &Path, env: &EnvVars) -> Result<()> {
     team.assign_label(memberb, label1, op).await?;
 
     // Allow peers to sync with added label commands.
-    sleep(3 * sleep_interval).await;
+    sleep(sleep_interval).await;
 
     info!("operator: complete");
 
