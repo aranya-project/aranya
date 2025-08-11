@@ -144,34 +144,6 @@ typedef uint8_t AranyaChanOp;
 #endif // __cplusplus
 
 /**
- * * ─────────────────────── Extended‐error (_ext) Variants ───────────────────────
- * *
- * * Functions suffixed with `_ext` accept an extra
- * * `struct AranyaExtError *ext_err` parameter for extended error information.
- * *
- * * - `ext_err` must be a valid, non-NULL pointer.
- * * - If the call returns anything other than `ARANYA_ERROR_SUCCESS`,
- * *   `*ext_err` is populated with additional error details.
- * * - On success, the contents of `ext_err` are undefined.
- * * - To extract a human-readable message:
- * *
- * *       AranyaError aranya_ext_error_msg(
- * *           const struct AranyaExtError *err,
- * *           char *msg,
- * *           size_t *msg_len
- * *       );
- * *
- * * Example:
- * *     struct AranyaExtError ext_err;
- * *     AranyaError rc = aranya_get_device_id_ext(client, &id, &ext_err);
- * *     if (rc != ARANYA_ERROR_SUCCESS) {
- * *         size_t len = 0;
- * *         aranya_ext_error_msg(&ext_err, NULL, &len);
- * *         char *buf = malloc(len);
- * *         aranya_ext_error_msg(&ext_err, buf, &len);
- * *         // `buf` now holds the detailed error message
- * *     }
- * * ──────────────────────────────────────────────────────────────────────────────
  * An error code.
  *
  * For extended error information, see [`AranyaExtError`](@ref AranyaExtError).
@@ -276,6 +248,34 @@ typedef uint8_t AranyaRole;
 #endif // __cplusplus
 
 /**
+ * * ─────────────────────── Extended‐error (_ext) Variants ───────────────────────
+ * *
+ * * Functions suffixed with `_ext` accept an extra
+ * * `struct AranyaExtError *ext_err` parameter for extended error information.
+ * *
+ * * - `ext_err` must be a valid, non-NULL pointer.
+ * * - If the call returns anything other than `ARANYA_ERROR_SUCCESS`,
+ * *   `*ext_err` is populated with additional error details.
+ * * - On success, the contents of `ext_err` are undefined.
+ * * - To extract a human-readable message:
+ * *
+ * *       AranyaError aranya_ext_error_msg(
+ * *           const struct AranyaExtError *err,
+ * *           char *msg,
+ * *           size_t *msg_len
+ * *       );
+ * *
+ * * Example:
+ * *     struct AranyaExtError ext_err;
+ * *     AranyaError rc = aranya_get_device_id_ext(client, &id, &ext_err);
+ * *     if (rc != ARANYA_ERROR_SUCCESS) {
+ * *         size_t len = 0;
+ * *         aranya_ext_error_msg(&ext_err, NULL, &len);
+ * *         char *buf = malloc(len);
+ * *         aranya_ext_error_msg(&ext_err, buf, &len);
+ * *         // `buf` now holds the detailed error message
+ * *     }
+ * * ──────────────────────────────────────────────────────────────────────────────
  * Extended error information.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaExtError {
