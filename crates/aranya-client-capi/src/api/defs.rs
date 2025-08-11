@@ -85,7 +85,6 @@ pub enum Error {
 
 impl From<&imp::Error> for Error {
     fn from(err: &imp::Error) -> Self {
-        error!(error = %err.report(), "Aranya client C API error");
         match err {
             imp::Error::Bug(_) => Self::Bug,
             imp::Error::Timeout(_) => Self::Timeout,
