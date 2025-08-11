@@ -66,7 +66,7 @@ async fn main() -> Result<()> {
         .join("run")
         .join("uds.sock");
     // Wait for daemon to start.
-    sleep(Duration::from_secs(1)).await;
+    sleep(Duration::from_secs(2)).await;
     info!("admin: started daemon");
 
     if let Err(e) = run(&uds_sock, &env).await {
