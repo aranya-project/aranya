@@ -42,7 +42,7 @@ pub enum DebugLogType {
 pub struct MetricsConfig {
     /// The method used to export metrics to a remote server.
     pub exporter: MetricsExporter,
-    /// How often to forward data to the remote server. See [`MetricsMode`] for more information.
+    /// How often to forward data to the remote server. See [`MetricsExporter`] for more info.
     pub interval: Duration,
     /// The current job name, used for filtering out metrics to the current run.
     pub job_name: String,

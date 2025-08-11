@@ -10,14 +10,50 @@
 //! the `sysinfo` crate for disk usage stats.
 //!
 //! [observer problem]: https://w.wiki/Ekxn
-use std::{collections::HashMap, fmt, time::Instant};
+use std::{collections::HashMap, fmt, ops::Deref, time::Instant};
 
 use anyhow::{anyhow, Result};
 use metrics::{describe_gauge, describe_histogram, gauge, histogram};
-use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System};
 use tracing::{debug, warn};
 
 use crate::backend::MetricsConfig;
+
+/// Helper type for PIDs
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct Pid((&'static str, sysinfo::Pid));
+
+impl Pid {
+    /// Constructs a Pid from a u32 and str.
+    pub fn from_u32(pid: u32, name: &'static str) -> Self {
+        Self((name, sysinfo::Pid::from_u32(pid)))
+    }
+
+    /// Returns the friendly name for this PID.
+    fn name(&self) -> &'static str {
+        self.0 .0
+    }
+
+    /// Returns the raw PID value.
+    fn pid(&self) -> u32 {
+        self.0 .1.as_u32()
+    }
+}
+
+impl Deref for Pid {
+    type Target = sysinfo::Pid;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0 .1
+    }
+}
+
+impl fmt::Display for Pid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", **self)
+    }
+}
 
 /// Collector for process metrics, uses native APIs when possible.
 #[derive(Debug)]
@@ -25,7 +61,7 @@ pub struct ProcessMetricsCollector {
     /// Config options for the current run
     config: MetricsConfig,
     /// All child process PIDs for tracking
-    pids: Vec<(&'static str, u32)>,
+    pids: Vec<Pid>,
     /// System struct for sysinfo fallback
     system: System,
     /// Collection start time for rate calculations
@@ -33,7 +69,7 @@ pub struct ProcessMetricsCollector {
     /// Total cumulative metrics for this run
     total_metrics: ProcessMetrics,
     /// Total cumulative metrics for individual processes
-    individual_metrics: HashMap<u32, ProcessMetrics>,
+    individual_metrics: HashMap<Pid, ProcessMetrics>,
 }
 
 /// Container struct for collected metrics data
@@ -113,7 +149,7 @@ fn scale_bytes(bytes: u64) -> String {
 
 impl ProcessMetricsCollector {
     /// Create a new instance to collect process metrics.
-    pub fn new(config: MetricsConfig, pids: Vec<(&'static str, u32)>) -> Self {
+    pub fn new(config: MetricsConfig, pids: Vec<Pid>) -> Self {
         Self::register_metrics();
 
         Self {
@@ -208,14 +244,15 @@ impl ProcessMetricsCollector {
             if let Err(e) = self.collect_process_metrics(pid, &mut metrics) {
                 warn!(
                     "Failed to collect metrics for \"{}\", PID {}: {e}",
-                    pid.0, pid.1
+                    pid.name(),
+                    pid.pid()
                 );
                 removals.push(index);
             }
         }
 
         self.pids
-            .retain(|&pid| !removals.contains(&(pid.1 as usize)));
+            .retain(|&pid| !removals.contains(&(pid.pid() as usize)));
 
         metrics.process_count = self.pids.len();
 
@@ -224,11 +261,7 @@ impl ProcessMetricsCollector {
 
     /// Collects metrics for a specific process, using a number of syscalls.
     #[cfg(target_os = "macos")]
-    fn collect_process_metrics(
-        &mut self,
-        pid: (&'static str, u32),
-        metrics: &mut ProcessMetrics,
-    ) -> Result<()> {
+    fn collect_process_metrics(&mut self, pid: Pid, metrics: &mut ProcessMetrics) -> Result<()> {
         use std::collections::hash_map::Entry;
 
         use crate::backend::DebugLogType;
@@ -238,7 +271,7 @@ impl ProcessMetricsCollector {
 
         // Collect what we can using native syscalls, and fall back to sysinfo for disk stats.
         self.collect_native_macos_metrics(pid, &mut process_metrics)?;
-        self.collect_sysinfo_disk_metrics(pid.1, &mut process_metrics)?;
+        self.collect_sysinfo_disk_metrics(pid, &mut process_metrics)?;
 
         // Aggregate this process's metrics towards the total.
         metrics.cpu_user_time_us += process_metrics.cpu_user_time_us;
@@ -251,7 +284,7 @@ impl ProcessMetricsCollector {
         metrics.disk_write_bytes += process_metrics.disk_write_bytes;
 
         // Store the latest per-process metrics
-        let result = match self.individual_metrics.entry(pid.1) {
+        let result = match self.individual_metrics.entry(pid) {
             Entry::Occupied(mut entry) => {
                 // Update the entries we need to accumulate
                 let stored = entry.get_mut();
@@ -265,7 +298,11 @@ impl ProcessMetricsCollector {
         };
 
         if matches!(self.config.debug_logs, DebugLogType::PerProcess) {
-            debug!("Process Metrics for \"{}\": PID {}, {result}", pid.0, pid.1);
+            debug!(
+                "Process Metrics for \"{}\": PID {}, {result}",
+                pid.name(),
+                pid.pid()
+            );
         }
 
         Ok(())
@@ -274,11 +311,7 @@ impl ProcessMetricsCollector {
     /// Collects metrics for a specific process, using a number of syscalls.
     #[cfg(not(target_os = "macos"))]
     #[allow(dead_code)]
-    fn collect_process_metrics(
-        &self,
-        _pid: (&'static str, u32),
-        _metrics: &mut ProcessMetrics,
-    ) -> Result<()> {
+    fn collect_process_metrics(&self, _pid: Pid, _metrics: &mut ProcessMetrics) -> Result<()> {
         // TODO(nikki): Linux support using /proc/{PID}
         Err(anyhow!(
             "We don't currently support {} for metrics, sorry!",
@@ -290,7 +323,7 @@ impl ProcessMetricsCollector {
     #[cfg(target_os = "macos")]
     fn collect_native_macos_metrics(
         &self,
-        pid: (&'static str, u32),
+        pid: Pid,
         process_metrics: &mut ProcessMetrics,
     ) -> Result<()> {
         use std::{io, mem};
@@ -301,7 +334,7 @@ impl ProcessMetricsCollector {
         #[allow(clippy::cast_possible_wrap)]
         let result = unsafe {
             libc::proc_pidinfo(
-                pid.1 as _,
+                pid.pid() as _,
                 libc::PROC_PIDTASKINFO,
                 0,
                 &raw mut task_info as _,
@@ -319,7 +352,10 @@ impl ProcessMetricsCollector {
 
         #[allow(clippy::cast_sign_loss)]
         if result as usize != size_of::<libc::proc_taskinfo>() {
-            return Err(anyhow!("Unable to obtain `proc_taskinfo` for {}!", pid.0));
+            return Err(anyhow!(
+                "Unable to obtain `proc_taskinfo` for {}!",
+                pid.name()
+            ));
         }
 
         // These are in nanoseconds, convert to microseconds. TODO(nikki): more precision?
@@ -336,18 +372,17 @@ impl ProcessMetricsCollector {
     #[allow(dead_code)]
     fn collect_sysinfo_disk_metrics(
         &mut self,
-        pid: u32,
+        pid: Pid,
         process_metrics: &mut ProcessMetrics,
     ) -> Result<()> {
-        let pid = Pid::from_u32(pid);
         self.system.refresh_processes_specifics(
-            ProcessesToUpdate::Some(&[pid]),
+            ProcessesToUpdate::Some(&[*pid]),
             false,
             ProcessRefreshKind::nothing().with_disk_usage(),
         );
 
         // Note that this disk usage is "since last refresh", which in our case is last tick.
-        if let Some(process) = self.system.process(pid) {
+        if let Some(process) = self.system.process(*pid) {
             let disk_usage = process.disk_usage();
             process_metrics.disk_read_bytes = disk_usage.read_bytes;
             process_metrics.disk_write_bytes = disk_usage.written_bytes;

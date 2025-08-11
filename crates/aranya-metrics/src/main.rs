@@ -32,7 +32,10 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
-use crate::{backend::MetricsConfig, harness::ProcessMetricsCollector};
+use crate::{
+    backend::MetricsConfig,
+    harness::{Pid, ProcessMetricsCollector},
+};
 pub mod backend;
 mod harness;
 
@@ -81,7 +84,7 @@ async fn main() -> Result<()> {
 
     info!("Setting up daemons...");
     let (mut daemon_pids, demo_context) = setup_demo("rust_example").await?;
-    daemon_pids.push(("example", std::process::id()));
+    daemon_pids.push(Pid::from_u32(std::process::id(), "example"));
 
     info!("Starting metrics collection for PIDs: {daemon_pids:?}");
     let mut metrics_collector = ProcessMetricsCollector::new(metrics_config, daemon_pids);
@@ -229,7 +232,7 @@ struct DemoContext {
     memberb: ClientCtx,
 }
 
-async fn setup_demo(team_name: &str) -> Result<(Vec<(&str, u32)>, DemoContext)> {
+async fn setup_demo(team_name: &str) -> Result<(Vec<Pid>, DemoContext)> {
     let daemon_path = PathBuf::from(
         env::args()
             .nth(1)
@@ -240,13 +243,13 @@ async fn setup_demo(team_name: &str) -> Result<(Vec<(&str, u32)>, DemoContext)> 
 
     const CLIENT_NAMES: [&str; 5] = ["owner", "admin", "operator", "member_a", "member_b"];
     let mut contexts: [Option<ClientCtx>; CLIENT_NAMES.len()] = Default::default();
-    let mut daemon_pids: Vec<(&str, u32)> = Vec::with_capacity(CLIENT_NAMES.len() + 1);
+    let mut daemon_pids: Vec<Pid> = Vec::with_capacity(CLIENT_NAMES.len() + 1);
 
     for (i, &user_name) in CLIENT_NAMES.iter().enumerate() {
         let ctx = ClientCtx::new(team_name, user_name, &daemon_path).await?;
 
         if let Some(pid) = ctx.daemon.pid() {
-            daemon_pids.push((user_name, pid));
+            daemon_pids.push(Pid::from_u32(pid, user_name));
         } else {
             warn!("Daemon PID not available for user: {user_name}");
         }
