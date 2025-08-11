@@ -21,8 +21,10 @@ async fn main() -> Result<()> {
     let workspace = env::var("CARGO_WORKSPACE_DIR")
         .expect("expected CARGO_WORKSPACE_DIR env var to be defined");
     let workspace = Path::new(&workspace);
-    let env = EnvVars::default();
+    let release = workspace.join("target").join("release");
+
     // Generate environment file for deploying on different machines.
+    let env = EnvVars::default();
     env.generate(
         &workspace
             .join("examples")
@@ -34,8 +36,6 @@ async fn main() -> Result<()> {
     // Set environment variables before spawning child processes.
     env.set();
 
-    let release = workspace.join("target").join("release");
-
     // Start device for each team member.
     let mut set = JoinSet::new();
     for device in env.devices {
@@ -45,6 +45,7 @@ async fn main() -> Result<()> {
             let _ = child.wait();
         });
     }
+    // Wait for all client processes to complete.
     set.join_all().await;
 
     info!("completed aranya-example-multi-node example");
