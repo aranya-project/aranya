@@ -170,6 +170,7 @@ pub fn error_to_str(err: u32) -> *const c_char {
 /// *     }
 /// * ──────────────────────────────────────────────────────────────────────────────
 /// Extended error information.
+#[allow(rustdoc::invalid_rust_codeblocks)]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 88, align = 8)]
 pub type ExtError = Safe<imp::ExtError>;
