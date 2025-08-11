@@ -1,6 +1,10 @@
 //! Member B device.
 
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    time::Duration,
+};
 
 use anyhow::{bail, Result};
 use aranya_client::{
@@ -9,29 +13,25 @@ use aranya_client::{
 };
 use aranya_daemon_api::TeamId;
 use aranya_example_multi_node::{
+    config::create_config,
     env::EnvVars,
     info::DeviceInfo,
     tcp::{TcpClient, TcpServer},
     tracing::init_tracing,
 };
-use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
+use tempfile::tempdir;
 use tokio::time::sleep;
-use tracing::info;
+use tracing::{error, info};
 
+/// CLI args.
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Daemon UDS socket path.
+    /// Daemon executable path.
     #[arg(long)]
-    uds_sock: PathBuf,
-    /// AQC server address.
-    #[arg(long)]
-    aqc_addr: Addr,
-    /// TCP server address for receiving team info from owner.
-    #[arg(long)]
-    tcp_addr: Addr,
+    daemon_path: PathBuf,
 }
 
 /// Name of the current Aranya device.
@@ -45,18 +45,58 @@ async fn main() -> Result<()> {
     // Parse input args.
     let args = Args::parse();
     let env = EnvVars::load()?;
+    // Generate daemon config file.
+    let tmp = tempdir()?;
+    info!("memberb: generating daemon config");
+    let cfg = create_config(
+        DEVICE_NAME.to_string(),
+        env.memberb.sync_addr,
+        tmp.path().into(),
+    )
+    .await
+    .expect("expected to generate daemon config file");
 
+    // Start daemon.
+    info!("memberb: starting daemon");
+    let mut child = Command::new(args.daemon_path)
+        .arg("--config")
+        .arg(cfg)
+        .spawn()?;
+    let uds_sock = tmp
+        .path()
+        .join(DEVICE_NAME)
+        .join("daemon")
+        .join("run")
+        .join("uds.sock");
+    // Wait for daemon to start.
+    sleep(Duration::from_secs(1)).await;
+    info!("memberb: started daemon");
+
+    if let Err(e) = run(&uds_sock, &env).await {
+        error!(?e);
+        // Stop the daemon.
+        let _ = child.kill();
+        return Err(e);
+    };
+
+    // Stop the daemon.
+    let _ = child.kill();
+
+    Ok(())
+}
+
+async fn run(uds_sock: &Path, env: &EnvVars) -> Result<()> {
     // Start TCP server.
     info!("memberb: starting tcp server");
-    let server = TcpServer::bind(args.tcp_addr).await?;
+    let server = TcpServer::bind(env.memberb.tcp_addr).await?;
     info!("memberb: started tcp server");
 
     // Initialize client.
     info!("memberb: initializing client");
     let client = (|| {
         Client::builder()
-            .daemon_uds_path(&args.uds_sock)
-            .aqc_server_addr(&args.aqc_addr)
+            .daemon_uds_path(uds_sock)
+            .aqc_server_addr(&env.memberb.aqc_addr)
             .connect()
     })
     .retry(ExponentialBuilder::default())

@@ -1,35 +1,36 @@
 //! Admin device.
 
-use std::{path::PathBuf, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    time::Duration,
+};
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_daemon_api::TeamId;
 use aranya_example_multi_node::{
+    config::create_config,
     env::EnvVars,
     tcp::{TcpClient, TcpServer},
     tracing::init_tracing,
 };
-use aranya_util::Addr;
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
-use tracing::info;
+use tempfile::tempdir;
+use tokio::time::sleep;
+use tracing::{error, info};
 
 /// Name of the current Aranya device.
 const DEVICE_NAME: &str = "admin";
 
+/// CLI args.
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Daemon UDS socket path.
+    /// Daemon executable path.
     #[arg(long)]
-    uds_sock: PathBuf,
-    /// AQC server address.
-    #[arg(long)]
-    aqc_addr: Addr,
-    /// TCP server address for receiving team info from owner.
-    #[arg(long)]
-    tcp_addr: Addr,
+    daemon_path: PathBuf,
 }
 
 #[tokio::main]
@@ -41,17 +42,58 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     let env = EnvVars::load()?;
 
+    // Generate daemon config file.
+    let tmp = tempdir()?;
+    info!("admin: generating daemon config");
+    let cfg = create_config(
+        DEVICE_NAME.to_string(),
+        env.admin.sync_addr,
+        tmp.path().into(),
+    )
+    .await
+    .expect("expected to generate daemon config file");
+
+    // Start daemon.
+    info!("admin: starting daemon");
+    let mut child = Command::new(args.daemon_path)
+        .arg("--config")
+        .arg(cfg)
+        .spawn()?;
+    let uds_sock = tmp
+        .path()
+        .join(DEVICE_NAME)
+        .join("daemon")
+        .join("run")
+        .join("uds.sock");
+    // Wait for daemon to start.
+    sleep(Duration::from_secs(1)).await;
+    info!("admin: started daemon");
+
+    if let Err(e) = run(&uds_sock, &env).await {
+        error!(?e);
+        // Stop the daemon.
+        let _ = child.kill();
+        return Err(e);
+    };
+
+    // Stop the daemon.
+    let _ = child.kill();
+
+    Ok(())
+}
+
+async fn run(uds_sock: &Path, env: &EnvVars) -> Result<()> {
     // Start TCP server.
     info!("admin: starting tcp server");
-    let server = TcpServer::bind(args.tcp_addr).await?;
+    let server = TcpServer::bind(env.admin.tcp_addr).await?;
     info!("admin: started tcp server");
 
     // Initialize client.
     info!("admin: initializing client");
     let client = (|| {
         Client::builder()
-            .daemon_uds_path(&args.uds_sock)
-            .aqc_server_addr(&args.aqc_addr)
+            .daemon_uds_path(uds_sock)
+            .aqc_server_addr(&env.admin.aqc_addr)
             .connect()
     })
     .retry(ExponentialBuilder::default())
@@ -94,6 +136,7 @@ async fn main() -> Result<()> {
 
     // Setup sync peers.
     let sync_interval = Duration::from_millis(100);
+    let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
     for device in &env.devices {
         if device.name == DEVICE_NAME {
@@ -103,6 +146,10 @@ async fn main() -> Result<()> {
         team.add_sync_peer(device.sync_addr, sync_cfg.clone())
             .await?;
     }
+
+    // TODO: need to keep admin daemon running so member syncs with operator don't get blocked on timed out sync requests.
+    // Wait for syncing.
+    sleep(10 * sleep_interval).await;
 
     info!("admin: complete");
 

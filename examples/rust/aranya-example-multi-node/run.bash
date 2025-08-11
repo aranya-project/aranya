@@ -4,6 +4,16 @@
 
 set -xeuo pipefail
 
+if command -v shellcheck; then
+    shellcheck "${0}"
+fi
+
+cleanup() {
+    jobs -p | xargs -I{} kill {} || true
+}
+trap 'cleanup' EXIT
+trap 'trap - SIGTERM && cleanup && kill -- -$$ || true' SIGINT SIGTERM EXIT
+
 script_dir="$(dirname "$0")"
 
 # Back to root of the repo.
@@ -17,7 +27,7 @@ for device in "${devices[@]}"; do
     cargo build \
         --release \
         --manifest-path Cargo.toml \
-        --bin aranya-example-multi-node-${device} \
+        --bin aranya-example-multi-node-"${device}" \
         --locked
 done
 
