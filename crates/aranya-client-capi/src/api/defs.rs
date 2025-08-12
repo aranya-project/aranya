@@ -11,7 +11,7 @@ use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_daemon_api::Text;
 use aranya_util::error::ReportExt as _;
 use bytes::Bytes;
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::imp::{self, aqc::consume_bytes};
 
@@ -85,7 +85,7 @@ pub enum Error {
 
 impl From<&imp::Error> for Error {
     fn from(err: &imp::Error) -> Self {
-        error!(error = %err.report(), "Aranya client C API error");
+        debug!(error = %err.report(), "Aranya client C API error");
         match err {
             imp::Error::Bug(_) => Self::Bug,
             imp::Error::Timeout(_) => Self::Timeout,
