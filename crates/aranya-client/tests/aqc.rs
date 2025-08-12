@@ -147,13 +147,13 @@ async fn test_aqc_chans() -> Result<()> {
             .membera
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan1)
+            .delete_bidi_channel(&mut bidi_chan1)
             .await?;
         devices
             .memberb
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan2)
+            .delete_bidi_channel(&mut bidi_chan2)
             .await?;
     }
 
@@ -187,6 +187,20 @@ async fn test_aqc_chans() -> Result<()> {
 
         let bytes = recv2_1.receive().await?.assume("no data received")?;
         assert_eq!(bytes, msg1);
+
+        devices
+            .membera
+            .client
+            .aqc()
+            .delete_send_uni_channel(&mut uni_chan1)
+            .await?;
+
+        devices
+            .membera
+            .client
+            .aqc()
+            .delete_receive_uni_channel(&mut uni_chan2)
+            .await?;
     }
 
     {
@@ -242,6 +256,19 @@ async fn test_aqc_chans() -> Result<()> {
             .assume("is recv stream")?;
         let bytes = recv2_1.receive().await?.assume("no data received")?;
         assert_eq!(bytes, msg1);
+
+        devices
+            .membera
+            .client
+            .aqc()
+            .delete_bidi_channel(&mut bidi_chan1)
+            .await?;
+        devices
+            .memberb
+            .client
+            .aqc()
+            .delete_bidi_channel(&mut bidi_chan2)
+            .await?;
     }
 
     Ok(())
@@ -516,13 +543,13 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
             .membera
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan1)
+            .delete_bidi_channel(&mut bidi_chan1)
             .await?;
         devices
             .memberb
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan2)
+            .delete_bidi_channel(&mut bidi_chan2)
             .await?;
     }
 
@@ -639,13 +666,13 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
             .membera
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan1)
+            .delete_bidi_channel(&mut bidi_chan1)
             .await?;
         devices
             .memberb
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan2)
+            .delete_bidi_channel(&mut bidi_chan2)
             .await?;
 
         // wait for ctrl message to be sent.

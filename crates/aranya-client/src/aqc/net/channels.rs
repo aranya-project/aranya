@@ -54,7 +54,7 @@ pub struct AqcSendChannel {
 }
 
 impl AqcSendChannel {
-    /// Create a new channel with the given id and conection handle.
+    /// Create a new channel with the given id and connection handle.
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
@@ -106,7 +106,7 @@ pub struct AqcReceiveChannel {
 }
 
 impl AqcReceiveChannel {
-    /// Create a new channel with the given conection handle.
+    /// Create a new channel with the given connection handle.
     ///
     /// Returns the new channel and the sender used to send new streams to the
     /// channel.
@@ -149,6 +149,12 @@ impl AqcReceiveChannel {
             Poll::Pending => Err(TryReceiveError::Empty),
         }
     }
+
+    /// Close the receive channel.
+    pub fn close(&mut self) {
+        const ERROR_CODE: u32 = 0;
+        self.conn.close(ERROR_CODE.into());
+    }
 }
 
 /// A unique channel between two peers.
@@ -162,7 +168,7 @@ pub struct AqcBidiChannel {
 }
 
 impl AqcBidiChannel {
-    /// Create a new bidirectional channel with the given id and conection handle.
+    /// Create a new bidirectional channel with the given id and connection handle.
     pub(super) fn new(label_id: LabelId, aqc_id: BidiChannelId, conn: s2n::Connection) -> Self {
         Self {
             label_id,
