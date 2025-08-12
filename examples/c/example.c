@@ -668,6 +668,11 @@ AranyaError run(Team *t) {
 
     sleep(1);
 
+    printf("finalizing graph state\n");
+    
+    err = aranya_finalize_team(&owner->client, &t->id);
+    EXPECT("error finalizing graph state", err);
+
     // Queries
     printf("running factdb queries\n");
 
