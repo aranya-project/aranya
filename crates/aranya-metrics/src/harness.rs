@@ -10,7 +10,7 @@
 //! the `sysinfo` crate for disk usage stats.
 //!
 //! [observer problem]: https://w.wiki/Ekxn
-use std::{collections::HashMap, fmt, ops::Deref, time::Instant};
+use std::{collections::HashMap, fmt, time::Instant};
 
 use anyhow::{anyhow, Result};
 use metrics::{describe_gauge, describe_histogram, gauge, histogram};
@@ -20,38 +20,24 @@ use tracing::{debug, warn};
 use crate::backend::MetricsConfig;
 
 /// Helper type for PIDs
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub struct Pid((&'static str, sysinfo::Pid));
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Pid {
+    /// The actual Process Identifier, given from [`Child::id()`](std::process::Child::id).
+    pub pid: u32,
+    /// A "friendly name" for this particular process.
+    pub name: &'static str,
+}
 
 impl Pid {
     /// Constructs a Pid from a u32 and str.
     pub fn from_u32(pid: u32, name: &'static str) -> Self {
-        Self((name, sysinfo::Pid::from_u32(pid)))
-    }
-
-    /// Returns the friendly name for this PID.
-    fn name(&self) -> &'static str {
-        self.0 .0
-    }
-
-    /// Returns the raw PID value.
-    fn pid(&self) -> u32 {
-        self.0 .1.as_u32()
-    }
-}
-
-impl Deref for Pid {
-    type Target = sysinfo::Pid;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0 .1
+        Self { pid, name }
     }
 }
 
 impl fmt::Display for Pid {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", **self)
+        write!(f, "{}", self.name)
     }
 }
 
@@ -244,15 +230,14 @@ impl ProcessMetricsCollector {
             if let Err(e) = self.collect_process_metrics(pid, &mut metrics) {
                 warn!(
                     "Failed to collect metrics for \"{}\", PID {}: {e}",
-                    pid.name(),
-                    pid.pid()
+                    pid.name, pid.pid
                 );
                 removals.push(index);
             }
         }
 
         self.pids
-            .retain(|&pid| !removals.contains(&(pid.pid() as usize)));
+            .retain(|&pid| !removals.contains(&(pid.pid as usize)));
 
         metrics.process_count = self.pids.len();
 
@@ -300,8 +285,7 @@ impl ProcessMetricsCollector {
         if matches!(self.config.debug_logs, DebugLogType::PerProcess) {
             debug!(
                 "Process Metrics for \"{}\": PID {}, {result}",
-                pid.name(),
-                pid.pid()
+                pid.name, pid.pid
             );
         }
 
@@ -334,7 +318,7 @@ impl ProcessMetricsCollector {
         #[allow(clippy::cast_possible_wrap)]
         let result = unsafe {
             libc::proc_pidinfo(
-                pid.pid() as _,
+                pid.pid as _,
                 libc::PROC_PIDTASKINFO,
                 0,
                 &raw mut task_info as _,
@@ -354,7 +338,7 @@ impl ProcessMetricsCollector {
         if result as usize != size_of::<libc::proc_taskinfo>() {
             return Err(anyhow!(
                 "Unable to obtain `proc_taskinfo` for {}!",
-                pid.name()
+                pid.name
             ));
         }
 
@@ -375,14 +359,15 @@ impl ProcessMetricsCollector {
         pid: Pid,
         process_metrics: &mut ProcessMetrics,
     ) -> Result<()> {
+        let pid = sysinfo::Pid::from_u32(pid.pid);
         self.system.refresh_processes_specifics(
-            ProcessesToUpdate::Some(&[*pid]),
+            ProcessesToUpdate::Some(&[pid]),
             false,
             ProcessRefreshKind::nothing().with_disk_usage(),
         );
 
         // Note that this disk usage is "since last refresh", which in our case is last tick.
-        if let Some(process) = self.system.process(*pid) {
+        if let Some(process) = self.system.process(pid) {
             let disk_usage = process.disk_usage();
             process_metrics.disk_read_bytes = disk_usage.read_bytes;
             process_metrics.disk_write_bytes = disk_usage.written_bytes;
