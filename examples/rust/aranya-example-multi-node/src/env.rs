@@ -79,7 +79,7 @@ impl EnvVars {
     /// Generate environment file.
     pub async fn generate(&self, path: &Path) -> Result<()> {
         let mut buf = "".to_string();
-        buf += "export ARANYA_EXAMPLE = info\r\n";
+        buf += "export ARANYA_EXAMPLE=info\r\n";
         for device in &self.devices {
             buf += &format!(
                 "export ARANYA_SYNC_ADDR_{}={}\r\n",

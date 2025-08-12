@@ -1,10 +1,6 @@
 //! Operator device.
 
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-    time::Duration,
-};
+use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
@@ -19,8 +15,8 @@ use aranya_example_multi_node::{
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
 use tempfile::tempdir;
-use tokio::time::sleep;
-use tracing::{error, info};
+use tokio::{process::Command, time::sleep};
+use tracing::info;
 
 /// CLI args.
 #[derive(Debug, Parser)]
@@ -56,7 +52,8 @@ async fn main() -> Result<()> {
 
     // Start daemon.
     info!("operator: starting daemon");
-    let mut child = Command::new(args.daemon_path)
+    let _child = Command::new(args.daemon_path)
+        .kill_on_drop(true)
         .arg("--config")
         .arg(cfg)
         .spawn()?;
@@ -70,20 +67,6 @@ async fn main() -> Result<()> {
     sleep(Duration::from_secs(2)).await;
     info!("operator: started daemon");
 
-    if let Err(e) = run(&uds_sock, &env).await {
-        error!(?e);
-        // Stop the daemon.
-        let _ = child.kill();
-        return Err(e);
-    };
-
-    // Stop the daemon.
-    let _ = child.kill();
-
-    Ok(())
-}
-
-async fn run(uds_sock: &Path, env: &EnvVars) -> Result<()> {
     // Start TCP server.
     info!("operator: starting tcp server");
     let server = TcpServer::bind(env.operator.tcp_addr).await?;
@@ -93,7 +76,7 @@ async fn run(uds_sock: &Path, env: &EnvVars) -> Result<()> {
     info!("operator: initializing client");
     let client = (|| {
         Client::builder()
-            .daemon_uds_path(uds_sock)
+            .daemon_uds_path(&uds_sock)
             .aqc_server_addr(&env.operator.aqc_addr)
             .connect()
     })

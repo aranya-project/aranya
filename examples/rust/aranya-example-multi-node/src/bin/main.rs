@@ -1,14 +1,13 @@
 //! Multi-node Aranya example written in Rust.
 
-use std::{
-    env,
-    path::Path,
-    process::{Child, Command},
-};
+use std::{env, path::Path};
 
 use anyhow::Result;
 use aranya_example_multi_node::{env::EnvVars, tracing::init_tracing};
-use tokio::task::JoinSet;
+use tokio::{
+    process::{Child, Command},
+    task::JoinSet,
+};
 use tracing::info;
 
 #[tokio::main]
@@ -42,7 +41,7 @@ async fn main() -> Result<()> {
         info!("starting {} client", device.name);
         let mut child = client(&release, device.name.clone()).expect("expected to spawn client");
         set.spawn(async move {
-            let _ = child.wait();
+            let _ = child.wait().await;
         });
     }
     // Wait for all client processes to complete.
@@ -57,6 +56,7 @@ async fn main() -> Result<()> {
 fn client(release: &Path, device: String) -> Result<Child> {
     let daemon_path = release.join("aranya-daemon");
     let child = Command::new(release.join(format!("aranya-example-multi-node-{:}", device)))
+        .kill_on_drop(true)
         .arg("--daemon-path")
         .arg(daemon_path)
         .spawn()?;
