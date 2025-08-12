@@ -1,5 +1,8 @@
 name: "Publish Release Artifacts To GitHub Release On Tag Creation"
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
