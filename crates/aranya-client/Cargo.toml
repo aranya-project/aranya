@@ -46,3 +46,7 @@ test-log = { workspace = true }
 [[test]]
 name = "tests"
 path = "tests/tests.rs"
+
+[package.metadata.cargo-all-features]
+# TODO: remove in #448
+always_include_features = ["default"]
