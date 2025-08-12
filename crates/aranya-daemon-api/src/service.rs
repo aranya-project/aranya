@@ -664,6 +664,9 @@ pub trait DaemonApi {
     /// Close the team.
     async fn close_team(team: TeamId) -> Result<()>;
 
+    /// Finalize the team's current graph state.
+    async fn finalize_team(team: TeamId) -> Result<()>;
+
     async fn encrypt_psk_seed_for_peer(
         team: TeamId,
         peer_enc_pk: EncryptionPublicKey<CS>,

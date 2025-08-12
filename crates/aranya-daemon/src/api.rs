@@ -440,6 +440,15 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
+    async fn finalize_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.client.actions(&team.into_id().into()).finalize_team().await.context("unable to finalize team")?;
+
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
     async fn encrypt_psk_seed_for_peer(
         self,
         _: context::Context,

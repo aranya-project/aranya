@@ -390,6 +390,16 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    /// Finalize the team's current graph state.
+    pub async fn finalize_team(&self) -> Result<()> {
+        self.client
+            .daemon
+            .finalize_team(context::current(), self.team_id)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Add a device to the team with the default `Member` role.
     pub async fn add_device_to_team(&self, keys: KeyBundle) -> Result<()> {
         self.client
