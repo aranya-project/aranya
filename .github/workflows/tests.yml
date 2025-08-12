@@ -24,6 +24,8 @@ concurrency:
 
 jobs:
   unit-tests:
+    permissions:
+      contents: read
     strategy:
       matrix:
         runner:
@@ -41,6 +43,8 @@ jobs:
 
 
   c-example-application:
+    permissions:
+      contents: read
     strategy:
       matrix:
         runner:
@@ -59,6 +63,8 @@ jobs:
           cargo make run-capi-example
 
   rust-example-application:
+    permissions:
+      contents: read
     strategy:
       matrix:
         runner:
@@ -76,6 +82,8 @@ jobs:
           cargo make run-rust-example
 
   rust-example-application-multi-node:
+    permissions:
+      contents: read
     strategy:
       matrix:
         runner:
