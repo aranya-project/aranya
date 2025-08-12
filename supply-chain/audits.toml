@@ -129,6 +129,11 @@ delta = "0.2.168 -> 0.2.170"
 [[audits.linux-raw-sys]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
+version = "0.9.4"
+
+[[audits.linux-raw-sys]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
 delta = "0.4.14 -> 0.4.15"
 
 [[audits.log]]
@@ -254,6 +259,16 @@ version = "0.4.0"
 [[audits.rustix]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
+version = "1.0.8"
+
+[[audits.rustix]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.37.13 -> 0.37.28"
+
+[[audits.rustix]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
 delta = "0.37.13 -> 0.37.28"
 
 [[audits.rustix]]
@@ -346,6 +361,11 @@ version = "0.1.0"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "2.0.90 -> 2.0.99"
+
+[[audits.tempfile]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "3.19.1"
 
 [[audits.tempfile]]
 who = "gknopf <gknopf@spideroak.com>"
