@@ -149,7 +149,7 @@ pub fn error_to_str(err: u32) -> *const c_char {
 /// * - `ext_err` must be a valid, non-NULL pointer.
 /// * - If the call returns anything other than `ARANYA_ERROR_SUCCESS`,
 /// *   `*ext_err` is populated with additional error details.
-/// * - On success, the contents of `ext_err` are undefined.
+/// * - On success, the content of `ext_err` is unchanged.
 /// * - To extract a human-readable message:
 /// *
 /// *       AranyaError aranya_ext_error_msg(
