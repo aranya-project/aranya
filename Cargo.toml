@@ -35,8 +35,8 @@ wildcard_imports = "warn"
 
 [workspace.dependencies]
 aranya-aqc-util = { version = "0.4.0", features = ["alloc"] }
-aranya-capi-core = { version = "0.4.1" }
-aranya-capi-codegen = { version = "0.3.1" }
+aranya-capi-core = { version = "0.4.3" }
+aranya-capi-codegen = { version = "0.3.3" }
 aranya-crypto = { version = "0.6.1", features = ["alloc", "fs-keystore", "clone-aead", "std"] }
 aranya-crypto-ffi = { version = "0.9.0" }
 aranya-device-ffi = { version = "0.9.0" }
