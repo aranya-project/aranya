@@ -443,7 +443,11 @@ impl DaemonApi for Api {
     async fn finalize_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
         self.check_team_valid(team).await?;
 
-        self.client.actions(&team.into_id().into()).finalize_team().await.context("unable to finalize team")?;
+        self.client
+            .actions(&team.into_id().into())
+            .finalize_team()
+            .await
+            .context("unable to finalize team")?;
 
         Ok(())
     }
