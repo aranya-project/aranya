@@ -1254,6 +1254,20 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
     Ok(())
 }
 
+/// Finalizes the team's current graph state.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] team the team's ID [`TeamId`].
+///
+/// @relates AranyaClient.
+pub fn finalize_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
+    let client = client.imp();
+    client
+        .rt
+        .block_on(client.inner.team(team.into()).finalize_team())?;
+    Ok(())
+}
+
 /// Add a device to the team with the default role.
 ///
 /// Permission to perform this operation is checked against the Aranya policy.
