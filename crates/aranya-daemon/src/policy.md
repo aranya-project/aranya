@@ -435,7 +435,7 @@ finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyId
 **Invariants:**
 
 - This is the initial command in the graph.
-- Only an Owner will create this event.
+- Only an Owner will create this command.
 
 
 ## FinalizeTeam
@@ -479,7 +479,7 @@ command FinalizeTeam {
 
 **Invariants:**
 
-- Only an Owner will create this event.
+- Only an Owner will create this command.
 
 
 ## TerminateTeam
@@ -524,7 +524,7 @@ command TerminateTeam {
 **Invariants:**
 
 - This is the final command in the graph.
-- Only an Owner can create this event.
+- Only an Owner can create this command.
 - Once terminated, no further communication will occur over the team graph.
 
 
