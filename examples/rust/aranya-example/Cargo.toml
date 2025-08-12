@@ -22,12 +22,12 @@ aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 
-anyhow = { version = "1.0.97" }
-backon = { version = "1.4.0" }
-buggy = { version = "0.1.0" }
-bytes = { version = "1.10.0" }
-futures-util = { version = "0.3" }
-tempfile = { version = "3.17.1" }
-tokio = { version = "1.44.2", features = ["io-util", "macros", "net", "process", "sync"] }
-tracing = { version = "0.1.41" }
-tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
+anyhow = { workspace = true }
+backon = { workspace = true }
+buggy = { workspace = true }
+bytes = { workspace = true }
+futures-util = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["io-util", "macros", "net", "process", "sync"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

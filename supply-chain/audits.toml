@@ -254,6 +254,16 @@ version = "0.4.0"
 [[audits.rustix]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
+delta = "0.37.13 -> 0.37.28"
+
+[[audits.rustix]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.37.13 -> 0.37.28"
+
+[[audits.rustix]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
 delta = "0.38.42 -> 0.38.44"
 
 [[audits.rustls]]
@@ -311,6 +321,11 @@ version = "0.3.1"
 who = "Eric Lagergren <elagergren@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.3.1 -> 0.3.0"
+
+[[audits.signal-hook-registry]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "1.4.1 -> 1.4.5"
 
 [[audits.spideroak-base58]]
 who = "gknopf <gknopf@spideroak.com>"

@@ -73,7 +73,7 @@ impl ClientCtx {
     pub async fn new(team_name: &str, user_name: &str, daemon_path: &DaemonPath) -> Result<Self> {
         info!(team_name, user_name, "creating `ClientCtx`");
 
-        let work_dir = TempDir::with_prefix(user_name)?;
+        let work_dir = TempDir::new()?;
 
         let daemon = {
             let work_dir = work_dir.path().join("daemon");

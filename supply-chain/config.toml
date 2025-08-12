@@ -93,8 +93,8 @@ version = "0.28.0"
 criteria = "safe-to-deploy"
 
 [[exemptions.backon]]
-version = "1.3.0"
-criteria = "safe-to-run"
+version = "1.2.0"
+criteria = "safe-to-deploy"
 
 [[exemptions.backtrace]]
 version = "0.3.74"
@@ -274,7 +274,7 @@ criteria = "safe-to-deploy"
 
 [[exemptions.gloo-timers]]
 version = "0.3.0"
-criteria = "safe-to-run"
+criteria = "safe-to-deploy"
 
 [[exemptions.group]]
 version = "0.13.0"
@@ -610,7 +610,7 @@ criteria = "safe-to-deploy"
 
 [[exemptions.tempfile]]
 version = "3.14.0"
-criteria = "safe-to-run"
+criteria = "safe-to-deploy"
 
 [[exemptions.termcolor]]
 version = "1.4.1"
