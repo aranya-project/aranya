@@ -670,6 +670,15 @@ AranyaError run(Team *t) {
 
     printf("finalizing graph state\n");
     
+    // This is expected to fail since only the owner can call this API
+    err = aranya_finalize_team(&admin->client, &t->id);
+    if (err == ARANYA_ERROR_SUCCESS) {
+        fprintf(stderr,
+                "application error: An admin should not be able to create a `FinalizeTeam` command\n");
+        err = ARANYA_ERROR_OTHER;
+        goto exit;
+    }
+    
     err = aranya_finalize_team(&owner->client, &t->id);
     EXPECT("error finalizing graph state", err);
 
