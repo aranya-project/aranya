@@ -257,3 +257,23 @@ category = "examples"
 description = "Run Rust example application"
 cwd = "examples/rust"
 script = "./run.bash"
+
+# Metrics
+
+# Run `aranya-metrics`
+[tasks.metrics]
+category = "metrics"
+description = "Run Metrics Crate"
+script = '''
+#!/usr/bin/env bash
+set -e
+cargo build --bin aranya-daemon --release
+cargo build --bin aranya-metrics --release
+CONFIG_PATH=$(pwd)/crates/aranya-metrics/example-metrics.toml $(pwd)/target/release/aranya-metrics $(pwd)/target/release/aranya-daemon
+'''
+
+# Run `aranya-metrics` using prometheus
+[tasks.metrics-prometheus]
+category = "metrics"
+description = "Run aranya-metrics crate w/ Prometheus exporter and a Push Gateway"
+script = "crates/aranya-metrics/prometheus.bash"
