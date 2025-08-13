@@ -1,21 +1,18 @@
 //! Owner device.
 
-use std::{path::PathBuf, time::Duration};
+use std::{future, path::PathBuf};
 
 use anyhow::Result;
 use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
 use aranya_example_multi_node::{
     age::AgeEncryptor,
-    config::create_config,
     env::EnvVars,
     tcp::{TcpClient, TcpServer},
     tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
-use tempfile::tempdir;
-use tokio::{process::Command, time::sleep};
 use tracing::info;
 
 /// Name of the current Aranya device.
@@ -25,9 +22,9 @@ const DEVICE_NAME: &str = "owner";
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Daemon executable path.
+    /// Daemon UDS socket path.
     #[arg(long)]
-    daemon_path: PathBuf,
+    uds_sock: PathBuf,
 }
 
 #[tokio::main]
@@ -39,34 +36,6 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     let env = EnvVars::load()?;
 
-    // Generate daemon config file.
-    let tmp = tempdir()?;
-    info!("owner: generating daemon config");
-    let cfg = create_config(
-        DEVICE_NAME.to_string(),
-        env.owner.sync_addr,
-        tmp.path().into(),
-    )
-    .await
-    .expect("expected to generate daemon config file");
-
-    // Start daemon.
-    info!("owner: starting daemon");
-    let _child = Command::new(args.daemon_path)
-        .kill_on_drop(true)
-        .arg("--config")
-        .arg(cfg)
-        .spawn()?;
-    let uds_sock = tmp
-        .path()
-        .join(DEVICE_NAME)
-        .join("daemon")
-        .join("run")
-        .join("uds.sock");
-    // Wait for daemon to start.
-    sleep(Duration::from_secs(2)).await;
-    info!("owner: started daemon");
-
     // Start TCP server.
     info!("owner: starting tcp server");
     let server = TcpServer::bind(env.owner.tcp_addr).await?;
@@ -76,7 +45,7 @@ async fn main() -> Result<()> {
     info!("owner: initializing client");
     let client = (|| {
         Client::builder()
-            .daemon_uds_path(&uds_sock)
+            .daemon_uds_path(&args.uds_sock)
             .aqc_server_addr(&env.owner.aqc_addr)
             .connect()
     })
@@ -163,11 +132,8 @@ async fn main() -> Result<()> {
         }
     }
 
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
-    sleep(10 * sleep_interval).await;
-
     info!("owner: complete");
 
-    Ok(())
+    // Keep the daemon running.
+    future::pending().await
 }

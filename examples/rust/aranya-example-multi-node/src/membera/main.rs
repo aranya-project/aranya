@@ -7,7 +7,6 @@ use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig
 use aranya_daemon_api::{NetIdentifier, TeamId};
 use aranya_example_multi_node::{
     age::AgeEncryptor,
-    config::create_config,
     env::EnvVars,
     info::DeviceInfo,
     tcp::{TcpClient, TcpServer},
@@ -16,17 +15,16 @@ use aranya_example_multi_node::{
 use backon::{ExponentialBuilder, Retryable};
 use bytes::Bytes;
 use clap::Parser;
-use tempfile::tempdir;
-use tokio::{process::Command, time::sleep};
+use tokio::time::sleep;
 use tracing::info;
 
 /// CLI args.
 #[derive(Debug, Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Args {
-    /// Daemon executable path.
+    /// Daemon UDS socket path.
     #[arg(long)]
-    daemon_path: PathBuf,
+    uds_sock: PathBuf,
 }
 
 /// Name of the current Aranya device.
@@ -41,34 +39,6 @@ async fn main() -> Result<()> {
     let args = Args::parse();
     let env = EnvVars::load()?;
 
-    // Generate daemon config file.
-    let tmp = tempdir()?;
-    info!("membera: generating daemon config");
-    let cfg = create_config(
-        DEVICE_NAME.to_string(),
-        env.membera.sync_addr,
-        tmp.path().into(),
-    )
-    .await
-    .expect("expected to generate daemon config file");
-
-    // Start daemon.
-    info!("membera: starting daemon");
-    let _child = Command::new(args.daemon_path)
-        .kill_on_drop(true)
-        .arg("--config")
-        .arg(cfg)
-        .spawn()?;
-    let uds_sock = tmp
-        .path()
-        .join(DEVICE_NAME)
-        .join("daemon")
-        .join("run")
-        .join("uds.sock");
-    // Wait for daemon to start.
-    sleep(Duration::from_secs(2)).await;
-    info!("membera: started daemon");
-
     // Start TCP server.
     info!("membera: starting tcp server");
     let server = TcpServer::bind(env.membera.tcp_addr).await?;
@@ -78,7 +48,7 @@ async fn main() -> Result<()> {
     info!("membera: initializing client");
     let client = (|| {
         Client::builder()
-            .daemon_uds_path(&uds_sock)
+            .daemon_uds_path(&args.uds_sock)
             .aqc_server_addr(&env.membera.aqc_addr)
             .connect()
     })

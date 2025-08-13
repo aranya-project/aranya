@@ -1,6 +1,6 @@
 //! Utility for generating a daemon config file.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context as _, Result};
 use aranya_util::Addr;
@@ -8,7 +8,7 @@ use tokio::fs;
 use tracing::info;
 
 // Create a daemon config file.
-pub async fn create_config(device: String, sync_addr: Addr, dir: PathBuf) -> Result<PathBuf> {
+pub async fn create_config(device: String, sync_addr: Addr, dir: &Path) -> Result<PathBuf> {
     let device_dir = dir.join(&device);
     let work_dir = device_dir.join("daemon");
     fs::create_dir_all(&work_dir).await?;
