@@ -1,6 +1,16 @@
 
 # cargo-vet audits file
 
+[[audits.age]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.11.1"
+
+[[audits.age-core]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.11.0"
+
 [[audits.allocator-api2]]
 who = "Ben Zimmerman <bzimmerman@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -16,6 +26,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.94 -> 1.0.97"
 
+[[audits.arc-swap]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "1.7.1"
+
 [[audits.async-trait]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -23,8 +38,18 @@ delta = "0.1.83 -> 0.1.87"
 
 [[audits.backon]]
 who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "1.2.0"
+
+[[audits.backon]]
+who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-run"
 delta = "1.3.0 -> 1.4.0"
+
+[[audits.bech32]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.8.1"
 
 [[audits.bindgen]]
 who = "Ben Zimmerman <bzimmerman@spideroak.com>"
@@ -51,6 +76,16 @@ who = "Ben Zimmerman <bzimmerman@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "1.2.18"
 
+[[audits.chacha20]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.9.1"
+
+[[audits.chacha20poly1305]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.9.0"
+
 [[audits.clap]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -71,6 +106,11 @@ who = "Declan Johnson <djohnson@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.49 -> 0.1.54"
 
+[[audits.cookie-factory]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.3.3"
+
 [[audits.cpufeatures]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -85,6 +125,26 @@ delta = "0.2.2 -> 0.2.3"
 who = "Declan Johnson <djohnson@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "1.0.5"
+
+[[audits.find-crate]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.6.3"
+
+[[audits.fluent]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.16.1"
+
+[[audits.fluent-bundle]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.15.3"
+
+[[audits.fluent-syntax]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.11.1"
 
 [[audits.getrandom]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -106,10 +166,35 @@ who = "Declan Johnson <djohnson@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.4.1"
 
+[[audits.i18n-config]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.8"
+
+[[audits.i18n-embed]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.15.4"
+
+[[audits.i18n-embed-fl]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.9.4"
+
+[[audits.i18n-embed-impl]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.8.4"
+
 [[audits.inout]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.3 -> 0.1.4"
+
+[[audits.io_tee]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.1.1"
 
 [[audits.itoa]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -156,6 +241,21 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.13.0 -> 0.13.1"
 
+[[audits.parking_lot]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.12.2"
+
+[[audits.parking_lot_core]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.9.10"
+
+[[audits.pbkdf2]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.12.2"
+
 [[audits.pin-project]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -170,6 +270,11 @@ delta = "1.1.7 -> 1.1.10"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.2.15 -> 0.2.16"
+
+[[audits.poly1305]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.7.2"
 
 [[audits.postcard]]
 who = "nikki-aranya <npoelma@spideroak.com>"
@@ -193,6 +298,16 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.2.25 -> 0.2.30"
 
+[[audits.proc-macro-error-attr2]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "2.0.0"
+
+[[audits.proc-macro-error2]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "2.0.1"
+
 [[audits.proc-macro2]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -202,6 +317,11 @@ delta = "1.0.93 -> 1.0.94"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.38 -> 1.0.39"
+
+[[audits.redox_syscall]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.5.10"
 
 [[audits.redox_syscall]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -268,10 +388,35 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.4.0"
 
+[[audits.rust-embed]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "8.7.2"
+
+[[audits.rust-embed-impl]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "8.7.2"
+
+[[audits.rust-embed-utils]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "8.7.2"
+
 [[audits.rustix]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "1.0.8"
+
+[[audits.rustix]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.37.13 -> 0.37.28"
+
+[[audits.rustix]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.37.13 -> 0.37.28"
 
 [[audits.rustix]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -303,15 +448,45 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "1.0.18 -> 1.0.20"
 
+[[audits.salsa20]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.10.2"
+
+[[audits.same-file]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "1.0.6"
+
 [[audits.scc]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-run"
 delta = "2.2.5 -> 2.3.3"
 
+[[audits.scrypt]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.11.0"
+
 [[audits.sdd]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-run"
 delta = "3.0.4 -> 3.0.7"
+
+[[audits.secrecy]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.10.3"
+
+[[audits.self_cell]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.10.2"
+
+[[audits.self_cell]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.10.3"
 
 [[audits.semver]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -424,6 +599,11 @@ who = "Jonathan Dygert <jdygert@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.7.13 -> 0.7.15"
 
+[[audits.type-map]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "0.4.0"
+
 [[audits.typenum]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -438,6 +618,11 @@ delta = "1.0.16 -> 1.0.18"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.0 -> 0.1.1"
+
+[[audits.walkdir]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "2.5.0"
 
 [[audits.wasi]]
 who = "gknopf <gknopf@spideroak.com>"
@@ -479,6 +664,11 @@ who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 version = "0.4.0"
 
+[[audits.x25519-dalek]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+version = "2.0.1"
+
 [[audits.zerofrom]]
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
@@ -488,6 +678,11 @@ delta = "0.1.5 -> 0.1.6"
 who = "gknopf <gknopf@spideroak.com>"
 criteria = "safe-to-deploy"
 delta = "0.1.5 -> 0.1.6"
+
+[[audits.zerovec]]
+who = "gknopf <gknopf@spideroak.com>"
+criteria = "safe-to-deploy"
+delta = "0.11.3 -> 0.11.4"
 
 [[trusted.anstream]]
 criteria = "safe-to-deploy"
