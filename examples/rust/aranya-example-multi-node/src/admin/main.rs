@@ -4,8 +4,9 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
-use aranya_daemon_api::TeamId;
+use aranya_daemon_api::{Role, TeamId};
 use aranya_example_multi_node::{
+    age::AgeEncryptor,
     config::create_config,
     env::EnvVars,
     tcp::{TcpClient, TcpServer},
@@ -84,12 +85,15 @@ async fn main() -> Result<()> {
     .expect("expected to initialize client");
     info!("admin: initialized client");
 
+    // Initialize `age` encryptor.
+    let encryptor = AgeEncryptor::new(env.passphrase);
+
     // Get team ID from owner.
-    let team_id: TeamId = postcard::from_bytes(&server.recv().await?)?;
+    let team_id: TeamId = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
     info!("admin: received team ID from owner");
 
     // Get seed IKM from owner.
-    let seed_ikm = postcard::from_bytes(&server.recv().await?)?;
+    let seed_ikm = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
     info!("admin: received seed ikm from owner");
 
     // Add team.
@@ -106,16 +110,21 @@ async fn main() -> Result<()> {
     info!("admin: added team");
 
     // Send device ID to owner.
+    info!("admin: sending device ID to owner");
+    let device_id = client.get_device_id().await?;
     TcpClient::connect(env.owner.tcp_addr)
         .await?
-        .send(&postcard::to_allocvec(&client.get_device_id().await?)?)
+        .send(&encryptor.encrypt(&postcard::to_allocvec(&device_id)?)?)
         .await?;
+    info!("admin: sent device ID to owner");
 
     // Send public keys to owner.
+    info!("admin: sending public keys to owner");
     TcpClient::connect(env.owner.tcp_addr)
         .await?
-        .send(&postcard::to_allocvec(&client.get_key_bundle().await?)?)
+        .send(&encryptor.encrypt(&postcard::to_allocvec(&client.get_key_bundle().await?)?)?)
         .await?;
+    info!("admin: sent public keys to owner");
 
     // Setup sync peers.
     let sync_interval = Duration::from_millis(100);
@@ -129,9 +138,39 @@ async fn main() -> Result<()> {
     // Wait for syncing.
     sleep(sleep_interval).await;
 
+    // Loop until this device has the `Admin` role assigned to it.
+    let queries = team.queries();
+    info!("admin: waiting for admin role assignment");
+    loop {
+        if let Ok(Role::Admin) = queries.device_role(device_id).await {
+            break;
+        }
+        sleep(sleep_interval).await;
+    }
+    info!("admin: detected admin role assignment");
+
+    info!("admin: waiting for all devices to be added to team and operator role assignment");
+    'outer: loop {
+        if let Ok(devices) = queries.devices_on_team().await {
+            if devices.iter().count() == 5 {
+                for device in devices.iter() {
+                    if let Ok(Role::Operator) = queries.device_role(*device).await {
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        sleep(3 * sleep_interval).await;
+    }
+    info!("admin: detected that all devices have been added to team and operator role has been assigned");
+
+    // Wait for syncing.
+    sleep(sleep_interval).await;
+
     // Remove owner sync peer.
     info!("admin: removing owner sync peer");
     team.remove_sync_peer(env.owner.sync_addr).await?;
+    info!("admin: removed owner sync peer");
 
     info!("admin: complete");
 

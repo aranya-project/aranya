@@ -4,8 +4,9 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
-use aranya_daemon_api::{text, ChanOp, NetIdentifier, TeamId};
+use aranya_daemon_api::{text, ChanOp, NetIdentifier, Role, TeamId};
 use aranya_example_multi_node::{
+    age::AgeEncryptor,
     config::create_config,
     env::EnvVars,
     info::DeviceInfo,
@@ -85,12 +86,15 @@ async fn main() -> Result<()> {
     .expect("expected to initialize client");
     info!("operator: initialized client");
 
+    // Initialize `age` encryptor.
+    let encryptor = AgeEncryptor::new(env.passphrase);
+
     // Get team ID from owner.
-    let team_id: TeamId = postcard::from_bytes(&server.recv().await?)?;
+    let team_id: TeamId = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
     info!("operator: received team ID from owner");
 
     // Get seed IKM from owner.
-    let seed_ikm = postcard::from_bytes(&server.recv().await?)?;
+    let seed_ikm = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
     info!("operator: received seed ikm from owner");
 
     // Add team.
@@ -107,16 +111,21 @@ async fn main() -> Result<()> {
     info!("operator: added team");
 
     // Send device ID to owner.
+    info!("operator: sending device ID to owner");
+    let device_id = client.get_device_id().await?;
     TcpClient::connect(env.owner.tcp_addr)
         .await?
-        .send(&postcard::to_allocvec(&client.get_device_id().await?)?)
+        .send(&encryptor.encrypt(&postcard::to_allocvec(&device_id)?)?)
         .await?;
+    info!("operator: sent device ID to owner");
 
     // Send public keys to owner.
+    info!("operator: sending public keys to owner");
     TcpClient::connect(env.owner.tcp_addr)
         .await?
-        .send(&postcard::to_allocvec(&client.get_key_bundle().await?)?)
+        .send(&encryptor.encrypt(&postcard::to_allocvec(&client.get_key_bundle().await?)?)?)
         .await?;
+    info!("operator: sent public keys to owner");
 
     // Setup sync peers.
     let sync_interval = Duration::from_millis(100);
@@ -129,6 +138,23 @@ async fn main() -> Result<()> {
     // Wait to sync effects.
     sleep(sleep_interval).await;
 
+    // Loop until this device has the `Operator` role assigned to it.
+    info!("operator: waiting for all devices to be added to team and operator role assignment");
+    let queries = team.queries();
+    'outer: loop {
+        if let Ok(devices) = queries.devices_on_team().await {
+            if devices.iter().count() == 5 {
+                for device in devices.iter() {
+                    if let Ok(Role::Operator) = queries.device_role(*device).await {
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        sleep(3 * sleep_interval).await;
+    }
+    info!("operator: detected that all devices have been added to team and operator role has been assigned");
+
     // Remove admin sync peer.
     info!("operator: removing admin sync peer");
     team.remove_sync_peer(env.admin.sync_addr).await?;
@@ -136,9 +162,9 @@ async fn main() -> Result<()> {
     // Get device info from membera and memberb.
     // TODO: get human-readable name from owner or graph.
     let (membera, memberb) = {
-        let info1: DeviceInfo = postcard::from_bytes(&server.recv().await?)?;
+        let info1: DeviceInfo = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
         info!("operator: received device info from {}", info1.name);
-        let info2: DeviceInfo = postcard::from_bytes(&server.recv().await?)?;
+        let info2: DeviceInfo = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
         info!("operator: received device info from {}", info2.name);
 
         if info1.name == "membera" {
@@ -149,6 +175,7 @@ async fn main() -> Result<()> {
     };
 
     // Assign network identifiers for AQC.
+    info!("operator: assigning network identifier to membera");
     team.assign_aqc_net_identifier(
         membera,
         NetIdentifier(
@@ -161,6 +188,9 @@ async fn main() -> Result<()> {
     )
     .await
     .expect("expected to assign net identifier");
+    info!("operator: assigned network identifier to membera");
+
+    info!("operator: assigning network identifier to memberb");
     team.assign_aqc_net_identifier(
         memberb,
         NetIdentifier(
@@ -173,20 +203,24 @@ async fn main() -> Result<()> {
     )
     .await
     .expect("expected to assign net identifier");
+    info!("operator: assigned network identifier to membera");
 
     // Create label.
     info!("operator: creating aqc label");
     let label1 = team.create_label(text!("label1")).await?;
+    info!("operator: created aqc label");
 
     // Assign label to members.
     let op = ChanOp::SendRecv;
     info!("operator: assigning label to membera");
     team.assign_label(membera, label1, op).await?;
+    info!("operator: assigned label to membera");
     info!("operator: assigning label to memberb");
     team.assign_label(memberb, label1, op).await?;
+    info!("operator: assigned label to memberb");
 
     // Allow peers to sync with added label commands.
-    sleep(sleep_interval).await;
+    sleep(3 * sleep_interval).await;
 
     info!("operator: complete");
 

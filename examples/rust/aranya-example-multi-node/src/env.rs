@@ -2,6 +2,7 @@
 
 use std::{env, net::Ipv4Addr, path::Path, str::FromStr};
 
+use age::secrecy::{ExposeSecret, SecretString};
 use anyhow::{Context, Result};
 use aranya_daemon_api::Role;
 use aranya_util::Addr;
@@ -33,6 +34,8 @@ pub struct Device {
 /// Environment variables.
 #[derive(Debug)]
 pub struct EnvVars {
+    /// Tracing log level.
+    pub level: String,
     /// Owner device
     pub owner: Device,
     /// Admin device
@@ -45,11 +48,14 @@ pub struct EnvVars {
     pub memberb: Device,
     /// List of devices
     pub devices: Vec<Device>,
+    /// Onboarding passphrase for encrypting team info with `age`.
+    pub passphrase: SecretString,
 }
 
 impl EnvVars {
     /// Load device info from environment variables.
     pub fn load() -> Result<Self> {
+        let level = env_var("ARANYA_EXAMPLE")?;
         let mut devices = Vec::new();
         for device in DEVICE_LIST {
             let device = Device {
@@ -66,20 +72,27 @@ impl EnvVars {
         let operator = devices[2].clone();
         let membera = devices[3].clone();
         let memberb = devices[4].clone();
+        let passphrase = SecretString::from(env_var::<String>("ARANYA_ONBOARDING_PASSPHRASE")?);
         Ok(Self {
+            level,
             owner,
             admin,
             operator,
             membera,
             memberb,
             devices,
+            passphrase,
         })
     }
 
     /// Generate environment file.
     pub async fn generate(&self, path: &Path) -> Result<()> {
         let mut buf = "".to_string();
-        buf += "export ARANYA_EXAMPLE=info\r\n";
+        buf += &format!("export ARANYA_EXAMPLE={}\r\n", self.level);
+        buf += &format!(
+            "export ARANYA_ONBOARDING_PASSPHRASE={}\r\n",
+            self.passphrase.expose_secret()
+        );
         for device in &self.devices {
             buf += &format!(
                 "export ARANYA_SYNC_ADDR_{}={}\r\n",
@@ -103,7 +116,11 @@ impl EnvVars {
 
     /// Set environment variables.
     pub fn set(&self) {
-        env::set_var("ARANYA_EXAMPLE", "info");
+        env::set_var("ARANYA_EXAMPLE", self.level.clone());
+        env::set_var(
+            "ARANYA_ONBOARDING_PASSPHRASE",
+            self.passphrase.expose_secret(),
+        );
         for device in &self.devices {
             env::set_var(
                 format!("ARANYA_SYNC_ADDR_{}", device.name.to_uppercase()),
@@ -123,8 +140,9 @@ impl EnvVars {
 
 impl Default for EnvVars {
     fn default() -> Self {
+        let level = "info".to_string();
         let mut devices = Vec::new();
-        let mut port = 14001;
+        let mut port = 10001;
         for device in DEVICE_LIST {
             let sync_addr = Addr::from((Ipv4Addr::LOCALHOST, port));
             port += 1;
@@ -146,13 +164,16 @@ impl Default for EnvVars {
         let operator = devices[2].clone();
         let membera = devices[3].clone();
         let memberb = devices[4].clone();
+        let passphrase = SecretString::from("passphrase");
         Self {
+            level,
             owner,
             admin,
             operator,
             membera,
             memberb,
             devices,
+            passphrase,
         }
     }
 }

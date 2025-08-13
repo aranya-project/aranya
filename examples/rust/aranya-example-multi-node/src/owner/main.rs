@@ -6,6 +6,7 @@ use anyhow::Result;
 use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
 use aranya_example_multi_node::{
+    age::AgeEncryptor,
     config::create_config,
     env::EnvVars,
     tcp::{TcpClient, TcpServer},
@@ -104,10 +105,15 @@ async fn main() -> Result<()> {
     let team_id = team.team_id();
     info!("owner: created team: {}", team_id);
 
+    // Initialize `age` encryptor.
+    let encryptor = AgeEncryptor::new(env.passphrase);
+
     // Send team ID and IKM to each device except for itself.
     // Receive the device ID and public key bundle from each device.
     // Add each device to the team.
     // Assign the proper role to each device.
+    let encrypted_team_id = encryptor.encrypt(&postcard::to_allocvec(&team_id)?)?;
+    let encrypted_seed_ikm = encryptor.encrypt(&postcard::to_allocvec(&seed_ikm)?)?;
     for device in &env.devices {
         if device.name == DEVICE_NAME {
             continue;
@@ -117,7 +123,7 @@ async fn main() -> Result<()> {
         info!("owner: sending team ID to {}", device.name);
         TcpClient::connect(device.tcp_addr)
             .await?
-            .send(&postcard::to_allocvec(&team_id)?)
+            .send(&encrypted_team_id)
             .await?;
         info!("owner: sent team ID to {}", device.name);
 
@@ -125,16 +131,16 @@ async fn main() -> Result<()> {
         info!("owner: sending seed ikm to {}", device.name);
         TcpClient::connect(device.tcp_addr)
             .await?
-            .send(&postcard::to_allocvec(&seed_ikm)?)
+            .send(&encrypted_seed_ikm)
             .await?;
         info!("owner: sent seed ikm to {}", device.name);
 
         // Receive device ID from device.
-        let id: DeviceId = postcard::from_bytes(&server.recv().await?)?;
+        let id: DeviceId = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
         info!("owner: received device ID from {}", device.name);
 
         // Receive public keys from device.
-        let pk: KeyBundle = postcard::from_bytes(&server.recv().await?)?;
+        let pk: KeyBundle = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
         info!("owner: received public keys from {}", device.name);
 
         team.add_device_to_team(pk).await?;
@@ -159,7 +165,7 @@ async fn main() -> Result<()> {
 
     let sync_interval = Duration::from_millis(100);
     let sleep_interval = sync_interval * 6;
-    sleep(sleep_interval).await;
+    sleep(10 * sleep_interval).await;
 
     info!("owner: complete");
 

@@ -22,6 +22,7 @@ aranya-client = { workspace = true }
 aranya-daemon-api = { workspace = true }
 aranya-util = { workspace = true }
 
+age = { workspace = true }
 anyhow = { workspace = true }
 backon = { workspace = true }
 bytes = { workspace = true }

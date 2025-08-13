@@ -6,6 +6,7 @@ use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_daemon_api::{NetIdentifier, TeamId};
 use aranya_example_multi_node::{
+    age::AgeEncryptor,
     config::create_config,
     env::EnvVars,
     info::DeviceInfo,
@@ -86,12 +87,15 @@ async fn main() -> Result<()> {
     .expect("expected to initialize client");
     info!("membera: initialized client");
 
+    // Initialize `age` encryptor.
+    let encryptor = AgeEncryptor::new(env.passphrase);
+
     // Get team ID from owner.
-    let team_id: TeamId = postcard::from_bytes(&server.recv().await?)?;
+    let team_id: TeamId = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
     info!("membera: received team ID from owner");
 
     // Get seed IKM from owner.
-    let seed_ikm = postcard::from_bytes(&server.recv().await?)?;
+    let seed_ikm = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
     info!("membera: received seed ikm from owner");
 
     // Add team.
@@ -111,16 +115,20 @@ async fn main() -> Result<()> {
     info!("membera: added team");
 
     // Send device ID to owner.
+    info!("membera: sending device ID to owner");
     TcpClient::connect(env.owner.tcp_addr)
         .await?
-        .send(&postcard::to_allocvec(&client.get_device_id().await?)?)
+        .send(&encryptor.encrypt(&postcard::to_allocvec(&client.get_device_id().await?)?)?)
         .await?;
+    info!("membera: sent device ID to owner");
 
     // Send public keys to owner.
+    info!("membera: sending public keys to owner");
     TcpClient::connect(env.owner.tcp_addr)
         .await?
-        .send(&postcard::to_allocvec(&client.get_key_bundle().await?)?)
+        .send(&encryptor.encrypt(&postcard::to_allocvec(&client.get_key_bundle().await?)?)?)
         .await?;
+    info!("membera: sent public keys to owner");
 
     // Setup sync peers.
     let sync_interval = Duration::from_millis(100);
@@ -135,29 +143,33 @@ async fn main() -> Result<()> {
     sleep(sleep_interval).await;
 
     // Send device info to operator.
+    info!("membera: sending device info to operator");
     TcpClient::connect(env.operator.tcp_addr)
         .await?
-        .send(&postcard::to_allocvec(&DeviceInfo {
+        .send(&encryptor.encrypt(&postcard::to_allocvec(&DeviceInfo {
             name: DEVICE_NAME.to_string(),
             device_id: client.get_device_id().await?,
-        })?)
+        })?)?)
         .await?;
+    info!("membera: sent device info to operator");
 
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // Remove operator sync peer.
-    team.remove_sync_peer(env.operator.sync_addr).await?;
-
     // Query the AQC label.
     let queries = team.queries();
     let label = loop {
-        let labels = queries.labels().await?;
-        if labels.iter().count() > 0 {
-            break labels.iter().next().expect("expected label").clone();
+        if let Ok(labels) = queries.labels().await {
+            if labels.iter().count() > 0 {
+                break labels.iter().next().expect("expected label").clone();
+            }
         }
         sleep(sleep_interval).await;
     };
+
+    // Remove operator sync peer.
+    info!("membera: removing operator sync peer");
+    team.remove_sync_peer(env.operator.sync_addr).await?;
 
     // Create a bidi AQC channel.
     info!("membera: creating bidi channel");
