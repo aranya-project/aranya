@@ -51,6 +51,7 @@ type Request = (Msg, oneshot::Sender<Reply>);
 type Reply = SyncResult<()>;
 
 /// A sync peer.
+///
 /// Contains the information needed to sync with a single peer:
 /// - network address
 /// - Aranya graph id
@@ -145,12 +146,14 @@ impl PeerCacheKey {
     }
 }
 
-/// Thread-safe map of peer caches
+/// Thread-safe map of peer caches.
+///
 /// For a given peer, there's should only be one cache. If separate caches are used
 /// for the server and state it will reduce the efficiency of the syncer.
 pub(crate) type PeerCacheMap = Arc<Mutex<BTreeMap<PeerCacheKey, PeerCache>>>;
 
 /// Syncs with each peer after the specified interval.
+///
 /// Uses a [`DelayQueue`] to obtain the next peer to sync with.
 /// Receives added/removed peers from [`SyncPeers`] via mpsc channels.
 #[derive(Debug)]
