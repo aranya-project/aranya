@@ -61,7 +61,6 @@ aranya-daemon-api = { version = "1.0.0", path = "crates/aranya-daemon-api" }
 aranya-keygen = { version = "1.0.0", path = "crates/aranya-keygen" }
 aranya-util = { version = "1.0.0", path = "crates/aranya-util" }
 
-age = { version = "0.11.1" }
 anyhow = { version = "1.0.86" }
 backon = { version = "1.2.0" }
 bytes = { version = "1.10.0" }
