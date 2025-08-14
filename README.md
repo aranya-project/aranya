@@ -130,7 +130,7 @@ info!(?team_id);
 ```
 
 This snippet can be found in the
-[Rust example](examples/rust/src/main.rs#L198).
+[Rust example](examples/rust/aranya-example/src/main.rs#L198).
 
 Before starting your application, run the daemon by providing the path to a
 [configuration file](crates/aranya-daemon/example.toml). Find more details on
