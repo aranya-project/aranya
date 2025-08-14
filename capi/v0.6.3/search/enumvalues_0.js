@@ -1,0 +1,25 @@
+var searchData=
+[
+  ['aranya_5fchan_5fop_5frecv_5fonly_0',['ARANYA_CHAN_OP_RECV_ONLY',['../aranya-client_8h.html#ae327ccde00be772aaef1361231d36495ab53d2b14b4750c6ed1cbc8fe5b823af9',1,'aranya-client.h']]],
+  ['aranya_5fchan_5fop_5fsend_5fonly_1',['ARANYA_CHAN_OP_SEND_ONLY',['../aranya-client_8h.html#ae327ccde00be772aaef1361231d36495a4a86a2dcce04490f432bc6609ada7b80',1,'aranya-client.h']]],
+  ['aranya_5fchan_5fop_5fsend_5frecv_2',['ARANYA_CHAN_OP_SEND_RECV',['../aranya-client_8h.html#ae327ccde00be772aaef1361231d36495a8620802f5a7ec425e6b876a5cf415c48',1,'aranya-client.h']]],
+  ['aranya_5ferror_5faqc_3',['ARANYA_ERROR_AQC',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558a550cb9f6988ba110a5a6ce5bd027c458',1,'aranya-client.h']]],
+  ['aranya_5ferror_5faranya_4',['ARANYA_ERROR_ARANYA',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558ac37c25801672f1246090c1be18401b0f',1,'aranya-client.h']]],
+  ['aranya_5ferror_5fbuffer_5ftoo_5fsmall_5',['ARANYA_ERROR_BUFFER_TOO_SMALL',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558a6419a14ccf2005bbbb6cf72a0b00d8c0',1,'aranya-client.h']]],
+  ['aranya_5ferror_5fbug_6',['ARANYA_ERROR_BUG',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558a65138d1c177b59a48eced06fe225a8c4',1,'aranya-client.h']]],
+  ['aranya_5ferror_5fclosed_7',['ARANYA_ERROR_CLOSED',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558acae0a270463aac7137e78635996af844',1,'aranya-client.h']]],
+  ['aranya_5ferror_5fconfig_8',['ARANYA_ERROR_CONFIG',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558a12692b82a1af593c7f73fcf1faee0eae',1,'aranya-client.h']]],
+  ['aranya_5ferror_5finvalid_5faddr_9',['ARANYA_ERROR_INVALID_ADDR',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558a892a25f82c176177bb2f0401a18b273e',1,'aranya-client.h']]],
+  ['aranya_5ferror_5finvalid_5fargument_10',['ARANYA_ERROR_INVALID_ARGUMENT',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558a0b64478c014db73ea65c20089b59bf8b',1,'aranya-client.h']]],
+  ['aranya_5ferror_5finvalid_5futf8_11',['ARANYA_ERROR_INVALID_UTF8',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558a39738a5cba7a71d66dc636dfda3b6256',1,'aranya-client.h']]],
+  ['aranya_5ferror_5fipc_12',['ARANYA_ERROR_IPC',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558a2b59b50a4468d21cb3104480d4499149',1,'aranya-client.h']]],
+  ['aranya_5ferror_5fother_13',['ARANYA_ERROR_OTHER',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558ac1fc8223c8d12780f7f4ab767d4972a4',1,'aranya-client.h']]],
+  ['aranya_5ferror_5fserialization_14',['ARANYA_ERROR_SERIALIZATION',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558aa289be7c67d1f17227793cb82e6d634d',1,'aranya-client.h']]],
+  ['aranya_5ferror_5fsuccess_15',['ARANYA_ERROR_SUCCESS',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558aa52c2b2f9b4fbed79e0ad921bf5a4ec7',1,'aranya-client.h']]],
+  ['aranya_5ferror_5ftimeout_16',['ARANYA_ERROR_TIMEOUT',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558a4046890a19d8fea6a3c84c30e05701a4',1,'aranya-client.h']]],
+  ['aranya_5ferror_5fwould_5fblock_17',['ARANYA_ERROR_WOULD_BLOCK',['../aranya-client_8h.html#ae17c03176fbf2b753be8db7e4007d558ad5a733158152c0897e019b0a3d9c4a6c',1,'aranya-client.h']]],
+  ['aranya_5frole_5fadmin_18',['ARANYA_ROLE_ADMIN',['../aranya-client_8h.html#af8e2c410a381e31b630764c9341c4727a14ef15c091334db6f04f13a48899979f',1,'aranya-client.h']]],
+  ['aranya_5frole_5fmember_19',['ARANYA_ROLE_MEMBER',['../aranya-client_8h.html#af8e2c410a381e31b630764c9341c4727a5c199f3a79ccb75b0da9cfcf877d745c',1,'aranya-client.h']]],
+  ['aranya_5frole_5foperator_20',['ARANYA_ROLE_OPERATOR',['../aranya-client_8h.html#af8e2c410a381e31b630764c9341c4727afe6298ffda61fc2ba1b2b371ed893f5b',1,'aranya-client.h']]],
+  ['aranya_5frole_5fowner_21',['ARANYA_ROLE_OWNER',['../aranya-client_8h.html#af8e2c410a381e31b630764c9341c4727a19c452e178c21fc930721d33a8874a22',1,'aranya-client.h']]]
+];
