@@ -141,9 +141,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-capi-codegen"
-version = "0.3.1"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f73d5d110d81566f07c1ff988d0091c161c829681467fcc9578a5c38194c46e8"
+checksum = "8c0850521343f0b22cff93107d4c0d33f76c9ca6d7ebc3f0955f9d7f9186e499"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -159,9 +159,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-capi-core"
-version = "0.4.1"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5bc02d9d37676f9a3567dc47e42e2b906f1faf6bf86fa184cd57e44c5f00830"
+checksum = "81d0d13b4981aa06047789aeecea507046f09522f9df3a9ca1868765358438fa"
 dependencies = [
  "aranya-capi-macro",
  "aranya-libc",
@@ -175,9 +175,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-capi-macro"
-version = "0.3.1"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a90506c7aa0f60e41ea0dc2c447e66269e38853341abadd5e96bd2e2c5d82ad9"
+checksum = "1e310ddefe8ec487d7c5b7a2d3c271d3d2b92b1c448f6b803aab0ee82aea3db2"
 dependencies = [
  "aranya-capi-codegen",
  "proc-macro2",
@@ -188,7 +188,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-client"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -271,7 +271,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "anyhow",
  "aranya-aqc-util",
@@ -313,7 +313,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-daemon-api"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -443,7 +443,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-keygen"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "anyhow",
  "aranya-crypto",
@@ -452,9 +452,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-libc"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6dbc2d3e3fa7eb807b35c240605eaf04cb9502a11fd63abc70b038f71387d1a"
+checksum = "d3859ec7937db1db6f9d76b9cfb5050c1cc8269d6e8dc890a0fdbb1644832042"
 dependencies = [
  "cfg-if",
  "errno",
@@ -617,7 +617,7 @@ dependencies = [
 
 [[package]]
 name = "aranya-util"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "anyhow",
  "aranya-fast-channels",

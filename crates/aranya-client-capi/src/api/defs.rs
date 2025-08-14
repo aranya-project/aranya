@@ -10,7 +10,7 @@ use aranya_capi_core::{opaque::Opaque, prelude::*, ErrorCode, InvalidArg};
 use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_crypto::hex;
 use bytes::Bytes;
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::{imp, imp::aqc::consume_bytes};
 
@@ -84,7 +84,7 @@ pub enum Error {
 
 impl From<&imp::Error> for Error {
     fn from(err: &imp::Error) -> Self {
-        error!(?err);
+        debug!(?err, "Aranya client C API error");
         match err {
             imp::Error::Bug(_) => Self::Bug,
             imp::Error::Timeout(_) => Self::Timeout,
