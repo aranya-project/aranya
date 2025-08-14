@@ -23,6 +23,7 @@ higher role back down to `Member`.
 
 * Owner:
   * Initialize/terminate Team.
+  * Finalize graph state.
   * Add (new) / remove Members.
   * Assign/revoke Owner role.
   * Assign/revoke Admin role.
@@ -434,7 +435,52 @@ finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyId
 **Invariants:**
 
 - This is the initial command in the graph.
-- Only an Owner will create this event.
+- Only an Owner will create this command.
+
+
+## FinalizeTeam
+
+Finalizes the current state of the team's graph.
+
+```policy
+action finalize_team() {
+    publish FinalizeTeam {}
+}
+
+effect TeamFinalized {
+    owner_id id,
+}
+
+command FinalizeTeam {
+    fields {}
+    attributes {
+        finalize: true
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        // Check that the team is active and return the author's info if they exist in the team.
+        let author = get_valid_device(envelope::author_id(envelope))
+        // Only the Owner can create this command
+        check is_owner(author.role)
+
+        finish {
+            emit TeamFinalized {
+                owner_id: author.device_id,
+            }
+        }
+    }
+}
+```
+
+**Invariants:**
+
+- Only an Owner will create this command.
+
 
 ## TerminateTeam
 
@@ -478,7 +524,7 @@ command TerminateTeam {
 **Invariants:**
 
 - This is the final command in the graph.
-- Only an Owner can create this event.
+- Only an Owner can create this command.
 - Once terminated, no further communication will occur over the team graph.
 
 

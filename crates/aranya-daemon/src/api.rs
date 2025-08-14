@@ -188,6 +188,7 @@ impl EffectHandler {
             trace!(?effect, "handling effect");
             match effect {
                 TeamCreated(_team_created) => {}
+                TeamFinalized(_team_finalized) => {}
                 TeamTerminated(_team_terminated) => {}
                 MemberAdded(_member_added) => {}
                 MemberRemoved(_member_removed) => {}
@@ -436,6 +437,19 @@ impl DaemonApi for Api {
         self.check_team_valid(team).await?;
 
         todo!();
+    }
+
+    #[instrument(skip(self), err)]
+    async fn finalize_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.client
+            .actions(&team.into_id().into())
+            .finalize_team()
+            .await
+            .context("unable to finalize team")?;
+
+        Ok(())
     }
 
     #[instrument(skip(self), err)]

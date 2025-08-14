@@ -2081,6 +2081,29 @@ AranyaError aranya_close_team_ext(const struct AranyaClient *client,
                                   struct AranyaExtError *__ext_err);
 
 /**
+ * Finalizes the team's current graph state.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_finalize_team(const struct AranyaClient *client,
+                                 const struct AranyaTeamId *team);
+
+/**
+ * Finalizes the team's current graph state.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_finalize_team_ext(const struct AranyaClient *client,
+                                     const struct AranyaTeamId *team,
+                                     struct AranyaExtError *__ext_err);
+
+/**
  * Add a device to the team with the default role.
  *
  * Permission to perform this operation is checked against the Aranya policy.
