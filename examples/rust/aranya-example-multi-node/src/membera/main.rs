@@ -4,7 +4,7 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
-use aranya_daemon_api::{NetIdentifier, TeamId};
+use aranya_daemon_api::{NetIdentifier, Role, TeamId};
 use aranya_example_multi_node::{
     age::AgeEncryptor,
     env::EnvVars,
@@ -112,6 +112,35 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
+    // Wait for admin to create label.
+    info!("membera: waiting for admin to create label");
+    let queries = team.queries();
+    let label1 = loop {
+        if let Ok(labels) = queries.labels().await {
+            if let Some(label1) = labels.iter().next() {
+                break label1.id;
+            }
+        }
+        sleep(sleep_interval).await;
+    };
+
+    // Loop until this device has the `Operator` role assigned to it.
+    info!("membera: waiting for all devices to be added to team and operator role assignment");
+    let queries = team.queries();
+    'outer: loop {
+        if let Ok(devices) = queries.devices_on_team().await {
+            if devices.iter().count() == 5 {
+                for device in devices.iter() {
+                    if let Ok(Role::Operator) = queries.device_role(*device).await {
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        sleep(3 * sleep_interval).await;
+    }
+    info!("membera: detected that all devices have been added to team and operator role has been assigned");
+
     // Send device info to operator.
     info!("membera: sending device info to operator");
     TcpClient::connect(env.operator.tcp_addr)
@@ -126,16 +155,23 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // Query the AQC label.
-    let queries = team.queries();
-    let label = loop {
-        if let Ok(labels) = queries.labels().await {
-            if labels.iter().count() > 0 {
-                break labels.iter().next().expect("expected label").clone();
+    // Check that label has been assigned to membera and memberb.
+    'outer: loop {
+        if let Ok(devices) = queries.devices_on_team().await {
+            let mut labels_assigned = 0;
+            for device in devices.iter() {
+                if let Ok(labels) = queries.device_label_assignments(*device).await {
+                    if labels.iter().count() > 0 {
+                        labels_assigned += 1;
+                        if labels_assigned >= 2 {
+                            break 'outer;
+                        }
+                    }
+                }
             }
         }
-        sleep(sleep_interval).await;
-    };
+        sleep(3 * sleep_interval).await;
+    }
 
     // Remove operator sync peer.
     info!("membera: removing operator sync peer");
@@ -154,7 +190,7 @@ async fn main() -> Result<()> {
                     .try_into()
                     .expect("addr is valid text"),
             ),
-            label.id,
+            label1,
         )
         .await
         .expect("expected to create bidi channel");

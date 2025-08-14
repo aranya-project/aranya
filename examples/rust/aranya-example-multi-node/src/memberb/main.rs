@@ -7,7 +7,7 @@ use aranya_client::{
     aqc::{AqcPeerChannel, AqcPeerStream},
     AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig,
 };
-use aranya_daemon_api::TeamId;
+use aranya_daemon_api::{Role, TeamId};
 use aranya_example_multi_node::{
     age::AgeEncryptor,
     env::EnvVars,
@@ -114,6 +114,35 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
+    // Wait for admin to create label.
+    info!("memberb: waiting for admin to create label");
+    let queries = team.queries();
+    loop {
+        if let Ok(labels) = queries.labels().await {
+            if labels.iter().next().is_some() {
+                break;
+            }
+        }
+        sleep(sleep_interval).await;
+    }
+
+    // Loop until this device has the `Operator` role assigned to it.
+    info!("memberb: waiting for all devices to be added to team and operator role assignment");
+    let queries = team.queries();
+    'outer: loop {
+        if let Ok(devices) = queries.devices_on_team().await {
+            if devices.iter().count() == 5 {
+                for device in devices.iter() {
+                    if let Ok(Role::Operator) = queries.device_role(*device).await {
+                        break 'outer;
+                    }
+                }
+            }
+        }
+        sleep(3 * sleep_interval).await;
+    }
+    info!("memberb: detected that all devices have been added to team and operator role has been assigned");
+
     // Send device info to operator.
     info!("memberb: sending device info to operator");
     TcpClient::connect(env.operator.tcp_addr)
@@ -128,15 +157,21 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
-    // Query the AQC label.
+    // Check that label has been assigned to membera and memberb.
     let queries = team.queries();
-    loop {
-        if let Ok(labels) = queries.labels().await {
-            if labels.iter().count() > 0 {
-                break;
+    'outer: loop {
+        if let Ok(devices) = queries.devices_on_team().await {
+            let mut labels_assigned = 0;
+            for device in devices.iter() {
+                if let Ok(labels) = queries.device_label_assignments(*device).await {
+                    labels_assigned += labels.iter().count();
+                    if labels_assigned >= 2 {
+                        break 'outer;
+                    }
+                }
             }
         }
-        sleep(sleep_interval).await;
+        sleep(3 * sleep_interval).await;
     }
 
     // Remove operator sync peer.

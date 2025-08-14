@@ -4,7 +4,7 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
-use aranya_daemon_api::TeamId;
+use aranya_daemon_api::{text, Role, TeamId};
 use aranya_example_multi_node::{
     age::AgeEncryptor,
     env::EnvVars,
@@ -13,6 +13,7 @@ use aranya_example_multi_node::{
 };
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
+use tokio::time::sleep;
 use tracing::info;
 
 /// CLI args.
@@ -95,9 +96,30 @@ async fn main() -> Result<()> {
     // Setup sync peers.
     info!("admin: adding owner sync peer");
     let sync_interval = Duration::from_millis(100);
+    let sleep_interval = sync_interval * 6;
     let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
     team.add_sync_peer(env.owner.sync_addr, sync_cfg.clone())
         .await?;
+
+    // Loop until this device has the `Admin` role assigned to it.
+    info!("admin: waiting for owner to assign admin role");
+    let queries = team.queries();
+    'outer: loop {
+        if let Ok(devices) = queries.devices_on_team().await {
+            for device in devices.iter() {
+                if let Ok(Role::Admin) = queries.device_role(*device).await {
+                    break 'outer;
+                }
+            }
+        }
+        sleep(3 * sleep_interval).await;
+    }
+    info!("admin: detected that owner has assigned admin role");
+
+    // Create label.
+    info!("admin: creating aqc label");
+    let _label1 = team.create_label(text!("label1")).await?;
+    info!("admin: created aqc label");
 
     info!("admin: complete");
 

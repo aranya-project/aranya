@@ -4,7 +4,7 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
-use aranya_daemon_api::{text, ChanOp, NetIdentifier, Role, TeamId};
+use aranya_daemon_api::{ChanOp, NetIdentifier, Role, TeamId};
 use aranya_example_multi_node::{
     age::AgeEncryptor,
     env::EnvVars,
@@ -105,6 +105,17 @@ async fn main() -> Result<()> {
     // Wait to sync effects.
     sleep(sleep_interval).await;
 
+    // Wait for admin to create label.
+    let queries = team.queries();
+    let label1 = loop {
+        if let Ok(labels) = queries.labels().await {
+            if let Some(label1) = labels.iter().next() {
+                break label1.id;
+            }
+        }
+        sleep(sleep_interval).await;
+    };
+
     // Loop until this device has the `Operator` role assigned to it.
     info!("operator: waiting for all devices to be added to team and operator role assignment");
     let queries = team.queries();
@@ -171,11 +182,6 @@ async fn main() -> Result<()> {
     .await
     .expect("expected to assign net identifier");
     info!("operator: assigned network identifier to membera");
-
-    // Create label.
-    info!("operator: creating aqc label");
-    let label1 = team.create_label(text!("label1")).await?;
-    info!("operator: created aqc label");
 
     // Assign label to members.
     let op = ChanOp::SendRecv;
