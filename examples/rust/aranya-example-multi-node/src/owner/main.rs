@@ -37,7 +37,7 @@ async fn main() -> Result<()> {
 
     // Start TCP server.
     info!("owner: starting onboarding server");
-    let onboard = Onboard::new(env.owner.tcp_addr, env.passphrase).await?;
+    let onboard = Onboard::new(env.owner.tcp_addr, env.passphrase.clone()).await?;
     info!("owner: started onboarding server");
 
     // Initialize client.
@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
     // Receive the device ID and public key bundle from each device.
     // Add each device to the team.
     // Assign the proper role to each device.
-    for device in &env.devices {
+    for device in env.devices() {
         if device.name == DEVICE_NAME {
             continue;
         }

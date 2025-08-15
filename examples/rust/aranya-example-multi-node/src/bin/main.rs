@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
     // Start a daemon for each device.
     let tmp = tempdir()?;
     let mut children = vec![];
-    for device in &env.devices {
+    for device in env.devices() {
         // Generate config file.
         info!("generating daemon config file for {}", device.name);
         let cfg = create_config(device.name.clone(), device.sync_addr, tmp.path())
@@ -57,7 +57,7 @@ async fn main() -> Result<()> {
 
     // Start device for each team member.
     let mut set = JoinSet::new();
-    for device in env.devices {
+    for device in env.devices() {
         info!("starting {} client", device.name);
         let uds_sock = tmp
             .path()

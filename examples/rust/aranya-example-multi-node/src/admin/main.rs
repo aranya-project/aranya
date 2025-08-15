@@ -1,13 +1,13 @@
 //! Admin device.
 
-use std::{path::PathBuf, time::Duration};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_daemon_api::{text, Role};
 use aranya_example_multi_node::{
     env::EnvVars,
-    onboarding::{DeviceInfo, Onboard, TeamInfo},
+    onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
     tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};
@@ -86,9 +86,7 @@ async fn main() -> Result<()> {
 
     // Setup sync peers.
     info!("admin: adding owner sync peer");
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
-    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
+    let sync_cfg = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
     team.add_sync_peer(env.owner.sync_addr, sync_cfg.clone())
         .await?;
 
@@ -103,7 +101,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        sleep(3 * sleep_interval).await;
+        sleep(SLEEP_INTERVAL).await;
     }
     info!("admin: detected that owner has assigned admin role");
 

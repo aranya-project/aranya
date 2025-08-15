@@ -1,13 +1,13 @@
 //! Member A device.
 
-use std::{path::PathBuf, time::Duration};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_daemon_api::{NetIdentifier, Role};
 use aranya_example_multi_node::{
     env::EnvVars,
-    onboarding::{DeviceInfo, Onboard, TeamInfo},
+    onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
     tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};
@@ -89,16 +89,14 @@ async fn main() -> Result<()> {
     info!("membera: sent device info to owner");
 
     // Setup sync peers.
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
-    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
+    let sync_cfg = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
     info!("membera: adding operator sync peer");
     team.add_sync_peer(env.operator.sync_addr, sync_cfg.clone())
         .await
         .expect("expected to add sync peer");
 
     // wait for syncing.
-    sleep(sleep_interval).await;
+    sleep(SLEEP_INTERVAL).await;
 
     // Wait for admin to create label.
     info!("membera: waiting for admin to create label");
@@ -109,7 +107,7 @@ async fn main() -> Result<()> {
                 break label1.id;
             }
         }
-        sleep(sleep_interval).await;
+        sleep(SLEEP_INTERVAL).await;
     };
 
     // Loop until this device has the `Operator` role assigned to it.
@@ -125,7 +123,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        sleep(3 * sleep_interval).await;
+        sleep(3 * SLEEP_INTERVAL).await;
     }
     info!("membera: detected that all devices have been added to team and operator role has been assigned");
 
@@ -144,7 +142,7 @@ async fn main() -> Result<()> {
     info!("membera: sent device info to operator");
 
     // wait for syncing.
-    sleep(sleep_interval).await;
+    sleep(SLEEP_INTERVAL).await;
 
     // Check that label has been assigned to membera and memberb.
     'outer: loop {
@@ -161,7 +159,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        sleep(3 * sleep_interval).await;
+        sleep(3 * SLEEP_INTERVAL).await;
     }
 
     // Remove operator sync peer.

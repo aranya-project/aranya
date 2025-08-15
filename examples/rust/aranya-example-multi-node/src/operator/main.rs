@@ -1,13 +1,13 @@
 //! Operator device.
 
-use std::{path::PathBuf, time::Duration};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
 use aranya_daemon_api::{ChanOp, NetIdentifier, Role};
 use aranya_example_multi_node::{
     env::EnvVars,
-    onboarding::{DeviceInfo, Onboard, TeamInfo},
+    onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
     tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};
@@ -85,15 +85,13 @@ async fn main() -> Result<()> {
     info!("operator: sent device info to owner");
 
     // Setup sync peers.
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
-    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
+    let sync_cfg = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
     info!("operator: adding admin sync peer");
     team.add_sync_peer(env.admin.sync_addr, sync_cfg.clone())
         .await?;
 
     // Wait to sync effects.
-    sleep(sleep_interval).await;
+    sleep(SLEEP_INTERVAL).await;
 
     // Wait for admin to create label.
     let queries = team.queries();
@@ -103,7 +101,7 @@ async fn main() -> Result<()> {
                 break label1.id;
             }
         }
-        sleep(sleep_interval).await;
+        sleep(SLEEP_INTERVAL).await;
     };
 
     // Loop until this device has the `Operator` role assigned to it.
@@ -119,7 +117,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        sleep(3 * sleep_interval).await;
+        sleep(3 * SLEEP_INTERVAL).await;
     }
     info!("operator: detected that all devices have been added to team and operator role has been assigned");
 

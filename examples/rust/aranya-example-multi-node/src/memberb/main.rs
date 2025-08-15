@@ -1,6 +1,6 @@
 //! Member B device.
 
-use std::{path::PathBuf, time::Duration};
+use std::path::PathBuf;
 
 use anyhow::{bail, Result};
 use aranya_client::{
@@ -10,7 +10,7 @@ use aranya_client::{
 use aranya_daemon_api::Role;
 use aranya_example_multi_node::{
     env::EnvVars,
-    onboarding::{DeviceInfo, Onboard, TeamInfo},
+    onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
     tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};
@@ -91,16 +91,14 @@ async fn main() -> Result<()> {
     info!("memberb: sent device info to owner");
 
     // Setup sync peers.
-    let sync_interval = Duration::from_millis(100);
-    let sleep_interval = sync_interval * 6;
-    let sync_cfg = SyncPeerConfig::builder().interval(sync_interval).build()?;
+    let sync_cfg = SyncPeerConfig::builder().interval(SYNC_INTERVAL).build()?;
     info!("memberb: adding operator sync peer");
     team.add_sync_peer(env.operator.sync_addr, sync_cfg.clone())
         .await
         .expect("expected to add sync peer");
 
     // wait for syncing.
-    sleep(sleep_interval).await;
+    sleep(SLEEP_INTERVAL).await;
 
     // Wait for admin to create label.
     info!("memberb: waiting for admin to create label");
@@ -111,7 +109,7 @@ async fn main() -> Result<()> {
                 break;
             }
         }
-        sleep(sleep_interval).await;
+        sleep(SLEEP_INTERVAL).await;
     }
 
     // Loop until this device has the `Operator` role assigned to it.
@@ -127,7 +125,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        sleep(3 * sleep_interval).await;
+        sleep(3 * SLEEP_INTERVAL).await;
     }
     info!("memberb: detected that all devices have been added to team and operator role has been assigned");
 
@@ -147,7 +145,7 @@ async fn main() -> Result<()> {
     info!("memberb: sent device info to operator");
 
     // wait for syncing.
-    sleep(sleep_interval).await;
+    sleep(SLEEP_INTERVAL).await;
 
     // Check that label has been assigned to membera and memberb.
     let queries = team.queries();
@@ -163,7 +161,7 @@ async fn main() -> Result<()> {
                 }
             }
         }
-        sleep(3 * sleep_interval).await;
+        sleep(3 * SLEEP_INTERVAL).await;
     }
 
     // Remove operator sync peer.
@@ -199,6 +197,9 @@ async fn main() -> Result<()> {
     // Send data.
     stream.send(data).await.expect("expected to send data");
     info!("memberb: sent AQC data");
+
+    // Wait for membera to receive data before closing stream.
+    sleep(SYNC_INTERVAL).await;
 
     info!("memberb: complete");
 

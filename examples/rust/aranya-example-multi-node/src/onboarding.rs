@@ -1,5 +1,7 @@
 //! Utilities for encrypting/decrypting onboarding data and passing it between peers.
 
+use std::time::Duration;
+
 use age::secrecy::SecretString;
 use anyhow::Result;
 use aranya_daemon_api::{DeviceId, KeyBundle, TeamId};
@@ -10,6 +12,11 @@ use crate::{
     age::AgeEncryptor,
     tcp::{TcpClient, TcpServer},
 };
+
+/// How long to wait between syncs.
+pub const SYNC_INTERVAL: Duration = Duration::from_millis(100);
+/// How long to wait to sync new effects.
+pub const SLEEP_INTERVAL: Duration = Duration::from_millis(600);
 
 /// Team info sent from team owner to other devices during onboarding.
 #[derive(Debug, Serialize, Deserialize)]
