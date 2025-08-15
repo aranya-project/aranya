@@ -9,11 +9,7 @@ use aranya_client::{
 };
 use aranya_daemon_api::{Role, TeamId};
 use aranya_example_multi_node::{
-    age::AgeEncryptor,
-    env::EnvVars,
-    info::DeviceInfo,
-    tcp::{TcpClient, TcpServer},
-    tracing::init_tracing,
+    env::EnvVars, info::DeviceInfo, onboarding::Onboard, tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
@@ -42,9 +38,9 @@ async fn main() -> Result<()> {
     let env = EnvVars::load()?;
 
     // Start TCP server.
-    info!("memberb: starting tcp server");
-    let server = TcpServer::bind(env.memberb.tcp_addr).await?;
-    info!("memberb: started tcp server");
+    info!("memberb: starting onboarding server");
+    let onboard = Onboard::new(env.memberb.tcp_addr, env.passphrase).await?;
+    info!("memberb: started onboarding server");
 
     // Initialize client.
     info!("memberb: initializing client");
@@ -59,15 +55,12 @@ async fn main() -> Result<()> {
     .expect("expected to initialize client");
     info!("memberb: initialized client");
 
-    // Initialize `age` encryptor.
-    let encryptor = AgeEncryptor::new(env.passphrase);
-
     // Get team ID from owner.
-    let team_id: TeamId = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
+    let team_id: TeamId = onboard.recv().await?;
     info!("memberb: received team ID from owner");
 
     // Get seed IKM from owner.
-    let seed_ikm = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
+    let seed_ikm = onboard.recv().await?;
     info!("memberb: received seed ikm from owner");
 
     // Add team.
@@ -88,17 +81,15 @@ async fn main() -> Result<()> {
 
     // Send device ID to owner.
     info!("memberb: sending device ID to owner");
-    TcpClient::connect(env.owner.tcp_addr)
-        .await?
-        .send(&encryptor.encrypt(&postcard::to_allocvec(&client.get_device_id().await?)?)?)
+    onboard
+        .send(&client.get_device_id().await?, env.owner.tcp_addr)
         .await?;
     info!("memberb: sent device ID to owner");
 
     // Send public keys to owner.
     info!("memberb: sending public keys to owner");
-    TcpClient::connect(env.owner.tcp_addr)
-        .await?
-        .send(&encryptor.encrypt(&postcard::to_allocvec(&client.get_key_bundle().await?)?)?)
+    onboard
+        .send(&client.get_key_bundle().await?, env.owner.tcp_addr)
         .await?;
     info!("memberb: sending public keys to owner");
 
@@ -145,12 +136,15 @@ async fn main() -> Result<()> {
 
     // Send device info to operator.
     info!("memberb: sending device info to operator");
-    TcpClient::connect(env.operator.tcp_addr)
-        .await?
-        .send(&encryptor.encrypt(&postcard::to_allocvec(&DeviceInfo {
-            name: DEVICE_NAME.to_string(),
-            device_id: client.get_device_id().await?,
-        })?)?)
+
+    onboard
+        .send(
+            &DeviceInfo {
+                name: DEVICE_NAME.to_string(),
+                device_id: client.get_device_id().await?,
+            },
+            env.operator.tcp_addr,
+        )
         .await?;
     info!("memberb: sent device info to operator");
 

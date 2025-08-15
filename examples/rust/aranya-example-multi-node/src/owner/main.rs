@@ -5,12 +5,7 @@ use std::{future, path::PathBuf};
 use anyhow::Result;
 use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
 use aranya_daemon_api::{DeviceId, KeyBundle, Role};
-use aranya_example_multi_node::{
-    age::AgeEncryptor,
-    env::EnvVars,
-    tcp::{TcpClient, TcpServer},
-    tracing::init_tracing,
-};
+use aranya_example_multi_node::{env::EnvVars, onboarding::Onboard, tracing::init_tracing};
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
 use tracing::info;
@@ -37,9 +32,9 @@ async fn main() -> Result<()> {
     let env = EnvVars::load()?;
 
     // Start TCP server.
-    info!("owner: starting tcp server");
-    let server = TcpServer::bind(env.owner.tcp_addr).await?;
-    info!("owner: started tcp server");
+    info!("owner: starting onboarding server");
+    let onboard = Onboard::new(env.owner.tcp_addr, env.passphrase).await?;
+    info!("owner: started onboarding server");
 
     // Initialize client.
     info!("owner: initializing client");
@@ -74,15 +69,10 @@ async fn main() -> Result<()> {
     let team_id = team.team_id();
     info!("owner: created team: {}", team_id);
 
-    // Initialize `age` encryptor.
-    let encryptor = AgeEncryptor::new(env.passphrase);
-
     // Send team ID and IKM to each device except for itself.
     // Receive the device ID and public key bundle from each device.
     // Add each device to the team.
     // Assign the proper role to each device.
-    let encrypted_team_id = encryptor.encrypt(&postcard::to_allocvec(&team_id)?)?;
-    let encrypted_seed_ikm = encryptor.encrypt(&postcard::to_allocvec(&seed_ikm)?)?;
     for device in &env.devices {
         if device.name == DEVICE_NAME {
             continue;
@@ -90,26 +80,20 @@ async fn main() -> Result<()> {
 
         // Send team ID to device.
         info!("owner: sending team ID to {}", device.name);
-        TcpClient::connect(device.tcp_addr)
-            .await?
-            .send(&encrypted_team_id)
-            .await?;
+        onboard.send(&team_id, device.tcp_addr).await?;
         info!("owner: sent team ID to {}", device.name);
 
         // Send seed IKM to device.
         info!("owner: sending seed ikm to {}", device.name);
-        TcpClient::connect(device.tcp_addr)
-            .await?
-            .send(&encrypted_seed_ikm)
-            .await?;
+        onboard.send(&seed_ikm, device.tcp_addr).await?;
         info!("owner: sent seed ikm to {}", device.name);
 
         // Receive device ID from device.
-        let id: DeviceId = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
+        let id: DeviceId = onboard.recv().await?;
         info!("owner: received device ID from {}", device.name);
 
         // Receive public keys from device.
-        let pk: KeyBundle = postcard::from_bytes(&encryptor.decrypt(&server.recv().await?)?)?;
+        let pk: KeyBundle = onboard.recv().await?;
         info!("owner: received public keys from {}", device.name);
 
         team.add_device_to_team(pk).await?;
