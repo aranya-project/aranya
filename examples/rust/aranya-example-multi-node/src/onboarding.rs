@@ -2,6 +2,7 @@
 
 use age::secrecy::SecretString;
 use anyhow::Result;
+use aranya_daemon_api::{DeviceId, KeyBundle, TeamId};
 use aranya_util::Addr;
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +10,26 @@ use crate::{
     age::AgeEncryptor,
     tcp::{TcpClient, TcpServer},
 };
+
+/// Team info sent from team owner to other devices during onboarding.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TeamInfo {
+    /// Aranya team ID.
+    pub team_id: TeamId,
+    /// QUIC syncer seed IKM (initial key material).
+    pub seed_ikm: [u8; 32],
+}
+
+/// Device info sent between peers during onboarding.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DeviceInfo {
+    /// Device name.
+    pub name: String,
+    /// Device ID.
+    pub device_id: DeviceId,
+    /// Device public key bundle.
+    pub pk: KeyBundle,
+}
 
 /// Object for simplifying Aranya team onboarding.
 /// Sends/receives serialized, encrypted team info for onboarding such as:

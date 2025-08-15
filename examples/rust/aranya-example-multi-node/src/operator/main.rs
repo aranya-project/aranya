@@ -4,9 +4,11 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
-use aranya_daemon_api::{ChanOp, NetIdentifier, Role, TeamId};
+use aranya_daemon_api::{ChanOp, NetIdentifier, Role};
 use aranya_example_multi_node::{
-    env::EnvVars, info::DeviceInfo, onboarding::Onboard, tracing::init_tracing,
+    env::EnvVars,
+    onboarding::{DeviceInfo, Onboard, TeamInfo},
+    tracing::init_tracing,
 };
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
@@ -49,39 +51,38 @@ async fn main() -> Result<()> {
     .expect("expected to initialize client");
     info!("operator: initialized client");
 
-    // Get team ID from owner.
-    let team_id: TeamId = onboard.recv().await?;
-    info!("operator: received team ID from owner");
-
-    // Get seed IKM from owner.
-    let seed_ikm = onboard.recv().await?;
-    info!("operator: received seed ikm from owner");
+    // Get team info from owner.
+    let team_info: TeamInfo = onboard.recv().await?;
+    info!("operator: received team info from owner");
 
     // Add team.
     let add_team_cfg = {
         let qs_cfg = AddTeamQuicSyncConfig::builder()
-            .seed_ikm(seed_ikm)
+            .seed_ikm(team_info.seed_ikm)
             .build()?;
         AddTeamConfig::builder()
             .quic_sync(qs_cfg)
-            .team_id(team_id)
+            .team_id(team_info.team_id)
             .build()?
     };
     let team = client.add_team(add_team_cfg.clone()).await?;
     info!("operator: added team");
 
-    // Send device ID to owner.
-    info!("operator: sending device ID to owner");
+    // Send device info to owner.
+    info!("operator: sending device info to owner");
     let device_id = client.get_device_id().await?;
-    onboard.send(&device_id, env.owner.tcp_addr).await?;
-    info!("operator: sent device ID to owner");
-
-    // Send public keys to owner.
-    info!("operator: sending public keys to owner");
+    let pk = client.get_key_bundle().await?;
     onboard
-        .send(&client.get_key_bundle().await?, env.owner.tcp_addr)
+        .send(
+            &DeviceInfo {
+                name: env.operator.name,
+                device_id,
+                pk,
+            },
+            env.owner.tcp_addr,
+        )
         .await?;
-    info!("operator: sent public keys to owner");
+    info!("operator: sent device info to owner");
 
     // Setup sync peers.
     let sync_interval = Duration::from_millis(100);

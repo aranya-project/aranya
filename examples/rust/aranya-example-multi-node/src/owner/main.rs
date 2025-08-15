@@ -4,8 +4,12 @@ use std::{future, path::PathBuf};
 
 use anyhow::Result;
 use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
-use aranya_daemon_api::{DeviceId, KeyBundle, Role};
-use aranya_example_multi_node::{env::EnvVars, onboarding::Onboard, tracing::init_tracing};
+use aranya_daemon_api::Role;
+use aranya_example_multi_node::{
+    env::EnvVars,
+    onboarding::{DeviceInfo, Onboard, TeamInfo},
+    tracing::init_tracing,
+};
 use backon::{ExponentialBuilder, Retryable};
 use clap::Parser;
 use tracing::info;
@@ -79,24 +83,17 @@ async fn main() -> Result<()> {
         }
 
         // Send team ID to device.
-        info!("owner: sending team ID to {}", device.name);
-        onboard.send(&team_id, device.tcp_addr).await?;
-        info!("owner: sent team ID to {}", device.name);
+        info!("owner: sending team info to {}", device.name);
+        onboard
+            .send(&TeamInfo { team_id, seed_ikm }, device.tcp_addr)
+            .await?;
+        info!("owner: sent team info to {}", device.name);
 
-        // Send seed IKM to device.
-        info!("owner: sending seed ikm to {}", device.name);
-        onboard.send(&seed_ikm, device.tcp_addr).await?;
-        info!("owner: sent seed ikm to {}", device.name);
-
-        // Receive device ID from device.
-        let id: DeviceId = onboard.recv().await?;
+        // Receive device info from device.
+        let info: DeviceInfo = onboard.recv().await?;
         info!("owner: received device ID from {}", device.name);
 
-        // Receive public keys from device.
-        let pk: KeyBundle = onboard.recv().await?;
-        info!("owner: received public keys from {}", device.name);
-
-        team.add_device_to_team(pk).await?;
+        team.add_device_to_team(info.pk).await?;
         info!("owner: added device to team {}", device.name);
 
         // Devices are assigned the `Role::Member` role by default when added to the team. No need to assign it again.
@@ -106,7 +103,7 @@ async fn main() -> Result<()> {
                 "owner: assigning role {:?} to device {}",
                 device.role, device.name
             );
-            team.assign_role(id, device.role)
+            team.assign_role(info.device_id, device.role)
                 .await
                 .expect("expected to assign role");
             info!(
