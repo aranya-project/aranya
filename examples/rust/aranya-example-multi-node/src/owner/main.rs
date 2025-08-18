@@ -1,6 +1,6 @@
 //! Owner device.
 
-use std::{future, path::PathBuf};
+use std::path::PathBuf;
 
 use anyhow::Result;
 use aranya_client::{Client, CreateTeamConfig, CreateTeamQuicSyncConfig};
@@ -115,6 +115,5 @@ async fn main() -> Result<()> {
 
     info!("owner: complete");
 
-    // Keep the daemon running.
-    future::pending().await
+    Ok(())
 }
