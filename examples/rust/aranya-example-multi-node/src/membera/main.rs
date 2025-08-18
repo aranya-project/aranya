@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use anyhow::Result;
 use aranya_client::{AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig};
-use aranya_daemon_api::{NetIdentifier, Role};
+use aranya_daemon_api::NetIdentifier;
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
@@ -110,22 +110,18 @@ async fn main() -> Result<()> {
         sleep(SLEEP_INTERVAL).await;
     };
 
-    // Loop until this device has the `Operator` role assigned to it.
-    info!("membera: waiting for all devices to be added to team and operator role assignment");
+    // Loop until all devices have been added to the team.
+    info!("membera: waiting for all devices to be added to team");
     let queries = team.queries();
-    'outer: loop {
+    loop {
         if let Ok(devices) = queries.devices_on_team().await {
             if devices.iter().count() == 5 {
-                for device in devices.iter() {
-                    if let Ok(Role::Operator) = queries.device_role(*device).await {
-                        break 'outer;
-                    }
-                }
+                break;
             }
         }
         sleep(3 * SLEEP_INTERVAL).await;
     }
-    info!("membera: detected that all devices have been added to team and operator role has been assigned");
+    info!("membera: detected that all devices have been added to team");
 
     // Send device info to operator.
     info!("membera: sending device info to operator");
@@ -144,19 +140,12 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(SLEEP_INTERVAL).await;
 
-    // Check that label has been assigned to membera and memberb.
-    'outer: loop {
-        if let Ok(devices) = queries.devices_on_team().await {
-            let mut labels_assigned = 0;
-            for device in devices.iter() {
-                if let Ok(labels) = queries.device_label_assignments(*device).await {
-                    if labels.iter().count() > 0 {
-                        labels_assigned += 1;
-                        if labels_assigned >= 2 {
-                            break 'outer;
-                        }
-                    }
-                }
+    // Check that label has been assigned to membera.
+    let queries = team.queries();
+    loop {
+        if let Ok(labels) = queries.device_label_assignments(device_id).await {
+            if labels.iter().count() == 1 {
+                break;
             }
         }
         sleep(3 * SLEEP_INTERVAL).await;

@@ -93,13 +93,9 @@ async fn main() -> Result<()> {
     // Loop until this device has the `Admin` role assigned to it.
     info!("admin: waiting for owner to assign admin role");
     let queries = team.queries();
-    'outer: loop {
-        if let Ok(devices) = queries.devices_on_team().await {
-            for device in devices.iter() {
-                if let Ok(Role::Admin) = queries.device_role(*device).await {
-                    break 'outer;
-                }
-            }
+    loop {
+        if let Ok(Role::Admin) = queries.device_role(device_id).await {
+            break;
         }
         sleep(SLEEP_INTERVAL).await;
     }

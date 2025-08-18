@@ -107,15 +107,17 @@ async fn main() -> Result<()> {
     // Loop until this device has the `Operator` role assigned to it.
     info!("operator: waiting for all devices to be added to team and operator role assignment");
     let queries = team.queries();
-    'outer: loop {
+    loop {
         if let Ok(devices) = queries.devices_on_team().await {
             if devices.iter().count() == 5 {
-                for device in devices.iter() {
-                    if let Ok(Role::Operator) = queries.device_role(*device).await {
-                        break 'outer;
-                    }
-                }
+                break;
             }
+        }
+        sleep(3 * SLEEP_INTERVAL).await;
+    }
+    loop {
+        if let Ok(Role::Operator) = queries.device_role(device_id).await {
+            break;
         }
         sleep(3 * SLEEP_INTERVAL).await;
     }

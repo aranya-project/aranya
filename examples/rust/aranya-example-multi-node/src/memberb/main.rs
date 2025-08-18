@@ -7,7 +7,6 @@ use aranya_client::{
     aqc::{AqcPeerChannel, AqcPeerStream},
     AddTeamConfig, AddTeamQuicSyncConfig, Client, SyncPeerConfig,
 };
-use aranya_daemon_api::Role;
 use aranya_example_multi_node::{
     env::EnvVars,
     onboarding::{DeviceInfo, Onboard, TeamInfo, SLEEP_INTERVAL, SYNC_INTERVAL},
@@ -112,22 +111,18 @@ async fn main() -> Result<()> {
         sleep(SLEEP_INTERVAL).await;
     }
 
-    // Loop until this device has the `Operator` role assigned to it.
-    info!("memberb: waiting for all devices to be added to team and operator role assignment");
+    // Loop until all devices have been added to the team.
+    info!("memberb: waiting for all devices to be added to team");
     let queries = team.queries();
-    'outer: loop {
+    loop {
         if let Ok(devices) = queries.devices_on_team().await {
             if devices.iter().count() == 5 {
-                for device in devices.iter() {
-                    if let Ok(Role::Operator) = queries.device_role(*device).await {
-                        break 'outer;
-                    }
-                }
+                break;
             }
         }
         sleep(3 * SLEEP_INTERVAL).await;
     }
-    info!("memberb: detected that all devices have been added to team and operator role has been assigned");
+    info!("memberb: detected that all devices have been added to team");
 
     // Send device info to operator.
     info!("memberb: sending device info to operator");
@@ -147,18 +142,12 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(SLEEP_INTERVAL).await;
 
-    // Check that label has been assigned to membera and memberb.
+    // Check that label has been assigned to memberb.
     let queries = team.queries();
-    'outer: loop {
-        if let Ok(devices) = queries.devices_on_team().await {
-            let mut labels_assigned = 0;
-            for device in devices.iter() {
-                if let Ok(labels) = queries.device_label_assignments(*device).await {
-                    labels_assigned += labels.iter().count();
-                    if labels_assigned >= 2 {
-                        break 'outer;
-                    }
-                }
+    loop {
+        if let Ok(labels) = queries.device_label_assignments(device_id).await {
+            if labels.iter().count() == 1 {
+                break;
             }
         }
         sleep(3 * SLEEP_INTERVAL).await;
