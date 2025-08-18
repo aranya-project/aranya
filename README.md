@@ -37,6 +37,42 @@ on this component.
 For more information on Aranya's internal components, see the Aranya Core
 [README](https://github.com/aranya-project/aranya-core/blob/main/README.md).
 
+- [Aranya Examples](examples/): examples of how to integrate Aranya into an application. We currently support direct integration into Rust and C applications.
+
+## Cargo Make
+
+We rely heavely on `cargo make` targets to build software, run integration tests, perform unit tests, and run CICD checks. Here's how to install `cargo make`:
+[cargo-make](https://github.com/sagiegurari/cargo-make?tab=readme-ov-file#installation)
+
+Building Aranya:
+- `cargo make build` - builds release versions of crates at [crates](crates/) and [examples/rust](examples/rust). This includes the Aranya client Rust library, Aranya daemon executable, and Rust example executables.
+- `cargo make build-capi` - builds the Aranya C API library including the [aranya-client.h](crates/aranya-client-capi/output/aranya-client.h) header file and `libaranya_client_capi.*` shared library artifact. The extension of the shared library artifact depends on what system it is built on. E.g. MacOS will have a `.dylib` extension while linux would have a `.so` extension.
+
+Testing Aranya:
+- `cargo make test` - runs Rust unit tests with all feature combinations
+
+Examples (these are run as part of the CICD pipeline to ensure they do not break):
+- `cargo make run-rust-example` - runs the default Rust example
+- `cargo make run-rust-example-multi-node` - runs the multi-node Rust example
+- `cargo make run-capi-example` - runs the C example
+
+A complete list of examples can be found at [examples](examples/):
+- [Rust examples](examples/rust/)
+- [C examples](examples/c/)
+
+CICD checks:
+- `cargo make security` - runs security checks such as `cargo-audit`, `cargo-deny` and `cargo-vet`
+- `cargo make correctness` - runs correctness checks such as `cargo fmt`, `cargo clippy`, and `cargo-machete`
+- `cargo make gen-docs-nightly` - generates `rustdocs` with Rust nightly
+
+Performance metrics:
+- `cargo make metrics`
+
+Auto-formatting code:
+- `cargo make fmt`
+
+A complete list of `cargo make` targets can be found in the [Makefile.toml](Makefile.toml)
+
 ## Getting Started
 
 The following platforms are supported:
@@ -55,6 +91,7 @@ We currently provide the following integrations for Aranya:
 
 #### Dependencies
 
+The following are needed to build and run Aranya code:
 - [Rust](https://www.rust-lang.org/tools/install) (Find version info in the
 [rust-toolchain.toml](rust-toolchain.toml))
 > NOTE: When building with Rust, the compiler will automatically download and
@@ -65,49 +102,6 @@ We currently provide the following integrations for Aranya:
 > NOTE: we have tested using the specified versions above. Other versions of these tools may also work.
 
 If you'd like to run the Rust example app, see [below](#example-applications).
-
-#### Install
-
-First, install the Aranya client.
-
-**From this repository**:
-
-`git clone git@github.com:aranya-project/aranya.git`
-
-**From crates.io**:
-
-Run the following in your project's directory:
-
-`cargo add aranya-client`
-
-Or, add it to your project's `Cargo.toml`:
-
-```
-[dependencies]
-aranya-client = { version = ... }
-```
-
-See the [`aranya-client` crate](https://crates.io/crates/aranya-client) on
-`crates.io` for the latest version.
-
-#### Build
-
-If the source code has been downloaded, navigate to the Aranya project
-workspace.
-
-Build the code using `cargo` or `cargo-make`.
-
-**Using `cargo`**:
-
-`cargo build --release`
-
-**Using `cargo-make`**:
-
-`cargo make build`
-
-This will build the Aranya [client](crates/aranya-client/) and the
-[daemon](crates/aranya-daemon/) executable. The built versions are available
-in the `target/release` directory.
 
 #### Integrate
 
@@ -161,39 +155,8 @@ Prebuilt versions of the library are uploaded (along with the [header file](http
 A prebuilt version of the `aranya-daemon` is available for supported platforms
 in the Aranya [release](https://github.com/aranya-project/aranya/releases).
 
-If your platform is unsupported, you may download the source code and build
+If your platform is unsupported, you may checkout the source code and build
 locally.
-
-**Download the source code**:
-
-`git clone git@github.com:aranya-project/aranya.git`
-
-#### Build
-
-As mentioned, prebuilt versions of the Aranya C API library, header file, and
-the Aranya daemon are uploaded to each Aranya
-[release](https://github.com/aranya-project/aranya/releases).
-
-Instructions for generating the Aranya client library and `aranya-client.h`
-header file locally are available in the `aranya-client-capi`
-[README](crates/aranya-client-capi/README.md).
-
-To build the daemon locally, use `cargo` or `cargo-make`.
-
-**Using `cargo`**:
-
-`cargo build --release`
-
-**Using `cargo-make`**:
-
-`cargo make build`
-
-The daemon executable will be available in the `target/release` directory.
-
-#### Unit Tests
-
-To run unit tests, run the following `cargo-make` command:
-`cargo make test`
 
 #### Integrate
 
@@ -237,12 +200,12 @@ Step 2. The `Owner` initializes the team
 Step 3. The `Owner` adds the `Admin` and `Operator` to the team. `Member A` and
 `Member B` can either be added by the `Owner` or `Operator`.
 
-Step 4. The `Admin` creates an Aranya Fast Channels label
+Step 4. The `Admin` creates an Aranya QUIC Channel label
 
-Step 5. The `Operator` assigns the created Fast Channels label to `Member A`
+Step 5. The `Operator` assigns the created QUIC Channel label to `Member A`
 and `Member B`
 
-Step 6. `Member A` creates an Aranya Fast Channel
+Step 6. `Member A` creates an Aranya QUIC Channel
 
 Step 7. `Member A` uses this channel to send a message to `Member B`.
 Optionally, `Member B` may also send a message back to `Member A`.
