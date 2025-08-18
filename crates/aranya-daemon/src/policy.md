@@ -118,7 +118,7 @@ struct KeyIds {
 
 ```policy
 // A device on the team.
-fact Device[device_id id]=>{role enum Role, sign_key_id id, enc_key_id id}
+fact Device[device_id id]=>{role enum Role, sign_key_id id, enc_key_id id, can_finalize bool}
 
 // A device's public IdentityKey
 fact DeviceIdentKey[device_id id]=>{key bytes}
@@ -403,7 +403,7 @@ command CreateTeam {
         check author_id == owner_key_ids.device_id
 
         finish {
-            add_new_device(this.owner_keys, owner_key_ids, Role::Owner)
+            add_new_device(this.owner_keys, owner_key_ids, Role::Owner, true)
 
             emit TeamCreated {
                 owner_id: author_id,
@@ -413,11 +413,12 @@ command CreateTeam {
 }
 
 // Adds the device to the Team.
-finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, role enum Role) {
+finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyIds, role enum Role, can_finalize bool) {
     create Device[device_id: key_ids.device_id]=>{
         role: role,
         sign_key_id: key_ids.sign_key_id,
         enc_key_id: key_ids.enc_key_id,
+        can_finalize: can_finalize
     }
 
     create DeviceIdentKey[device_id: key_ids.device_id]=>{key: key_bundle.ident_key}
@@ -443,6 +444,8 @@ finish function add_new_device(key_bundle struct KeyBundle, key_ids struct KeyId
 Finalizes the current state of the team's graph.
 
 ```policy
+fact Epoch[]=>{count int}
+
 action finalize_team() {
     publish FinalizeTeam {}
 }
@@ -465,12 +468,28 @@ command FinalizeTeam {
 
         // Check that the team is active and return the author's info if they exist in the team.
         let author = get_valid_device(envelope::author_id(envelope))
-        // Only the Owner can create this command
-        check is_owner(author.role)
 
-        finish {
-            emit TeamFinalized {
-                owner_id: author.device_id,
+        // Check that the author is able to create commands that finalize
+        check author.can_finalize
+
+        let maybe_epoch = query Epoch[]
+
+        if maybe_epoch is Some {
+            let epoch = unwrap maybe_epoch
+            let new_count = epoch.count + 1
+            finish {
+                update Epoch[]=>{count: epoch.count} to {count: new_count}
+                emit TeamFinalized {
+                    owner_id: author.device_id,
+                }
+            }
+
+        } else {
+            finish {
+                create Epoch[]=>{count: 1}
+                emit TeamFinalized {
+                    owner_id: author.device_id,
+                }
             }
         }
     }
@@ -570,7 +589,7 @@ command AddMember {
         check find_existing_device(device_key_ids.device_id) is None
 
         finish {
-            add_new_device(this.device_keys, device_key_ids, Role::Member)
+            add_new_device(this.device_keys, device_key_ids, Role::Member, false)
 
             emit MemberAdded {
                 device_id: device_key_ids.device_id,
@@ -726,10 +745,12 @@ finish function assign_role(device struct Device, role enum Role) {
         role: device.role,
         sign_key_id: device.sign_key_id,
         enc_key_id: device.enc_key_id,
+        can_finalize: device.can_finalize
         } to {
             role: role,
             sign_key_id: device.sign_key_id,
             enc_key_id: device.enc_key_id,
+            can_finalize: device.can_finalize,
         }
 }
 ```
@@ -901,10 +922,12 @@ finish function revoke_role(device struct Device) {
         role: device.role,
         sign_key_id: device.sign_key_id,
         enc_key_id: device.enc_key_id,
+        can_finalize: device.can_finalize,
         } to {
             role: Role::Member,
             sign_key_id: device.sign_key_id,
             enc_key_id: device.enc_key_id,
+            can_finalize: device.can_finalize,
             }
 }
 ```
