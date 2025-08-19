@@ -2081,7 +2081,9 @@ AranyaError aranya_close_team_ext(const struct AranyaClient *client,
                                   struct AranyaExtError *__ext_err);
 
 /**
- * Finalizes the team's current graph state.
+ * Finalize the team's current graph state.
+ *
+ * See https://aranya-project.github.io/glossary#finalization
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
@@ -2092,7 +2094,9 @@ AranyaError aranya_finalize_team(const struct AranyaClient *client,
                                  const struct AranyaTeamId *team);
 
 /**
- * Finalizes the team's current graph state.
+ * Finalize the team's current graph state.
+ *
+ * See https://aranya-project.github.io/glossary#finalization
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
