@@ -36,60 +36,6 @@ user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
-[[publisher.aranya-aqc-util]]
-version = "0.6.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-capi-codegen]]
-version = "0.3.2"
-when = "2025-06-12"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-capi-core]]
-version = "0.4.2"
-when = "2025-06-12"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-capi-macro]]
-version = "0.3.2"
-when = "2025-06-12"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-crypto]]
-version = "0.8.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-crypto-ffi]]
-version = "0.11.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-device-ffi]]
-version = "0.11.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-envelope-ffi]]
-version = "0.11.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-idam-ffi]]
-version = "0.11.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
 [[publisher.aranya-internal-rustls]]
 version = "0.23.26-psk.1"
 when = "2025-05-29"
@@ -105,90 +51,6 @@ user-login = "aranya-project-bot"
 [[publisher.aranya-internal-s2n-quic-rustls]]
 version = "0.58.0-psk.2"
 when = "2025-08-04"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-libc]]
-version = "0.3.1"
-when = "2025-06-12"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-perspective-ffi]]
-version = "0.11.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-policy-ast]]
-version = "0.6.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-policy-compiler]]
-version = "0.11.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-policy-derive]]
-version = "0.6.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-policy-ifgen]]
-version = "0.11.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-policy-ifgen-build]]
-version = "0.5.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-policy-ifgen-macro]]
-version = "0.4.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-policy-lang]]
-version = "0.6.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-policy-module]]
-version = "0.11.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-policy-text]]
-version = "0.1.1"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-policy-text-macro]]
-version = "0.1.0"
-when = "2025-06-13"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-policy-vm]]
-version = "0.11.0"
-when = "2025-06-23"
-user-id = 293722
-user-login = "aranya-project-bot"
-
-[[publisher.aranya-runtime]]
-version = "0.11.0"
-when = "2025-06-23"
 user-id = 293722
 user-login = "aranya-project-bot"
 
@@ -226,6 +88,13 @@ when = "2024-10-24"
 user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
+
+[[publisher.indexmap]]
+version = "2.10.0"
+when = "2025-06-26"
+user-id = 539
+user-login = "cuviper"
+user-name = "Josh Stone"
 
 [[publisher.intrusive-collections]]
 version = "0.9.7"
@@ -1106,19 +975,6 @@ criteria = "safe-to-deploy"
 version = "1.0.3"
 aggregated-from = "https://chromium.googlesource.com/chromiumos/third_party/rust_crates/+/refs/heads/main/cargo-vet/audits.toml?format=TEXT"
 
-[[audits.google.audits.indexmap]]
-who = "Lukasz Anforowicz <lukasza@chromium.org>"
-criteria = "safe-to-deploy"
-version = "2.7.1"
-notes = '''
-Grepped for `-i cipher`, `-i crypto`, `'\bfs\b'`, `'\bnet\b'`
-and there were no hits.
-
-There is a little bit of `unsafe` Rust code - the audit can be found at
-https://chromium-review.googlesource.com/c/chromium/src/+/6187726/2
-'''
-aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
-
 [[audits.google.audits.itoa]]
 who = "Lukasz Anforowicz <lukasza@chromium.org>"
 criteria = "safe-to-deploy"
@@ -1838,11 +1694,32 @@ criteria = "safe-to-deploy"
 version = "0.7.5"
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
+[[audits.google.audits.yoke]]
+who = "Daniel Cheng <dcheng@chromium.org>"
+criteria = "safe-to-deploy"
+delta = "0.7.5 -> 0.8.0"
+notes = """
+Cleaning up a previous hack for adding trait bounds to yoke objects. Unsafe changes:
+- deleting the hack itself removes a lot of unsafe use required in the hack's implementation
+- changes another unsafe use to remove the use of the hack, now that it's no longer needed
+
+
+See https://crrev.com/c/6323349 for more audit notes.
+"""
+aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
+
 [[audits.google.audits.yoke-derive]]
 who = "Manish Goregaokar <manishearth@google.com>"
 criteria = "safe-to-deploy"
 version = "0.7.5"
 notes = "Custom derive implementing the `Yokeable` trait. Generally generates simple code that asserts covariance."
+aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
+
+[[audits.google.audits.yoke-derive]]
+who = "Daniel Cheng <dcheng@chromium.org>"
+criteria = "safe-to-deploy"
+delta = "0.7.5 -> 0.8.0"
+notes = "No code changes: only incrementing the version."
 aggregated-from = "https://chromium.googlesource.com/chromium/src/+/main/third_party/rust/chromium_crates_io/supply-chain/audits.toml?format=TEXT"
 
 [[audits.google.audits.zerofrom]]
