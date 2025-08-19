@@ -335,6 +335,34 @@ where
         .in_current_span()
     }
 
+    /// Queries all AFC network names off-graph.
+    #[instrument(skip(self))]
+    fn query_afc_network_names_off_graph(
+        &self,
+    ) -> impl Future<Output = Result<Vec<(NetIdentifier, DeviceId)>>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("query_afc_network_names"),
+            args: Cow::Owned(vec![]),
+        })
+        .and_then(|(_, effects)| {
+            std::future::ready(
+                effects
+                    .into_iter()
+                    .map(|eff| {
+                        let Effect::QueryAfcNetworkNamesOutput(eff) = eff else {
+                            anyhow::bail!("bad effect in query_network_names");
+                        };
+                        Ok((
+                            NetIdentifier(eff.net_identifier),
+                            DeviceId::from(eff.device_id),
+                        ))
+                    })
+                    .collect(),
+            )
+        })
+        .in_current_span()
+    }
+
     /// Creates a bidirectional AQC channel off graph.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(peer_id = %peer_id, label_id = %label_id))]

@@ -219,6 +219,31 @@ impl Daemon {
                 )
             };
 
+            let afc = {
+                let peers = {
+                    let mut peers = BTreeMap::new();
+                    for graph_id in &graph_ids {
+                        let graph_peers = BiBTreeMap::from_iter(
+                            client
+                                .actions(graph_id)
+                                .query_afc_network_names_off_graph()
+                                .await?,
+                        );
+                        peers.insert(*graph_id, graph_peers);
+                    }
+                    peers
+                };
+                // TODO: use AFC shm key store
+                Aqc::new(
+                    eng.clone(),
+                    pks.ident_pk.id()?,
+                    aranya_store
+                        .try_clone()
+                        .context("unable to clone keystore")?,
+                    peers,
+                )
+            };
+
             let data = QSData { psk_store };
 
             let crypto = crate::api::Crypto {
@@ -237,6 +262,8 @@ impl Daemon {
                 recv_effects,
                 invalid_graphs,
                 aqc,
+                #[cfg(all(feature = "afc", feature = "unstable"))]
+                afc,
                 crypto,
                 seed_id_dir,
                 Some(data),

@@ -47,10 +47,16 @@ pub enum Effect {
     OperatorRevoked(OperatorRevoked),
     AqcNetworkNameSet(AqcNetworkNameSet),
     AqcNetworkNameUnset(AqcNetworkNameUnset),
+    AfcNetworkNameSet(AfcNetworkNameSet),
+    AfcNetworkNameUnset(AfcNetworkNameUnset),
     AqcBidiChannelCreated(AqcBidiChannelCreated),
     AqcBidiChannelReceived(AqcBidiChannelReceived),
     AqcUniChannelCreated(AqcUniChannelCreated),
     AqcUniChannelReceived(AqcUniChannelReceived),
+    AfcBidiChannelCreated(AfcBidiChannelCreated),
+    AfcBidiChannelReceived(AfcBidiChannelReceived),
+    AfcUniChannelCreated(AfcUniChannelCreated),
+    AfcUniChannelReceived(AfcUniChannelReceived),
     LabelCreated(LabelCreated),
     LabelDeleted(LabelDeleted),
     LabelAssigned(LabelAssigned),
@@ -63,6 +69,8 @@ pub enum Effect {
     QueryDeviceKeyBundleResult(QueryDeviceKeyBundleResult),
     QueryAqcNetIdentifierResult(QueryAqcNetIdentifierResult),
     QueryAqcNetworkNamesOutput(QueryAqcNetworkNamesOutput),
+    QueryAfcNetIdentifierResult(QueryAfcNetIdentifierResult),
+    QueryAfcNetworkNamesOutput(QueryAfcNetworkNamesOutput),
 }
 /// TeamCreated policy effect.
 #[effect]
@@ -126,6 +134,17 @@ pub struct AqcNetworkNameSet {
 pub struct AqcNetworkNameUnset {
     pub device_id: Id,
 }
+/// AfcNetworkNameSet policy effect.
+#[effect]
+pub struct AfcNetworkNameSet {
+    pub device_id: Id,
+    pub net_identifier: Text,
+}
+/// AfcNetworkNameUnset policy effect.
+#[effect]
+pub struct AfcNetworkNameUnset {
+    pub device_id: Id,
+}
 /// AqcBidiChannelCreated policy effect.
 #[effect]
 pub struct AqcBidiChannelCreated {
@@ -179,6 +198,52 @@ pub struct AqcUniChannelReceived {
     pub label_id: Id,
     pub encap: Vec<u8>,
     pub psk_length_in_bytes: i64,
+}
+/// AfcBidiChannelCreated policy effect.
+#[effect]
+pub struct AfcBidiChannelCreated {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub author_enc_key_id: Id,
+    pub peer_id: Id,
+    pub peer_enc_pk: Vec<u8>,
+    pub label_id: Id,
+    pub channel_key_id: Id,
+}
+/// AfcBidiChannelReceived policy effect.
+#[effect]
+pub struct AfcBidiChannelReceived {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_id: Id,
+    pub peer_enc_key_id: Id,
+    pub label_id: Id,
+    pub encap: Vec<u8>,
+}
+/// AfcUniChannelCreated policy effect.
+#[effect]
+pub struct AfcUniChannelCreated {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub writer_id: Id,
+    pub reader_id: Id,
+    pub author_enc_key_id: Id,
+    pub peer_enc_pk: Vec<u8>,
+    pub label_id: Id,
+    pub channel_key_id: Id,
+}
+/// AfcUniChannelReceived policy effect.
+#[effect]
+pub struct AfcUniChannelReceived {
+    pub parent_cmd_id: Id,
+    pub author_id: Id,
+    pub writer_id: Id,
+    pub reader_id: Id,
+    pub author_enc_pk: Vec<u8>,
+    pub peer_enc_key_id: Id,
+    pub label_id: Id,
+    pub encap: Vec<u8>,
 }
 /// LabelCreated policy effect.
 #[effect]
@@ -259,6 +324,17 @@ pub struct QueryAqcNetworkNamesOutput {
     pub net_identifier: Text,
     pub device_id: Id,
 }
+/// QueryAfcNetIdentifierResult policy effect.
+#[effect]
+pub struct QueryAfcNetIdentifierResult {
+    pub net_identifier: Text,
+}
+/// QueryAfcNetworkNamesOutput policy effect.
+#[effect]
+pub struct QueryAfcNetworkNamesOutput {
+    pub net_identifier: Text,
+    pub device_id: Id,
+}
 /// Implements all supported policy actions.
 #[actions]
 pub trait ActorExt {
@@ -278,6 +354,12 @@ pub trait ActorExt {
         net_identifier: Text,
     ) -> Result<(), ClientError>;
     fn unset_aqc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn set_afc_network_name(
+        &mut self,
+        device_id: Id,
+        net_identifier: Text,
+    ) -> Result<(), ClientError>;
+    fn unset_afc_network_name(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn create_aqc_bidi_channel(
         &mut self,
         peer_id: Id,
@@ -287,6 +369,17 @@ pub trait ActorExt {
         &mut self,
         sender_id: Id,
         receiver_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn create_afc_bidi_channel(
+        &mut self,
+        peer_id: Id,
+        label_id: Id,
+    ) -> Result<(), ClientError>;
+    fn create_afc_uni_channel(
+        &mut self,
+        writer_id: Id,
+        reader_id: Id,
         label_id: Id,
     ) -> Result<(), ClientError>;
     fn create_label(&mut self, name: Text) -> Result<(), ClientError>;
@@ -306,4 +399,6 @@ pub trait ActorExt {
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
+    fn query_afc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
+    fn query_afc_network_names(&mut self) -> Result<(), ClientError>;
 }
