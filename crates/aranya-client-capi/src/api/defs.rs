@@ -1254,7 +1254,9 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
     Ok(())
 }
 
-/// Finalizes the team's current graph state.
+/// Finalize the team's current graph state.
+/// 
+/// See https://aranya-project.github.io/glossary#finalization
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
