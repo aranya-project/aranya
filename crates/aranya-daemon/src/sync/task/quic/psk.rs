@@ -47,7 +47,7 @@ impl PskSeed {
         id: &PskSeedId,
     ) -> Result<Option<Self>> {
         store
-            .get_key(eng, id.into_id())
+            .get_key(eng, *id)
             .map(|r| r.map(Self))
             .map_err(Into::into)
     }
