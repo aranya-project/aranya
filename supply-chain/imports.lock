@@ -36,6 +36,60 @@ user-id = 6743
 user-login = "epage"
 user-name = "Ed Page"
 
+[[publisher.aranya-aqc-util]]
+version = "0.7.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-capi-codegen]]
+version = "0.3.3"
+when = "2025-08-14"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-capi-core]]
+version = "0.4.4"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-capi-macro]]
+version = "0.3.3"
+when = "2025-08-14"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-crypto]]
+version = "0.9.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-crypto-ffi]]
+version = "0.12.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-device-ffi]]
+version = "0.12.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-envelope-ffi]]
+version = "0.12.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-idam-ffi]]
+version = "0.12.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
 [[publisher.aranya-internal-rustls]]
 version = "0.23.26-psk.1"
 when = "2025-05-29"
@@ -51,6 +105,90 @@ user-login = "aranya-project-bot"
 [[publisher.aranya-internal-s2n-quic-rustls]]
 version = "0.58.0-psk.2"
 when = "2025-08-04"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-libc]]
+version = "0.3.2"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-perspective-ffi]]
+version = "0.12.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-policy-ast]]
+version = "0.7.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-policy-compiler]]
+version = "0.12.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-policy-derive]]
+version = "0.7.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-policy-ifgen]]
+version = "0.12.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-policy-ifgen-build]]
+version = "0.6.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-policy-ifgen-macro]]
+version = "0.4.0"
+when = "2025-06-23"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-policy-lang]]
+version = "0.7.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-policy-module]]
+version = "0.12.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-policy-text]]
+version = "0.1.2"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-policy-text-macro]]
+version = "0.1.0"
+when = "2025-06-13"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-policy-vm]]
+version = "0.12.0"
+when = "2025-08-20"
+user-id = 293722
+user-login = "aranya-project-bot"
+
+[[publisher.aranya-runtime]]
+version = "0.12.0"
+when = "2025-08-20"
 user-id = 293722
 user-login = "aranya-project-bot"
 
