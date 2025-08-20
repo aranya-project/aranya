@@ -96,9 +96,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-crypto"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b6cdec0994309ae7e89ff00e7a4ec4bb23f7db1a7b576b67e93e39272a257320"
+checksum = "91c8eab5fb5519c7435aa69263c662df4cbf8ee59a6472968c86d55bd25bd978"
 dependencies = [
  "buggy",
  "byteorder",
@@ -210,9 +210,9 @@ dependencies = [
 
 [[package]]
 name = "aranya-policy-text"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a32afb76cab14f2fd18563e234bc2c7c7bd49fcf719f03bc6066759a4bff9f04"
+checksum = "8b39a413c48e08d25f2b6b7ab9cb43bba27147563984929c4ce9b5d7007e42df"
 dependencies = [
  "aranya-policy-text-macro",
  "serde",
