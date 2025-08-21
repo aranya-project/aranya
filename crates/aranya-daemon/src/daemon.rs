@@ -219,6 +219,7 @@ impl Daemon {
                 )
             };
 
+            #[cfg(all(feature = "afc", feature = "unstable"))]
             let afc = {
                 let peers = {
                     let mut peers = BTreeMap::new();

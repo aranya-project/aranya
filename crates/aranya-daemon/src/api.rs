@@ -94,6 +94,7 @@ impl DaemonApiServer {
     ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
         let aqc = Arc::new(aqc);
+        #[cfg(all(feature = "afc", feature = "unstable"))]
         let afc = Arc::new(afc);
         let effect_handler = EffectHandler {
             aqc: Arc::clone(&aqc),
@@ -217,9 +218,9 @@ impl EffectHandler {
                         )
                         .await;
                 }
-                AqcNetworkNameUnset(e) => self.afc.remove_peer(graph, e.device_id.into()).await,
+                AqcNetworkNameUnset(e) => self.aqc.remove_peer(graph, e.device_id.into()).await,
+                #[cfg(all(feature = "afc", feature = "unstable"))]
                 AfcNetworkNameSet(e) => {
-                    #[cfg(all(feature = "afc", feature = "unstable"))]
                     self.aqc
                         .add_peer(
                             graph,
@@ -228,11 +229,8 @@ impl EffectHandler {
                         )
                         .await;
                 }
-                AfcNetworkNameUnset(e) =>
-                {
-                    #[cfg(all(feature = "afc", feature = "unstable"))]
-                    self.afc.remove_peer(graph, e.device_id.into()).await
-                }
+                #[cfg(all(feature = "afc", feature = "unstable"))]
+                AfcNetworkNameUnset(e) => self.afc.remove_peer(graph, e.device_id.into()).await,
                 QueriedLabel(_) => {}
                 AqcBidiChannelCreated(_) => {}
                 AqcBidiChannelReceived(_) => {}
@@ -251,6 +249,8 @@ impl EffectHandler {
                 QueryAqcNetworkNamesOutput(_) => {}
                 QueryAfcNetIdentifierResult(_) => {}
                 QueryAfcNetworkNamesOutput(_) => {}
+                #[cfg(not(feature = "unstable"))]
+                _ => {}
             }
         }
         Ok(())
