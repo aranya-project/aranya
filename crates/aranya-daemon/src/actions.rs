@@ -307,6 +307,37 @@ where
         .in_current_span()
     }
 
+    /// Sets an AFC network name.
+    #[cfg(all(feature = "afc", feature = "unstable"))]
+    #[instrument(skip(self), fields(device_id = %device_id, net_identifier = %net_identifier))]
+    fn set_afc_network_name(
+        &self,
+        device_id: DeviceId,
+        net_identifier: Text,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        info!(%device_id, %net_identifier, "setting AFC network name");
+        self.with_actor(move |actor| {
+            actor.set_afc_network_name(device_id.into(), net_identifier)?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
+    /// Unsets an AFC network name.
+    #[cfg(all(feature = "afc", feature = "unstable"))]
+    #[instrument(skip(self), fields(device_id = %device_id))]
+    fn unset_afc_network_name(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
+        info!(%device_id, "unsetting AFC network name");
+        self.with_actor(move |actor| {
+            actor.unset_afc_network_name(device_id.into())?;
+            Ok(())
+        })
+        .in_current_span()
+    }
+
     /// Queries all AQC network names off-graph.
     #[instrument(skip(self))]
     fn query_aqc_network_names_off_graph(
@@ -379,21 +410,6 @@ where
     }
 
     /// Creates a unidirectional AQC channel.
-    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
-    fn create_aqc_uni_channel(
-        &self,
-        seal_id: DeviceId,
-        open_id: DeviceId,
-        label_id: LabelId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.create_aqc_uni_channel(seal_id.into(), open_id.into(), label_id.into())?;
-            Ok(())
-        })
-        .in_current_span()
-    }
-
-    /// Creates a unidirectional AQC channel.
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
     fn create_aqc_uni_channel_off_graph(
@@ -413,16 +429,39 @@ where
         .in_current_span()
     }
 
-    /// Creates a bidirectional AQC channel.
+    /// Creates a bidirectional AFC channel off graph.
+    #[cfg(all(feature = "afc", feature = "unstable"))]
+    #[allow(clippy::type_complexity)]
     #[instrument(skip(self), fields(peer_id = %peer_id, label_id = %label_id))]
-    fn create_aqc_bidi_channel(
+    fn create_afc_bidi_channel_off_graph(
         &self,
         peer_id: DeviceId,
         label_id: LabelId,
-    ) -> impl Future<Output = Result<Vec<Effect>>> + Send {
-        self.with_actor(move |actor| {
-            actor.create_aqc_bidi_channel(peer_id.into(), label_id.into())?;
-            Ok(())
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("create_afc_bidi_channel"),
+            args: Cow::Owned(vec![Value::from(peer_id), Value::from(label_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Creates a unidirectional AFC channel.
+    #[cfg(all(feature = "afc", feature = "unstable"))]
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self), fields(seal_id = %seal_id, open_id = %open_id, label_id = %label_id))]
+    fn create_afc_uni_channel_off_graph(
+        &self,
+        seal_id: DeviceId,
+        open_id: DeviceId,
+        label_id: LabelId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("create_afc_uni_channel"),
+            args: Cow::Owned(vec![
+                Value::from(seal_id),
+                Value::from(open_id),
+                Value::from(label_id),
+            ]),
         })
         .in_current_span()
     }
@@ -486,6 +525,21 @@ where
     #[allow(clippy::type_complexity)]
     #[instrument(skip(self))]
     fn query_aqc_net_identifier_off_graph(
+        &self,
+        device_id: DeviceId,
+    ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
+        self.session_action(move || VmAction {
+            name: ident!("query_aqc_net_identifier"),
+            args: Cow::Owned(vec![Value::from(device_id)]),
+        })
+        .in_current_span()
+    }
+
+    /// Query AFC net identifier off-graph.
+    #[cfg(all(feature = "afc", feature = "unstable"))]
+    #[allow(clippy::type_complexity)]
+    #[instrument(skip(self))]
+    fn query_afc_net_identifier_off_graph(
         &self,
         device_id: DeviceId,
     ) -> impl Future<Output = Result<(Vec<Box<[u8]>>, Vec<Effect>)>> + Send {
