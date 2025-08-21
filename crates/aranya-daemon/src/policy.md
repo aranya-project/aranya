@@ -2007,8 +2007,8 @@ command DeleteLabel {
         let label = check_unwrap query Label[label_id: this.label_id]
 
         finish {
-            // Cascade deleting the label assignments.
-            delete AssignedLabel[label_id: label.label_id, device_id: ?]
+            // TODO: Cascade deleting the label assignments.
+            // delete AssignedLabel[label_id: label.label_id, device_id: ?]
 
             delete Label[label_id: label.label_id]
 
