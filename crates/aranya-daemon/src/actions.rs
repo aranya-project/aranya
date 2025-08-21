@@ -4,11 +4,11 @@ use core::{future::Future, marker::PhantomData};
 use std::{borrow::Cow, sync::Arc};
 
 use anyhow::{Context, Result};
-use aranya_aqc_util::LabelId;
 use aranya_crypto::{Csprng, DeviceId, Rng};
 use aranya_daemon_api::NetIdentifier;
 use aranya_keygen::PublicKeys;
 use aranya_policy_ifgen::{Actor, VmAction, VmEffect};
+use aranya_policy_module::LabelId;
 use aranya_policy_vm::{ident, Text, Value};
 use aranya_runtime::{
     vm_action, ClientError, ClientState, Engine, GraphId, Policy, Session, Sink, StorageProvider,
