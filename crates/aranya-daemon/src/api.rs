@@ -87,14 +87,19 @@ impl DaemonApiServer {
         recv_effects: EffectReceiver,
         invalid: InvalidGraphs,
         aqc: Aqc<CE, KS>,
+        #[cfg(all(feature = "afc", feature = "unstable"))] afc: Aqc<CE, KS>,
         crypto: Crypto,
         seed_id_dir: SeedDir,
         quic: Option<quic_sync::Data>,
     ) -> anyhow::Result<Self> {
         let listener = UnixListener::bind(&uds_path)?;
         let aqc = Arc::new(aqc);
+        #[cfg(all(feature = "afc", feature = "unstable"))]
+        let afc = Arc::new(afc);
         let effect_handler = EffectHandler {
             aqc: Arc::clone(&aqc),
+            #[cfg(all(feature = "afc", feature = "unstable"))]
+            afc: Arc::clone(&afc),
         };
         let api = Api(Arc::new(ApiInner {
             client,
@@ -175,6 +180,8 @@ impl DaemonApiServer {
 #[derive(Clone, Debug)]
 struct EffectHandler {
     aqc: Arc<Aqc<CE, KS>>,
+    #[cfg(all(feature = "afc", feature = "unstable"))]
+    afc: Arc<Aqc<CE, KS>>,
 }
 
 impl EffectHandler {
@@ -184,6 +191,7 @@ impl EffectHandler {
         trace!("handling effects");
 
         use Effect::*;
+        // TODO: support feature flag in interface generator to compile out certain effects.
         for effect in effects {
             trace!(?effect, "handling effect");
             match effect {
@@ -211,18 +219,38 @@ impl EffectHandler {
                         .await;
                 }
                 AqcNetworkNameUnset(e) => self.aqc.remove_peer(graph, e.device_id.into()).await,
+                #[cfg(all(feature = "afc", feature = "unstable"))]
+                AfcNetworkNameSet(e) => {
+                    self.aqc
+                        .add_peer(
+                            graph,
+                            api::NetIdentifier(e.net_identifier.clone()),
+                            e.device_id.into(),
+                        )
+                        .await;
+                }
+                #[cfg(all(feature = "afc", feature = "unstable"))]
+                AfcNetworkNameUnset(e) => self.afc.remove_peer(graph, e.device_id.into()).await,
                 QueriedLabel(_) => {}
                 AqcBidiChannelCreated(_) => {}
                 AqcBidiChannelReceived(_) => {}
                 AqcUniChannelCreated(_) => {}
                 AqcUniChannelReceived(_) => {}
+                AfcBidiChannelCreated(_) => {}
+                AfcBidiChannelReceived(_) => {}
+                AfcUniChannelCreated(_) => {}
+                AfcUniChannelReceived(_) => {}
                 QueryDevicesOnTeamResult(_) => {}
                 QueryDeviceRoleResult(_) => {}
                 QueryDeviceKeyBundleResult(_) => {}
-                QueryAqcNetIdentifierResult(_) => {}
                 QueriedLabelAssignment(_) => {}
                 QueryLabelExistsResult(_) => {}
+                QueryAqcNetIdentifierResult(_) => {}
                 QueryAqcNetworkNamesOutput(_) => {}
+                QueryAfcNetIdentifierResult(_) => {}
+                QueryAfcNetworkNamesOutput(_) => {}
+                #[cfg(not(feature = "unstable"))]
+                _ => {}
             }
         }
         Ok(())
