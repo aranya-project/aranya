@@ -120,8 +120,8 @@ pub struct AfcNetworkNameUnset {
 pub struct AfcUniChannelCreated {
     pub parent_cmd_id: Id,
     pub author_id: Id,
-    pub writer_id: Id,
-    pub reader_id: Id,
+    pub sender_id: Id,
+    pub receiver_id: Id,
     pub author_enc_key_id: Id,
     pub peer_enc_pk: Vec<u8>,
     pub label_id: Id,
@@ -132,8 +132,8 @@ pub struct AfcUniChannelCreated {
 pub struct AfcUniChannelReceived {
     pub parent_cmd_id: Id,
     pub author_id: Id,
-    pub writer_id: Id,
-    pub reader_id: Id,
+    pub sender_id: Id,
+    pub receiver_id: Id,
     pub author_enc_pk: Vec<u8>,
     pub peer_enc_key_id: Id,
     pub label_id: Id,
@@ -353,8 +353,8 @@ pub trait ActorExt {
     ) -> Result<(), ClientError>;
     fn create_afc_uni_channel(
         &mut self,
-        writer_id: Id,
-        reader_id: Id,
+        sender_id: Id,
+        receiver_id: Id,
         label_id: Id,
     ) -> Result<(), ClientError>;
     fn create_aqc_bidi_channel(
