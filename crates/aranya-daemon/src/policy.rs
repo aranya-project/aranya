@@ -43,6 +43,7 @@ pub enum Effect {
     AqcNetworkNameUnset(AqcNetworkNameUnset),
     AqcUniChannelCreated(AqcUniChannelCreated),
     AqcUniChannelReceived(AqcUniChannelReceived),
+    FinalizePermAssigned(FinalizePermAssigned),
     LabelAssigned(LabelAssigned),
     LabelCreated(LabelCreated),
     LabelDeleted(LabelDeleted),
@@ -139,6 +140,11 @@ pub struct AqcUniChannelReceived {
     pub label_id: Id,
     pub encap: Vec<u8>,
     pub psk_length_in_bytes: i64,
+}
+/// FinalizePermAssigned policy effect.
+#[effect]
+pub struct FinalizePermAssigned {
+    pub device_id: Id,
 }
 /// LabelAssigned policy effect.
 #[effect]
@@ -269,6 +275,7 @@ pub struct TeamTerminated {
 #[actions]
 pub trait ActorExt {
     fn add_member(&mut self, device_keys: KeyBundle) -> Result<(), ClientError>;
+    fn assign_finalize_perm(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn assign_label(
         &mut self,
         device_id: Id,

@@ -198,6 +198,7 @@ impl EffectHandler {
                 OwnerRevoked(_owner_revoked) => {}
                 AdminRevoked(_admin_revoked) => {}
                 OperatorRevoked(_operator_revoked) => {}
+                FinalizePermAssigned(_revoked) => {}
                 LabelCreated(_) => {}
                 LabelDeleted(_) => {}
                 LabelAssigned(_) => {}
@@ -449,6 +450,25 @@ impl DaemonApi for Api {
             .finalize_team()
             .await
             .context("unable to finalize team")?;
+
+        Ok(())
+    }
+
+    #[instrument(skip(self), err)]
+    #[cfg(feature = "unstable")]
+    async fn assign_finalize(
+        self,
+        _: context::Context,
+        team: api::TeamId,
+        device: api::DeviceId,
+    ) -> api::Result<()> {
+        self.check_team_valid(team).await?;
+
+        self.client
+            .actions(&team.into_id().into())
+            .assign_finalize_perm(device.into_id().into())
+            .await
+            .context("unable to assign finalize permission")?;
 
         Ok(())
     }
