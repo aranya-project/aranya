@@ -289,10 +289,9 @@ impl Deref for Api {
 impl Api {
     /// Checks wither a team's graph is valid.
     /// If the graph is not valid, return an error to prevent operations on the invalid graph.
-    async fn check_team_valid(&self, team: api::TeamId) -> anyhow::Result<()> {
+    async fn check_team_valid(&self, team: api::TeamId) -> api::Result<()> {
         if self.invalid.contains(team.into_id().into()) {
-            // TODO: return custom daemon error type
-            anyhow::bail!("team {team} invalid due to graph finalization error")
+            return Err(api::Error::ParallelFinalize(team));
         }
         Ok(())
     }
