@@ -62,6 +62,7 @@ pub enum Effect {
     QueryDevicesOnTeamResult(QueryDevicesOnTeamResult),
     QueryLabelExistsResult(QueryLabelExistsResult),
     TeamCreated(TeamCreated),
+    TeamFinalized(TeamFinalized),
     TeamTerminated(TeamTerminated),
 }
 /// AdminAssigned policy effect.
@@ -254,6 +255,11 @@ pub struct QueryLabelExistsResult {
 pub struct TeamCreated {
     pub owner_id: Id,
 }
+/// TeamFinalized policy effect.
+#[effect]
+pub struct TeamFinalized {
+    pub owner_id: Id,
+}
 /// TeamTerminated policy effect.
 #[effect]
 pub struct TeamTerminated {
@@ -288,6 +294,7 @@ pub trait ActorExt {
         nonce: Vec<u8>,
     ) -> Result<(), ClientError>;
     fn delete_label(&mut self, label_id: Id) -> Result<(), ClientError>;
+    fn finalize_team(&mut self) -> Result<(), ClientError>;
     fn query_aqc_net_identifier(&mut self, device_id: Id) -> Result<(), ClientError>;
     fn query_aqc_network_names(&mut self) -> Result<(), ClientError>;
     fn query_device_keybundle(&mut self, device_id: Id) -> Result<(), ClientError>;
