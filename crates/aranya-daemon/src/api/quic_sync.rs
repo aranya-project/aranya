@@ -59,7 +59,7 @@ impl Api {
                     let crypto = &mut *self.crypto.lock().await;
                     crypto
                         .aranya_store
-                        .get_key(&mut crypto.engine, enc_id.into_id())
+                        .get_key(&mut crypto.engine, enc_id)
                         .context("keystore error")?
                         .context("missing enc_sk in add_team")?
                 };

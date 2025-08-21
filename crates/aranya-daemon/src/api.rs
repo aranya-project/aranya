@@ -456,7 +456,7 @@ impl DaemonApi for Api {
             };
             let enc_sk: EncryptionKey<CS> = crypto
                 .aranya_store
-                .get_key(&mut crypto.engine, enc_pk.id()?.into_id())
+                .get_key(&mut crypto.engine, enc_pk.id()?)
                 .context("keystore error")?
                 .context("missing enc_sk for encrypt seed")?;
             (seed, enc_sk)
