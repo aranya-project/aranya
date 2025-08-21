@@ -188,6 +188,7 @@ impl EffectHandler {
             trace!(?effect, "handling effect");
             match effect {
                 TeamCreated(_team_created) => {}
+                TeamFinalized(_team_finalized) => {}
                 TeamTerminated(_team_terminated) => {}
                 MemberAdded(_member_added) => {}
                 MemberRemoved(_member_removed) => {}
