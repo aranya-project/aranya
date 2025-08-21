@@ -440,6 +440,7 @@ impl DaemonApi for Api {
     }
 
     #[instrument(skip(self), err)]
+    #[cfg(feature = "unstable")]
     async fn finalize_team(self, _: context::Context, team: api::TeamId) -> api::Result<()> {
         self.check_team_valid(team).await?;
 

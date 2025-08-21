@@ -179,6 +179,7 @@ where
 
     /// Finalizes the team's current graph state.
     #[instrument(skip_all)]
+    #[cfg(feature = "unstable")]
     fn finalize_team(&self) -> impl Future<Output = Result<Vec<Effect>>> + Send {
         self.with_actor(|actor| {
             actor.finalize_team()?;

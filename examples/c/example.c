@@ -668,19 +668,21 @@ AranyaError run(Team *t) {
 
     sleep(1);
 
-    printf("finalizing graph state\n");
-    
-    // This is expected to fail since only the owner can call this API
-    err = aranya_finalize_team(&admin->client, &t->id);
-    if (err == ARANYA_ERROR_SUCCESS) {
-        fprintf(stderr,
-                "application error: An admin should not be able to create a `FinalizeTeam` command\n");
-        err = ARANYA_ERROR_OTHER;
-        goto exit;
-    }
-    
-    err = aranya_finalize_team(&owner->client, &t->id);
-    EXPECT("error finalizing graph state", err);
+    #if defined(ENABLE_UNSTABLE_FEATURES)
+        printf("finalizing graph state\n");
+        
+        // This is expected to fail since only certain devices can call this API
+        err = aranya_finalize_team(&admin->client, &t->id);
+        if (err == ARANYA_ERROR_SUCCESS) {
+            fprintf(stderr,
+                    "application error: An admin should not be able to create a `FinalizeTeam` command\n");
+            err = ARANYA_ERROR_OTHER;
+            goto exit;
+        }
+        
+        err = aranya_finalize_team(&owner->client, &t->id);
+        EXPECT("error finalizing graph state", err);
+    #endif
 
     // Queries
     printf("running factdb queries\n");
