@@ -63,7 +63,7 @@ EOF
 done
 
 # build the daemon.
-cargo build --bin aranya-daemon --release
+cargo build --bin aranya-daemon --release --features unstable
 
 # copy the aranya-client.h header file
 mkdir -p "${example}/include"

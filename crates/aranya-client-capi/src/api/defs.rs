@@ -1255,13 +1255,14 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 }
 
 /// Finalize the team's current graph state.
-/// 
+///
 /// See https://aranya-project.github.io/glossary#finalization
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].
 ///
 /// @relates AranyaClient.
+#[cfg(feature = "unstable")]
 pub fn finalize_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
     let client = client.imp();
     client

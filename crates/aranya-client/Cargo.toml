@@ -13,6 +13,7 @@ workspace = true
 
 [features]
 default = []
+unstable = ["aranya-daemon-api/unstable"]
 
 # Enable debugging.
 debug = []

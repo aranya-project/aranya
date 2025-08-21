@@ -665,6 +665,7 @@ pub trait DaemonApi {
     async fn close_team(team: TeamId) -> Result<()>;
 
     /// Finalize the team's current graph state.
+    #[cfg(feature = "unstable")]
     async fn finalize_team(team: TeamId) -> Result<()>;
 
     async fn encrypt_psk_seed_for_peer(

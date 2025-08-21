@@ -12,6 +12,8 @@ rust-version.workspace = true
 [lints]
 workspace = true
 
+[features]
+unstable = []
 
 [dependencies]
 aranya-crypto = { workspace = true }

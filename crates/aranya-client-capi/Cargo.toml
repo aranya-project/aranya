@@ -20,6 +20,7 @@ doctest = false
 
 [features]
 default = []
+unstable = ["aranya-client/unstable"]
 
 
 [dependencies]
