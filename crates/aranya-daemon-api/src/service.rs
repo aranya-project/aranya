@@ -668,6 +668,10 @@ pub trait DaemonApi {
     #[cfg(feature = "unstable")]
     async fn finalize_team(team: TeamId) -> Result<()>;
 
+    /// Assigns the finalize permission to a device.
+    #[cfg(feature = "unstable")]
+    async fn assign_finalize(team: TeamId, device: DeviceId) -> Result<()>;
+
     async fn encrypt_psk_seed_for_peer(
         team: TeamId,
         peer_enc_pk: EncryptionPublicKey<CS>,

@@ -403,6 +403,17 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    /// Assigns the finalize permission to a device.
+    #[cfg(feature = "unstable")]
+    pub async fn assign_finalize_perm(&self, device: DeviceId) -> Result<()> {
+        self.client
+            .daemon
+            .assign_finalize(context::current(), self.team_id, device)
+            .await
+            .map_err(IpcError::new)?
+            .map_err(aranya_error)
+    }
+
     /// Add a device to the team with the default `Member` role.
     pub async fn add_device_to_team(&self, keys: KeyBundle) -> Result<()> {
         self.client

@@ -667,6 +667,64 @@ finish function remove_device(device_id id) {
 - Members can only be removed by Operators and Owners.
 - Removing non-Members requires revoking their higher role so the device is made into a Member first.
 
+## AssignFinalizePerm
+
+Assigns the finalize permission to a device.
+
+```policy
+effect FinalizePermAssigned {
+    device_id id,
+}
+
+action assign_finalize_perm(device_id id){
+    publish AssignFinalizePerm { device_id: device_id }
+}
+
+command AssignFinalizePerm {
+    fields {
+        // The assigned device's ID.
+        device_id id,
+    }
+
+    seal { return seal_command(serialize(this)) }
+    open { return deserialize(open_envelope(envelope)) }
+
+    policy {
+        check team_exists()
+
+        let author = get_valid_device(envelope::author_id(envelope))
+        let device = get_valid_device(this.device_id)
+
+        // Only an Owner can assign the Owner role.
+        check is_owner(author.role)
+        // The device must not already have the finalize permission.
+        check device.can_finalize != true
+
+        finish {
+            update Device[device_id: device.device_id]=>{
+            role: device.role,
+            sign_key_id: device.sign_key_id,
+            enc_key_id: device.enc_key_id,
+            can_finalize: false,
+            } to {
+                role: device.role,
+                sign_key_id: device.sign_key_id,
+                enc_key_id: device.enc_key_id,
+                can_finalize: true,
+            }
+
+            emit FinalizePermAssigned {
+                device_id: this.device_id,
+            }
+        }
+    }
+}
+```
+
+**Invariants**:
+
+- Only the owner can create this command
+
 
 ## AssignRole
 
