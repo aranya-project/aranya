@@ -36,17 +36,19 @@ pub type CE = DefaultEngine;
 pub type CS = <DefaultEngine as Engine>::CS;
 
 /// An error returned by the API.
-// TODO: enum?
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Error(String);
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub enum Error {
+    ParallelFinalize(TeamId),
+    Other(String),
+}
 
 impl Error {
     pub fn from_msg(err: &str) -> Self {
-        Self(err.into())
+        Self::Other(err.into())
     }
 
     pub fn from_err<E: error::Error>(err: E) -> Self {
-        Self(ReportExt::report(&err).to_string())
+        Self::Other(ReportExt::report(&err).to_string())
     }
 }
 
@@ -58,7 +60,7 @@ impl From<Bug> for Error {
 
 impl From<anyhow::Error> for Error {
     fn from(err: anyhow::Error) -> Self {
-        Self(format!("{err:?}"))
+        Self::Other(format!("{err:?}"))
     }
 }
 
@@ -76,7 +78,12 @@ impl From<IdError> for Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
+        match self {
+            Self::Other(s) => s.fmt(f),
+            Self::ParallelFinalize(team) => {
+                write!(f, "team {team} invalid due to graph finalization error")
+            }
+        }
     }
 }
 
