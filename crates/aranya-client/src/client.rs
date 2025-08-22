@@ -392,7 +392,7 @@ impl Team<'_> {
 
     /// Finalize the team's current graph state.
     ///
-    /// See https://aranya-project.github.io/glossary#finalization
+    /// See <https://aranya-project.github.io/glossary#finalization>
     #[cfg(feature = "unstable")]
     pub async fn finalize_team(&self) -> Result<()> {
         self.client
