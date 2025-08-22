@@ -749,6 +749,12 @@ start = "2024-02-02"
 end = "2026-07-28"
 notes = "windows and related crates are provided directly from Microsoft, and are generated from Windows metadata."
 
+[[trusted.indexmap]]
+criteria = "safe-to-deploy"
+user-id = 539 # Josh Stone (cuviper)
+start = "2020-01-15"
+end = "2026-08-19"
+
 [[trusted.intrusive-collections]]
 criteria = "safe-to-deploy"
 user-id = 2915 # Amanieu d'Antras (Amanieu)

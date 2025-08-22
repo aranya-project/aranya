@@ -277,7 +277,7 @@ impl Syncer<State> {
     async fn send_sync_request<A>(
         &self,
         send: &mut SendStream,
-        syncer: &mut SyncRequester<'_, A>,
+        syncer: &mut SyncRequester<A>,
         id: GraphId,
         peer: &Addr,
     ) -> SyncResult<()>
@@ -317,7 +317,7 @@ impl Syncer<State> {
     async fn receive_sync_response<S, A>(
         &self,
         recv: &mut ReceiveStream,
-        syncer: &mut SyncRequester<'_, A>,
+        syncer: &mut SyncRequester<A>,
         id: &GraphId,
         sink: &mut S,
         peer: &Addr,
