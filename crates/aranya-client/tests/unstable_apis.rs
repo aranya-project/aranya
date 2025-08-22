@@ -19,6 +19,7 @@ async fn test_parallel_finalize() -> Result<()> {
 
     // Grab the shorthand for our address.
     let owner_addr = devices.owner.aranya_local_addr().await?;
+    let membera_addr = devices.membera.aranya_local_addr().await?;
 
     // Add the devices to the team.
     info!("adding devices to team");
@@ -34,17 +35,29 @@ async fn test_parallel_finalize() -> Result<()> {
 
     membera.sync_now(owner_addr.into(), None).await?;
 
-    owner.finalize_team().await?;
-    membera.finalize_team().await?;
+    // Ok. Sync with peer between finalize commands
+    {
+        owner.finalize_team().await?;
+        membera.sync_now(owner_addr.into(), None).await?;
 
-    let sync_result = membera.sync_now(owner_addr.into(), None).await;
+        membera.finalize_team().await?;
+        owner.sync_now(membera_addr.into(), None).await?;
+    }
 
-    match sync_result {
-        Ok(()) => bail!("Expected syncing to fail"),
-        Err(aranya_client::Error::Aranya(err)) => {
-            assert!(err.is_parallel_finalize());
+    // Not Ok.
+    {
+        owner.finalize_team().await?;
+        membera.finalize_team().await?;
+
+        let sync_result = membera.sync_now(owner_addr.into(), None).await;
+
+        match sync_result {
+            Ok(()) => bail!("Expected syncing to fail"),
+            Err(aranya_client::Error::Aranya(err)) => {
+                assert!(err.is_parallel_finalize());
+            }
+            Err(_) => bail!("Unexpected error"),
         }
-        Err(_) => bail!("Unexpected error"),
     }
 
     Ok(())
