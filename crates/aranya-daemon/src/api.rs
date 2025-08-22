@@ -291,7 +291,7 @@ impl Api {
     /// If the graph is not valid, return an error to prevent operations on the invalid graph.
     async fn check_team_valid(&self, team: api::TeamId) -> api::Result<()> {
         if self.invalid.contains(team.into_id().into()) {
-            return Err(api::Error::ParallelFinalize(team));
+            return Err(api::Error::ParallelFinalize(Some(team)));
         }
         Ok(())
     }
