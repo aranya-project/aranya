@@ -16,13 +16,15 @@ echo "Building aranya-example..."
 cargo build \
     --release \
     --manifest-path "examples/rust/Cargo.toml" \
-    --locked
+    --locked \
+    --features unstable
 
 echo "Building aranya-daemon..."
 cargo build \
     --release \
     --manifest-path Cargo.toml \
-    --bin aranya-daemon
+    --bin aranya-daemon \
+    --features unstable
 
 daemon="${current_dir}/target/release/aranya-daemon"
 example="${current_dir}/examples/rust/target/release/aranya-example"

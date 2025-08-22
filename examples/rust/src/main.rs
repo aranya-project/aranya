@@ -371,6 +371,21 @@ async fn main() -> Result<()> {
     // wait for syncing.
     sleep(sleep_interval).await;
 
+    #[cfg(feature = "unstable")]
+    {
+        // finalize operation
+    
+        // Admin tries to publish a finalize command but fails
+        match admin_team.finalize_team().await {
+            Ok(()) => bail!("expected this operation to fail"),
+            Err(Error::Aranya(_)) => {}
+            Err(err) => bail!("unexpected error: {err:?}"),
+        }
+    
+        // Owner successfully publishes a finalize command
+        assert!(owner_team.finalize_team().await.is_ok());
+    }
+
     // fact database queries
     let queries = membera_team.queries();
     let devices = queries.devices_on_team().await?;

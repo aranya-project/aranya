@@ -13,6 +13,7 @@ workspace = true
 
 [features]
 default = []
+unstable = ["aranya-daemon-api/unstable", "aranya-daemon/unstable"]
 
 # Enable debugging.
 debug = []
@@ -46,6 +47,10 @@ test-log = { workspace = true }
 [[test]]
 name = "tests"
 path = "tests/tests.rs"
+
+[[test]]
+name = "unstable_apis"
+required-features = ["unstable"]
 
 [package.metadata.cargo-all-features]
 # TODO: remove in #448

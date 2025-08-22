@@ -60,6 +60,13 @@ pub struct AranyaError {
     err: api::Error,
 }
 
+impl AranyaError {
+    /// Checks if the underlying error is a ParallelFinalize error
+    pub fn is_parallel_finalize(&self) -> bool {
+        matches!(self.err, api::Error::ParallelFinalize(_))
+    }
+}
+
 pub(crate) fn aranya_error(err: api::Error) -> Error {
     Error::Aranya(err.into())
 }
