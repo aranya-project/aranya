@@ -38,7 +38,7 @@ pub type CS = <DefaultEngine as Engine>::CS;
 /// An error returned by the API.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub enum Error {
-    ParallelFinalize(TeamId),
+    ParallelFinalize(Option<TeamId>),
     Other(String),
 }
 
@@ -80,8 +80,11 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Other(s) => s.fmt(f),
-            Self::ParallelFinalize(team) => {
+            Self::ParallelFinalize(Some(team)) => {
                 write!(f, "team {team} invalid due to graph finalization error")
+            }
+            Self::ParallelFinalize(None) => {
+                write!(f, "team invalid due to graph finalization error")
             }
         }
     }

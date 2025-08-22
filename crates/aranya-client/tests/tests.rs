@@ -458,7 +458,6 @@ async fn test_multi_team_sync() -> Result<()> {
 
 /// Tests parallel finailize commands
 #[test(tokio::test(flavor = "multi_thread"))]
-#[cfg(feature = "unstable")]
 async fn test_parallel_finalize() -> Result<()> {
     // Set up our team context so we can run the test.
     let mut devices = DevicesCtx::new("test_parallel_finalize").await?;
@@ -469,13 +468,13 @@ async fn test_parallel_finalize() -> Result<()> {
     // Grab the shorthand for our address.
     let owner_addr = devices.owner.aranya_local_addr().await?;
 
+    // Add the devices to the team.
+    info!("adding devices to team");
+    devices.add_all_device_roles(team_id).await?;
+
     // Grab the shorthand for the teams we need to operate on.
     let owner = devices.owner.client.team(team_id);
     let membera = devices.membera.client.team(team_id);
-
-    // Add the member as a new device.
-    info!("adding membera to team");
-    owner.add_device_to_team(devices.membera.pk.clone()).await?;
 
     // Assign the finalize permission to this device.
     // Note: The device that created the team has this permission by default.
@@ -490,7 +489,9 @@ async fn test_parallel_finalize() -> Result<()> {
 
     match sync_result {
         Ok(()) => bail!("Expected syncing to fail"),
-        Err(aranya_client::Error::Aranya(_)) => {}
+        Err(aranya_client::Error::Aranya(err)) => {
+            assert!(err.is_parallel_finalize());
+        }
         Err(_) => bail!("Unexpected error"),
     }
 

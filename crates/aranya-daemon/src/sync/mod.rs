@@ -32,6 +32,10 @@ mod error {
 
     impl From<SyncError> for aranya_daemon_api::Error {
         fn from(err: SyncError) -> Self {
+            if err.is_parallel_finalize() {
+                // TODO: keep error source chain
+                return Self::ParallelFinalize(None);
+            }
             Self::from_err(err)
         }
     }
