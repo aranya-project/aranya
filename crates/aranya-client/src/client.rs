@@ -390,6 +390,7 @@ impl Team<'_> {
             .map_err(aranya_error)
     }
 
+    // TODO(#468): Improve docs
     /// Finalize the team's current graph state.
     ///
     /// # Errors

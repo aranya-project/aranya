@@ -1254,6 +1254,7 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
     Ok(())
 }
 
+// TODO(#468): Improve docs
 /// Finalize the team's current graph state.
 ///
 /// This function will return an error when the device doesn't have the permission
