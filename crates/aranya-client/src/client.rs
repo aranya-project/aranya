@@ -392,6 +392,11 @@ impl Team<'_> {
 
     /// Finalize the team's current graph state.
     ///
+    /// # Errors
+    ///
+    /// This function will return an error when the device doesn't have the permission
+    /// to create a `FinalizeTeam` command.
+    ///
     /// See <https://aranya-project.github.io/glossary#finalization>
     #[cfg(feature = "unstable")]
     pub async fn finalize_team(&self) -> Result<()> {
@@ -404,6 +409,8 @@ impl Team<'_> {
     }
 
     /// Assigns the finalize permission to a device.
+    ///
+    /// Only devices with the `Owner` role can assign this permission
     #[cfg(feature = "unstable")]
     pub async fn assign_finalize_perm(&self, device: DeviceId) -> Result<()> {
         self.client

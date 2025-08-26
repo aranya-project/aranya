@@ -8,7 +8,7 @@ use crate::common::DevicesCtx;
 
 mod common;
 
-/// Tests parallel finailize commands
+/// Tests parallel finalize commands
 #[test(tokio::test(flavor = "multi_thread"))]
 async fn test_parallel_finalize() -> Result<()> {
     // Set up our team context so we can run the test.

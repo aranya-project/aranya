@@ -1256,7 +1256,10 @@ pub fn close_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 
 /// Finalize the team's current graph state.
 ///
-/// See https://aranya-project.github.io/glossary#finalization
+/// This function will return an error when the device doesn't have the permission
+/// to create a `FinalizeTeam` command.
+///
+/// See <https://aranya-project.github.io/glossary#finalization>
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] team the team's ID [`TeamId`].

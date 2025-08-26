@@ -29,6 +29,8 @@ add_compile_options(
     -Wno-gnu-zero-variadic-macro-arguments
 )
 
+add_definitions(-DENABLE_UNSTABLE_FEATURES)
+
 # Apple and Windows system linkers do not recognize these options.
 if(NOT APPLE AND NOT WIN32)
     add_link_options(
