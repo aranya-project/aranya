@@ -2114,6 +2114,35 @@ AranyaError aranya_finalize_team_ext(const struct AranyaClient *client,
                                      struct AranyaExtError *__ext_err);
 
 /**
+ * Assigns the finalize permission to a device.
+ *
+ * Only devices with the `Owner` role can assign this permission
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_assign_finalize_perm(const struct AranyaClient *client,
+                                        const struct AranyaTeamId *team,
+                                        const struct AranyaDeviceId *device);
+
+/**
+ * Assigns the finalize permission to a device.
+ *
+ * Only devices with the `Owner` role can assign this permission
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] team the team's ID [`AranyaTeamId`](@ref AranyaTeamId).
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_assign_finalize_perm_ext(const struct AranyaClient *client,
+                                            const struct AranyaTeamId *team,
+                                            const struct AranyaDeviceId *device,
+                                            struct AranyaExtError *__ext_err);
+
+/**
  * Add a device to the team with the default role.
  *
  * Permission to perform this operation is checked against the Aranya policy.

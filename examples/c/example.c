@@ -682,6 +682,11 @@ AranyaError run(Team *t) {
         
         err = aranya_finalize_team(&owner->client, &t->id);
         EXPECT("error finalizing graph state", err);
+
+        // Devices with the 'Owner' role can assign the 'finalize' permission
+        // to other devices
+        err = aranya_assign_finalize_perm(&owner->client, &t->id, &admin->id);
+        EXPECT("error assigning 'finalize' permission", err);
     #endif
 
     // Queries
