@@ -1284,11 +1284,18 @@ pub fn finalize_team(client: &Client, team: &TeamId) -> Result<(), imp::Error> {
 ///
 /// @relates AranyaClient.
 #[cfg(feature = "unstable")]
-pub fn assign_finalize_perm(client: &Client, team: &TeamId, device: &DeviceId,) -> Result<(), imp::Error> {
+pub fn assign_finalize_perm(
+    client: &Client,
+    team: &TeamId,
+    device: &DeviceId,
+) -> Result<(), imp::Error> {
     let client = client.imp();
-    client
-        .rt
-        .block_on(client.inner.team(team.into()).assign_finalize_perm(device.into()))?;
+    client.rt.block_on(
+        client
+            .inner
+            .team(team.into())
+            .assign_finalize_perm(device.into()),
+    )?;
     Ok(())
 }
 
