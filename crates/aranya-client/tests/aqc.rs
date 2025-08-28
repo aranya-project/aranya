@@ -12,20 +12,17 @@ use backon::{ConstantBuilder, Retryable as _};
 use buggy::BugExt;
 use bytes::{Bytes, BytesMut};
 use futures_util::{future::try_join, FutureExt};
-use tempfile::tempdir;
 
 use crate::common::{sleep, DevicesCtx};
 
 /// Demonstrate nominal usage of AQC channels.
+///
 /// 1. Create bidirectional and unidirectional AQC channels.
 /// 2. Send and receive data via AQC channels.
 /// 3. Delete AQC channels.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans() -> Result<()> {
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut devices = DevicesCtx::new("test_aqc_chans", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
@@ -150,13 +147,13 @@ async fn test_aqc_chans() -> Result<()> {
             .membera
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan1)
+            .delete_bidi_channel(&mut bidi_chan1)
             .await?;
         devices
             .memberb
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan2)
+            .delete_bidi_channel(&mut bidi_chan2)
             .await?;
     }
 
@@ -190,6 +187,20 @@ async fn test_aqc_chans() -> Result<()> {
 
         let bytes = recv2_1.receive().await?.assume("no data received")?;
         assert_eq!(bytes, msg1);
+
+        devices
+            .membera
+            .client
+            .aqc()
+            .delete_send_uni_channel(&mut uni_chan1)
+            .await?;
+
+        devices
+            .membera
+            .client
+            .aqc()
+            .delete_receive_uni_channel(&mut uni_chan2)
+            .await?;
     }
 
     {
@@ -245,6 +256,19 @@ async fn test_aqc_chans() -> Result<()> {
             .assume("is recv stream")?;
         let bytes = recv2_1.receive().await?.assume("no data received")?;
         assert_eq!(bytes, msg1);
+
+        devices
+            .membera
+            .client
+            .aqc()
+            .delete_bidi_channel(&mut bidi_chan1)
+            .await?;
+        devices
+            .memberb
+            .client
+            .aqc()
+            .delete_bidi_channel(&mut bidi_chan2)
+            .await?;
     }
 
     Ok(())
@@ -253,10 +277,7 @@ async fn test_aqc_chans() -> Result<()> {
 /// Demonstrate that a device cannot create an AQC channel with a label that is not assigned to it.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_sender", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_sender").await?;
     // create team.
     let team_id = devices.create_and_add_team().await?;
 
@@ -331,10 +352,7 @@ async fn test_aqc_chans_not_auth_label_sender() -> Result<()> {
 /// Demonstrate that a device cannot receive an AQC channel with a label that is not assigned to the device.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_recvr", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_not_auth_label_recvr").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
@@ -410,10 +428,7 @@ async fn test_aqc_chans_not_auth_label_recvr() -> Result<()> {
 /// Demonstrate that data cannot be received on a closed AQC QUIC stream.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_close_sender_stream() -> Result<()> {
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut devices = DevicesCtx::new("test_aqc_chans_close_sender_stream", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_close_sender_stream").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
@@ -528,13 +543,13 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
             .membera
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan1)
+            .delete_bidi_channel(&mut bidi_chan1)
             .await?;
         devices
             .memberb
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan2)
+            .delete_bidi_channel(&mut bidi_chan2)
             .await?;
     }
 
@@ -544,10 +559,7 @@ async fn test_aqc_chans_close_sender_stream() -> Result<()> {
 /// Demonstrate that data cannot be sent or received on a deleted AQC channel.
 #[test_log::test(tokio::test(flavor = "multi_thread"))]
 async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
-    let tmp = tempdir()?;
-    let work_dir = tmp.path().to_path_buf();
-
-    let mut devices = DevicesCtx::new("test_aqc_chans_delete_chan_send", work_dir).await?;
+    let mut devices = DevicesCtx::new("test_aqc_chans_delete_chan_send").await?;
 
     // create team.
     let team_id = devices.create_and_add_team().await?;
@@ -654,13 +666,13 @@ async fn test_aqc_chans_delete_chan_send_recv() -> Result<()> {
             .membera
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan1)
+            .delete_bidi_channel(&mut bidi_chan1)
             .await?;
         devices
             .memberb
             .client
             .aqc()
-            .delete_bidi_channel(bidi_chan2)
+            .delete_bidi_channel(&mut bidi_chan2)
             .await?;
 
         // wait for ctrl message to be sent.

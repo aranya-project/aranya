@@ -248,6 +248,34 @@ typedef uint8_t AranyaRole;
 #endif // __cplusplus
 
 /**
+ * * ─────────────────────── Extended‐error (_ext) Variants ───────────────────────
+ * *
+ * * Functions suffixed with `_ext` accept an extra
+ * * `struct AranyaExtError *ext_err` parameter for extended error information.
+ * *
+ * * - `ext_err` must be a valid, non-NULL pointer.
+ * * - If the call returns anything other than `ARANYA_ERROR_SUCCESS`,
+ * *   `*ext_err` is populated with additional error details.
+ * * - On success, the content of `ext_err` is unchanged.
+ * * - To extract a human-readable message:
+ * *
+ * *       AranyaError aranya_ext_error_msg(
+ * *           const struct AranyaExtError *err,
+ * *           char *msg,
+ * *           size_t *msg_len
+ * *       );
+ * *
+ * * Example:
+ * *     struct AranyaExtError ext_err;
+ * *     AranyaError rc = aranya_get_device_id_ext(client, &id, &ext_err);
+ * *     if (rc != ARANYA_ERROR_SUCCESS) {
+ * *         size_t len = 0;
+ * *         aranya_ext_error_msg(&ext_err, NULL, &len);
+ * *         char *buf = malloc(len);
+ * *         aranya_ext_error_msg(&ext_err, buf, &len);
+ * *         // `buf` now holds the detailed error message
+ * *     }
+ * * ──────────────────────────────────────────────────────────────────────────────
  * Extended error information.
  */
 typedef struct ARANYA_ALIGNED(8) AranyaExtError {
@@ -531,7 +559,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcPeerChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[120];
+    uint8_t __for_size_only[168];
 } AranyaAqcPeerChannel;
 
 /**
@@ -543,7 +571,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[112];
+    uint8_t __for_size_only[160];
 } AranyaAqcBidiChannel;
 
 /**
@@ -555,7 +583,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcSendChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[112];
+    uint8_t __for_size_only[160];
 } AranyaAqcSendChannel;
 
 /**
@@ -567,7 +595,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveChannel {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[112];
+    uint8_t __for_size_only[160];
 } AranyaAqcReceiveChannel;
 
 /**
@@ -579,7 +607,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcBidiStream {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[184];
+    uint8_t __for_size_only[208];
 } AranyaAqcBidiStream;
 
 /**
@@ -591,7 +619,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcSendStream {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[152];
+    uint8_t __for_size_only[176];
 } AranyaAqcSendStream;
 
 /**
@@ -603,7 +631,7 @@ typedef struct ARANYA_ALIGNED(8) AranyaAqcReceiveStream {
      * UNDEFINED BEHAVIOR to read from or write to it.
      * @private
      */
-    uint8_t __for_size_only[184];
+    uint8_t __for_size_only[208];
 } AranyaAqcReceiveStream;
 
 #ifdef __cplusplus
@@ -2812,8 +2840,8 @@ AranyaError aranya_aqc_create_uni_channel_ext(const struct AranyaClient *client,
 
 /**
  * Delete a bidirectional AQC channel.
- *
- * Note that this function takes ownership of the [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) and invalidates any further use.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
@@ -2825,8 +2853,8 @@ AranyaError aranya_aqc_delete_bidi_channel(const struct AranyaClient *client,
 
 /**
  * Delete a bidirectional AQC channel.
- *
- * Note that this function takes ownership of the [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) and invalidates any further use.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcBidiChannel`](@ref AranyaAqcBidiChannel) to delete.
@@ -2838,31 +2866,58 @@ AranyaError aranya_aqc_delete_bidi_channel_ext(const struct AranyaClient *client
                                                struct AranyaExtError *__ext_err);
 
 /**
- * Delete a unidirectional AQC channel.
- *
- * Note that this function takes ownership of the [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) and invalidates any further use.
+ * Delete a send unidirectional AQC channel.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) to delete.
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_uni_channel(const struct AranyaClient *client,
-                                          struct AranyaAqcSendChannel *channel);
+AranyaError aranya_aqc_delete_send_uni_channel(const struct AranyaClient *client,
+                                               struct AranyaAqcSendChannel *channel);
 
 /**
- * Delete a unidirectional AQC channel.
- *
- * Note that this function takes ownership of the [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) and invalidates any further use.
+ * Delete a send unidirectional AQC channel.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
  *
  * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
  * @param[in] channel the AQC Channel [`AranyaAqcSendChannel`](@ref AranyaAqcSendChannel) to delete.
  *
  * @relates AranyaClient.
  */
-AranyaError aranya_aqc_delete_uni_channel_ext(const struct AranyaClient *client,
-                                              struct AranyaAqcSendChannel *channel,
-                                              struct AranyaExtError *__ext_err);
+AranyaError aranya_aqc_delete_send_uni_channel_ext(const struct AranyaClient *client,
+                                                   struct AranyaAqcSendChannel *channel,
+                                                   struct AranyaExtError *__ext_err);
+
+/**
+ * Delete a receive unidirectional AQC channel.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] channel the AQC Channel [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_delete_receive_uni_channel(const struct AranyaClient *client,
+                                                  struct AranyaAqcReceiveChannel *channel);
+
+/**
+ * Delete a receive unidirectional AQC channel.
+ * Zeroizes PSKs associated with the channel.
+ * Closes all associated QUIC connections and streams.
+ *
+ * @param[in] client the Aranya Client [`AranyaClient`](@ref AranyaClient).
+ * @param[in] channel the AQC Channel [`AranyaAqcReceiveChannel`](@ref AranyaAqcReceiveChannel) to delete.
+ *
+ * @relates AranyaClient.
+ */
+AranyaError aranya_aqc_delete_receive_uni_channel_ext(const struct AranyaClient *client,
+                                                      struct AranyaAqcReceiveChannel *channel,
+                                                      struct AranyaExtError *__ext_err);
 
 /**
  * Tries to poll AQC to see if any channels have been received.

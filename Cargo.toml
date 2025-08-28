@@ -7,7 +7,7 @@ members = [
 
 
 [workspace.package]
-version = "1.0.0"
+version = "2.0.0"
 authors = ["SpiderOak, Inc."]
 edition = "2021"
 license = "AGPL-3.0-only"
@@ -35,30 +35,30 @@ unwrap_used = "warn"
 wildcard_imports = "warn"
 
 [workspace.dependencies]
-aranya-aqc-util = { version = "0.6.0", features = ["alloc"] }
-aranya-capi-core = { version = "0.4.2" }
-aranya-capi-codegen = { version = "0.3.2" }
-aranya-crypto = { version = "0.8.0", features = ["alloc", "aqc", "fs-keystore", "clone-aead", "std", "tls"] }
-aranya-crypto-ffi = { version = "0.11.0" }
-aranya-device-ffi = { version = "0.11.0" }
-aranya-envelope-ffi = { version = "0.11.0" }
-aranya-idam-ffi = { version = "0.11.0" }
-aranya-perspective-ffi = { version = "0.11.0" }
-aranya-policy-compiler = { version = "0.11.0" }
-aranya-policy-ifgen = { version = "0.11.0", features = ["serde"] }
-aranya-policy-ifgen-build = { version = "0.5.0" }
-aranya-policy-lang = { version = "0.6.0" }
-aranya-policy-text = { version = "0.1.1" }
-aranya-policy-vm = { version = "0.11.0", features = ["std"] }
-aranya-runtime = { version = "0.11.0", features = ["std", "libc"] }
+aranya-aqc-util = { version = "0.7.0", features = ["alloc"] }
+aranya-capi-core = { version = "0.4.4" }
+aranya-capi-codegen = { version = "0.3.3" }
+aranya-crypto = { version = "0.9.0", features = ["alloc", "aqc", "fs-keystore", "clone-aead", "std", "tls"] }
+aranya-crypto-ffi = { version = "0.12.0" }
+aranya-device-ffi = { version = "0.12.0" }
+aranya-envelope-ffi = { version = "0.12.0" }
+aranya-idam-ffi = { version = "0.12.0" }
+aranya-perspective-ffi = { version = "0.12.0" }
+aranya-policy-compiler = { version = "0.12.0" }
+aranya-policy-ifgen = { version = "0.12.0", features = ["serde"] }
+aranya-policy-ifgen-build = { version = "0.6.0" }
+aranya-policy-lang = { version = "0.7.0" }
+aranya-policy-text = { version = "0.1.2" }
+aranya-policy-vm = { version = "0.12.0", features = ["std"] }
+aranya-runtime = { version = "0.12.0", features = ["std", "libc"] }
 
 buggy = { version = "0.1.0" }
 
-aranya-client = { version = "1.0.0", path = "crates/aranya-client" }
-aranya-daemon = { version = "1.0.0", path = "crates/aranya-daemon" }
-aranya-daemon-api = { version = "1.0.0", path = "crates/aranya-daemon-api" }
-aranya-keygen = { version = "1.0.0", path = "crates/aranya-keygen" }
-aranya-util = { version = "1.0.0", path = "crates/aranya-util" }
+aranya-client = { version = "2.0.0", path = "crates/aranya-client" }
+aranya-daemon = { version = "2.0.0", path = "crates/aranya-daemon" }
+aranya-daemon-api = { version = "2.0.0", path = "crates/aranya-daemon-api" }
+aranya-keygen = { version = "2.0.0", path = "crates/aranya-keygen" }
+aranya-util = { version = "2.0.0", path = "crates/aranya-util" }
 
 anyhow = { version = "1.0.86" }
 backon = { version = "1.2.0" }
@@ -66,21 +66,28 @@ bytes = { version = "1.0" }
 ciborium = { version = "0.2" }
 clap = { version = "4", features = ["derive"] }
 derive-where = { version = "1" }
+divan = { version = "0.1", default-features = false }
 futures-lite = { version = "2.6.0" }
 futures-util = { version = "0.3.30" }
 heapless = { version = "0.8", default-features = false }
+http = { version = "1" }
+libc = { version = "0.2" }
+metrics = { version = "0.24" }
+metrics-util = { version = "0.20" }
 postcard = { version = "1", default-features = false, features = ["use-std", "heapless", "experimental-derive"] }
 pretty_assertions = { version = "1.4" }
-s2n-quic = { version = "1.58.0-psk.1", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"], package = "aranya-internal-s2n-quic" }
+s2n-quic = { version = "1.58.0-psk.2", default-features = false, features = ["provider-address-token-default", "provider-tls-rustls"], package = "aranya-internal-s2n-quic" }
 semver = { version = "1", features = ["serde"] }
 serde = "1"
 serial_test = { version = "3" }
+sysinfo = { version = "0.36" }
 tarpc = { version = "0.35.0", features = ["unix", "serde-transport", "serde-transport-json"] }
 tempfile = { version = "3.6.0" }
 test-log = { version = "0.2.14", default-features = false, features = ["trace"] }
 thiserror = { version = "2.0" }
 tokio = { version = "1.44" }
 tokio-util = { version = "0.7.12" }
+toml = { version = "0.9", default-features = false, features = ["std", "serde", "parse"] }
 tracing = { version = "0.1.40" }
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
@@ -88,10 +95,10 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 opt-level = 1
 
 [profile.release]
-lto = true
 opt-level = "z"
 strip = true
-
+lto = true
+panic = "abort"
 
 [workspace.metadata.release]
 allow-branch = ["main"]

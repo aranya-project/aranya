@@ -46,8 +46,9 @@ use crate::{
 
 mod quic_sync;
 
-/// returns first effect matching a particular type.
-/// returns None if there are no matching effects.
+/// Find the first effect matching a given pattern.
+///
+/// Returns `None` if there are no matching effects.
 #[macro_export]
 macro_rules! find_effect {
     ($effects:expr, $pattern:pat $(if $guard:expr)? $(,)?) => {
@@ -650,7 +651,7 @@ impl DaemonApi for Api {
             };
             let enc_sk: EncryptionKey<CS> = crypto
                 .aranya_store
-                .get_key(&mut crypto.engine, enc_pk.id()?.into())
+                .get_key(&mut crypto.engine, enc_pk.id()?)
                 .context("keystore error")?
                 .context("missing enc_sk for encrypt seed")?;
             (seed, enc_sk)

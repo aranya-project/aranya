@@ -1,5 +1,6 @@
 use std::{
     collections::{hash_map::Entry, HashMap},
+    mem,
     sync::{Arc, LazyLock, Mutex},
 };
 
@@ -11,7 +12,6 @@ use s2n_quic::provider::tls::rustls::rustls::{
     crypto::{hash::HashAlgorithm, PresharedKey},
     server::SelectsPresharedKeys,
 };
-use tokio::sync::mpsc;
 use tracing::error;
 
 // Define constant PSK identity and bytes
@@ -29,57 +29,69 @@ pub(super) static CTRL_PSK: LazyLock<Arc<PresharedKey>> = LazyLock::new(|| {
 
 #[derive(Debug)]
 pub(crate) struct ServerPresharedKeys {
-    keys: Mutex<HashMap<Vec<u8>, Arc<PresharedKey>>>,
-    // Optional sender to report the selected identity
-    identity_sender: mpsc::Sender<Vec<u8>>,
+    keys: Mutex<HashMap<PskIdAsKey, Arc<[Arc<PresharedKey>]>>>,
 }
 
 impl ServerPresharedKeys {
-    pub fn new() -> (Self, mpsc::Receiver<Vec<u8>>) {
-        // Create the mpsc channel for PSK identities
-        let (identity_tx, identity_rx) = mpsc::channel::<Vec<u8>>(1);
-
-        (
-            Self {
-                keys: Mutex::default(),
-                identity_sender: identity_tx,
-            },
-            identity_rx,
-        )
+    pub fn new() -> Self {
+        Self {
+            keys: Mutex::default(),
+        }
     }
 
+    /// Insert PSK into server key store.
     pub fn insert(&self, psk: Arc<PresharedKey>) {
-        let identity = psk.identity().to_vec();
-        match self.keys.lock().expect("poisoned").entry(identity.clone()) {
+        let mut keys = self.keys.lock().expect("poisoned");
+        match keys.entry(PskIdAsKey(psk)) {
             Entry::Vacant(v) => {
-                v.insert(psk);
+                v.insert(Arc::default());
             }
-            Entry::Occupied(_) => {
+            Entry::Occupied(v) => {
+                let identity = v.key().0.identity();
                 error!("Duplicate PSK identity inserted: {:?}", identity);
             }
         }
     }
 
+    /// Load AQC channel PSKs into server key store.
     pub fn load_psks(&self, psks: AqcPsks) {
         let mut keys = self.keys.lock().expect("poisoned");
-        for (suite, psk) in psks {
-            let identity = psk.identity().as_bytes().to_vec();
-            let key = make_preshared_key(suite, psk).expect("can make psk");
-            keys.insert(identity, key);
-        }
+
+        let psks: Arc<[_]> = psks
+            .into_iter()
+            .map(|(suite, psk)| make_preshared_key(suite, psk).expect("can make psk"))
+            .collect();
+        psks.iter().for_each(|psk| {
+            keys.insert(PskIdAsKey(psk.clone()), psks.clone());
+        });
     }
 }
 
 impl SelectsPresharedKeys for ServerPresharedKeys {
     fn load_psk(&self, identity: &[u8]) -> Option<Arc<PresharedKey>> {
-        self.keys.lock().expect("poisoned").get(identity).cloned()
+        Some(
+            self.keys
+                .lock()
+                .expect("poisoned")
+                .get_key_value(identity)?
+                .0
+                 .0
+                .clone(),
+        )
     }
 
     fn chosen(&self, identity: &[u8]) {
-        // Use try_send for non-blocking behavior.
-        self.identity_sender
-            .try_send(identity.to_vec())
-            .expect("Failed to send identity");
+        // Don't remove ctrl PSK.
+        if identity == CTRL_PSK.identity() {
+            return;
+        }
+
+        let mut keys = self.keys.lock().expect("poisoned");
+        if let Some(psks) = keys.remove(identity) {
+            for psk in psks.iter() {
+                keys.remove(psk.identity());
+            }
+        }
     }
 }
 
@@ -113,7 +125,7 @@ impl ClientPresharedKeys {
 
 impl PresharedKeyStore for ClientPresharedKeys {
     fn psks(&self, _server_name: &rustls::pki_types::ServerName<'_>) -> Vec<Arc<PresharedKey>> {
-        self.keys.lock().expect("Client PSK mutex poisoned").clone()
+        mem::take(&mut self.keys.lock().expect("poisoned"))
     }
 }
 
@@ -132,4 +144,23 @@ fn suite_hash(suite: CipherSuiteId) -> Option<HashAlgorithm> {
         CipherSuiteId::TlsAes128Ccm8Sha256 => HashAlgorithm::SHA256,
         _ => return None,
     })
+}
+
+#[derive(Debug)]
+struct PskIdAsKey(Arc<PresharedKey>);
+impl core::hash::Hash for PskIdAsKey {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.0.identity().hash(state);
+    }
+}
+impl core::borrow::Borrow<[u8]> for PskIdAsKey {
+    fn borrow(&self) -> &[u8] {
+        self.0.identity()
+    }
+}
+impl Eq for PskIdAsKey {}
+impl PartialEq for PskIdAsKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.identity() == other.0.identity()
+    }
 }

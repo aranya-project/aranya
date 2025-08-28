@@ -166,8 +166,7 @@ impl Daemon {
             let seed_id_dir = SeedDir::new(cfg.seed_id_path().to_path_buf()).await?;
             let initial_keys =
                 load_team_psk_pairs(&mut eng, &mut local_store, &seed_id_dir).await?;
-            let (psk_store, active_team_rx) = PskStore::new(initial_keys);
-            let psk_store = Arc::new(psk_store);
+            let psk_store = Arc::new(PskStore::new(initial_keys));
 
             let invalid_graphs = InvalidGraphs::default();
 
@@ -186,7 +185,6 @@ impl Daemon {
                     psk_store: Arc::clone(&psk_store),
                     caches: caches.clone(),
                     server_addr: qs_config.addr,
-                    active_team_rx,
                 },
                 invalid_graphs.clone(),
             )
@@ -333,7 +331,6 @@ impl Daemon {
         pk: &PublicKeys<CS>,
         SyncParams {
             psk_store,
-            active_team_rx,
             caches,
             server_addr,
         }: SyncParams,
@@ -380,7 +377,6 @@ impl Daemon {
             psk_store,
             conns,
             conn_rx,
-            active_team_rx,
             caches,
             peers.clone(),
             hello_subscriptions,

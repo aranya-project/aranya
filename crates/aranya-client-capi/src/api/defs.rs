@@ -11,7 +11,7 @@ use aranya_client::aqc::{self, AqcPeerStream};
 use aranya_daemon_api::Text;
 use aranya_util::error::ReportExt as _;
 use bytes::Bytes;
-use tracing::error;
+use tracing::{debug, error};
 
 use crate::imp::{self, aqc::consume_bytes};
 
@@ -85,7 +85,7 @@ pub enum Error {
 
 impl From<&imp::Error> for Error {
     fn from(err: &imp::Error) -> Self {
-        error!(error = %err.report(), "Aranya client C API error");
+        debug!(error = %err.report(), "Aranya client C API error");
         match err {
             imp::Error::Bug(_) => Self::Bug,
             imp::Error::Timeout(_) => Self::Timeout,
@@ -141,7 +141,36 @@ pub fn error_to_str(err: u32) -> *const c_char {
     }
 }
 
+/// * ─────────────────────── Extended‐error (_ext) Variants ───────────────────────
+/// *
+/// * Functions suffixed with `_ext` accept an extra
+/// * `struct AranyaExtError *ext_err` parameter for extended error information.
+/// *
+/// * - `ext_err` must be a valid, non-NULL pointer.
+/// * - If the call returns anything other than `ARANYA_ERROR_SUCCESS`,
+/// *   `*ext_err` is populated with additional error details.
+/// * - On success, the content of `ext_err` is unchanged.
+/// * - To extract a human-readable message:
+/// *
+/// *       AranyaError aranya_ext_error_msg(
+/// *           const struct AranyaExtError *err,
+/// *           char *msg,
+/// *           size_t *msg_len
+/// *       );
+/// *
+/// * Example:
+/// *     struct AranyaExtError ext_err;
+/// *     AranyaError rc = aranya_get_device_id_ext(client, &id, &ext_err);
+/// *     if (rc != ARANYA_ERROR_SUCCESS) {
+/// *         size_t len = 0;
+/// *         aranya_ext_error_msg(&ext_err, NULL, &len);
+/// *         char *buf = malloc(len);
+/// *         aranya_ext_error_msg(&ext_err, buf, &len);
+/// *         // `buf` now holds the detailed error message
+/// *     }
+/// * ──────────────────────────────────────────────────────────────────────────────
 /// Extended error information.
+#[allow(rustdoc::invalid_rust_codeblocks)]
 #[aranya_capi_core::derive(Init, Cleanup)]
 #[aranya_capi_core::opaque(size = 88, align = 8)]
 pub type ExtError = Safe<imp::ExtError>;
@@ -1673,7 +1702,7 @@ pub unsafe fn aqc_remove_net_identifier(
 /// `try_receive_channel`, and is invalidated after calling
 /// `get_bidi_channel`/`get_receive_channel`.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 120, align = 8)]
+#[aranya_capi_core::opaque(size = 168, align = 8)]
 pub type AqcPeerChannel = Safe<imp::AqcPeerChannel>;
 
 /// An enum containing all [`AqcPeerChannel`] variants.
@@ -1686,32 +1715,32 @@ pub enum AqcChannelType {
 
 /// An AQC Bidirectional Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 112, align = 8)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AqcBidiChannel = Safe<imp::AqcBidiChannel>;
 
 /// An AQC Sender Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 112, align = 8)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AqcSendChannel = Safe<imp::AqcSendChannel>;
 
 /// An AQC Receiver Channel Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 112, align = 8)]
+#[aranya_capi_core::opaque(size = 160, align = 8)]
 pub type AqcReceiveChannel = Safe<imp::AqcReceiveChannel>;
 
 /// An AQC Bidirectional Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 184, align = 8)]
+#[aranya_capi_core::opaque(size = 208, align = 8)]
 pub type AqcBidiStream = Safe<imp::AqcBidiStream>;
 
 /// An AQC Sender Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 152, align = 8)]
+#[aranya_capi_core::opaque(size = 176, align = 8)]
 pub type AqcSendStream = Safe<imp::AqcSendStream>;
 
 /// An AQC Receiver Stream Object.
 #[aranya_capi_core::derive(Cleanup)]
-#[aranya_capi_core::opaque(size = 184, align = 8)]
+#[aranya_capi_core::opaque(size = 208, align = 8)]
 pub type AqcReceiveStream = Safe<imp::AqcReceiveStream>;
 
 /// Create a bidirectional AQC channel between this device and a peer.
@@ -1779,8 +1808,8 @@ pub unsafe fn aqc_create_uni_channel(
 }
 
 /// Delete a bidirectional AQC channel.
-///
-/// Note that this function takes ownership of the [`AqcBidiChannel`] and invalidates any further use.
+/// Zeroizes PSKs associated with the channel.
+/// Closes all associated QUIC connections and streams.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] channel the AQC Channel [`AqcBidiChannel`] to delete.
@@ -1788,37 +1817,56 @@ pub unsafe fn aqc_create_uni_channel(
 /// @relates AranyaClient.
 pub fn aqc_delete_bidi_channel(
     client: &Client,
-    channel: OwnedPtr<AqcBidiChannel>,
+    channel: &mut AqcBidiChannel,
 ) -> Result<(), imp::Error> {
-    // SAFETY: the user is responsible for passing in a valid AqcBidiChannel pointer.
-    let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
-
     let client = client.imp();
     client
         .rt
-        .block_on(client.inner.aqc().delete_bidi_channel(channel))?;
+        .block_on(client.inner.aqc().delete_bidi_channel(&mut channel.inner))?;
     Ok(())
 }
 
-/// Delete a unidirectional AQC channel.
-///
-/// Note that this function takes ownership of the [`AqcSendChannel`] and invalidates any further use.
+/// Delete a send unidirectional AQC channel.
+/// Zeroizes PSKs associated with the channel.
+/// Closes all associated QUIC connections and streams.
 ///
 /// @param[in] client the Aranya Client [`Client`].
 /// @param[in] channel the AQC Channel [`AqcSendChannel`] to delete.
 ///
 /// @relates AranyaClient.
-pub fn aqc_delete_uni_channel(
+pub fn aqc_delete_send_uni_channel(
     client: &Client,
-    channel: OwnedPtr<AqcSendChannel>,
+    channel: &mut AqcSendChannel,
 ) -> Result<(), imp::Error> {
-    // SAFETY: the user is responsible for passing in a valid AqcSendChannel pointer.
-    let channel = unsafe { Opaque::into_inner(channel.read()).into_inner().inner };
-
     let client = client.imp();
-    client
-        .rt
-        .block_on(client.inner.aqc().delete_uni_channel(channel))?;
+    client.rt.block_on(
+        client
+            .inner
+            .aqc()
+            .delete_send_uni_channel(&mut channel.inner),
+    )?;
+    Ok(())
+}
+
+/// Delete a receive unidirectional AQC channel.
+/// Zeroizes PSKs associated with the channel.
+/// Closes all associated QUIC connections and streams.
+///
+/// @param[in] client the Aranya Client [`Client`].
+/// @param[in] channel the AQC Channel [`AqcReceiveChannel`] to delete.
+///
+/// @relates AranyaClient.
+pub fn aqc_delete_receive_uni_channel(
+    client: &Client,
+    channel: &mut AqcReceiveChannel,
+) -> Result<(), imp::Error> {
+    let client = client.imp();
+    client.rt.block_on(
+        client
+            .inner
+            .aqc()
+            .delete_receive_uni_channel(&mut channel.inner),
+    )?;
     Ok(())
 }
 
